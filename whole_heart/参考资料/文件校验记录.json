@@ -1,0 +1,85 @@
+[
+  {
+    "file": "01_任务规则\\CARE2026_WholeHeart_官方规则.html",
+    "check": "File present; content signature and SHA256 verified"
+  },
+  {
+    "file": "01_任务规则\\CARE2026_总览与时间表.html",
+    "check": "File present; content signature and SHA256 verified"
+  },
+  {
+    "file": "02_医学影像基础\\SimpleITK_空间信息基础.html",
+    "check": "File present; content signature and SHA256 verified"
+  },
+  {
+    "file": "03_nnUNet_自动化基线\\01_数据准备.md",
+    "check": "File present; content signature and SHA256 verified"
+  },
+  {
+    "file": "03_nnUNet_自动化基线\\02_数据格式.md",
+    "check": "File present; content signature and SHA256 verified"
+  },
+  {
+    "file": "03_nnUNet_自动化基线\\03_规划与预处理.md",
+    "check": "File present; content signature and SHA256 verified"
+  },
+  {
+    "file": "03_nnUNet_自动化基线\\04_强度归一化.md",
+    "check": "File present; content signature and SHA256 verified"
+  },
+  {
+    "file": "03_nnUNet_自动化基线\\05_完整训练预测流程.md",
+    "check": "File present; content signature and SHA256 verified"
+  },
+  {
+    "file": "03_nnUNet_自动化基线\\nnUNet_作者预印本_1904.08128.pdf",
+    "check": "PDF opens; first page text extracted; SHA256 matches",
+    "pages": 55
+  },
+  {
+    "file": "04_MONAI_逐步实操\\MONAI_官方学习入口.html",
+    "check": "File present; content signature and SHA256 verified"
+  },
+  {
+    "file": "04_MONAI_逐步实操\\MONAI_三维脾脏分割教程.ipynb",
+    "check": "Valid Notebook JSON; code not executed",
+    "cells": 37
+  },
+  {
+    "file": "04_MONAI_逐步实操\\MONAI_三维图像变换教程.ipynb",
+    "check": "Valid Notebook JSON; code not executed",
+    "cells": 44
+  },
+  {
+    "file": "05_实验设计与报告\\CLAIM2024_原文PDF.pdf",
+    "check": "PDF opens; first page text extracted; SHA256 matches",
+    "pages": 8
+  },
+  {
+    "file": "06_评价指标\\MetricsReloaded_作者预印本_2206.01653.pdf",
+    "check": "PDF opens; first page text extracted; SHA256 matches",
+    "pages": 209
+  },
+  {
+    "file": "07_IBSI_影像组学特征\\IBSI_参考手册_1612.07003.pdf",
+    "check": "PDF opens; first page text extracted; SHA256 matches",
+    "pages": 178
+  },
+  {
+    "file": "07_IBSI_影像组学特征\\IBSI_官方文档目录.html",
+    "check": "File present; content signature and SHA256 verified"
+  },
+  {
+    "file": "07_IBSI_影像组学特征\\IBSI_影像处理流程.html",
+    "check": "File present; content signature and SHA256 verified"
+  },
+  {
+    "file": "07_IBSI_影像组学特征\\IBSI_特征定义.html",
+    "check": "File present; content signature and SHA256 verified"
+  },
+  {
+    "file": "08_CARE_方法论文\\CARE2026_跨中心全心脏分割_2608.25109.pdf",
+    "check": "PDF opens; first page text extracted; SHA256 matches",
+    "pages": 12
+  }
+]

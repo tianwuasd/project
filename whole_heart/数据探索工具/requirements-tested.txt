@@ -1,0 +1,4 @@
+# 本次验证环境：Windows，Python 3.14.3。不是所有旧版 Python 均兼容以下精确版本。
+numpy==2.4.2
+nibabel==5.4.2
+matplotlib==3.10.8

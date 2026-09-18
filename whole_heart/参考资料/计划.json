@@ -1,0 +1,233 @@
+[
+  {
+    "folder": "01_任务规则",
+    "stem": "CARE2026_WholeHeart_官方规则",
+    "url": "https://zmic.org.cn/care_2026/track_wholeheart/",
+    "kind": "html",
+    "description": "CARE 全心脏分割任务的官方定义与约束。",
+    "focus": "七类标签；训练验证测试划分；血管评价范围；DSC 和 HD。",
+    "caution": "以对应届次规则和官方评估实现为准；没有定义标签 421。",
+    "priority": "必读",
+    "source": "https://zmic.org.cn/care_2026/track_wholeheart/"
+  },
+  {
+    "folder": "01_任务规则",
+    "stem": "CARE2026_总览与时间表",
+    "url": "https://zmic.org.cn/care_2026/",
+    "kind": "html",
+    "description": "比赛总览、时间表、论文列表与联系入口。",
+    "focus": "与具体赛道页面交叉核对时间和提交要求。",
+    "caution": "总览与赛道正文的历史日期可能未同步，应记录差异并核实。",
+    "priority": "参考",
+    "source": "https://zmic.org.cn/care_2026/"
+  },
+  {
+    "folder": "02_医学影像基础",
+    "stem": "SimpleITK_空间信息基础",
+    "url": "https://simpleitk.readthedocs.io/en/master/fundamentalConcepts.html",
+    "kind": "html",
+    "description": "解释医学影像作为物理空间对象的基本概念。",
+    "focus": "Size、Spacing、Origin、Direction；体素索引和物理坐标的区别。",
+    "caution": "数组尺寸相同不代表物理空间一致；头信息异常不能仅凭复制元数据修复。",
+    "priority": "必读",
+    "source": "https://simpleitk.readthedocs.io/en/master/fundamentalConcepts.html"
+  },
+  {
+    "folder": "03_nnUNet_自动化基线",
+    "stem": "01_数据准备",
+    "url": "https://raw.githubusercontent.com/MIC-DKFZ/nnUNet/master/documentation/how-to/prepare-a-dataset.md",
+    "kind": "md",
+    "description": "整理 nnU-Net 数据目录和配对关系。",
+    "focus": "imagesTr、labelsTr、dataset.json。",
+    "caution": "保留原始数据，另建转换后的数据目录。",
+    "priority": "必读",
+    "source": "https://github.com/MIC-DKFZ/nnUNet/blob/master/documentation/how-to/prepare-a-dataset.md"
+  },
+  {
+    "folder": "03_nnUNet_自动化基线",
+    "stem": "02_数据格式",
+    "url": "https://raw.githubusercontent.com/MIC-DKFZ/nnUNet/master/documentation/dataset_format.md",
+    "kind": "md",
+    "description": "描述 nnU-Net 的输入格式和标签约定。",
+    "focus": "病例命名、通道、连续标签编号与背景。",
+    "caution": "CT 与 MRI 来自不同病例时，不要当作同一个人的两个配准输入通道。",
+    "priority": "必读",
+    "source": "https://github.com/MIC-DKFZ/nnUNet/blob/master/documentation/dataset_format.md"
+  },
+  {
+    "folder": "03_nnUNet_自动化基线",
+    "stem": "03_规划与预处理",
+    "url": "https://raw.githubusercontent.com/MIC-DKFZ/nnUNet/master/documentation/how-to/plan-and-preprocess.md",
+    "kind": "md",
+    "description": "从数据统计出发规划模型和预处理。",
+    "focus": "数据完整性检查、数据指纹、计划文件。",
+    "caution": "完整性检查不能替代对标签含义及空间对齐的人工核验。",
+    "priority": "必读",
+    "source": "https://github.com/MIC-DKFZ/nnUNet/blob/master/documentation/how-to/plan-and-preprocess.md"
+  },
+  {
+    "folder": "03_nnUNet_自动化基线",
+    "stem": "04_强度归一化",
+    "url": "https://raw.githubusercontent.com/MIC-DKFZ/nnUNet/master/documentation/explanation_normalization.md",
+    "kind": "md",
+    "description": "解释 CT 和其他模态的默认归一化策略。",
+    "focus": "CT 前景强度统计、百分位截断；逐例 Z-score。",
+    "caution": "这是 nnU-Net 的策略，不是所有数据通用的强制参数。",
+    "priority": "必读",
+    "source": "https://github.com/MIC-DKFZ/nnUNet/blob/master/documentation/explanation_normalization.md"
+  },
+  {
+    "folder": "03_nnUNet_自动化基线",
+    "stem": "05_完整训练预测流程",
+    "url": "https://raw.githubusercontent.com/MIC-DKFZ/nnUNet/master/documentation/how_to_use_nnunet.md",
+    "kind": "md",
+    "description": "串联预处理、训练、交叉验证、预测和后处理。",
+    "focus": "首先跑通一个基线；区分训练日志指标和完整病例评价。",
+    "caution": "模型选择使用开发数据；测试集不能参与调参。",
+    "priority": "必读",
+    "source": "https://github.com/MIC-DKFZ/nnUNet/blob/master/documentation/how_to_use_nnunet.md"
+  },
+  {
+    "folder": "03_nnUNet_自动化基线",
+    "stem": "nnUNet_作者预印本_1904.08128",
+    "url": "https://arxiv.org/pdf/1904.08128",
+    "kind": "pdf",
+    "description": "nnU-Net 自动化方法设计的作者预印本，用于理解整个流程。",
+    "focus": "数据集特征如何影响预处理、网络、训练和后处理选择。",
+    "caution": "这是 arXiv 预印本，不是 Nature Methods 出版社排版版本；正式发表 DOI 为 10.1038/s41592-020-01008-z。",
+    "priority": "进阶",
+    "source": "https://arxiv.org/abs/1904.08128"
+  },
+  {
+    "folder": "04_MONAI_逐步实操",
+    "stem": "MONAI_官方学习入口",
+    "url": "https://project-monai.github.io/tutorials.html",
+    "kind": "html",
+    "description": "MONAI 官方教程入口。",
+    "focus": "Getting Started、Spleen 3D Segmentation、Transforms and Datasets。",
+    "caution": "网页入口中的交互功能和外链需要联网。",
+    "priority": "参考",
+    "source": "https://project-monai.github.io/tutorials.html"
+  },
+  {
+    "folder": "04_MONAI_逐步实操",
+    "stem": "MONAI_三维脾脏分割教程",
+    "url": "https://raw.githubusercontent.com/Project-MONAI/tutorials/main/3d_segmentation/spleen_segmentation_3d.ipynb",
+    "kind": "ipynb",
+    "description": "端到端三维分割 Notebook，可借此学习处理链。",
+    "focus": "读取影像、方向与间距变换、裁剪、增强、训练和滑窗预测。",
+    "caution": "教程是脾脏二分类；心脏是七类前景。不能照搬脾脏强度窗口、类别数和训练路径。文件仅下载，不执行。",
+    "priority": "必读",
+    "source": "https://github.com/Project-MONAI/tutorials/blob/main/3d_segmentation/spleen_segmentation_3d.ipynb"
+  },
+  {
+    "folder": "04_MONAI_逐步实操",
+    "stem": "MONAI_三维图像变换教程",
+    "url": "https://raw.githubusercontent.com/Project-MONAI/tutorials/main/modules/3d_image_transforms.ipynb",
+    "kind": "ipynb",
+    "description": "展示三维医学影像的变换操作。",
+    "focus": "对照原图理解变换，注意影像和标签同步变换。",
+    "caution": "代码和外部数据依赖需要另行配置；仅下载，不执行。",
+    "priority": "进阶",
+    "source": "https://github.com/Project-MONAI/tutorials/blob/main/modules/3d_image_transforms.ipynb"
+  },
+  {
+    "folder": "05_实验设计与报告",
+    "stem": "CLAIM2024_医学影像AI报告指南",
+    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11304031/",
+    "kind": "html",
+    "description": "医学影像 AI 研究透明性与可复现性报告指南。",
+    "focus": "数据来源、参考标注、预处理、患者级划分、模型与统计结果。",
+    "caution": "属于报告指南，不规定某种网络或者一套固定预处理参数。",
+    "priority": "必读",
+    "source": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11304031/"
+  },
+  {
+    "folder": "05_实验设计与报告",
+    "stem": "CLAIM2024_原文PDF",
+    "url": "https://pubs.rsna.org/doi/pdf/10.1148/ryai.240300",
+    "kind": "pdf",
+    "description": "CLAIM 2024 的期刊论文 PDF。",
+    "focus": "配合报告指南逐项核对实验记录。",
+    "caution": "如出版社拒绝自动下载，将明确记录，不用网页冒充 PDF。",
+    "priority": "必读",
+    "source": "https://doi.org/10.1148/ryai.240300"
+  },
+  {
+    "folder": "06_评价指标",
+    "stem": "MetricsReloaded_官方入口",
+    "url": "https://metrics-reloaded.dkfz.de/",
+    "kind": "html",
+    "description": "医学图像分析评价指标选择与局限说明。",
+    "focus": "Semantic Segmentation；重叠指标与边界指标的区别。",
+    "caution": "交互式指标选择器需要联网；本地保存的是页面文字快照。",
+    "priority": "参考",
+    "source": "https://metrics-reloaded.dkfz.de/"
+  },
+  {
+    "folder": "06_评价指标",
+    "stem": "MetricsReloaded_作者预印本_2206.01653",
+    "url": "https://arxiv.org/pdf/2206.01653",
+    "kind": "pdf",
+    "description": "Metrics Reloaded 的作者预印本，介绍问题驱动的指标选择。",
+    "focus": "指标选择流程、指标局限与评价误区。",
+    "caution": "预印本不同于出版社排版版本；正式发表 DOI 为 10.1038/s41592-023-02151-z。CARE 指标以比赛要求为准。",
+    "priority": "进阶",
+    "source": "https://arxiv.org/abs/2206.01653"
+  },
+  {
+    "folder": "07_IBSI_影像组学特征",
+    "stem": "IBSI_参考手册_1612.07003",
+    "url": "https://arxiv.org/pdf/1612.07003",
+    "kind": "pdf",
+    "description": "IBSI 影像组学参考手册：处理流程与特征定义。",
+    "focus": "Interpolation、ROI、Intensity discretisation、形状与纹理特征。",
+    "caution": "适用于显式影像特征提取，不是训练深度学习分割模型的必需前置步骤。",
+    "priority": "按需",
+    "source": "https://arxiv.org/abs/1612.07003"
+  },
+  {
+    "folder": "07_IBSI_影像组学特征",
+    "stem": "IBSI_官方文档目录",
+    "url": "https://theibsi.github.io/documentation/",
+    "kind": "html",
+    "description": "IBSI 官方说明或手册章节。",
+    "focus": "核对 IBSI 1、IBSI 2 等版本与原始资源。",
+    "caution": "公式和插图以原始网页或 PDF 为准；Markdown 是文字快照。",
+    "priority": "按需",
+    "source": "https://theibsi.github.io/documentation/"
+  },
+  {
+    "folder": "07_IBSI_影像组学特征",
+    "stem": "IBSI_影像处理流程",
+    "url": "https://ibsi.readthedocs.io/en/latest/02_Image_processing.html",
+    "kind": "html",
+    "description": "IBSI 官方说明或手册章节。",
+    "focus": "重采样、ROI、灰度离散化和特征计算。",
+    "caution": "公式和插图以原始网页或 PDF 为准；Markdown 是文字快照。",
+    "priority": "按需",
+    "source": "https://ibsi.readthedocs.io/en/latest/02_Image_processing.html"
+  },
+  {
+    "folder": "07_IBSI_影像组学特征",
+    "stem": "IBSI_特征定义",
+    "url": "https://ibsi.readthedocs.io/en/latest/03_Image_features.html",
+    "kind": "html",
+    "description": "IBSI 官方说明或手册章节。",
+    "focus": "形状、灰度统计与纹理特征的定义。",
+    "caution": "公式和插图以原始网页或 PDF 为准；Markdown 是文字快照。",
+    "priority": "按需",
+    "source": "https://ibsi.readthedocs.io/en/latest/03_Image_features.html"
+  },
+  {
+    "folder": "08_CARE_方法论文",
+    "stem": "CARE2026_跨中心全心脏分割_2608.25109",
+    "url": "https://arxiv.org/pdf/2608.25109",
+    "kind": "pdf",
+    "description": "Improving Cross-Site Whole-Heart Segmentation：直接针对 CARE 的方法论文。",
+    "focus": "模态分流、中心差异分析、外观增强和后处理。",
+    "caution": "具体参赛方法，不是统一指南；文中 HD95 与官方页面的 HD 应区分。",
+    "priority": "进阶",
+    "source": "https://arxiv.org/abs/2608.25109"
+  }
+]

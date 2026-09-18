@@ -1,0 +1,918 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Image processing &mdash; IBSI 0.0.1dev documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+        <script type="text/javascript" src="_static/language_data.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Image features" href="03_Image_features.html" />
+    <link rel="prev" title="Introduction" href="01_Introduction.html" /> 
+
+<!-- RTD Extra Head -->
+
+
+
+<script type="application/json" id="READTHEDOCS_DATA">{"ad_free": false, "api_host": "https://readthedocs.org", "build_date": "2021-12-13T15:18:06Z", "builder": "sphinx", "canonical_url": null, "commit": "b952e71e", "docroot": "/docs/", "features": {"docsearch_disabled": false}, "global_analytics_code": "UA-17997319-1", "language": "en", "page": "02_Image_processing", "programming_language": "py", "project": "ibsi", "proxied_api_host": "/_", "source_suffix": ".rst", "subprojects": {}, "theme": "sphinx_rtd_theme", "user_analytics_code": "", "version": "latest"}</script>
+
+<!--
+Using this variable directly instead of using `JSON.parse` is deprecated.
+The READTHEDOCS_DATA global variable will be removed in the future.
+-->
+<script type="text/javascript">
+READTHEDOCS_DATA = JSON.parse(document.getElementById('READTHEDOCS_DATA').innerHTML);
+</script>
+
+
+
+<!-- end RTD <extrahead> -->
+<script async type="text/javascript" src="/_/static/javascript/readthedocs-addons.js"></script><meta name="readthedocs-project-slug" content="ibsi" /><meta name="readthedocs-version-slug" content="latest" /><meta name="readthedocs-resolver-filename" content="/02_Image_processing.html" /><meta name="readthedocs-http-status" content="200" /></head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> IBSI
+          
+
+          
+          </a>
+
+          
+            
+            
+            
+              <div class="version">
+                latest
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="index.html">Home</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="01_Introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Image processing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#data-conversion">Data conversion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#image-post-acquisition-processing">Image post-acquisition processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#segmentation">Segmentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#interpolation">Interpolation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#interpolation-algorithms">Interpolation algorithms</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#rounding-image-intensities-after-interpolation">Rounding image intensities after interpolation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#partial-volume-effects-in-the-roi-mask">Partial volume effects in the ROI mask</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#interpolation-grid">Interpolation grid</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#interpolation-grid-dimensions">Interpolation grid dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#interpolation-grid-position">Interpolation grid position</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#re-segmentation">Re-segmentation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#intensity-and-morphological-masks-of-an-roi">Intensity and morphological masks of an ROI</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#range-re-segmentation">Range re-segmentation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#intensity-outlier-filtering">Intensity outlier filtering</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#roi-extraction">ROI extraction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#intensity-discretisation">Intensity discretisation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#fixed-bin-number">Fixed bin number</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#fixed-bin-size">Fixed bin size</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#other-methods">Other methods</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#recommendations">Recommendations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#feature-calculation">Feature calculation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="03_Image_features.html">Image features</a></li>
+<li class="toctree-l1"><a class="reference internal" href="04_Radiomics_reporting_guidelines_and_nomenclature.html">Radiomics reporting guidelines and nomenclature</a></li>
+<li class="toctree-l1"><a class="reference internal" href="05_Reference_data_sets.html">Reference data sets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="06_Digital_phantom_texture_matrices.html">Digital phantom texture matrices</a></li>
+<li class="toctree-l1"><a class="reference internal" href="References.html">References</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">IBSI</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Image processing</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            
+              <a href="https://github.com/theibsi/ibsi-doc/blob/origin/master/docs/02_Image_processing.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="image-processing">
+<span id="chap-img-proc"></span><h1>Image processing<a class="headerlink" href="#image-processing" title="Permalink to this headline">¶</a></h1>
+<p>Image processing is the sequence of operations required to derive image
+biomarkers (features) from acquired images. In the context of this work
+an image is defined as a three-dimensional (3D) stack of two-dimensional
+(2D) digital image slices. Image slices are stacked along the
+<span class="math notranslate nohighlight">\(z\)</span>-axis. This stack is furthermore assumed to possess the same
+coordinate system, i.e. image slices are not rotated or translated (in
+the <span class="math notranslate nohighlight">\(xy\)</span>-plane) with regards to each other. Moreover, digital
+images typically possess a finite resolution. Intensities in an image
+are thus located at regular intervals, or spacing. In 2D such regular
+positions are called <em>pixels</em>, whereas in 3D the term <em>voxels</em> is used.
+Pixels and voxels are thus represented as the intersections on a
+regularly spaced grid. Alternatively, pixels and voxels may be
+represented as rectangles and rectangular cuboids. The centers of the
+pixels and voxels then coincide with the intersections of the regularly
+spaced grid. Both representations are used in the document.</p>
+<p>Pixels and voxels contain an intensity value for each channel of the
+image. The number of channels depends on the imaging modality. Most
+medical imaging generates single-channel images, whereas the number of
+channels in microscopy may be greater, e.g. due to different stainings.
+In such multi-channel cases, features may be extracted for each separate
+channel, a subset of channels, or alternatively, channels may be
+combined and converted to a single-channel representation. In the
+remainder of the document we consider an image as if it only possesses a
+single channel.</p>
+<p>The intensity of a pixel or voxel is also called a <em>grey level</em> or <em>grey
+tone</em>, particularly in single-channel images. Though practically there
+is no difference, the terms <em>grey level</em> or <em>grey tone</em> are more
+commonly used to refer to discrete intensities, including discretised
+intensities.</p>
+<p>Image processing may be conducted using a wide variety of schemes. We
+therefore designed a general image processing scheme for image feature
+calculation based on schemes used within scientific literature
+<a class="reference internal" href="References.html#hatt2016" id="id1">[Hatt2016]</a>. The image processing scheme is shown in
+<a class="reference internal" href="#figimageproc"><span class="std std-numref">Fig. 1</span></a>. The processing steps referenced in the figure are
+described in detail within this chapter.</p>
+<div class="figure align-center" id="id52">
+<span id="figimageproc"></span><img alt="_images/Processing_simplifiedv6.png" src="_images/Processing_simplifiedv6.png" />
+<p class="caption"><span class="caption-number">Fig. 1 </span><span class="caption-text">Image processing scheme for image feature calculation. Depending on
+the specific imaging modality and purpose, some steps may be omitted.
+The region of interest (ROI) is explicitly split into two masks,
+namely an intensity and morphological mask, after interpolation to
+the same grid as the interpolated image. Feature calculation is
+expanded to show the different feature families with specific
+pre-processing. IH: intensity histogram; IVH: intensity-volume
+histogram; GLCM: grey level cooccurrence matrix; GLRLM: grey level
+run length matrix; GLSZM: grey level size zone matrix; NGTDM:
+neighbourhood grey tone difference matrix; NGLDM: Neighbouring grey
+level dependence matrix; GLDZM: grey level distance zone matrix;
+*Discretisation of IVH differs from IH and texture features (see
+<a class="reference internal" href="03_Image_features.html#sect-ivh"><span class="std std-ref">Intensity-volume histogram features</span></a>).</span></p>
+</div>
+<div class="section" id="data-conversion">
+<span id="ref-data-conversion"></span><h2>Data conversion<a class="headerlink" href="#data-conversion" title="Permalink to this headline">¶</a></h2>
+<p style="color:grey;font-style:italic;text-align:right">23XZ</p><p>Some imaging modalities require conversion of raw image data into a more
+meaningful presentation, e.g. standardised uptake values
+(SUV) <a class="reference internal" href="References.html#boellaard2015" id="id2">[Boellaard2015]</a>. This is performed during the
+data conversion step. Assessment of data conversion methods falls
+outside the scope of the current work.</p>
+</div>
+<div class="section" id="image-post-acquisition-processing">
+<span id="ref-image-postprocessing"></span><h2>Image post-acquisition processing<a class="headerlink" href="#image-post-acquisition-processing" title="Permalink to this headline">¶</a></h2>
+<p style="color:grey;font-style:italic;text-align:right">PCDE</p><p>Images are post-processed to enhance image quality. For instance,
+magnetic resonance imaging (MRI) contains both Gaussian and Rician noise
+<a class="reference internal" href="References.html#gudbjartsson1995" id="id3">[Gudbjartsson1995]</a> and may benefit from denoising. As
+another example, intensities measured using MR may be non-uniform across
+an image and could require correction
+<a class="reference internal" href="References.html#sled1998" id="id4">[Sled1998]</a><a class="reference internal" href="References.html#vovk2007" id="id5">[Vovk2007]</a><a class="reference internal" href="References.html#balafar2010" id="id6">[Balafar2010]</a>. FDG-PET-based may
+furthermore be corrected for partial volume effects
+<a class="reference internal" href="References.html#soret2007" id="id7">[Soret2007]</a><a class="reference internal" href="References.html#boussion2009" id="id8">[Boussion2009]</a> and noise
+<a class="reference internal" href="References.html#lepogam2013" id="id9">[LePogam2013]</a><a class="reference internal" href="References.html#elnaqa2017" id="id10">[ElNaqa2017]</a>. In CT imaging, metal
+objects, e.g. pacemakers and tooth implants, introduce artifacts and may
+require artifinterpact suppression <a class="reference internal" href="References.html#gjesteby2016" id="id11">[Gjesteby2016]</a>.
+Microscopy images generally benefit from field-of-view illumination
+correction as illumination is usually inhomogeneous due to the
+light-source or the optical path
+<a class="reference internal" href="References.html#caicedo2017" id="id12">[Caicedo2017]</a><a class="reference internal" href="References.html#smith2015" id="id13">[Smith2015]</a>.</p>
+<p>Evaluation and standardisation of various image post-acquisition
+processing methods falls outside the scope of the current work. Note
+that vendors may provide or implement software to perform noise
+reduction and other post-processing during image reconstruction. In such
+cases, additional post-acquisition processing may not be required.</p>
+</div>
+<div class="section" id="segmentation">
+<span id="ref-segmentation"></span><h2>Segmentation<a class="headerlink" href="#segmentation" title="Permalink to this headline">¶</a></h2>
+<p style="color:grey;font-style:italic;text-align:right">OQYT</p><p>High-throughput image analysis, within the feature-based paradigm,
+relies on the definition of regions of interest (ROI). ROIs are used to
+define the region in which features are calculated. What constitutes an
+ROI depends on the imaging and the study objective. For example, in 3D
+microscopy of cell plates, cells are natural ROIs. In medical imaging of
+cancer patients, the tumour volume is a common ROI. ROIs can be defined
+manually by experts or (semi-)automatically using algorithms.</p>
+<p>From a process point-of-view, segmentation leads to the creation of an
+ROI mask <span class="math notranslate nohighlight">\(\mathbf{R}\)</span>, for which every voxel
+<span class="math notranslate nohighlight">\(j \in \mathbf{R}\)</span> (<span class="math notranslate nohighlight">\(R_j\)</span>) is defined as:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}R_j =\begin{cases}
+1\qquad j \text{ in ROI}\\
+0\qquad \text{otherwise}\\
+\end{cases}\end{split}\]</div>
+<p>ROIs are typically stored with the accompanying image. Some image
+formats directly store ROI masks as voxels (e.g. <code class="docutils literal notranslate"><span class="pre">NIfTI</span></code>, <code class="docutils literal notranslate"><span class="pre">NRRD</span></code> and
+<code class="docutils literal notranslate"><span class="pre">DICOM</span> <span class="pre">Segmentation</span></code>), and generating the ROI mask is conducted by
+loading the corresponding image. In other cases the ROI is saved as a
+set of <span class="math notranslate nohighlight">\((x,y,z)\)</span> points that define closed loops of (planar)
+polygons, for example within <code class="docutils literal notranslate"><span class="pre">DICOM</span> <span class="pre">RTSTRUCT</span></code> or <code class="docutils literal notranslate"><span class="pre">DICOM</span> <span class="pre">SR</span></code> files.
+In such cases, we should determine which voxel centers lie within the
+space enclosed by the contour polygon in each slice to generate the ROI
+mask.</p>
+<p>A common method to determine whether a point in an image slice lies
+inside a 2D polygon is the <em>crossing number</em> algorithm, for which
+several implementations exist <a class="reference internal" href="References.html#schirra2008" id="id14">[Schirra2008]</a>. The main
+concept behind this algorithm is that for any point inside the polygon,
+any line originating outside the polygon will cross the polygon an
+uneven number of times. A simple example is shown in
+<a class="reference internal" href="#figimagepointgrid"><span class="std std-numref">Fig. 2</span></a>. The implementation in the example makes use of the
+fact that the ROI mask is a regular grid to scan entire rows at a time.
+The example implementation consists of the following steps:</p>
+<ol class="arabic simple">
+<li>(optional) A ray is cast horizontally from outside the polygon for
+each of the <span class="math notranslate nohighlight">\(n\)</span> image rows. As we iterate over the rows, it is
+computationally beneficial to exclude polygon edges that will not be
+crossed by the ray for the current row <span class="math notranslate nohighlight">\(j\)</span>. If the current row
+has <span class="math notranslate nohighlight">\(y\)</span>-coordinate <span class="math notranslate nohighlight">\(y_j\)</span>, and edge <span class="math notranslate nohighlight">\(k\)</span> has two
+vertices with <span class="math notranslate nohighlight">\(y\)</span>-coordinates <span class="math notranslate nohighlight">\(y_{k1}\)</span> and
+<span class="math notranslate nohighlight">\(y_{k2}\)</span>, the ray will not cross the edge if both vertices lie
+either above or below <span class="math notranslate nohighlight">\(y_j\)</span>, i.e. <span class="math notranslate nohighlight">\(y_j &lt; y_{k1}, y_{k2}\)</span>
+or <span class="math notranslate nohighlight">\(y_j &gt; y_{k1}, y_{k2}\)</span>. For each row <span class="math notranslate nohighlight">\(j\)</span>, find those
+polygon edges whose <span class="math notranslate nohighlight">\(y\)</span>-component of the vertices do not both
+lie on the same side of the row coordinate <span class="math notranslate nohighlight">\(y_j\)</span>. This step is
+used to limit calculation of intersection points to only those that
+cross a ray cast from outside the polygon – e.g. ray with origin
+<span class="math notranslate nohighlight">\((-1, y_j)\)</span> and direction <span class="math notranslate nohighlight">\((1,0)\)</span>. This an optional step.</li>
+<li>Determine intersection points <span class="math notranslate nohighlight">\(x_i\)</span> of the (remaining) polygon
+edges with the ray.</li>
+<li>Iterate over intersection points and add <span class="math notranslate nohighlight">\(1\)</span> to the count of
+each pixel center with <span class="math notranslate nohighlight">\(x \geq x_i\)</span>.</li>
+<li>Apply the <em>even-odd</em> rule. Pixels with an odd count are inside the
+polygon, whereas pixels with an even count are outside.</li>
+</ol>
+<p>Note that the example represents a relatively naive implementation that
+will not consistently assign voxel centers positioned on the polygon
+itself to the interior.</p>
+<div class="figure align-center" id="id53">
+<span id="figimagepointgrid"></span><img alt="_images/pointGrid.png" src="_images/pointGrid.png" />
+<p class="caption"><span class="caption-number">Fig. 2 </span><span class="caption-text">Simple algorithm to determine which pixels are inside a 2D polygon.
+The suggested implementation consists of four steps: (1) Omit edges
+that will not intersect with the current row of voxel centers. (2)
+Calculate intersection points of edges I and II with the ray for the
+current row. (3) Determine the number of intersections crossed from
+ray origin to the row voxel centers. (4) Apply <em>even-odd</em> rule to
+determine whether voxel centers are inside the polygon.</span></p>
+</div>
+</div>
+<div class="section" id="interpolation">
+<span id="ref-interpolation"></span><h2>Interpolation<a class="headerlink" href="#interpolation" title="Permalink to this headline">¶</a></h2>
+<p style="color:grey;font-style:italic;text-align:right">VTM2</p><p>Texture feature sets require interpolation to isotropic voxel spacing to
+be rotationally invariant, and to allow comparison between image data
+from different samples, cohorts or batches. Voxel interpolation affects
+image feature values as many image features are sensitive to changes in
+voxel size
+<a class="reference internal" href="References.html#yan2015" id="id15">[Yan2015]</a><a class="reference internal" href="References.html#bailly2016" id="id16">[Bailly2016]</a><a class="reference internal" href="References.html#altazi2017" id="id17">[Altazi2017]</a><a class="reference internal" href="References.html#shafiq-ul-hassan2017" id="id18">[Shafiq-ul-Hassan2017]</a><a class="reference internal" href="References.html#shiri2017" id="id19">[Shiri2017]</a>.
+Maintaining consistent isotropic voxel spacing across different
+measurements and devices is therefore important for reproducibility. At
+the moment there are no clear indications whether upsampling or
+downsampling schemes are preferable. Consider, for example, an image
+stack of slices with <span class="math notranslate nohighlight">\(1.0 \times 1.0 \times 3.0~\text{mm}^3\)</span> voxel
+spacing. Upsampling to <span class="math notranslate nohighlight">\(1.0 \times 1.0 \times 1.0~\text{mm}^3\)</span>
+requires inference and introduces artificial information, while
+conversely downsampling to the largest dimension
+(<span class="math notranslate nohighlight">\(3.0 \times 3.0 \times 3.0~\text{mm}^3\)</span>) incurs information loss.
+Multiple-scaling strategies potentially offer a good trade-off
+<a class="reference internal" href="References.html#vallieres2017" id="id20">[Vallieres2017]</a>. Note that downsampling may introduce
+image aliasing artifacts. Downsampling may therefore require
+anti-aliasing filters prior to filtering
+<a class="reference internal" href="References.html#mackin2017" id="id21">[Mackin2017]</a><a class="reference internal" href="References.html#zwanenburg2018" id="id22">[Zwanenburg2018]</a>.</p>
+<p>While in general 3D interpolation algorithms are used to interpolate 3D
+images, 2D interpolation within the image slice plane may be recommended
+in some situations. In 2D interpolation voxels are not interpolated
+between slices. This may be beneficial if, for example, the spacing
+between slices is large compared to the desired voxel size, and/or
+compared to the in-plane spacing. Applying 3D interpolation would either
+require inferencing a large number of voxels between slices
+(upsampling), or the loss of a large fraction of in-plane information
+(downsampling). The disadvantage of 2D interpolation is that voxel
+spacing is no longer isotropic, and as a consequence texture features
+can only be calculated in-plane.</p>
+<div class="section" id="interpolation-algorithms">
+<h3>Interpolation algorithms<a class="headerlink" href="#interpolation-algorithms" title="Permalink to this headline">¶</a></h3>
+<p>Interpolation algorithms translate image intensities from the original
+image grid to an interpolation grid. In such grids, voxels are spatially
+represented by their center. Several algorithms are commonly used for
+interpolation, such as <em>nearest neighbour</em>, <em>trilinear</em>, <em>tricubic
+convolution</em> and <em>tricubic spline interpolation</em>. In short, <em>nearest
+neighbour interpolation</em> assigns the intensity of the most nearby voxel
+in the original grid to each voxel in the interpolation grid. <em>Trilinear
+interpolation</em> uses the intensities of the eight most nearby voxels in
+the original grid to calculate a new interpolated intensity using linear
+interpolation. <em>Tricubic convolution</em> and <em>tricubic spline
+interpolation</em> draw upon a larger neighbourhood to evaluate a smooth,
+continuous third-order polynomial at the voxel centers in the
+interpolation grid. The difference between <em>tricubic convolution</em> and
+<em>tricubic spline interpolation</em> lies in the implementation. Whereas
+<em>tricubic spline interpolation</em> evaluates the smooth and continuous
+third-order polynomial at every voxel center, <em>tricubic convolution</em>
+approximates the solution using a convolution filter. Though <em>tricubic
+convolution</em> is faster, with modern hardware and common image sizes, the
+difference in execution speed is practically meaningless. Both
+interpolation algorithms produce similar results, and both are often
+referred to as <em>tricubic interpolation</em>.</p>
+<p>While no consensus exists concerning the optimal choice of interpolation
+algorithm, <em>trilinear interpolation</em> is usually seen as a conservative
+choice. It does not lead to the blockiness produced by <em>nearest
+neighbour interpolation</em> that introduces bias in local textures
+<a class="reference internal" href="References.html#hatt2016" id="id23">[Hatt2016]</a>. Nor does it lead to out-of-range
+intensities which may occur due to overshoot with <em>tricubic</em> and higher
+order interpolations. The latter problem can occur in acute intensity
+transitions, where the local neighbourhood itself is not sufficiently
+smooth to evaluate the polynomial within the allowed range. <em>Tricubic</em>
+methods, however, may retain tissue contrast differences better.
+Particularly when upsampling, <em>trilinear</em> interpolation may act as a
+low-pass filter which suppresses higher spatial frequencies and cause
+artefacts in high-pass spatial filters. Interpolation algorithms and
+their advantages and disadvantages are treated in more detail elsewhere,
+e.g. <a class="reference internal" href="References.html#thevenaz2000image" id="id24">[thevenaz2000image]</a>.</p>
+<p>In a phantom study, <a class="reference internal" href="References.html#larue2017" id="id25">[Larue2017]</a> compared <em>nearest
+neighbour</em>, <em>trilinear</em> and <em>tricubic</em> interpolation and indicated that
+feature reproducibility is dependent on the selected interpolation
+algorithm, i.e. some features were more reproducible using one
+particular algorithm.</p>
+</div>
+<div class="section" id="rounding-image-intensities-after-interpolation">
+<h3>Rounding image intensities after interpolation<a class="headerlink" href="#rounding-image-intensities-after-interpolation" title="Permalink to this headline">¶</a></h3>
+<p style="color:grey;font-style:italic;text-align:right">68QD</p><p>Image intensities may require rounding after interpolation, or the
+application of cut-off values. For example, in CT images intensities
+represent Hounsfield Units, and these do not take non-integer values.
+Following voxel interpolation, interpolated CT intensities are thus
+rounded to the nearest integer.</p>
+</div>
+<div class="section" id="partial-volume-effects-in-the-roi-mask">
+<h3>Partial volume effects in the ROI mask<a class="headerlink" href="#partial-volume-effects-in-the-roi-mask" title="Permalink to this headline">¶</a></h3>
+<p style="color:grey;font-style:italic;text-align:right">E8H9</p><p>If the image on which the ROI mask was defined, is interpolated after
+the ROI was segmented, the ROI mask <span class="math notranslate nohighlight">\(\mathbf{R}\)</span> should likewise
+be interpolated to the same dimensions. Interpolation of the ROI mask is
+best conducted using either the <em>nearest neighbour</em> or <em>trilinear
+interpolation</em> methods, as these are guaranteed to produce meaningful
+masks. <em>Trilinear interpolation</em> of the ROI mask leads to partial volume
+effects, with some voxels containing fractions of the original voxels.
+Since a ROI mask is a binary mask, such fractions need to be binarised
+by setting a partial volume threshold <span class="math notranslate nohighlight">\(\delta\)</span>:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}R_j=\begin{cases}
+1\qquad R_{interp,j} \geq \delta\\
+0\qquad R_{interp,j} &lt; \delta
+\end{cases}\end{split}\]</div>
+<p>A common choice for the partial volume threshold is <span class="math notranslate nohighlight">\(\delta=0.5\)</span>.
+For <em>nearest neighbour interpolation</em> the ROI mask does not contain
+partial volume fractions, and may be used directly.</p>
+<p>Interpolation results depend on the floating point representation used
+for the image and ROI masks. Floating point representations should at
+least be full precision (<code class="docutils literal notranslate"><span class="pre">32-bit</span></code>) to avoid rounding errors.</p>
+</div>
+<div class="section" id="interpolation-grid">
+<h3>Interpolation grid<a class="headerlink" href="#interpolation-grid" title="Permalink to this headline">¶</a></h3>
+<p style="color:grey;font-style:italic;text-align:right">UMPJ</p><p>Interpolated voxel centers lie on the intersections of a regularly
+spaced grid. Grid intersections are represented by two coordinate
+systems. The first coordinate system is the grid coordinate system, with
+origin at <span class="math notranslate nohighlight">\((0.0, 0.0, 0.0)\)</span> and distance between directly
+neighbouring voxel centers (spacing) of <span class="math notranslate nohighlight">\(1.0\)</span>. The grid coordinate
+system is the coordinate system typically used by computers, and
+consequentially, by interpolation algorithms. The second coordinate
+system is the world coordinate system, which is typically found in
+(medical) imaging and provides an image scale. As the desired isotropic
+spacing is commonly defined in world coordinate dimensions, conversions
+between world coordinates and grid coordinates are necessary, and are
+treated in more detail after assessing grid alignment methods.</p>
+<p>Grid alignment affects feature values and is non-trivial. Three common
+grid alignments may be identified, and are shown in
+<a class="reference internal" href="#figmeshgrids"><span class="std std-numref">Fig. 3</span></a>:</p>
+<ol class="arabic simple">
+<li><strong>Fit to original grid</strong> (<em>58MB</em>). In this case the interpolation
+grid is deformed so that the voxel centers at the grid intersections
+overlap with the original grid vertices. For an original
+<span class="math notranslate nohighlight">\(4\times4\)</span> voxel grid with spacing <span class="math notranslate nohighlight">\((3.00, 3.00)\)</span> mm and
+a desired interpolation spacing of <span class="math notranslate nohighlight">\((2.00, 2.00)\)</span>&nbsp;mm we first
+calculate the extent of the original voxel grid in world coordinates
+leading to an extent of
+<span class="math notranslate nohighlight">\(((4-1)\,3.00, ((4-1)\,3.00) = (9.00, 9.00)\)</span>&nbsp;mm. In this case
+the interpolated grid will not exactly fit the original grid.
+Therefore we try to find the closest fitting grid, which leads to a
+<span class="math notranslate nohighlight">\(6\times 6\)</span> grid by rounding up <span class="math notranslate nohighlight">\((9.00/2.00, 9.00/2.00)\)</span>.
+The resulting grid has a grid spacing of <span class="math notranslate nohighlight">\((1.80, 1.80)\)</span>&nbsp;mm in
+world coordinates, which differs from the desired grid spacing of
+<span class="math notranslate nohighlight">\((2.00, 2.00)\)</span>&nbsp;mm.</li>
+<li><strong>Align grid origins</strong> (<em>SBKJ</em>). A simple approach which conserves
+the desired grid spacing is the alignment of the origins of the
+interpolation and original grids. Keeping with the same example, the
+interpolation grid is <span class="math notranslate nohighlight">\((6 \times 6)\)</span>. The resulting voxel grid
+has a grid spacing of <span class="math notranslate nohighlight">\((2.00, 2.00)\)</span>&nbsp;mm in world coordinates.
+By definition both grids are aligned at the origin,
+<span class="math notranslate nohighlight">\((0.00, 0.00)\)</span>.</li>
+<li><strong>Align grid centers</strong> (<em>3WE3</em>). The position of the origin may
+depend on image meta-data defining image orientation. Not all
+software implementations may process this meta-data the same way. An
+implementation-independent solution is to align both grids on the
+grid center. Again, keeping with the same example, the interpolation
+grid is <span class="math notranslate nohighlight">\((6 \times 6)\)</span>. Thus, the resulting voxel grid has a
+grid spacing of <span class="math notranslate nohighlight">\((2.00, 2.00)\)</span>&nbsp;mm in world coordinates.</li>
+</ol>
+<p><em>Align grid centers</em> is recommended as it is implementation-independent
+and achieves the desired voxel spacing. Technical details of
+implementing <em>align grid centers</em> are described below.</p>
+</div>
+<div class="section" id="interpolation-grid-dimensions">
+<h3>Interpolation grid dimensions<a class="headerlink" href="#interpolation-grid-dimensions" title="Permalink to this headline">¶</a></h3>
+<p style="color:grey;font-style:italic;text-align:right">026Q</p><p>The dimensions of the interpolation grid are determined as follows. Let
+<span class="math notranslate nohighlight">\(n_a\)</span> be the number of points along one axis of the original grid
+and <span class="math notranslate nohighlight">\(s_{a,w}\)</span> their spacing in world coordinates. Then, let
+<span class="math notranslate nohighlight">\(s_{b,w}\)</span> be the desired spacing after interpolation. The axial
+dimension of the interpolated mesh grid is then:</p>
+<div class="math notranslate nohighlight">
+\[n_b = \left\lceil \frac{n_a s_a}{s_b}\right\rceil\]</div>
+<p>Rounding towards infinity guarantees that the interpolation grid exists
+even when the original grid contains few voxels. However, it also means
+that the interpolation mesh grid is partially located outside of the
+original grid. Extrapolation is thus required. Padding the original grid
+with the intensities at the boundary is recommended. Some
+implementations of interpolation algorithms may perform this padding
+internally.</p>
+</div>
+<div class="section" id="interpolation-grid-position">
+<h3>Interpolation grid position<a class="headerlink" href="#interpolation-grid-position" title="Permalink to this headline">¶</a></h3>
+<p style="color:grey;font-style:italic;text-align:right">QCY4</p><p>For the <em>align grid centers</em> method, the positions of the interpolation
+grid points are determined as follows. As before, let <span class="math notranslate nohighlight">\(n_a\)</span> and
+<span class="math notranslate nohighlight">\(n_b\)</span> be the dimensions of one axis in the original and
+interpolation grid, respectively. Moreover, let <span class="math notranslate nohighlight">\(s_{a,w}\)</span> be the
+original spacing and <span class="math notranslate nohighlight">\(s_{b,w}\)</span> the desired spacing for the same
+axis in world coordinates. Then, with <span class="math notranslate nohighlight">\(x_{a,w}\)</span> the origin of the
+original grid in world coordinates, the origin of the interpolation grid
+is located at:</p>
+<div class="math notranslate nohighlight">
+\[x_{b,w} = x_{a,w} + \frac{s_a (n_a - 1) - s_b (n_b - 1)}{2}\]</div>
+<p>In the grid coordinate system, the original grid origin is located at
+<span class="math notranslate nohighlight">\(x_{a,g} = 0\)</span>. The origin of the interpolation grid is then
+located at:</p>
+<div class="math notranslate nohighlight">
+\[x_{b,g} = \frac{1}{2}\left(n_a - 1 - \frac{s_{b,w}}{s_{a,w}} \left(n_b -1\right) \right)\]</div>
+<p>Here the fraction <span class="math notranslate nohighlight">\(s_{b,w}/s_{a,w}= s_{b,g}\)</span> is the desired
+spacing in grid coordinates. Thus, the interpolation grid points along
+the considered axis are located at grid coordinates:</p>
+<div class="math notranslate nohighlight">
+\[x_{b,g},\,x_{b,g} + s_{b,g},\,x_{b,g} + 2s_{b,g},\,\ldots,\,x_{b,g} + (n_b-1)s_{b,g}\]</div>
+<p>Naturally, the above description applies to each grid axis.</p>
+<div class="figure align-center" id="id54">
+<span id="figmeshgrids"></span><img alt="_images/InterpolationGrids.png" src="_images/InterpolationGrids.png" />
+<p class="caption"><span class="caption-number">Fig. 3 </span><span class="caption-text">Different interpolation mesh grids based on an original
+<span class="math notranslate nohighlight">\(4\times 4\)</span> grid with <span class="math notranslate nohighlight">\((3.00, 3.00)\)</span>&nbsp;mm spacing. The
+desired interpolation spacing is <span class="math notranslate nohighlight">\((2.00, 2.00)\)</span>&nbsp;mm. <em>Fit to
+original grid</em> creates an interpolation mesh grid that overlaps with
+the corners of the original grid. <em>Align grid origins</em> creates an
+interpolation mesh grid that is positioned at the origin of the
+original grid. <em>Align grid centers</em> creates an interpolation grid
+that is centered on the center of original and interpolation grids.</span></p>
+</div>
+<div class="figure align-center" id="id55">
+<span id="figresegmentationexample"></span><img alt="_images/VoxelReSegmentationv2.png" src="_images/VoxelReSegmentationv2.png" />
+<p class="caption"><span class="caption-number">Fig. 4 </span><span class="caption-text">Example showing how intensity and morphological masks may differ due
+to re-segmentation. (1) The original region of interest (ROI) is
+shown with pixel intensities. (2) Subsequently, the ROI is
+re-segmented to only contain values in the range <span class="math notranslate nohighlight">\([1,6]\)</span>.
+Pixels outside this range are marked for removal from the intensity
+mask. (3a) Resulting morphological mask, which is identical to the
+original ROI. (3b) Re-segmented intensity mask. Note that due to
+re-segmentation, intensity and morphological masks are different.</span></p>
+</div>
+</div>
+</div>
+<div class="section" id="re-segmentation">
+<span id="id26"></span><h2>Re-segmentation<a class="headerlink" href="#re-segmentation" title="Permalink to this headline">¶</a></h2>
+<p style="color:grey;font-style:italic;text-align:right">IF9H</p><p>Re-segmentation entails updating the ROI mask <span class="math notranslate nohighlight">\(\mathbf{R}\)</span> based
+on corresponding voxel intensities <span class="math notranslate nohighlight">\(\mathbf{X}_{gl}\)</span>.
+Re-segmentation may be performed to exclude voxels from a previously
+segmented ROI, and is performed after interpolation. An example use
+would be the exclusion of air or bone voxels from an ROI defined on CT
+imaging. Two common re-segmentation methods are described in this
+section. Combining multiple re-segmentation methods is possible. In this
+case, the intersection of the intensity ranges defined by the
+re-segmentation methods is used.</p>
+<div class="figure align-center" id="id56">
+<span id="figresegmentation-real-example"></span><img alt="_images/resegmentation.png" src="_images/resegmentation.png" />
+<p class="caption"><span class="caption-number">Fig. 5 </span><span class="caption-text">Re-segmentation example based on a CT-image. The masked region (blue)
+is re-segmented to create an intensity mask (orange). Examples using
+three different re-segmentation parameter sets are shown. The bottom
+right combines the range and outlier re-segmentation, and the
+resulting mask is the intersection of the masks in the other two
+examples. Image data from Vallières et al. <a class="reference internal" href="References.html#vallieres2015" id="id27">[Vallieres2015]</a><a class="reference internal" href="References.html#vallieres2015-hv" id="id28">[Vallieres2015-hv]</a><a class="reference internal" href="References.html#clark2013" id="id29">[Clark2013]</a>.</span></p>
+</div>
+<div class="section" id="intensity-and-morphological-masks-of-an-roi">
+<h3>Intensity and morphological masks of an ROI<a class="headerlink" href="#intensity-and-morphological-masks-of-an-roi" title="Permalink to this headline">¶</a></h3>
+<p style="color:grey;font-style:italic;text-align:right">ECJF</p><p>Conventionally, an ROI consists of a single mask. However,
+re-segmentation may lead to exclusion of internal voxels, or divide the
+ROI into sub-volumes. To avoid undue complexity by again updating the
+re-segmented ROI for a more plausible morphology, we define two separate
+ROI masks.</p>
+<p>The morphological mask (<em>G5KJ</em>) is not re-segmented and maintains the
+original morphology as defined by an expert and/or (semi-)automatic
+segmentation algorithms.</p>
+<p>The intensity mask (<em>SEFI</em>) can be re-segmented and will contain only
+the selected voxels. For many feature families, only this is important.
+However, for morphological and grey level distance zone matrix (GLDZM)
+feature families, both intensity and morphological masks are used. A
+two-dimensional schematic example is shown in
+<a class="reference internal" href="#figresegmentationexample"><span class="std std-numref">Fig. 4</span></a>, and a real
+example is shown in
+<a class="reference internal" href="#figresegmentation-real-example"><span class="std std-numref">Fig. 5</span></a>.</p>
+</div>
+<div class="section" id="range-re-segmentation">
+<h3>Range re-segmentation<a class="headerlink" href="#range-re-segmentation" title="Permalink to this headline">¶</a></h3>
+<p style="color:grey;font-style:italic;text-align:right">USB3</p><p>Re-segmentation may be performed to remove voxels from the intensity
+mask that fall outside of a specified range. An example is the exclusion
+of voxels with Hounsfield Units indicating air and bone tissue in the
+tumour ROI within CT images, or low activity areas in PET images. Such
+ranges of intensities of included voxels are usually presented as a
+closed interval <span class="math notranslate nohighlight">\(\left[ a,b\right]\)</span> or half-open interval
+<span class="math notranslate nohighlight">\(\left[a,\infty\right)\)</span>, respectively. For arbitrary intensity
+units (found in e.g. raw MRI data, uncalibrated microscopy images, and
+many spatial filters), no re-segmentation range can be provided.</p>
+<p>When a re-segmentation range is defined by the user, it needs to be
+propagated and used for the calculation of features that require a
+specified intensity range (e.g. intensity-volume histogram features)
+and/or that employs <em>fixed bin size</em> discretisation. Recommendations for
+the possible combinations of different imaging intensity definitions,
+re-segmentation ranges and discretisation algorithms are provided in
+<a class="reference internal" href="#table-discretisation"><span class="std std-numref">Table 1</span></a>.</p>
+</div>
+<div class="section" id="intensity-outlier-filtering">
+<h3>Intensity outlier filtering<a class="headerlink" href="#intensity-outlier-filtering" title="Permalink to this headline">¶</a></h3>
+<p style="color:grey;font-style:italic;text-align:right">7ACA</p><p>ROI voxels with outlier intensities may be removed from the intensity
+mask. One method for defining outliers was suggested by
+<a class="reference internal" href="References.html#vallieres2015" id="id30">[Vallieres2015]</a> after
+<a class="reference internal" href="References.html#collewet2004" id="id31">[Collewet2004]</a>. The mean <span class="math notranslate nohighlight">\(\mu\)</span> and standard
+deviation <span class="math notranslate nohighlight">\(\sigma\)</span> of grey levels of voxels assigned to the ROI
+are calculated. Voxels outside the range
+<span class="math notranslate nohighlight">\(\left[\mu - 3\sigma, \mu + 3\sigma\right]\)</span> are subsequently
+excluded from the intensity mask.</p>
+</div>
+</div>
+<div class="section" id="roi-extraction">
+<h2>ROI extraction<a class="headerlink" href="#roi-extraction" title="Permalink to this headline">¶</a></h2>
+<p style="color:grey;font-style:italic;text-align:right">1OBP</p><div class="figure align-center" id="id57">
+<span id="figroi-extraction"></span><img alt="_images/roi_extraction.png" src="_images/roi_extraction.png" />
+<p class="caption"><span class="caption-number">Fig. 6 </span><span class="caption-text">Masking of an image by the ROI mask during <em>ROI extraction</em>.
+Intensities outside the ROI are excluded. Image data from Vallières
+et al. <a class="reference internal" href="References.html#vallieres2015" id="id32">[Vallieres2015]</a><a class="reference internal" href="References.html#vallieres2015-hv" id="id33">[Vallieres2015-hv]</a><a class="reference internal" href="References.html#clark2013" id="id34">[Clark2013]</a>.</span></p>
+</div>
+<p>Many feature families require that the ROI is isolated from the
+surrounding voxels. The ROI intensity mask is used to extract the image
+volume to be studied. Excluded voxels are commonly replaced by a
+placeholder value, often <em>NaN</em>. This placeholder value may then used to
+exclude these voxels from calculations. Voxels included in the ROI mask
+retain their original intensity. An example is shown in
+<a class="reference internal" href="#figroi-extraction"><span class="std std-numref">Fig. 6</span></a>.</p>
+</div>
+<div class="section" id="intensity-discretisation">
+<span id="discretisation"></span><h2>Intensity discretisation<a class="headerlink" href="#intensity-discretisation" title="Permalink to this headline">¶</a></h2>
+<p style="color:grey;font-style:italic;text-align:right">4R0B</p><p>Discretisation or quantisation of image intensities inside the ROI is
+often required to make calculation of texture features tractable
+<a class="reference internal" href="References.html#yip2016" id="id35">[Yip2016]</a>, and possesses noise-suppressing properties
+as well. An example of discretisation is shown in
+<a class="reference internal" href="#figimagediscretisation"><span class="std std-numref">Fig. 7</span></a>.</p>
+<p>Two approaches to discretisation are commonly used. One involves the
+discretisation to a fixed number of bins, and the other discretisation
+with a fixed bin width. As we will observe, there is no inherent
+preference for one or the other method. However, both methods have
+particular characteristics (as described below) that may make them
+better suited for specific purposes. Note that the lowest bin always has
+value <span class="math notranslate nohighlight">\(1\)</span>, and not <span class="math notranslate nohighlight">\(0\)</span>. This ensures consistency for
+calculations of texture features, where for some features grey level
+<span class="math notranslate nohighlight">\(0\)</span> is not allowed.</p>
+<div class="figure" id="id58">
+<span id="figimagediscretisation"></span><img alt="_images/discretisation.png" src="_images/discretisation.png" />
+<p class="caption"><span class="caption-number">Fig. 7 </span><span class="caption-text">Discretisation of two different 18F-FDG-PET images with
+SUV<sub>max</sub> of <span class="math notranslate nohighlight">\(27.8\)</span> (A) and <span class="math notranslate nohighlight">\(6.6\)</span> (B). <em>Fixed bin
+number</em> discretisation adjust the contrast between the two images,
+with the number of bins determining the coarseness of the discretised
+image. <em>Fixed bin size</em> discretisation leaves the contrast
+differences between image A and B intact. Increasing the bin size
+increases the coarseness of the discretised image. Image data from
+Vallières et al.
+<a class="reference internal" href="References.html#vallieres2015" id="id36">[Vallieres2015]</a><a class="reference internal" href="References.html#vallieres2015-hv" id="id37">[Vallieres2015-hv]</a><a class="reference internal" href="References.html#clark2013" id="id38">[Clark2013]</a>.</span></p>
+</div>
+<div class="section" id="fixed-bin-number">
+<span id="par-discr-fbn"></span><h3>Fixed bin number<a class="headerlink" href="#fixed-bin-number" title="Permalink to this headline">¶</a></h3>
+<p style="color:grey;font-style:italic;text-align:right">K15C</p><p>In the <em>fixed bin number</em> method, intensities <span class="math notranslate nohighlight">\(X_{gl}\)</span> are
+discretised to a fixed number of <span class="math notranslate nohighlight">\(N_g\)</span> bins. It is defined as
+follows:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}X_{d,k} = \begin{cases}
+\left\lfloor N_g \frac{X_{gl,k}-X_{gl,min}}{X_{gl,max}-X_{gl,min}}\right\rfloor  + 1 &amp; X_{gl,k}&lt;X_{gl,max}\\
+N_g &amp; X_{gl,k}=X_{gl,max}
+\end{cases}\end{split}\]</div>
+<p>In short, the intensity <span class="math notranslate nohighlight">\(X_{gl,k}\)</span> of voxel <span class="math notranslate nohighlight">\(k\)</span> is
+corrected by the lowest occurring intensity <span class="math notranslate nohighlight">\(X_{gl,min}\)</span> in the
+ROI, divided by the bin width
+<span class="math notranslate nohighlight">\(\left(X_{gl,max}-X_{gl,min}\right)/N_g\)</span>, and subsequently rounded
+down to the nearest integer (floor function).</p>
+<p>The <em>fixed bin number</em> method breaks the relationship between image
+intensity and physiological meaning (if any). However, it introduces a
+normalising effect which may be beneficial when intensity units are
+arbitrary (e.g. raw MRI data and many spatial filters), and where
+contrast is considered important. Furthermore, as values of many
+features depend on the number of grey levels found within a given ROI,
+the use of a <em>fixed bin number</em> discretisation algorithm allows for a
+direct comparison of feature values across multiple analysed ROIs (e.g.
+across different samples).</p>
+</div>
+<div class="section" id="fixed-bin-size">
+<span id="par-discr-fbs"></span><h3>Fixed bin size<a class="headerlink" href="#fixed-bin-size" title="Permalink to this headline">¶</a></h3>
+<p style="color:grey;font-style:italic;text-align:right">Q3RU</p><p><em>Fixed bin size</em> discretisation is conceptually simple. A new bin is
+assigned for every intensity interval with width <span class="math notranslate nohighlight">\(w_b\)</span>; i.e.
+<span class="math notranslate nohighlight">\(w_b\)</span> is the bin width, starting at a minimum <span class="math notranslate nohighlight">\(X_{gl,min}\)</span>.
+The minimum intensity may be a user-set value as defined by the lower
+bound of the re-segmentation range, or data-driven as defined by the
+minimum intensity in the ROI
+<span class="math notranslate nohighlight">\(X_{gl,min}=\text{min} \left( X_{gl} \right)\)</span>. In all cases, the
+method used and/or set minimum value must be clearly reported. However,
+to maintain consistency between samples, we strongly recommend to always
+set the same minimum value for all samples as defined by the lower bound
+of the re-segmentation range (e.g. HU of -500 for CT, SUV of 0 for PET,
+etc.). In the case that no re-segmentation range may be defined due to
+arbitrary intensity units (e.g. raw MRI data and many spatial filters),
+the use of the <em>fixed bin size</em> discretisation algorithm is not
+recommended.</p>
+<p>The <em>fixed bin size</em> method has the advantage of maintaining a direct
+relationship with the original intensity scale, which could be useful
+for functional imaging modalities such as PET.</p>
+<p>Discretised intensities are computed as follows:</p>
+<div class="math notranslate nohighlight">
+\[X_{d,k}=\left\lfloor \frac{X_{gl,k}-X_{gl,min}}{w_b}\right\rfloor  + 1\]</div>
+<p>In short, the minimum intensity <span class="math notranslate nohighlight">\(X_{gl,min}\)</span> is subtracted from
+intensity <span class="math notranslate nohighlight">\(X_{gl,k}\)</span> in voxel <span class="math notranslate nohighlight">\(k\)</span>, and then divided by the
+bin width <span class="math notranslate nohighlight">\(w_b\)</span>. The resulting value is subsequently rounded down
+to the nearest integer (floor function), and <span class="math notranslate nohighlight">\(1\)</span> is added to
+arrive at the discretised intensity.</p>
+</div>
+<div class="section" id="other-methods">
+<h3>Other methods<a class="headerlink" href="#other-methods" title="Permalink to this headline">¶</a></h3>
+<p>Many other methods and variations for discretisation exist, but are not
+described in detail here. <a class="reference internal" href="References.html#vallieres2015" id="id39">[Vallieres2015]</a> described
+the use of <em>intensity histogram equalisation</em> and <em>Lloyd-Max</em> algorithms
+for discretisation. <em>Intensity histogram equalisation</em> involves
+redistributing intensities so that the resulting bins contain a similar
+number of voxels, i.e. contrast is increased by flattening the histogram
+as much as possible <a class="reference internal" href="References.html#hall1971" id="id40">[Hall1971]</a>. Histogram
+equalisation of the ROI imaging intensities can be performed before any
+other discretisation algorithm (e.g. FBN, FSB, etc.), and it also
+requires the definition of a given number of bins in the histogram to be
+equalised. The <em>Lloyd-Max</em> algorithm is an iterative clustering method
+that seeks to minimise mean squared discretisation errors
+<a class="reference internal" href="References.html#max1960" id="id41">[Max1960]</a><a class="reference internal" href="References.html#lloyd1982" id="id42">[Lloyd1982]</a>.</p>
+</div>
+<div class="section" id="recommendations">
+<h3>Recommendations<a class="headerlink" href="#recommendations" title="Permalink to this headline">¶</a></h3>
+<p>The discretisation method that leads to optimal feature inter- and
+intra-sample reproducibility is modality-dependent. Usage
+recommendations for the possible combinations of different imaging
+intensity definitions, re-segmentation ranges and discretisation
+algorithms are provided in <a class="reference internal" href="#table-discretisation"><span class="std std-numref">Table 1</span></a>. Overall, the
+discretisation choice has a substantial impact on intensity
+distributions, feature values and reproducibility
+<a class="reference internal" href="References.html#hatt2015" id="id43">[Hatt2015]</a><a class="reference internal" href="References.html#leijenaar2015a" id="id44">[Leijenaar2015a]</a><a class="reference internal" href="References.html#vanvelden2016" id="id45">[vanVelden2016]</a><a class="reference internal" href="References.html#desseroit2017" id="id46">[Desseroit2017]</a><a class="reference internal" href="References.html#hatt2016" id="id47">[Hatt2016]</a><a class="reference internal" href="References.html#shafiq-ul-hassan2017" id="id48">[Shafiq-ul-Hassan2017]</a><a class="reference internal" href="References.html#altazi2017" id="id49">[Altazi2017]</a>.</p>
+<span id="table-discretisation"></span><table border="1" class="colwidths-auto docutils" id="id59">
+<caption><span class="caption-number">Table 1 </span><span class="caption-text">Recommendations for the possible combinations of different imaging intensity definitions, resegmentation ranges and discretisation algorithms.
+Checkmarks (✔) represent recommended combinations of resegmentation range and discretisation algorithm, whereas crossmarks (✕) represent non-recommended combinations.
+<sup>(1)</sup> PET and CT are examples of imaging modalities with calibrated intensity units (e.g. SUV and HU, respectively), and raw MRI data of arbitrary intensity units.
+<sup>(2)</sup> Fixed bin number (FBN) discretisation uses the actual range of intensities in the analysed ROI (re-segmented or not), and not the re-segmentation range itself (when defined).
+<sup>(3)</sup> Fixed bin size (FBS) discretisation uses the lower bound of the re-segmentation range as the minimum set value. When the re-segmentation range is not or cannot be defined (e.g. arbitrary intensity units), the use of the FBS algorithm is not recommended.</span><a class="headerlink" href="#id59" title="Permalink to this table">¶</a></caption>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Imaging intensity units<span class="math notranslate nohighlight">\(^{(1)}\)</span></th>
+<th class="head">Re-segmentation  range</th>
+<th class="head">FBN<span class="math notranslate nohighlight">\(^{(2)}\)</span></th>
+<th class="head">FBS<span class="math notranslate nohighlight">\(^{(3)}\)</span></th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>&#160;</td>
+<td><span class="math notranslate nohighlight">\([a,b]\)</span></td>
+<td>✔</td>
+<td>✔</td>
+</tr>
+<tr class="row-odd"><td>calibrated</td>
+<td><span class="math notranslate nohighlight">\([a,\infty)\)</span></td>
+<td>✔</td>
+<td>✔</td>
+</tr>
+<tr class="row-even"><td>&#160;</td>
+<td>none</td>
+<td>✔</td>
+<td>✕</td>
+</tr>
+<tr class="row-odd"><td>&#160;</td>
+<td>&#160;</td>
+<td>&#160;</td>
+<td>&#160;</td>
+</tr>
+<tr class="row-even"><td>arbitrary</td>
+<td>none</td>
+<td>✔</td>
+<td>✕</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="section" id="feature-calculation">
+<h2>Feature calculation<a class="headerlink" href="#feature-calculation" title="Permalink to this headline">¶</a></h2>
+<p>Feature calculation is the final processing step where feature
+descriptors are used to quantify characteristics of the ROI. After
+calculation such features may be used as image biomarkers by relating
+them to physiological and medical outcomes of interest. Feature
+calculation is handled in full details in the next chapter.</p>
+<p>Let us recall that the image processing steps leading to image biomarker
+calculations can be performed in many different ways, notably in terms
+of spatial filtering, segmentation, interpolation and discretisation
+parameters. Furthermore, it is plausible that different texture features
+will better quantify the characteristics of the ROI when computed using
+different image processing parameters. For example, a lower number of
+grey levels in the discretisation process (e.g. 8 or 16) may allow to
+better characterize the sub-regions of the ROI using <em>grey level size
+zone matrix</em> (GLSZM) features, whereas <em>grey level co-occurence matrix</em> (GLCM)
+features may be better modeled with a higher number of grey levels (e.g.
+32 or 64). Overall, these possible differences opens the door to the
+optimization of image processing parameters for each different feature
+in terms of a specific objective. For the specific case of the
+optimization of image interpolation and discretisation prior to texture
+analysis, Vallières <em>et al.</em> <a class="reference internal" href="References.html#vallieres2015" id="id50">[Vallieres2015]</a> have
+named this process <em>texture optimization</em>. The authors notably suggested
+that the <em>texture optimization</em> process could have significant influence
+of the prognostic capability of subsequent features. In another
+study <a class="reference internal" href="References.html#vallieres2017" id="id51">[Vallieres2017]</a>, the authors constructed
+predictive models using textures calculated from all possible
+combinations of PET and CT images interpolated at four isotropic
+resolutions and discretised with two different algorithms and four
+numbers of grey levels.</p>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="03_Image_features.html" class="btn btn-neutral float-right" title="Image features" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="01_Introduction.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright test
+      
+        <span class="commit">
+          Revision <code>b952e71e</code>.
+        </span>
+      
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+   
+
+</body>
+</html>

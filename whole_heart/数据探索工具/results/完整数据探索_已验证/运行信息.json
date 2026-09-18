@@ -1,0 +1,132 @@
+{
+  "created_at": "2026-09-18T21:36:03.383783+08:00",
+  "input": "D:\\code_project\\whole_heart\\Wholeheart_Train_Dataset",
+  "output": "C:\\Users\\ruichen\\AppData\\Local\\Temp\\whole_heart_explorer\\results\\完整数据探索_已验证",
+  "discovered_cases": 106,
+  "processed_cases": 106,
+  "partial_run": false,
+  "input_file_count": 212,
+  "input_bytes": 4934524897,
+  "input_size_and_mtime_unchanged": true,
+  "fully_read_cases": 106,
+  "intensity_sample_limit": 200000,
+  "sampling": "每例按现有内存顺序固定步长均匀抽样；包括背景；分位数为估计值",
+  "duplicate_hash_enabled": true,
+  "font": "Microsoft YaHei",
+  "versions": {
+    "python": "3.14.3",
+    "numpy": "2.4.2",
+    "nibabel": "5.4.2",
+    "matplotlib": "3.10.8"
+  },
+  "preview_count": 10,
+  "preview_errors": [],
+  "figure_index": [
+    [
+      "数据构成",
+      "figures/01_groups.png"
+    ],
+    [
+      "体素间距",
+      "figures/02_spacing.png"
+    ],
+    [
+      "尺寸与覆盖范围",
+      "figures/03_size_fov.png"
+    ],
+    [
+      "影像灰度分布",
+      "figures/04_intensity.png"
+    ],
+    [
+      "七种结构体积",
+      "figures/05_label_volumes.png"
+    ],
+    [
+      "背景与类别比例",
+      "figures/06_class_balance.png"
+    ]
+  ],
+  "preview_index": [
+    [
+      "代表病例：A ct_train / Case1001",
+      "figures/case_001_Case1001.png",
+      [
+        "A ct_train",
+        "Case1001"
+      ]
+    ],
+    [
+      "代表病例：B ct_train / Case2001",
+      "figures/case_002_Case2001.png",
+      [
+        "B ct_train",
+        "Case2001"
+      ]
+    ],
+    [
+      "代表病例：C and D mr_train / Case3001",
+      "figures/case_003_Case3001.png",
+      [
+        "C and D mr_train",
+        "Case3001"
+      ]
+    ],
+    [
+      "代表病例：E mr_train / Case5001",
+      "figures/case_004_Case5001.png",
+      [
+        "E mr_train",
+        "Case5001"
+      ]
+    ],
+    [
+      "代表病例：G ct_train / Case7001",
+      "figures/case_005_Case7001.png",
+      [
+        "G ct_train",
+        "Case7001"
+      ]
+    ],
+    [
+      "需核实病例：B ct_train / Case2009",
+      "figures/case_006_Case2009.png",
+      [
+        "B ct_train",
+        "Case2009"
+      ]
+    ],
+    [
+      "需核实病例：B ct_train / Case2017",
+      "figures/case_007_Case2017.png",
+      [
+        "B ct_train",
+        "Case2017"
+      ]
+    ],
+    [
+      "需核实病例：C and D mr_train / Case3010",
+      "figures/case_008_Case3010.png",
+      [
+        "C and D mr_train",
+        "Case3010"
+      ]
+    ],
+    [
+      "需核实病例：E mr_train / Case5006",
+      "figures/case_009_Case5006.png",
+      [
+        "E mr_train",
+        "Case5006"
+      ]
+    ],
+    [
+      "需核实病例：E mr_train / Case5015",
+      "figures/case_010_Case5015.png",
+      [
+        "E mr_train",
+        "Case5015"
+      ]
+    ]
+  ]
+}

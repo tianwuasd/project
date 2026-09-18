@@ -1,0 +1,247 @@
+[
+  {
+    "target": "https://arxiv.org/",
+    "probe_url": "https://arxiv.org/",
+    "hostname": "arxiv.org",
+    "classification": "foreign",
+    "matched_rule": "foreign domain rule arxiv.org",
+    "decision": "proxy",
+    "proxy_url": "http://127.0.0.1:7897",
+    "reason": "Foreign targets must use proxy 7897, and the proxied route is reachable.",
+    "environment": {},
+    "probes": {
+      "proxy_listener": {
+        "reachable": true,
+        "status": null,
+        "latency_ms": 0,
+        "error": null
+      },
+      "selected_route": {
+        "reachable": true,
+        "status": 200,
+        "latency_ms": 1482,
+        "error": null
+      }
+    }
+  },
+  {
+    "target": "https://ibsi.readthedocs.io/",
+    "probe_url": "https://ibsi.readthedocs.io/",
+    "hostname": "ibsi.readthedocs.io",
+    "classification": "foreign",
+    "matched_rule": "unlisted public hostname defaults to foreign",
+    "decision": "proxy",
+    "proxy_url": "http://127.0.0.1:7897",
+    "reason": "Foreign targets must use proxy 7897, and the proxied route is reachable.",
+    "environment": {},
+    "probes": {
+      "proxy_listener": {
+        "reachable": true,
+        "status": null,
+        "latency_ms": 0,
+        "error": null
+      },
+      "selected_route": {
+        "reachable": true,
+        "status": 302,
+        "latency_ms": 1593,
+        "error": "HTTP Error 302: Found"
+      }
+    }
+  },
+  {
+    "target": "https://metrics-reloaded.dkfz.de/",
+    "probe_url": "https://metrics-reloaded.dkfz.de/",
+    "hostname": "metrics-reloaded.dkfz.de",
+    "classification": "foreign",
+    "matched_rule": "unlisted public hostname defaults to foreign",
+    "decision": "blocked",
+    "proxy_url": null,
+    "reason": "Foreign target requires proxy 7897, but the proxy route is unavailable; direct fallback is disabled.",
+    "environment": {},
+    "probes": {
+      "proxy_listener": {
+        "reachable": true,
+        "status": null,
+        "latency_ms": 1,
+        "error": null
+      },
+      "selected_route": {
+        "reachable": false,
+        "status": null,
+        "latency_ms": 5048,
+        "error": "<urlopen error _ssl.c:1063: The handshake operation timed out>"
+      }
+    }
+  },
+  {
+    "target": "https://pmc.ncbi.nlm.nih.gov/",
+    "probe_url": "https://pmc.ncbi.nlm.nih.gov/",
+    "hostname": "pmc.ncbi.nlm.nih.gov",
+    "classification": "foreign",
+    "matched_rule": "unlisted public hostname defaults to foreign",
+    "decision": "blocked",
+    "proxy_url": null,
+    "reason": "Foreign target requires proxy 7897, but the proxy route is unavailable; direct fallback is disabled.",
+    "environment": {},
+    "probes": {
+      "proxy_listener": {
+        "reachable": true,
+        "status": null,
+        "latency_ms": 0,
+        "error": null
+      },
+      "selected_route": {
+        "reachable": false,
+        "status": null,
+        "latency_ms": 957,
+        "error": "<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1081)>"
+      }
+    }
+  },
+  {
+    "target": "https://project-monai.github.io/",
+    "probe_url": "https://project-monai.github.io/",
+    "hostname": "project-monai.github.io",
+    "classification": "foreign",
+    "matched_rule": "foreign domain rule github.io",
+    "decision": "proxy",
+    "proxy_url": "http://127.0.0.1:7897",
+    "reason": "Foreign targets must use proxy 7897, and the proxied route is reachable.",
+    "environment": {},
+    "probes": {
+      "proxy_listener": {
+        "reachable": true,
+        "status": null,
+        "latency_ms": 1,
+        "error": null
+      },
+      "selected_route": {
+        "reachable": true,
+        "status": 200,
+        "latency_ms": 1499,
+        "error": null
+      }
+    }
+  },
+  {
+    "target": "https://pubs.rsna.org/",
+    "probe_url": "https://pubs.rsna.org/",
+    "hostname": "pubs.rsna.org",
+    "classification": "foreign",
+    "matched_rule": "unlisted public hostname defaults to foreign",
+    "decision": "proxy",
+    "proxy_url": "http://127.0.0.1:7897",
+    "reason": "Foreign targets must use proxy 7897, and the proxied route is reachable.",
+    "environment": {},
+    "probes": {
+      "proxy_listener": {
+        "reachable": true,
+        "status": null,
+        "latency_ms": 1,
+        "error": null
+      },
+      "selected_route": {
+        "reachable": true,
+        "status": 403,
+        "latency_ms": 2443,
+        "error": "HTTP Error 403: Forbidden"
+      }
+    }
+  },
+  {
+    "target": "https://raw.githubusercontent.com/",
+    "probe_url": "https://raw.githubusercontent.com/",
+    "hostname": "raw.githubusercontent.com",
+    "classification": "foreign",
+    "matched_rule": "foreign domain rule githubusercontent.com",
+    "decision": "proxy",
+    "proxy_url": "http://127.0.0.1:7897",
+    "reason": "Foreign targets must use proxy 7897, and the proxied route is reachable.",
+    "environment": {},
+    "probes": {
+      "proxy_listener": {
+        "reachable": true,
+        "status": null,
+        "latency_ms": 0,
+        "error": null
+      },
+      "selected_route": {
+        "reachable": true,
+        "status": 301,
+        "latency_ms": 1316,
+        "error": "HTTP Error 301: Moved Permanently"
+      }
+    }
+  },
+  {
+    "target": "https://simpleitk.readthedocs.io/",
+    "probe_url": "https://simpleitk.readthedocs.io/",
+    "hostname": "simpleitk.readthedocs.io",
+    "classification": "foreign",
+    "matched_rule": "unlisted public hostname defaults to foreign",
+    "decision": "proxy",
+    "proxy_url": "http://127.0.0.1:7897",
+    "reason": "Foreign targets must use proxy 7897, and the proxied route is reachable.",
+    "environment": {},
+    "probes": {
+      "proxy_listener": {
+        "reachable": true,
+        "status": null,
+        "latency_ms": 0,
+        "error": null
+      },
+      "selected_route": {
+        "reachable": true,
+        "status": 302,
+        "latency_ms": 1485,
+        "error": "HTTP Error 302: Found"
+      }
+    }
+  },
+  {
+    "target": "https://theibsi.github.io/",
+    "probe_url": "https://theibsi.github.io/",
+    "hostname": "theibsi.github.io",
+    "classification": "foreign",
+    "matched_rule": "foreign domain rule github.io",
+    "decision": "proxy",
+    "proxy_url": "http://127.0.0.1:7897",
+    "reason": "Foreign targets must use proxy 7897, and the proxied route is reachable.",
+    "environment": {},
+    "probes": {
+      "proxy_listener": {
+        "reachable": true,
+        "status": null,
+        "latency_ms": 21,
+        "error": null
+      },
+      "selected_route": {
+        "reachable": true,
+        "status": 200,
+        "latency_ms": 1519,
+        "error": null
+      }
+    }
+  },
+  {
+    "target": "https://zmic.org.cn/",
+    "probe_url": "https://zmic.org.cn/",
+    "hostname": "zmic.org.cn",
+    "classification": "domestic",
+    "matched_rule": "domestic suffix .cn",
+    "decision": "direct",
+    "proxy_url": null,
+    "reason": "Domestic targets must connect directly, and the direct route is reachable.",
+    "environment": {},
+    "probes": {
+      "proxy_listener": null,
+      "selected_route": {
+        "reachable": true,
+        "status": 301,
+        "latency_ms": 71,
+        "error": "HTTP Error 301: Moved Permanently"
+      }
+    }
+  }
+]

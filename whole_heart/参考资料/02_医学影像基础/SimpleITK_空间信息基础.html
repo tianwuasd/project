@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fundamental Concepts &mdash; SimpleITK 2.4.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css" />
+      <link rel="stylesheet" type="text/css" href="_static/style.css" />
+
+  
+    <link rel="shortcut icon" href="_static/yellow_itk_icon.svg"/>
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Registration Overview" href="registrationOverview.html" />
+    <link rel="prev" title="Getting Started" href="gettingStarted.html" /> 
+<script async type="text/javascript" src="/_/static/javascript/readthedocs-addons.js"></script><meta name="readthedocs-project-slug" content="simpleitk" /><meta name="readthedocs-version-slug" content="master" /><meta name="readthedocs-resolver-filename" content="/fundamentalConcepts.html" /><meta name="readthedocs-http-status" content="200" /></head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            SimpleITK
+              <img src="_static/simpleitk_logo.png" class="logo" alt="Logo"/>
+          </a>
+              <div class="version">
+                2.4
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Table of Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gettingStarted.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Fundamental Concepts</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#images">Images</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#channels">Channels</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#additional-resources">Additional Resources</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#transforms">Transforms</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id1">Additional Resources</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#resampling">Resampling</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#common-errors">Common Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id3">Additional Resources</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="registrationOverview.html">Registration Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="conventions.html">Common Conventions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="IO.html">Reading and Writing for Images and Transforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="filters.html">SimpleITK Filters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="building.html">Building SimpleITK</a></li>
+<li class="toctree-l1"><a class="reference internal" href="setUp.html">Setting Up Eclipse and Visual Studio</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorialsAndCourses.html">Tutorials and Courses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="migrationGuide2.0.html">Migration Guide 2.0</a></li>
+<li class="toctree-l1"><a class="reference internal" href="FilterTemplates.html">Developer</a></li>
+<li class="toctree-l1"><a class="reference internal" href="link_examples.html">Examples</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">SimpleITK</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Fundamental Concepts</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/fundamentalConcepts.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="fundamental-concepts">
+<span id="lbl-fundamental-concepts"></span><h1>Fundamental Concepts<a class="headerlink" href="#fundamental-concepts" title="Permalink to this heading"></a></h1>
+<p>The two basic elements which are at the heart of SimpleITK are images and
+spatial transformations. These follow the same conventions as the ITK components
+which they represent. The fundamental underlying concepts are described below.</p>
+<section id="images">
+<h2>Images<a class="headerlink" href="#images" title="Permalink to this heading"></a></h2>
+<p>The fundamental tenet of an image in ITK and consequentially in SimpleITK is
+that an image is defined by a set of points on a grid occupying a <strong>physical region
+in space</strong>. This significantly differs from many other image analysis libraries
+that treat an image as an array which has two implications: (1) pixel/voxel spacing
+is assumed to be isotropic and (2) there is no notion of an image’s location in
+physical space.</p>
+<p>SimpleITK images are multi-dimensional ( the default configuration
+includes images from 2D upto 5D ) and can be a scalar, labelmap
+(scalar with run length encoding), complex value or have an arbitrary
+number of  scalar channels ( also known as a vector image). The region
+in physical space which an image occupies is defined by the image’s:</p>
+<ol class="arabic simple">
+<li><p>Origin (vector like type) - location in the world coordinate system of
+the voxel with all zero indexes.</p></li>
+<li><p>Spacing (vector like type) - distance between pixels along each of the
+dimensions.</p></li>
+<li><p>Size (vector like type) - number of pixels in each dimension.</p></li>
+<li><p>Direction cosine matrix (vector like type representing matrix in row major order) -
+direction of each of the axes corresponding to the matrix columns.</p></li>
+</ol>
+<p>The meaning of each of these meta-data elements
+is visually illustrated in <a class="reference internal" href="#lbl-image-metadata"><span class="std std-ref">this figure</span></a>.</p>
+<figure class="align-default" id="id5">
+<span id="lbl-image-metadata"></span><img alt="Image meta-data." src="_images/ImageOriginAndSpacing.svg" /><figcaption>
+<p><span class="caption-text">An image in SimpleITK occupies a region in physical space which is defined by
+its meta-data (origin, size, spacing, and direction cosine matrix). Note that
+the image’s physical extent starts half a voxel before the origin and ends half
+a voxel beyond the last voxel.</span><a class="headerlink" href="#id5" title="Permalink to this image"></a></p>
+</figcaption>
+</figure>
+<p>In SimpleITK, when we construct an image we specify its dimensionality, size and pixel
+type, all other components are set to <strong>reasonable default values</strong>:</p>
+<ol class="arabic simple">
+<li><p>origin - all zeros.</p></li>
+<li><p>spacing - all ones.</p></li>
+<li><p>direction - identity.</p></li>
+<li><p>intensities in all channels - all zero.</p></li>
+</ol>
+<p>In the following Python code snippet we illustrate how to create a 2D image with five
+float valued channels per pixel, origin set to (3, 14) and a spacing of (0.5, 2).
+Note that the metric units associated with the location of the image origin
+in the world coordinate system and the spacing between pixels are unknown
+(km, m, cm, mm,…). It is up to you the developer to be consistent. More about
+that <a class="reference internal" href="#lbl-metric-units"><span class="std std-ref">below</span></a>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">image</span> <span class="o">=</span> <span class="n">sitk</span><span class="o">.</span><span class="n">Image</span><span class="p">([</span><span class="mi">10</span><span class="p">,</span><span class="mi">10</span><span class="p">],</span> <span class="n">sitk</span><span class="o">.</span><span class="n">sitkVectorFloat32</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+<span class="n">image</span><span class="o">.</span><span class="n">SetOrigin</span><span class="p">((</span><span class="mf">3.0</span><span class="p">,</span> <span class="mf">14.0</span><span class="p">))</span>
+<span class="n">image</span><span class="o">.</span><span class="n">SetSpacing</span><span class="p">((</span><span class="mf">0.5</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>The tenet that images occupy a spatial location in the physical world has to do with
+the original application domain of ITK and SimpleITK, medical imaging. In that domain
+images represent anatomical structures with metric sizes and spatial locations.
+Additionally, the spacing between voxels is often non-isotropic (most commonly the
+spacing along the inferior-superior/foot-to-head direction is larger). Viewers that
+treat images as an array will display a distorted image as shown in
+<a class="reference internal" href="#lbl-isotropy"><span class="std std-ref">this figure</span></a>.</p>
+<figure class="align-default" id="id6">
+<span id="lbl-isotropy"></span><img alt="nonisotropic vs. isotropic pixels." src="_images/nonisotropicVsIsotropic.svg" /><figcaption>
+<p><span class="caption-text">The same image displayed with a viewer that is not aware of spatial meta-data
+(left image) and one that is aware (right image). The image’s pixel spacing is (0.97656, 2.0)mm.</span><a class="headerlink" href="#id6" title="Permalink to this image"></a></p>
+</figcaption>
+</figure>
+<p>As an image is also defined by its spatial location, two images with the same pixel data
+and spacing may not be considered equivalent. Think of two CT scans of the same patient
+acquired at different sites. <a class="reference internal" href="#lbl-spatial-location"><span class="std std-ref">This figure</span></a>
+illustrates the notion of spatial location in
+the physical world, the two images are considered different even though
+the intensity values and pixel spacing are the same.</p>
+<figure class="align-default" id="id7">
+<span id="lbl-spatial-location"></span><img alt="images are spatial objects" src="_images/spatialRelationship.svg" /><figcaption>
+<p><span class="caption-text">Two images with exactly the same pixel data, positioned in the world coordinate
+system. In SimpleITK these are not considered the same image, because they occupy
+different spatial locations. The image on the left
+has its origin at (-136.3, -20.5) with a direction cosine matrix, in row
+major order, of (0.7, -0.7, 0.7, 0.7), <span class="math notranslate nohighlight">\(\left[\begin{array}{cc}0.7&amp;-0.7\\0.7&amp;0.7\end{array}\right]\)</span>.
+The image on the right’s origin is
+(16.9, 21.4) with a direction cosine matrix of (1,0,0,1), <span class="math notranslate nohighlight">\(\left[\begin{array}{cc}1&amp;0\\0&amp;1\end{array}\right]\)</span>.</span><a class="headerlink" href="#id7" title="Permalink to this image"></a></p>
+</figcaption>
+</figure>
+<p id="lbl-metric-units">As SimpleITK images occupy a physical region in space, the quantities defining
+this region have metric units (cm, mm, etc.). In general SimpleITK assume units are in
+millimeters (historical reasons, due to DICOM standard). In practice SimpleITK is not aware
+of the specific units associated with each image, it just assumes that they are consistent.
+Thus, it is up to you the developer to ensure that all of the images you read and created
+are using the same units. Mixing units and using wrong
+units has <a class="reference external" href="https://en.wikipedia.org/wiki/Mars_Climate_Orbiter">not ended well in the past</a>.</p>
+<p>Finally, having convinced you to think of images as objects occupying a physical region
+in space, we need to answer two questions:</p>
+<ol class="arabic">
+<li><p>How do you access the pixel values in an image?</p>
+<ol class="loweralpha">
+<li><p>In dynamically typed languages such as Python and R use a type agnostic function:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">image</span><span class="o">.</span><span class="n">GetPixel</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">))</span>
+</pre></div>
+</div>
+</li>
+<li><p>In statically typed languages such as C# and C++ use type specific functions:</p>
+<div class="highlight-C++ notranslate"><div class="highlight"><pre><span></span><span class="n">image</span><span class="p">.</span><span class="n">GetPixelAsUInt8</span><span class="p">(</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">}</span><span class="w"> </span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<p>SimpleITK functions use a zero based indexing scheme. The toolkit also includes
+syntactic sugar that allows one to use the bracket operator in combination with
+the native zero/one based indexing scheme (e.g. a one
+based indexing in R vs. the zero based indexing in Python).</p>
+</li>
+<li><p>How do you determine the physical location of a pixel:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">image</span><span class="o">.</span><span class="n">TransformIndexToPhysicalPoint</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>This computation can also be done manually using the meta-data defining the
+image’s spatial location, but we highly recommend that you do not do so as it
+is error prone.</p>
+</li>
+</ol>
+<section id="channels">
+<h3>Channels<a class="headerlink" href="#channels" title="Permalink to this heading"></a></h3>
+<p>As stated above, a SimpleITK image can have an arbitrary number of
+channels with the content of the channels being a scalar or complex value. This
+is determined when an image is created.</p>
+<p>In the medical domain, many image types have a single scalar channel (e.g. CT, US).
+Another common image type is a three channel image where each channel has scalar
+values in [0,255], often people refer to such an image as an RGB image. This terminology
+implies that the three channels should be interpreted using the
+<a class="reference external" href="https://en.wikipedia.org/wiki/RGB_color_space">RGB color space</a>. In some cases you
+can have the same image type, but the channel values represent another color space, such as <a class="reference external" href="https://en.wikipedia.org/wiki/HSL_and_HSV">HSV</a> (it decouples the color and intensity
+information and is a bit more invariant to illumination changes).
+SimpleITK has no concept of color space, thus in both cases it will simply view a pixel value as a
+3-tuple.</p>
+<p>Word of caution: In some cases looks may be deceiving. Gray scale images are not always
+stored as a single channel image. In some cases an image that looks like a gray scale
+image is actually a three channel image with the intensity values repeated in each of
+the channels. Even worse, some gray scale images can be four
+channel images with the channels representing RGBA and the alpha channel set to all 255. This can
+result in a significant waste of memory and computation time. Always become familiar with your data.</p>
+</section>
+<section id="additional-resources">
+<h3>Additional Resources<a class="headerlink" href="#additional-resources" title="Permalink to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>The API for the SimpleITK
+<a class="reference external" href="https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1Image.html">Image class</a>
+in Doxygen format.</p></li>
+<li><p>To really understand the structure of SimpleITK images and how to work with them,
+we recommend some hands-on interaction using the
+<a class="reference external" href="https://github.com/InsightSoftwareConsortium/SimpleITK-Notebooks">SimpleITK Jupyter notebooks</a>
+(Python and R only).</p></li>
+</ol>
+</section>
+</section>
+<section id="transforms">
+<span id="lbl-transforms"></span><h2>Transforms<a class="headerlink" href="#transforms" title="Permalink to this heading"></a></h2>
+<p>SimpleITK supports two types of spatial transforms, ones with a global (unbounded)
+spatial domain and ones with a bounded spatial domain. Points in SimpleITK are
+mapped by the transform using the <cite>TransformPoint</cite> method.</p>
+<p>All <strong>global domain transforms</strong> are of the form:</p>
+<div class="math notranslate nohighlight">
+\[T(\mathbf{x}) = A(\mathbf{x}-\mathbf{c}) + \mathbf{t} + \mathbf{c}\]</div>
+<p>The nomenclature used in the documentation refers to the components of the transformations
+as follows:</p>
+<ul class="simple">
+<li><p>Matrix - the matrix <span class="math notranslate nohighlight">\(A\)</span>.</p></li>
+<li><p>Center - the point <span class="math notranslate nohighlight">\(\mathbf{c}\)</span>.</p></li>
+<li><p>Translation - the vector <span class="math notranslate nohighlight">\(\mathbf{t}\)</span>.</p></li>
+<li><p>Offset - the expression <span class="math notranslate nohighlight">\(\mathbf{t} + \mathbf{c} - A\mathbf{c}\)</span>.</p></li>
+</ul>
+<p>A variety of global 2D and 3D transformations are available
+(translation, rotation, rigid, similarity, affine…). Some of these
+transformations are available with various
+parameterizations which are useful for registration purposes.</p>
+<p>The second type of spatial transformation, <strong>bounded domain transformations</strong>, are
+defined to be identity outside their domain. These include the B-spline deformable
+transformation, often referred to as Free-Form Deformation, and the displacement
+field transformation.</p>
+<p>The B-spline transform uses a grid of control points to represent a
+spline based transformation. To specify the transformation the user defines the
+number of control points and the spatial region which they overlap. The spline
+order can also be set, though the default of cubic is appropriate in most cases.
+The displacement field transformation uses a dense set of vectors representing
+displacement in a bounded spatial domain. It has no implicit constraints on
+transformation continuity or smoothness.</p>
+<p>Finally, SimpleITK supports a <strong>composite transformation</strong> with either a bounded or
+global domain. This transformation represents multiple transformations applied
+one after the other <span class="math notranslate nohighlight">\(T_0(T_1(T_2(...T_n(p)...)))\)</span>. The semantics are
+stack based, that is, first in last applied:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">composite_transform</span> <span class="o">=</span> <span class="n">CompositeTransform</span><span class="p">([</span><span class="n">T0</span><span class="p">,</span> <span class="n">T1</span><span class="p">])</span>
+<span class="n">composite_transform</span><span class="o">.</span><span class="n">AddTransform</span><span class="p">(</span><span class="n">T2</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>In the context of registration, if you use a composite transform as the transformation
+that is optimized, only the parameters of the last transformation <span class="math notranslate nohighlight">\(T_n\)</span> will
+be optimized over.</p>
+<section id="id1">
+<h3>Additional Resources<a class="headerlink" href="#id1" title="Permalink to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>The API for the SimpleITK transformation classes is available in Doxygen format:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1TranslationTransform.html">2D or 3D translation</a>.</p></li>
+<li><p><a class="reference external" href="https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1VersorTransform.html">VersorTransform</a>.</p></li>
+<li><p><a class="reference external" href="https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1Euler2DTransform.html">Euler2DTransform</a>
+and <a class="reference external" href="https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1Euler3DTransform.html">Euler3DTransform</a>.</p></li>
+<li><p><a class="reference external" href="https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1Similarity2DTransform.html">Similarity2DTransform</a>
+and <a class="reference external" href="https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1Similarity3DTransform.html">Similarity3DTransform</a>.</p></li>
+<li><p><a class="reference external" href="https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1ScaleTransform.html">2D or 3D ScaleTransform</a>.</p></li>
+<li><p><a class="reference external" href="https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1ScaleVersor3DTransform.html">ScaleVersor3DTransform</a>.</p></li>
+<li><p><a class="reference external" href="https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1ScaleSkewVersor3DTransform.html">ScaleSkewVersor3DTransform</a>.</p></li>
+<li><p><a class="reference external" href="https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1ComposeScaleSkewVersor3DTransform.html">ComposeScaleSkewVersor3DTransform</a>.</p></li>
+<li><p><a class="reference external" href="https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1AffineTransform.html">2D or 3D AffineTransform</a>.</p></li>
+<li><p><a class="reference external" href="https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1BSplineTransform.html">2D or 3D BSplineTransform</a>.</p></li>
+<li><p><a class="reference external" href="https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1DisplacementFieldTransform.html">2D or 3D DisplacementFieldTransform</a>.</p></li>
+<li><p><a class="reference external" href="https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1CompositeTransform.html">CompositeTransform</a>.</p></li>
+<li><p><a class="reference external" href="https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1Transform.html">Transform</a>.</p></li>
+</ul>
+</li>
+<li><p>To really understand the structure of SimpleITK transforms and how to work with them,
+we recommend some hands-on interaction using the
+<a class="reference external" href="https://github.com/InsightSoftwareConsortium/SimpleITK-Notebooks">SimpleITK Jupyter notebooks</a>
+(Python and R only).</p></li>
+</ol>
+</section>
+</section>
+<section id="resampling">
+<h2>Resampling<a class="headerlink" href="#resampling" title="Permalink to this heading"></a></h2>
+<p>Resampling, as the verb implies, is the action of sampling an image, which itself
+is a sampling of an original continuous signal.</p>
+<p>Generally speaking, resampling in SimpleITK involves four components:</p>
+<ol class="arabic simple">
+<li><p>Image - the image we resample, given in coordinate system <span class="math notranslate nohighlight">\(m\)</span>.</p></li>
+<li><p>Resampling grid - a regular grid of points given in coordinate system <span class="math notranslate nohighlight">\(f\)</span>
+which will be mapped to coordinate system <span class="math notranslate nohighlight">\(m\)</span>.</p></li>
+<li><p>Transformation <span class="math notranslate nohighlight">\(T_f^m\)</span> - maps points from coordinate system <span class="math notranslate nohighlight">\(f\)</span>
+to coordinate system <span class="math notranslate nohighlight">\(m\)</span>, <span class="math notranslate nohighlight">\(^mp = T_f^m(^fp)\)</span>.</p></li>
+<li><p>Interpolator - method for obtaining the intensity values at arbitrary points
+in coordinate system <span class="math notranslate nohighlight">\(m\)</span> from the values of the points defined by the Image.</p></li>
+</ol>
+<p>While SimpleITK provides a large number of interpolation methods, the two most
+commonly used are sitkLinear and sitkNearestNeighbor. The former is used for
+most interpolation tasks and is a compromise between accuracy and computational
+efficiency. The later is used to interpolate labeled images representing a
+segmentation. It is the only interpolation approach which will not introduce
+new labels into the result.</p>
+<p>The SimpleITK interface includes three variants for specifying the resampling grid:</p>
+<ol class="arabic simple">
+<li><p>Use the same grid as defined by the resampled image.</p></li>
+<li><p>Provide a second, reference, image which defines the grid.</p></li>
+<li><p>Specify the grid using: size, origin, spacing, and direction cosine matrix.</p></li>
+</ol>
+<p>Points that are mapped outside of the resampled image’s spatial extent in physical
+space are set to a constant pixel value which you provide (default is zero).</p>
+<section id="common-errors">
+<h3>Common Errors<a class="headerlink" href="#common-errors" title="Permalink to this heading"></a></h3>
+<p>It is not uncommon to end up with an empty (all black) image after resampling.
+This is due to:</p>
+<ol class="arabic simple">
+<li><p>Using wrong settings for the resampling grid (not too common, but does happen).</p></li>
+<li><p>Using the inverse of the transformation <span class="math notranslate nohighlight">\(T_f^m\)</span>. This is a relatively
+common error, which is readily addressed by invoking the transformation’s
+<cite>GetInverse</cite> method.</p></li>
+</ol>
+</section>
+<section id="id3">
+<h3>Additional Resources<a class="headerlink" href="#id3" title="Permalink to this heading"></a></h3>
+<ol class="arabic simple">
+<li><p>The API for the SimpleITK
+<a class="reference external" href="https://simpleitk.org/doxygen/latest/html/classitk_1_1simple_1_1ResampleImageFilter.html">ResampleImageFilter class</a>
+in Doxygen format. The procedural interface for this class supports the three variations for specifying the
+resampling grid described above.</p></li>
+<li><p>To really understand the structure of SimpleITK images and how to work with them
+we recommend some hands-on interaction using the
+<a class="reference external" href="https://github.com/InsightSoftwareConsortium/SimpleITK-Notebooks">SimpleITK Jupyter notebooks</a>
+(Python and R only).</p></li>
+</ol>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="gettingStarted.html" class="btn btn-neutral float-left" title="Getting Started" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="registrationOverview.html" class="btn btn-neutral float-right" title="Registration Overview" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025 NumFOCUS.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

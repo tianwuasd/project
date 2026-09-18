@@ -1,0 +1,6 @@
+﻿病例,数据组,模态,code,severity,detail
+Case2009,B ct_train,CT,invalid_affine,错误,影像首选空间矩阵无效/奇异；不自动修复
+Case2017,B ct_train,CT,invalid_affine,错误,影像首选空间矩阵无效/奇异；不自动修复
+Case3010,C and D mr_train,MRI,unexpected_label,需核实,非官方取值：421 (8284 体素)
+Case5006,E mr_train,MRI,duplicate_file,需核实,"image_sha256 完全相同的文件：['E mr_train/Case5006', 'E mr_train/Case5015']；实验划分时需避免同一影像跨集合；对应标签文件哈希不同（可能为标注或文件头差异），请核实"
+Case5015,E mr_train,MRI,duplicate_file,需核实,"image_sha256 完全相同的文件：['E mr_train/Case5006', 'E mr_train/Case5015']；实验划分时需避免同一影像跨集合；对应标签文件哈希不同（可能为标注或文件头差异），请核实"

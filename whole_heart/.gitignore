@@ -1,0 +1,13 @@
+# 原始数据集仅保存在本地，不上传 GitHub。
+/Wholeheart_Train_Dataset/
+*.nii
+*.nii.gz
+
+# 本机运行环境及缓存。
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.DS_Store
+Thumbs.db
