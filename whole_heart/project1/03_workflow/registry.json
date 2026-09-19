@@ -1,0 +1,47 @@
+[
+  {
+    "source": "D:\\code_project\\academic_tools\\skills\\academic-research-skills\\academic-pipeline\\SKILL.md",
+    "snapshot": "03_workflow/skill_snapshots/academic-pipeline.md",
+    "sha256": "6abac2bc0524bbd559b8af69eb0b24d45bccb8d040a89d7afaedb75bfdc35677"
+  },
+  {
+    "source": "D:\\code_project\\academic_tools\\skills\\academic-research-skills\\deep-research\\SKILL.md",
+    "snapshot": "03_workflow/skill_snapshots/deep-research.md",
+    "sha256": "8b14a1af1db0d15c765730adc138b9de6afde245c561198c68e3a4888b5ca8c5"
+  },
+  {
+    "source": "D:\\code_project\\academic_tools\\skills\\academic-research-skills-codex\\skills\\academic-research-suite\\SKILL.md",
+    "snapshot": "03_workflow/skill_snapshots/codex_adapter.md",
+    "sha256": "1795ecf9d56aad189bc36b6db1c67dd87166c85922ff4790d6bd49af505885c0"
+  },
+  {
+    "source": "D:\\code_project\\academic_tools\\skills\\academic-research-skills-codex\\skills\\academic-research-suite\\ars\\experiment-agent\\WORKFLOW.md",
+    "snapshot": "03_workflow/skill_snapshots/experiment-agent.md",
+    "sha256": "6d984f36be84c3f9249f68ef0c599155978b5a661d172e2bb4db2205fdc720f3"
+  },
+  {
+    "source": "D:\\code_project\\academic_tools\\skills\\academic-research-skills-codex\\skills\\academic-research-suite\\ars\\experiment-agent\\templates\\code_experiment_plan.md",
+    "snapshot": "03_workflow/skill_snapshots/code_experiment_plan_template.md",
+    "sha256": "f92503033a45020a15dfdfb6d4c2c83cde580bf27f3ff9ba2f5b713c63d9987f"
+  },
+  {
+    "source": "D:\\code_project\\academic_tools\\skills\\academic-research-skills\\LICENSE",
+    "snapshot": "03_workflow/skill_snapshots/ARS_LICENSE.txt",
+    "sha256": "164f886a1b137a1899c31ff711aa93d9000d51f5fbc5ff2727fb4b924a95e1c9"
+  },
+  {
+    "source": "D:\\code_project\\academic_tools\\skills\\academic-research-skills\\deep-research\\agents\\research_question_agent.md",
+    "snapshot": "03_workflow/agent_roles/research_question_agent.md",
+    "sha256": "c6405e0a9663d1cb5e34d5f863b61815eb300c9c11905ce584a5adfd41a24ac7"
+  },
+  {
+    "source": "D:\\code_project\\academic_tools\\skills\\academic-research-skills\\deep-research\\agents\\research_architect_agent.md",
+    "snapshot": "03_workflow/agent_roles/research_architect_agent.md",
+    "sha256": "164e2f9258110a94fc35f65ccd5ffbb8c1972a6193fb441676b7617bc95692f1"
+  },
+  {
+    "source": "D:\\code_project\\academic_tools\\skills\\academic-research-skills\\deep-research\\agents\\devils_advocate_agent.md",
+    "snapshot": "03_workflow/agent_roles/devils_advocate_agent.md",
+    "sha256": "5055115ae72680ac116665f72777a60207e07ee4cb4ae9aa615e2b4f85adeee9"
+  }
+]

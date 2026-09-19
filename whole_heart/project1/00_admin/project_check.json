@@ -1,0 +1,34 @@
+{
+  "status": "passed",
+  "total_cases": 106,
+  "quarantined": [
+    "Case2009",
+    "Case2017",
+    "Case3010",
+    "Case5006",
+    "Case5015"
+  ],
+  "eligible_by_modality": {
+    "CT": 58,
+    "MRI": 43
+  },
+  "eligible_by_group": {
+    "A ct_train": 20,
+    "B ct_train": 18,
+    "C and D mr_train": 19,
+    "E mr_train": 24,
+    "G ct_train": 20
+  },
+  "relative_links_checked": 13,
+  "pdfs": [
+    {
+      "path": "02_materials/pdf/CARE_cross_site_2608.25109.pdf",
+      "sha256": "23edea7c6c9838d40c791a8bb0a3dfe1ba1cca15b219f1fd16daa08aaf808c98"
+    },
+    {
+      "path": "02_materials/pdf/nnUNet_1904.08128.pdf",
+      "sha256": "7bc25fa4aa786c3052ec174e4b564905d54a0a508348370b927649d9aae44ad1"
+    }
+  ],
+  "scope": "manifest, audit hash, skill snapshots, project links, PDF headers; no model test"
+}

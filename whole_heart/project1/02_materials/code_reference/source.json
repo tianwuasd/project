@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/Purdue-M2/Improving-Cross-Site-Whole-Heart-Segmentation",
+  "commit": "1e151b754b704ceede74d51a9447fb2147b639ca",
+  "purpose": "local reference and numerical equivalence checks; not runtime dependency",
+  "files": ["trainers/nnUNetTrainerLayer2BezierDualNorm.py", "trainers/bezier_dualnorm_transform.py", "trainers/bias_field_transform.py", "README.md"],
+  "license_status": "root LICENSE URL returned 404; redistribution terms not established"
+}

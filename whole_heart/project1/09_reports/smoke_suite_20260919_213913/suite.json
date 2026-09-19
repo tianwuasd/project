@@ -1,0 +1,84 @@
+[
+  {
+    "fold": "ct_holdG",
+    "method": "B0",
+    "command": [
+      "C:\\programming\\anaconda\\envs\\whole_heart_project1\\python.exe",
+      "-B",
+      "-X",
+      "utf8",
+      "D:\\code_project\\whole_heart\\project1\\05_src\\smoke_train.py",
+      "ct_holdG",
+      "B0",
+      "--steps",
+      "12",
+      "--predict"
+    ],
+    "hard_timeout_seconds": 1800,
+    "log": "D:\\code_project\\whole_heart\\project1\\09_reports\\smoke_suite_20260919_213913\\ct_holdG_B0.log",
+    "status": "passed",
+    "exit_code": 0,
+    "seconds": 64.03427299999748
+  },
+  {
+    "fold": "ct_holdG",
+    "method": "B1",
+    "command": [
+      "C:\\programming\\anaconda\\envs\\whole_heart_project1\\python.exe",
+      "-B",
+      "-X",
+      "utf8",
+      "D:\\code_project\\whole_heart\\project1\\05_src\\smoke_train.py",
+      "ct_holdG",
+      "B1",
+      "--steps",
+      "12"
+    ],
+    "hard_timeout_seconds": 1800,
+    "log": "D:\\code_project\\whole_heart\\project1\\09_reports\\smoke_suite_20260919_213913\\ct_holdG_B1.log",
+    "status": "passed",
+    "exit_code": 0,
+    "seconds": 20.63122250000015
+  },
+  {
+    "fold": "mr_holdE",
+    "method": "B0",
+    "command": [
+      "C:\\programming\\anaconda\\envs\\whole_heart_project1\\python.exe",
+      "-B",
+      "-X",
+      "utf8",
+      "D:\\code_project\\whole_heart\\project1\\05_src\\smoke_train.py",
+      "mr_holdE",
+      "B0",
+      "--steps",
+      "12",
+      "--predict"
+    ],
+    "hard_timeout_seconds": 1800,
+    "log": "D:\\code_project\\whole_heart\\project1\\09_reports\\smoke_suite_20260919_213913\\mr_holdE_B0.log",
+    "status": "passed",
+    "exit_code": 0,
+    "seconds": 52.31607109999459
+  },
+  {
+    "fold": "mr_holdE",
+    "method": "B1",
+    "command": [
+      "C:\\programming\\anaconda\\envs\\whole_heart_project1\\python.exe",
+      "-B",
+      "-X",
+      "utf8",
+      "D:\\code_project\\whole_heart\\project1\\05_src\\smoke_train.py",
+      "mr_holdE",
+      "B1",
+      "--steps",
+      "12"
+    ],
+    "hard_timeout_seconds": 1800,
+    "log": "D:\\code_project\\whole_heart\\project1\\09_reports\\smoke_suite_20260919_213913\\mr_holdE_B1.log",
+    "status": "passed",
+    "exit_code": 0,
+    "seconds": 19.88807739999902
+  }
+]

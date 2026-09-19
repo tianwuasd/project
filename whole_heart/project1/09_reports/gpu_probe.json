@@ -1,0 +1,17 @@
+{
+  "status": "passed",
+  "synthetic_only": true,
+  "torch": "2.8.0+cu128",
+  "cuda": "12.8",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "patch": [
+    96,
+    128,
+    128
+  ],
+  "batch": 2,
+  "loss": 2.424898862838745,
+  "seconds_including_warmup": 0.9655070000007981,
+  "peak_allocated_gib": 3.52407169342041,
+  "peak_reserved_gib": 3.681640625
+}

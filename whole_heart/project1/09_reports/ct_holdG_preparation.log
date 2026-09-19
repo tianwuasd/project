@@ -1,0 +1,50 @@
+Using <class 'nnunetv2.imageio.nibabel_reader_writer.NibabelIO'> reader/writer
+
+Extracting dataset fingerprint:   0%|          | 0/30 [00:00<?, ?it/s]
+Extracting dataset fingerprint:   3%|▎         | 1/30 [00:03<01:50,  3.82s/it]
+Extracting dataset fingerprint:   7%|▋         | 2/30 [00:06<01:20,  2.88s/it]
+Extracting dataset fingerprint:  10%|█         | 3/30 [00:07<00:58,  2.16s/it]
+Extracting dataset fingerprint:  13%|█▎        | 4/30 [00:09<00:51,  1.98s/it]
+Extracting dataset fingerprint:  17%|█▋        | 5/30 [00:10<00:47,  1.88s/it]
+Extracting dataset fingerprint:  20%|██        | 6/30 [00:12<00:47,  2.00s/it]
+Extracting dataset fingerprint:  23%|██▎       | 7/30 [00:14<00:45,  1.97s/it]
+Extracting dataset fingerprint:  27%|██▋       | 8/30 [00:16<00:41,  1.89s/it]
+Extracting dataset fingerprint:  30%|███       | 9/30 [00:17<00:35,  1.71s/it]
+Extracting dataset fingerprint:  33%|███▎      | 10/30 [00:19<00:33,  1.68s/it]
+Extracting dataset fingerprint:  37%|███▋      | 11/30 [00:22<00:37,  1.99s/it]
+Extracting dataset fingerprint:  40%|████      | 12/30 [00:24<00:36,  2.00s/it]
+Extracting dataset fingerprint:  43%|████▎     | 13/30 [00:26<00:36,  2.16s/it]
+Extracting dataset fingerprint:  47%|████▋     | 14/30 [00:28<00:33,  2.11s/it]
+Extracting dataset fingerprint:  50%|█████     | 15/30 [00:30<00:31,  2.11s/it]
+Extracting dataset fingerprint:  53%|█████▎    | 16/30 [00:33<00:32,  2.32s/it]
+Extracting dataset fingerprint:  57%|█████▋    | 17/30 [00:33<00:21,  1.69s/it]
+Extracting dataset fingerprint:  60%|██████    | 18/30 [00:34<00:14,  1.24s/it]
+Extracting dataset fingerprint:  63%|██████▎   | 19/30 [00:34<00:10,  1.04it/s]
+Extracting dataset fingerprint:  67%|██████▋   | 20/30 [00:34<00:07,  1.26it/s]
+Extracting dataset fingerprint:  70%|███████   | 21/30 [00:35<00:05,  1.63it/s]
+Extracting dataset fingerprint:  73%|███████▎  | 22/30 [00:35<00:03,  2.04it/s]
+Extracting dataset fingerprint:  77%|███████▋  | 23/30 [00:35<00:02,  2.48it/s]
+Extracting dataset fingerprint:  80%|████████  | 24/30 [00:35<00:02,  2.67it/s]
+Extracting dataset fingerprint:  83%|████████▎ | 25/30 [00:35<00:01,  3.10it/s]
+Extracting dataset fingerprint:  87%|████████▋ | 26/30 [00:36<00:01,  3.16it/s]
+Extracting dataset fingerprint:  90%|█████████ | 27/30 [00:36<00:00,  3.21it/s]
+Extracting dataset fingerprint:  93%|█████████▎| 28/30 [00:36<00:00,  3.24it/s]
+Extracting dataset fingerprint:  97%|█████████▋| 29/30 [00:37<00:00,  3.62it/s]
+Extracting dataset fingerprint: 100%|██████████| 30/30 [00:37<00:00,  3.94it/s]
+Extracting dataset fingerprint: 100%|██████████| 30/30 [00:37<00:00,  1.24s/it]
+Traceback (most recent call last):
+  File "D:\code_project\whole_heart\project1\05_src\prepare_nnunet.py", line 52, in <module>
+    main()
+  File "D:\code_project\whole_heart\project1\05_src\prepare_nnunet.py", line 44, in main
+    plans = planner.plan_experiment()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\programming\anaconda\envs\whole_heart_project1\Lib\site-packages\nnunetv2\experiment_planning\experiment_planners\default_experiment_planner.py", line 436, in plan_experiment
+    plan_3d_fullres = self.get_plans_for_configuration(fullres_spacing_transposed,
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\programming\anaconda\envs\whole_heart_project1\Lib\site-packages\nnunetv2\experiment_planning\experiment_planners\default_experiment_planner.py", line 304, in get_plans_for_configuration
+    estimate = self.static_estimate_VRAM_usage(patch_size,
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\programming\anaconda\envs\whole_heart_project1\Lib\site-packages\nnunetv2\experiment_planning\experiment_planners\default_experiment_planner.py", line 104, in static_estimate_VRAM_usage
+    torch.set_num_threads(get_allowed_n_proc_DA())
+RuntimeError: set_num_threads expects a positive integer
+ERROR conda.cli.main_run:execute(127): `conda run python -B -X utf8 D:/code_project/whole_heart/project1/05_src/prepare_nnunet.py ct_holdG` failed. (See above for error)

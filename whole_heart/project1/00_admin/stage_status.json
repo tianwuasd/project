@@ -1,0 +1,19 @@
+{
+  "updated": "2026-09-19",
+  "stage": "preflight_and_smoke_complete_for_two_directions",
+  "frozen_outer_splits": 5,
+  "prepared_outer_splits": [
+    "ct_holdG",
+    "mr_holdE"
+  ],
+  "successful_smoke_conditions": 4,
+  "formal_training_started": false,
+  "pending": [
+    "full_gpu_budget_confirmation",
+    "remaining_three_directions_preparation",
+    "formal_training_and_evaluation"
+  ],
+  "independent_peer_review_performed": false,
+  "formal_ars_schema_validated": false,
+  "no_effectiveness_results_yet": true
+}

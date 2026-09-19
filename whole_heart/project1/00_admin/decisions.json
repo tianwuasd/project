@@ -1,0 +1,21 @@
+{
+  "updated": "2026-09-19",
+  "confirmed": {
+    "goal": "跨中心泛化：可靠基线加一个可验证改进假设",
+    "compute": "本机 RTX 5060 Ti，8151 MiB，驱动 591.44",
+    "environment": "授权新建独立 Conda 环境",
+    "project_root": "D:/code_project/whole_heart/project1",
+    "cost_preference": "不必要时不启动子代理；简单任务使用轻量模型；大规模消耗前告知",
+    "modality_strategy": "CT和MRI分别建模、都覆盖、先CT后MRI",
+    "intervention_direction": "先复现验证已有外观增强，不宣称新算法",
+    "data_issue_policy": "初轮排除5例，原件保留，后续核实再做补充实验",
+    "protocol_approval": "2026-09-19 用户：好的，按照研究方案进行",
+    "initialization": "按获准方案的建议，B0/B1 统一随机初始化；短测哈希相同"
+  },
+  "pending": {
+    "full_training_budget_hours": null,
+    "remaining_three_folds_preparation": true
+  },
+  "training_started": true,
+  "training_scope": "仅四组12步工程短测及各1步恢复验证；正式研究训练未开始"
+}

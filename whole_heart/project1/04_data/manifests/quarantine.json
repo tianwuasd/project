@@ -1,0 +1,57 @@
+[
+  {
+    "case_id": "Case2009",
+    "group": "B ct_train",
+    "modality": "CT",
+    "image": "D:\\code_project\\whole_heart\\Wholeheart_Train_Dataset\\B ct_train\\Case2009_image.nii.gz",
+    "label": "D:\\code_project\\whole_heart\\Wholeheart_Train_Dataset\\B ct_train\\Case2009_label.nii.gz",
+    "image_sha256": "1b4591b9df3aca66f0044a79e1007969d528b8d7648cb490359168b0a9b6888b",
+    "label_sha256": "b22547ee53bb8985dfde208ea6c35ad44d59fe499886622d9a933c9a0e40c6ef",
+    "status": "quarantined",
+    "reason": "影像首选空间矩阵无效"
+  },
+  {
+    "case_id": "Case2017",
+    "group": "B ct_train",
+    "modality": "CT",
+    "image": "D:\\code_project\\whole_heart\\Wholeheart_Train_Dataset\\B ct_train\\Case2017_image.nii.gz",
+    "label": "D:\\code_project\\whole_heart\\Wholeheart_Train_Dataset\\B ct_train\\Case2017_label.nii.gz",
+    "image_sha256": "27537d0468d324f2ab26f5e0d671558309e2c9f14ff84babccd25816723062b7",
+    "label_sha256": "26e481661679292849f853186a6d668ba90f7d2cefdd2ac710bf6db7cc93c330",
+    "status": "quarantined",
+    "reason": "影像首选空间矩阵无效"
+  },
+  {
+    "case_id": "Case3010",
+    "group": "C and D mr_train",
+    "modality": "MRI",
+    "image": "D:\\code_project\\whole_heart\\Wholeheart_Train_Dataset\\C and D mr_train\\Case3010_image.nii.gz",
+    "label": "D:\\code_project\\whole_heart\\Wholeheart_Train_Dataset\\C and D mr_train\\Case3010_label.nii.gz",
+    "image_sha256": "7e8c813f0677998288c1236f53d3f381f46fbc6f9186b73bc71f8449f0abb632",
+    "label_sha256": "183086e3e45ff49c01bb0d7ade712c899d7b876d7dc1c1c087597e75f7940cdd",
+    "status": "quarantined",
+    "reason": "未知标签421，8284体素"
+  },
+  {
+    "case_id": "Case5006",
+    "group": "E mr_train",
+    "modality": "MRI",
+    "image": "D:\\code_project\\whole_heart\\Wholeheart_Train_Dataset\\E mr_train\\Case5006_image.nii.gz",
+    "label": "D:\\code_project\\whole_heart\\Wholeheart_Train_Dataset\\E mr_train\\Case5006_label.nii.gz",
+    "image_sha256": "011e3b77ded9975af24d0c5a89812ed8eab3710375fbbcc41b33d5fd5901f3fd",
+    "label_sha256": "3ac1a3d357298f22e5e38b94aa65ecec5ab94da4a1b3e50dff3df59437917b83",
+    "status": "quarantined",
+    "reason": "与Case5015影像重复但标注不同"
+  },
+  {
+    "case_id": "Case5015",
+    "group": "E mr_train",
+    "modality": "MRI",
+    "image": "D:\\code_project\\whole_heart\\Wholeheart_Train_Dataset\\E mr_train\\Case5015_image.nii.gz",
+    "label": "D:\\code_project\\whole_heart\\Wholeheart_Train_Dataset\\E mr_train\\Case5015_label.nii.gz",
+    "image_sha256": "011e3b77ded9975af24d0c5a89812ed8eab3710375fbbcc41b33d5fd5901f3fd",
+    "label_sha256": "f9a5a6ca01ae42ea7a3b12313ab3954c918b2e9d1a46bafee234e9db7bedc907",
+    "status": "quarantined",
+    "reason": "与Case5006影像重复但标注不同"
+  }
+]

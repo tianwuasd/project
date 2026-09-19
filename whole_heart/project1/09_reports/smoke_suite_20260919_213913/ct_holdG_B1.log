@@ -1,0 +1,45 @@
+Using device: cuda:0
+
+#######################################################################
+Please cite the following paper when using nnU-Net:
+Isensee, F., Jaeger, P. F., Kohl, S. A., Petersen, J., & Maier-Hein, K. H. (2021). nnU-Net: a self-configuring method for deep learning-based biomedical image segmentation. Nature methods, 18(2), 203-211.
+#######################################################################
+
+2026-09-19 21:40:22.147999: do_dummy_2d_data_aug: False
+2026-09-19 21:40:22.149005: Frozen source split: 30 train / 8 val; target excluded
+
+This is the configuration used by this training:
+Configuration name: 3d_fullres
+ {'data_identifier': 'Project1Plans_3d_fullres', 'preprocessor_name': 'DefaultPreprocessor', 'batch_size': 2, 'patch_size': [96, 128, 128], 'median_image_size_in_voxels': [239.0, 341.5, 341.5], 'spacing': [0.625, 0.5751954913139343, 0.5751954913139343], 'normalization_schemes': ['CTNormalization'], 'use_mask_for_norm': [False], 'resampling_fn_data': 'resample_data_or_seg_to_shape', 'resampling_fn_seg': 'resample_data_or_seg_to_shape', 'resampling_fn_data_kwargs': {'is_seg': False, 'order': 3, 'order_z': 0, 'force_separate_z': None}, 'resampling_fn_seg_kwargs': {'is_seg': True, 'order': 1, 'order_z': 0, 'force_separate_z': None}, 'resampling_fn_probabilities': 'resample_data_or_seg_to_shape', 'resampling_fn_probabilities_kwargs': {'is_seg': False, 'order': 1, 'order_z': 0, 'force_separate_z': None}, 'architecture': {'network_class_name': 'dynamic_network_architectures.architectures.unet.PlainConvUNet', 'arch_kwargs': {'n_stages': 6, 'features_per_stage': [32, 64, 128, 256, 320, 320], 'conv_op': 'torch.nn.modules.conv.Conv3d', 'kernel_sizes': [[3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3]], 'strides': [[1, 1, 1], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [1, 2, 2]], 'n_conv_per_stage': [2, 2, 2, 2, 2, 2], 'n_conv_per_stage_decoder': [2, 2, 2, 2, 2], 'conv_bias': True, 'norm_op': 'torch.nn.modules.instancenorm.InstanceNorm3d', 'norm_op_kwargs': {'eps': 1e-05, 'affine': True}, 'dropout_op': None, 'dropout_op_kwargs': None, 'nonlin': 'torch.nn.LeakyReLU', 'nonlin_kwargs': {'inplace': True}}, '_kw_requires_import': ['conv_op', 'norm_op', 'dropout_op', 'nonlin']}, 'batch_dice': True} 
+
+These are the global plan.json settings:
+ {'dataset_name': 'Dataset703_ct_holdG', 'plans_name': 'Project1Plans', 'original_median_spacing_after_transp': [0.625, 0.5751954913139343, 0.5751954913139343], 'original_median_shape_after_transp': [177, 512, 512], 'image_reader_writer': 'NibabelIO', 'transpose_forward': [0, 1, 2], 'transpose_backward': [0, 1, 2], 'experiment_planner_used': 'ExperimentPlanner', 'label_manager': 'LabelManager', 'foreground_intensity_properties_per_channel': {'0': {'max': 3071.0, 'mean': 339.8524169921875, 'median': 278.0, 'min': -1024.0, 'percentile_00_5': -4.0, 'percentile_99_5': 1202.3265380859375, 'std': 248.07151794433594}}} 
+
+2026-09-19 21:40:22.380542: 
+2026-09-19 21:40:22.385534: Epoch 0
+2026-09-19 21:40:22.390536: Current learning rate: 0.01
+smoke_ct_holdG_B1_seed0_20260919_214021 step 1/12: 1.298s loss=2.59924
+smoke_ct_holdG_B1_seed0_20260919_214021 step 2/12: 0.388s loss=2.62030
+smoke_ct_holdG_B1_seed0_20260919_214021 step 3/12: 1.474s loss=2.56040
+smoke_ct_holdG_B1_seed0_20260919_214021 step 4/12: 0.468s loss=2.46742
+smoke_ct_holdG_B1_seed0_20260919_214021 step 5/12: 0.449s loss=2.16562
+smoke_ct_holdG_B1_seed0_20260919_214021 step 6/12: 1.916s loss=1.95740
+smoke_ct_holdG_B1_seed0_20260919_214021 step 7/12: 1.074s loss=1.82017
+smoke_ct_holdG_B1_seed0_20260919_214021 step 8/12: 0.811s loss=1.88017
+smoke_ct_holdG_B1_seed0_20260919_214021 step 9/12: 1.350s loss=1.75049
+smoke_ct_holdG_B1_seed0_20260919_214021 step 10/12: 0.426s loss=1.63055
+smoke_ct_holdG_B1_seed0_20260919_214021 step 11/12: 1.354s loss=1.51136
+smoke_ct_holdG_B1_seed0_20260919_214021 step 12/12: 0.848s loss=1.51976
+2026-09-19 21:40:34.562156: train_loss 2.0402
+2026-09-19 21:40:34.567605: val_loss 1.4983
+2026-09-19 21:40:34.575939: Pseudo dice [np.float32(0.3886), np.float32(0.3913), np.float32(0.2223), np.float32(0.0074), np.float32(0.0111), np.float32(0.0017), np.float32(0.044)]
+2026-09-19 21:40:34.579948: Epoch time: 12.18 s
+2026-09-19 21:40:34.584941: Yayy! New best EMA pseudo Dice: 0.15230000019073486
+Using device: cuda:0
+
+#######################################################################
+Please cite the following paper when using nnU-Net:
+Isensee, F., Jaeger, P. F., Kohl, S. A., Petersen, J., & Maier-Hein, K. H. (2021). nnU-Net: a self-configuring method for deep learning-based biomedical image segmentation. Nature methods, 18(2), 203-211.
+#######################################################################
+
+REPORT: D:\code_project\whole_heart\project1\07_experiments\smoke_ct_holdG_B1_seed0_20260919_214021\run.json

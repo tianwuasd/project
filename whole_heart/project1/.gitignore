@@ -1,0 +1,25 @@
+# 原始数据、衍生医学影像和训练大文件留在本地。
+*.nii
+*.nii.gz
+*.npy
+*.npz
+*.pt
+*.pth
+*.ckpt
+.conda/
+.venv/
+__pycache__/
+*.py[cod]
+04_data/derived/*
+!04_data/derived/README.md
+07_experiments/**/checkpoints/
+08_results/predictions/
+*.log
+# 作者仓库许可尚未核实；参考副本只保存在本地，不自动发布。
+02_materials/code_reference/*.py
+02_materials/code_reference/README.md
+
+# 将可复核的小型验证日志随研究代码归档。
+!09_reports/**/*.log
+!07_experiments/**/*.log
+

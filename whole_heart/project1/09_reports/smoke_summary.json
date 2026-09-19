@@ -1,0 +1,45 @@
+{
+  "status": "passed",
+  "suite": "D:\\code_project\\whole_heart\\project1\\09_reports\\smoke_suite_20260919_213913\\suite.json",
+  "same_initialization_and_plans": true,
+  "rows": [
+    {
+      "fold": "ct_holdG",
+      "method": "B0",
+      "train_step_seconds": 0.6958822400032659,
+      "validation_step_seconds": 0.15216420000069775,
+      "peak_allocated_gib": 3.622140884399414,
+      "one_training_hours_extrapolated": 12.609636805614677,
+      "outer_folds_assumed": 3
+    },
+    {
+      "fold": "ct_holdG",
+      "method": "B1",
+      "train_step_seconds": 1.0170048099986162,
+      "validation_step_seconds": 0.1543526000023121,
+      "peak_allocated_gib": 3.622140884399414,
+      "one_training_hours_extrapolated": 18.192280034706226,
+      "outer_folds_assumed": 3
+    },
+    {
+      "fold": "mr_holdE",
+      "method": "B0",
+      "train_step_seconds": 0.6866179200020269,
+      "validation_step_seconds": 0.1243615499988664,
+      "peak_allocated_gib": 3.065786361694336,
+      "one_training_hours_extrapolated": 14.822713125037504,
+      "outer_folds_assumed": 2
+    },
+    {
+      "fold": "mr_holdE",
+      "method": "B1",
+      "train_step_seconds": 0.7644434100031503,
+      "validation_step_seconds": 0.17663615000492427,
+      "peak_allocated_gib": 3.065786361694336,
+      "one_training_hours_extrapolated": 16.661888333419483,
+      "outer_folds_assumed": 2
+    }
+  ],
+  "ten_runs_core_hours_extrapolated": 155.37495343787668,
+  "limitation": "Only 10 timed steady-state steps per condition and 2 validation steps; other folds have different plans. Excludes preparation, full-volume inference, checkpoint IO, thermal/desktop load changes. Not a guaranteed runtime or performance result."
+}

@@ -1,0 +1,26 @@
+{
+  "checked_on": "2026-09-19",
+  "environment_name": "whole_heart_project1",
+  "python": "3.11.16 | packaged by conda-forge | (main, Sep  2 2026, 23:31:17) [MSC v.1944 64 bit (AMD64)]",
+  "executable": "C:\\programming\\anaconda\\envs\\whole_heart_project1\\python.exe",
+  "packages": {
+    "numpy": "2.4.6",
+    "scipy": "1.17.1",
+    "nibabel": "5.4.2",
+    "matplotlib": "3.11.2",
+    "pandas": "3.0.6",
+    "PyYAML": "6.0.3",
+    "torch": "2.8.0+cu128",
+    "torchvision": "0.23.0+cu128",
+    "nnunetv2": "2.8.1",
+    "SimpleITK": "2.5.6",
+    "batchgeneratorsv2": "0.3.5"
+  },
+  "pytorch_installed_by_this_project": true,
+  "nnunet_installed_by_this_project": true,
+  "gpu_training_verified": true,
+  "formal_training_started": false,
+  "gpu_evidence": "09_reports/gpu_probe.json and smoke_summary.json",
+  "blas": "OpenBLAS",
+  "runtime_conflict_bypassed": false
+}

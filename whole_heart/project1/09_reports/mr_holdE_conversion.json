@@ -1,0 +1,268 @@
+[
+  {
+    "case_id": "Case3001",
+    "shape": [
+      512,
+      512,
+      160
+    ],
+    "spacing_mm": [
+      0.78125,
+      0.78125,
+      1.600000023841858
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3002",
+    "shape": [
+      512,
+      512,
+      128
+    ],
+    "spacing_mm": [
+      0.78125,
+      0.78125,
+      1.600000023841858
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3003",
+    "shape": [
+      288,
+      288,
+      160
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0499999523162842
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3004",
+    "shape": [
+      288,
+      288,
+      120
+    ],
+    "spacing_mm": [
+      0.9722222089767456,
+      0.9722222089767456,
+      1.0499999523162842
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3005",
+    "shape": [
+      288,
+      288,
+      130
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0499999523162842
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3006",
+    "shape": [
+      256,
+      256,
+      160
+    ],
+    "spacing_mm": [
+      1.2109375,
+      1.2109375,
+      0.8999999761581421
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3007",
+    "shape": [
+      288,
+      288,
+      180
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0499999523162842
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3008",
+    "shape": [
+      288,
+      288,
+      130
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0499999523162842
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3009",
+    "shape": [
+      512,
+      512,
+      120
+    ],
+    "spacing_mm": [
+      0.78125,
+      0.78125,
+      1.600000023841858
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3011",
+    "shape": [
+      288,
+      288,
+      160
+    ],
+    "spacing_mm": [
+      1.1111111640930176,
+      1.1111111640930176,
+      0.8999999761581421
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3012",
+    "shape": [
+      512,
+      512,
+      128
+    ],
+    "spacing_mm": [
+      0.78125,
+      0.78125,
+      1.600000023841858
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3013",
+    "shape": [
+      512,
+      512,
+      112
+    ],
+    "spacing_mm": [
+      0.78125,
+      0.78125,
+      1.600000023841858
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3014",
+    "shape": [
+      512,
+      512,
+      160
+    ],
+    "spacing_mm": [
+      0.78125,
+      0.78125,
+      1.600000023841858
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3017",
+    "shape": [
+      288,
+      288,
+      140
+    ],
+    "spacing_mm": [
+      0.9722222089767456,
+      0.9722222089767456,
+      1.0499999523162842
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3018",
+    "shape": [
+      288,
+      288,
+      150
+    ],
+    "spacing_mm": [
+      0.9722222089767456,
+      0.9722222089767456,
+      1.0499999523162842
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3015",
+    "shape": [
+      340,
+      340,
+      200
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3016",
+    "shape": [
+      288,
+      288,
+      130
+    ],
+    "spacing_mm": [
+      0.9722222089767456,
+      0.9722222089767456,
+      1.0499999523162842
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3019",
+    "shape": [
+      288,
+      288,
+      135
+    ],
+    "spacing_mm": [
+      0.9722222089767456,
+      0.9722222089767456,
+      1.0499999523162842
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case3020",
+    "shape": [
+      288,
+      288,
+      135
+    ],
+    "spacing_mm": [
+      0.9722222089767456,
+      0.9722222089767456,
+      1.0499999523162842
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  }
+]

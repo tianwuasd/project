@@ -1,0 +1,15 @@
+test_label_unchanged (test_appearance.AppearanceTests.test_label_unchanged) ... ok
+test_monotonic_range_and_constant (test_appearance.AppearanceTests.test_monotonic_range_and_constant) ... ok
+test_reference_equivalence (test_appearance.AppearanceTests.test_reference_equivalence) ... ok
+test_labels_roundtrip (test_data_pipeline.DataTests.test_labels_roundtrip) ... ok
+test_split_no_leakage_or_quarantine (test_data_pipeline.DataTests.test_split_no_leakage_or_quarantine) ... ok
+test_unknown_label_rejected (test_data_pipeline.DataTests.test_unknown_label_rejected) ... ok
+test_empty_predictions_reported (test_metrics.MetricTests.test_empty_predictions_reported) ... ok
+test_identity (test_metrics.MetricTests.test_identity) ... ok
+test_physical_distance_with_shear (test_metrics.MetricTests.test_physical_distance_with_shear) ... ok
+test_missing_and_changed_splits_fail_closed (test_trainer_split.TrainerSplitTests.test_missing_and_changed_splits_fail_closed) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.032s
+
+OK

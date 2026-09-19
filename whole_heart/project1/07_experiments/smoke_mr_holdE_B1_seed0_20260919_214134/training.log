@@ -1,0 +1,18 @@
+2026-09-19 21:41:34.933073: do_dummy_2d_data_aug: False 
+2026-09-19 21:41:34.934072: Frozen source split: 15 train / 4 val; target excluded 
+
+This is the configuration used by this training:
+Configuration name: 3d_fullres
+ {'data_identifier': 'Project1Plans_3d_fullres', 'preprocessor_name': 'DefaultPreprocessor', 'batch_size': 2, 'patch_size': [64, 160, 128], 'median_image_size_in_voxels': [159.0, 319.0, 291.0], 'spacing': [1.0499999523162842, 0.9722222089767456, 0.9722222089767456], 'normalization_schemes': ['ZScoreNormalization'], 'use_mask_for_norm': [False], 'resampling_fn_data': 'resample_data_or_seg_to_shape', 'resampling_fn_seg': 'resample_data_or_seg_to_shape', 'resampling_fn_data_kwargs': {'is_seg': False, 'order': 3, 'order_z': 0, 'force_separate_z': None}, 'resampling_fn_seg_kwargs': {'is_seg': True, 'order': 1, 'order_z': 0, 'force_separate_z': None}, 'resampling_fn_probabilities': 'resample_data_or_seg_to_shape', 'resampling_fn_probabilities_kwargs': {'is_seg': False, 'order': 1, 'order_z': 0, 'force_separate_z': None}, 'architecture': {'network_class_name': 'dynamic_network_architectures.architectures.unet.PlainConvUNet', 'arch_kwargs': {'n_stages': 6, 'features_per_stage': [32, 64, 128, 256, 320, 320], 'conv_op': 'torch.nn.modules.conv.Conv3d', 'kernel_sizes': [[3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3]], 'strides': [[1, 1, 1], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [1, 2, 2]], 'n_conv_per_stage': [2, 2, 2, 2, 2, 2], 'n_conv_per_stage_decoder': [2, 2, 2, 2, 2], 'conv_bias': True, 'norm_op': 'torch.nn.modules.instancenorm.InstanceNorm3d', 'norm_op_kwargs': {'eps': 1e-05, 'affine': True}, 'dropout_op': None, 'dropout_op_kwargs': None, 'nonlin': 'torch.nn.LeakyReLU', 'nonlin_kwargs': {'inplace': True}}, '_kw_requires_import': ['conv_op', 'norm_op', 'dropout_op', 'nonlin']}, 'batch_dice': True} 
+ 
+These are the global plan.json settings:
+ {'dataset_name': 'Dataset705_mr_holdE', 'plans_name': 'Project1Plans', 'original_median_spacing_after_transp': [1.0499999523162842, 0.9722222089767456, 0.9722222089767456], 'original_median_shape_after_transp': [140, 288, 275], 'image_reader_writer': 'NibabelIO', 'transpose_forward': [0, 1, 2], 'transpose_backward': [0, 1, 2], 'experiment_planner_used': 'ExperimentPlanner', 'label_manager': 'LabelManager', 'foreground_intensity_properties_per_channel': {'0': {'max': 3075.0, 'mean': 739.8115844726562, 'median': 726.0, 'min': 0.0, 'percentile_00_5': 149.0, 'percentile_99_5': 1559.0, 'std': 299.9910583496094}}} 
+ 
+2026-09-19 21:41:35.140674:  
+2026-09-19 21:41:35.144681: Epoch 0 
+2026-09-19 21:41:35.148632: Current learning rate: 0.01 
+2026-09-19 21:41:44.675984: train_loss 2.0142 
+2026-09-19 21:41:44.680984: val_loss 1.1058 
+2026-09-19 21:41:44.686887: Pseudo dice [np.float32(0.0337), np.float32(0.1175), np.float32(0.1172), np.float32(0.1589), np.float32(0.3598), np.float32(0.0091), np.float32(0.0215)] 
+2026-09-19 21:41:44.690884: Epoch time: 9.54 s 
+2026-09-19 21:41:44.694885: Yayy! New best EMA pseudo Dice: 0.11680000275373459 

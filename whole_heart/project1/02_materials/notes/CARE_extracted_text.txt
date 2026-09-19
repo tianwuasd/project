@@ -1,0 +1,622 @@
+arXiv:2608.25109v1 [eess.IV] 25 Aug 2026  Improving Cross-Site Whole-Heart Segmentation
+
+                                            Tanish Mudaliar1, Justin Li2, Daniel Lin3, Julianna Vo4, Kaitao Liao5, Xin
+                                                                               Wang6, and Shu Hu1
+
+                                                                       1 Purdue University, West Lafayette, USA
+                                                                           2 Carmel High School, Carmel, USA
+
+                                                            3 Case Western Reserve University, Cleveland, Ohio, USA
+                                                             4 The Pennsylvania State University, State College, USA
+
+                                                                   5 Georgia Institute of Technology, Atlanta, USA
+                                                     6 University at Albany, State University of New York, Albany, USA
+                                             {tmudali,shuhu}@purdue.edu, justinyli2018@gmail.com, dxl941@case.edu,
+
+                                                       jhv5097@psu.edu, kliao47@gatech.edu, xwang56@albany.edu
+
+                                                   Abstract. Whole-heart segmentation from CT and MRI is essential for
+                                                   quantitative cardiac image analysis, but remains challenging under multi-
+                                                   center and multi-modality distribution shift. In the CARE whole-heart
+                                                   segmentation task, models must generalize from limited labeled sites
+                                                   to unseen acquisition distributions, where variation in spacing, inten-
+                                                   sity, reconstruction texture, and anatomy can degrade out-of-distribution
+                                                   performance. We propose a modality-routed 3D cardiac segmentation
+                                                   pipeline that combines TotalSegmentator-initialized nnU-Netv2 mod-
+                                                   els with site-characterized, label-preserving appearance augmentation.
+                                                   We first characterize the available sites using measurable image prop-
+                                                   erties and use this analysis to motivate candidate data-space general-
+                                                   ization routes. The final retained recipe applies Bias Field + Bezier
+                                                   appearance augmentation, combining smooth spatial intensity pertur-
+                                                   bation with nonlinear intensity remapping, followed by lightweight class-
+                                                   wise largest-connected-component cleanup. On the primary held-out-site
+                                                   validation splits, the final configuration improves CT mean Dice from
+                                                   0.8350 to 0.9135 and MRI mean Dice from 0.7695 to 0.7830, while also
+                                                   reducing HD95. These results suggest that site-motivated appearance
+                                                   augmentation is a practical strategy for improving cross-site robustness
+                                                   in limited-data whole-heart segmentation. Our code can be found in
+                                                   https://github.com/Purdue- M2/Improving- Cross- Site- Whole- H
+                                                   eart-Segmentation.
+
+                                                   Keywords: Whole-heart segmentation · Domain generalization · Car-
+                                                   diac CT · Cardiac MRI · Data augmentation
+
+                                          1 Introduction
+
+                                          Three-dimensional cardiac structure segmentation is a core step in quantitative
+                                          cardiac image analysis. Reliable delineation of chambers, myocardium, and great
+
+                                           Corresponding author: shuhu@purdue.edu
+2  Mudaliar et al.
+
+     Fig. 1. Graphical comparison of generalization approaches in model pipeline.
+
+vessels enables measurements of ventricular volume, myocardial mass and thick-
+ness, and vessel morphology, which support assessment of cardiac anatomy and
+function [10]. In clinical and research settings, these quantitative measurements
+provide objective evidence for disease assessment, longitudinal follow-up, and
+treatment-response monitoring in cardiovascular conditions such as cardiomy-
+opathy and coronary artery disease [1,15].
+
+    Robust cardiac segmentation remains difficult across heterogeneous data
+sources. Multi-center data vary with scanner hardware, acquisition protocol,
+reconstruction, voxel spacing, and patient population, while CT and MRI intro-
+duce additional differences in imaging physics and tissue contrast. These factors
+create distribution shifts that can change both image appearance and apparent
+anatomy, causing models trained on one site or modality to degrade on unseen
+acquisition settings [6].
+
+    Existing solutions address generalization at different points in the segmen-
+tation pipeline, as summarized in Fig. 1. Pretrained and generalist models such
+as TotalSegmentator, MedSAM2, and STU-Net provide strong initialization or
+baseline model families [23,14,9]. Other methods modify the training signal or im-
+pose structural constraints through boundary losses or anatomical priors [12,16].
+Data-based generalization instead acts before the model by expanding the train-
+ing distribution through label-preserving deformation, contrast, bias-field, or
+frequency-based transformations [2,18,17].
+
+    However, data-space generalization still requires deciding which forms of vari-
+ation to introduce. Strong initialization may remain sensitive to site-specific ap-
+pearance or reconstruction cues, while losses and anatomical priors can improve
+optimization or structural consistency without expanding the image distribution
+that produced the shift [12,16]. Generic augmentation can also distort anatomy
+or remove discriminative image detail when transformations are not well matched
+Appearance Augmentation for CARE-WHS  3
+
+to the task [18]. We therefore use site characterization to guide stable data aug-
+mentation: measurable site differences motivate candidate augmentation routes,
+and held-out-site validation determines which components are retained.
+
+    In this paper, we apply this strategy to the CARE whole-heart segmentation
+(CARE-WHS) challenge, where limited CT and MRI training data must gener-
+alize to unseen acquisition distributions [3]. We propose a modality-routed 3D
+cardiac segmentation pipeline that combines TotalSegmentator-initialized nnU-
+Netv2 models with site-motivated, label-preserving appearance/intensity aug-
+mentation. We first characterize the available sites by spacing, physical volume,
+intensity, and frequency statistics, then use this analysis to motivate candidate
+augmentation choices. The final retained recipe uses Bias Field + Bezier appear-
+ance augmentation and lightweight connected-component cleanup.
+
+2 Task and Dataset Background
+
+2.1 Segmentation Task
+
+The whole-heart segmentation task evaluates automatic segmentation of cardiac
+CT and MRI volumes across multiple acquisition sites [3,25]. Each case is an-
+notated with seven foreground structures: left ventricular myocardium (Myo),
+left atrium (LA), left ventricular blood pool (LV), right atrium (RA), right
+ventricular blood pool (RV), aorta (AO), and pulmonary artery (PA). CT and
+MRI were treated as separate segmentation domains because they differ in ac-
+quisition physics, intensity scale, image appearance, and available pretrained
+initialization [22].
+
+    The available training data contained three CT sites, denoted A, B, and G,
+and two MRI site groups, denoted C/D and E. The MRI C and D cases were
+released as a pooled folder without separable site labels, so they were analyzed
+jointly. To evaluate cross-site generalization, we used held-out-site validation
+splits throughout development. For CT, the primary split trained on sites A+B
+and evaluated on held-out site G. For MRI, the primary split trained on C/D
+and evaluated on held-out site E.
+
+2.2 Dataset Analysis
+
+This work uses the CARE-WHS challenge data [3,25]. Because the challenge
+evaluates performance on unseen sites, we first characterized the available sites
+before selecting augmentation and training strategies. Table 1 summarizes rep-
+resentative differences in voxel spacing, physical whole-heart volume, median
+intensity, and low/high-frequency content. These measurements show that site
+shift is not a single nuisance factor: the CARE-WHS sites differ along scale,
+appearance/intensity, and reconstruction-texture axes.
+
+    This characterization motivated a data-space generalization strategy. Rather
+than relying only on architecture changes or loss reweighting, we evaluated aug-
+mentations that directly expand the training distribution along the measured
+4       Mudaliar et al.
+
+Table 1. Site characterization summary. Spacing is reported as median in-plane
+spacing × through-plane spacing in mm. Whole-heart volume, median intensity, and
+low/high-frequency ratio are reported as mean ± standard deviation.
+
+   Modality Site n Spacing (mm) WH Vol. (mL) Med. intensity Low/high-freq. ratio
+
+   CT   A 20    0.43 × 0.58  601 ± 120  -514 ± 324  176.6 ± 47.5
+   CT   B 20    1.00 × 1.00  759 ± 275  -106 ± 161   19.5 ± 6.6
+   CT   G 20    0.37 × 0.50  533 ± 118              70.6 ± 11.0
+   MRI  C/D 20  0.94 × 1.20  784 ± 259   -66 ± 41   45.8 ± 14.7
+   MRI  E 26    0.94 × 1.27  921 ± 228    96 ± 53   32.5 ± 12.7
+                                          81 ± 42
+
+axes while preserving the underlying anatomical labels [2,18]. Scale augmenta-
+tions target spacing and apparent-size variation, deformation-based augmenta-
+tions target shape variability, and intensity or frequency augmentations target
+site-dependent appearance and texture [17]. The final method was then selected
+by held-out-site validation rather than by the measured distributions alone.
+
+3 Methods
+
+3.1 Overview
+
+Given a 3D cardiac CT or MRI volume, our objective is to segment seven whole-
+heart structures while generalizing across acquisition sites not seen during train-
+ing. Following the site analysis in Section 2, we treat cross-site variation as a
+data-distribution problem and use label-preserving appearance augmentation to
+broaden feature variability without altering anatomical labels.
+
+    Figure 2 shows the proposed framework. The pipeline contains three stages:
+modality routing, intensity/appearance segmentation, and lightweight post pro-
+cessing. The modality router assigns each input to a CT or MRI branch us-
+ing a deterministic intensity heuristic. Each branch uses a TotalSegmentator-
+initialized nnU-Net model trained with the retained Bias Field + Bezier aug-
+mentation. The predicted seven-class probability map is then converted to the
+final segmentation with class-wise largest-connected-component cleanup.
+
+3.2 TotalSegmentator nnU-Net Pre-trained Segmentation Models
+
+Both branches use nnU-Net 3D full-resolution segmentation models [11]. The CT
+model is initialized from TotalSegmentator-pretrained weights for the heartcham-
+bers high-resolution task (Dataset 301) [23], and the MRI model is initialized
+from TotalSegmentator MRI pretrained weights for Organs Part 1 (Dataset
+850) [4]. Both models are fine-tuned on the corresponding CARE-WHS modality-
+specific training cases. Default mirroring augmentation is disabled for both CT
+and MRI training since the label classes are asymmetric.
+Appearance Augmentation for CARE-WHS  5
+
+Fig. 2. Architecture pipeline end-to-end for CT and MRI input streams for training
+and inference.
+
+    We use nnU-Net as the backbone because it provides a strong self-configuring
+baseline for biomedical segmentation while allowing the study to focus on ini-
+tialization and cross-site generalization strategies rather than new architecture
+design [11].
+
+3.3 Bias-Field and Bezier Intensity Augmentation
+
+The retained appearance augmentation combines bias-field perturbation and
+Bezier intensity remapping [2,18]. Let I :   R denote a normalized input
+volume over voxel coordinates x  . Bias-field augmentation applies a smooth
+multiplicative field,
+
+Ibias(x) = I(x) exp(s(x)),            (1)
+
+    where s(x) is a low-frequency random field generated on a coarse grid and
+smoothly interpolated to image resolution, and  controls the perturbation mag-
+nitude. This transformation simulates smooth spatial intensity nonuniformity
+while preserving the segmentation label map.
+
+    Bezier augmentation applies a random nonlinear contrast remapping [18].
+Intensities are clipped and rescaled to [0, 1], then transformed by a monotone
+mapping g : [0, 1]  [0, 1] sampled from a cubic Bezier curve. For control points
+P0 = (0, 0), P3 = (1, 1), and random internal control points P1 and P2, the curve
+is
+6  Mudaliar et al.
+
+        B(t) = (1 - t)3P0 + 3(1 - t)2tP1 + 3(1 - t)t2P2 + t3P3, t  [0, 1]. (2)
+
+    The horizontal coordinate defines the input intensity and the vertical coor-
+dinate defines the transformed intensity. The resulting curve is converted to a
+monotone lookup table and applied voxel-wise:
+
+                          Ibez(x) = g(I(x)).           (3)
+
+   For the combined transform, the augmented image is
+
+                      Iaug(x) = g(I(x) exp(s(x))) ,    (4)
+
+    with modality-specific clipping and normalization applied according to the
+preprocessing pipeline. This transform changes image appearance without chang-
+ing anatomical geometry, making it appropriate for testing whether cross-site
+performance is limited by contrast and intensity variation.
+
+3.4 Test-Time Strategies
+
+We evaluated lightweight test-time strategies after model prediction, includ-
+ing largest-connected-component (LCC) cleanup which focused on the common
+problem of fragmentation in image segmentation.
+
+    For LCC cleanup, each predicted class is processed independently. Given the
+predicted segmentation y^ and class c, we define the binary mask
+
+                      Mc(x) = 1[y^(x) = c].            (5)
+
+Connected-component labeling with 26-connectivity partitions Mc into disjoint
+
+regions R1, . . . , Rn. We retain the largest component and remove all smaller
+
+components:
+
+             Mc(x) = 1[x  Ri ],  i = arg max |Ri|.     (6)
+
+                                                    i
+
+This operation uses only graph connectivity and component size; it does not use
+
+model probabilities.
+
+3.5 Inference Pipeline
+
+To resolve two separate models, we use a modality router at inference time. The
+input modality is selected deterministically from the image intensity range. Vol-
+umes with minimum intensity below -500 are routed to the CT model, while all
+remaining volumes are routed to the MRI model. This rule separates CT from
+MRI in the available training data because CT volumes contain air/background
+values near -1000 HU or below, whereas MRI volumes have non-negative back-
+ground intensities.
+
+    The selected nnU-Net branch outputs per-voxel class probabilities for the
+seven target structures, followed by class-wise LCC cleanup to produce the final
+segmentation. The full inference pipeline is shown in Fig. 2.
+               Appearance Augmentation for CARE-WHS  7
+
+4 Experiments
+
+4.1 Experimental Settings
+
+Datasets. All experiments use the CARE-WHS data described in Section 2. For
+development, CT trains on A+B and tests on G and MRI trains on C/D and
+tests on E. Final submissions are retrained on all available labeled cases for each
+modality.
+
+Evaluation Metrics. We predominantly employ the Dice similarity coefficient
+and use 95th-percentile Hausdorff distance (HD95) to measure the performance
+of our models and baseline methods.
+
+Baseline Models. To contextualize performance under the same held-out-site
+protocol, we compare our method against SegVol [5], MedSAM2 [14], SAM-
+Med3D [20], STU-Net-B [9], and nnU-Netv2 [11].
+
+Baseline Training Details. All baselines used the same held-out-site pro-
+tocol: CT trained on A+B and evaluated on G, while MRI trained on C/D
+and evaluated on E. SegVol was initialized from SegVol_v1.pth and fine-tuned
+for 100 epochs using batch size 1, AdamW, learning rate 1 × 10-4, weight de-
+cay 1 × 10-5, and its default pseudo-label/semi-supervised setup. MedSAM2
+was fine-tuned for 75 epochs with the Hiera-tiny configuration, base learning
+rate 5 × 10-5, vision learning rate 3 × 10-5, cosine decay, gradient clipping,
+and layer-wise learning-rate decay. SAM-Med3D was evaluated zero-shot from
+sam_med3d_turbo.pth with one click per case. STU-Net-B was initialized from
+the released STU-Net-B.model checkpoint and fine-tuned with nnU-Netv2 de-
+faults, initial learning rate 1 × 10-3, batch size 2, and disabled mirroring. The
+nnU-Netv2 baseline was trained without TotalSegmentator initialization using
+standard Dice + cross-entropy loss, initial learning rate 1 × 10-2, polynomial
+learning-rate decay, and 250/300 epochs for CT/MRI.
+
+Our Model Implementation Details. All experiments use TotalSegmentator-
+pretrained nnU-Netv2 3D full-resolution models. We keep the nnU-Netv2 de-
+fault training configuration unchanged outside of disabling mirroring. Models
+are trained with initial learning rate 1 × 10-2, weight decay 3 × 10-5, and poly-
+nomial learning-rate decay with exponent 0.9. CT models are trained for 250
+epochs while MRI models are trained for 300 epochs, each from their respective
+initialized TotalSegmentator checkpoints. Bias Field augmentation uses magni-
+tude 0.25 with a 3 × 3 × 3 random control-point grid and application probability
+0.30. Bezier intensity augmentation uses monotonic "similar" mode with lookup-
+table size 1000 and application probability 0.25.
+
+4.2 Results
+
+General Performance.
+    Table 2 compares the proposed method with external baseline models on the
+
+primary held-out-site validation splits. On CT, our method achieves the highest
+mean Dice, improving over the strongest non-final baseline from 0.8343 to 0.9135.
+8        Mudaliar et al.
+
+Table 2. Comparison with external baseline models. CT models are trained on sites
+A+B and evaluated on site G; MRI models are trained on C/D and evaluated on site
+E. Dice is reported per structure and averaged across foreground classes.
+
+   Model   Myo LA LV RA RV AO PA Dice HD95
+
+   CT (train: A+B; test: G, n = 20)
+
+   SegVol  0.6234 0.9395 0.8511 0.8276 0.7846 0.9541 0.6403 0.8029 24.07
+
+   MedSAM2 0.4180 0.9412 0.8381 0.7252 0.5127 0.8050 0.3330 0.6533 69.07
+
+   SAM-Med3D 0.6447 0.9103 0.6881 0.8730 0.8712 0.8487 0.8263 0.8089 6.21
+
+   STU-Net-B 0.9141 0.8890 0.8597 0.8858 0.4780 0.9465 0.8670 0.8343 14.05
+
+   nnU-Netv2 0.9261 0.2540 0.8202 0.8461 0.2027 0.6435 0.5713 0.6091 29.13
+
+   Ours    0.9477 0.9606 0.9454 0.9115 0.7813 0.9647 0.8834 0.9135 5.22
+
+   MRI (train: C/D; test: E, n = 26)
+
+   SegVol  0.4776 0.7299 0.7813 0.7206 0.5148 0.5788 0.6560 0.6370 16.49
+
+   MedSAM2 0.1134 0.8087 0.8880 0.5883 0.5623 0.5162 0.5160 0.5704 35.86
+
+   SAM-Med3D 0.5347 0.8713 0.7669 0.8581 0.7832 0.7238 0.7303 0.7526 8.41
+
+   STU-Net-B 0.7494 0.8420 0.8854 0.8172 0.7055 0.5200 0.5002 0.7171 26.77
+
+   nnU-Netv2 0.8002 0.8879 0.9308 0.8888 0.8439 0.5515 0.5502 0.7790 19.26
+
+   Ours    0.8082 0.8898 0.9347 0.8974 0.8606 0.5443 0.5460 0.7830 19.30
+
+The largest gains are observed for structures that are more sensitive to cross-
+site appearance and extent variation, including LA, AO, PA, and the overall
+mean score. Foundation/generalist models such as SegVol and MedSAM2 show
+competitive performance for selected structures, but their mean performance is
+lower and less consistent across all seven labels.
+
+    On MRI, the margin is smaller but the proposed method again achieves the
+best mean Dice. The nnU-Netv2 and SAM-Med3D baselines are close in average
+performance, indicating that MRI site E is less strongly separated by the retained
+appearance-augmentation route than CT site G. Nevertheless, our final model
+provides the most consistent overall result, with improvements in Myo, RA, RV,
+and LV while AO and PA remain challenging across methods.
+
+Augmented Distribution Analysis. After selecting Bias+Bezier through held-
+out-site validation, we measured the same site-characterization statistics under
+the retained augmentation. This analysis is intended to interpret the selected
+recipe rather than to serve as a model-selection criterion. Dice and HD95 in
+Table 4 determine the retained configuration; Table 3 shows how Bias+Bezier
+changes the input distribution seen during training.
+
+    Bias+Bezier primarily expands intensity and frequency variability while pre-
+serving the geometric spacing of each site. This matches the intended role of the
+augmentation: broaden appearance variation without changing the anatomical
+label structure. This improves held-out-site performance for both modalities as
+indicated from the ablation studies, with the strongest effect observed in CT
+where the measured appearance shift is larger.
+                                   Appearance Augmentation for CARE-WHS            9
+
+Table 3. Site characteristics after Bias+Bezier appearance augmentation. Spacing is
+reported as median in-plane spacing × through-plane spacing in mm. Whole-heart vol-
+ume, median intensity, and low/high-frequency ratio are reported as mean ± standard
+deviation.
+
+Modality Site Spacing (mm) WH Vol. (mL) Med. intensity Low/high-freq. ratio
+
+CT       A     0.43 × 0.58         594 ± 142  -677 ± 837  240.8 ± 161.1
+CT       B     1.00 × 1.00         766 ± 308  -354 ± 381  97.0 ± 163.8
+CT       G     0.37 × 0.50         506 ± 144  -59 ± 444    89.7 ± 44.6
+MRI      C/D   0.94 × 1.20         753 ± 302               54.0 ± 30.1
+MRI      E     0.94 × 1.27         918 ± 251    72 ± 72    39.1 ± 20.9
+                                                71 ± 52
+
+4.3 Ablation Study
+
+To validate the role of key components in our framework, we conduct a series of
+ablation studies and evaluate on the held-out validation set specified in Datasets
+in Section 4.1.
+
+Table 4. Ablation Study. Appearance augmentation and LCC ablation on held-out
+sites. CT models are trained on sites A+B and evaluated on site G; MRI models are
+trained on C/D and evaluated on site E. Dice is reported per structure and averaged
+across foreground classes; HD95 is the mean 95th-percentile Hausdorff distance (mm).
+
+Variant        Myo LA LV RA RV AO PA Dice HD95
+
+CT (train: A+B; test: G, n = 20)
+
+Base           0.9183 0.9269 0.8747 0.8708 0.5244 0.9312 0.7991 0.8350 33.25
+
+Base + LCC     0.9229 0.9498 0.9390 0.8868 0.5409 0.9662 0.8044 0.8586 9.12
+
+Bias           0.9485 0.9233 0.9404 0.9099 0.7793 0.9270 0.8363 0.8949 13.01
+
+Bezier         0.9399 0.9103 0.9292 0.9084 0.7460 0.9302 0.8489 0.8876 20.15
+
+Bias + Bezier  0.9476 0.9455 0.9419 0.9017 0.7727 0.9499 0.8656 0.9036 13.66
+
+Bias + Bezier + LCC 0.9477 0.9606 0.9454 0.9115 0.7813 0.9647 0.8834 0.9135 5.22
+
+MRI (train: C/D; test: E, n = 26)
+
+Base           0.7830 0.8881 0.9302 0.8909 0.8207 0.5252 0.5481 0.7695 24.50
+
+Base + LCC     0.7910 0.8885 0.9314 0.8933 0.8366 0.5106 0.5492 0.7715 20.13
+
+Bezier         0.8025 0.8919 0.9332 0.8936 0.8510 0.5297 0.5455 0.7782 23.23
+
+Bias           0.7990 0.8887 0.9328 0.8828 0.8439 0.5294 0.5419 0.7740 21.83
+
+Bias + Bezier  0.8081 0.8898 0.9347 0.8929 0.8582 0.5356 0.5457 0.7807 20.87
+
+Bias + Bezier + LCC 0.8082 0.8898 0.9347 0.8974 0.8606 0.5443 0.5460 0.7830 19.30
+
+    Effect of Appearance Augmentation. Table 4 evaluates the contribution
+of the retained appearance components under held-out-site validation. Bias Field
+and Bezier augmentation are tested independently and jointly before adding LCC
+cleanup. On CT, both appearance transforms improve over the base model, with
+Bias Field producing the stronger single-transform gain and Bias Field+Bezier
+giving the best pre-post-processing result. On MRI, the same ordering is less
+10  Mudaliar et al.
+
+pronounced but the combined recipe remains the strongest augmentation-only
+setting. These results support the use of paired smooth spatial intensity pertur-
+bation and nonlinear intensity remapping rather than either transform alone.
+
+    Effect of LCC Cleanup. LCC cleanup is evaluated both on the base pre-
+dictions and on the final augmented model. Its main effect is reflected in HD95,
+where removing small disconnected components substantially reduces boundary
+outliers, with an improvement especially clear for CT. Because LCC improves the
+final mean Dice in both modalities, it is retained as a lightweight inference-time
+cleanup step.
+
+5 Conclusion
+
+We presented a modality-routed 3D whole-heart segmentation pipeline for cross-
+site CT and MRI segmentation in CARE-WHS. The method uses TotalSegmen-
+tator initialized nnU-Netv2 models with Bias Field + Bezier appearance aug-
+mentation chosen from characterizing measurable site variation and appended
+with a class-wise LCC cleanup.
+
+    Across the primary held-out-site splits, the retained recipe improved over
+the base models for both modalities, with the largest gain observed for CT. The
+results suggest that label-preserving appearance augmentation (derived from the
+feature distribution) can be an effective way to improve robustness when limited
+cardiac training data contain site-specific acquisition differences. LCC cleanup
+further reduced boundary outliers, particularly in CT, while MRI improvements
+were more modest.
+
+    Limitations. The site-characterization analysis is specific to the available
+CARE-WHS training data. The broader contribution is a development workflow
+that quantifies site variation and selects candidate augmentation axes that in-
+crease feature variance while preserving anatomical labels, retaining components
+only when they improve held-out-site validation.
+
+    Future Work should extend the site-characterization strategy beyond input-
+space augmentation. Measured site differences could be used to guide feature-
+space regularization, encouraging the model to learn representations that remain
+predictive of cardiac anatomy while being less predictive of acquisition site. This
+may improve generalization to unseen scanners and protocols beyond what label-
+preserving augmentation alone can provide.
+
+    Acknowledgments. This work is supported by the U.S. National Science
+Foundation (NSF) under grants IIS-2434967 and CNS-2431725, the National
+Artificial Intelligence Research Resource (NAIRR) Pilot and TACC, Computing
+Research Association (CRA), Purdue ACC Curricular Innovation Seed Grant,
+and Purdue Applied AI Research Center. The views, opinions, and/or findings
+expressed are those of the author and should not be interpreted as representing
+the official views of NSF, NAIRR Pilot, CRA, and Purdue University or any of
+the other institutions listed.
+
+    Disclosure of Interest. The authors have no competing interests to declare
+that are relevant to the content of this article.
+            Appearance Augmentation for CARE-WHS  11
+
+References
+
+ 1. Arbelo, E., Protonotarios, A., Gimeno, J.R., Arbustini, E., Barriales-Villa, R.,
+     Basso, C., Bezzina, C.R., Biagini, E., Blom, N.A., de Boer, R.A., et al.: 2023
+     ESC Guidelines for the management of cardiomyopathies. European Heart Journal
+     44(37), 3503­3626 (2023)
+
+ 2. Billot, B., Greve, D.N., Puonti, O., Thielscher, A., Van Leemput, K., Fischl, B.,
+     Dalca, A.V., Iglesias, J.E.: SynthSeg: segmentation of brain MRI scans of any
+     contrast and resolution without retraining. Medical Image Analysis 86, 102789
+     (2023)
+
+ 3. CARE 2026: CARE whole-heart segmentation challenge. https://zmic.org.cn/
+     care_2026/track_wholeheart/, last accessed 2026/07/13
+
+ 4. D'Antonoli, T.A., Berger, L.K., Indrakanti, A.K., et al.: TotalSegmentator MRI:
+     robust sequence-independent segmentation of multiple anatomic structures in MRI.
+     Radiology (2025)
+
+ 5. Du, Y., Bai, F., Huang, T., Zhao, B.: SegVol: universal and interactive volumetric
+     medical image segmentation. Advances in Neural Information Processing Systems
+     37 (2024)
+
+ 6. Gao, S., Zhou, H., Gao, Y., Zhuang, X.: BayeSeg: Bayesian modeling for medical
+     image segmentation with interpretable generalizability. Medical Image Analysis
+     89, 102889 (2023)
+
+ 7. Huang, P., Hu, S., Peng, B., Zhang, J., Wu, X., Wang, X.: Robustly Optimized
+     Deep Feature Decoupling Network for Fatty Liver Diseases Detection. In: Medical
+     Image Computing and Computer Assisted Intervention ­ MICCAI 2024. Lecture
+     Notes in Computer Science, vol. 15001, pp. 68­78. Springer Nature Switzerland
+     (2024)
+
+ 8. Huang, P., Hu, S., Peng, B., Zhang, J., Zhu, H., Wu, X., Wang, X.: Diffusion-
+     Empowered AutoPrompt MedSAM. arXiv preprint arXiv:2502.06817 (2025)
+
+ 9. Huang, Z., Wang, H., Deng, Z., Ye, J., Su, Y., Sun, H., He, J., Gu, Y., Gu, L.,
+     Zhang, S., Qiao, Y.: STU-Net: scalable and transferable medical image segmen-
+     tation models empowered by large-scale supervised pre-training. arXiv preprint
+     arXiv:2304.06716 (2023)
+
+10. Hundley, W.G., Bluemke, D.A., Bogaert, J., Friedrich, M.G., Higgins, C.B., Law-
+     son, M.A., McConnell, M.V., Raman, S.V., van Rossum, A.C., Flamm, S., et al.:
+     Society for Cardiovascular Magnetic Resonance guidelines for reporting cardio-
+     vascular magnetic resonance examinations. Journal of Cardiovascular Magnetic
+     Resonance 24, 29 (2022)
+
+11. Isensee, F., Jaeger, P.F., Kohl, S.A.A., Petersen, J., Maier-Hein, K.H.: nnU-Net:
+     a self-configuring method for deep learning-based biomedical image segmentation.
+     Nature Methods 18, 203­211 (2021)
+
+12. Kervadec, H., Bouchtiba, J., Desrosiers, C., Granger, E., Dolz, J., Ben Ayed, I.:
+     Boundary loss for highly unbalanced segmentation. Medical Image Analysis 67,
+     101851 (2021)
+
+13. Lin, L., Krubha, Y.S., Yang, Z., Ren, C., Le, T.D., Amerini, I., Wang, X., Hu, S.:
+     Robust COVID-19 Detection in CT Images with CLIP. In: 2024 IEEE 7th Inter-
+     national Conference on Multimedia Information Processing and Retrieval (MIPR),
+     pp. 586­592. IEEE (2024)
+
+14. Ma, J., Yang, Z., Kim, S., Chen, B., Baharoon, M., Fallahpour, A., Asakereh, R.,
+     Lyu, H., Wang, B.: MedSAM2: segment anything in 3D medical images and videos.
+     arXiv preprint arXiv:2504.03600 (2025)
+12  Mudaliar et al.
+
+15. Nieman, K., García-García, H.M., Hideo-Kajita, A., Collet, C., Dey, D., Pugliese,
+     F., Weissman, G., Tijssen, J.G.P., Leipsic, J., Opolski, M.P., et al.: Standards for
+     quantitative assessments by coronary computed tomography angiography (CCTA):
+     an expert consensus document of the Society of Cardiovascular Computed Tomog-
+     raphy. Journal of Cardiovascular Computed Tomography 18(5), 429­443 (2024)
+
+16. Oktay, O., Ferrante, E., Kamnitsas, K., Heinrich, M., Bai, W., Caballero, J., Cook,
+     S.A., de Marvao, A., Dawes, T., O'Regan, D.P., Kainz, B., Glocker, B., Rueck-
+     ert, D.: Anatomically constrained neural networks: application to cardiac image
+     enhancement and segmentation. IEEE Transactions on Medical Imaging 37(2),
+     384­395 (2018)
+
+17. Ouyang, C., Chen, C., Li, S., Li, Z., Qin, C., Bai, W., Rueckert, D.: Causality-
+     inspired single-source domain generalization for medical image segmentation. IEEE
+     Transactions on Medical Imaging 42(4), 1095­1106 (2023)
+
+18. Su, Z., Yao, K., Yang, X., Huang, K., Wang, Q., Sun, J.: Rethinking data aug-
+     mentation for single-source domain generalization in medical image segmentation.
+     Proceedings of the AAAI Conference on Artificial Intelligence 37(2), 2366­2374
+     (2023)
+
+19. Tsai, T.Y., Lin, L., Hu, S., Chang, M.-C., Zhu, H., Wang, X.: UU-Mamba:
+     Uncertainty-Aware U-Mamba for Cardiac Image Segmentation. In: 2024 IEEE
+     7th International Conference on Multimedia Information Processing and Retrieval
+     (MIPR), pp. 267­273. IEEE (2024)
+
+20. Wang, H., Guo, S., Ye, J., Deng, Z., Cheng, J., Li, T., Chen, J., Su, Y.,
+     Huang, Z., Shen, Y., Fu, B., Zhang, S., He, J., Qiao, Y.: SAM-Med3D: to-
+     wards general-purpose segmentation models for volumetric medical images. arXiv
+     preprint arXiv:2310.15161 (2024)
+
+21. Wang, X., Liu, X., Huang, P., Huang, P., Hu, S., Zhu, H.: U-MedSAM: Uncertainty-
+     Aware MedSAM for Medical Image Segmentation. In: Medical Image Segmentation
+     Foundation Models. CVPR 2024 Challenge: Segment Anything in Medical Images
+     on Laptop. Lecture Notes in Computer Science, vol. 15458, pp. 206­217. Springer
+     (2025)
+
+22. Wang, Z., Gao, Z., Dou, Q.: A unified 3D cardiac structure segmentation framework
+     for heterogeneous medical data. In: Zhuang, X., Ding, W., Liu, Y., Ma, Y., Zhao, J.,
+     Wang, B. (eds.) Comprehensive Analysis and Computing of Real-World Medical
+     Images. CARE 2025. Lecture Notes in Computer Science, vol. 16257, pp. 1­11.
+     Springer, Cham (2026). https://doi.org/10.1007/978-3-032-16271-7_1
+
+23. Wasserthal, J., Breit, H.C., Meyer, M.T., Pradella, M., Hinck, D., Sauter, A.W.,
+     Heye, T., Boll, D.T., Cyriac, J., Yang, S., Bach, M., Segeroth, M.: TotalSegmen-
+     tator: robust segmentation of 104 anatomic structures in CT images. Radiology:
+     Artificial Intelligence 5(5), e230024 (2023)
+
+24. Zhu, X., Liu, T., Liu, Z., Ouyang, S., Wang, X., Hu, S., Ding, F.: CGD-Net: A
+     Hybrid End-to-End Network with Gating Decoding for Liver Tumor Segmentation
+     from CT Images. In: 2024 IEEE International Conference on Advanced Video and
+     Signal Based Surveillance (AVSS), pp. 1­7. IEEE (2024)
+
+25. Zhuang, X., Li, L., Payer, C., Stern, D., Urschler, M., Heinrich, M.P., Oster, J.,
+     Wang, C., Smedby, O., Bian, C., et al.: Evaluation of algorithms for multi-modality
+     whole heart segmentation: an open-access grand challenge. Medical Image Analysis
+     58, 101537 (2019)
+

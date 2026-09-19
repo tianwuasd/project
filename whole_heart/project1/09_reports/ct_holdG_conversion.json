@@ -1,0 +1,534 @@
+[
+  {
+    "case_id": "Case1002",
+    "shape": [
+      512,
+      512,
+      239
+    ],
+    "spacing_mm": [
+      0.4882810115814209,
+      0.4882810115814209,
+      0.625
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1003",
+    "shape": [
+      512,
+      512,
+      298
+    ],
+    "spacing_mm": [
+      0.302734375,
+      0.302734375,
+      0.44999998807907104
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1005",
+    "shape": [
+      512,
+      512,
+      177
+    ],
+    "spacing_mm": [
+      0.4882810115814209,
+      0.4882810115814209,
+      0.625
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1006",
+    "shape": [
+      512,
+      512,
+      248
+    ],
+    "spacing_mm": [
+      0.4882810115814209,
+      0.4882810115814209,
+      0.625
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1007",
+    "shape": [
+      512,
+      512,
+      243
+    ],
+    "spacing_mm": [
+      0.43554699420928955,
+      0.43554699420928955,
+      0.625
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1009",
+    "shape": [
+      512,
+      512,
+      293
+    ],
+    "spacing_mm": [
+      0.4882810115814209,
+      0.4882810115814209,
+      0.625
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1010",
+    "shape": [
+      512,
+      512,
+      274
+    ],
+    "spacing_mm": [
+      0.5058590173721313,
+      0.5058590173721313,
+      0.625
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1011",
+    "shape": [
+      512,
+      512,
+      239
+    ],
+    "spacing_mm": [
+      0.38867199420928955,
+      0.38867199420928955,
+      0.625
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1012",
+    "shape": [
+      512,
+      512,
+      177
+    ],
+    "spacing_mm": [
+      0.4882810115814209,
+      0.4882810115814209,
+      0.625
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1013",
+    "shape": [
+      512,
+      512,
+      211
+    ],
+    "spacing_mm": [
+      0.43945300579071045,
+      0.43945300579071045,
+      0.625
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1014",
+    "shape": [
+      512,
+      512,
+      358
+    ],
+    "spacing_mm": [
+      0.28125,
+      0.28125,
+      0.44999998807907104
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1015",
+    "shape": [
+      512,
+      512,
+      300
+    ],
+    "spacing_mm": [
+      0.5644530057907104,
+      0.5644530057907104,
+      0.625
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1016",
+    "shape": [
+      512,
+      512,
+      333
+    ],
+    "spacing_mm": [
+      0.306640625,
+      0.306640625,
+      0.44999998807907104
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1017",
+    "shape": [
+      512,
+      512,
+      283
+    ],
+    "spacing_mm": [
+      0.5859379768371582,
+      0.5859379768371582,
+      0.625
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1019",
+    "shape": [
+      512,
+      512,
+      297
+    ],
+    "spacing_mm": [
+      0.4882810115814209,
+      0.4882810115814209,
+      0.625
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1020",
+    "shape": [
+      512,
+      512,
+      363
+    ],
+    "spacing_mm": [
+      0.35546875,
+      0.35546875,
+      0.44999998807907104
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2001",
+    "shape": [
+      170,
+      170,
+      120
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2003",
+    "shape": [
+      167,
+      167,
+      143
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2004",
+    "shape": [
+      223,
+      223,
+      164
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2005",
+    "shape": [
+      192,
+      192,
+      176
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2006",
+    "shape": [
+      175,
+      175,
+      138
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2010",
+    "shape": [
+      181,
+      148,
+      121
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2011",
+    "shape": [
+      168,
+      168,
+      131
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2013",
+    "shape": [
+      221,
+      221,
+      145
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2014",
+    "shape": [
+      175,
+      175,
+      138
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2015",
+    "shape": [
+      224,
+      224,
+      164
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2016",
+    "shape": [
+      194,
+      194,
+      145
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2018",
+    "shape": [
+      192,
+      192,
+      176
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2019",
+    "shape": [
+      173,
+      173,
+      119
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2020",
+    "shape": [
+      167,
+      167,
+      143
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1001",
+    "shape": [
+      512,
+      512,
+      363
+    ],
+    "spacing_mm": [
+      0.35546875,
+      0.35546875,
+      0.44999998807907104
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1004",
+    "shape": [
+      512,
+      512,
+      200
+    ],
+    "spacing_mm": [
+      0.3203119933605194,
+      0.3203119933605194,
+      0.625
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1008",
+    "shape": [
+      512,
+      512,
+      222
+    ],
+    "spacing_mm": [
+      0.4375,
+      0.4375,
+      0.625
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case1018",
+    "shape": [
+      512,
+      512,
+      187
+    ],
+    "spacing_mm": [
+      0.36523398756980896,
+      0.36523398756980896,
+      0.625
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2002",
+    "shape": [
+      184,
+      184,
+      144
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2007",
+    "shape": [
+      187,
+      187,
+      129
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2008",
+    "shape": [
+      211,
+      211,
+      160
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  },
+  {
+    "case_id": "Case2012",
+    "shape": [
+      250,
+      250,
+      160
+    ],
+    "spacing_mm": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "geometry_and_label_roundtrip": "passed"
+  }
+]
