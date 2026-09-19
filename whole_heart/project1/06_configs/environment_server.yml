@@ -1,0 +1,16 @@
+name: whole_heart_server
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - scipy
+  - nibabel
+  - matplotlib
+  - pandas
+  - pyyaml
+  - libblas=*=*openblas
+  - libcblas=*=*openblas
+  - liblapack=*=*openblas

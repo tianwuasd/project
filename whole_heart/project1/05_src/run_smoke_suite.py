@@ -2,7 +2,7 @@
 import subprocess
 import sys
 import time
-from data_pipeline import ROOT, load_json, save_json
+from data_pipeline import ROOT, CODE_ROOT, load_json, save_json
 
 
 def main():
@@ -14,7 +14,7 @@ def main():
     records = []
     for fold in ["ct_holdG", "mr_holdE"]:
         for method in ["B0", "B1"]:
-            command = [sys.executable, "-B", "-X", "utf8", str(ROOT / "05_src/smoke_train.py"), fold, method, "--steps", "12"]
+            command = [sys.executable, "-B", "-X", "utf8", str(CODE_ROOT / "05_src/smoke_train.py"), fold, method, "--steps", "12"]
             # 每种模态只做一次完整预测，B1 仍验证训练、开发集和检查点恢复。
             if method == "B0":
                 command.append("--predict")

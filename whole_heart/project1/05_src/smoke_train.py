@@ -12,7 +12,7 @@ import time
 import traceback
 from pathlib import Path
 import numpy as np
-from data_pipeline import ROOT, FOLDS, load_json, save_json, inverse_labels
+from data_pipeline import ROOT, CODE_ROOT, FOLDS, load_json, save_json, inverse_labels
 from prepare_nnunet import configure_paths
 
 
@@ -57,7 +57,7 @@ def main():
     # nnunetv2.paths 已在 import 时缓存；单独设置训练器输出路径，避免污染正式结果。
     cls = Project1B0 if args.method == "B0" else Project1B1
     report = {"run_id": run_id, "status": "running", "smoke_only": True, "fold": args.fold, "method": args.method, "seed": 0, "steps": args.steps, "torch": torch.__version__, "cuda": torch.version.cuda, "device": torch.cuda.get_device_name(), "plan_sha256": hashlib.sha256((data / "Project1Plans.json").read_bytes()).hexdigest()}
-    report["code_sha256"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted((ROOT / "05_src").glob("*.py"))}
+    report["code_sha256"] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted((CODE_ROOT / "05_src").glob("*.py"))}
     report["input_record_sha256"] = {p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest() for p in ["04_data/manifests/case_inventory.json", "04_data/manifests/splits_v1.json", "06_configs/conda_explicit_training.txt", "06_configs/pip_freeze_training.txt"]}
     report["split"] = split
     save_json(out / "run.json", report)

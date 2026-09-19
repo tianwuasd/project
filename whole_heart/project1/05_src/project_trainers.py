@@ -1,6 +1,8 @@
 """两组共用同一个 nnU-Net 训练器；B1 只额外加入外观增强。"""
 import copy
+import os
 from pathlib import Path
+import numpy as np
 import torch
 from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer
 from batchgeneratorsv2.transforms.utils.compose import ComposeTransforms
@@ -44,6 +46,25 @@ class Project1B0(nnUNetTrainer):
     def plot_network_architecture(self):
         # 结构在 plans.json 中完整保存；短测不调用额外的 Graphviz 可执行程序。
         pass
+
+    def train_step(self, batch):
+        result = super().train_step(batch)
+        if not np.isfinite(result["loss"]).all():
+            raise FloatingPointError("训练损失出现 NaN/Inf，停止并保留此前检查点")
+        return result
+
+    def validation_step(self, batch):
+        result = super().validation_step(batch)
+        if not np.isfinite(result["loss"]).all():
+            raise FloatingPointError("开发集损失出现 NaN/Inf")
+        return result
+
+    def save_checkpoint(self, filename):
+        # 原子替换：写出中断时保留上一份完整检查点。
+        temporary = str(filename) + ".tmp"
+        super().save_checkpoint(temporary)
+        if self.local_rank == 0 and not self.disable_checkpointing:
+            os.replace(temporary, filename)
 
 
 class Project1B1(Project1B0):

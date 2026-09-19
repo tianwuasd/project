@@ -33,6 +33,8 @@ class AppearanceTests(unittest.TestCase):
 
     def test_reference_equivalence(self):
         # 参考文件只用于本地核对，不作为训练代码依赖。
+        if not all((ROOT / "02_materials/code_reference" / name).is_file() for name in ["bias_field_transform.py", "bezier_dualnorm_transform.py"]):
+            self.skipTest("GitHub 不分发第三方参考脚本；本地有脚本时再运行数值对照测试")
         sys.path.insert(0, str(ROOT / "02_materials/code_reference"))
         from bias_field_transform import BiasFieldTransform3D
         from bezier_dualnorm_transform import DualNormBezierIntensityTransform3D

@@ -7,13 +7,16 @@ import argparse
 from collections import Counter
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 
 import nibabel as nib
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
+CODE_ROOT = Path(__file__).resolve().parents[1]
+# 服务器写入独立工作区，本机不设置该变量时维持原来的目录布局。
+ROOT = Path(os.environ.get("WHOLE_HEART_WORKSPACE", str(CODE_ROOT))).expanduser().resolve()
 LABELS = {"background": 0, "Myo": 1, "LA": 2, "LV": 3, "RA": 4, "RV": 5, "AO": 6, "PA": 7}
 OFFICIAL = np.array([0, 205, 420, 500, 550, 600, 820, 850], dtype=np.int16)
 GROUPS = {"A": "A ct_train", "B": "B ct_train", "G": "G ct_train", "CD": "C and D mr_train", "E": "E mr_train"}
@@ -94,24 +97,40 @@ def validate_geometry(case):
     return image, label, mapped
 
 
-def export_fold(root, fold, split, cases):
+def export_fold(root, fold, split, cases, resume=False):
     """为每个外层实验建立独立数据集；只复制来源病例。"""
     out = root / "04_data/derived/nnUNet_raw" / f"Dataset{split['dataset_id']:03d}_{fold}"
-    if out.exists():
+    if not out.resolve().is_relative_to(Path(root).resolve()):
+        raise ValueError("派生数据路径超出工作区")
+    if out.exists() and not resume:
         raise FileExistsError(f"禁止覆盖已有数据集: {out}")
-    (out / "imagesTr").mkdir(parents=True)
-    (out / "labelsTr").mkdir()
+    saved_split = out / "source_only_split.json"
+    if saved_split.exists() and load_json(saved_split) != split:
+        raise ValueError("现有数据集的划分不同，不能继续")
+    (out / "imagesTr").mkdir(parents=True, exist_ok=resume)
+    (out / "labelsTr").mkdir(exist_ok=resume)
+    save_json(saved_split, split)
     lookup = {c["case_id"]: c for c in cases}
     records = []
     for case_id in split["train"] + split["val"]:
         case = lookup[case_id]
         image, label, mapped = validate_geometry(case)
-        shutil.copyfile(case["image"], out / "imagesTr" / f"{case_id}_0000.nii.gz")
+        image_out = out / "imagesTr" / f"{case_id}_0000.nii.gz"
+        copied_ok = False
+        if image_out.exists():
+            with image_out.open("rb") as stream:
+                copied_ok = hashlib.file_digest(stream, "sha256").hexdigest() == case["image_sha256"]
+        if not copied_ok:
+            temporary = image_out.with_name(image_out.name + ".partial")
+            shutil.copyfile(case["image"], temporary)
+            os.replace(temporary, image_out)
         header = label.header.copy()
         header.set_data_dtype(np.uint8)
         converted = nib.Nifti1Image(mapped, label.affine, header)
         path = out / "labelsTr" / f"{case_id}.nii.gz"
-        nib.save(converted, path)
+        temporary = path.with_name(case_id + ".partial.nii.gz")
+        nib.save(converted, temporary)
+        os.replace(temporary, path)
         restored = nib.load(path)
         if not np.array_equal(np.asanyarray(restored.dataobj), mapped) or not np.allclose(restored.affine, image.affine, atol=1e-4, rtol=0):
             raise ValueError(f"写入后验证失败: {case_id}")
