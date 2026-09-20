@@ -1,0 +1,38 @@
+{
+  "rendered_at": "2026-09-20 19:48:13",
+  "reason": "nnU-Net changed global matplotlib fonts; reset plotting defaults",
+  "prediction_and_metrics_changed": false,
+  "training_rerun": false,
+  "current_plotting_source_sha256": "222f39fe27b345b823708820ab51c934c2548f845ed9f582eb91de3ed33a7caa",
+  "original_training_source_sha256": "de7590605d0431a89883b0b676cdac4012fca26a5e0eda0ef45b60f5a8743034",
+  "figures": [
+    {
+      "figure": "D:\\code_project\\whole_heart\\project1\\07_experiments\\preexperiment_ct_B0_seed0_20260920_190341\\preview_epoch000\\Case1001_overlay.png",
+      "sha256": "36369c829764563856e12b00f709861e3fd2dd7114adc97ca8c15382f43b2a9c"
+    },
+    {
+      "figure": "D:\\code_project\\whole_heart\\project1\\07_experiments\\preexperiment_ct_B0_seed0_20260920_190341\\preview_epoch000\\Case2002_overlay.png",
+      "sha256": "a5d9c478fdfade7245f5fff8cb33866ebd58a7dd3dcdcb7a4f88c84aac72b199"
+    },
+    {
+      "figure": "D:\\code_project\\whole_heart\\project1\\07_experiments\\preexperiment_ct_B0_seed0_20260920_190341\\preview_epoch001\\Case1001_overlay.png",
+      "sha256": "f428f3b5971c3dbca126f65eafd0befd633f397678754e2fbc53238be63a896b"
+    },
+    {
+      "figure": "D:\\code_project\\whole_heart\\project1\\07_experiments\\preexperiment_ct_B0_seed0_20260920_190341\\preview_epoch001\\Case2002_overlay.png",
+      "sha256": "6a720d13dfd2b4b31c6b715e43218d2afa47c56ebd08a408b792bb3adf3a4c30"
+    },
+    {
+      "figure": "D:\\code_project\\whole_heart\\project1\\07_experiments\\preexperiment_ct_B0_seed0_20260920_190341\\preview_epoch005\\Case1001_overlay.png",
+      "sha256": "dd21a26956cd96297f78fa962daa2f88c72f6d3466734307316d1e68317c04e2"
+    },
+    {
+      "figure": "D:\\code_project\\whole_heart\\project1\\07_experiments\\preexperiment_ct_B0_seed0_20260920_190341\\preview_epoch005\\Case2002_overlay.png",
+      "sha256": "60a3e4f80370a11c92b41013506efde171e53760a1b4a08549e166c5c775b67d"
+    },
+    {
+      "figure": "D:\\code_project\\whole_heart\\project1\\07_experiments\\preexperiment_ct_B0_seed0_20260920_190341\\learning_curves.png",
+      "sha256": "d722a5eb4778665b0a5a0166f0aca93d0bb463a8a18ce435b320457ac64c778d"
+    }
+  ]
+}

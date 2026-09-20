@@ -26,3 +26,11 @@ server_work/
 !09_reports/**/*.log
 !07_experiments/**/*.log
 
+
+# 二进制缓存及本机凭据不进入代码归档。
+*.b2nd
+*.blosc2
+*.pkl
+.env
+.env.*
+!.env.example

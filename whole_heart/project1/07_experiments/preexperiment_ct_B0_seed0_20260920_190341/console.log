@@ -1,0 +1,129 @@
+RUN_DIRECTORY: D:\code_project\whole_heart\project1\07_experiments\preexperiment_ct_B0_seed0_20260920_190341
+Using device: cuda:0
+
+#######################################################################
+Please cite the following paper when using nnU-Net:
+Isensee, F., Jaeger, P. F., Kohl, S. A., Petersen, J., & Maier-Hein, K. H. (2021). nnU-Net: a self-configuring method for deep learning-based biomedical image segmentation. Nature methods, 18(2), 203-211.
+#######################################################################
+
+2026-09-20 19:03:43.268679: Frozen source split: 30 train / 8 val; target excluded
+TINY_PROBE {'step': 0, 'same_training_patch_loss': 2.7266738414764404, 'same_training_patch_mean_dice': 0.045606621994271075}
+TINY_PROBE {'step': 50, 'same_training_patch_loss': 0.3995383232831955, 'same_training_patch_mean_dice': 0.22098590285251185}
+TINY_PROBE {'step': 100, 'same_training_patch_loss': -0.0063257161527872086, 'same_training_patch_mean_dice': 0.496584478020668}
+TINY_PROBE {'step': 150, 'same_training_patch_loss': -0.2961079478263855, 'same_training_patch_mean_dice': 0.6202031338853495}
+TINY_PROBE {'step': 200, 'same_training_patch_loss': -0.5517120361328125, 'same_training_patch_mean_dice': 0.7724812090396881}
+Using device: cuda:0
+
+#######################################################################
+Please cite the following paper when using nnU-Net:
+Isensee, F., Jaeger, P. F., Kohl, S. A., Petersen, J., & Maier-Hein, K. H. (2021). nnU-Net: a self-configuring method for deep learning-based biomedical image segmentation. Nature methods, 18(2), 203-211.
+#######################################################################
+
+2026-09-20 19:04:58.967683: Frozen source split: 30 train / 8 val; target excluded
+2026-09-20 19:04:59.486919: do_dummy_2d_data_aug: False
+2026-09-20 19:04:59.492918: Frozen source split: 30 train / 8 val; target excluded
+
+This is the configuration used by this training:
+Configuration name: 3d_fullres
+ {'data_identifier': 'Project1Plans_3d_fullres', 'preprocessor_name': 'DefaultPreprocessor', 'batch_size': 2, 'patch_size': [96, 128, 128], 'median_image_size_in_voxels': [239.0, 341.5, 341.5], 'spacing': [0.625, 0.5751954913139343, 0.5751954913139343], 'normalization_schemes': ['CTNormalization'], 'use_mask_for_norm': [False], 'resampling_fn_data': 'resample_data_or_seg_to_shape', 'resampling_fn_seg': 'resample_data_or_seg_to_shape', 'resampling_fn_data_kwargs': {'is_seg': False, 'order': 3, 'order_z': 0, 'force_separate_z': None}, 'resampling_fn_seg_kwargs': {'is_seg': True, 'order': 1, 'order_z': 0, 'force_separate_z': None}, 'resampling_fn_probabilities': 'resample_data_or_seg_to_shape', 'resampling_fn_probabilities_kwargs': {'is_seg': False, 'order': 1, 'order_z': 0, 'force_separate_z': None}, 'architecture': {'network_class_name': 'dynamic_network_architectures.architectures.unet.PlainConvUNet', 'arch_kwargs': {'n_stages': 6, 'features_per_stage': [32, 64, 128, 256, 320, 320], 'conv_op': 'torch.nn.modules.conv.Conv3d', 'kernel_sizes': [[3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3], [3, 3, 3]], 'strides': [[1, 1, 1], [2, 2, 2], [2, 2, 2], [2, 2, 2], [2, 2, 2], [1, 2, 2]], 'n_conv_per_stage': [2, 2, 2, 2, 2, 2], 'n_conv_per_stage_decoder': [2, 2, 2, 2, 2], 'conv_bias': True, 'norm_op': 'torch.nn.modules.instancenorm.InstanceNorm3d', 'norm_op_kwargs': {'eps': 1e-05, 'affine': True}, 'dropout_op': None, 'dropout_op_kwargs': None, 'nonlin': 'torch.nn.LeakyReLU', 'nonlin_kwargs': {'inplace': True}}, '_kw_requires_import': ['conv_op', 'norm_op', 'dropout_op', 'nonlin']}, 'batch_dice': True} 
+
+These are the global plan.json settings:
+ {'dataset_name': 'Dataset703_ct_holdG', 'plans_name': 'Project1Plans', 'original_median_spacing_after_transp': [0.625, 0.5751954913139343, 0.5751954913139343], 'original_median_shape_after_transp': [177, 512, 512], 'image_reader_writer': 'NibabelIO', 'transpose_forward': [0, 1, 2], 'transpose_backward': [0, 1, 2], 'experiment_planner_used': 'ExperimentPlanner', 'label_manager': 'LabelManager', 'foreground_intensity_properties_per_channel': {'0': {'max': 3071.0, 'mean': 339.8524169921875, 'median': 278.0, 'min': -1024.0, 'percentile_00_5': -4.0, 'percentile_99_5': 1202.3265380859375, 'std': 248.07151794433594}}} 
+
+VOLUME_PREVIEW Case1001 0 0.03187735887234279
+VOLUME_PREVIEW Case2002 0 0.021687862424710574
+2026-09-20 19:06:36.937059: 
+2026-09-20 19:06:36.942064: Epoch 0
+2026-09-20 19:06:36.946064: Current learning rate: 0.01
+BASELINE_PROGRESS {'epoch': 1, 'step': 25, 'recent_train_loss': 1.5927190780639648}
+BASELINE_PROGRESS {'epoch': 1, 'step': 50, 'recent_train_loss': 0.9911782741546631}
+BASELINE_PROGRESS {'epoch': 1, 'step': 75, 'recent_train_loss': 0.9650701284408569}
+BASELINE_PROGRESS {'epoch': 1, 'step': 100, 'recent_train_loss': 0.8373929858207703}
+BASELINE_PROGRESS {'epoch': 1, 'step': 125, 'recent_train_loss': 1.015599250793457}
+BASELINE_PROGRESS {'epoch': 1, 'step': 150, 'recent_train_loss': 0.9039032459259033}
+BASELINE_PROGRESS {'epoch': 1, 'step': 175, 'recent_train_loss': 0.8686242699623108}
+BASELINE_PROGRESS {'epoch': 1, 'step': 200, 'recent_train_loss': 0.9119148850440979}
+BASELINE_PROGRESS {'epoch': 1, 'step': 225, 'recent_train_loss': 0.7637587785720825}
+BASELINE_PROGRESS {'epoch': 1, 'step': 250, 'recent_train_loss': 0.7213680744171143}
+2026-09-20 19:10:14.466341: train_loss 0.9572
+2026-09-20 19:10:14.472345: val_loss 0.8267
+2026-09-20 19:10:14.477334: Pseudo dice [np.float32(0.2781), np.float32(0.5461), np.float32(0.1685), np.float32(0.0), np.float32(0.0031), np.float32(0.0034), np.float32(0.0)]
+2026-09-20 19:10:14.483334: Epoch time: 217.53 s
+2026-09-20 19:10:14.685440: Yayy! New best EMA pseudo Dice: 0.14270000159740448
+VOLUME_PREVIEW Case1001 1 0.12115677600083687
+VOLUME_PREVIEW Case2002 1 0.1175589963830207
+2026-09-20 19:11:39.859008: 
+2026-09-20 19:11:39.859008: Epoch 1
+2026-09-20 19:11:39.865009: Current learning rate: 0.00996
+BASELINE_PROGRESS {'epoch': 2, 'step': 25, 'recent_train_loss': 0.8119686841964722}
+BASELINE_PROGRESS {'epoch': 2, 'step': 50, 'recent_train_loss': 0.9046985507011414}
+BASELINE_PROGRESS {'epoch': 2, 'step': 75, 'recent_train_loss': 0.7226873636245728}
+BASELINE_PROGRESS {'epoch': 2, 'step': 100, 'recent_train_loss': 0.7177889347076416}
+BASELINE_PROGRESS {'epoch': 2, 'step': 125, 'recent_train_loss': 0.6982231140136719}
+BASELINE_PROGRESS {'epoch': 2, 'step': 150, 'recent_train_loss': 0.6516005992889404}
+BASELINE_PROGRESS {'epoch': 2, 'step': 175, 'recent_train_loss': 0.8255674242973328}
+BASELINE_PROGRESS {'epoch': 2, 'step': 200, 'recent_train_loss': 0.7690100073814392}
+BASELINE_PROGRESS {'epoch': 2, 'step': 225, 'recent_train_loss': 0.6744411587715149}
+BASELINE_PROGRESS {'epoch': 2, 'step': 250, 'recent_train_loss': 0.6620319485664368}
+2026-09-20 19:15:03.849220: train_loss 0.7438
+2026-09-20 19:15:03.854948: val_loss 0.6495
+2026-09-20 19:15:03.858955: Pseudo dice [np.float32(0.4829), np.float32(0.4423), np.float32(0.234), np.float32(0.1384), np.float32(0.0245), np.float32(0.0146), np.float32(0.0)]
+2026-09-20 19:15:03.863946: Epoch time: 203.99 s
+2026-09-20 19:15:04.092941: Yayy! New best EMA pseudo Dice: 0.147599995136261
+2026-09-20 19:15:04.765842: 
+2026-09-20 19:15:04.771466: Epoch 2
+2026-09-20 19:15:04.775463: Current learning rate: 0.00993
+BASELINE_PROGRESS {'epoch': 3, 'step': 25, 'recent_train_loss': 0.5886245369911194}
+BASELINE_PROGRESS {'epoch': 3, 'step': 50, 'recent_train_loss': 0.6820597052574158}
+BASELINE_PROGRESS {'epoch': 3, 'step': 75, 'recent_train_loss': 0.6417397856712341}
+BASELINE_PROGRESS {'epoch': 3, 'step': 100, 'recent_train_loss': 0.6225364804267883}
+BASELINE_PROGRESS {'epoch': 3, 'step': 125, 'recent_train_loss': 0.6016011834144592}
+BASELINE_PROGRESS {'epoch': 3, 'step': 150, 'recent_train_loss': 0.5189215540885925}
+BASELINE_PROGRESS {'epoch': 3, 'step': 175, 'recent_train_loss': 0.6297910213470459}
+BASELINE_PROGRESS {'epoch': 3, 'step': 200, 'recent_train_loss': 0.561606764793396}
+BASELINE_PROGRESS {'epoch': 3, 'step': 225, 'recent_train_loss': 0.4908331334590912}
+BASELINE_PROGRESS {'epoch': 3, 'step': 250, 'recent_train_loss': 0.4888463616371155}
+2026-09-20 19:18:27.284591: train_loss 0.5827
+2026-09-20 19:18:27.289585: val_loss 0.4901
+2026-09-20 19:18:27.294591: Pseudo dice [np.float32(0.4615), np.float32(0.5986), np.float32(0.4639), np.float32(0.0285), np.float32(0.4041), np.float32(0.0043), np.float32(0.0312)]
+2026-09-20 19:18:27.298947: Epoch time: 202.52 s
+2026-09-20 19:18:27.501060: Yayy! New best EMA pseudo Dice: 0.16130000352859497
+2026-09-20 19:18:28.131694: 
+2026-09-20 19:18:28.137512: Epoch 3
+2026-09-20 19:18:28.141512: Current learning rate: 0.00989
+BASELINE_PROGRESS {'epoch': 4, 'step': 25, 'recent_train_loss': 0.4317004382610321}
+BASELINE_PROGRESS {'epoch': 4, 'step': 50, 'recent_train_loss': 0.4233787953853607}
+BASELINE_PROGRESS {'epoch': 4, 'step': 75, 'recent_train_loss': 0.4512278735637665}
+BASELINE_PROGRESS {'epoch': 4, 'step': 100, 'recent_train_loss': 0.4792129397392273}
+BASELINE_PROGRESS {'epoch': 4, 'step': 125, 'recent_train_loss': 0.38132208585739136}
+BASELINE_PROGRESS {'epoch': 4, 'step': 150, 'recent_train_loss': 0.2474696934223175}
+BASELINE_PROGRESS {'epoch': 4, 'step': 175, 'recent_train_loss': 0.2682821452617645}
+BASELINE_PROGRESS {'epoch': 4, 'step': 200, 'recent_train_loss': 0.21880879998207092}
+BASELINE_PROGRESS {'epoch': 4, 'step': 225, 'recent_train_loss': 0.2613416612148285}
+BASELINE_PROGRESS {'epoch': 4, 'step': 250, 'recent_train_loss': 0.21448184549808502}
+2026-09-20 19:21:46.789207: train_loss 0.3377
+2026-09-20 19:21:46.795210: val_loss 0.1129
+2026-09-20 19:21:46.799201: Pseudo dice [np.float32(0.6651), np.float32(0.7709), np.float32(0.7266), np.float32(0.4294), np.float32(0.5644), np.float32(0.7379), np.float32(0.3769)]
+2026-09-20 19:21:46.803204: Epoch time: 198.66 s
+2026-09-20 19:21:47.000105: Yayy! New best EMA pseudo Dice: 0.2062000036239624
+2026-09-20 19:21:47.590477: 
+2026-09-20 19:21:47.594494: Epoch 4
+2026-09-20 19:21:47.599477: Current learning rate: 0.00986
+BASELINE_PROGRESS {'epoch': 5, 'step': 25, 'recent_train_loss': 0.04906000569462776}
+BASELINE_PROGRESS {'epoch': 5, 'step': 50, 'recent_train_loss': 0.06970065832138062}
+BASELINE_PROGRESS {'epoch': 5, 'step': 75, 'recent_train_loss': 0.0038804137147963047}
+BASELINE_PROGRESS {'epoch': 5, 'step': 100, 'recent_train_loss': 0.046894583851099014}
+BASELINE_PROGRESS {'epoch': 5, 'step': 125, 'recent_train_loss': 0.10518965870141983}
+BASELINE_PROGRESS {'epoch': 5, 'step': 150, 'recent_train_loss': 0.04702458903193474}
+BASELINE_PROGRESS {'epoch': 5, 'step': 175, 'recent_train_loss': 0.030018795281648636}
+BASELINE_PROGRESS {'epoch': 5, 'step': 200, 'recent_train_loss': -0.008889108896255493}
+BASELINE_PROGRESS {'epoch': 5, 'step': 225, 'recent_train_loss': -0.06794074177742004}
+BASELINE_PROGRESS {'epoch': 5, 'step': 250, 'recent_train_loss': -0.03597936034202576}
+2026-09-20 19:25:09.276097: train_loss 0.0239
+2026-09-20 19:25:09.282099: val_loss -0.0132
+2026-09-20 19:25:09.286519: Pseudo dice [np.float32(0.7198), np.float32(0.8505), np.float32(0.8103), np.float32(0.7196), np.float32(0.6716), np.float32(0.713), np.float32(0.4635)]
+2026-09-20 19:25:09.290707: Epoch time: 201.69 s
+2026-09-20 19:25:09.497931: Yayy! New best EMA pseudo Dice: 0.25619998574256897
+VOLUME_PREVIEW Case1001 5 0.6559509690018169
+VOLUME_PREVIEW Case2002 5 0.6515476537098503
+RESULT: D:\code_project\whole_heart\project1\07_experiments\preexperiment_ct_B0_seed0_20260920_190341\预实验记录.md

@@ -1,0 +1,48 @@
+{
+  "status": "passed",
+  "type": "output consistency verification; not an independent training replication",
+  "checkpoint_completed_epochs": 5,
+  "optimizer_state_present": true,
+  "weights_finite": true,
+  "source_split_and_plan_unchanged": true,
+  "code_snapshot_hashes_match": true,
+  "volumes": [
+    {
+      "epoch": 0,
+      "case_id": "Case1001",
+      "dice_independent_recalculation": "passed",
+      "grid_check": "passed"
+    },
+    {
+      "epoch": 0,
+      "case_id": "Case2002",
+      "dice_independent_recalculation": "passed",
+      "grid_check": "passed"
+    },
+    {
+      "epoch": 1,
+      "case_id": "Case1001",
+      "dice_independent_recalculation": "passed",
+      "grid_check": "passed"
+    },
+    {
+      "epoch": 1,
+      "case_id": "Case2002",
+      "dice_independent_recalculation": "passed",
+      "grid_check": "passed"
+    },
+    {
+      "epoch": 5,
+      "case_id": "Case1001",
+      "dice_independent_recalculation": "passed",
+      "grid_check": "passed"
+    },
+    {
+      "epoch": 5,
+      "case_id": "Case2002",
+      "dice_independent_recalculation": "passed",
+      "grid_check": "passed"
+    }
+  ],
+  "verification_script_sha256": "c0302d95b11f31660645ea0b8b9ace6ffba0e9e27a8f4059e9be224121873d6d"
+}
