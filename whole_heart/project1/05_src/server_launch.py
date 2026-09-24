@@ -1,5 +1,6 @@
 """Linux 启动脚本的中文向导；本模块顶层只导入标准库，先设置工作区再导入训练模块。"""
 import argparse
+import json
 import math
 import os
 from pathlib import Path
@@ -51,8 +52,24 @@ def runtime_check(work, gpu_memory):
     explicit = subprocess.check_output([conda, "list", "--prefix", sys.prefix, "--explicit"], text=True)
     (config_dir / "conda_explicit_training.txt").write_text(explicit, encoding="utf-8")
     report = {"checked": time.strftime("%Y-%m-%d %H:%M:%S"), "gpu": torch.cuda.get_device_name(), "total_gib": total/2**30, "free_gib": free/2**30, "packages": actual, "gpu_backward_check": "passed", "platform": sys.platform}
+    report['gpu_visible_device'] = os.environ.get('CUDA_VISIBLE_DEVICES')
     write_json(config_dir / "server_environment.json", report)
     print(f"GPU 检查通过：{report['gpu']}，总显存 {report['total_gib']:.1f} GiB。", flush=True)
+
+
+def check_selected_gpus(work, gpu_memory, gpus):
+    """逐卡检查并退出探测进程，主调度进程不长期占用任何GPU上下文。"""
+    from gpu_devices import select_gpus
+    from server_data import read_json, write_json
+    select_gpus(len(gpus), ','.join(gpus))
+    reports = []
+    for gpu in gpus:
+        env = os.environ.copy()
+        env['CUDA_VISIBLE_DEVICES'] = gpu
+        subprocess.run([sys.executable, '-B', '-X', 'utf8', str(CODE_ROOT / '05_src/server_gpu_check.py'),
+                        str(work), str(gpu_memory)], env=env, cwd=CODE_ROOT, check=True)
+        reports.append(read_json(work / '06_configs/server_environment.json'))
+    write_json(work / '06_configs/server_gpus.json', reports)
 
 
 def show_status(work):
@@ -126,11 +143,19 @@ def main():
         raise RuntimeError("可用磁盘不足10 GiB，请选择空间更充足的结果目录")
     work.mkdir(parents=True, exist_ok=True)
     os.environ["WHOLE_HEART_WORKSPACE"] = str(work)
+    gpus = json.loads(os.environ.get('WHOLE_HEART_GPU_UUIDS', '[]'))
+    if not isinstance(gpus, list) or any(not isinstance(g, str) or not g for g in gpus) or len(set(gpus)) != len(gpus):
+        raise ValueError('显卡列表必须是非重复UUID列表')
+    if gpus:
+        os.environ['CUDA_VISIBLE_DEVICES'] = gpus[0]
     from filelock import FileLock
     # 防止不同代码副本同时写入同一个输出目录。
     with FileLock(str(work / ".run.lock"), timeout=0):
         bind_workspace(CODE_ROOT, work, data, gpu_memory)
-        runtime_check(work, gpu_memory)
+        if gpus:
+            check_selected_gpus(work, gpu_memory, gpus)
+        else:
+            runtime_check(work, gpu_memory)
         if mode == "check":
             print(f"检查完成：106例匹配，按既定规则排除5例；未启动训练。\n记录目录：{work}")
             return
@@ -156,13 +181,17 @@ def main():
         folds = ["ct_holdG", "mr_holdE"] if mode == "smoke" else SCOPES[scope]
         if mode != "smoke":
             write_json(queue_file, {"scope": scope, "folds": folds, "methods": ["B0", "B1"]})
-        # 按方向逐一准备并训练，不并发占用显卡。
+        # 预处理只执行一次；多卡时全部准备好后，再并行独立模型，避免并发改同一缓存。
         for fold in folds:
             child("server_prepare.py", fold, "--gpu-memory", gpu_memory)
-            if mode != "smoke":
+            if mode != "smoke" and not gpus:
                 for method in ["B0", "B1"]:
                     extra = ["--resume"] if mode in {"resume", "experiment"} else []
                     child("server_train.py", fold, method, *extra)
+        if mode != 'smoke' and gpus:
+            from gpu_queue import run_training_queue
+            run_training_queue([(fold, method) for fold in folds for method in ['B0', 'B1']],
+                               gpus, work, resume=mode in {'resume', 'experiment'})
         if mode == "smoke":
             child("run_smoke_suite.py")
             child("summarize_smoke.py")

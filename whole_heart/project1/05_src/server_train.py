@@ -39,6 +39,18 @@ def archive_uncheckpointed(out):
     return str(destination)
 
 
+def publish_initial_weight(record, report, other, initial_hash):
+    """先发布再比较，兼容另一组正在初始化或归档无检查点的失败记录。"""
+    report['initial_weight_sha256'] = initial_hash
+    write_json(record, report)
+    try:
+        other_hash = load_json(other).get('initial_weight_sha256')
+    except FileNotFoundError:
+        other_hash = None
+    if other_hash is not None and other_hash != initial_hash:
+        raise ValueError('两组初始权重不同，停止以保护对照')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("fold", choices=list(FOLDS))
@@ -104,9 +116,9 @@ def main():
         initial_hash = state_hash(trainer.network)
         other_method = "B1" if args.method == "B0" else "B0"
         other = out.parent / f"{args.fold}_{other_method}_seed0/run.json"
-        if other.exists() and load_json(other).get("initial_weight_sha256") != initial_hash:
-            raise ValueError("两组初始权重不同，停止以保护对照")
-        report["initial_weight_sha256"] = initial_hash
+        # 多卡时两组可能同时初始化：先原子发布自己的哈希，再读取另一组。
+        # 后发布的一组一定能核对先发布的值；评价冻结时仍会再次核对两组。
+        publish_initial_weight(record, report, other, initial_hash)
         report["planned_epochs"] = trainer.num_epochs
         if checkpoint:
             trainer.load_checkpoint(str(checkpoint))

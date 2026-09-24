@@ -1,10 +1,9 @@
-"""zmic44 初学者入口：标准库即可运行，个人目录安装、单卡、后台日志。
+"""zmic44 初学者入口：个人目录安装、可选GPU数量与编号、后台日志。
 
 服务器文档中的位置仅是建议，首次输入才绑定；不会使用旧用户目录本身。
 不安装驱动、不使用 sudo、不登录网盘、不下载预训练权重。
 """
 import argparse
-import csv
 import hashlib
 import json
 import os
@@ -14,6 +13,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from gpu_devices import select_gpus
 
 CODE = Path(__file__).resolve().parents[1]
 SETTINGS = CODE / '.zmic44_settings.json'
@@ -112,24 +112,8 @@ def ensure_conda(base, env):
 
 
 def select_gpu(index):
-    output = subprocess.check_output(['nvidia-smi', '--query-gpu=index,uuid,name,memory.free,utilization.gpu',
-                                      '--format=csv,noheader,nounits'], text=True)
-    rows = list(csv.reader(output.splitlines(), skipinitialspace=True))
-    print('GPU编号 / UUID / 名称 / 空闲MiB / 利用率：\n' + output)
-    if index is None:
-        index = input('请填写一张已获准使用的空闲GPU编号（不会自动占用全部8张）：').strip()
-    matches = [r for r in rows if r[0] == str(index) or r[1] == str(index)]
-    if len(matches) != 1:
-        raise ValueError('GPU编号不存在，或填写了多张卡')
-    row = matches[0]
-    if float(row[3]) < 6000 or float(row[4]) > 10:
-        raise RuntimeError('所选GPU显存不足或正在忙碌；请与使用者协调后选择空闲卡')
-    # 仅查看进程，不停止任何任务；有计算进程时保守拒绝共享。
-    active = subprocess.check_output(['nvidia-smi', '--query-compute-apps=gpu_uuid,pid',
-                                     '--format=csv,noheader,nounits'], text=True)
-    if any(line.split(',')[0].strip() == row[1] for line in active.splitlines()):
-        raise RuntimeError('所选GPU已有计算进程，本向导不抢占或终止其他任务')
-    return row[1]
+    """保留旧单卡调用接口。"""
+    return select_gpus(1, index)[0]
 
 
 def run_worker(config_path, mode):
@@ -145,10 +129,14 @@ def run_worker(config_path, mode):
         write_json(state_file, state)
         try:
             # 再次检查，降低用户选择后到后台启动间被占用的风险；不是集群调度锁。
-            env['CUDA_VISIBLE_DEVICES'] = select_gpu(config['gpu_uuid'])
+            gpus = config.get('gpu_uuids') or [config['gpu_uuid']]
+            select_gpus(len(gpus), ','.join(gpus))
             env['CONDA_EXE'] = str(ensure_conda(base, env))
             # 首次安装可能较久，真正开始项目入口前再检查一次。
-            env['CUDA_VISIBLE_DEVICES'] = select_gpu(config['gpu_uuid'])
+            select_gpus(len(gpus), ','.join(gpus))
+            # 主流程的短测/评价仅使用第一张；正式任务由队列给每个进程分配一张。
+            env['CUDA_VISIBLE_DEVICES'] = gpus[0]
+            env['WHOLE_HEART_GPU_UUIDS'] = json.dumps(gpus)
             command = ['bash', str(CODE / 'start_server.sh'), config['data'], '--work-dir', str(work),
                        '--mode', mode, '--scope', 'all', '--gpu-memory', '5', '--yes-train']
             subprocess.run(command, env=env, check=True)
@@ -167,7 +155,8 @@ def main():
     parser.add_argument('--work-dir', help=f"可选：预处理/模型/结果目录；首次默认 {DEFAULT_PATHS['work']}")
     parser.add_argument('--data-dir', help=f"可选：原始数据目录；首次默认 {DEFAULT_PATHS['data']}")
     parser.add_argument('--server-defaults', action='store_true', help='本次路径提示恢复服务器预设；仍可逐项修改或用路径参数覆盖')
-    parser.add_argument('--gpu', help='一张可用GPU的编号')
+    parser.add_argument('--gpu-count', type=int, help='使用显卡数量；交互默认1，有编号列表时可自动推断')
+    parser.add_argument('--gpus', '--gpu', dest='gpus', help='空闲显卡编号，以逗号分隔，例如0,2；兼容旧--gpu参数')
     parser.add_argument('--mode', choices=['check', 'smoke', 'experiment', 'evaluate', 'status'])
     parser.add_argument('--foreground', action='store_true', help='调试时前台运行；默认后台运行')
     parser.add_argument('--worker', nargs=2, metavar=('CONFIG', 'MODE'), help=argparse.SUPPRESS)
@@ -185,6 +174,12 @@ def main():
         state = Path(old['base']) / 'job_state.json'
         print(state.read_text(encoding='utf-8') if state.exists() else '正在启动，查看日志。')
         print('日志：', old.get('log', '尚无日志'), '\n结果：', old['work'])
+        queue = Path(old['work']) / '00_admin/gpu_queue.json'
+        if queue.exists():
+            jobs = json.loads(queue.read_text(encoding='utf-8'))
+            print('正式训练队列：', jobs['status'])
+            for job in jobs['jobs']:
+                print(f"  {job['fold']}/{job['method']}: {job['status']}  {job.get('gpu_uuid', '')}")
         print('以上为最后保存状态；服务器重启或强制结束后状态可能滞后。')
         return
     def answer(given, key, prompt):
@@ -210,7 +205,9 @@ def main():
         parent = parent.parent
     if shutil.disk_usage(base).free < 20 * 2**30 or shutil.disk_usage(parent).free < 100 * 2**30:
         raise RuntimeError('环境盘需20GiB、结果盘需100GiB空闲空间；这些是最低检查，不是容量保证')
-    gpu = select_gpu(args.gpu)
+    gpus = select_gpus(args.gpu_count, args.gpus)
+    print(f'已选择{len(gpus)}张显卡：正式训练每张卡独立运行一个模型，完成后领取下一任务。\n'
+          '预处理按顺序执行，短测和最终评价使用所选第一张卡。', flush=True)
     mode = args.mode
     if mode is None:
         print('1 检查环境与数据\n2 短测CT/MRI（首次推荐）\n3 完整B0/B1实验或继续：十次训练＋评价\n4 十次训练已完成，仅继续评价')
@@ -229,7 +226,7 @@ def main():
     log_dir.mkdir(exist_ok=True)
     stamp = time.strftime('%Y%m%d_%H%M%S') + f'_{os.getpid()}'
     log = log_dir / f'{mode}_{stamp}.log'
-    config = {'base': str(base), 'work': str(work), 'data': str(data), 'gpu_uuid': gpu, 'log': str(log)}
+    config = {'base': str(base), 'work': str(work), 'data': str(data), 'gpu_uuids': gpus, 'log': str(log)}
     config_path = log_dir / f'{mode}_{stamp}.json'
     write_json(config_path, config)
     write_json(SETTINGS, config)

@@ -12,6 +12,32 @@ import evaluation
 
 
 class QueueTests(unittest.TestCase):
+    def test_multigpu_prepares_once_then_waits_before_evaluation(self):
+        import gpu_queue
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            data, work = root / 'data', root / 'work'
+            data.mkdir()
+            events = []
+            args = ['server_launch.py', str(data), '--work-dir', str(work), '--mode', 'experiment', '--yes-train']
+            with patch.object(sys, 'argv', args), \
+                 patch.object(launcher, 'child', side_effect=lambda script, *args: events.append((script, args))), \
+                 patch.object(launcher, 'check_selected_gpus'), patch.object(server_data, 'bind_workspace'), \
+                 patch.object(launcher, 'preflight_signature', return_value={'same': True}), \
+                 patch.object(evaluation, 'ROOT', work), \
+                 patch.dict(launcher.os.environ, {'WHOLE_HEART_GPU_UUIDS': '["GPU-zero", "GPU-three"]'}), \
+                 patch.object(gpu_queue, 'run_training_queue', side_effect=lambda tasks, gpus, work, resume: events.append(('queue', tasks))) as queue:
+                launcher.main()
+                self.assertEqual(queue.call_count, 1)
+                self.assertEqual(len(queue.call_args.args[0]), 10)
+                self.assertEqual(events[-1][0], 'evaluation.py')
+                self.assertEqual(events[-2][0], 'queue')
+                events.clear()
+                queue.side_effect = RuntimeError('training failed')
+                with self.assertRaises(RuntimeError):
+                    launcher.main()
+                self.assertNotIn('evaluation.py', [e[0] for e in events])
+
     def run_queue(self, root, fail=False):
         data, work = root / 'data', root / 'work'
         data.mkdir(exist_ok=True)

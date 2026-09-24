@@ -259,7 +259,10 @@ B1 的假设是：训练时看到更多外观变化后，模型对医院间成�
 | 文件 | 主要工作 | 注意事项 |
 |---|---|---|
 | [server_launch.py](05_src/server_launch.py) | 中文菜单、环境检查、工作区绑定、按顺序启动准备与训练 | `ct-first` 默认会运行 B0 和 B1，不是只跑 B0 |
-| [zmic44_setup.py](05_src/zmic44_setup.py) | 自动安装个人Conda、选择单卡、后台运行和记录日志 | 新手从 `run_zmic44.sh` 进入；选3完成整套实验 |
+| [zmic44_setup.py](05_src/zmic44_setup.py) | 自动安装个人Conda、选择显卡数量和编号、后台运行和记录日志 | 新手从 `run_zmic44.sh` 进入；选3完成整套实验 |
+| [gpu_devices.py](05_src/gpu_devices.py) | 检查编号、数量与空闲状态，转换为稳定的GPU UUID | 不自动抢占其他任务 |
+| [gpu_queue.py](05_src/gpu_queue.py) | 每张卡独立跑一个模型，动态领取任务 | 每个子进程只看见分配给它的一张卡 |
+| [server_gpu_check.py](05_src/server_gpu_check.py) | 在独立进程中做一次GPU计算检查 | 检查后退出，释放上下文再训练 |
 | [evaluation.py](05_src/evaluation.py) | 冻结全部模型、逐病例原图推理、七结构指标与恢复 | 所有10个模型完成前不开始目标评分 |
 | [evaluation_summary.py](05_src/evaluation_summary.py) | CSV、中心等权比较、成对bootstrap区间 | raw是主结果，lcc为预先规定的辅助结果 |
 | [metrics.py](05_src/metrics.py) | 对同一三维网格中的二值结构计算 Dice、HD、HD95 | 是单结构指标工具，不是完整的批量评估程序 |
@@ -409,7 +412,7 @@ start_server.sh
 
 这条菜单流程**不会调用 `local_preexperiment.py`**。菜单中的“短测”是工程短测，不是已经完成的那种 200 步拟合加 5 轮预实验。
 
-`server_train.py` 每次负责一个方向的一种方法；`server_launch.py` 负责依次安排多个实验。`ct-first` 是 CT 留出 G 的 B0 和 B1；`mr-first` 是 MRI 留出 E 的 B0 和 B1；`all` 是五个方向各两种方法，共十次训练。当前实现按顺序使用 GPU，不做多卡并行。
+`server_train.py` 每次负责一个方向的一种方法；`server_launch.py` 安排整体流程。`ct-first` 是 CT 留出 G 的 B0 和 B1；`mr-first` 是 MRI 留出 E 的 B0 和 B1；`all` 是五个方向各两种方法，共十次训练。9月24日新增多卡独立实验队列：向导选择多张卡后，先依次准备数据，再由 `gpu_queue.py` 动态分配模型，一张卡只跑一个模型；全部成功后统一评价。短测和最终评价使用所选第一张卡，单模型训练设置不变。旧通用入口未指定GPU队列时仍按顺序训练。
 
 ### 10.1 代码目录和输出目录是两回事
 
