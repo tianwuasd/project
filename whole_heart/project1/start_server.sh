@@ -8,7 +8,7 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   cat <<'HELP'
 用法：bash start_server.sh "/原始数据所在目录"
 不填路径时会询问。默认显示中文菜单，推荐先选择短测。
-可选参数：--mode check|smoke|train|resume|status
+可选参数：--mode check|smoke|train|resume|experiment|evaluate|status
            --scope ct-first|mr-first|all --work-dir "/结果保存目录"
            --gpu-memory 5 --yes-train
 长训练建议先进入 tmux；--yes-train 只适用于你明确确认过的非交互运行。
@@ -30,11 +30,12 @@ if [[ ! -x "$CONDA_BIN" ]]; then
   done
 fi
 [[ -x "$CONDA_BIN" ]] || { echo "找不到 Conda。请先安装 Miniconda，或设置 CONDA_EXE=/实际路径/bin/conda。" >&2; exit 2; }
-ENV_PREFIX="$SCRIPT_DIR/.server_env"
+ENV_PREFIX="${WHOLE_HEART_ENV_PREFIX:-$SCRIPT_DIR/.server_env}"
 
 # 防止两次启动同时修改环境；训练阶段由 Python 工作区锁保护。
 command -v flock >/dev/null || { echo "缺少 flock，请安装 util-linux。" >&2; exit 2; }
-exec 9>"$SCRIPT_DIR/.server_setup.lock"
+mkdir -p "$(dirname -- "$ENV_PREFIX")"
+exec 9>"${ENV_PREFIX}.setup.lock"
 flock -n 9 || { echo "正在安装环境，请等待安装结束。" >&2; exit 2; }
 
 if [[ ! -x "$ENV_PREFIX/bin/python" ]]; then

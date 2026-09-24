@@ -17,7 +17,26 @@ def select_checkpoint(folder):
     for name in ["checkpoint_final.pth", "checkpoint_latest.pth"]:
         if (folder / name).is_file():
             return folder / name
-    raise FileNotFoundError("尚无完整轮次的检查点；请使用新工作区从头运行，不使用短测权重续训")
+    raise FileNotFoundError("尚无完整轮次的检查点；不能用短测或best作为续训权重")
+
+
+def archive_uncheckpointed(out):
+    """用户选择继续后，仅重启没有完整轮次检查点的这一模型；保留失败现场。"""
+    root = ROOT.resolve()
+    out = Path(out).resolve()
+    if not out.is_relative_to(root / '07_experiments/formal'):
+        raise ValueError('只能归档本工作区的正式实验目录')
+    if (root / '08_results/evaluation/frozen_models.json').exists():
+        raise ValueError('模型已经冻结，不能重新启动训练')
+    if any((out / 'fold_0' / name).exists() for name in ['checkpoint_latest.pth', 'checkpoint_final.pth']):
+        raise ValueError('已有完整检查点，应继续而不是重新初始化')
+    destination = root / '07_experiments/recovery_archive' / f'{out.name}_{time.time_ns()}'
+    if not destination.resolve().is_relative_to(root):
+        raise ValueError('归档路径超出当前工作区')
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    out.rename(destination)
+    print(f'本模型尚无完整轮次检查点，失败现场保留于 {destination}；仅该模型从seed0重新开始。', flush=True)
+    return str(destination)
 
 
 def main():
@@ -57,9 +76,18 @@ def main():
             raise FileExistsError("实验已存在，请选择‘断点继续’或新的工作区")
     elif out.exists():
         raise FileExistsError("发现无状态记录的已有实验目录，不自动覆盖")
-    checkpoint = select_checkpoint(out / "fold_0") if previous else None
+    checkpoint, restarted_from = None, None
+    if previous:
+        try:
+            checkpoint = select_checkpoint(out / "fold_0")
+        except FileNotFoundError:
+            # --resume且签名相符才到这里。一次调用只启动一次，不在失败后循环重试。
+            restarted_from = archive_uncheckpointed(out)
+            previous = None
     out.mkdir(parents=True, exist_ok=True)
     report = previous or {"signature": signature, "split": split, "history": [], "formal_training": True}
+    if restarted_from:
+        report['restarted_from_archive'] = restarted_from
     report["status"] = "running"
     report["history"].append({"started": time.strftime("%Y-%m-%d %H:%M:%S"), "resumed_from": str(checkpoint) if checkpoint else None})
     write_json(record, report)

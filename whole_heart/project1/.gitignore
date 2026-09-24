@@ -18,6 +18,7 @@ __pycache__/
 .server_env/
 server_work/
 .server_setup.lock
+.zmic44_settings.json
 # 作者仓库许可尚未核实；参考副本只保存在本地，不自动发布。
 02_materials/code_reference/*.py
 02_materials/code_reference/README.md
