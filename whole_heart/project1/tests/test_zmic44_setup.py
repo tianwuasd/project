@@ -11,6 +11,17 @@ import zmic44_setup as wizard
 
 
 class WizardTests(unittest.TestCase):
+    def test_paths_remain_editable_after_saving_and_cli_takes_priority(self):
+        with patch('builtins.input', return_value=''):
+            self.assertEqual(wizard.choose_path(None, None, '/server/default', '路径'), '/server/default')
+            self.assertEqual(wizard.choose_path(None, '/previous', '/server/default', '路径'), '/previous')
+        with patch('builtins.input', return_value='"/new folder/data"') as prompt:
+            self.assertEqual(wizard.choose_path(None, '/previous', '/server/default', '路径'), '/new folder/data')
+            prompt.assert_called_once()
+        with patch('builtins.input') as prompt:
+            self.assertEqual(wizard.choose_path('/explicit', '/previous', '/server/default', '路径'), '/explicit')
+            prompt.assert_not_called()
+
     def test_failed_first_binding_allows_only_lock_file(self):
         with tempfile.TemporaryDirectory() as temp:
             work = Path(temp)

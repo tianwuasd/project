@@ -17,6 +17,11 @@ import urllib.request
 
 CODE = Path(__file__).resolve().parents[1]
 SETTINGS = CODE / '.zmic44_settings.json'
+DEFAULT_PATHS = {
+    'base': '/data5/zhougaowei/zhangruichen_workspace/project1_runtime',
+    'work': '/data_nas/zhangruichen/project1_results',
+    'data': '/data_nas/zhangruichen/baidu_import/Wholeheart_Train_Dataset',
+}
 VERSION = '26.7.2-0'
 INSTALLER = f'Miniforge3-{VERSION}-Linux-x86_64.sh'
 URL = f'https://github.com/conda-forge/miniforge/releases/download/{VERSION}/{INSTALLER}'
@@ -30,14 +35,29 @@ def write_json(path, value):
 
 
 def personal_path(value):
-    """拦住共享磁盘根目录、旧用户根目录和拥挤的系统/Home 分区。"""
+    """只保护根目录；其他个人子目录可以自由选择，后续检查空间与权限。"""
     path = Path(value).expanduser().resolve()
     blocked = {'/', '/home', '/data2', '/data3', '/data4', '/data5', '/data_nas', '/data5/zhougaowei'}
     if str(path) in blocked or path == CODE or path in CODE.parents:
         raise ValueError('请选择个人子目录，不能使用共享盘根目录、旧用户根目录或代码根目录')
-    if path == Path.home() or Path.home() in path.parents or str(path).startswith(('/tmp/', '/var/', '/usr/')):
-        raise ValueError('此服务器系统盘/Home空间不足，请选择个人数据盘目录')
+    if path == Path.home() or str(path) in {'/tmp', '/var', '/usr', '/etc', '/bin', '/opt'}:
+        raise ValueError('请选择本项目专用子目录，不能直接使用个人主目录或系统目录')
     return path
+
+
+def choose_path(given, saved, default, prompt):
+    """命令行参数优先；交互启动每次都能改路径，不被上次设置锁住。"""
+    if given is not None:
+        return given
+    suggestion = saved or default
+    print(f'\n{prompt}\n服务器预设：{default}')
+    if saved and saved != default:
+        print(f'上次选择：{saved}')
+    value = input(f'输入新路径，或回车使用 [{suggestion}]：').strip()
+    # 兼容初学者从命令示例中连同外围引号一起粘贴；内部空格保持不变。
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        value = value[1:-1]
+    return value or suggestion
 
 
 def validate_work_directory(work):
@@ -143,9 +163,10 @@ def run_worker(config_path, mode):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--base-dir', help='Conda/缓存/后台日志所在的个人目录')
-    parser.add_argument('--work-dir', help='数据准备、模型和评价输出目录；默认NAS')
-    parser.add_argument('--data-dir', help='已解压的原始106例数据目录')
+    parser.add_argument('--base-dir', help=f"可选：环境/缓存/日志目录；首次默认 {DEFAULT_PATHS['base']}")
+    parser.add_argument('--work-dir', help=f"可选：预处理/模型/结果目录；首次默认 {DEFAULT_PATHS['work']}")
+    parser.add_argument('--data-dir', help=f"可选：原始数据目录；首次默认 {DEFAULT_PATHS['data']}")
+    parser.add_argument('--server-defaults', action='store_true', help='本次路径提示恢复服务器预设；仍可逐项修改或用路径参数覆盖')
     parser.add_argument('--gpu', help='一张可用GPU的编号')
     parser.add_argument('--mode', choices=['check', 'smoke', 'experiment', 'evaluate', 'status'])
     parser.add_argument('--foreground', action='store_true', help='调试时前台运行；默认后台运行')
@@ -166,13 +187,15 @@ def main():
         print('日志：', old.get('log', '尚无日志'), '\n结果：', old['work'])
         print('以上为最后保存状态；服务器重启或强制结束后状态可能滞后。')
         return
-    def answer(given, key, default, prompt):
-        return given or old.get(key) or (input(f'{prompt}\n[回车默认 {default}] > ').strip() or default)
-    print('默认使用你已提供的本地个人目录安装环境和运行缓存；\n'
-          '结果与预处理数据放NAS。只在填写的个人工作区内创建本项目文件。')
-    base = personal_path(answer(args.base_dir, 'base', '/data5/zhougaowei/zhangruichen_workspace/project1_runtime', '个人运行目录'))
-    work = personal_path(answer(args.work_dir, 'work', '/data_nas/zhangruichen/project1_results', '实验结果目录（建议NAS，完整实验预留100GiB以上）'))
-    data = Path(answer(args.data_dir, 'data', '/data_nas/zhangruichen/baidu_import/Wholeheart_Train_Dataset', '原始数据目录')).expanduser().resolve()
+    def answer(given, key, prompt):
+        saved = None if args.server_defaults else old.get(key)
+        return choose_path(given, saved, DEFAULT_PATHS[key], prompt)
+    print('下面三个路径都可以修改。首次回车使用服务器预设，再次启动回车沿用上次选择。\n'
+          '恢复服务器预设可加 --server-defaults。只在选定的个人工作区内创建本项目文件。')
+    base = personal_path(answer(args.base_dir, 'base', '个人运行目录（环境、缓存和日志）'))
+    work = personal_path(answer(args.work_dir, 'work', '实验结果目录（预处理、模型和报告，预留100GiB以上）'))
+    data = Path(answer(args.data_dir, 'data', '原始数据目录')).expanduser().resolve()
+    print(f'\n本次使用：\n  环境/缓存：{base}\n  结果/模型：{work}\n  原始数据：{data}', flush=True)
     if not data.is_dir():
         raise ValueError('原始数据目录不存在；请先完成网盘下载与解压，再填写真实目录')
     for p in [base, work]:
