@@ -1,0 +1,22 @@
+# Code-only allowlist. Keep all clinical data and run outputs local.
+/*
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/一键处理说明.md
+!/独立转换器说明.md
+!/requirements.txt
+!/一键处理.cmd
+!/common.py
+!/convert_ct.py
+!/convert_us.py
+!/pipeline_gui.py
+!/run_pipeline.py
+!/patient_pipeline/
+!/tests/
+/patient_pipeline/*
+!/patient_pipeline/*.py
+/tests/*
+!/tests/test_*.py
+__pycache__/
+*.py[cod]
