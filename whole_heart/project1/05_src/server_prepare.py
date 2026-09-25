@@ -9,6 +9,43 @@ from prepare_nnunet import configure_paths
 from server_data import digest, write_json
 
 
+# 只允许迁移这个已发布版本：其影像处理不变，仅完成记录的位置有误。
+LEGACY_PREPARE_SHA256 = "88be5c8f7cdf37a1c6d0bb710cc02566c3fe8c61158111e175a8144c022b9352"
+
+
+def compatible_signature(previous, current):
+    """不放宽划分、预算、其他代码或依赖版本的缓存校验。"""
+    legacy = dict(current)
+    legacy["implementation_sha256"] = dict(current["implementation_sha256"])
+    legacy["implementation_sha256"]["server_prepare.py"] = LEGACY_PREPARE_SHA256
+    return previous == current or previous == legacy
+
+
+def completion_directory(prep, cache, case_ids, plan_hash):
+    """完成记录放在训练数据目录之外；旧记录原子迁移，影像不动。
+
+    nnU-Net 2.8.1 会检查数据目录内全部文件的后缀，不能混入 JSON。
+    先核查全部待迁移记录，再移动；若中断，下次可以继续。
+    """
+    destination = prep / "server_case_completion" / cache.name
+    moves = []
+    for case_id in case_ids:
+        source = cache / f"{case_id}.complete.json"
+        target = destination / source.name
+        if source.exists():
+            if load_json(source) != {"plan_sha256": plan_hash}:
+                raise ValueError(f"旧完成记录与当前计划不符：{source}")
+            if target.exists() and load_json(target) != load_json(source):
+                raise ValueError(f"新旧完成记录冲突，保留文件：{source}")
+            moves.append((source, target))
+    destination.mkdir(parents=True, exist_ok=True)
+    for source, target in moves:
+        source.replace(target)
+    if moves:
+        print(f"已迁移 {len(moves)} 份完成记录到 {destination}；预处理影像保持不变。", flush=True)
+    return destination
+
+
 def prepare(fold, gpu_memory):
     configure_paths()
     import torch
@@ -23,11 +60,18 @@ def prepare(fold, gpu_memory):
     prep = ROOT / "04_data/derived/nnUNet_preprocessed" / name
     signature = {"split": split, "gpu_memory_gb": gpu_memory, "inventory_sha256": digest(ROOT / "04_data/manifests/case_inventory.json"), "implementation_sha256": {name: digest(Path(__file__).with_name(name)) for name in ["server_prepare.py", "data_pipeline.py", "prepare_nnunet.py"]}, "nnunet_version": importlib.metadata.version("nnunetv2")}
     marker = prep / "server_preparation_signature.json"
-    if marker.exists() and load_json(marker) != signature:
+    previous = load_json(marker) if marker.exists() else None
+    if previous is not None and not compatible_signature(previous, signature):
         raise ValueError("已有预处理输入或代码不同，请使用新的工作区")
     for path in [raw, prep]:
         if not path.resolve().is_relative_to(ROOT.resolve()):
             raise ValueError("数据准备路径超出工作区")
+    if previous is not None and previous != signature:
+        # 保存旧签名供追溯，绝不把任意代码改动当成此次兼容迁移。
+        backup = prep / "server_preparation_signature.before_marker_fix.json"
+        if backup.exists() and load_json(backup) != previous:
+            raise ValueError("旧签名备份冲突，停止迁移")
+        write_json(backup, previous)
     complete = ROOT / f"09_reports/{fold}_preparation.json"
     if complete.exists() and marker.exists():
         plan = load_json(prep / "Project1Plans.json")
@@ -35,7 +79,9 @@ def prepare(fold, gpu_memory):
         if load_json(complete)["plan_sha256"] != digest(prep / "Project1Plans.json") or prov["sha256"] != digest(prep / "dataset_fingerprint.json") or prov["fit_ids"] != split["train"]:
             raise ValueError("已完成的计划或指纹被改动，停止复用")
         cache = prep / plan["configurations"]["3d_fullres"]["data_identifier"]
+        completion_directory(prep, cache, split["train"] + split["val"], digest(prep / "Project1Plans.json"))
         if all((cache / f"{i}{suffix}").is_file() for i in split["train"]+split["val"] for suffix in [".b2nd", "_seg.b2nd", ".pkl"]):
+            write_json(marker, signature)
             print(f"{fold} 已准备完成，复用同一份来源数据。", flush=True)
             return
     started = time.perf_counter()
@@ -68,8 +114,9 @@ def prepare(fold, gpu_memory):
     gt.mkdir(exist_ok=True)
     dataset_json = load_json(raw / "dataset.json")
     plan_hash = digest(plans_path)
+    done_dir = completion_directory(prep, cache, split["train"] + split["val"], plan_hash)
     for i, case_id in enumerate(split["train"] + split["val"], 1):
-        done = cache / f"{case_id}.complete.json"
+        done = done_dir / f"{case_id}.complete.json"
         files_ok = all((cache / f"{case_id}{s}").exists() for s in [".b2nd", "_seg.b2nd", ".pkl"])
         if not (done.exists() and files_ok and load_json(done).get("plan_sha256") == plan_hash):
             # 使用官方逐病例接口，避免官方整批入口先删除已有缓存目录。
