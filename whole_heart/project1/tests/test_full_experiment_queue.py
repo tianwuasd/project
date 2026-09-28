@@ -12,6 +12,22 @@ import evaluation
 
 
 class QueueTests(unittest.TestCase):
+    def test_evaluate_does_not_require_a_preselected_idle_gpu(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            data, work = root / 'data', root / 'work'
+            data.mkdir()
+            args = ['server_launch.py', str(data), '--work-dir', str(work), '--mode', 'evaluate']
+            with patch.object(sys, 'argv', args), patch.object(launcher, 'child') as child, \
+                 patch.object(launcher, 'runtime_check') as runtime, \
+                 patch.object(launcher, 'check_selected_gpus') as selected, \
+                 patch.object(server_data, 'bind_workspace'), \
+                 patch.dict(launcher.os.environ, {'WHOLE_HEART_GPU_UUIDS': '[]'}, clear=True):
+                launcher.main()
+                child.assert_called_once_with('evaluation_parallel.py')
+                runtime.assert_not_called()
+                selected.assert_not_called()
+
     def test_multigpu_prepares_once_then_waits_before_evaluation(self):
         import gpu_queue
         with tempfile.TemporaryDirectory() as temp:
@@ -30,13 +46,13 @@ class QueueTests(unittest.TestCase):
                 launcher.main()
                 self.assertEqual(queue.call_count, 1)
                 self.assertEqual(len(queue.call_args.args[0]), 10)
-                self.assertEqual(events[-1][0], 'evaluation.py')
+                self.assertEqual(events[-1][0], 'evaluation_parallel.py')
                 self.assertEqual(events[-2][0], 'queue')
                 events.clear()
                 queue.side_effect = RuntimeError('training failed')
                 with self.assertRaises(RuntimeError):
                     launcher.main()
-                self.assertNotIn('evaluation.py', [e[0] for e in events])
+                self.assertNotIn('evaluation_parallel.py', [e[0] for e in events])
 
     def run_queue(self, root, fail=False):
         data, work = root / 'data', root / 'work'
@@ -63,7 +79,7 @@ class QueueTests(unittest.TestCase):
             root = Path(temp)
             calls = self.run_queue(root)
             names = [s for s, _ in calls]
-            self.assertEqual(names[-1], 'evaluation.py')
+            self.assertEqual(names[-1], 'evaluation_parallel.py')
             self.assertEqual(names.count('server_train.py'), 10)
             self.assertLess(names.index('run_smoke_suite.py'), names.index('server_train.py'))
             self.assertTrue(all('--resume' in args for script, args in calls if script == 'server_train.py'))
@@ -73,7 +89,7 @@ class QueueTests(unittest.TestCase):
     def test_last_training_failure_prevents_evaluation(self):
         with tempfile.TemporaryDirectory() as temp:
             calls = self.run_queue(Path(temp), fail=True)
-            self.assertNotIn('evaluation.py', [s for s, _ in calls])
+            self.assertNotIn('evaluation_parallel.py', [s for s, _ in calls])
 
 
 if __name__ == '__main__':

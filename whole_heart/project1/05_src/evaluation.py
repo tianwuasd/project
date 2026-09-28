@@ -39,6 +39,21 @@ def require_completed(run):
         raise ValueError('十个正式训练必须全部完成后才能打开目标中心评价')
 
 
+def compatible_evaluation_code(recorded, current):
+    """仅放行本次已审计的完整历史版本，不忽略任意文件或改写训练签名。
+
+    配置保存旧版与本次发布的完整 SHA256 清单；任何额外改动均拒绝迁移。
+    新训练的代码完全一致时走原校验；此兼容入口不用于继续旧训练。
+    """
+    if recorded == current:
+        return True
+    path = CODE_ROOT / '06_configs/evaluation_code_compatibility.json'
+    if not path.exists():
+        return False
+    release = read_json(path)
+    return current in release.get('release', []) and recorded in release.get('legacy', [])
+
+
 def freeze_models():
     """先检查全部十个模型，再一次性保存不可变的检查点清单。"""
     establish_protocol()
@@ -58,7 +73,9 @@ def freeze_models():
                             splits_sha256=digest(ROOT / '04_data/manifests/splits_v1.json'),
                             environment_sha256=digest(ROOT / '06_configs/pip_freeze_training.txt'),
                             conda_environment_sha256=digest(ROOT / '06_configs/conda_explicit_training.txt'),
-                            code_sha256=code)
+                            code_sha256=run['signature']['code_sha256'])
+            if not compatible_evaluation_code(expected['code_sha256'], code):
+                raise ValueError(f'{fold}/{method} 代码不是相同版本或已审计的评价调度升级版本')
             if run['signature'] != expected or run['split'] != split:
                 raise ValueError(f'{fold}/{method} 训练签名与当前实验不符')
             initial.append(run['initial_weight_sha256'])

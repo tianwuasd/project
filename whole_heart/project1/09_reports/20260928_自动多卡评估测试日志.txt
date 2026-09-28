@@ -1,0 +1,200 @@
+test_label_unchanged (test_appearance.AppearanceTests.test_label_unchanged) ... ok
+test_monotonic_range_and_constant (test_appearance.AppearanceTests.test_monotonic_range_and_constant) ... ok
+test_reference_equivalence (test_appearance.AppearanceTests.test_reference_equivalence) ... ok
+test_labels_roundtrip (test_data_pipeline.DataTests.test_labels_roundtrip) ... ok
+test_split_no_leakage_or_quarantine (test_data_pipeline.DataTests.test_split_no_leakage_or_quarantine) ... ok
+test_unknown_label_rejected (test_data_pipeline.DataTests.test_unknown_label_rejected) ... ok
+test_all_ten_required_and_frozen_checkpoint_cannot_change (test_evaluation.EvaluationTests.test_all_ten_required_and_frozen_checkpoint_cannot_change) ... ok
+test_bootstrap_weights_centers_equally (test_evaluation.EvaluationTests.test_bootstrap_weights_centers_equally) ... ok
+test_empty_failure_is_not_dropped (test_evaluation.EvaluationTests.test_empty_failure_is_not_dropped) ... ok
+test_incomplete_model_blocks_target_evaluation (test_evaluation.EvaluationTests.test_incomplete_model_blocks_target_evaluation) ... ok
+test_lcc_is_per_class_and_26_connected (test_evaluation.EvaluationTests.test_lcc_is_per_class_and_26_connected) ... ok
+ct_holdG/B0/Case0001: raw Dice=1.0
+评价已完成，跳过：ct_holdG/B0/Case0001
+test_native_prediction_resume_and_corruption_guard (test_evaluation.EvaluationTests.test_native_prediction_resume_and_corruption_guard) ... ok
+本模型尚无完整轮次检查点，失败现场保留于 C:\Users\ruichen\AppData\Local\Temp\tmp4thmr_qw\07_experiments\recovery_archive\ct_holdG_B1_seed0_1790572033142802600；仅该模型从seed0重新开始。
+test_no_checkpoint_recovery_preserves_other_runs_and_archive (test_evaluation.EvaluationTests.test_no_checkpoint_recovery_preserves_other_runs_and_archive) ... ok
+评价及配对汇总完成：C:\Users\ruichen\AppData\Local\Temp\tmpg2skrh94\09_reports\final_evaluation
+test_summary_writes_reports_and_keeps_infinite_distances (test_evaluation.EvaluationTests.test_summary_writes_reports_and_keeps_infinite_distances) ... ok
+test_allocation_intersection_and_internal_first_gpu_override (test_evaluation_parallel.GPUSelectionTests.test_allocation_intersection_and_internal_first_gpu_override) ... ok
+test_failed_query_does_not_report_idle (test_evaluation_parallel.GPUSelectionTests.test_failed_query_does_not_report_idle) ... ok
+test_invalid_config_rejected (test_evaluation_parallel.GPUSelectionTests.test_invalid_config_rejected) ... ok
+GPU 0 跳过：已有计算进程（即使利用率为0也跳过）
+GPU 1 跳过：空闲显存 7000 MiB 不足
+GPU 0 跳过：已有计算进程（即使利用率为0也跳过）
+GPU 1 跳过：空闲显存 7000 MiB 不足
+GPU 2 跳过：利用率 70% 过高
+GPU 0 跳过：已有计算进程（即使利用率为0也跳过）
+GPU 1 跳过：空闲显存 7000 MiB 不足
+test_process_low_memory_and_transient_load_are_not_idle (test_evaluation_parallel.GPUSelectionTests.test_process_low_memory_and_transient_load_are_not_idle) ... ok
+test_compatibility_requires_exact_audited_release_and_legacy (test_evaluation_parallel.ParallelQueueTests.test_compatibility_requires_exact_audited_release_and_legacy) ... ok
+test_environment_mismatch_does_not_rewrite_training_record (test_evaluation_parallel.ParallelQueueTests.test_environment_mismatch_does_not_rewrite_training_record) ... ok
+评价自动选择 3 张GPU：['GPU-0', 'GPU-1', 'GPU-2']
+开始评价 fold0/B0，GPU=GPU-0，日志：C:\Users\ruichen\AppData\Local\Temp\tmpfijzw3c_\08_results\evaluation\queue_logs\1790572033203614200_fold0_B0.log
+开始评价 fold1/B0，GPU=GPU-1，日志：C:\Users\ruichen\AppData\Local\Temp\tmpfijzw3c_\08_results\evaluation\queue_logs\1790572033203614200_fold1_B0.log
+开始评价 fold2/B0，GPU=GPU-2，日志：C:\Users\ruichen\AppData\Local\Temp\tmpfijzw3c_\08_results\evaluation\queue_logs\1790572033203614200_fold2_B0.log
+评价 fold0/B0: failed，日志 C:\Users\ruichen\AppData\Local\Temp\tmpfijzw3c_\08_results\evaluation\queue_logs\1790572033203614200_fold0_B0.log
+test_failure_stops_owned_workers_and_prevents_final_report (test_evaluation_parallel.ParallelQueueTests.test_failure_stops_owned_workers_and_prevents_final_report) ... ok
+没有空闲GPU，30秒后重查。
+评价自动选择 1 张GPU：['GPU-1']
+开始评价 ct_holdA/B0，GPU=GPU-1，日志：C:\Users\ruichen\AppData\Local\Temp\tmpl7dqbzg6\08_results\evaluation\queue_logs\1790572033216112300_ct_holdA_B0.log
+评价 ct_holdA/B0: completed，日志 C:\Users\ruichen\AppData\Local\Temp\tmpl7dqbzg6\08_results\evaluation\queue_logs\1790572033216112300_ct_holdA_B0.log
+test_no_gpu_waits_then_uses_one (test_evaluation_parallel.ParallelQueueTests.test_no_gpu_waits_then_uses_one) ... ok
+评价自动选择 1 张GPU：['GPU-0']
+开始评价 ct_holdA/B0，GPU=GPU-0，日志：C:\Users\ruichen\AppData\Local\Temp\tmpxgbrmmgr\08_results\evaluation\queue_logs\1790572033222758400_ct_holdA_B0.log
+test_sigterm_cleans_only_owned_worker_and_does_not_summarize (test_evaluation_parallel.ParallelQueueTests.test_sigterm_cleans_only_owned_worker_and_does_not_summarize) ... ok
+评价自动选择 3 张GPU：['GPU-0', 'GPU-1', 'GPU-2']
+开始评价 fold0/B0，GPU=GPU-0，日志：C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold0_B0.log
+开始评价 fold1/B0，GPU=GPU-1，日志：C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold1_B0.log
+开始评价 fold2/B0，GPU=GPU-2，日志：C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold2_B0.log
+评价 fold0/B0: completed，日志 C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold0_B0.log
+评价 fold1/B0: completed，日志 C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold1_B0.log
+评价 fold2/B0: completed，日志 C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold2_B0.log
+开始评价 fold3/B0，GPU=GPU-0，日志：C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold3_B0.log
+开始评价 fold4/B0，GPU=GPU-1，日志：C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold4_B0.log
+开始评价 fold5/B0，GPU=GPU-2，日志：C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold5_B0.log
+评价 fold3/B0: completed，日志 C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold3_B0.log
+评价 fold4/B0: completed，日志 C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold4_B0.log
+评价 fold5/B0: completed，日志 C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold5_B0.log
+开始评价 fold6/B0，GPU=GPU-0，日志：C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold6_B0.log
+开始评价 fold7/B0，GPU=GPU-1，日志：C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold7_B0.log
+开始评价 fold8/B0，GPU=GPU-2，日志：C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold8_B0.log
+评价 fold6/B0: completed，日志 C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold6_B0.log
+评价 fold7/B0: completed，日志 C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold7_B0.log
+评价 fold8/B0: completed，日志 C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold8_B0.log
+开始评价 fold9/B0，GPU=GPU-0，日志：C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold9_B0.log
+评价 fold9/B0: completed，日志 C:\Users\ruichen\AppData\Local\Temp\tmpcoy0u5_p\08_results\evaluation\queue_logs\1790572033226765200_fold9_B0.log
+test_ten_jobs_maximum_three_workers_and_single_summary (test_evaluation_parallel.ParallelQueueTests.test_ten_jobs_maximum_three_workers_and_single_summary) ... ok
+test_evaluate_does_not_require_a_preselected_idle_gpu (test_full_experiment_queue.QueueTests.test_evaluate_does_not_require_a_preselected_idle_gpu) ... ok
+test_full_order_and_resume_reuses_smoke (test_full_experiment_queue.QueueTests.test_full_order_and_resume_reuses_smoke) ... ok
+test_last_training_failure_prevents_evaluation (test_full_experiment_queue.QueueTests.test_last_training_failure_prevents_evaluation) ... ok
+test_multigpu_prepares_once_then_waits_before_evaluation (test_full_experiment_queue.QueueTests.test_multigpu_prepares_once_then_waits_before_evaluation) ... ok
+将运行 10 个正式实验；本机旧预算为全10次约155小时，服务器速度需重新实测。
+完整实验完成，报告：C:\Users\ruichen\AppData\Local\Temp\tmpq98zfh8v\work\09_reports\final_evaluation\README.md
+所有输出：C:\Users\ruichen\AppData\Local\Temp\tmpq98zfh8v\work
+将运行 10 个正式实验；本机旧预算为全10次约155小时，服务器速度需重新实测。
+完整实验完成，报告：C:\Users\ruichen\AppData\Local\Temp\tmpq98zfh8v\work\09_reports\final_evaluation\README.md
+所有输出：C:\Users\ruichen\AppData\Local\Temp\tmpq98zfh8v\work
+将运行 10 个正式实验；本机旧预算为全10次约155小时，服务器速度需重新实测。
+将运行 10 个正式实验；本机旧预算为全10次约155小时，服务器速度需重新实测。
+完整实验完成，报告：C:\Users\ruichen\AppData\Local\Temp\tmpviiqeh6y\work\09_reports\final_evaluation\README.md
+所有输出：C:\Users\ruichen\AppData\Local\Temp\tmpviiqeh6y\work
+将运行 10 个正式实验；本机旧预算为全10次约155小时，服务器速度需重新实测。
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, RTX3090, 23000, 0
+2, GPU-two, RTX3090, 23000, 0
+3, GPU-three, RTX3090, 23000, 0
+
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, RTX3090, 23000, 0
+2, GPU-two, RTX3090, 23000, 0
+3, GPU-three, RTX3090, 23000, 0
+
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, RTX3090, 23000, 0
+2, GPU-two, RTX3090, 23000, 0
+3, GPU-three, RTX3090, 23000, 0
+
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, RTX3090, 23000, 0
+2, GPU-two, RTX3090, 23000, 0
+3, GPU-three, RTX3090, 23000, 0
+
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, RTX3090, 23000, 0
+2, GPU-two, RTX3090, 23000, 0
+3, GPU-three, RTX3090, 23000, 0
+
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, RTX3090, 23000, 0
+2, GPU-two, RTX3090, 23000, 0
+3, GPU-three, RTX3090, 23000, 0
+
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, RTX3090, 23000, 0
+2, GPU-two, RTX3090, 23000, 0
+3, GPU-three, RTX3090, 23000, 0
+
+test_count_ids_and_uuid_alias_duplicates (test_gpu_queue.GPUSelectionTests.test_count_ids_and_uuid_alias_duplicates) ... ok
+启动 ct_holdA/B0，GPU=GPU-zero，日志：C:\Users\ruichen\AppData\Local\Temp\tmp6gjpgyqh\07_experiments\queue_logs\1790572033310286600_ct_holdA_B0.log
+启动 ct_holdA/B1，GPU=GPU-three，日志：C:\Users\ruichen\AppData\Local\Temp\tmp6gjpgyqh\07_experiments\queue_logs\1790572033310286600_ct_holdA_B1.log
+启动 ct_holdB/B0，GPU=GPU-three，日志：C:\Users\ruichen\AppData\Local\Temp\tmp6gjpgyqh\07_experiments\queue_logs\1790572033310286600_ct_holdB_B0.log
+启动 ct_holdB/B1，GPU=GPU-three，日志：C:\Users\ruichen\AppData\Local\Temp\tmp6gjpgyqh\07_experiments\queue_logs\1790572033310286600_ct_holdB_B1.log
+test_dynamic_queue_single_device_per_process (test_gpu_queue.QueueTests.test_dynamic_queue_single_device_per_process) ... ok
+启动 ct_holdA/B0，GPU=GPU-zero，日志：C:\Users\ruichen\AppData\Local\Temp\tmpukp20zg4\07_experiments\queue_logs\1790572033323285000_ct_holdA_B0.log
+启动 ct_holdA/B1，GPU=GPU-three，日志：C:\Users\ruichen\AppData\Local\Temp\tmpukp20zg4\07_experiments\queue_logs\1790572033323285000_ct_holdA_B1.log
+ct_holdA/B1 失败，日志：C:\Users\ruichen\AppData\Local\Temp\tmpukp20zg4\07_experiments\queue_logs\1790572033323285000_ct_holdA_B1.log；停止派发新任务，已运行模型继续收尾。
+test_failure_stops_new_dispatch_and_drains_running_job (test_gpu_queue.QueueTests.test_failure_stops_new_dispatch_and_drains_running_job) ... ok
+test_handoff_only_retries_stale_utilization_without_external_process (test_gpu_queue.QueueTests.test_handoff_only_retries_stale_utilization_without_external_process) ... ok
+test_launch_error_stops_before_training (test_gpu_queue.QueueTests.test_launch_error_stops_before_training) ... ok
+test_paired_initialization_does_not_fail_on_running_record (test_gpu_queue.QueueTests.test_paired_initialization_does_not_fail_on_running_record) ... ok
+启动 foldA/B0，GPU=GPU-zero，日志：C:\Users\ruichen\AppData\Local\Temp\tmpmzcypokt\work\07_experiments\queue_logs\1790572033345285400_foldA_B0.log
+启动 foldA/B1，GPU=GPU-three，日志：C:\Users\ruichen\AppData\Local\Temp\tmpmzcypokt\work\07_experiments\queue_logs\1790572033345285400_foldA_B1.log
+启动 foldB/B0，GPU=GPU-zero，日志：C:\Users\ruichen\AppData\Local\Temp\tmpmzcypokt\work\07_experiments\queue_logs\1790572033345285400_foldB_B0.log
+test_real_cpu_subprocesses_receive_only_assigned_gpu (test_gpu_queue.QueueTests.test_real_cpu_subprocesses_receive_only_assigned_gpu) ... ok
+启动 ct_holdA/B0，GPU=GPU-zero，日志：C:\Users\ruichen\AppData\Local\Temp\tmpymskdouj\07_experiments\queue_logs\1790572035391097700_ct_holdA_B0.log
+test_sigterm_cleans_owned_job_and_restores_handler (test_gpu_queue.QueueTests.test_sigterm_cleans_owned_job_and_restores_handler) ... ok
+test_empty_predictions_reported (test_metrics.MetricTests.test_empty_predictions_reported) ... ok
+test_identity (test_metrics.MetricTests.test_identity) ... ok
+test_physical_distance_with_shear (test_metrics.MetricTests.test_physical_distance_with_shear) ... ok
+已迁移 2 份完成记录到 C:\Users\ruichen\AppData\Local\Temp\tmp84huezra\04_data\derived\nnUNet_preprocessed\Dataset703_ct_holdG\server_case_completion\Project1Plans_3d_fullres；预处理影像保持不变。
+ct_holdG 已准备完成，复用同一份来源数据。
+ct_holdG 已准备完成，复用同一份来源数据。
+test_completed_legacy_cache_migrates_without_export_or_data_changes (test_preparation_markers.PreparationMarkerTests.test_completed_legacy_cache_migrates_without_export_or_data_changes) ... ok
+test_conflicting_record_preserves_all_legacy_files (test_preparation_markers.PreparationMarkerTests.test_conflicting_record_preserves_all_legacy_files) ... ok
+test_invalid_plan_record_preserved (test_preparation_markers.PreparationMarkerTests.test_invalid_plan_record_preserved) ... ok
+ct_holdG 已准备完成，复用同一份来源数据。
+test_manually_moved_records_also_reuse_old_cache (test_preparation_markers.PreparationMarkerTests.test_manually_moved_records_also_reuse_old_cache) ... ok
+已迁移 1 份完成记录到 C:\Users\ruichen\AppData\Local\Temp\tmp6bjuk82h\04_data\derived\nnUNet_preprocessed\Dataset703_ct_holdG\server_case_completion\Project1Plans_3d_fullres；预处理影像保持不变。
+已迁移 1 份完成记录到 C:\Users\ruichen\AppData\Local\Temp\tmp6bjuk82h\04_data\derived\nnUNet_preprocessed\Dataset703_ct_holdG\server_case_completion\Project1Plans_3d_fullres；预处理影像保持不变。
+test_partial_migration_can_continue (test_preparation_markers.PreparationMarkerTests.test_partial_migration_can_continue) ... ok
+test_signature_rejects_unrelated_changes (test_preparation_markers.PreparationMarkerTests.test_signature_rejects_unrelated_changes) ... ok
+test_checkpoint_priority_never_uses_smoke_or_best (test_server_launcher.ServerDataTests.test_checkpoint_priority_never_uses_smoke_or_best) ... ok
+test_missing_duplicate_and_changed_files_fail (test_server_launcher.ServerDataTests.test_missing_duplicate_and_changed_files_fail) ... ok
+校验通过：Case0001 (eligible)
+校验通过：Case0002 (quarantined)
+校验通过：Case0001 (eligible)
+校验通过：Case0002 (quarantined)
+test_relocation_preserves_splits_quarantine_and_sources (test_server_launcher.ServerDataTests.test_relocation_preserves_splits_quarantine_and_sources) ... ok
+test_workspace_cannot_overwrite_source_or_unknown_files (test_server_launcher.ServerDataTests.test_workspace_cannot_overwrite_source_or_unknown_files) ... ok
+exported ct_holdG/Case0001
+exported ct_holdG/Case0001
+test_export_resume_repairs_partial_copy_without_exporting_target (test_server_launcher.ServerExecutionTests.test_export_resume_repairs_partial_copy_without_exporting_target) ... ok
+ct_holdG/B0 已完成，跳过。
+test_formal_lifecycle_resume_and_changed_environment (test_server_launcher.ServerExecutionTests.test_formal_lifecycle_resume_and_changed_environment) ... ok
+test_checkpoint_is_replaced_only_after_successful_write (test_server_launcher.TrainerGuardTests.test_checkpoint_is_replaced_only_after_successful_write) ... ok
+test_finite_loss_guard (test_server_launcher.TrainerGuardTests.test_finite_loss_guard) ... ok
+test_missing_and_changed_splits_fail_closed (test_trainer_split.TrainerSplitTests.test_missing_and_changed_splits_fail_closed) ... ok
+test_environment_is_personal_and_no_hardcoded_local_proxy (test_zmic44_setup.WizardTests.test_environment_is_personal_and_no_hardcoded_local_proxy) ... ok
+test_failed_first_binding_allows_only_lock_file (test_zmic44_setup.WizardTests.test_failed_first_binding_allows_only_lock_file) ... ok
+test_invalid_installer_never_executes (test_zmic44_setup.WizardTests.test_invalid_installer_never_executes) ... ok
+test_paths_remain_editable_after_saving_and_cli_takes_priority (test_zmic44_setup.WizardTests.test_paths_remain_editable_after_saving_and_cli_takes_priority) ... ok
+
+路径
+服务器预设：/server/default
+
+路径
+服务器预设：/server/default
+上次选择：/previous
+
+路径
+服务器预设：/server/default
+上次选择：/previous
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, NVIDIA RTX 3090, 23000, 0
+1, GPU-one, NVIDIA RTX 3090, 24000, 0
+
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, NVIDIA RTX 3090, 23000, 0
+1, GPU-one, NVIDIA RTX 3090, 24000, 0
+
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, NVIDIA RTX 3090, 23000, 0
+1, GPU-one, NVIDIA RTX 3090, 24000, 0
+
+test_single_gpu_uuid_and_refuse_active_card (test_zmic44_setup.WizardTests.test_single_gpu_uuid_and_refuse_active_card) ... ok
+
+----------------------------------------------------------------------
+Ran 59 tests in 3.531s
+
+OK

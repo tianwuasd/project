@@ -129,13 +129,17 @@ def run_worker(config_path, mode):
         write_json(state_file, state)
         try:
             # 再次检查，降低用户选择后到后台启动间被占用的风险；不是集群调度锁。
-            gpus = config.get('gpu_uuids') or [config['gpu_uuid']]
-            select_gpus(len(gpus), ','.join(gpus))
+            gpus = config.get('gpu_uuids') or ([config['gpu_uuid']] if config.get('gpu_uuid') else [])
+            if mode != 'evaluate':
+                select_gpus(len(gpus), ','.join(gpus))
             env['CONDA_EXE'] = str(ensure_conda(base, env))
             # 首次安装可能较久，真正开始项目入口前再检查一次。
-            select_gpus(len(gpus), ','.join(gpus))
-            # 主流程的短测/评价仅使用第一张；正式任务由队列给每个进程分配一张。
-            env['CUDA_VISIBLE_DEVICES'] = gpus[0]
+            if mode != 'evaluate':
+                select_gpus(len(gpus), ','.join(gpus))
+            # 保存外部分配范围；自动评价不能误继承短测的单卡限制。
+            env['WHOLE_HEART_EVAL_VISIBLE_DEVICES'] = env.get('CUDA_VISIBLE_DEVICES', '__UNRESTRICTED__')
+            if gpus:
+                env['CUDA_VISIBLE_DEVICES'] = gpus[0]
             env['WHOLE_HEART_GPU_UUIDS'] = json.dumps(gpus)
             command = ['bash', str(CODE / 'start_server.sh'), config['data'], '--work-dir', str(work),
                        '--mode', mode, '--scope', 'all', '--gpu-memory', '5', '--yes-train']
@@ -180,6 +184,12 @@ def main():
             print('正式训练队列：', jobs['status'])
             for job in jobs['jobs']:
                 print(f"  {job['fold']}/{job['method']}: {job['status']}  {job.get('gpu_uuid', '')}")
+        evaluation = Path(old['work']) / '08_results/evaluation/status.json'
+        if evaluation.exists():
+            info = json.loads(evaluation.read_text(encoding='utf-8'))
+            print('最终评价：', info['status'])
+            for job in info.get('jobs', []):
+                print(f"  {job['fold']}/{job['method']}: {job['status']}  {job.get('gpu_uuid', '')}")
         print('以上为最后保存状态；服务器重启或强制结束后状态可能滞后。')
         return
     def answer(given, key, prompt):
@@ -205,13 +215,18 @@ def main():
         parent = parent.parent
     if shutil.disk_usage(base).free < 20 * 2**30 or shutil.disk_usage(parent).free < 100 * 2**30:
         raise RuntimeError('环境盘需20GiB、结果盘需100GiB空闲空间；这些是最低检查，不是容量保证')
-    gpus = select_gpus(args.gpu_count, args.gpus)
-    print(f'已选择{len(gpus)}张显卡：正式训练每张卡独立运行一个模型，完成后领取下一任务。\n'
-          '预处理按顺序执行，短测和最终评价使用所选第一张卡。', flush=True)
     mode = args.mode
     if mode is None:
         print('1 检查环境与数据\n2 短测CT/MRI（首次推荐）\n3 完整B0/B1实验或继续：十次训练＋评价\n4 十次训练已完成，仅继续评价')
         mode = {'1': 'check', '2': 'smoke', '3': 'experiment', '4': 'evaluate'}[input('选择 [默认2]：').strip() or '2']
+    if mode == 'evaluate':
+        if args.gpus is not None or args.gpu_count is not None:
+            raise ValueError('自动评价请在06_configs/evaluation_gpu.json设置max_gpus和allowed_gpus；--gpus/--gpu-count用于训练或短测')
+        gpus = []
+        print('评价阶段自动检测空闲GPU，最多3张；配置：06_configs/evaluation_gpu.json。', flush=True)
+    else:
+        gpus = select_gpus(args.gpu_count, args.gpus)
+        print(f'已选择{len(gpus)}张训练显卡；短测用第一张。正式训练结束后，评价重新检测空闲卡，最多3张。', flush=True)
     if mode in {'experiment', 'evaluate'}:
         print('完整训练包含CT 6次、MRI 4次；不加入CaberNet。旧本机核心计算估计155小时，3090/NAS耗时需实测。\n'
               '会在十次训练全部完成后评价留出中心；不要根据目标结果改方法后覆盖原实验。')

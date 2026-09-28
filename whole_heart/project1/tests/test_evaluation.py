@@ -97,6 +97,15 @@ class EvaluationTests(unittest.TestCase):
                 models, sha = ev.freeze_models()
                 self.assertEqual(len(models), 10)
                 self.assertEqual(ev.freeze_models()[1], sha)
+                # 仅升级已审计的调度代码，冻结清单与病例缓存引用的SHA必须保持不变。
+                addition = root / '05_src/evaluation_parallel.py'
+                addition.write_text('# audited scheduling addition\n', encoding='utf-8')
+                current = {addition.name: digest(addition)}
+                with self.assertRaises(ValueError):
+                    ev.freeze_models()
+                write_json(root / '06_configs/evaluation_code_compatibility.json',
+                           dict(legacy=[{}], release=[current]))
+                self.assertEqual(ev.freeze_models()[1], sha)
                 write_json(out / 'fold_0/checkpoint_best.pth', {'changed': True})
                 with self.assertRaises(ValueError):
                     ev.freeze_models()

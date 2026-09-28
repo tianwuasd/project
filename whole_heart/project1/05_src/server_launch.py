@@ -143,6 +143,7 @@ def main():
         raise RuntimeError("可用磁盘不足10 GiB，请选择空间更充足的结果目录")
     work.mkdir(parents=True, exist_ok=True)
     os.environ["WHOLE_HEART_WORKSPACE"] = str(work)
+    os.environ.setdefault('WHOLE_HEART_EVAL_VISIBLE_DEVICES', os.environ.get('CUDA_VISIBLE_DEVICES', '__UNRESTRICTED__'))
     gpus = json.loads(os.environ.get('WHOLE_HEART_GPU_UUIDS', '[]'))
     if not isinstance(gpus, list) or any(not isinstance(g, str) or not g for g in gpus) or len(set(gpus)) != len(gpus):
         raise ValueError('显卡列表必须是非重复UUID列表')
@@ -152,6 +153,10 @@ def main():
     # 防止不同代码副本同时写入同一个输出目录。
     with FileLock(str(work / ".run.lock"), timeout=0):
         bind_workspace(CODE_ROOT, work, data, gpu_memory)
+        if mode == 'evaluate':
+            # 自动评估不需要事先选一张空闲卡，也不覆盖训练时的环境快照。
+            child('evaluation_parallel.py')
+            return
         if gpus:
             check_selected_gpus(work, gpu_memory, gpus)
         else:
@@ -159,12 +164,9 @@ def main():
         if mode == "check":
             print(f"检查完成：106例匹配，按既定规则排除5例；未启动训练。\n记录目录：{work}")
             return
-        if mode in {"experiment", "evaluate"}:
+        if mode == 'experiment':
             from evaluation import establish_protocol
             establish_protocol()
-        if mode == "evaluate":
-            child("evaluation.py")
-            return
         if mode == "experiment":
             # 第一次完整运行先做短测。版本/环境改变后拒绝复用旧短测凭证。
             evidence = preflight_signature(work, gpu_memory)
@@ -198,7 +200,7 @@ def main():
             write_json(work / "00_admin/full_experiment_preflight.json", preflight_signature(work, gpu_memory))
             print(f"短测通过。请查看 {work / '09_reports/短测与预算.md'}")
         elif mode == "experiment":
-            child("evaluation.py")
+            child("evaluation_parallel.py")
             print(f"完整实验完成，报告：{work / '09_reports/final_evaluation/README.md'}")
         else:
             print("所选训练队列完成。模型已保存；外层目标中心批量评价尚未执行。")

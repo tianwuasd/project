@@ -1,0 +1,9 @@
+{
+  "max_gpus": 3,
+  "min_free_mib": 8192,
+  "max_utilization_percent": 10,
+  "idle_samples": 3,
+  "sample_interval_seconds": 2,
+  "retry_seconds": 30,
+  "allowed_gpus": null
+}
