@@ -1,0 +1,10 @@
+{
+  "sources": [
+    {
+      "type": "papers",
+      "label": "medical_papers",
+      "path": "../papers",
+      "notes": true
+    }
+  ]
+}

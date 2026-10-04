@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "data_kind": "synthetic",
+  "patient_column": "patient_id",
+  "target": "label",
+  "site_column": "site",
+  "external_site": "C",
+  "seed": 42,
+  "bootstrap": 500,
+  "prediction_time": "synthetic pre-intervention index; both scans declared earlier",
+  "outcome": "Bernoulli label generated from latent synthetic anatomy; not a diagnosis",
+  "features": [
+    {
+      "name": "age",
+      "available": "pre_index",
+      "source": "make_demo.py synthetic generator"
+    },
+    {
+      "name": "volume_ratio",
+      "available": "pre_index",
+      "source": "make_demo.py synthetic generator"
+    },
+    {
+      "name": "shape_index",
+      "available": "pre_index",
+      "source": "make_demo.py synthetic generator"
+    },
+    {
+      "name": "quality",
+      "available": "pre_index",
+      "source": "make_demo.py synthetic generator"
+    }
+  ],
+  "feature_sets": {
+    "clinical_only": [
+      "age"
+    ],
+    "clinical_morphology": [
+      "age",
+      "volume_ratio",
+      "shape_index"
+    ],
+    "clinical_morphology_quality": [
+      "age",
+      "volume_ratio",
+      "shape_index",
+      "quality"
+    ]
+  }
+}

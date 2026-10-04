@@ -1,0 +1,306 @@
+{
+  "status": "completed",
+  "data_kind": "synthetic",
+  "seed": 42,
+  "test_patients": 80,
+  "row_count": 480,
+  "patient_count": 240,
+  "split_type": "external_site_holdout",
+  "models": [
+    {
+      "feature_set": "clinical_only",
+      "family": "dummy",
+      "selected_parameter": null,
+      "validation_auroc": 0.5,
+      "threshold_from_validation": 0.0,
+      "candidate_validation_auroc": [
+        {
+          "parameter": null,
+          "auroc": 0.5
+        }
+      ],
+      "test": {
+        "auroc": 0.5,
+        "auprc": 0.5125,
+        "brier": 0.25,
+        "sensitivity": 1.0,
+        "specificity": 0.0,
+        "prevalence": 0.5125,
+        "patients": 80,
+        "auroc_ci95": [
+          0.5,
+          0.5
+        ],
+        "bootstrap_valid": 500,
+        "bootstrap_requested": 500
+      }
+    },
+    {
+      "feature_set": "clinical_only",
+      "family": "logistic",
+      "selected_parameter": 0.1,
+      "validation_auroc": 0.49749999999999994,
+      "threshold_from_validation": 0.48405588727421134,
+      "candidate_validation_auroc": [
+        {
+          "parameter": 0.1,
+          "auroc": 0.49749999999999994
+        },
+        {
+          "parameter": 1.0,
+          "auroc": 0.49749999999999994
+        }
+      ],
+      "test": {
+        "auroc": 0.42213883677298314,
+        "auprc": 0.46789514083953865,
+        "brier": 0.2582684282176166,
+        "sensitivity": 0.5121951219512195,
+        "specificity": 0.358974358974359,
+        "prevalence": 0.5125,
+        "patients": 80,
+        "auroc_ci95": [
+          0.29015254753299813,
+          0.547862605130047
+        ],
+        "bootstrap_valid": 500,
+        "bootstrap_requested": 500
+      }
+    },
+    {
+      "feature_set": "clinical_only",
+      "family": "random_forest",
+      "selected_parameter": 3,
+      "validation_auroc": 0.35124999999999995,
+      "threshold_from_validation": 0.0,
+      "candidate_validation_auroc": [
+        {
+          "parameter": 3,
+          "auroc": 0.35124999999999995
+        },
+        {
+          "parameter": null,
+          "auroc": 0.34624999999999995
+        }
+      ],
+      "test": {
+        "auroc": 0.48311444652908064,
+        "auprc": 0.5318847471521,
+        "brier": 0.2790248479929718,
+        "sensitivity": 1.0,
+        "specificity": 0.0,
+        "prevalence": 0.5125,
+        "patients": 80,
+        "auroc_ci95": [
+          0.36517515268224293,
+          0.6107023026315789
+        ],
+        "bootstrap_valid": 500,
+        "bootstrap_requested": 500
+      }
+    },
+    {
+      "feature_set": "clinical_morphology",
+      "family": "dummy",
+      "selected_parameter": null,
+      "validation_auroc": 0.5,
+      "threshold_from_validation": 0.0,
+      "candidate_validation_auroc": [
+        {
+          "parameter": null,
+          "auroc": 0.5
+        }
+      ],
+      "test": {
+        "auroc": 0.5,
+        "auprc": 0.5125,
+        "brier": 0.25,
+        "sensitivity": 1.0,
+        "specificity": 0.0,
+        "prevalence": 0.5125,
+        "patients": 80,
+        "auroc_ci95": [
+          0.5,
+          0.5
+        ],
+        "bootstrap_valid": 500,
+        "bootstrap_requested": 500
+      }
+    },
+    {
+      "feature_set": "clinical_morphology",
+      "family": "logistic",
+      "selected_parameter": 0.1,
+      "validation_auroc": 0.6825,
+      "threshold_from_validation": 0.5,
+      "candidate_validation_auroc": [
+        {
+          "parameter": 0.1,
+          "auroc": 0.6825
+        },
+        {
+          "parameter": 1.0,
+          "auroc": 0.6825
+        }
+      ],
+      "test": {
+        "auroc": 0.7317073170731707,
+        "auprc": 0.7378434411878237,
+        "brier": 0.2149871401699622,
+        "sensitivity": 0.6829268292682927,
+        "specificity": 0.6153846153846154,
+        "prevalence": 0.5125,
+        "patients": 80,
+        "auroc_ci95": [
+          0.6113149787040916,
+          0.8437406588683184
+        ],
+        "bootstrap_valid": 500,
+        "bootstrap_requested": 500
+      }
+    },
+    {
+      "feature_set": "clinical_morphology",
+      "family": "random_forest",
+      "selected_parameter": 3,
+      "validation_auroc": 0.6425000000000001,
+      "threshold_from_validation": 0.5315890939800939,
+      "candidate_validation_auroc": [
+        {
+          "parameter": 3,
+          "auroc": 0.6425000000000001
+        },
+        {
+          "parameter": null,
+          "auroc": 0.575
+        }
+      ],
+      "test": {
+        "auroc": 0.7823639774859287,
+        "auprc": 0.8019165467527718,
+        "brier": 0.20345706390432688,
+        "sensitivity": 0.5365853658536586,
+        "specificity": 0.8205128205128205,
+        "prevalence": 0.5125,
+        "patients": 80,
+        "auroc_ci95": [
+          0.6738719376109101,
+          0.8791040100250627
+        ],
+        "bootstrap_valid": 500,
+        "bootstrap_requested": 500
+      }
+    },
+    {
+      "feature_set": "clinical_morphology_quality",
+      "family": "dummy",
+      "selected_parameter": null,
+      "validation_auroc": 0.5,
+      "threshold_from_validation": 0.0,
+      "candidate_validation_auroc": [
+        {
+          "parameter": null,
+          "auroc": 0.5
+        }
+      ],
+      "test": {
+        "auroc": 0.5,
+        "auprc": 0.5125,
+        "brier": 0.25,
+        "sensitivity": 1.0,
+        "specificity": 0.0,
+        "prevalence": 0.5125,
+        "patients": 80,
+        "auroc_ci95": [
+          0.5,
+          0.5
+        ],
+        "bootstrap_valid": 500,
+        "bootstrap_requested": 500
+      }
+    },
+    {
+      "feature_set": "clinical_morphology_quality",
+      "family": "logistic",
+      "selected_parameter": 0.1,
+      "validation_auroc": 0.685,
+      "threshold_from_validation": 0.5,
+      "candidate_validation_auroc": [
+        {
+          "parameter": 0.1,
+          "auroc": 0.685
+        },
+        {
+          "parameter": 1.0,
+          "auroc": 0.68
+        }
+      ],
+      "test": {
+        "auroc": 0.7292057535959975,
+        "auprc": 0.7381207319534082,
+        "brier": 0.21458715761726904,
+        "sensitivity": 0.6829268292682927,
+        "specificity": 0.6153846153846154,
+        "prevalence": 0.5125,
+        "patients": 80,
+        "auroc_ci95": [
+          0.6062523864384464,
+          0.8346260477111541
+        ],
+        "bootstrap_valid": 500,
+        "bootstrap_requested": 500
+      }
+    },
+    {
+      "feature_set": "clinical_morphology_quality",
+      "family": "random_forest",
+      "selected_parameter": 3,
+      "validation_auroc": 0.6475,
+      "threshold_from_validation": 0.5584593572101801,
+      "candidate_validation_auroc": [
+        {
+          "parameter": 3,
+          "auroc": 0.6475
+        },
+        {
+          "parameter": null,
+          "auroc": 0.595
+        }
+      ],
+      "test": {
+        "auroc": 0.7592245153220762,
+        "auprc": 0.7785289390157575,
+        "brier": 0.2120163320386969,
+        "sensitivity": 0.3902439024390244,
+        "specificity": 0.8717948717948718,
+        "prevalence": 0.5125,
+        "patients": 80,
+        "auroc_ci95": [
+          0.6424196731615336,
+          0.8572982568313366
+        ],
+        "bootstrap_valid": 500,
+        "bootstrap_requested": 500
+      }
+    }
+  ],
+  "selected_by_validation": {
+    "feature_set": "clinical_morphology_quality",
+    "family": "logistic"
+  },
+  "provenance": {
+    "csv_sha256": "1d3021b9ae24e7b3d47a74079e7ed19ddb25ed40b0e298b27cee9a3b1cc38240",
+    "manifest_sha256": "8d7a96d4905d38b962517ecfb29f5cefe9255b0fef7c99e239d3f36912e3f1ba",
+    "code_sha256": "790ce699f02ddb7a6a75a7127b39deafd3150f5c475050795d9fd086bc3972cd",
+    "python": "3.14.3",
+    "numpy": "2.4.2",
+    "sklearn": "1.8.0"
+  },
+  "runtime_seconds": 4.147,
+  "limitations": [
+    "一次固定划分；探索性基线，非正式临床验证。",
+    "重复扫描均须在预测时点前；测试按患者均值聚合，预处理按训练扫描拟合。",
+    "CI仅重采样测试患者，不包含重新训练的方差；测试集不可用于后续选择。",
+    "字段可用性依据manifest声明，不能替代原始时间戳与数据来源审计。"
+  ]
+}

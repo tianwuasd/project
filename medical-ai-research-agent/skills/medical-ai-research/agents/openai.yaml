@@ -1,0 +1,6 @@
+interface:
+  display_name: "医疗 AI 论文研究"
+  short_description: "基于本地论文证据开展医疗 AI 场景发现、特征工程与可复现算法实验"
+  default_prompt: "使用 $medical-ai-research，结合我的论文库提出医疗 AI 场景，设计特征工程、基线与消融实验，并保存可继续的研究包。"
+policy:
+  allow_implicit_invocation: true
