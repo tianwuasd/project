@@ -1,0 +1,6 @@
+interface:
+  display_name: "运筹学研究 Agent"
+  short_description: "根据本地论文库寻找研究场景、构建数学模型并设计验证求解算法"
+  default_prompt: "使用 $or-research，结合我的论文库，推进找场景、数学建模和求解算法，并给出可追溯证据与可运行小例。"
+policy:
+  allow_implicit_invocation: true

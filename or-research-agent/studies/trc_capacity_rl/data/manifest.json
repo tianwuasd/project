@@ -1,0 +1,48 @@
+{
+  "dataset": "LaDe-D Jilin",
+  "url": "https://huggingface.co/datasets/Cainiao-AI/LaDe/resolve/main/delivery/delivery_jl.csv",
+  "sha256": "12e2cf4664dd5b4475d39dddee8872f5a03b3082f08f0eece7f103baee6c6e73",
+  "license": "Apache-2.0 according to publisher dataset card",
+  "raw_rows": 31415,
+  "raw_days": 163,
+  "region_chosen_using_training_only": "53",
+  "base_derived_using_training_only": [
+    126.56689,
+    43.81213
+  ],
+  "dropped_missing_destination_coordinates": 0,
+  "calendar_year": "not provided in selected CSV; dates retain MMDD format",
+  "real_fields": [
+    "destination coordinates",
+    "courier task acceptance timestamps"
+  ],
+  "assumed_fields": [
+    "single drone depot",
+    "aircraft/charging/launch resources",
+    "30 minute service target",
+    "all costs",
+    "ground fallback availability",
+    "flight speeds and range"
+  ],
+  "split_summary": {
+    "train": {
+      "days": 89,
+      "orders": 4667,
+      "first": "0514",
+      "last": "0818"
+    },
+    "validation": {
+      "days": 33,
+      "orders": 2559,
+      "first": "0819",
+      "last": "0920"
+    },
+    "test": {
+      "days": 17,
+      "orders": 911,
+      "first": "0921",
+      "last": "1021"
+    }
+  },
+  "limitations": "Courier acceptance is not customer order arrival. Distances are local planar approximations. This is public-data-driven counterfactual simulation, not observed drone operations."
+}

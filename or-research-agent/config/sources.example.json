@@ -1,0 +1,7 @@
+{
+  "sources": [
+    {"type": "json_records", "label": "paper_metadata", "path": "YOUR_LIBRARY/included_records.json"},
+    {"type": "wos", "label": "wos_export", "path": "YOUR_LIBRARY/savedrecs.txt"},
+    {"type": "notes", "label": "reading_notes", "path": "YOUR_LIBRARY/reading_notes"}
+  ]
+}

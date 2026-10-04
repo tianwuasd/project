@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+config/sources.json
+/data/
+runs/
+examples/relay_dispatch/source_evidence.json
+studies/*/data/raw/
+studies/*/data/processed/
+studies/*/literature/
+release_public/
+release_manifest.json
+remote_state.json
+*.aux
+*.log
+*.out

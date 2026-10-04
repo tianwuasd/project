@@ -1,0 +1,144 @@
+{
+  "policies": {
+    "ground": {
+      "mean_daily_saving": 0.0,
+      "seed_mean_range": [
+        0.0,
+        0.0
+      ],
+      "mean_air_orders": 0.0,
+      "mean_of_daily_decision_ms": 0.20820783965169318
+    },
+    "greedy": {
+      "mean_daily_saving": 63.9263111823348,
+      "seed_mean_range": [
+        63.9263111823348,
+        63.9263111823348
+      ],
+      "mean_air_orders": 5.411764705882353,
+      "mean_of_daily_decision_ms": 0.14705829056370442
+    },
+    "bid_price": {
+      "mean_daily_saving": 74.92880387021856,
+      "seed_mean_range": [
+        74.92880387021856,
+        74.92880387021856
+      ],
+      "mean_air_orders": 5.0,
+      "mean_of_daily_decision_ms": 0.15423674312128616
+    },
+    "sampled_rollout": {
+      "mean_daily_saving": 65.92845306821252,
+      "seed_mean_range": [
+        65.92845306821252,
+        65.92845306821252
+      ],
+      "mean_air_orders": 5.411764705882353,
+      "mean_of_daily_decision_ms": 31.62801063396019
+    },
+    "clairvoyant_milp": {
+      "mean_daily_saving": 97.11267283140585,
+      "seed_mean_range": [
+        97.11267283140585,
+        97.11267283140585
+      ],
+      "mean_air_orders": null,
+      "mean_of_daily_decision_ms": null
+    },
+    "monotone": {
+      "mean_daily_saving": 69.04793293771161,
+      "seed_mean_range": [
+        67.82391299185957,
+        71.10087151401349
+      ],
+      "mean_air_orders": 4.647058823529412,
+      "mean_of_daily_decision_ms": 0.4369844937559435
+    },
+    "unconstrained": {
+      "mean_daily_saving": 68.4384499545105,
+      "seed_mean_range": [
+        65.66171668564103,
+        70.00033870263556
+      ],
+      "mean_air_orders": 4.8,
+      "mean_of_daily_decision_ms": 0.4237655769878285
+    }
+  },
+  "monotone_minus_comparator": {
+    "greedy": {
+      "mean_difference": 5.121621755376795,
+      "percent_of_comparator_mean": 8.011758633731535,
+      "paired_day_percentile_ci95": [
+        0.08464608405151419,
+        10.441757754064085
+      ],
+      "circular_3_observed_day_block_ci95": [
+        -0.5578667335804934,
+        11.08793319310752
+      ]
+    },
+    "bid_price": {
+      "mean_difference": -5.880870932506967,
+      "percent_of_comparator_mean": -7.848611787121289,
+      "paired_day_percentile_ci95": [
+        -10.041380469623787,
+        -1.917611175261861
+      ],
+      "circular_3_observed_day_block_ci95": [
+        -9.266867837582343,
+        -2.6720879705847778
+      ]
+    },
+    "sampled_rollout": {
+      "mean_difference": 3.1194798694990786,
+      "percent_of_comparator_mean": 4.731613930439906,
+      "paired_day_percentile_ci95": [
+        -1.836785428341881,
+        8.538873443744908
+      ],
+      "circular_3_observed_day_block_ci95": [
+        -2.1150573165872246,
+        8.317204868350835
+      ]
+    },
+    "unconstrained": {
+      "mean_difference": 0.6094829832010987,
+      "percent_of_comparator_mean": 0.8905563811077082,
+      "paired_day_percentile_ci95": [
+        -1.9756356278784266,
+        3.3354935867525626
+      ],
+      "circular_3_observed_day_block_ci95": [
+        -1.7015244274571113,
+        3.6235911195839074
+      ]
+    }
+  },
+  "fleet_stress": {
+    "2": {
+      "greedy": 49.756447956983784,
+      "bid_price": 59.06111673640159,
+      "monotone": 47.73361640066294,
+      "unconstrained": 48.67854718630537
+    },
+    "6": {
+      "greedy": 63.9263111823348,
+      "bid_price": 73.90010022005106,
+      "monotone": 68.7857121591334,
+      "unconstrained": 67.45425261467275
+    }
+  },
+  "post_hoc_non_singleton_days": {
+    "n": 12,
+    "means": {
+      "ground": 0.0,
+      "greedy": 83.5304655507782,
+      "bid_price": 99.11733019194685,
+      "sampled_rollout": 86.4918332224383,
+      "clairvoyant_milp": 130.5444778869622,
+      "monotone": 91.24859637089533,
+      "unconstrained": 90.22266214469379
+    }
+  },
+  "inference_note": "Seeds averaged within day. Intervals condition on five fitted models, do not capture all training uncertainty, and are descriptive with only 17 nonempty days. Block length 3 denotes consecutive observed days, not calendar days."
+}

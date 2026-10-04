@@ -1,0 +1,12 @@
+{
+  "claims": [
+    {"claim": "Courier acceptance timestamps and destinations are public inputs; drone settings are assumptions", "type": "source_fact", "source": "https://huggingface.co/datasets/Cainiao-AI/LaDe", "reading_scope": "official dataset card field descriptions and local Jilin CSV", "limitation": "acceptance is not customer order release; no observed drone operations"},
+    {"claim": "Related TRC work already uses risk-aware courier-drone MARL", "type": "source_fact", "doi": "10.1016/j.trc.2025.105381", "source": "https://kclpure.kcl.ac.uk/portal/en/publications/real-time-coordination-of-human-couriers-and-drones-for-on-demand/", "reading_scope": "abstract and metadata", "limitation": "full method not replicated; no direct performance comparison"},
+    {"claim": "Monotone ADP predates this study", "type": "source_fact", "doi": "10.1287/opre.2015.1425", "reading_scope": "publisher abstract and author manuscript introductory excerpt", "limitation": "its convergence proof does not apply automatically to this network"},
+    {"claim": "Extra unused capacity cannot reduce optimal value under fixed exogenous demand information", "type": "inference", "locator": "manuscript.tex Proposition 1", "limitation": "does not establish concavity or history sufficiency"},
+    {"claim": "Base capacities 1 pad, 4 drones and 2 chargers; 30 minute target", "type": "assumption", "locator": "src/environment.py Config and Order", "limitation": "not calibrated operating data"},
+    {"claim": "Monotone RL mean saving 69.0479 is below resource price 74.9288", "type": "computed_result", "locator": "results/summary.json", "limitation": "17 nonempty test days; five fitted training seeds; simulated cost units"}
+  ],
+  "search_runs": [{"date": "2026-10-04", "scope": "local low-altitude/OR collection plus primary online sources", "queries": ["courier drone reinforcement learning risk aware", "drone scheduling value function", "monotone approximate dynamic programming drone charging", "LaDe official public dataset"], "status": "targeted search, not exhaustive systematic review"}],
+  "publication_status": "draft; citation identities and abstract-level claims checked; full-text novelty validation remains"
+}

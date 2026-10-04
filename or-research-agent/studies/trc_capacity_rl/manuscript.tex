@@ -1,0 +1,209 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=25mm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,booktabs,array}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[hidelinks]{hyperref}
+\newtheorem{proposition}{Proposition}
+\newcommand{\R}{\mathbb{R}}
+\title{Learning the Opportunity Cost of Shared Drone Infrastructure:\\A Capacity-Monotone Reservation Model and Public-Data Replay Study}
+\author{Research draft --- authorship and affiliations to be supplied by the researchers}
+\date{4 October 2026}
+\begin{document}
+\maketitle
+\noindent\textbf{Status.} TRC-oriented exploratory research draft. This document reports a completed computational pilot, including unfavorable comparisons. Novelty and submission readiness have not been established.
+
+\begin{abstract}
+Shared takeoff, landing, and charging resources couple current drone dispatch decisions to future delivery opportunities. We formulate an online single-depot reservation problem in which a dispatcher assigns each revealed parcel either to an unlimited ground fallback or to a feasible drone departure slot. A calendar records simultaneous requirements for pad access, fleet occupancy, and charging. We establish a resource-monotonicity property under an exogenous demand law and implement a temporal-difference learning policy with a capacity-monotone post-decision value approximation. A matched signed-weight model examines the effect of this structural restriction. The experiment replays publicly available LaDe-D Jilin task acceptance times and destinations under explicitly simulated drone settings. Chronological partitions contain 4,667 training, 2,559 validation, and 911 test tasks. Across 17 nonempty test days and five training seeds, the monotone model attains 69.05 generalized saving units per day, compared with 63.93 for greedy dispatch, 68.44 for its signed-weight counterpart, and 74.93 for a validation-tuned resource-price policy. Thus, the pilot does not establish a performance advantage over the strongest implemented online baseline. A reduced-fleet stress test further exposes weak transfer. The study provides a reproducible reservation benchmark and a falsifiable structural-learning hypothesis; it does not establish deployment benefits or state-of-the-art performance.
+\end{abstract}
+\noindent\textbf{Keywords:} drone logistics; online scheduling; shared infrastructure; reinforcement learning; approximate dynamic programming; reproducibility.
+
+\section{Introduction}
+An available aircraft does not by itself make a drone delivery feasible. Its departure requires access to a launch facility, its return requires landing capacity, and its next assignment may require a charging position. A short trip can therefore prevent a more valuable later trip even when its immediate saving is positive. This motivates a dispatch question: how much future infrastructure capacity should an operator preserve when the next delivery requests are unknown?
+
+We study a deliberately restricted version of this question. All sorties start and end at one depot, aircraft are identical, travel times are deterministic, and orders are served individually. A departure decision reserves the entire sortie and charging interval. Ground fallback is always available at a modeled reference cost. These assumptions remove routing and repositioning choices so that the experiment can isolate intertemporal competition for shared resources. The objective is expected saving relative to the ground reference, rather than a service-rate increase: with unlimited ground fallback, the model cannot demonstrate improved overall fulfillment.
+
+The proposed experiment asks whether a structural restriction on the learned continuation value improves online reservation decisions. More remaining capacity cannot worsen the optimal continuation value when extra capacity can be left unused. We impose this monotonicity directly in a compact neural approximation and compare it with an otherwise matched approximation permitting signed capacity weights. The resulting policy can be interpreted as balancing immediate saving against a learned opportunity cost of the reservation.
+
+Three outputs are developed. First, a time-indexed resource model connects online decisions to a perfect-information integer-programming benchmark. Second, a simple feasible-policy inclusion argument motivates the monotone approximation while clearly separating the proved property from additional architectural assumptions. Third, a public-data replay protocol distinguishes observed delivery fields from simulated drone operations and preserves unfavorable results. These are concrete methodological outputs, not evidence that the combination is globally novel. In particular, the experiment finds that a simple tuned resource price outperforms the learned policies. That finding defines the boundary of the present contribution and a useful target for subsequent work.
+
+\section{Related work and positioning}
+Chen, Ulmer, and Thomas \cite{chen} study dynamic same-day service with vehicles and drones using deep Q-learning, including the value of state and action information. Campuzano, Lalla-Ruiz, and Mes \cite{campuzano} formulate dynamic drone scheduling at a central station and use value-based reinforcement learning. Consequently, depot-based stochastic drone dispatch and anticipatory value learning are established ideas.
+
+Hu, Du, and Li \cite{hu} address a richer multimodal food-delivery system in which couriers bring parcels to launchpads and drones complete subsequent legs. Their reported framework combines multi-agent learning, risk-aware assignment, and coordination across transfers. Yu, Yu, and Wu \cite{yu} report feasibility masks for taxi--drone cooperation, including recovery and docking constraints. Neither learning-based cooperation nor masking resource infeasibility can serve as the novelty claim here. The current pilot uses a simpler centralized reservation system and does not reproduce those algorithms or compare their numerical performance across incompatible simulators.
+
+Structural value approximation also has a substantial history. Jiang and Powell \cite{jiang} develop monotone approximate dynamic programming. Asadi and Nurre Pinkley \cite{asadi} exploit monotonicity for battery-swap operations relevant to drones and electric vehicles. We do not introduce monotone ADP or transfer their convergence guarantees to the neural temporal-difference procedure used below. The candidate distinction is the explicit joint calendar of pad, sortie, and charging occupancy and the controlled assessment of an increasing calendar-value approximation. Establishing whether that distinction is sufficient for a journal contribution requires a broader full-text comparison.
+
+The literature checks supporting this draft cover publisher or institutional metadata, abstracts, and accessible excerpts; they are not a systematic full-text review. Accordingly, absence of an identical formulation in the reviewed sources is not evidence of priority. The public LaDe dataset \cite{lade} supplies a reproducible demand trace, but its courier task events are not measurements of drone operations.
+
+\section{Operational model}
+\subsection{Information and assumptions}
+An episode comprises a finite sequence of revealed orders $i=1,\ldots,N$. Each order has a reveal slot $t_i$, depot-to-destination distance $d_i$, and an assumed delivery allowance $D_i$. At its decision epoch, the operator observes that order, previous revealed orders and decisions, and outstanding reservations. Future orders and the episode's eventual order count are not policy inputs. Orders sharing a slot are disclosed sequentially in a fixed hashed-identifier order; this artificial convention is shared by every policy.
+
+Let $\mathcal T=\{0,\ldots,T-1\}$ be five-minute slots and $\mathcal R=\{P,F,C\}$ denote pad, fleet, and charger resources. Capacities are $B_P=1$, $B_F=4$, and $B_C=2$ in the base experiment. The horizon has $T=60$ slots, allowing arrivals during its first 48 slots and time for returns thereafter. Every drone returns to the same depot and completes a fixed two-slot charging operation before becoming available. The model does not track battery state, payload, airspace conflicts, weather, or charging power. The six-kilometer one-way eligibility limit is an assumed range screen, not an energy-feasibility calculation.
+
+Ground fallback has no resource or deadline constraint in this pilot. Its cost is a reference generalized effort, not an observed courier cost. Every order is therefore assigned, and all-aircraft feasibility statements refer only to the modeled drone reservations. They imply neither operational flight safety nor empirical delivery reliability.
+
+\subsection{Reservation patterns and costs}
+For an eligible order, action $a\in\{1,2,3,4\}$ denotes a departure delay $\delta=a-1$ slots. Action zero assigns ground fallback. Set
+\begin{align}
+ f_i&=\max\{1,\lceil d_i/(v_D\Delta)\rceil\}, & \ell_{ia}&=t_i+\delta,\\
+ b_{ia}&=\ell_{ia}+2f_i+1, & e_{ia}&=b_{ia}+q,
+\end{align}
+where $v_D=0.8$ km/min, $\Delta=5$ min, and $q=2$. Here $\ell$, $b$, and $e$ denote launch, landing, and ready-for-reuse slots. The extra return slot conservatively accommodates handling. Customer delivery time relative to reveal is $\delta\Delta+f_i\Delta+2$ minutes. A candidate must satisfy $d_i\leq6$, $\delta\Delta+f_i\Delta+2\leq D_i=30$, and $e_{ia}<T$. The strict horizon cutoff is part of this benchmark.
+
+Each action has a nonnegative integer resource pattern $u_{ia,r\tau}$:
+\begin{align}
+u_{ia,P\tau}&=\mathbf1\{\tau=\ell_{ia}\}+\mathbf1\{\tau=b_{ia}\},\\
+u_{ia,F\tau}&=\mathbf1\{\ell_{ia}\leq\tau<e_{ia}\},\\
+u_{ia,C\tau}&=\mathbf1\{b_{ia}\leq\tau<e_{ia}\}.
+\end{align}
+Charging and the landing slot overlap by convention. The pad is not occupied during other charging slots. Aircraft are indistinguishable; interval occupancy with a common depot permits a consistent aircraft assignment whenever the fleet bound holds. This argument would fail for heterogeneous aircraft or different return depots without additional state.
+
+The reference and drone costs are
+\begin{equation}
+c_i^G=2\rho d_i/v_G+4,\qquad c_{ia}^D=2d_i/v_D+4+0.15\delta\Delta,
+\end{equation}
+with road factor $\rho=1.35$ and $v_G=0.35$ km/min. Saving is $r_{ia}=c_i^G-c_{ia}^D$; ground has $r_{i0}=0$ and zero resource consumption. These dimensionless generalized units combine travel effort and a waiting penalty. They are not monetary, emissions, or welfare estimates. Equal handling constants cancel in the saving objective.
+
+\subsection{Online decisions and offline benchmark}
+Let $C_i$ be the remaining resource calendar before order $i$. The feasible action set contains ground and all physically eligible patterns satisfying $u_{ia}\leq C_i$ componentwise. On selecting $a_i$, the calendar becomes $C_i-u_{ia_i}$. Reservations cannot be canceled. For a fixed finite demand distribution, the online objective is
+\begin{equation}
+\max_{\pi\ \mathrm{nonanticipative}}\ \mathbb E_\pi\left[\sum_{i=1}^N r_{ia_i}\right].
+\end{equation}
+Nonanticipativity requires identical decisions for histories indistinguishable to the operator; it excludes use of future test requests.
+
+For a realized full day, a binary pattern program gives the perfect-information benchmark:
+\begin{align}
+\max_x\quad &\sum_i\sum_{a\in A_i^D}r_{ia}x_{ia}\\
+\text{s.t.}\quad &\sum_{a\in A_i^D}x_{ia}\leq1 &&\forall i,\\
+&\sum_i\sum_{a\in A_i^D}u_{ia,r\tau}x_{ia}\leq B_r &&\forall r,\tau,\\
+&x_{ia}\in\{0,1\}.\nonumber
+\end{align}
+The implicit unselected option is ground service. $A_i^D$ includes physical candidate patterns generated without prior reservations. Knowing the whole day makes this benchmark more informed than every online policy. Its optimal objective bounds attainable savings from above under the same patterns. With solver tolerances or a time limit, the reported dual bound, rather than an arbitrary incumbent, is the certified upper bound. We retain both and the termination status.
+
+\section{Capacity-monotone post-decision learning}
+\subsection{Structural property and its limits}
+Write $h$ for fixed revealed information determining the conditional law of future demand. Let $W(h,C)$ be the optimal expected continuation saving after the current decision, with remaining calendar $C$.
+\begin{proposition}
+If future demand is exogenous to decisions, unused capacity has no penalty, and ground fallback remains feasible, then $C'\geq C$ implies $W(h,C')\geq W(h,C)$ for the same $h$ and conditional demand law.
+\end{proposition}
+\begin{proof}
+Take any feasible nonanticipative policy for calendar $C$. Under $C'$, maintain a virtual copy initialized at $C$ and make the decisions prescribed by that policy from its virtual history. Couple both systems to the same future requests. Each selected pattern is feasible in the virtual system. The actual calendar exceeds the virtual calendar by $C'-C$ after every identical subtraction, so that pattern remains feasible in the actual system. Both systems obtain the same saving on every coupled path. Thus every attainable expected saving under $C$ is attainable under $C'$. Taking the supremum over policies proves the result.
+\end{proof}
+The proposition does not establish concavity, separability, or monotonicity when the demand law changes with capacity. Nor does it prove that time and a calendar alone are a sufficient Markov state for the observed demand process. In the implementation, historical information is compressed, so the value network is a heuristic partial-information approximation.
+
+\subsection{Architecture and opportunity cost}
+Let $z$ contain normalized remaining capacities, with entries for past slots set to zero. Temporal features are $\eta(t)=(t/T,\sin(\pi t/T),\cos(\pi t/T),1)$. The implemented approximation is
+\begin{equation}
+\widehat W_\theta(t,z)=b_\theta(\eta(t))+\sum_{j=1}^{3T}\operatorname{softplus}(g_{\theta,j}(\eta(t)))\,[1-\exp(-z_j)].
+\end{equation}
+At fixed time, every partial derivative with respect to $z_j$ is nonnegative. The capacity transformation also imposes a separable diminishing-return shape; this is an architectural assumption that is stronger than the proposition and may be wrong for complementary resources. The temporal weight network has one 32-unit tanh hidden layer, and the intercept has one 16-unit tanh hidden layer. The signed-weight ablation replaces softplus weights with unrestricted weights and uses matching initial effective weights. Different parameterizations still induce different optimization dynamics, so the comparison does not isolate monotonicity perfectly.
+
+At each order the policy selects
+\begin{equation}
+a_i\in\arg\max_{a\in A_i(C_i)}\{r_{ia}/20+\widehat W_\theta(t_i,z(C_i-u_{ia}))\}.
+\end{equation}
+Subtracting the action-independent value at $C_i$ shows the implied opportunity cost of consuming $u_{ia}$. Feasibility is enforced by enumerating admissible patterns, independently of learned values. Ground fallback therefore remains selectable even when predictions are poor.
+
+\subsection{Learning procedure}
+The value describes rewards \emph{after} the current action. For a stored selected afterstate $z_i$, the temporal-difference target begins with the next revealed order's reward:
+\begin{align}
+a^*&\in\arg\max_{a\in A_{i+1}}\{r_{i+1,a}/20+\widehat W_\theta(z_{i+1,a})\},\\
+y_i&=r_{i+1,a^*}/20+\widehat W_{\bar\theta}(z_{i+1,a^*}).
+\end{align}
+At episode termination $y_i=0$. Adding the current reward again would be an indexing error. We use an online network for target action selection and a periodically copied network for target evaluation, a replay buffer of 50,000 transitions, batches of 64, Huber loss, Adam with learning rate $0.001$, gradient norm limit 5, one update per four decisions, and a target copy every 100 updates. The finite-horizon discount is one. Exploration decreases from 0.7 to a floor of 0.05 during the first 80\% of 400 sampled training days. Each day is sampled uniformly with replacement from the training partition. A validation check every 50 episodes retains the best checkpoint. No convergence or optimality guarantee is asserted for this procedure.
+
+\section{Public-data replay and evaluation}
+\subsection{Data construction}
+The official LaDe-D Jilin file contains 31,415 records across 163 distinct day identifiers. We sort those identifiers, allocate the first 60\% to training, the next 20\% to validation, and the remainder to testing before selecting a region or estimating a depot. The most frequent training region is 53. The artificial depot is the componentwise median of valid training acceptance GPS coordinates in that region: longitude 126.56689, latitude 43.81213. This point is not a verified drone facility.
+
+Within each partition, we retain tasks accepted between 07:00 and 11:00 and compute approximate planar distances to the depot. Acceptance timestamps are rounded down to five-minute slots; the simulator reveals tasks at those discretized times. This is a new discretized replay process, not exact real-time service at the original timestamps. The CSV's courier acceptance event must not be interpreted as customer order placement. The selected file does not specify a calendar year; day identifiers remain in month--day form. The complete input SHA256 and the transformation are included in the repository.
+
+\begin{table}[ht]
+\centering\caption{Nonempty replay partitions after filtering.}
+\begin{tabular}{lrrl}\toprule
+Partition & Days & Tasks & First--last retained day\\\midrule
+Training &89&4,667&05-14--08-18\\
+Validation&33&2,559&08-19--09-20\\
+Test&17&911&09-21--10-21\\\bottomrule
+\end{tabular}
+\end{table}
+Only destinations and courier acceptance events are empirical inputs. Drone capacities, speeds, deadlines, range, charging times, handling, and costs are simulated assumptions. The official dataset card identifies an Apache-2.0 license. We distribute a downloader and checksums rather than republishing order records. Five test days contain only one retained task. These days remain in the primary evaluation, and the resulting 17-day sample is too small for strong generalization claims.
+
+\subsection{Baselines and statistical protocol}
+Ground-only service gives zero reference saving. Greedy maximizes current saving over feasible candidates. A resource-price policy maximizes
+\begin{equation}
+r_{ia}-p(1-t_i/T)\sum_{r,\tau}u_{ia,r\tau}/\max(B_r,1).
+\end{equation}
+The price is selected on validation days from $\{0,1,2,4,8,12,20,32\}$; the selected value is 4. Sampled rollout draws three training days at each decision, takes their orders strictly after the current slot as possible futures, and evaluates greedy continuations from each candidate afterstate. It uses no actual test future. Its unconditional day sampling and omission of unrevealed same-slot tasks make it a limited scenario baseline, not an optimized stochastic controller.
+
+Both learning variants use seeds 11, 22, 33, 44, and 55 and 400 training episodes per seed. Policies and parameters are frozen before test evaluation. No revision is selected using test performance. The MILP uses a 30-second time limit and relative gap tolerance $10^{-4}$; all 17 base-test instances returned successful status. Their incumbents are reported separately from stored dual bounds.
+
+For comparisons we average the five learned-policy outcomes within each day and then form paired day differences. The 85 seed--day observations are not treated as 85 independent demand realizations. Ten thousand fixed-seed bootstrap replicates provide descriptive percentile intervals. We also report circular blocks of three consecutive \emph{observed} days because serial dependence may invalidate independent-day resampling. These intervals condition on the five fitted models, and do not measure the full uncertainty from retraining, model selection, or a different city.
+
+\section{Results}
+\begin{table}[ht]
+\centering\caption{Held-out performance. Higher saving is better. Decision time is the unweighted mean of daily means; ground is an unlimited reference.}
+\begin{tabular}{lrrr}\toprule
+Policy & Saving/day & Drone tasks/day & Decision ms\\\midrule
+Ground&0.00&0.00&0.208\\
+Greedy&63.93&5.41&0.147\\
+Sampled rollout&65.93&5.41&31.628\\
+Resource price&74.93&5.00&0.154\\
+Signed-weight RL&68.44&4.80&0.424\\
+Monotone RL&69.05&4.65&0.437\\
+Perfect-information MILP incumbent&97.11&---&---\\\bottomrule
+\end{tabular}
+\end{table}
+The monotone model improves mean saving over greedy by 5.12 units (8.01\%), but falls below resource pricing by 5.88 units (7.85\%). Its mean remains approximately 28.9\% below the perfect-information incumbent, which has an informational advantage. Across training seeds, monotone daily means range from 67.82 to 71.10, while signed-weight means range from 65.66 to 70.00. All evaluated online episodes satisfy the simulator's resource checks. This outcome is enforced by candidate feasibility and cannot be attributed to learning a safety mechanism.
+
+\begin{table}[ht]
+\centering\caption{Monotone RL minus comparator: paired daily saving differences and descriptive 95\% percentile intervals.}
+\begin{tabular}{lrrr}\toprule
+Comparator&Mean difference&Independent-day interval&3-day block interval\\\midrule
+Greedy&5.12&[0.08,10.44]&[-0.56,11.09]\\
+Resource price&-5.88&[-10.04,-1.92]&[-9.27,-2.67]\\
+Sampled rollout&3.12&[-1.84,8.54]&[-2.12,8.32]\\
+Signed-weight RL&0.61&[-1.98,3.34]&[-1.70,3.62]\\\bottomrule
+\end{tabular}
+\end{table}
+The independent-day interval against greedy only narrowly excludes zero; the block interval includes it. Both intervals for the architecture comparison include zero. The study therefore does not establish that monotonicity materially improves performance, and it should not be summarized as a significant superiority result. By contrast, the observed shortfall against resource pricing is consistent across the reported resampling schemes. These are exploratory comparisons without a multiple-testing correction.
+
+\begin{table}[ht]
+\centering\caption{Frozen-policy fleet sensitivity: saving/day. Pad and charger capacities remain unchanged.}
+\begin{tabular}{lrrr}\toprule
+Policy&Two aircraft&Four aircraft&Six aircraft\\\midrule
+Greedy&49.76&63.93&63.93\\
+Resource price&59.06&74.93&73.90\\
+Signed-weight RL&48.68&68.44&67.45\\
+Monotone RL&47.73&69.05&68.79\\\bottomrule
+\end{tabular}
+\end{table}
+The reduced-fleet case is particularly unfavorable to the learned policies. Monotone RL achieves less saving than greedy with two aircraft. Increasing the fleet to six does not improve these online outcomes, although the optimal value cannot decrease. This is not a contradiction: policy quality may deteriorate, and normalization divides each calendar by its scenario capacity, so the monotonicity guarantee applies within a fixed representation and context rather than across these differently normalized scenarios. An initially full fleet looks identical to the network regardless of its absolute size. Transfer to changed capacities is consequently a substantial unresolved issue.
+
+A post hoc diagnostic excluding the five singleton days leaves 12 days. Their mean savings are 91.25 for monotone RL, 90.22 for signed-weight RL, 99.12 for resource pricing, and 83.53 for greedy. The principal ordering persists. This diagnostic does not replace the prespecified full test sample. The complete run took approximately 520 seconds on the local CPU environment with one PyTorch computation thread; timings include training and evaluation and are descriptive, not a hardware-independent speed claim.
+
+\section{Discussion and research agenda}
+The experiment supports a narrow operational lesson: reserving capacity using even a coarse opportunity price can improve on immediate-saving dispatch in this constructed system. It does not support preferring the implemented neural policy to a calibrated price. One plausible explanation is that the separable continuation approximation misses complementarities: a free pad slot has little value without a simultaneously available aircraft and charger. A second is that time-only demand context cannot recognize day-specific intensity or spatial patterns. A third is limited training and seasonal change across chronological splits. These are hypotheses; none is established by the current experiment.
+
+A promising next methodological study would learn nonnegative interaction terms across aligned pad, fleet, and charger windows while conditioning on causal recent-demand summaries and absolute capacities. Exact small-instance continuation values could provide diagnostics or training targets. That would require fresh development partitions and a new untouched test period; the present held-out results must not become an informal tuning set. Stronger conditional stochastic lookahead and a carefully adapted published RL baseline are needed before a performance claim.
+
+The proposed model also omits weather-dependent flight duration, uncertain charging completion, multi-depot repositioning, finite ground resources, parcel weight, and actual facility operating constraints. Adding all of them at once would obscure the contribution. A defensible next scenario is uncertain return-time reservations with an explicit probability or robust-feasibility requirement, supported by accessible operational data. Any claimed improvement would then require both a calibrated disturbance model and constraint-violation evaluation outside training. No such claim is made here.
+
+\section{Conclusion}
+We formulate online drone dispatch as a joint infrastructure-reservation problem and implement a capacity-monotone post-decision learning policy. The resource-monotonicity argument is valid under stated assumptions, while the neural approximation introduces additional restrictions that need empirical justification. A chronological public-data replay yields a reproducible pilot with an informative negative result: monotone learning exceeds greedy on average but loses to tuned resource pricing and shows weak reduced-fleet transfer. The formulation, checks, and open experiment are a basis for further research. A TRC submission would require a sharper verified distinction from prior work, stronger baseline comparisons, richer data validation, and evidence beyond this pilot.
+
+\section*{Reproducibility and declarations}
+The repository contains the data downloader, input hash, transformation, simulator, training code, tests, daily results, training logs, and statistical summary. Python 3.14.3, NumPy 2.4.2, SciPy 1.17.1, and PyTorch 2.10.0+cpu were used; the machine-readable experiment records are authoritative for versions. All experiment numbers in this draft derive from saved outputs. The original LaDe records and the researchers' private literature library are excluded from the release. No real drone deployment or controlled operational experiment was conducted. Authorship, affiliations, funding, conflicts of interest, and final data-use declarations must be completed and verified by the human researchers before submission. Generative AI assisted formulation, code, analysis, and drafting; human authors must verify and take responsibility for any submitted version. Current TRC formatting and declaration requirements have not been verified in this draft.
+
+\begin{thebibliography}{9}
+\bibitem{chen} X. Chen, M. W. Ulmer, B. W. Thomas (2022). Deep Q-learning for same-day delivery with vehicles and drones. \emph{European Journal of Operational Research}, 298(3), 939--952. \href{https://doi.org/10.1016/j.ejor.2021.06.021}{doi:10.1016/j.ejor.2021.06.021}.
+\bibitem{campuzano} G. Campuzano, E. Lalla-Ruiz, M. Mes (2022). The Dynamic Drone Scheduling Delivery Problem. \emph{Computational Logistics}, LNCS 13557, 260--274. \href{https://doi.org/10.1007/978-3-031-16579-5_18}{doi:10.1007/978-3-031-16579-5\_18}.
+\bibitem{hu} Y. Hu, Y. Du, S. Li (2025). Real-time coordination of human couriers and drones for on-demand food-delivery platforms: A multi-stage risk-aware multi-agent reinforcement learning framework. \emph{Transportation Research Part C}, 181, 105381. \href{https://doi.org/10.1016/j.trc.2025.105381}{doi:10.1016/j.trc.2025.105381}.
+\bibitem{yu} J. Yu, Z. Yu, Y. Wu (2026). Multi-agent PPO with embedded feasibility constraints for taxi--drone collaborative instant delivery. \emph{Journal of Computer Applications}, online 7 September. \href{https://doi.org/10.11772/j.issn.1001-9081.2026060727}{doi:10.11772/j.issn.1001-9081.2026060727}.
+\bibitem{jiang} D. R. Jiang, W. B. Powell (2015). An Approximate Dynamic Programming Algorithm for Monotone Value Functions. \emph{Operations Research}, 63(6), 1489--1511. \href{https://doi.org/10.1287/opre.2015.1425}{doi:10.1287/opre.2015.1425}.
+\bibitem{asadi} A. Asadi, S. Nurre Pinkley (2021). A Monotone Approximate Dynamic Programming Approach for the Stochastic Scheduling, Allocation, and Inventory Replenishment Problem: Applications to Drone and Electric Vehicle Battery Swap Stations. \href{https://arxiv.org/abs/2105.07026}{arXiv:2105.07026}; related journal article \href{https://doi.org/10.1287/trsc.2021.1108}{doi:10.1287/trsc.2021.1108}.
+\bibitem{lade} L. Wu et al. (2023; revised 2025). LaDe: The First Comprehensive Last-mile Delivery Dataset from Industry. \href{https://arxiv.org/abs/2306.10675}{arXiv:2306.10675}. Official data: \url{https://huggingface.co/datasets/Cainiao-AI/LaDe}.
+\end{thebibliography}
+\end{document}

@@ -1,0 +1,88 @@
+{
+  "seed": 33,
+  "monotone": true,
+  "training_episodes": 400,
+  "steps": 21177,
+  "updates": 5279,
+  "best_validation_reward": 102.14466396091237,
+  "history": [
+    {
+      "episode": 50,
+      "validation_reward": 88.15111479048255,
+      "steps": 2590,
+      "updates": 632
+    },
+    {
+      "episode": 100,
+      "validation_reward": 91.45174357404042,
+      "steps": 5265,
+      "updates": 1301
+    },
+    {
+      "episode": 150,
+      "validation_reward": 88.89694143838041,
+      "steps": 7966,
+      "updates": 1976
+    },
+    {
+      "episode": 200,
+      "validation_reward": 92.14561745170178,
+      "steps": 10472,
+      "updates": 2603
+    },
+    {
+      "episode": 250,
+      "validation_reward": 94.80873196633392,
+      "steps": 13116,
+      "updates": 3264
+    },
+    {
+      "episode": 300,
+      "validation_reward": 99.11050364974815,
+      "steps": 15630,
+      "updates": 3892
+    },
+    {
+      "episode": 350,
+      "validation_reward": 99.28341846016467,
+      "steps": 18466,
+      "updates": 4601
+    },
+    {
+      "episode": 400,
+      "validation_reward": 102.14466396091237,
+      "steps": 21177,
+      "updates": 5279
+    }
+  ],
+  "identity": {
+    "config": {
+      "slots": 60,
+      "slot_minutes": 5,
+      "pad_capacity": 1,
+      "fleet_capacity": 4,
+      "charger_capacity": 2,
+      "charge_slots": 2,
+      "max_delay_slots": 3,
+      "max_distance_km": 6.0,
+      "drone_speed_km_min": 0.8,
+      "ground_speed_km_min": 0.35,
+      "road_factor": 1.35,
+      "reward_scale": 20.0
+    },
+    "epochs": 400,
+    "processed_data_sha256": "f1c713c2ca921edd7b658adc11eaa3d6f9ab1ffd4fa0983ae14f0159d18a6715",
+    "source_sha256": {
+      "environment.py": "7fc8bc1889a4a3f5b5f0350d64995583c20daa0ce933cd39ba225e1d791e7d0f",
+      "learning.py": "ce7b7182951ee290529b369201875d785da30a8b0df77122adb6d47dad054f70",
+      "prepare_data.py": "204392dda4387cf0c656571e85c39dcaef4168c175fdc78720f03292930dc291",
+      "run_experiment.py": "e2e1981f44a9479d2570fa8c0b3daaf7fd444fc5011b764c47111f24785d1da3"
+    },
+    "versions": {
+      "python": "3.14.3",
+      "torch": "2.10.0+cpu",
+      "numpy": "2.4.2",
+      "scipy": "1.17.1"
+    }
+  }
+}

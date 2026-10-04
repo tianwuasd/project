@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "topic": "Shared drone infrastructure reservations with capacity-monotone post-decision learning",
+  "scenario": "tested",
+  "modeling": "tested",
+  "algorithm": "tested",
+  "publication_status": "exploratory_draft_not_submission_ready",
+  "novelty_status": "not_confirmed",
+  "data_status": "public_ground_delivery_replay_with_synthetic_drone_settings",
+  "next_action": "Review closest full texts; test interaction-aware value models with a new untouched test period and stronger calibrated baselines",
+  "artifacts": ["manuscript.tex", "NOVELTY.md", "REVIEW.md", "data/manifest.json", "results/experiment.json", "results/summary.json"],
+  "tested_meaning": "Specified implementation and experiment checks passed; this is not a guarantee of scientific validity, novelty, deployment performance or acceptance"
+}
