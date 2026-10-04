@@ -1,0 +1,23 @@
+{
+  "variant": "mlp",
+  "seed": 11,
+  "epochs": 80,
+  "steps": 4616,
+  "updates": 1139,
+  "parameter_count": 27585,
+  "best_validation_mean": 75.68668026835553,
+  "log": [
+    {
+      "training_episode": 40,
+      "validation_mean": 72.83558785920896,
+      "steps": 2335,
+      "updates": 568
+    },
+    {
+      "training_episode": 80,
+      "validation_mean": 75.68668026835553,
+      "steps": 4616,
+      "updates": 1139
+    }
+  ]
+}

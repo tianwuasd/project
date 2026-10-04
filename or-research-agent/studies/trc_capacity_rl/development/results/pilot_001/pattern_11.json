@@ -1,0 +1,23 @@
+{
+  "variant": "pattern",
+  "seed": 11,
+  "epochs": 80,
+  "steps": 4034,
+  "updates": 993,
+  "parameter_count": 12137,
+  "best_validation_mean": 80.32179429599019,
+  "log": [
+    {
+      "training_episode": 40,
+      "validation_mean": 80.32179429599019,
+      "steps": 2266,
+      "updates": 551
+    },
+    {
+      "training_episode": 80,
+      "validation_mean": 80.28650395670404,
+      "steps": 4034,
+      "updates": 993
+    }
+  ]
+}

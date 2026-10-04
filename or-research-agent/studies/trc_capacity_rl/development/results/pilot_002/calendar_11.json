@@ -1,0 +1,41 @@
+{
+  "variant": "calendar",
+  "seed": 11,
+  "epochs": 200,
+  "steps": 10872,
+  "updates": 2703,
+  "parameter_count": 12329,
+  "best_validation_mean": 77.57394865688428,
+  "log": [
+    {
+      "training_episode": 40,
+      "validation_mean": 75.95730328948913,
+      "steps": 2142,
+      "updates": 520
+    },
+    {
+      "training_episode": 80,
+      "validation_mean": 77.30033462716744,
+      "steps": 4125,
+      "updates": 1016
+    },
+    {
+      "training_episode": 120,
+      "validation_mean": 76.51252572751117,
+      "steps": 6416,
+      "updates": 1589
+    },
+    {
+      "training_episode": 160,
+      "validation_mean": 77.57394865688428,
+      "steps": 8283,
+      "updates": 2055
+    },
+    {
+      "training_episode": 200,
+      "validation_mean": 74.88700132968776,
+      "steps": 10872,
+      "updates": 2703
+    }
+  ]
+}

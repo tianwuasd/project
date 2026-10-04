@@ -1,0 +1,41 @@
+{
+  "variant": "mlp",
+  "seed": 22,
+  "epochs": 200,
+  "steps": 11043,
+  "updates": 2745,
+  "parameter_count": 27841,
+  "best_validation_mean": 76.54560715943455,
+  "log": [
+    {
+      "training_episode": 40,
+      "validation_mean": 72.911639084212,
+      "steps": 2364,
+      "updates": 576
+    },
+    {
+      "training_episode": 80,
+      "validation_mean": 73.63503334430969,
+      "steps": 4374,
+      "updates": 1078
+    },
+    {
+      "training_episode": 120,
+      "validation_mean": 74.5518455219919,
+      "steps": 6331,
+      "updates": 1567
+    },
+    {
+      "training_episode": 160,
+      "validation_mean": 75.15341372941245,
+      "steps": 8662,
+      "updates": 2150
+    },
+    {
+      "training_episode": 200,
+      "validation_mean": 76.54560715943455,
+      "steps": 11043,
+      "updates": 2745
+    }
+  ]
+}

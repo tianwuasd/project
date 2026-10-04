@@ -1,0 +1,68 @@
+{
+  "label": "development validation, not independent confirmation",
+  "days": 33,
+  "training_episodes_per_seed": 200,
+  "training_seeds": [
+    11,
+    22,
+    33,
+    44,
+    55
+  ],
+  "means": {
+    "bid_price": 80.8821684265049,
+    "calendar": 77.2112110753888,
+    "envelope_greedy": 73.65652120368122,
+    "greedy": 76.147531315268,
+    "mlp": 78.18601859156155,
+    "pattern": 83.53558523744384,
+    "conditional_lp": 84.12614990148309
+  },
+  "seed_means": {
+    "calendar": [
+      77.57394865688428,
+      75.56547896300229,
+      76.39674539993919,
+      78.04436922579113,
+      78.47551313132718
+    ],
+    "mlp": [
+      78.17431794183898,
+      76.54560715943455,
+      79.81068734768273,
+      76.78733110095051,
+      79.61214940790099
+    ],
+    "pattern": [
+      82.47025599940235,
+      84.15964731915196,
+      85.05739063534345,
+      83.08995009729962,
+      82.90068213602193
+    ]
+  },
+  "pattern_vs_price_pct": 3.2805955410926124,
+  "pattern_vs_lp_pct": -0.7019989203485899,
+  "audit_rows": 693,
+  "all_audits_pass": true,
+  "lp_counters": [
+    {
+      "weight": 0.25,
+      "solves": 2293,
+      "fallbacks": 0,
+      "empirical_support_misses": 0
+    },
+    {
+      "weight": 0.5,
+      "solves": 3283,
+      "fallbacks": 0,
+      "empirical_support_misses": 4
+    },
+    {
+      "weight": 1.0,
+      "solves": 10494,
+      "fallbacks": 0,
+      "empirical_support_misses": 34
+    }
+  ]
+}

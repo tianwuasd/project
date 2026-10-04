@@ -4,6 +4,9 @@
 
 ## 先看成果
 
+- [持续研究目标](RESEARCH_GOAL.md)：建模区别、结构匹配方法、独立数据上的可靠优势，三项同时验收；目标进行中。
+- [第二轮开发模型](studies/trc_capacity_rl/development/scenario_model.md)、[全文对照](studies/trc_capacity_rl/literature/fulltext_comparison.md)：共同扰动下的返航预约与资源组合价值。当前仅探索性候选，尚未确认创新。
+
 - [Agent 技能入口](skill/SKILL.md)：三阶段流程、证据规则与工具调用。
 - [低空物流强化学习研究](studies/trc_capacity_rl/README.md)：公开LaDe数据、共享起降/机队/充电预约、单调后决策TD、基线、消融、五训练种子。
 - [英文论文初稿](studies/trc_capacity_rl/manuscript.tex)：完整模型、证明、方法、实验及局限；LaTeX可编辑，当前宿主编译器环境错误，排版编译尚未验证。
@@ -40,4 +43,4 @@ python -X utf8 -m unittest discover -s tests -v
 
 依赖见 [requirements.txt](requirements.txt)，完整训练命令见[研究说明](studies/trc_capacity_rl/README.md)。原始公开数据由下载脚本重建；论文数据库、收藏PDF、个人阅读笔记及本机配置不进入公共仓库。公开包保留代码、技能、检查点、汇总与逐日结果，便于审查。
 
-Agent工具测试13项、研究测试9项通过。图表数值来自实际运行。单调命题的条件、额外凹性假设、部分观测近似、合成揭示时序与统计局限均在论文中明确。
+Agent工具测试13项、研究测试18项通过（含第二轮9项检查）。图表数值来自实际运行。单调命题的条件、额外凹性假设、部分观测近似、合成揭示时序与统计局限均在论文中明确。

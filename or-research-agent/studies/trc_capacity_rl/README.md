@@ -6,6 +6,7 @@
 - [创新审查与下一步](NOVELTY.md)、[独立审查处理记录](REVIEW.md)。
 - [逐日实验记录](results/experiment.json)、[统计汇总](results/summary.json)、[结果图](figures/test_results.png)。
 - [公开数据清单](data/manifest.json)：来源、哈希、切分与假设。
+- [第二轮开发结果](development/RESULTS_02.md)：联合情景预约、资源组合TD与条件LP前瞻；五种子验证83.54对84.13，仍未达到目标。[公开飞行测量数据](development/PUBLIC_FLIGHT_DATA.md)已取得，尚未用于校准。
 
 ## 已运行结果
 

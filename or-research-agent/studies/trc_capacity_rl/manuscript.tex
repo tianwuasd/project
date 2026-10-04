@@ -197,7 +197,66 @@ We formulate online drone dispatch as a joint infrastructure-reservation problem
 \section*{Reproducibility and declarations}
 The repository contains the data downloader, input hash, transformation, simulator, training code, tests, daily results, training logs, and statistical summary. Python 3.14.3, NumPy 2.4.2, SciPy 1.17.1, and PyTorch 2.10.0+cpu were used; the machine-readable experiment records are authoritative for versions. All experiment numbers in this draft derive from saved outputs. The original LaDe records and the researchers' private literature library are excluded from the release. No real drone deployment or controlled operational experiment was conducted. Authorship, affiliations, funding, conflicts of interest, and final data-use declarations must be completed and verified by the human researchers before submission. Generative AI assisted formulation, code, analysis, and drafting; human authors must verify and take responsibility for any submitted version. Current TRC formatting and declaration requirements have not been verified in this draft.
 
-\begin{thebibliography}{9}
+\appendix
+\section{Development extension: joint-scenario reservations and resource-pattern values}
+\label{app:development}
+This appendix records an exploratory successor to the completed pilot above. It does not replace the original experiment or claim a confirmed modeling or algorithmic contribution. The original test outcomes have already been observed, and a new independent confirmation set has not been evaluated. The current aim is to distinguish an operational mechanism from a change of function approximator.
+
+\subsection{Positioning and information restriction}
+Targeted full-text inspection of Chen et al.\ \cite{chen}, physical pages 5--11 of their preprint, confirms that accepted but unloaded requests may remain in updated tentative plans. This mechanism cannot be claimed as new here. Finite charging capacity already appears in joint aerial-vehicle routing and charging models \cite{chencharging}, and energy-predictive drone-service planning already includes charging reservations \cite{ren}. NASA's discussion of uncertain arrival and resource availability motivates examining the cost of operational buffers \cite{nasa}; it does not calibrate our disturbances or validate flight safety.
+
+We instead examine a finite set $\Omega$ of \emph{joint} operating scenarios, with positive probabilities $q_\omega$ summing to one. Each scenario specifies a common flight-time multiplier $m_\omega$ and an integer charging duration $c_\omega$ for the operating period. These are synthetic assumptions. A request is assigned either to the ground reference or to a launch slot $\ell_i=a_i+d_i$ fixed at acceptance. The launch decision is identical across scenarios. The current controller deliberately retains its original forecast set; it does not condition on subsequently observed flight outcomes. It is therefore a restricted observation policy, not an optimal controller using every available operational observation.
+
+\subsection{Scenario-dependent occupancy with common commitments}
+Let $\Delta$ be slot duration, $v$ nominal drone speed, and $s_i$ distance. For a candidate delay $d$, define
+\begin{align}
+ f_{i\omega}&=\max\{1,\lceil m_\omega s_i/(v\Delta)\rceil\}, &
+ b_{id\omega}&=a_i+d+2f_{i\omega}+1,\\
+ e_{id\omega}&=b_{id\omega}+c_\omega.&&
+\end{align}
+The pad is occupied at launch and landing, the aircraft on $[a_i+d,e_{id\omega})$, and a charger on $[b_{id\omega},e_{id\omega})$. Write this resource-time vector as $U_{id\omega}$. Each scenario must satisfy the delivery deadline $\Delta(d+f_{i\omega})+2\leq\delta_i$ and $e_{id\omega}\leq T$. Unlike the original pilot's strict horizon convention, completion exactly at $T$ is allowed in this extension. The convention is tested explicitly and results from the two formulations are not pooled.
+
+For remaining scenario calendars $C_\omega$, an action is admissible only if $U_{id\omega}\leq C_\omega$ for every $\omega$. Once accepted, its common launch commitment is retained. With unlimited ground fallback, induction over admissions proves resource and deadline feasibility for every listed scenario: the initial calendars are feasible, each accepted action subtracts no more than the remaining capacity in any coordinate, and fallback subtracts zero. Homogeneous aircraft at one base can be assigned at launch to an available aircraft; the interval load constraint ensures one exists in each realized listed scenario. The argument does not cover omitted disturbances, physical airspace separation, or a safety certification.
+
+Expected immediate saving is $r_{id}=\sum_\omega q_\omega(g_i-c_{id\omega})$, with the pilot's continuous generalized transport cost scaled by $m_\omega$ and its waiting penalty retained. Occupancy uses rounded slots while cost uses a continuous proxy; these are separate modeling choices. The corresponding perfect-future integer model has objective $\max\sum_{i,d}r_{id}x_{id}$, constraints $\sum_d x_{id}\leq1$ and $\sum_{i,d}U_{id\omega}x_{id}\leq K$ for every scenario, and binary $x$. It is an informational upper benchmark, not an online competitor.
+
+A per-request envelope instead reserves $\overline U_{id}=\max_\omega U_{id\omega}$ coordinatewise. Since $U_{id\omega}\leq\overline U_{id}$, envelope-feasible selections are joint-scenario feasible. The inclusion can be strict, a standard robust-optimization observation rather than a new general theorem. In a two-request example, launches at slots 0 and 2 return at $(3,5)$ under one common scenario and $(5,7)$ under the other. Both schedules satisfy pad capacity one, whereas the per-request envelope double-books slot 5. Exhaustive enumeration with the specified synthetic costs gives 15.3571 for joint reservations and 7.6786 for the envelope. These numbers establish a structural difference, not an operational percentage improvement.
+
+\subsection{Pattern features and a falsifiable method hypothesis}
+For a fixed future-request template $p$ and its launch alternatives $d$, define
+\begin{equation}
+ B_p(C)=\max_d\min\left\{1,\min_{\omega,r,t:U_{pd\omega,rt}>0}
+       \frac{C_{\omega,rt}}{U_{pd\omega,rt}}\right\}.
+\end{equation}
+Templates with no physics-feasible alternative have value zero. They are fixed distance-time templates, not future evaluation requests. The proposed approximate continuation value is
+\begin{equation}
+ \widehat V_\theta(C,h)=b_\theta(h)+\sum_p\operatorname{softplus}(w_{\theta p}(h))B_p(C).
+\end{equation}
+Each $B_p$ and their positive weighted sum are nondecreasing in remaining capacity for fixed context. Taking a maximum over launch alternatives does not generally preserve concavity. Templates compete for resources, so their summed value is neither an exact continuation value nor a certified upper bound.
+
+The construction can express a basic complementarity that the pilot's separable critic cannot. A single future task worth $R$ requiring both binary resources $p$ and $f$ has values $(0,0,0,R)$ at states $(0,0),(1,0),(0,1),(1,1)$. Its mixed finite difference is $R$, while any separable $g(p)+h(f)+b$ has mixed difference zero. Uniform error is therefore at least $R/4$ by the triangle inequality; a single feature $R\min(p,f)$ represents all four values exactly. This is an expressivity diagnostic, not a proof of improved learning or a claim that resource complementarity is new.
+
+An independent code review exposed an important information-resolution issue: current-slot requests are revealed sequentially, but the first prototype omitted all future templates in the current slot. In the validation data, 2,279 of 2,559 requests are not the first request of their slot. The revised features retain current-slot opportunities and include only observed within-slot progress, cumulative revealed demand, recent revealed demand and mean distance, plus time features. They never use the actual remaining request count. The resulting summary is still not proved to be a sufficient Markov state.
+
+The accompanying baseline selects up to three training-day continuations conditional on observed demand and within-slot progress, then solves a scenario-capacity LP for each candidate afterstate. Current actions share the same predicted paths. These pathwise LP values relax integrality and know the sampled future, so the baseline is an optimistic two-stage heuristic. It is not allowed access to the actual evaluation suffix. Empirical-support misses and solver fallbacks are recorded. Development comparisons and their limitations are stored separately from the original experiment; independent confirmation, disturbance calibration, and a fuller novelty review remain required.
+
+\subsection{Development outcomes, not independent confirmation}
+The revised development run uses the 89 original training days and 33 validation days, with 200 sampled training episodes for each of five seeds (11, 22, 33, 44, 55). All three critics receive the same eight-dimensional observed context; their parameter counts and feature scales differ. Checkpoint selection and price/lookahead tuning use these validation days, so the following comparison is exploratory.
+\begin{table}[ht]
+\centering\caption{Development validation: mean simulated saving per day.}
+\begin{tabular}{lr}\toprule
+Policy & Saving/day\\\midrule
+Joint-scenario greedy &76.15\\
+Separable calendar TD &77.21\\
+Unrestricted MLP TD &78.19\\
+Resource price &80.88\\
+Resource-pattern TD &83.54\\
+Conditional training-path LP &84.13\\\bottomrule
+\end{tabular}
+\end{table}
+Resource-pattern TD improves over the selected price by 3.28\% but remains 0.70\% below the conditional LP. Its five seed means range from 82.47 to 85.06; the best seed is not substituted for the mean. All 693 stored policy-day evaluations, including alternative lookahead weights, pass the finite-scenario audit; they represent only 33 distinct demand days. The selected lookahead weight of 0.5 encounters four empirical count-support misses and no solver failures. These results motivate further investigation of interactions, but do not meet the intended superiority criterion or establish confirmed novelty. The source, checkpoints, daily outcomes and the earlier unsuccessful prototypes are retained separately. Newly acquired public single-drone measurements have not yet calibrated this model and cannot by themselves establish multi-aircraft disturbance dependence.
+
+\begin{thebibliography}{10}
 \bibitem{chen} X. Chen, M. W. Ulmer, B. W. Thomas (2022). Deep Q-learning for same-day delivery with vehicles and drones. \emph{European Journal of Operational Research}, 298(3), 939--952. \href{https://doi.org/10.1016/j.ejor.2021.06.021}{doi:10.1016/j.ejor.2021.06.021}.
 \bibitem{campuzano} G. Campuzano, E. Lalla-Ruiz, M. Mes (2022). The Dynamic Drone Scheduling Delivery Problem. \emph{Computational Logistics}, LNCS 13557, 260--274. \href{https://doi.org/10.1007/978-3-031-16579-5_18}{doi:10.1007/978-3-031-16579-5\_18}.
 \bibitem{hu} Y. Hu, Y. Du, S. Li (2025). Real-time coordination of human couriers and drones for on-demand food-delivery platforms: A multi-stage risk-aware multi-agent reinforcement learning framework. \emph{Transportation Research Part C}, 181, 105381. \href{https://doi.org/10.1016/j.trc.2025.105381}{doi:10.1016/j.trc.2025.105381}.
@@ -205,5 +264,8 @@ The repository contains the data downloader, input hash, transformation, simulat
 \bibitem{jiang} D. R. Jiang, W. B. Powell (2015). An Approximate Dynamic Programming Algorithm for Monotone Value Functions. \emph{Operations Research}, 63(6), 1489--1511. \href{https://doi.org/10.1287/opre.2015.1425}{doi:10.1287/opre.2015.1425}.
 \bibitem{asadi} A. Asadi, S. Nurre Pinkley (2021). A Monotone Approximate Dynamic Programming Approach for the Stochastic Scheduling, Allocation, and Inventory Replenishment Problem: Applications to Drone and Electric Vehicle Battery Swap Stations. \href{https://arxiv.org/abs/2105.07026}{arXiv:2105.07026}; related journal article \href{https://doi.org/10.1287/trsc.2021.1108}{doi:10.1287/trsc.2021.1108}.
 \bibitem{lade} L. Wu et al. (2023; revised 2025). LaDe: The First Comprehensive Last-mile Delivery Dataset from Industry. \href{https://arxiv.org/abs/2306.10675}{arXiv:2306.10675}. Official data: \url{https://huggingface.co/datasets/Cainiao-AI/LaDe}.
+\bibitem{chencharging} J. Chen (2019). Integrated Routing and Charging Scheduling for Autonomous Electric Aerial Vehicle System. \emph{Digital Avionics Systems Conference}. \href{https://doi.org/10.1109/DASC43569.2019.9081655}{doi:10.1109/DASC43569.2019.9081655}.
+\bibitem{ren} G. Ren, B. Shahzaad, B. Alkouz, A. Lakhdari, A. Bouguettaya (2025). Energy-Predictive Planning for Optimizing Drone Service Delivery. \href{https://arxiv.org/abs/2508.01671}{arXiv:2508.01671}.
+\bibitem{nasa} L. Spirkovska (2023). Vertiport Dynamic Density. NASA/TM--20230012622. \href{https://ntrs.nasa.gov/citations/20230012622}{NASA Technical Reports Server}.
 \end{thebibliography}
 \end{document}

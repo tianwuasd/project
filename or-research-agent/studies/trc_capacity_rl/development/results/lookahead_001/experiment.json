@@ -1,0 +1,968 @@
+{
+  "purpose": "exploratory_validation_tuning",
+  "identity": {
+    "config": {
+      "slots": 60,
+      "slot_minutes": 5,
+      "pad_capacity": 1,
+      "fleet_capacity": 4,
+      "charger_capacity": 2,
+      "charge_slots": 2,
+      "max_delay_slots": 3,
+      "max_distance_km": 6.0,
+      "drone_speed_km_min": 0.8,
+      "ground_speed_km_min": 0.35,
+      "road_factor": 1.35,
+      "reward_scale": 20.0,
+      "flight_multipliers": [
+        1.0,
+        1.5
+      ],
+      "charge_durations": [
+        2,
+        3
+      ],
+      "probabilities": [
+        0.7,
+        0.3
+      ]
+    },
+    "samples": 3,
+    "weights": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "scipy": "1.17.1",
+    "data_sha256": "f1c713c2ca921edd7b658adc11eaa3d6f9ab1ffd4fa0983ae14f0159d18a6715",
+    "source_sha256": {
+      "environment.py": "7fc8bc1889a4a3f5b5f0350d64995583c20daa0ce933cd39ba225e1d791e7d0f",
+      "evaluate_scenario_lookahead.py": "253ac6034960bbe41217e68167be6febc5e7892b7c49485f7adaa5d71a193d84",
+      "learning.py": "ce7b7182951ee290529b369201875d785da30a8b0df77122adb6d47dad054f70",
+      "pattern_value.py": "63cf0c42a7012b8167cb7a8c3ef861ca254ffee4e7382862725b5888b4e1c4cf",
+      "prepare_data.py": "204392dda4387cf0c656571e85c39dcaef4168c175fdc78720f03292930dc291",
+      "run_experiment.py": "e2e1981f44a9479d2570fa8c0b3daaf7fd444fc5011b764c47111f24785d1da3",
+      "run_scenario_development.py": "2feb77ada15c98d5ac706366cfb36930fd94b9aca3e0e326896db33852df7490",
+      "scenario_environment.py": "0277f01d3626042acde39351bd9926e126f6424b01835d8cebbb7849d81ce4b4",
+      "scenario_lookahead.py": "c448a1f1c8fb53f6bc4848ea6bb5d181d60a7bc7bb772825871ae1fd3044cfc5",
+      "summarize.py": "32ca27950d29239080457e64101406e8d2bb11bac1b3a197d5632d84502ce386"
+    }
+  },
+  "validation_summary": {
+    "0.25": 78.8746126028437,
+    "0.5": 80.82381065207616,
+    "1.0": 83.57382236629904
+  },
+  "rows": [
+    {
+      "day": "0819",
+      "weight": 0.25,
+      "reward": 93.76900859973262,
+      "air_orders": 10,
+      "feasible": true,
+      "mean_decision_ms": 1.2443464275704519,
+      "p95_decision_ms": 10.72447501064743
+    },
+    {
+      "day": "0820",
+      "weight": 0.25,
+      "reward": 84.1068205780254,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 2.138525557367959,
+      "p95_decision_ms": 15.328820000286209
+    },
+    {
+      "day": "0821",
+      "weight": 0.25,
+      "reward": 106.75109892951212,
+      "air_orders": 11,
+      "feasible": true,
+      "mean_decision_ms": 1.9274591393167935,
+      "p95_decision_ms": 17.203120002523033
+    },
+    {
+      "day": "0822",
+      "weight": 0.25,
+      "reward": 92.95827185757979,
+      "air_orders": 9,
+      "feasible": true,
+      "mean_decision_ms": 0.938652885312107,
+      "p95_decision_ms": 5.962209997232994
+    },
+    {
+      "day": "0823",
+      "weight": 0.25,
+      "reward": 95.30493172341819,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 0.8219815233884298,
+      "p95_decision_ms": 0.35009999992325913
+    },
+    {
+      "day": "0824",
+      "weight": 0.25,
+      "reward": 75.50656731697833,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 1.1428271726522918,
+      "p95_decision_ms": 10.316080020857058
+    },
+    {
+      "day": "0825",
+      "weight": 0.25,
+      "reward": 69.14684546701474,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 1.7703272789329678,
+      "p95_decision_ms": 14.913820009678608
+    },
+    {
+      "day": "0826",
+      "weight": 0.25,
+      "reward": 80.03452977239095,
+      "air_orders": 10,
+      "feasible": true,
+      "mean_decision_ms": 1.6672455556949393,
+      "p95_decision_ms": 10.78649503178894
+    },
+    {
+      "day": "0827",
+      "weight": 0.25,
+      "reward": 67.48154831269218,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 1.5864734069761286,
+      "p95_decision_ms": 13.361079987953401
+    },
+    {
+      "day": "0828",
+      "weight": 0.25,
+      "reward": 91.96032169593417,
+      "air_orders": 9,
+      "feasible": true,
+      "mean_decision_ms": 0.9323523345046512,
+      "p95_decision_ms": 6.790070008719308
+    },
+    {
+      "day": "0829",
+      "weight": 0.25,
+      "reward": 49.008464877300646,
+      "air_orders": 5,
+      "feasible": true,
+      "mean_decision_ms": 1.1250556880523535,
+      "p95_decision_ms": 12.631910000345636
+    },
+    {
+      "day": "0830",
+      "weight": 0.25,
+      "reward": 78.6207117267606,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 1.1031835219710246,
+      "p95_decision_ms": 8.83845001226291
+    },
+    {
+      "day": "0831",
+      "weight": 0.25,
+      "reward": 61.45670432153922,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 1.1050677100380806,
+      "p95_decision_ms": 9.055100003024563
+    },
+    {
+      "day": "0901",
+      "weight": 0.25,
+      "reward": 52.72387864017809,
+      "air_orders": 5,
+      "feasible": true,
+      "mean_decision_ms": 0.9507804536314188,
+      "p95_decision_ms": 6.67435998911972
+    },
+    {
+      "day": "0902",
+      "weight": 0.25,
+      "reward": 36.74200604323044,
+      "air_orders": 4,
+      "feasible": true,
+      "mean_decision_ms": 0.9788364868900562,
+      "p95_decision_ms": 3.653520013904141
+    },
+    {
+      "day": "0903",
+      "weight": 0.25,
+      "reward": 79.0671745241595,
+      "air_orders": 6,
+      "feasible": true,
+      "mean_decision_ms": 2.024186950976677,
+      "p95_decision_ms": 17.880775005323812
+    },
+    {
+      "day": "0904",
+      "weight": 0.25,
+      "reward": 68.4575335201085,
+      "air_orders": 6,
+      "feasible": true,
+      "mean_decision_ms": 1.8494799927187462,
+      "p95_decision_ms": 15.118544982396982
+    },
+    {
+      "day": "0905",
+      "weight": 0.25,
+      "reward": 99.53244660068707,
+      "air_orders": 9,
+      "feasible": true,
+      "mean_decision_ms": 2.290562067204958,
+      "p95_decision_ms": 17.548325005918738
+    },
+    {
+      "day": "0906",
+      "weight": 0.25,
+      "reward": 76.53406338807528,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 2.103859757459382,
+      "p95_decision_ms": 14.88618499424775
+    },
+    {
+      "day": "0907",
+      "weight": 0.25,
+      "reward": 54.4748363934461,
+      "air_orders": 6,
+      "feasible": true,
+      "mean_decision_ms": 0.9693484876841081,
+      "p95_decision_ms": 0.37300001713447273
+    },
+    {
+      "day": "0908",
+      "weight": 0.25,
+      "reward": 111.52743364900854,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 3.5016846187108266,
+      "p95_decision_ms": 22.12653500610029
+    },
+    {
+      "day": "0909",
+      "weight": 0.25,
+      "reward": 115.41634843249243,
+      "air_orders": 11,
+      "feasible": true,
+      "mean_decision_ms": 1.8646119057112152,
+      "p95_decision_ms": 13.87756995682139
+    },
+    {
+      "day": "0910",
+      "weight": 0.25,
+      "reward": 91.42161787734298,
+      "air_orders": 6,
+      "feasible": true,
+      "mean_decision_ms": 2.1294158641322856,
+      "p95_decision_ms": 18.203989998437446
+    },
+    {
+      "day": "0911",
+      "weight": 0.25,
+      "reward": 92.53807432320042,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 1.6027169005328816,
+      "p95_decision_ms": 15.842649998376146
+    },
+    {
+      "day": "0912",
+      "weight": 0.25,
+      "reward": 59.71370518785433,
+      "air_orders": 4,
+      "feasible": true,
+      "mean_decision_ms": 0.5720874954325458,
+      "p95_decision_ms": 2.872004994424077
+    },
+    {
+      "day": "0913",
+      "weight": 0.25,
+      "reward": 76.58785059394177,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 1.832376812092042,
+      "p95_decision_ms": 13.160699990112322
+    },
+    {
+      "day": "0914",
+      "weight": 0.25,
+      "reward": 65.29564890341373,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 1.566788893897966,
+      "p95_decision_ms": 15.641245010192508
+    },
+    {
+      "day": "0915",
+      "weight": 0.25,
+      "reward": 82.87946188783451,
+      "air_orders": 9,
+      "feasible": true,
+      "mean_decision_ms": 1.9601177426070095,
+      "p95_decision_ms": 15.761059991200451
+    },
+    {
+      "day": "0916",
+      "weight": 0.25,
+      "reward": 82.62584774403037,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 2.1979794161298365,
+      "p95_decision_ms": 16.41399001237005
+    },
+    {
+      "day": "0917",
+      "weight": 0.25,
+      "reward": 95.36992017740623,
+      "air_orders": 9,
+      "feasible": true,
+      "mean_decision_ms": 3.0070833334973894,
+      "p95_decision_ms": 18.15710497321557
+    },
+    {
+      "day": "0918",
+      "weight": 0.25,
+      "reward": 97.39729028875894,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 1.6617666687890296,
+      "p95_decision_ms": 11.994740029331295
+    },
+    {
+      "day": "0919",
+      "weight": 0.25,
+      "reward": 71.2963528653498,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 1.8080599996860005,
+      "p95_decision_ms": 17.124135009362362
+    },
+    {
+      "day": "0920",
+      "weight": 0.25,
+      "reward": 47.15489967444424,
+      "air_orders": 4,
+      "feasible": true,
+      "mean_decision_ms": 1.0308906266800477,
+      "p95_decision_ms": 8.470809977734405
+    },
+    {
+      "day": "0819",
+      "weight": 0.5,
+      "reward": 101.03510785660612,
+      "air_orders": 10,
+      "feasible": true,
+      "mean_decision_ms": 2.2206071451018077,
+      "p95_decision_ms": 12.10493498656433
+    },
+    {
+      "day": "0820",
+      "weight": 0.5,
+      "reward": 84.1068205780254,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 2.2808311119054756,
+      "p95_decision_ms": 15.85973501496482
+    },
+    {
+      "day": "0821",
+      "weight": 0.5,
+      "reward": 106.75109892951212,
+      "air_orders": 11,
+      "feasible": true,
+      "mean_decision_ms": 1.9596397835430839,
+      "p95_decision_ms": 17.8971600020304
+    },
+    {
+      "day": "0822",
+      "weight": 0.5,
+      "reward": 88.1661630547457,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 1.002228842900457,
+      "p95_decision_ms": 6.309529955615288
+    },
+    {
+      "day": "0823",
+      "weight": 0.5,
+      "reward": 99.37264995982979,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 0.9466869605998711,
+      "p95_decision_ms": 4.409495016443569
+    },
+    {
+      "day": "0824",
+      "weight": 0.5,
+      "reward": 75.50656731697833,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 1.067864130954663,
+      "p95_decision_ms": 10.020414993050522
+    },
+    {
+      "day": "0825",
+      "weight": 0.5,
+      "reward": 82.82730891259767,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 9.950619480457737,
+      "p95_decision_ms": 22.887859982438385
+    },
+    {
+      "day": "0826",
+      "weight": 0.5,
+      "reward": 80.07049568419234,
+      "air_orders": 9,
+      "feasible": true,
+      "mean_decision_ms": 1.8075166664655424,
+      "p95_decision_ms": 10.544269965612324
+    },
+    {
+      "day": "0827",
+      "weight": 0.5,
+      "reward": 83.46289426380608,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 3.2672659627736564,
+      "p95_decision_ms": 15.978465008083731
+    },
+    {
+      "day": "0828",
+      "weight": 0.5,
+      "reward": 91.96032169593417,
+      "air_orders": 9,
+      "feasible": true,
+      "mean_decision_ms": 0.9228756997264295,
+      "p95_decision_ms": 6.911480007693135
+    },
+    {
+      "day": "0829",
+      "weight": 0.5,
+      "reward": 44.97551321950997,
+      "air_orders": 4,
+      "feasible": true,
+      "mean_decision_ms": 5.326325001078658,
+      "p95_decision_ms": 21.417079991078932
+    },
+    {
+      "day": "0830",
+      "weight": 0.5,
+      "reward": 78.6207117267606,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 1.0617703287657554,
+      "p95_decision_ms": 8.441600017249584
+    },
+    {
+      "day": "0831",
+      "weight": 0.5,
+      "reward": 61.45670432153922,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 1.026004166609103,
+      "p95_decision_ms": 7.844599982490763
+    },
+    {
+      "day": "0901",
+      "weight": 0.5,
+      "reward": 54.74652858695155,
+      "air_orders": 5,
+      "feasible": true,
+      "mean_decision_ms": 2.1100425303260657,
+      "p95_decision_ms": 22.487310005817577
+    },
+    {
+      "day": "0902",
+      "weight": 0.5,
+      "reward": 36.74200604323044,
+      "air_orders": 4,
+      "feasible": true,
+      "mean_decision_ms": 1.9318918930366635,
+      "p95_decision_ms": 6.917119998251911
+    },
+    {
+      "day": "0903",
+      "weight": 0.5,
+      "reward": 79.0671745241595,
+      "air_orders": 6,
+      "feasible": true,
+      "mean_decision_ms": 4.115436952459909,
+      "p95_decision_ms": 35.6093750015134
+    },
+    {
+      "day": "0904",
+      "weight": 0.5,
+      "reward": 65.80445171070664,
+      "air_orders": 5,
+      "feasible": true,
+      "mean_decision_ms": 11.901809995955167,
+      "p95_decision_ms": 42.11276495771017
+    },
+    {
+      "day": "0905",
+      "weight": 0.5,
+      "reward": 96.3437011101965,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 6.018793107018452,
+      "p95_decision_ms": 32.75110499816946
+    },
+    {
+      "day": "0906",
+      "weight": 0.5,
+      "reward": 91.01722643677131,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 3.2550634123475812,
+      "p95_decision_ms": 34.68173000146637
+    },
+    {
+      "day": "0907",
+      "weight": 0.5,
+      "reward": 54.4748363934461,
+      "air_orders": 6,
+      "feasible": true,
+      "mean_decision_ms": 1.9624560593387508,
+      "p95_decision_ms": 1.081799971871078
+    },
+    {
+      "day": "0908",
+      "weight": 0.5,
+      "reward": 118.9209338135844,
+      "air_orders": 9,
+      "feasible": true,
+      "mean_decision_ms": 6.7025673063024165,
+      "p95_decision_ms": 41.416434996062854
+    },
+    {
+      "day": "0909",
+      "weight": 0.5,
+      "reward": 115.41634843249243,
+      "air_orders": 11,
+      "feasible": true,
+      "mean_decision_ms": 3.872958332760304,
+      "p95_decision_ms": 28.93418501189444
+    },
+    {
+      "day": "0910",
+      "weight": 0.5,
+      "reward": 91.42161787734298,
+      "air_orders": 6,
+      "feasible": true,
+      "mean_decision_ms": 4.392374599803357,
+      "p95_decision_ms": 39.2189200094435
+    },
+    {
+      "day": "0911",
+      "weight": 0.5,
+      "reward": 94.46316759830486,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 5.474454929074929,
+      "p95_decision_ms": 40.855350001947954
+    },
+    {
+      "day": "0912",
+      "weight": 0.5,
+      "reward": 59.71370518785433,
+      "air_orders": 4,
+      "feasible": true,
+      "mean_decision_ms": 1.18002638838435,
+      "p95_decision_ms": 5.6817649980076
+    },
+    {
+      "day": "0913",
+      "weight": 0.5,
+      "reward": 76.58785059394177,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 3.941366662426541,
+      "p95_decision_ms": 28.97990000201386
+    },
+    {
+      "day": "0914",
+      "weight": 0.5,
+      "reward": 67.20866983985476,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 4.192249996574699,
+      "p95_decision_ms": 32.93663497897797
+    },
+    {
+      "day": "0915",
+      "weight": 0.5,
+      "reward": 94.76849146402756,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 3.970183872414993,
+      "p95_decision_ms": 30.177945006289516
+    },
+    {
+      "day": "0916",
+      "weight": 0.5,
+      "reward": 79.52833249258218,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 6.137795587967369,
+      "p95_decision_ms": 32.98073999758344
+    },
+    {
+      "day": "0917",
+      "weight": 0.5,
+      "reward": 95.36992017740623,
+      "air_orders": 9,
+      "feasible": true,
+      "mean_decision_ms": 5.619669230863786,
+      "p95_decision_ms": 27.346254978328925
+    },
+    {
+      "day": "0918",
+      "weight": 0.5,
+      "reward": 97.39729028875894,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 3.030490476660253,
+      "p95_decision_ms": 22.861670010024675
+    },
+    {
+      "day": "0919",
+      "weight": 0.5,
+      "reward": 72.72624175241945,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 4.189891426358372,
+      "p95_decision_ms": 36.65227502351626
+    },
+    {
+      "day": "0920",
+      "weight": 0.5,
+      "reward": 47.15489967444424,
+      "air_orders": 4,
+      "feasible": true,
+      "mean_decision_ms": 2.1349203188947286,
+      "p95_decision_ms": 16.887399987899585
+    },
+    {
+      "day": "0819",
+      "weight": 1.0,
+      "reward": 102.90481130530219,
+      "air_orders": 9,
+      "feasible": true,
+      "mean_decision_ms": 4.850277381982388,
+      "p95_decision_ms": 28.46349999890659
+    },
+    {
+      "day": "0820",
+      "weight": 1.0,
+      "reward": 78.05552479606536,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 21.473806667038136,
+      "p95_decision_ms": 41.9754699774785
+    },
+    {
+      "day": "0821",
+      "weight": 1.0,
+      "reward": 114.41287842812491,
+      "air_orders": 11,
+      "feasible": true,
+      "mean_decision_ms": 5.965893547381124,
+      "p95_decision_ms": 46.276900009252124
+    },
+    {
+      "day": "0822",
+      "weight": 1.0,
+      "reward": 85.05337339136368,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 18.023715381926966,
+      "p95_decision_ms": 47.503925024648154
+    },
+    {
+      "day": "0823",
+      "weight": 1.0,
+      "reward": 92.3806723744711,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 6.367990217530979,
+      "p95_decision_ms": 40.01428501796909
+    },
+    {
+      "day": "0824",
+      "weight": 1.0,
+      "reward": 79.05733745533367,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 3.2671695662429556,
+      "p95_decision_ms": 30.226899991976104
+    },
+    {
+      "day": "0825",
+      "weight": 1.0,
+      "reward": 82.82730891259767,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 20.223715585239184,
+      "p95_decision_ms": 43.90831998316571
+    },
+    {
+      "day": "0826",
+      "weight": 1.0,
+      "reward": 93.76269159574363,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 14.281248889811751,
+      "p95_decision_ms": 85.15323000610805
+    },
+    {
+      "day": "0827",
+      "weight": 1.0,
+      "reward": 107.82667163207597,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 9.418957442555458,
+      "p95_decision_ms": 40.144780004629865
+    },
+    {
+      "day": "0828",
+      "weight": 1.0,
+      "reward": 91.96032169593417,
+      "air_orders": 9,
+      "feasible": true,
+      "mean_decision_ms": 1.9078710297052965,
+      "p95_decision_ms": 14.027390000410312
+    },
+    {
+      "day": "0829",
+      "weight": 1.0,
+      "reward": 38.937205556614,
+      "air_orders": 3,
+      "feasible": true,
+      "mean_decision_ms": 13.039654545454225,
+      "p95_decision_ms": 45.493260002695024
+    },
+    {
+      "day": "0830",
+      "weight": 1.0,
+      "reward": 85.50473855070787,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 8.151304395741445,
+      "p95_decision_ms": 44.6595499815885
+    },
+    {
+      "day": "0831",
+      "weight": 1.0,
+      "reward": 63.18007701218902,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 7.320420832911623,
+      "p95_decision_ms": 39.99915001622867
+    },
+    {
+      "day": "0901",
+      "weight": 1.0,
+      "reward": 54.09385857971923,
+      "air_orders": 5,
+      "feasible": true,
+      "mean_decision_ms": 5.506485056977762,
+      "p95_decision_ms": 42.65691000036895
+    },
+    {
+      "day": "0902",
+      "weight": 1.0,
+      "reward": 31.76910911532694,
+      "air_orders": 3,
+      "feasible": true,
+      "mean_decision_ms": 7.2311000037950945,
+      "p95_decision_ms": 40.15754998836201
+    },
+    {
+      "day": "0903",
+      "weight": 1.0,
+      "reward": 79.0671745241595,
+      "air_orders": 6,
+      "feasible": true,
+      "mean_decision_ms": 4.274286959907445,
+      "p95_decision_ms": 36.661000005551614
+    },
+    {
+      "day": "0904",
+      "weight": 1.0,
+      "reward": 65.80445171070664,
+      "air_orders": 5,
+      "feasible": true,
+      "mean_decision_ms": 11.959155006722236,
+      "p95_decision_ms": 41.6565599880414
+    },
+    {
+      "day": "0905",
+      "weight": 1.0,
+      "reward": 91.2319990744609,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 11.553125860418417,
+      "p95_decision_ms": 38.138180016539984
+    },
+    {
+      "day": "0906",
+      "weight": 1.0,
+      "reward": 105.60666212839851,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 7.840086586727965,
+      "p95_decision_ms": 40.8371349592926
+    },
+    {
+      "day": "0907",
+      "weight": 1.0,
+      "reward": 54.4748363934461,
+      "air_orders": 6,
+      "feasible": true,
+      "mean_decision_ms": 1.839099996934899,
+      "p95_decision_ms": 0.9294750052504241
+    },
+    {
+      "day": "0908",
+      "weight": 1.0,
+      "reward": 126.12090603089861,
+      "air_orders": 9,
+      "feasible": true,
+      "mean_decision_ms": 8.036263458332261,
+      "p95_decision_ms": 42.846684998949044
+    },
+    {
+      "day": "0909",
+      "weight": 1.0,
+      "reward": 106.62222495779649,
+      "air_orders": 10,
+      "feasible": true,
+      "mean_decision_ms": 4.061638097655738,
+      "p95_decision_ms": 38.39896997669712
+    },
+    {
+      "day": "0910",
+      "weight": 1.0,
+      "reward": 91.42161787734298,
+      "air_orders": 6,
+      "feasible": true,
+      "mean_decision_ms": 4.374325393684327,
+      "p95_decision_ms": 37.8912599815521
+    },
+    {
+      "day": "0911",
+      "weight": 1.0,
+      "reward": 125.0256202072334,
+      "air_orders": 9,
+      "feasible": true,
+      "mean_decision_ms": 8.327445068599944,
+      "p95_decision_ms": 40.040349995251745
+    },
+    {
+      "day": "0912",
+      "weight": 1.0,
+      "reward": 59.71370518785433,
+      "air_orders": 4,
+      "feasible": true,
+      "mean_decision_ms": 1.2338055514394202,
+      "p95_decision_ms": 5.925469985231793
+    },
+    {
+      "day": "0913",
+      "weight": 1.0,
+      "reward": 76.58785059394177,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 3.867563767108958,
+      "p95_decision_ms": 28.434000001288904
+    },
+    {
+      "day": "0914",
+      "weight": 1.0,
+      "reward": 77.88551333554757,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 6.545137501638641,
+      "p95_decision_ms": 35.733110012370176
+    },
+    {
+      "day": "0915",
+      "weight": 1.0,
+      "reward": 92.77937688012086,
+      "air_orders": 8,
+      "feasible": true,
+      "mean_decision_ms": 8.745411287940618,
+      "p95_decision_ms": 43.75342501443811
+    },
+    {
+      "day": "0916",
+      "weight": 1.0,
+      "reward": 82.61850203596117,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 8.794701473294374,
+      "p95_decision_ms": 35.674124967772514
+    },
+    {
+      "day": "0917",
+      "weight": 1.0,
+      "reward": 95.36992017740623,
+      "air_orders": 9,
+      "feasible": true,
+      "mean_decision_ms": 5.699400001247294,
+      "p95_decision_ms": 29.644334991462493
+    },
+    {
+      "day": "0918",
+      "weight": 1.0,
+      "reward": 97.67130375124056,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 3.309841270536362,
+      "p95_decision_ms": 22.802539967233308
+    },
+    {
+      "day": "0919",
+      "weight": 1.0,
+      "reward": 81.05299314533933,
+      "air_orders": 7,
+      "feasible": true,
+      "mean_decision_ms": 12.5404771409064,
+      "p95_decision_ms": 38.33729498437606
+    },
+    {
+      "day": "0920",
+      "weight": 1.0,
+      "reward": 47.15489967444424,
+      "air_orders": 4,
+      "feasible": true,
+      "mean_decision_ms": 2.083712500279944,
+      "p95_decision_ms": 16.202969982987163
+    }
+  ],
+  "counters": [
+    {
+      "weight": 0.25,
+      "solves": 1751,
+      "fallbacks": 0
+    },
+    {
+      "weight": 0.5,
+      "solves": 2398,
+      "fallbacks": 0
+    },
+    {
+      "weight": 1.0,
+      "solves": 3903,
+      "fallbacks": 0
+    }
+  ],
+  "elapsed_seconds": 35.276900199998636,
+  "limitations": "Training-path two-stage LP relaxation, not a nonanticipative implementable future policy; excludes unrevealed same-slot requests."
+}

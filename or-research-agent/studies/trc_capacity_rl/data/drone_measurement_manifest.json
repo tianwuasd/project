@@ -1,0 +1,31 @@
+{
+  "dataset": "Data Collected with Package Delivery Quadcopter Drone",
+  "doi": "10.1184/R1/12683453.v1",
+  "license": "CC BY 4.0",
+  "metadata_url": "https://api.figshare.com/v2/articles/12683453",
+  "retrieved": "2026-10-04",
+  "files": [
+    {
+      "name": "parameters.csv",
+      "source_url": "https://ndownloader.figshare.com/files/26385034",
+      "bytes": 7867,
+      "source_md5": "7daa897a1af7847b592ccb7a459477ee",
+      "sha256": "568dffaed11a4d335ef4f8a932b342c836907af2f4aa54da9b4a0e2ffef2108a"
+    },
+    {
+      "name": "README.txt",
+      "source_url": "https://ndownloader.figshare.com/files/26405786",
+      "bytes": 25101,
+      "source_md5": "af6afbb550286df945c9ecaf4c5f72a4",
+      "sha256": "8601dd211d6c297c5411992dc34923bdb98b72cdc287517ed18e479f0e9540fd"
+    },
+    {
+      "name": "flights.zip",
+      "source_url": "https://ndownloader.figshare.com/files/26385070",
+      "bytes": 41274360,
+      "source_md5": "cd1d267fd9b025219f9633b95158eea2",
+      "sha256": "98f65a1ab54a8b618c169fdf49311a53ff1fefed86fdc3f440d6a0166ce49fb1"
+    }
+  ],
+  "archive_members": 210
+}

@@ -1,0 +1,48 @@
+{
+  "config": {
+    "slots": 60,
+    "slot_minutes": 5,
+    "pad_capacity": 1,
+    "fleet_capacity": 4,
+    "charger_capacity": 2,
+    "charge_slots": 2,
+    "max_delay_slots": 3,
+    "max_distance_km": 6.0,
+    "drone_speed_km_min": 0.8,
+    "ground_speed_km_min": 0.35,
+    "road_factor": 1.35,
+    "reward_scale": 20.0,
+    "flight_multipliers": [
+      1.0,
+      1.5
+    ],
+    "charge_durations": [
+      2,
+      3
+    ],
+    "probabilities": [
+      0.7,
+      0.3
+    ]
+  },
+  "samples": 3,
+  "weights": [
+    0.25,
+    0.5,
+    1.0
+  ],
+  "scipy": "1.17.1",
+  "data_sha256": "f1c713c2ca921edd7b658adc11eaa3d6f9ab1ffd4fa0983ae14f0159d18a6715",
+  "source_sha256": {
+    "environment.py": "7fc8bc1889a4a3f5b5f0350d64995583c20daa0ce933cd39ba225e1d791e7d0f",
+    "evaluate_scenario_lookahead.py": "49121b44d47ac9b52af34acbefaeee1b6426274439470cfe08614056d2c6462e",
+    "learning.py": "ce7b7182951ee290529b369201875d785da30a8b0df77122adb6d47dad054f70",
+    "pattern_value.py": "2760cba5cac7f5af88375cddde49cd4ccdf9dada8c255a8467d67859bf3f089f",
+    "prepare_data.py": "204392dda4387cf0c656571e85c39dcaef4168c175fdc78720f03292930dc291",
+    "run_experiment.py": "e2e1981f44a9479d2570fa8c0b3daaf7fd444fc5011b764c47111f24785d1da3",
+    "run_scenario_development.py": "1f8ae06f5bf13774a402fed4840e821746ecaff6aa1a41d843185e5b232572b1",
+    "scenario_environment.py": "5ca1fc41cf0366786839602879c68f93604f71dac3873b879fec65b9ad558266",
+    "scenario_lookahead.py": "6a9ecaefd9b616f3d0373ab75e15196e2959c857c57fff7442ff5636a3d20c74",
+    "summarize.py": "32ca27950d29239080457e64101406e8d2bb11bac1b3a197d5632d84502ce386"
+  }
+}
