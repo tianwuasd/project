@@ -1,0 +1,84 @@
+# Illustrative research rules. NOT the authors' unpublished decision tree.
+# Null thresholds deliberately prevent unjustified decisions.
+name: independent_candidate_rules_v1
+thresholds:
+  ao_override_fraction: null
+  raa_right_offset_mm: null
+exclusive_groups:
+  - [VSD, SV]
+  - [ASD, SA]
+  - [ToF, DORV, TGA, TAC, PuA]
+  - [IAA, AAH, CoA]
+rules:
+  VSD:
+    all:
+      - {feature: conn_LV_RV, op: eq, value: true}
+      - {feature: single_ventricle_confirmed, op: eq, value: false}
+  SV:
+    all:
+      - {feature: single_ventricle_confirmed, op: eq, value: true}
+  ASD:
+    all:
+      - {feature: conn_LA_RA, op: eq, value: true}
+      - {feature: single_atrium_confirmed, op: eq, value: false}
+  SA:
+    all:
+      - {feature: single_atrium_confirmed, op: eq, value: true}
+  ToF:
+    all:
+      - {feature: conn_LV_RV, op: eq, value: true}
+      - {feature: ao_override_fraction, op: gt, threshold: ao_override_fraction}
+      - {feature: stenosis_PA_trunk, op: eq, value: true}
+  DORV:
+    all:
+      - {feature: conn_RV_AO, op: eq, value: true}
+      - {feature: conn_RV_PA, op: eq, value: true}
+      - {feature: ao_override_fraction, op: gt, threshold: ao_override_fraction}
+  TGA:
+    all:
+      - {feature: conn_RV_AO, op: eq, value: true}
+      - {feature: conn_LV_PA, op: eq, value: true}
+      - {feature: conn_LV_AO, op: eq, value: false}
+      - {feature: conn_RV_PA, op: eq, value: false}
+  TAC:
+    all:
+      - {feature: common_arterial_trunk_confirmed, op: eq, value: true}
+  PuA:
+    all:
+      - {feature: pa_atresia_confirmed, op: eq, value: true}
+  IAA:
+    all:
+      - {feature: n_island_AO, op: gt, value: 1}
+  AAH:
+    all:
+      - {feature: n_island_AO, op: eq, value: 1}
+      - {feature: stenosis_AO_arch, op: eq, value: true}
+  CoA:
+    all:
+      - {feature: n_island_AO, op: eq, value: 1}
+      - {feature: stenosis_descending_AO, op: eq, value: true}
+  RAA:
+    all:
+      - {feature: posi_AO_to_spine_arch, op: gt, threshold: raa_right_offset_mm}
+      - {feature: posi_AO_to_spine_middle, op: gt, threshold: raa_right_offset_mm}
+      - {feature: posi_AO_to_spine_low, op: gt, threshold: raa_right_offset_mm}
+  APVC:
+    any:
+      - {feature: conn_PV_RA, op: eq, value: true}
+      - {feature: conn_PV_SVC, op: eq, value: true}
+      - {feature: conn_PV_IVC, op: eq, value: true}
+  PS:
+    any:
+      - {feature: stenosis_PA_trunk, op: eq, value: true}
+      - {feature: stenosis_PA_valve_upper, op: eq, value: true}
+      - {feature: stenosis_PA_valve, op: eq, value: true}
+      - {feature: stenosis_PA_valve_down, op: eq, value: true}
+  DSVC:
+    all:
+      - {feature: n_island_SVC, op: ge, value: 2}
+      - any:
+          - {feature: n_island_SVC_to_RA, op: ge, value: 1}
+          - {feature: n_island_SVC_to_LA, op: ge, value: 1}
+  PDA:
+    all:
+      - {feature: conn_ao_pa, op: eq, value: true}
