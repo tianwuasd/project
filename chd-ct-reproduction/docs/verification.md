@@ -2,6 +2,17 @@
 
 本记录区分软件验证与论文结果复现。
 
+## 一键启动增量验证
+
+2026-10-07 新增 `start.bat` / `start.py`、数据选择、环境探测、完整数据校验和小样本试跑。
+
+* 完整测试：`python -m pytest -q --basetemp runs/wizard-all-tests`，**25 passed**。
+* 新测试覆盖中文及空格路径、目录/CSV 选择、多清单拒绝猜测、患者划分、原数据不变、副本 spacing、缺初始标签的 partial/退出码 2、缺依赖失败报告、check 模式不训练、拒绝覆盖已有输出。
+* 使用子进程实际完成“选择数据目录 → 环境检查 → 合成完整试跑 → 所选数据完整试跑”；测试输入是合成几何体，不是患者影像。
+* Windows 实际运行 `start.bat --demo --mode check --non-interactive --output runs/batch-launch-check` 成功。
+* 独立审查用 `python -B -S start.py --help` 验证没有科学依赖仍可进入启动器；未发现阻止交付的重要问题。
+* 未打开系统文件选择对话框进行人工 UI 操作，也未运行 CUDA 或真实临床数据测试；这些范围不列为已验证。
+
 ## 已运行
 
 * Windows，Python 3.14.3，PyTorch 2.10.0+cpu；CUDA 不可用。其他直接依赖见 `requirements-tested.txt`。

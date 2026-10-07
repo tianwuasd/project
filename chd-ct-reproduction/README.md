@@ -5,6 +5,21 @@
 
 **当前交付是可训练、可推理、可测试的研究实现，不是作者官方代码，也没有复现论文的临床准确率。** 未提供训练好的临床权重；缺少完整原始队列、作者决策规则和阈值。本仓库的诊断结果仅为算法研究候选，不用于患者诊疗。
 
+## 最简单的启动方式
+
+**Windows 直接双击根目录的 `start.bat`**，按中文提示选择：
+
+1. 没有准备好数据：直接回车，先跑合成演示。
+2. 已有数据：选择包含 `manifest.csv` 的数据文件夹，或直接选择 CSV 清单；也可以粘贴路径。
+3. 脚本自动检查 Python、依赖版本、CPU 运算、CUDA 实际运算和磁盘空间，再校验影像、标签、患者划分。
+4. 先跑合成数据完整测试，再用所选数据最多 4 个病例的缩小副本测试训练和推理。
+
+每次结果保存在 `runs/quickstart/时间戳/`，打开其中 **`report.txt`** 查看是否通过；详细过程见 `run.log`，机器可读结果见 `report.json`。不会改动源数据或覆盖旧实验。缺依赖时给出对应解释和修复命令；不自动安装软件，也不会自动开始正式长时间训练。
+
+自己的数据仍需符合 [数据规范](docs/data-guide.md)。初始血管标签缺失时只测试可用的基础环节，报告为“部分通过”。**任意原始影像文件夹不等于可训练数据集**，必须有患者划分、正确编号的标签与清单。
+
+详细步骤和常见问题见 [一键启动说明](docs/quickstart.md)。Linux/macOS 运行 `python start.py` 使用相同菜单。
+
 ## 实现范围
 
 - 六个 3D U-Net 任务：两路 ROI、两路全心和两路初始血管；instance normalization、空间概率门控、加权 Dice + CE。
@@ -20,6 +35,7 @@
 
 ```text
 chd-ct-reproduction/
+├── start.bat / start.py     # 双击启动 / 跨平台中文引导
 ├── configs/                 # paper、CPU smoke 和候选规则
 ├── src/chd_ct/
 │   ├── data.py              # NIfTI、manifest、ROI、标签
@@ -28,6 +44,7 @@ chd-ct-reproduction/
 │   ├── inference/           # 多模型推理、融合、区域扩张
 │   ├── features/            # 解剖特征、中心线图
 │   ├── diagnosis/           # 可解释三值规则
+│   ├── quickstart/          # 环境检查、选择数据、小样本测试、报告
 │   ├── evaluation.py        # 分割与多标签评估
 │   ├── synthetic.py         # 仅用于软件测试的几何体
 │   └── cli.py               # 统一命令入口
