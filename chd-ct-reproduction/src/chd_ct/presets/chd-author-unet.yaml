@@ -1,5 +1,5 @@
-# Author-source backbone; CHD widths are scaled; anatomy gate enabled by default.
-profile: chd
+# Author backbone widths/depths; CHD labels, grid adapter, training and anatomy gate remain adaptations.
+profile: author-unet
 seed: 42
 threads: 2
 roi_margin: 3
@@ -9,42 +9,42 @@ weight_decay: 0.0
 stages:
   crop64:
     size: 64
-    base: 16
+    base: 32
     epochs: 15
     batch: 1
     levels: 4
     spatial_gate: true
   crop128:
     size: 128
-    base: 16
+    base: 32
     epochs: 15
     batch: 1
     levels: 4
     spatial_gate: true
   all64:
     size: 64
-    base: 16
+    base: 32
     epochs: 15
     batch: 1
     levels: 4
     spatial_gate: true
   all128:
     size: 128
-    base: 16
+    base: 32
     epochs: 15
     batch: 1
     levels: 4
     spatial_gate: true
   blood2d:
     size: 256
-    base: 8
+    base: 64
     epochs: 12
     batch: 1
     levels: 5
     spatial_gate: false
   blood_lstm:
     size: 256
-    base: 8
+    base: 64
     epochs: 3
     batch: 1
     layers: 2

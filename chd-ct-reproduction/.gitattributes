@@ -1,1 +1,4 @@
 *.sh text eol=lf
+
+# Preserve downloaded author sources and their recorded hashes byte-for-byte.
+src/chd_ct/models/reference/* -text -whitespace

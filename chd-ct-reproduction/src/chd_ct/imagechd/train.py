@@ -10,6 +10,8 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
+from ..models.grid import GRID_ADAPTER
+from ..models.unet import ARCHITECTURE
 from ..paths import config_path
 from .augment import augment_batch
 from .common import LABELS, MODEL_FORMAT, NORMALIZATION, load_case, read_prepared, write_json
@@ -104,6 +106,8 @@ def train_stage(directory, rows, stage, config, output, mode, manifest_hash):
             best = losses["val"]
             record = {
                 "format": MODEL_FORMAT,
+                "architecture": ARCHITECTURE,
+                "grid_adapter": GRID_ADAPTER,
                 "stage": stage,
                 "labels": list(LABELS),
                 "normalization": NORMALIZATION,
@@ -131,8 +135,8 @@ def train(prepared, output, config_path, mode="smoke", device="cpu"):
     directory, data = read_prepared(prepared)
     config = load_config(config_path)
     rows = training_rows(data)
-    if config.get("profile") == "paper-scale" and device == "cpu" and mode not in {"check", "smoke"}:
-        raise ValueError("paper-scale 需要 GPU 预检；CPU 仅支持 check/smoke")
+    if config.get("profile") == "author-unet" and device == "cpu" and mode not in {"check", "smoke"}:
+        raise ValueError("author-unet 需要 GPU 预检；CPU 仅支持 check/smoke")
     if mode not in {"check", "smoke", "preflight", "train"}:
         raise ValueError("未知训练模式")
     if mode == "train" and (data.get("limit") is not None or config.get("profile") == "smoke"):
@@ -153,6 +157,8 @@ def train(prepared, output, config_path, mode="smoke", device="cpu"):
     collection = {
         "status": "running",
         "format": MODEL_FORMAT,
+        "architecture": ARCHITECTURE,
+        "grid_adapter": GRID_ADAPTER,
         "labels": list(LABELS),
         "normalization": NORMALIZATION,
         "mode": mode,

@@ -5,6 +5,8 @@ from pathlib import Path
 
 import torch
 
+from ..models.grid import GRID_ADAPTER
+from ..models.unet import ARCHITECTURE
 from .common import LABELS, MODEL_FORMAT, NORMALIZATION, safe_child
 from .config import STAGES, build_model
 from .train import file_hash
@@ -17,6 +19,10 @@ def read_collection(directory, allow_smoke=False):
             raise ValueError("需要完整模型目录或 models.json；旧 best.pt 位于 back 流程")
         directory = directory.parent
     record = json.loads((directory / "models.json").read_text(encoding="utf-8"))
+    if record.get("format") != MODEL_FORMAT:
+        raise ValueError("旧版或不支持的模型结构；官方主干需要重新训练，现有预处理缓存可复用")
+    if record.get("architecture") != ARCHITECTURE or record.get("grid_adapter") != GRID_ADAPTER:
+        raise ValueError("模型主干/网格适配版本不匹配，需要重新训练")
     if (
         record.get("status") != "complete"
         or record.get("format") != MODEL_FORMAT
@@ -36,7 +42,16 @@ def read_collection(directory, allow_smoke=False):
         if (
             any(
                 checkpoint.get(key) != record.get(key)
-                for key in ("format", "labels", "normalization", "config", "mode", "prepared_sha256")
+                for key in (
+                    "format",
+                    "architecture",
+                    "grid_adapter",
+                    "labels",
+                    "normalization",
+                    "config",
+                    "mode",
+                    "prepared_sha256",
+                )
             )
             or checkpoint.get("stage") != stage
             or checkpoint.get("spec") != record["config"]["stages"][stage]

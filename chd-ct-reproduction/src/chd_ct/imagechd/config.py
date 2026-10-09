@@ -4,7 +4,8 @@ from pathlib import Path
 
 import yaml
 
-from ..models import BiConvLSTM, UNet
+from ..models import BiConvLSTM, GridUNet
+from ..models.unet import ARCHITECTURE
 
 STAGES = ("crop64", "crop128", "all64", "all128", "blood2d", "blood_lstm")
 UNAVAILABLE = {
@@ -17,6 +18,8 @@ def load_config(path):
     config = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     if not isinstance(config, dict) or set(config.get("stages", {})) != set(STAGES):
         raise ValueError("配置必须包含全部六个 CHD 阶段")
+    if config.get("architecture") != ARCHITECTURE:
+        raise ValueError("旧配置或主干 architecture 不匹配；请使用当前 configs/chd.yaml")
     config["stages"] = {stage: config["stages"][stage] for stage in STAGES}
     if (
         config.get("learning_rate", 0) <= 0
@@ -31,6 +34,10 @@ def load_config(path):
     ):
         raise ValueError("seed/threads 无效")
     for stage, spec in config["stages"].items():
+        if stage != "blood_lstm":
+            spec.setdefault("spatial_gate", not stage.startswith("blood"))
+            if not isinstance(spec["spatial_gate"], bool):
+                raise ValueError("spatial_gate 必须是 YAML 布尔值 true/false")
         for key in ("size", "base", "epochs", "batch"):
             if not isinstance(spec.get(key), int) or spec[key] < 1:
                 raise ValueError(f"{stage}: {key} 需为正整数")
@@ -44,9 +51,9 @@ def load_config(path):
         elif (
             not isinstance(spec.get("levels"), int)
             or spec["levels"] < 2
-            or spec["size"] < 2 ** spec["levels"]
+            or spec["levels"] > (5 if stage == "blood2d" else 4)
         ):
-            raise ValueError("尺寸无法支持网络深度")
+            raise ValueError("网络深度需在 2 到官方层数之间；大于官方深度不是本配置支持的结构")
     return config
 
 
@@ -55,12 +62,12 @@ def build_model(stage, spec):
         raise ValueError("未知阶段")
     if stage == "blood_lstm":
         return BiConvLSTM(spec["base"], spec["layers"], 3)
-    return UNet(
+    return GridUNet(
         2 if stage == "blood2d" else 3,
         3 if stage == "blood2d" else 8,
         spec["base"],
         spec["levels"],
-        spatial_gate=not stage.startswith("blood"),
+        spatial_gate=spec.get("spatial_gate", not stage.startswith("blood")),
     )
 
 

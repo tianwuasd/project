@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 
 FORMAT = "imagechd7-v2"
-MODEL_FORMAT = "imagechd7-multistage-v1"
+MODEL_FORMAT = "imagechd7-author-unet-v2"
 LABELS = ("BG", "LV", "RV", "LA", "RA", "MYO", "AO", "PA")
 IGNORE = 255
 NORMALIZATION = {"kind": "per_image_percentile", "low": 1, "high": 99}

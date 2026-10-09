@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If this independent reproduction is useful, cite the original paper. This software is not the authors' implementation."
 title: "CHD CT independent research reproduction"
 type: software
-version: 0.1.0
+version: 0.3.0
 authors:
   - name: "tianwuasd"
 preferred-citation:
@@ -41,3 +41,31 @@ preferred-citation:
   volume: "90"
   year: 2023
   doi: 10.1016/j.media.2023.102953
+
+references:
+  - type: conference-paper
+    title: "U-Net: Convolutional Networks for Biomedical Image Segmentation"
+    authors:
+      - family-names: Ronneberger
+        given-names: Olaf
+      - family-names: Fischer
+        given-names: Philipp
+      - family-names: Brox
+        given-names: Thomas
+    year: 2015
+    url: "https://lmb.informatik.uni-freiburg.de/people/ronneber/u-net/"
+  - type: conference-paper
+    title: "3D U-Net: Learning Dense Volumetric Segmentation from Sparse Annotation"
+    authors:
+      - family-names: Çiçek
+        given-names: Özgün
+      - family-names: Abdulkadir
+        given-names: Ahmed
+      - family-names: Lienkamp
+        given-names: S. Soeren
+      - family-names: Brox
+        given-names: Thomas
+      - family-names: Ronneberger
+        given-names: Olaf
+    year: 2016
+    url: "https://lmb.informatik.uni-freiburg.de/lmbsoft/unet.en.html"

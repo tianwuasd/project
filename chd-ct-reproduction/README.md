@@ -1,8 +1,10 @@
 # ImageCHD：心脏 CT 多阶段分割复现
 
-主目录现在只有一条默认流程：**预处理 → 六阶段训练 → 融合预测 → 独立评估**。数据使用当前 archive 中的 ImageCHD，复用此前实现的 U-Net、BiConvLSTM、心脏区域定位、多尺度投票与血池边界细化方法。
+主目录现在只有一条默认流程：**预处理 → 六阶段训练 → 融合预测 → 独立评估**。数据使用当前 archive 中的 ImageCHD，U-Net 主干按原作者发布的 Caffe 网络定义移植，保留独立可关闭的 gate，并沿用 BiConvLSTM、心脏区域定位、多尺度投票与血池边界细化方法。
 
 这是原论文方法在现有七结构数据上的适配。当前没有初始血管标注、PV/SVC/IVC 标注与经验证的诊断规则，因此不运行两个 init 阶段，不输出疾病诊断，也不宣称复现了论文临床准确率。
+
+**U-Net 来源与开关：** 见 [官方来源与移植说明](docs/unet-source.md)。三维 gate 默认开启。旧权重需要重新训练，预处理缓存可复用。
 
 ## 从哪里开始
 
@@ -55,11 +57,11 @@ chd-ct-reproduction/
 ├── configs/
 │   ├── chd.yaml                  # 实用单卡配置
 │   ├── chd-smoke.yaml            # 16³ 软件短测
-│   ├── chd-paper-scale.yaml      # 旧论文规模的六个可用阶段
+│   ├── chd-author-unet.yaml      # 原作者主干宽度/深度，三维 gate 默认开启
 │   └── servers/zmic44.json       # 路径、环境、线程
 ├── src/chd_ct/
 │   ├── imagechd/                 # 数据、六阶段训练、融合预测、评估
-│   ├── models/                   # 复用 U-Net / BiConvLSTM
+│   ├── models/                   # 原作者结构主干 / 网格适配 / gate / BiConvLSTM
 │   ├── quickstart/               # 桌面引导与环境检查
 │   └── server/                   # 环境安装、GPU检查、任务派发
 ├── tests/                        # 当前主流程测试

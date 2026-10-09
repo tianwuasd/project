@@ -55,3 +55,7 @@ bash train_server.sh --prepared /data_nas/zhangruichen/chd_ct_data/imagechd7_96 
 脚本前台运行，长训练可放在 tmux 中。远程网络设置沿用服务器自身环境，不把本机127.0.0.1代理写入远程配置。
 
 本次已验证本机CPU与模拟派发，尚未连接zmic44执行安装、CUDA预检或正式训练。
+
+## 当前 U-Net 的预检要求
+
+主干已迁移到原作者有效卷积结构。镜像扩展使实际输入大于配置目标网格，旧版显存经验不可直接沿用；请按上述 preflight 流程确认。作者宽度配置为 `configs/chd-author-unet.yaml`，四个三维阶段 gate 默认开启。旧权重必须重新训练，数据缓存可复用。详见 [U-Net来源与尺寸](unet-source.md)。

@@ -1,0 +1,24 @@
+{
+  "retrieved": "2026-10-09",
+  "publisher": "Computer Vision Group, University of Freiburg",
+  "framework": "Caffe",
+  "two_dimensional": {
+    "url": "https://lmb.informatik.uni-freiburg.de/people/ronneber/u-net/u-net-release-2015-10-02.tar.gz",
+    "sha256": "260c51948e9e0f3fe1f1282dbedaf2ca69bea38b8392ef8df6d751e58b234740",
+    "member": "u-net-release/phseg_v5-train.prototxt"
+  },
+  "three_dimensional": {
+    "url": "https://lmb.informatik.uni-freiburg.de/lmbsoft/3dUnet_miccai2016_no_BN.prototxt",
+    "variant": "authors published no-BN architecture",
+    "license_archive_url": "https://lmb.informatik.uni-freiburg.de/lmbsoft/caffe_unet_3D_v1.0.tar.gz",
+    "license_archive_sha256": "f15ddb0a827eaaa2a8415fad25ba1482b0d24eed893de98a51d55a29067c2849"
+  },
+  "files": {
+    "2d-phseg_v5-train.prototxt": "3ea5b1dce77b952a0912523d00b650f1d4bbe88e496fd8a870e3c620d179e567",
+    "3dUnet_miccai2016_no_BN.prototxt": "8cabcbcab5b5213050239a7035f7f4dde572dee2b54d2952492cfbb2be4b26e3",
+    "2d-LICENSE": "ec5f7272b9c2f6ddd6b7843688d8fa6efaca46b8abef2a8279263b11fe57202f",
+    "3d-LICENSE": "b6e711e58b3b4d238178c50eb49473c4420f0a0e5ba858fc4eba336b99fd03bc",
+    "2d-README.txt": "88c9ec30f10d8bc5267f9e81d7a0cebb8b1107c20c8478d39cd67c4922e5e1a4",
+    "3d-README": "c13c6693619c593306cd406609d6f913ec0f76affe525bd85c3af7a02d260a0c"
+  }
+}

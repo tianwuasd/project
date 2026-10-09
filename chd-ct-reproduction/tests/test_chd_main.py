@@ -232,12 +232,12 @@ def test_source_unchanged_and_missing_annotations_are_excluded(raw_chd, tmp_path
         prepare(raw_chd, output, size=16)
 
 
-def test_paper_scale_requires_cuda_and_limit_cannot_train(raw_chd, tmp_path):
+def test_author_scale_requires_cuda_and_limit_cannot_train(raw_chd, tmp_path):
     from chd_ct.imagechd.train import train
 
     cache = tmp_path / "cache"
     prepare(raw_chd, cache, size=16, limit=3)
     with pytest.raises(ValueError, match="GPU"):
-        train(cache, tmp_path / "large", ROOT / "configs/chd-paper-scale.yaml", mode="preflight")
+        train(cache, tmp_path / "large", ROOT / "configs/chd-author-unet.yaml", mode="preflight")
     with pytest.raises(ValueError, match="limit"):
         train(cache, tmp_path / "formal", ROOT / "configs/chd.yaml", mode="train")

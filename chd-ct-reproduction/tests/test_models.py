@@ -1,12 +1,12 @@
 import torch
 
 from chd_ct.imagechd.losses import masked_loss
-from chd_ct.models import BiConvLSTM, UNet
+from chd_ct.models import BiConvLSTM, GridUNet
 
 
 def test_unet_odd_shape_and_loss_gradient():
     torch.set_num_threads(2)
-    model = UNet(3, 8, base=2, levels=3, spatial_gate=True)
+    model = GridUNet(3, 8, base=2, levels=3, spatial_gate=True)
     x = torch.randn(1, 1, 17, 19, 21)
     y = model(x)
     assert y.shape == (1, 8, 17, 19, 21)

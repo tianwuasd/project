@@ -1,4 +1,4 @@
-# ImageCHD six-stage adaptation; practical single-GPU dimensions, not exact paper widths.
+# Author-source backbone; CHD widths are scaled; anatomy gate enabled by default.
 profile: smoke
 seed: 42
 threads: 2
@@ -13,30 +13,35 @@ stages:
     epochs: 1
     batch: 1
     levels: 3
+    spatial_gate: true
   crop128:
     size: 16
     base: 2
     epochs: 1
     batch: 1
     levels: 3
+    spatial_gate: true
   all64:
     size: 16
     base: 2
     epochs: 1
     batch: 1
     levels: 3
+    spatial_gate: true
   all128:
     size: 16
     base: 2
     epochs: 1
     batch: 1
     levels: 3
+    spatial_gate: true
   blood2d:
     size: 16
     base: 2
     epochs: 1
     batch: 1
     levels: 3
+    spatial_gate: false
   blood_lstm:
     size: 16
     base: 2
@@ -44,3 +49,4 @@ stages:
     batch: 1
     layers: 2
     sequence: 7
+architecture: freiburg-caffe-2015-2d-2016-3d-nobn-port-v1
