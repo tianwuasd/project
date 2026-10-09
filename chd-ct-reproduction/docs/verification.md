@@ -1,68 +1,25 @@
-# 验证记录 · 2026-10-07
+# 验证记录：ImageCHD 主流程迁移（2026-10-09）
 
-本记录区分软件验证与论文结果复现。
+## 软件与数据验证
 
-## 一键启动增量验证
+- 当前主流程完整回归：**26 passed**。覆盖原生/旧缓存、标签255与血池邻域屏蔽、完整六阶段训练预测、正式训练分支、预检保持尺寸、混合/缺失权重拒绝、患者隔离、标签缺失排除、源文件不变、独立任务派发与服务器失败停止。
+- 已在独立工作目录执行 back/paper-v1 的原测试：**49 passed in 29.20s**。主测试不收集归档测试，主程序不导入归档模块。
+- 真实CHD小样本旧v1缓存：六阶段分别完成一个训练batch和验证batch，所有损失有限；随后独立融合预测、独立Dice评估成功。权重仅用于软件短测；此次单例前景Dice为0，不能作为训练效果。
+- 真实原生分辨率单例：无标签预处理与六阶段预测完成；原图和预测均为 **512×512×344**，affine一致，缓存没有target数组。此项验证原网格路径，不代表分割精度。
+- 之前完整110例96³缓存继续可用：97例保留，13例缺少MYO标注排除，默认train/val/test为67/15/15。未重复覆盖已有缓存；此次未对全体数据运行正式长训练。
+- 离线构建0.2.0 wheel并安装到独立目录；在仓库外运行安装包的默认合成演示，环境检查、六阶段训练、预测、评估均通过。安装包包含默认配置，不包含back、病例数据或权重。
 
-2026-10-07 新增 `start.bat` / `start.py`、数据选择、环境探测、完整数据校验和小样本试跑。
+## 独立审查及修复
 
-* 完整测试：`python -m pytest -q --basetemp runs/wizard-all-tests`，**25 passed**。
-* 新测试覆盖中文及空格路径、目录/CSV 选择、多清单拒绝猜测、患者划分、原数据不变、副本 spacing、缺初始标签的 partial/退出码 2、缺依赖失败报告、check 模式不训练、拒绝覆盖已有输出。
-* 使用子进程实际完成“选择数据目录 → 环境检查 → 合成完整试跑 → 所选数据完整试跑”；测试输入是合成几何体，不是患者影像。
-* Windows 实际运行 `start.bat --demo --mode check --non-interactive --output runs/batch-launch-check` 成功。
-* 独立审查用 `python -B -S start.py --help` 验证没有科学依赖仍可进入启动器；未发现阻止交付的重要问题。
-* 未打开系统文件选择对话框进行人工 UI 操作，也未运行 CUDA 或真实临床数据测试；这些范围不列为已验证。
+审查确认核心数据、六阶段训练、权重一致性、预测网格还原、忽略体素和评估分母；提出两项已修复问题：
 
-## 已运行
+1. 已有输出目录被拒绝后仍覆盖旧report.json。先用回归测试复现，再增加目录创建成功标记；失败不会改写旧报告。
+2. 普通安装后依赖仓库根脚本和配置。先在模拟安装布局复现，再改为模块调用、打包配置资源，并使用可写的当前目录作为安装版默认输出根目录。模拟安装测试及真实wheel安装运行都通过。
 
-* Windows，Python 3.14.3，PyTorch 2.10.0+cpu；CUDA 不可用。其他直接依赖见 `requirements-tested.txt`。
-* editable 安装成功；`pip check` 输出 `No broken requirements found.`。
-* `python -m pytest -q --basetemp runs/test-tmp-05`：16 passed；包含八阶段训练、推理、原方向输出、错误 stage/配置/数据折拒绝、缺失标签、未知诊断、物理距离和规则冲突。
-* `python -m ruff check src tests scripts`：通过；`ruff format --check`：30 files already formatted；`compileall -q src`：通过。
-* `python scripts/run_demo.py --output runs/demo`：成功生成 4 个合成几何体、验证 manifest、训练八阶段并输出 `runs/demo/prediction/`。
-* 独立只读代码审查：未发现阻止交付的重要问题；额外核查了空证据三值结果、init 类别映射和右侧坐标约定。
-* 未执行真实 CT 训练、GPU 训练、临床测试、三折临床实验或论文指标对齐。
+本机为Python3.14.3、PyTorch2.10 CPU；服务器配置目标仍为独立Python3.11/PyTorch2.8 CUDA12.8。没有实际连接zmic44执行Linux自动安装、GPU预检或正式训练，没有复现论文临床准确率。
 
-首次测试的临时目录被环境权限阻止，之后将临时目录限定在项目下。首次 pip 缓存写入也被限制，已通过 `--no-cache-dir` 和可写 TEMP/TMP 解决，不修改系统代理或全局 Python。
+## 结构与命令检查
 
-## 纸面配置的参数量检查
+主目录只有ImageCHD默认流程；预处理、训练、预测、评估各自独立，环境检查和明确选择的demo另列。旧八阶段论文流程和旧单U-Net适配保存在back/paper-v1。代码规范、服务器脚本语法、依赖未安装时的启动器帮助，以及主文档相对链接在提交前检查。
 
-使用 PyTorch meta device 只建立参数形状，不分配真实权重内存，得到：
-
-| 模型 | 本项目参数数 |
-|---|---:|
-| crop64 / all64 | 90,435,542（每个） |
-| crop128 / all128 | 50,877,670（每个） |
-| init64 | 90,428,110 |
-| init128 | 50,872,094 |
-| blood2d | 497,780,707 |
-| blood_lstm（不重复计算冻结编码器） | 369,347 |
-
-论文相应报告约 84.9M/51.2M、2D 452.9M、BiConvLSTM 0.2M。**本项目参数量不完全一致**；因此准确称谓为架构/流程复现，不能称逐层精确复刻。正式模型需要较大显存；并未证实它在论文 4×11GB 配置下的训练可行性。
-
-## 合成输出的解释
-
-所有示例输入均为规则几何体，随机初始化后只训练少量步数。有限 loss、能写出 NIfTI、能输出规则结果仅证明流程连通；无论输出何种候选疾病，都不反映医学能力。仓库只提交代码、配置与文档，示例影像/权重/逐体积输出留在本地忽略目录。
-
-## 2026-10-09：服务器入口与 archive 检查
-
-- 完整回归：`python -m pytest -q -o cache_dir=runs/pytestcache_server`，**37 passed**。
-- `ruff check .`、新增 Python 文件格式检查、`bash -n start_server.sh`、`git diff --check` 通过。
-- `python -B -S start_server.py --help` 通过：服务器引导模块在尚未安装科学计算库时也能载入。
-- 实际运行 `python start.py --demo --device cpu --non-interactive --output runs/server-cpu-verification-20261009`，八阶段训练与完整推理通过，report.json 为 passed。
-- 新增测试覆盖 GPU 分配范围、忙卡/显存不足、原始 ImageCHD/分卷拒绝、预检保持尺寸但限制 epoch/batch、partial/失败阻止正式训练、pip 安装目标隔离、中断进程组清理和并发保存设置。
-- 独立只读审查提出的 pip 目标继承、中断残留子进程、并发设置临时文件竞争已修复并加入回归测试。并发测试用两个写入完成后顺序原子 rename 的交错复现问题，避开 Windows 同时替换同一文件的访问限制。
-- 本地完整解压 13 卷 ImageCHD 成功；核对 110 对影像/标签的网格、全部标签值及两份说明表。见 [archive 检查报告](imagechd-archive.md)。
-- 服务器的 Linux 自动安装、真实文件锁和 CUDA 全尺寸预检尚未实机执行；CPU 合成测试不能证明 3090 显存足够或真实诊断有效。
-
-## 2026-10-09：ImageCHD 独立预处理、训练与预测
-
-- 新增三个本机 Python 入口与对应服务器脚本，分别只负责预处理、训练和预测；原论文八阶段入口保留。
-- 完整回归：`python -m pytest -q -o cache_dir=runs/pytestcache_imagechd`，**49 passed in 29.79s**；`ruff check .` 与新增/改动 Python 文件格式检查通过。
-- 真实数据小样本：预处理检查前 6 例，保留 4 例完整七结构标注，排除 2 例缺少 MYO 标注；16³ 缓存上独立完成一个训练 batch 和一个验证 batch，损失有限。独立预测输出 NIfTI，尺寸和 affine 与原影像一致。该短测不代表模型精度。
-- 完整 110 例预处理至 96³：**保留 97 例，排除 13 例缺少 MYO 标注**。固定种子 42 的默认文件名划分为 train 67 / val 15 / test 15；NPZ 总大小约 290.8 MiB。尚未核实文件名与真实患者的一一对应关系，正式研究应提供患者级划分。
-- 完整缓存保存在本机 `data/imagechd7_96`。`train_imagechd.py --prepared data/imagechd7_96 --output runs/imagechd-full-check-20261009 --mode check --device cpu` 已逐例读入全部 train/val 缓存，状态为 checked；test 集未参与训练检查或模型选择。
-- 新测试覆盖标签 255 的损失/梯度屏蔽、缺标注排除、患者跨集合拒绝、无标签预测、原始文件移除后的独立运行、空间恢复、旧 Conda 复用及三个服务器任务的独立派发。
-- 独立只读审查未发现需要修复的重要问题；额外核对全部 48 种轴排列/翻转还原，以及混合 batch 内全忽略标签样本的零梯度行为。
-- 服务器配置依据用户指定工作目录中实际更新于 **2026-09-26** 的笔记：复用已有 Conda 可执行文件，在独立 CHD runtime 创建环境；预处理数据与结果默认保存在 NAS，线程默认 2，GPU 由运行时检查选择。
-- 本次没有连接服务器执行 Linux 安装、CUDA 预检或正式百轮训练，没有验证医学准确率。原始影像、缓存、权重和逐病例报告均留在 Git 忽略目录。
+历史验证记录见 back/paper-v1/docs/verification.md。所有真实病例级输出保存在本地忽略目录，不提交GitHub。

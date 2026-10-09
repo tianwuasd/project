@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chd-ct-reproduction"
-version = "0.1.0"
-description = "Independent, research-only reproduction of Xu et al. (Medical Image Analysis, 2023)"
+version = "0.2.0"
+description = "ImageCHD primary multi-stage adaptation of Xu et al.; archived paper workflow in back"
 requires-python = ">=3.11"
 dependencies = ["numpy>=1.26", "scipy>=1.11", "torch>=2.6", "nibabel>=5.2", "PyYAML>=6", "scikit-image>=0.24", "networkx>=3.2"]
 
@@ -21,9 +21,14 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+norecursedirs = ["back", "runs", "data", "archive", ".venv"]
 
 [tool.ruff]
+extend-exclude = ["back"]
 line-length = 110
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.setuptools.package-data]
+chd_ct = ["presets/*.yaml"]

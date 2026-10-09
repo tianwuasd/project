@@ -1,4 +1,4 @@
-"""Prepared images + checkpoint -> native-grid segmentations; no labels or training."""
+"""Image-only multi-stage inference; prediction never opens cached targets."""
 
 import argparse
 from pathlib import Path
@@ -7,20 +7,87 @@ import nibabel as nib
 import numpy as np
 import torch
 
-from ..data import resize
-from ..models import UNet
-from .common import FORMAT, LABELS, NORMALIZATION, read_prepared, write_json
+from .checkpoints import load_stage, read_collection
+from .common import LABELS, load_case, read_prepared, write_json
+from .config import UNAVAILABLE, build_model
+from .fusion import refine_with_blood, weighted_vote
+from .geometry import bounding_box, resize
+from .train import file_hash
 
 
-def predict(prepared, checkpoint, output, device="cpu", case_id=None, split=None, allow_smoke=False):
-    directory, data = read_prepared(prepared)
-    record = torch.load(checkpoint, map_location="cpu", weights_only=True)
-    if record.get("format") != FORMAT or record.get("labels") != list(LABELS):
-        raise ValueError("权重不是 ImageCHD 七结构模型")
-    if record.get("normalization") != NORMALIZATION or record["config"]["size"] != data["size"]:
-        raise ValueError("权重与预处理尺寸/归一化协议不同")
-    if record.get("mode") != "train" and not allow_smoke:
-        raise ValueError("这是短测权重；软件试跑需显式 --allow-smoke")
+def anatomy(image, stage, directory, collection, device):
+    model, record = load_stage(directory, collection, stage, device)
+    size = record["spec"]["size"]
+    with torch.inference_mode():
+        tensor = torch.from_numpy(resize(image, (size,) * 3))[None, None].to(device)
+        return model(tensor).argmax(1)[0].cpu().numpy().astype(np.uint8)
+
+
+def blood_prediction(image, directory, collection, device):
+    recurrent, record = load_stage(directory, collection, "blood_lstm", device)
+    encoder = build_model("blood2d", record["encoder_spec"])
+    encoder.load_state_dict(record["encoder_state_dict"])
+    encoder.to(device).eval()
+    size, sequence = record["spec"]["size"], record["spec"]["sequence"]
+    small = np.empty((size, size, image.shape[2]), np.uint8)
+    # Cache only one sequence of feature maps, bounding memory on native volumes.
+    features = {}
+    with torch.inference_mode():
+        for z in range(image.shape[2]):
+            indices = np.clip(np.arange(z - sequence // 2, z + sequence // 2 + 1), 0, image.shape[2] - 1)
+            needed = set(int(i) for i in indices)
+            features = {i: value for i, value in features.items() if i in needed}
+            for i in needed:
+                if i not in features:
+                    x = torch.from_numpy(resize(image[:, :, i], (size, size)))[None, None].to(device)
+                    features[i] = encoder.features(x)
+            window = torch.stack([features[int(i)] for i in indices], dim=1)
+            small[:, :, z] = recurrent(window).argmax(1)[0].cpu().numpy()
+    return resize(small, image.shape, labels=True).astype(np.uint8)
+
+
+def predict_volume(image, directory, collection, device):
+    crops = [
+        resize(anatomy(image, stage, directory, collection, device), image.shape, labels=True).astype(
+            np.uint8
+        )
+        for stage in ("crop64", "crop128")
+    ]
+    foreground = (crops[0] > 0) | (crops[1] > 0)
+    roi = bounding_box(foreground, collection["config"]["roi_margin"])
+    cropped = image[roi]
+    size = collection["config"]["stages"]["all128"]["size"]
+    aligned = (size,) * 3
+    votes = [resize(result[roi], aligned, labels=True) for result in crops]
+    for stage in ("all64", "all128"):
+        votes.append(resize(anatomy(cropped, stage, directory, collection, device), aligned, labels=True))
+    fused = resize(weighted_vote(votes), cropped.shape, labels=True).astype(np.uint8)
+    blood = blood_prediction(cropped, directory, collection, device)
+    result = np.zeros(image.shape, np.uint8)
+    result[roi] = refine_with_blood(fused, blood)
+    return result, {
+        "roi_slices": [[s.start, s.stop] for s in roi],
+        "empty_roi_fallback": not bool(foreground.any()),
+    }
+
+
+def restore_native(prediction, row):
+    canonical = resize(prediction, row["canonical_shape"], labels=True).astype(np.uint8)
+    ras = nib.orientations.axcodes2ornt(("R", "A", "S"))
+    transform = nib.orientations.ornt_transform(ras, np.asarray(row["native_orientation"]))
+    native = nib.orientations.apply_orientation(canonical, transform)
+    if list(native.shape) != row["native_shape"]:
+        raise ValueError("还原尺寸失败")
+    result = nib.Nifti1Image(native, np.asarray(row["native_affine"]))
+    result.set_sform(np.asarray(row["native_affine"]), code=1)
+    result.set_qform(np.asarray(row["native_affine"]), code=0)
+    result.header.set_xyzt_units(*row["units"])
+    return result
+
+
+def predict(prepared, models, output, device="cpu", case_id=None, split=None, allow_smoke=False):
+    cache, data = read_prepared(prepared)
+    directory, collection = read_collection(models, allow_smoke)
     rows = [
         r
         for r in data["cases"]
@@ -28,48 +95,33 @@ def predict(prepared, checkpoint, output, device="cpu", case_id=None, split=None
     ]
     if not rows:
         raise ValueError("没有匹配的预测病例")
-    output = Path(output).resolve()
+    output = Path(output).expanduser().resolve()
     output.mkdir(parents=True, exist_ok=False)
     report = {
         "status": "running",
-        "task": "imagechd7_segmentation",
+        "task": "chd_multistage_prediction",
         "labels": list(LABELS),
-        "checkpoint": str(Path(checkpoint).resolve()),
+        "prepared_sha256": file_hash(cache / "dataset.json"),
+        "models_sha256": file_hash(directory / "models.json"),
+        "cache_resolution": data["resolution"],
         "cases": [],
-        "geometry": "restored supplied native grid; real millimetre calibration is unverified",
+        "unavailable": UNAVAILABLE,
+        "geometry": "supplied original grid restored; millimetre calibration unverified",
     }
     try:
-        config = record["config"]
-        torch.set_num_threads(config["threads"])
-        model = UNet(3, 8, config["base"], config["levels"]).to(device)
-        model.load_state_dict(record["state_dict"], strict=True)
-        model.eval()
-        ras = nib.orientations.axcodes2ornt(("R", "A", "S"))
+        torch.set_num_threads(collection["config"]["threads"])
         for row in rows:
-            # Deliberately do not request a target key; prediction works without any labels.
-            with np.load(directory / row["cache"], allow_pickle=False) as cached:
-                image = cached["image"]
-            if image.shape != (data["size"],) * 3 or not np.isfinite(image).all():
-                raise ValueError("预测缓存形状/数值无效")
-            if image.min() < 0 or image.max() > 1:
-                raise ValueError("预测缓存未按约定归一化")
-            with torch.inference_mode():
-                tensor = torch.from_numpy(image.copy())[None, None].to(device)
-                small = model(tensor).argmax(1)[0].cpu().numpy()
-            canonical = resize(small, row["canonical_shape"], labels=True).astype(np.uint8)
-            transform = nib.orientations.ornt_transform(ras, np.asarray(row["native_orientation"]))
-            native = nib.orientations.apply_orientation(canonical, transform)
-            if list(native.shape) != row["native_shape"]:
-                raise ValueError("还原原始影像尺寸失败")
-            result = nib.Nifti1Image(native, np.asarray(row["native_affine"]))
-            result.set_sform(np.asarray(row["native_affine"]), code=1)
-            result.set_qform(np.asarray(row["native_affine"]), code=0)
-            result.header.set_xyzt_units(*row["units"])
-            path = output / (row["case_id"] + "_seg.nii.gz")
-            nib.save(result, path)
-            report["cases"].append({"case_id": row["case_id"], "prediction": path.name})
+            image, _ = load_case(cache, row, labels=False)
+            prediction, details = predict_volume(image, directory, collection, device)
+            filename = row["case_id"] + "_seg.nii.gz"
+            nib.save(restore_native(prediction, row), output / filename)
+            grid = row["case_id"] + "_grid.npz"
+            np.savez_compressed(output / grid, prediction=prediction)
+            report["cases"].append(
+                {"case_id": row["case_id"], "prediction": filename, "grid_prediction": grid, **details}
+            )
             write_json(output / "prediction-report.json", report)
-            print(f"已预测：{row['case_id']}", flush=True)
+            print("已预测：" + row["case_id"], flush=True)
         report["status"] = "passed"
         return report
     except BaseException as error:
@@ -80,18 +132,16 @@ def predict(prepared, checkpoint, output, device="cpu", case_id=None, split=None
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="仅预测：读取预处理缓存与权重，不读取标签、不训练")
+    parser = argparse.ArgumentParser(description="CHD 六阶段独立预测：只读影像缓存与完整模型集合")
     parser.add_argument("--prepared", required=True)
-    parser.add_argument("--checkpoint", required=True)
+    parser.add_argument("--models", required=True, help="包含 models.json 的模型目录")
     parser.add_argument("--output", required=True)
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
     parser.add_argument("--case-id")
     parser.add_argument("--split", choices=["train", "val", "test"])
     parser.add_argument("--allow-smoke", action="store_true")
     args = parser.parse_args(argv)
-    predict(
-        args.prepared, args.checkpoint, args.output, args.device, args.case_id, args.split, args.allow_smoke
-    )
+    predict(args.prepared, args.models, args.output, args.device, args.case_id, args.split, args.allow_smoke)
     return 0
 
 

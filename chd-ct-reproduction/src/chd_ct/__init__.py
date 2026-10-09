@@ -1,3 +1,3 @@
-"""Independent research reproduction; no clinical validation or bundled weights."""
+"""ImageCHD primary multi-stage research workflow."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

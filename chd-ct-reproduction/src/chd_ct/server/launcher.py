@@ -3,17 +3,10 @@
 import argparse
 import json
 import os
-import platform
-import shutil
-import signal
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
-
-from ..quickstart.datasets import find_manifests
-from .bootstrap import ensure_python, environment, run_logged
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_RUNTIME = "/data5/zhougaowei/zhangruichen_workspace/chd_ct_runtime"
@@ -59,22 +52,6 @@ def personal_path(value):
     if str(path) in shared or path == Path.home() or path == ROOT or path in ROOT.parents:
         raise ValueError("请使用本项目专用的个人子目录。")
     return path
-
-
-def resolve_manifest(value):
-    path = Path(value).expanduser().resolve()
-    raw = [path, path / "ImageCHD_dataset"]
-    if any(p.is_dir() and next(p.glob("ct_*_label.nii.gz"), None) for p in raw):
-        raise ValueError(
-            "检测到原始 ImageCHD：7 类标签编号与本项目不同，且缺 SVC/IVC/PV 和 initial_label。"
-            "不能直接训练完整复现；见 docs/imagechd-archive.md。可用 --demo 测试服务器。"
-        )
-    if path.is_dir() and next(path.glob("*.z01"), None):
-        raise ValueError("这是未解压的分卷压缩包；见 docs/imagechd-archive.md。")
-    manifests = find_manifests(path)
-    if len(manifests) != 1:
-        raise ValueError("请选择一个明确的 manifest.csv；清单缺失或候选多于一个。")
-    return manifests[0]
 
 
 def query_gpus():
@@ -123,214 +100,23 @@ def select_gpu(rows, requested="auto", visible=None, minimum=6000):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="zmic44 / Linux CHD CT 引导入口")
-    parser.add_argument("--runtime", help="专用环境/缓存目录，默认本地盘")
-    parser.add_argument("--results", help="结果目录，默认 NAS")
-    data = parser.add_mutually_exclusive_group()
-    data.add_argument("--dataset", help="paper 使用 manifest.csv/目录；preprocess 使用已解压 ImageCHD 目录或待预测 NIfTI")
-    data.add_argument("--demo", action="store_true", help="合成数据，不需要真实病例")
-    parser.add_argument("--mode", choices=["check", "smoke", "preflight", "train"], default="smoke")
-    parser.add_argument("--gpu", default="auto", help="auto、nvidia-smi 物理编号或完整 GPU UUID")
-    parser.add_argument("--device", choices=["cuda", "cpu"], default="cuda")
-    parser.add_argument("--python", help="复用指定 Python，跳过安装；由环境检查判断是否可用")
-    parser.add_argument("--config", help="模型配置；paper 与 ImageCHD 使用各自默认配置")
-    parser.add_argument("--task", choices=["paper", "preprocess", "train", "predict"], default="paper")
+    from ..quickstart.commands import add_task_arguments, choose_task
+
+    parser = argparse.ArgumentParser(description="ImageCHD 主流程服务器入口")
+    add_task_arguments(parser)
+    parser.set_defaults(device="cuda")
+    parser.add_argument("--runtime")
+    parser.add_argument("--results")
+    parser.add_argument("--gpu", default="auto")
+    parser.add_argument("--python", help="已有 Python 路径；不安装依赖，由环境检查决定是否可用")
     parser.add_argument("--server-config", default=str(SERVER_PROFILE))
-    parser.add_argument("--prepared", help="ImageCHD 预处理目录：preprocess 输出，train/predict 输入")
-    parser.add_argument("--checkpoint", help="predict 使用的七结构权重")
-    parser.add_argument("--size", type=int, default=96, help="preprocess 输出的体素网格边长")
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--limit", type=int, help="preprocess 软件试跑仅保留前 N 例")
-    parser.add_argument("--split-file", help="preprocess 使用的患者划分 CSV")
-    parser.add_argument("--for-prediction", action="store_true", help="preprocess 无标签影像")
-    parser.add_argument("--case-id", help="predict 选择一个病例")
-    parser.add_argument("--split", choices=["train", "val", "test"], help="predict 选择一个集合")
-    parser.add_argument("--allow-smoke", action="store_true", help="predict 显式允许短测权重")
-    parser.add_argument("--non-interactive", action="store_true")
     args = parser.parse_args(argv)
     try:
+        args.task = choose_task(args, sys.stdin.isatty() and not args.non_interactive)
         profile = json.loads(Path(args.server_config).read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
-        print(f"服务器配置无法读取：{error}", file=sys.stderr)
-        return 1
-    if args.task != "paper":
         from .imagechd import run
 
         return run(args, profile)
-    if platform.system() != "Linux" or platform.machine() not in {"x86_64", "AMD64"}:
-        print("此入口面向 Linux x86_64；Windows 请使用 start.bat。")
+    except (Exception, KeyboardInterrupt) as error:
+        print("未通过：" + str(error), file=sys.stderr)
         return 1
-    interactive = sys.stdin.isatty() and not args.non_interactive
-    state, output = {}, None
-    interrupt_code = 130
-    previous_handlers = {}
-
-    def on_signal(signum, frame):
-        nonlocal interrupt_code
-        interrupt_code = 128 + signum
-        raise KeyboardInterrupt(f"收到终止信号 {signum}")
-
-    if os.name == "posix":
-        for sig in (signal.SIGTERM, signal.SIGHUP):
-            previous_handlers[sig] = signal.signal(sig, on_signal)
-    try:
-        settings_path = ROOT / ".server-settings.json"
-        saved = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.exists() else {}
-        runtime = personal_path(
-            choose(
-                args.runtime,
-                saved.get("runtime"),
-                profile.get("runtime", DEFAULT_RUNTIME),
-                "环境与缓存目录（本地盘）",
-                interactive,
-            )
-        )
-        results = personal_path(
-            choose(
-                args.results,
-                saved.get("results"),
-                profile.get("results", DEFAULT_RESULTS),
-                "结果目录（NAS）",
-                interactive,
-            )
-        )
-        selection = (
-            "demo"
-            if args.demo
-            else choose(
-                args.dataset,
-                saved.get("dataset"),
-                "demo",
-                "数据清单路径；demo 为合成测试",
-                interactive,
-            )
-        )
-        manifest = None if selection == "demo" else resolve_manifest(selection)
-        if args.mode in {"preflight", "train"} and (not manifest or args.device != "cuda"):
-            raise ValueError("正式尺寸预检/训练需要真实数据 manifest 与 CUDA。先用 smoke 检查软件。")
-        config = Path(args.config).expanduser().resolve() if args.config else ROOT / "configs/server3090.yaml"
-        if args.mode in {"preflight", "train"} and not config.is_file():
-            raise ValueError(f"配置文件不存在：{config}")
-        for folder, minimum in [
-            (runtime, 20 if not args.python else 2),
-            (results, 30 if args.mode in {"preflight", "train"} else 2),
-        ]:
-            folder.mkdir(parents=True, exist_ok=True)
-            if shutil.disk_usage(folder).free < minimum * 1024**3:
-                raise ValueError(f"{folder} 可用空间不足 {minimum} GiB")
-        import fcntl
-
-        with (runtime / ".job.lock").open("a") as lock:
-            try:
-                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                raise ValueError("这个 runtime 已有任务运行；请查看其日志或使用独立 runtime。") from None
-            tag = datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid4().hex[:6]
-            output = results / tag
-            output.mkdir(exist_ok=False)
-            state = dict(
-                status="running",
-                mode=args.mode,
-                output=str(output),
-                dataset=str(manifest),
-                started=datetime.now().isoformat(),
-            )
-            write_json(output / "status.json", state)
-            write_json(settings_path, dict(runtime=str(runtime), results=str(results), dataset=selection))
-            print(f"本次日志与报告：{output}", flush=True)
-            env = environment(runtime, ROOT, profile.get("threads", 2))
-            original_visible = env.get("CUDA_VISIBLE_DEVICES")
-            minimum_gpu = 18000 if args.mode in {"preflight", "train"} else 6000
-            if args.device == "cuda":
-                gpu = select_gpu(query_gpus(), args.gpu, original_visible, minimum_gpu)
-                print(f"候选 GPU：{gpu['index']} {gpu['name']}，空闲 {gpu['free']} MiB", flush=True)
-            python = (
-                Path(args.python).expanduser().resolve()
-                if args.python
-                else ensure_python(
-                    runtime,
-                    ROOT,
-                    env,
-                    output / "server.log",
-                    profile.get("existing_conda"),
-                )
-            )
-            if not python.is_file():
-                raise ValueError(f"Python 不存在：{python}")
-            if args.device == "cuda":
-                gpu = select_gpu(query_gpus(), args.gpu, original_visible, minimum_gpu)
-                env["CUDA_VISIBLE_DEVICES"] = gpu["uuid"]
-                state["gpu"] = gpu
-            else:
-                env["CUDA_VISIBLE_DEVICES"] = ""
-            command = [
-                python,
-                ROOT / "start.py",
-                "--non-interactive",
-                "--device",
-                args.device,
-                "--mode",
-                "check" if args.mode == "check" else "smoke",
-                "--output",
-                output / "quickstart",
-            ]
-            command += ["--dataset", manifest] if manifest else ["--demo"]
-            code = run_logged(command, env, output / "server.log")
-            if code:
-                state["status"] = "partial" if code == 2 else "failed"
-                return code
-            if args.mode in {"preflight", "train"}:
-                code = run_logged(
-                    [
-                        python,
-                        "-m",
-                        "chd_ct.server.training",
-                        "--manifest",
-                        manifest,
-                        "--config",
-                        config,
-                        "--output",
-                        output / "preflight",
-                        "--preflight",
-                    ],
-                    env,
-                    output / "server.log",
-                )
-                if code:
-                    state["status"] = "failed"
-                    return code
-                if args.mode == "train":
-                    code = run_logged(
-                        [
-                            python,
-                            "-m",
-                            "chd_ct.server.training",
-                            "--manifest",
-                            manifest,
-                            "--config",
-                            config,
-                            "--output",
-                            output / "training",
-                        ],
-                        env,
-                        output / "server.log",
-                    )
-                    if code:
-                        state["status"] = "failed"
-                        return code
-            state["status"] = "checked" if args.mode == "check" else "passed"
-            print(f"完成：{state['status']}；报告目录 {output}")
-            return 0
-    except KeyboardInterrupt as error:
-        state.update(status="interrupted", error=str(error) or "用户中止")
-        return interrupt_code
-    except Exception as error:
-        state.update(status="failed", error=str(error))
-        print(f"未通过：{error}", file=sys.stderr)
-        return 1
-    finally:
-        for sig, handler in previous_handlers.items():
-            signal.signal(sig, handler)
-        if output:
-            state["ended"] = datetime.now().isoformat()
-            write_json(output / "status.json", state)

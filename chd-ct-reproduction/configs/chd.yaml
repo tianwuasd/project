@@ -1,0 +1,46 @@
+# ImageCHD six-stage adaptation; practical single-GPU dimensions, not exact paper widths.
+profile: chd
+seed: 42
+threads: 2
+roi_margin: 3
+augment: true
+learning_rate: 0.0002
+weight_decay: 0.0
+stages:
+  crop64:
+    size: 64
+    base: 16
+    epochs: 15
+    batch: 1
+    levels: 4
+  crop128:
+    size: 128
+    base: 16
+    epochs: 15
+    batch: 1
+    levels: 4
+  all64:
+    size: 64
+    base: 16
+    epochs: 15
+    batch: 1
+    levels: 4
+  all128:
+    size: 128
+    base: 16
+    epochs: 15
+    batch: 1
+    levels: 4
+  blood2d:
+    size: 256
+    base: 8
+    epochs: 12
+    batch: 1
+    levels: 5
+  blood_lstm:
+    size: 256
+    base: 8
+    epochs: 3
+    batch: 1
+    layers: 2
+    sequence: 7

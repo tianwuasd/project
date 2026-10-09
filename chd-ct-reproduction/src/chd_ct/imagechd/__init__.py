@@ -1,1 +1,1 @@
-"""ImageCHD seven-structure baseline; independent of the paper diagnostic pipeline."""
+"""Primary six-stage ImageCHD workflow with native seven-structure labels."""

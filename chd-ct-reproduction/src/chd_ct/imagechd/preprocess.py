@@ -10,8 +10,8 @@ import nibabel as nib
 import numpy as np
 import torch
 
-from ..data import resize
 from .common import FORMAT, IGNORE, LABELS, NORMALIZATION, normalize, write_json
+from .geometry import resize
 
 
 def discover(folder, for_prediction=False):
@@ -82,9 +82,9 @@ def assign_splits(cases, seed, split_file=None):
     return result
 
 
-def prepare(source, output, size=96, seed=42, for_prediction=False, split_file=None, limit=None):
-    if size < 8 or (limit is not None and limit < 3):
-        raise ValueError("size 至少为 8；测试用 limit 至少为 3")
+def prepare(source, output, size=0, seed=42, for_prediction=False, split_file=None, limit=None):
+    if (size != 0 and size < 8) or (limit is not None and limit < 3):
+        raise ValueError("size=0 保留原始网格，或至少为8；测试用 limit 至少为3")
     torch.set_num_threads(2)
     output = Path(output).expanduser().resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -92,6 +92,7 @@ def prepare(source, output, size=96, seed=42, for_prediction=False, split_file=N
         "format": FORMAT,
         "status": "running",
         "size": size,
+        "resolution": "resized" if size else "native",
         "seed": seed,
         "for_prediction": for_prediction,
         "normalization": NORMALIZATION,
@@ -129,7 +130,9 @@ def prepare(source, output, size=96, seed=42, for_prediction=False, split_file=N
                         {"case_id": case, "reason": "missing_foreground_annotation", "missing_ids": missing}
                     )
                     continue
-                targets["target"] = resize(target, (size,) * 3, labels=True).astype(np.uint8)
+                targets["target"] = (resize(target, (size,) * 3, labels=True) if size else target).astype(
+                    np.uint8
+                )
             else:
                 extra = []
             image, intensity = normalize(canonical.get_fdata(dtype=np.float32))
@@ -141,11 +144,14 @@ def prepare(source, output, size=96, seed=42, for_prediction=False, split_file=N
             hashes.add(digest)
             cache = f"{case}.npz"
             np.savez_compressed(
-                output / cache, image=resize(image, (size,) * 3).astype(np.float32), **targets
+                output / cache,
+                image=(resize(image, (size,) * 3) if size else image).astype(np.float32),
+                **targets,
             )
             row = {
                 "case_id": case,
                 "cache": cache,
+                "cache_shape": [size] * 3 if size else list(image.shape),
                 "extra_ids_ignored": extra,
                 "intensity": intensity,
                 "source_sha256": digest,
@@ -179,7 +185,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="仅预处理 ImageCHD；生成可复用缓存，不训练、不预测")
     parser.add_argument("--input", required=True, help="已解压的 ImageCHD 目录；预测模式也支持单个 NIfTI")
     parser.add_argument("--output", required=True, help="新的预处理结果目录")
-    parser.add_argument("--size", type=int, default=96)
+    parser.add_argument("--size", type=int, default=0, help="0 保留原始分辨率；正数仅用于生成缩小缓存")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--split-file", help="显式患者划分 CSV；case_id 示例 ct_1001")
     parser.add_argument("--for-prediction", action="store_true", help="无标签预处理，不生成训练划分")

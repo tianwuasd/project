@@ -1,0 +1,46 @@
+# Six available CHD stages at the previous paper-scale dimensions; GPU preflight required.
+profile: paper-scale
+seed: 42
+threads: 2
+roi_margin: 3
+augment: true
+learning_rate: 0.0002
+weight_decay: 0.0
+stages:
+  crop64:
+    size: 64
+    base: 64
+    levels: 5
+    epochs: 15
+    batch: 1
+  crop128:
+    size: 128
+    base: 48
+    levels: 5
+    epochs: 15
+    batch: 1
+  all64:
+    size: 64
+    base: 64
+    levels: 5
+    epochs: 15
+    batch: 1
+  all128:
+    size: 128
+    base: 48
+    levels: 5
+    epochs: 15
+    batch: 1
+  blood2d:
+    size: 512
+    base: 32
+    levels: 8
+    epochs: 12
+    batch: 1
+  blood_lstm:
+    size: 512
+    base: 32
+    layers: 2
+    sequence: 7
+    epochs: 3
+    batch: 1
