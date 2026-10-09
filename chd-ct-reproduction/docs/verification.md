@@ -43,3 +43,14 @@
 ## 合成输出的解释
 
 所有示例输入均为规则几何体，随机初始化后只训练少量步数。有限 loss、能写出 NIfTI、能输出规则结果仅证明流程连通；无论输出何种候选疾病，都不反映医学能力。仓库只提交代码、配置与文档，示例影像/权重/逐体积输出留在本地忽略目录。
+
+## 2026-10-09：服务器入口与 archive 检查
+
+- 完整回归：`python -m pytest -q -o cache_dir=runs/pytestcache_server`，**37 passed**。
+- `ruff check .`、新增 Python 文件格式检查、`bash -n start_server.sh`、`git diff --check` 通过。
+- `python -B -S start_server.py --help` 通过：服务器引导模块在尚未安装科学计算库时也能载入。
+- 实际运行 `python start.py --demo --device cpu --non-interactive --output runs/server-cpu-verification-20261009`，八阶段训练与完整推理通过，report.json 为 passed。
+- 新增测试覆盖 GPU 分配范围、忙卡/显存不足、原始 ImageCHD/分卷拒绝、预检保持尺寸但限制 epoch/batch、partial/失败阻止正式训练、pip 安装目标隔离、中断进程组清理和并发保存设置。
+- 独立只读审查提出的 pip 目标继承、中断残留子进程、并发设置临时文件竞争已修复并加入回归测试。并发测试用两个写入完成后顺序原子 rename 的交错复现问题，避开 Windows 同时替换同一文件的访问限制。
+- 本地完整解压 13 卷 ImageCHD 成功；核对 110 对影像/标签的网格、全部标签值及两份说明表。见 [archive 检查报告](imagechd-archive.md)。
+- 服务器的 Linux 自动安装、真实文件锁和 CUDA 全尺寸预检尚未实机执行；CPU 合成测试不能证明 3090 显存足够或真实诊断有效。

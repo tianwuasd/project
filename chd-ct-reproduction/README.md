@@ -20,6 +20,12 @@
 
 详细步骤和常见问题见 [一键启动说明](docs/quickstart.md)。Linux/macOS 运行 `python start.py` 使用相同菜单。
 
+## zmic44 / Linux 服务器
+
+在服务器的 `project/chd-ct-reproduction` 目录运行 `bash start_server.sh`，按提示选择数据清单与结果目录。首次建议选 `demo`：自动建立独立 Python 3.11 / PyTorch 2.8 CUDA 12.8 环境，选择空闲 GPU，检查环境并测试八阶段流程。复用已有环境可指定 `--python /路径/bin/python`。
+
+完整命令、单卡配置、实际尺寸预检和日志位置见 [服务器启动说明](docs/server-start.md)。本机 `archive` 已确认是 110 例 ImageCHD，标签和空间信息需要适配，不能直接作为完整论文训练集；见 [archive 检查报告](docs/imagechd-archive.md)。
+
 ## 实现范围
 
 - 六个 3D U-Net 任务：两路 ROI、两路全心和两路初始血管；instance normalization、空间概率门控、加权 Dice + CE。
@@ -36,6 +42,7 @@
 ```text
 chd-ct-reproduction/
 ├── start.bat / start.py     # 双击启动 / 跨平台中文引导
+├── start_server.sh / .py    # zmic44 环境安装、GPU 检查和训练入口
 ├── configs/                 # paper、CPU smoke 和候选规则
 ├── src/chd_ct/
 │   ├── data.py              # NIfTI、manifest、ROI、标签
@@ -53,7 +60,7 @@ chd-ct-reproduction/
 └── docs/                    # 数据规范、复现差异、设计、验证结果
 ```
 
-`data/`、`runs/`、`checkpoints/`、影像和权重均被 Git 忽略。仓库不包含用户提供的 PDF 或患者数据。
+`archive/`、`data/`、`runs/`、`checkpoints/`、影像和权重均被 Git 忽略。仓库不包含用户提供的 PDF 或患者数据。
 
 ## 安装
 

@@ -18,3 +18,7 @@ checkpoints/
 *.pdf
 .env*
 !.env.example
+
+archive/
+.server-settings.json
+.server-settings.*.tmp
