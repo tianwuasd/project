@@ -14,7 +14,7 @@ URL = f"https://github.com/conda-forge/miniforge/releases/download/{VERSION}/{IN
 SHA256 = "281b0ac7d550802efc81af633225a5e6116d29ae72f3ab4eae7168c3931a4c05"
 
 
-def environment(base, root):
+def environment(base, root, threads=2):
     env = os.environ.copy()
     env.pop("PYTHONHOME", None)
     for key in ("PIP_TARGET", "PIP_PREFIX", "PIP_USER"):
@@ -35,6 +35,9 @@ def environment(base, root):
         folder.mkdir(parents=True, exist_ok=True)
         env[key] = str(folder)
     env["TEMP"] = env["TMP"] = env["TMPDIR"]
+    env["CONDA_ENVS_PATH"] = str(base / "envs")
+    for key in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+        env[key] = str(max(1, int(threads)))
     return env
 
 
@@ -96,9 +99,9 @@ def checked(command, env, log):
         raise RuntimeError(f"步骤退出码 {code}；详情见 {log}")
 
 
-def ensure_python(base, root, env, log):
+def ensure_python(base, root, env, log, conda_path=None):
     prefix = base / "tools/miniforge3"
-    conda = prefix / "bin/conda"
+    conda = Path(conda_path) if conda_path and Path(conda_path).is_file() else prefix / "bin/conda"
     if not conda.is_file():
         if prefix.exists():
             raise ValueError(f"安装目录不完整，请检查或改用新的 runtime：{prefix}")

@@ -20,6 +20,18 @@
 
 详细步骤和常见问题见 [一键启动说明](docs/quickstart.md)。Linux/macOS 运行 `python start.py` 使用相同菜单。
 
+## ImageCHD archive：三个独立步骤
+
+当前已支持七结构分割适配，按功能分开：
+
+| 功能 | 本机入口 | 服务器入口 |
+|---|---|---|
+| 预处理原始影像，生成可复用数据和划分 | `preprocess_imagechd.py` | `preprocess_server.sh` |
+| 读取预处理数据，短测或训练模型 | `train_imagechd.py` | `train_server.sh` |
+| 读取预处理影像与权重，输出分割 | `predict_imagechd.py` | `predict_server.sh` |
+
+预测不读取标签、不执行训练，训练不重复预处理。未知标签忽略、缺结构标注病例排除、强度按逐例百分位归一化；不猜测 HU 或真实毫米尺度。该模式不输出疾病诊断。完整示例见 [ImageCHD 独立流程](docs/imagechd-workflow.md)。
+
 ## zmic44 / Linux 服务器
 
 在服务器的 `project/chd-ct-reproduction` 目录运行 `bash start_server.sh`，按提示选择数据清单与结果目录。首次建议选 `demo`：自动建立独立 Python 3.11 / PyTorch 2.8 CUDA 12.8 环境，选择空闲 GPU，检查环境并测试八阶段流程。复用已有环境可指定 `--python /路径/bin/python`。
@@ -42,7 +54,9 @@
 ```text
 chd-ct-reproduction/
 ├── start.bat / start.py     # 双击启动 / 跨平台中文引导
-├── start_server.sh / .py    # zmic44 环境安装、GPU 检查和训练入口
+├── start_server.sh / .py    # 服务器环境和资源检查
+├── *_imagechd.py            # 独立预处理 / 训练 / 预测
+├── *_server.sh              # 上述三步的服务器入口
 ├── configs/                 # paper、CPU smoke 和候选规则
 ├── src/chd_ct/
 │   ├── data.py              # NIfTI、manifest、ROI、标签
@@ -51,6 +65,8 @@ chd-ct-reproduction/
 │   ├── inference/           # 多模型推理、融合、区域扩张
 │   ├── features/            # 解剖特征、中心线图
 │   ├── diagnosis/           # 可解释三值规则
+│   ├── imagechd/            # 原生七结构：预处理、训练、预测
+│   ├── server/              # 环境与GPU检查，按功能派发
 │   ├── quickstart/          # 环境检查、选择数据、小样本测试、报告
 │   ├── evaluation.py        # 分割与多标签评估
 │   ├── synthetic.py         # 仅用于软件测试的几何体

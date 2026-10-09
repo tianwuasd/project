@@ -18,6 +18,7 @@ from .bootstrap import ensure_python, environment, run_logged
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_RUNTIME = "/data5/zhougaowei/zhangruichen_workspace/chd_ct_runtime"
 DEFAULT_RESULTS = "/data_nas/zhangruichen/chd_ct_results"
+SERVER_PROFILE = ROOT / "configs/servers/zmic44.json"
 
 
 def write_json(path, data):
@@ -126,15 +127,36 @@ def main(argv=None):
     parser.add_argument("--runtime", help="专用环境/缓存目录，默认本地盘")
     parser.add_argument("--results", help="结果目录，默认 NAS")
     data = parser.add_mutually_exclusive_group()
-    data.add_argument("--dataset", help="符合项目规范的 manifest.csv 或目录")
+    data.add_argument("--dataset", help="paper 使用 manifest.csv/目录；preprocess 使用已解压 ImageCHD 目录或待预测 NIfTI")
     data.add_argument("--demo", action="store_true", help="合成数据，不需要真实病例")
     parser.add_argument("--mode", choices=["check", "smoke", "preflight", "train"], default="smoke")
     parser.add_argument("--gpu", default="auto", help="auto、nvidia-smi 物理编号或完整 GPU UUID")
     parser.add_argument("--device", choices=["cuda", "cpu"], default="cuda")
     parser.add_argument("--python", help="复用指定 Python，跳过安装；由环境检查判断是否可用")
-    parser.add_argument("--config", default=str(ROOT / "configs/server3090.yaml"))
+    parser.add_argument("--config", help="模型配置；paper 与 ImageCHD 使用各自默认配置")
+    parser.add_argument("--task", choices=["paper", "preprocess", "train", "predict"], default="paper")
+    parser.add_argument("--server-config", default=str(SERVER_PROFILE))
+    parser.add_argument("--prepared", help="ImageCHD 预处理目录：preprocess 输出，train/predict 输入")
+    parser.add_argument("--checkpoint", help="predict 使用的七结构权重")
+    parser.add_argument("--size", type=int, default=96, help="preprocess 输出的体素网格边长")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--limit", type=int, help="preprocess 软件试跑仅保留前 N 例")
+    parser.add_argument("--split-file", help="preprocess 使用的患者划分 CSV")
+    parser.add_argument("--for-prediction", action="store_true", help="preprocess 无标签影像")
+    parser.add_argument("--case-id", help="predict 选择一个病例")
+    parser.add_argument("--split", choices=["train", "val", "test"], help="predict 选择一个集合")
+    parser.add_argument("--allow-smoke", action="store_true", help="predict 显式允许短测权重")
     parser.add_argument("--non-interactive", action="store_true")
     args = parser.parse_args(argv)
+    try:
+        profile = json.loads(Path(args.server_config).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        print(f"服务器配置无法读取：{error}", file=sys.stderr)
+        return 1
+    if args.task != "paper":
+        from .imagechd import run
+
+        return run(args, profile)
     if platform.system() != "Linux" or platform.machine() not in {"x86_64", "AMD64"}:
         print("此入口面向 Linux x86_64；Windows 请使用 start.bat。")
         return 1
@@ -156,11 +178,21 @@ def main(argv=None):
         saved = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.exists() else {}
         runtime = personal_path(
             choose(
-                args.runtime, saved.get("runtime"), DEFAULT_RUNTIME, "环境与缓存目录（本地盘）", interactive
+                args.runtime,
+                saved.get("runtime"),
+                profile.get("runtime", DEFAULT_RUNTIME),
+                "环境与缓存目录（本地盘）",
+                interactive,
             )
         )
         results = personal_path(
-            choose(args.results, saved.get("results"), DEFAULT_RESULTS, "结果目录（NAS）", interactive)
+            choose(
+                args.results,
+                saved.get("results"),
+                profile.get("results", DEFAULT_RESULTS),
+                "结果目录（NAS）",
+                interactive,
+            )
         )
         selection = (
             "demo"
@@ -176,7 +208,7 @@ def main(argv=None):
         manifest = None if selection == "demo" else resolve_manifest(selection)
         if args.mode in {"preflight", "train"} and (not manifest or args.device != "cuda"):
             raise ValueError("正式尺寸预检/训练需要真实数据 manifest 与 CUDA。先用 smoke 检查软件。")
-        config = Path(args.config).expanduser().resolve()
+        config = Path(args.config).expanduser().resolve() if args.config else ROOT / "configs/server3090.yaml"
         if args.mode in {"preflight", "train"} and not config.is_file():
             raise ValueError(f"配置文件不存在：{config}")
         for folder, minimum in [
@@ -206,7 +238,7 @@ def main(argv=None):
             write_json(output / "status.json", state)
             write_json(settings_path, dict(runtime=str(runtime), results=str(results), dataset=selection))
             print(f"本次日志与报告：{output}", flush=True)
-            env = environment(runtime, ROOT)
+            env = environment(runtime, ROOT, profile.get("threads", 2))
             original_visible = env.get("CUDA_VISIBLE_DEVICES")
             minimum_gpu = 18000 if args.mode in {"preflight", "train"} else 6000
             if args.device == "cuda":
@@ -220,6 +252,7 @@ def main(argv=None):
                     ROOT,
                     env,
                     output / "server.log",
+                    profile.get("existing_conda"),
                 )
             )
             if not python.is_file():

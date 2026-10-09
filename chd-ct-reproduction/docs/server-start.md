@@ -1,8 +1,16 @@
 # zmic44 服务器启动
 
-这份入口沿用此前全心项目记录中的 Ubuntu 24.04、8 张 RTX 3090（24 GB）、580.173.02 驱动环境。硬件信息来自旧记录，本次未远程连接服务器核验。一次任务只选一张 GPU，不是八卡分布式训练。
+这份入口依据用户指定工作目录中的 `zmic44_服务器基础信息_更新版9.22.md`，其实际更新时间为 **2026-09-26**。配置集中保存在 `configs/servers/zmic44.json`：Ubuntu 24.04、双路 EPYC 7742（128 核/256 线程）、251 GiB RAM、8 张 RTX 3090（24 GB）、580.173.02 驱动。硬件信息来自旧记录，本次未远程连接服务器核验。一次任务只选一张 GPU，不是八卡分布式训练。
 
-## 第一次使用
+## ImageCHD 的独立入口
+
+本页下方 `start_server.sh` 默认仍服务原论文完整流程。ImageCHD 应使用 `preprocess_server.sh`、`train_server.sh`、`predict_server.sh` 三个独立入口；详见 [三步流程](imagechd-workflow.md)。每步只执行对应功能，并先检查环境。新增的 NAS 预处理目录是本项目建议路径，需要首次生成，不是笔记中已有数据目录。
+
+最新记录已确认 Miniforge 位于 `/data5/zhougaowei/zhangruichen_workspace/project1_runtime/tools/miniforge3`。入口优先使用其 conda 程序，但将新环境建在 `chd_ct_runtime/envs/chd_py311`，不修改旧 project1 Python 环境；缓存留在 CHD runtime。计算库线程上限来自服务器配置，默认 2。原始/预处理大数据、模型和报告放 NAS，不将 `/data5` 视为已确认 SSD。
+
+9 月 26 日 `/data5` 可用 101G、NAS 可用 25T 都是历史整盘快照；启动时重新检查空间。GitHub 直连曾不稳定，已有 Conda 可避免重复下载安装器；依赖下载仍依赖服务器网络。不自动改用公共镜像或旧快照里的空闲 GPU 4。
+
+## 原论文流程：第一次使用
 
 在服务器已有的 GitHub project 仓库中更新代码，进入子目录：
 
@@ -20,7 +28,7 @@ bash start_server.sh
 
 入口记住上次路径，下次仍可修改。无交互运行时建议始终明确传入 `--demo` 或 `--dataset`。
 
-首次自动在专用目录安装 Miniforge 26.7.2-0、Python 3.11、PyTorch 2.8.0/CUDA 12.8 和项目依赖。Miniforge 安装前核对官方 SHA256。不会安装系统驱动、调用 sudo 或修改 shell 配置。网络使用服务器已有的代理环境变量；Windows 上的 127.0.0.1:7897 不能直接当成服务器代理地址。
+首次自动在专用目录建立 Python 3.11、PyTorch 2.8.0/CUDA 12.8 和项目依赖。先使用配置中的已有 Conda；只有该程序不存在时，才安装本项目的 Miniforge 26.7.2-0。Miniforge 安装前核对官方 SHA256。不会安装系统驱动、调用 sudo 或修改 shell 配置。网络使用服务器已有的代理环境变量；Windows 上的 127.0.0.1:7897 不能直接当成服务器代理地址。
 
 需要安装包网络访问：GitHub、conda-forge、PyPI、download.pytorch.org。网络失败后日志会保留；不自动关闭 TLS 校验。环境安装不完整时保留目录供排查，可指定新的 runtime 重试。项目的其他依赖采用 pyproject.toml 下界约束，实际版本保存在环境报告中，并非完全锁定环境。
 
@@ -58,7 +66,7 @@ bash start_server.sh --dataset /你的数据/manifest.csv --mode train --gpu 3
 
 数据必须有明确的 train/val 患者划分、项目内部标签编号及全心 label。完整八阶段还需要 initial_label；缺少时短测返回“部分通过”（退出码 2），入口不会继续正式训练。
 
-本机 archive 是原始 ImageCHD，不能直接当作本项目的完整训练集。见 [archive 检查报告](imagechd-archive.md) 和 [数据规范](data-guide.md)。入口会识别原始 ImageCHD 文件夹/分卷目录并给出解释。即使手工写出 CSV，也不能跳过标签语义与空间信息核对：数字范围检查不能验证语义。
+本机 archive 是原始 ImageCHD，不能直接当作本项目的完整训练集。见 [archive 检查报告](imagechd-archive.md) 和 [数据规范](data-guide.md)。原论文入口仍会拒绝原始 ImageCHD 文件夹/分卷；七结构分割请进入上述独立流程。即使手工写出 CSV，也不能跳过标签语义与空间信息核对：数字范围检查不能验证语义。
 
 ## 查看进度与处理失败
 

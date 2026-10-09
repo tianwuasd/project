@@ -2,7 +2,7 @@
 # Published dimensions/hyperparameters; remaining design choices are in docs/paper-mapping.md.
 profile: paper
 seed: 42
-threads: 4
+threads: 2
 window: [-200, 1000] # Assumed HU window, not published.
 roi_margin: 3 # Assumed native-voxel margin.
 augment: true
