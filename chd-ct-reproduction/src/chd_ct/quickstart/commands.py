@@ -1,12 +1,14 @@
 """Dependency-light task arguments shared by desktop and server launchers."""
 
 from ..paths import config_path
+from .diagnosis import DIAGNOSIS_TASKS, add_arguments, build_diagnosis_command
 
-TASKS = ("environment", "preprocess", "train", "predict", "evaluate", "demo", "test")
+TASKS = ("environment", "preprocess", "train", "predict", "evaluate", "demo", "test") + DIAGNOSIS_TASKS
 
 
 def add_task_arguments(parser):
     parser.add_argument("--task", choices=TASKS)
+    add_arguments(parser)
     parser.add_argument("--dataset", help="已解压 ImageCHD 目录；预测预处理可选单个 NIfTI")
     parser.add_argument("--prepared", help="预处理输出目录 / 训练预测输入目录")
     parser.add_argument("--models", help="完整六阶段模型目录或 models.json")
@@ -31,16 +33,18 @@ def choose_task(args, interactive):
     if not interactive:
         raise ValueError("非交互运行请指定 --task environment/preprocess/train/predict/evaluate/demo/test")
     print(
-        "请选择一个独立功能：0 环境检查；1 预处理；2 训练/短测；3 预测；4 评估；5 合成全流程测试；6 测试集预测和评估"
+        "请选择一个独立功能：0 环境检查；1 预处理；2 训练/短测；3 预测；4 评估；5 合成分割测试；6 测试集预测和评估；7 导入诊断标签；8 提取诊断特征；9 训练诊断树；10 诊断与解释；11 诊断评估；12 合成诊断测试"
     )
     value = input("功能 [0]：").strip() or "0"
-    if value not in {str(i) for i in range(7)}:
-        raise ValueError("请选择 0 至 6")
+    if value not in {str(i) for i in range(len(TASKS))}:
+        raise ValueError("请选择 0 至 12")
     return TASKS[int(value)]
 
 
 def build_command(args, root, python, output, device, mode=None):
     task = args.task
+    if task in DIAGNOSIS_TASKS:
+        return build_diagnosis_command(args, python, output)
     if task == "demo":
         return [python, "-m", "chd_ct.imagechd.demo", "--output", output, "--device", device]
     command = [python, "-m", "chd_ct.imagechd." + task]

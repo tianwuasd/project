@@ -9,7 +9,9 @@ from uuid import uuid4
 
 from ..paths import PACKAGE_PARENT, project_root
 from ..server.bootstrap import run_logged
+from ..server.launcher import choose
 from .commands import add_task_arguments, build_command, choose_task
+from .diagnosis import DIAGNOSIS_TASKS, resolve_inputs
 from .environment import check_environment
 
 ROOT = project_root()
@@ -50,6 +52,8 @@ def main(argv=None):
     report = {"status": "running"}
     try:
         args.task = choose_task(args, interactive)
+        if args.task in DIAGNOSIS_TASKS:
+            resolve_inputs(args, {}, choose, interactive)
         if interactive:
             if args.task == "preprocess" and not args.dataset:
                 args.dataset = choose_path("选择已解压 ImageCHD 数据")

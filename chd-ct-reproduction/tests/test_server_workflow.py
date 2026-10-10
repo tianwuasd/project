@@ -181,3 +181,74 @@ def test_reset_settings_uses_profile_without_removing_cache(tmp_path):
     args.reset_settings = True
     resolve_settings(args, profile, False)
     assert args.gpu_count == 1 and settings_file.is_file()
+
+
+@pytest.mark.parametrize(
+    "task",
+    [
+        "diagnosis-labels",
+        "diagnosis-features",
+        "diagnosis-train",
+        "diagnose",
+        "diagnosis-evaluate",
+        "diagnosis-demo",
+    ],
+)
+def test_diagnosis_dispatch_is_independent_and_cpu_only(task, tmp_path, monkeypatch):
+    import signal
+    from types import SimpleNamespace
+
+    from chd_ct.quickstart.diagnosis import OUTPUT_KEYS
+    from chd_ct.server import imagechd
+
+    args, profile = arguments(
+        tmp_path,
+        "--task",
+        task,
+        "--features",
+        str(tmp_path / "features"),
+        "--diagnosis-labels",
+        str(tmp_path / "labels"),
+        "--classifier",
+        str(tmp_path / "classifier"),
+        "--predictions",
+        str(tmp_path / "segmentations"),
+        "--diagnoses",
+        str(tmp_path / "diagnoses"),
+    )
+    # No prepared files or available GPUs; launcher must not call segmentation or GPU selection.
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(signal, "SIGHUP", 1, raising=False)
+    monkeypatch.setattr(signal, "signal", lambda *a: None)
+    monkeypatch.setitem(sys.modules, "fcntl", SimpleNamespace(LOCK_EX=1, LOCK_NB=2, flock=lambda *a: None))
+    monkeypatch.setattr(imagechd, "query_gpus", lambda: pytest.fail("诊断不应检查或占用显卡"))
+    calls = []
+    monkeypatch.setattr(
+        imagechd, "run_logged", lambda cmd, env, log: calls.append((list(map(str, cmd)), env)) or 0
+    )
+    assert imagechd.run(args, profile) == 0
+    assert len(calls) == 2
+    assert calls[0][0][calls[0][0].index("--device") + 1] == "cpu"
+    command, env = calls[1]
+    assert command[2] == "chd_ct.diagnosis.cli"
+    assert env["CUDA_VISIBLE_DEVICES"] == ""
+    if task == "diagnosis-labels":
+        assert command[command.index("--blank-policy") + 1] == "negative"
+        assert command[command.index("--input") + 1].endswith("imageCHD_dataset_info.xlsx")
+    settings = json.loads((Path(profile["runtime"]) / ".server-settings.json").read_text())
+    if task in OUTPUT_KEYS:
+        assert Path(settings[OUTPUT_KEYS[task]]).name == task
+    assert "last_models" not in settings
+
+
+def test_explicit_diagnosis_dataset_overrides_saved_source(tmp_path):
+    args, profile = arguments(tmp_path, "--task", "diagnosis-labels")
+    runtime = Path(profile["runtime"])
+    runtime.mkdir()
+    (runtime / ".server-settings.json").write_text(
+        json.dumps({"diagnosis_source": str(tmp_path / "old.xlsx"), "gpu_count": 3, "gpu": "0,1,2"})
+    )
+    args.dataset = str(tmp_path / "new-dataset")
+    _, _, _, saved = resolve_settings(args, profile, False)
+    assert args.diagnosis_source == str(tmp_path / "new-dataset/imageCHD_dataset_info.xlsx")
+    assert saved["gpu_count"] == 3 and saved["gpu"] == "0,1,2"

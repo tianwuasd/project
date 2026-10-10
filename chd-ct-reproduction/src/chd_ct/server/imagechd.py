@@ -8,6 +8,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from ..quickstart.commands import build_command
+from ..quickstart.diagnosis import DIAGNOSIS_TASKS, OUTPUT_KEYS
 from .bootstrap import ensure_python, environment, run_logged
 from .launcher import ROOT, query_gpus, select_gpus, write_json
 from .settings import resolve_settings
@@ -74,7 +75,9 @@ def run(args, profile):
             env = environment(runtime, ROOT, profile.get("threads", 2))
             device = (
                 "cpu"
-                if args.task in {"preprocess", "evaluate"} or (args.task == "train" and args.mode == "check")
+                if args.task in DIAGNOSIS_TASKS
+                or args.task in {"preprocess", "evaluate"}
+                or (args.task == "train" and args.mode == "check")
                 else args.device
             )
             if device == "auto":
@@ -135,6 +138,9 @@ def run(args, profile):
                     output / ("test/predictions" if args.task == "test" else "predict")
                 )
             write_json(settings_file, settings)
+            if args.task in OUTPUT_KEYS:
+                settings[OUTPUT_KEYS[args.task]] = str(output / args.task)
+                write_json(settings_file, settings)
             state["status"] = "passed"
             print("已完成 " + args.task + "：" + str(output))
             return 0

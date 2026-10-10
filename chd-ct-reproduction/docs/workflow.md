@@ -60,7 +60,7 @@ python predict.py --prepared data/imagechd7_native --models runs/chd_full/models
 
 预测只读取缓存的 image，不读取 target。先预测区域，再进行四路1:1:2:2投票，随后用循环血池模型约束区域扩张。最后恢复原始尺寸、方向和 affine，保存 `*_seg.nii.gz`。同时保存缓存网格下的 `*_grid.npz`，供独立评估使用。报告为 `prediction-report.json`。
 
-`--case-id ct_1001` 可选一例；不传 `--split/--case-id` 时预测全部输入病例。没有疾病诊断输出。
+`--case-id ct_1001` 可选一例；不传 `--split/--case-id` 时预测全部输入病例。该命令只输出分割；疾病判断需要另外运行 [独立诊断步骤](diagnosis.md)。
 
 ## 4. 独立评估
 
@@ -83,7 +83,7 @@ ct_1002,patient002,val
 ct_1004,patient004,test
 ```
 
-须覆盖全部保留病例，患者不能跨集合。预处理一次固定划分，后续训练不重新抽样。诊断表中的空白不补为阴性，不用于当前分割任务。
+须覆盖全部保留病例，患者不能跨集合。预处理一次固定划分，后续训练不重新抽样。分割任务不使用疾病标签。独立诊断模块按用户约定将已有疾病列的空白作为阴性，并记录来源；见 [诊断说明](diagnosis.md)。
 
 ## 无标签新病例
 

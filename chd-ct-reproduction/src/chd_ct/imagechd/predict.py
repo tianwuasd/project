@@ -103,6 +103,8 @@ def predict(prepared, models, output, device="cpu", case_id=None, split=None, al
         "labels": list(LABELS),
         "prepared_sha256": file_hash(cache / "dataset.json"),
         "models_sha256": file_hash(directory / "models.json"),
+        "model_mode": collection["mode"],
+        "segmentation_prepared_sha256": collection["prepared_sha256"],
         "cache_resolution": data["resolution"],
         "cases": [],
         "unavailable": UNAVAILABLE,

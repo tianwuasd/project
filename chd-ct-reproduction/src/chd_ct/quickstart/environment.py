@@ -16,6 +16,7 @@ PACKAGES = {
     "yaml": (6, 0),
     "skimage": (0, 24),
     "networkx": (3, 2),
+    "sklearn": (1, 5),
 }
 
 

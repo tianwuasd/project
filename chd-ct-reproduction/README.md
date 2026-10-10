@@ -1,8 +1,8 @@
-# ImageCHD：心脏 CT 多阶段分割复现
+# ImageCHD：多阶段分割与独立可解释诊断
 
 主目录现在只有一条默认流程：**预处理 → 六阶段训练 → 融合预测 → 独立评估**。数据使用当前 archive 中的 ImageCHD，U-Net 主干按原作者发布的 Caffe 网络定义移植，保留独立可关闭的 gate，并沿用 BiConvLSTM、心脏区域定位、多尺度投票与血池边界细化方法。
 
-这是原论文方法在现有七结构数据上的适配。当前没有初始血管标注、PV/SVC/IVC 标注与经验证的诊断规则，因此不运行两个 init 阶段，不输出疾病诊断，也不宣称复现了论文临床准确率。
+这是原论文方法在现有七结构数据上的适配。当前没有初始血管标注、PV/SVC/IVC 标注与经验证的诊断规则，因此不运行两个 init 阶段。新增独立的解剖特征＋浅层决策树诊断，保留候选规则作对照；这是研究扩展，不宣称复现了论文临床准确率。
 
 **U-Net 来源与开关：** 见 [官方来源与移植说明](docs/unet-source.md)。三维 gate 默认开启。旧权重需要重新训练，预处理缓存可复用。
 
@@ -10,7 +10,8 @@
 
 1. 先看 [使用流程](docs/workflow.md)，理解每一步的输入和输出。
 2. 再看 [代码阅读路线](docs/code-guide.md)，依次读预处理、训练、预测。
-3. 准备上服务器时看 [服务器说明](docs/server-start.md)。
+3. 诊断模块从 [独立诊断流程](docs/diagnosis.md) 开始；空白疾病单元格按约定默认为阴性，并记录来源。
+4. 准备上服务器时看 [服务器说明](docs/server-start.md)。
 
 Windows 双击 **start.bat**，选择一个功能。数据路径可直接粘贴，或输入 `browse` 打开目录选择窗口。Linux/macOS 运行 `python start.py`。每个任务先检查环境；训练默认只做短测，正式训练需明确选择 `--mode train`。
 
@@ -21,10 +22,13 @@ Windows 双击 **start.bat**，选择一个功能。数据路径可直接粘贴�
 | 预测 | `predict.py` | `predict_server.sh` | 缓存影像 + 模型目录 → NIfTI 分割 |
 | 测试（预测 + 评估） | `test.py` | `test_server.sh` | 测试集缓存 + 模型 → 分割及 Dice |
 | 评估 | `evaluate.py` | `evaluate_server.sh` | 预测 + 缓存真值 → Dice 报告 |
+| 诊断各步骤 | `diagnosis.py labels/features/train/predict/evaluate/demo` | `diagnosis_server.sh --task ...` | 标签导入、特征、浅树训练、判断解释、诊断评估分别启动 |
 
 服务器数据路径和 GPU 数统一在 `configs/servers/zmic44.json` 设置，也可在菜单选择；`smoke_server.sh` 是独立短测。多卡采用一张卡一个阶段，保留血池 LSTM 的编码器依赖。详见 [服务器分步启动](docs/server-start.md)。
 
-训练和预测不会重新预处理。预测不会读取真值或训练模型；评估单独启动。
+训练和预测不会重新预处理。分割预测不会读取真值或训练模型；分割评估与诊断各步骤分别启动。
+
+诊断先试跑：`python start.py --task diagnosis-demo --device cpu --non-interactive`，随后查看输出中的 `diagnosis-demo/prediction/diagnosis-report.html`。
 
 ## 安装与先跑通
 
@@ -56,6 +60,7 @@ chd-ct-reproduction/
 ├── train.py                      # 六阶段训练
 ├── predict.py                    # 融合推理
 ├── evaluate.py                   # 单独评估
+├── diagnosis.py                  # 独立诊断六个子命令
 ├── *_server.sh / start_server.py # 同一主流程的服务器入口
 ├── configs/
 │   ├── chd.yaml                  # 实用单卡配置
@@ -64,6 +69,7 @@ chd-ct-reproduction/
 │   └── servers/zmic44.json       # 数据路径、GPU 数、环境、线程
 ├── src/chd_ct/
 │   ├── imagechd/                 # 数据、六阶段训练、融合预测、评估
+│   ├── diagnosis/                # 标签、解剖特征、规则、可解释树、诊断评估
 │   ├── models/                   # 原作者结构主干 / 网格适配 / gate / BiConvLSTM
 │   ├── quickstart/               # 桌面引导与环境检查
 │   └── server/                   # 环境安装、GPU检查、任务派发

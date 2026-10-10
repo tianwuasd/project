@@ -99,3 +99,7 @@ test/                       # 只有 test 任务生成
 复用已有 Conda 管理工具 `/data5/zhougaowei/zhangruichen_workspace/project1_runtime/tools/miniforge3/bin/conda`；CHD 使用自己 runtime 下的 `envs/chd_py311`，不向 whole heart 的 Python 环境安装依赖。默认 Python3.11、PyTorch2.8/CUDA12.8；未找到已有 Conda 时下载并校验 Miniforge。可用 `--python /已有环境/bin/python` 跳过安装，仍检查环境。网络设置沿用服务器环境。
 
 本次验证包括真实 CPU 多进程训练、单进程/多进程权重一致性、独立测试入口与模拟显卡派发；未连接 zmic44，尚未做真实多 GPU 或 3090 显存验证。原作者宽度配置 `configs/chd-author-unet.yaml` 仍须在服务器做 preflight；主干来源与三维默认 gate 见 [U-Net 说明](unet-source.md)。
+
+## 独立诊断步骤
+
+新增 `diagnosis_server.sh`，按 `--task diagnosis-labels/diagnosis-features/diagnosis-train/diagnose/diagnosis-evaluate/diagnosis-demo` 分别启动。每次只执行一步，使用 CPU，不改变既有分割 GPU 设置；成功后记住对应诊断输出。标签表默认位于 dataset 下的 `imageCHD_dataset_info.xlsx`，空白按约定默认转为 0。具体顺序及输入覆盖参数见 [独立诊断说明](diagnosis.md)。

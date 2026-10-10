@@ -10,7 +10,7 @@ from ..models.unet import ARCHITECTURE
 STAGES = ("crop64", "crop128", "all64", "all128", "blood2d", "blood_lstm")
 UNAVAILABLE = {
     "init64/init128": "ImageCHD has no initial-vessel annotation",
-    "clinical_diagnosis": "Missing PV/SVC/IVC supervision, verified physical calibration and validated diagnostic rules",
+    "validated_clinical_diagnosis": "Missing PV/SVC/IVC supervision, verified physical calibration and validated diagnostic rules",
 }
 
 

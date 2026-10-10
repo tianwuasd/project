@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+from ..quickstart.diagnosis import DIAGNOSIS_TASKS, resolve_inputs
 from .launcher import ROOT, choose, personal_path
 
 DEFAULT_DATASET = "/data_nas/zhangruichen/baidu_import/ImageCHD_dataset"
@@ -21,6 +22,24 @@ def resolve_settings(args, profile, interactive):
     results = personal_path(
         choose(args.results, saved.get("results"), profile["results"], "结果目录", interactive)
     )
+    if args.task in DIAGNOSIS_TASKS:
+        defaults = {
+            "prepared": profile["prepared"],
+            "diagnosis_source": str(
+                Path(args.dataset or saved.get("dataset") or profile.get("dataset", DEFAULT_DATASET))
+                / "imageCHD_dataset_info.xlsx"
+            ),
+        }
+        # An explicit dataset overrides the saved source-table directory.
+        input_settings = dict(saved)
+        if args.dataset and not args.diagnosis_source:
+            input_settings.pop("diagnosis_source", None)
+        resolve_inputs(args, input_settings, choose, interactive, defaults)
+        args.gpu, args.gpu_count = "auto", 1
+        saved["results"] = str(results)
+        if args.task == "diagnosis-labels":
+            saved["diagnosis_source"] = args.diagnosis_source
+        return runtime, results, settings_file, saved
     for name, label, default in (
         ("dataset", "原始 ImageCHD 数据目录", profile.get("dataset", DEFAULT_DATASET)),
         ("prepared", "预处理缓存目录", profile["prepared"]),
