@@ -59,13 +59,13 @@ def arguments(tmp_path, *options):
 def test_settings_default_saved_and_explicit_precedence(tmp_path):
     args, profile = arguments(tmp_path, "--task", "train")
     runtime, _, settings_file, settings = resolve_settings(args, profile, False)
-    assert args.dataset == profile["dataset"] and args.gpu_count == 1
+    assert args.dataset is None and args.gpu_count == 1  # Training only consumes prepared data.
     runtime.mkdir()
     settings.update(dataset=str(tmp_path / "saved_raw"), gpu_count=3, last_models=str(tmp_path / "models"))
     settings_file.write_text(json.dumps(settings))
     args, _ = arguments(tmp_path, "--task", "train", "--gpu-count", "2")
     resolve_settings(args, profile, False)
-    assert args.dataset.endswith("saved_raw") and args.gpu_count == 2
+    assert args.dataset is None and args.gpu_count == 2
     args, _ = arguments(tmp_path, "--task", "test")
     resolve_settings(args, profile, False)
     assert args.models.endswith("models")

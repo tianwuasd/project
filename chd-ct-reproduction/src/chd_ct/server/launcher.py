@@ -116,8 +116,8 @@ def select_gpus(rows, count=1, requested="auto", visible=None, minimum=6000):
     return selected
 
 
-def main(argv=None):
-    from ..quickstart.commands import add_task_arguments, choose_task
+def make_parser():
+    from ..quickstart.commands import add_task_arguments
 
     parser = argparse.ArgumentParser(description="ImageCHD 主流程服务器入口")
     add_task_arguments(parser)
@@ -131,13 +131,37 @@ def main(argv=None):
     parser.add_argument("--gpu-count", type=int, help="训练显卡数，默认沿用设置或 1（最多 5）")
     parser.add_argument("--python", help="已有 Python 路径；不安装依赖，由环境检查决定是否可用")
     parser.add_argument("--server-config", default=str(SERVER_PROFILE))
-    args = parser.parse_args(argv)
-    try:
-        args.task = choose_task(args, sys.stdin.isatty() and not args.non_interactive)
-        profile = json.loads(Path(args.server_config).read_text(encoding="utf-8"))
-        from .imagechd import run
+    parser.add_argument(
+        "--tasks", help="多选步骤，逗号或空格分隔；例如 environment,preprocess,smoke,train,test"
+    )
+    parser.add_argument("--foreground", action="store_true", help="前台调试并等待完成；默认独立后台运行")
+    parser.add_argument("--status", action="store_true", help="查看最近后台任务，不安装环境或查询GPU")
+    parser.add_argument("--worker", help=argparse.SUPPRESS)
+    parser.add_argument("--lock-fd", type=int, help=argparse.SUPPRESS)
+    return parser
 
-        return run(args, profile)
+
+def main(argv=None):
+    args = make_parser().parse_args(argv)
+    try:
+        from . import jobs
+
+        if args.worker:
+            return jobs.worker(Path(args.worker), args.lock_fd)
+        profile = json.loads(Path(args.server_config).read_text(encoding="utf-8"))
+        if args.status:
+            return jobs.show_status(personal_path(args.runtime or profile["runtime"]))
+        if sys.platform != "linux":
+            raise ValueError("服务器入口用于 Linux；本机请使用 start.py 或独立 Python 脚本。")
+        from .workflow import build_plan
+
+        plan = build_plan(args, profile, sys.stdin.isatty() and not args.non_interactive)
+        print("执行顺序：" + " → ".join(step["name"] for step in plan["steps"]))
+        for step in plan["steps"]:
+            print(step["name"] + "：" + json.dumps(step["arguments"], ensure_ascii=False))
+        print("本次日志：" + plan["log"], flush=True)
+        with jobs.acquire_lock(Path(plan["runtime"])) as lock:
+            return jobs.submit(plan, lock, foreground=args.foreground)
     except (Exception, KeyboardInterrupt) as error:
         print("未通过：" + str(error), file=sys.stderr)
         return 1

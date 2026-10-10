@@ -1,6 +1,6 @@
 # 独立诊断：解剖特征、决策树与规则对照
 
-这一层接在已有分割预测之后，但每一步需要单独启动。不会隐式预处理 CT、训练 U-Net 或重做分割。主分类器是**每个疾病一棵浅层决策树**，允许一例同时有多个阳性标签；规则结果另列，不把两者概率相加。
+这一层接在已有分割预测之后，每一步均有独立入口，也可通过服务器多选菜单按顺序提交。不会隐式预处理 CT、训练 U-Net 或重做分割。主分类器是**每个疾病一棵浅层决策树**，允许一例同时有多个阳性标签；规则结果另列，不把两者概率相加。
 
 论文 §4.4 通过解剖结构与专家规则诊断。这里的可训练树是项目扩展，候选规则是可审阅的研究实现，均不等于作者完整临床系统或已验证诊断性能。
 
@@ -88,29 +88,36 @@ AVSD 在原表没有阳性；某疾病训练集中不足 2 个阳性或 2 个阴
 
 ## 服务器按步骤运行
 
-进入服务器的 `project/chd-ct-reproduction`：
+进入服务器的 `project/chd-ct-reproduction`，可先单独验证 CPU 诊断链路：
 
 ```bash
-# 先检查环境和独立诊断链路，不占用 GPU
 bash diagnosis_server.sh --task diagnosis-demo --non-interactive
-
-# 默认标签表位于配置中的 dataset/imageCHD_dataset_info.xlsx
-bash diagnosis_server.sh --task diagnosis-labels --non-interactive
-# 覆盖来源可用 --dataset /新数据目录，或 --diagnosis-source /具体诊断表.xlsx
-
-# 如尚无全病例预测，先单独使用原分割入口；不要指定 --split
-bash predict_server.sh --models /完整路径/某次训练/train --non-interactive
-
-# 后续成功步骤会记住各自结果目录
-bash diagnosis_server.sh --task diagnosis-features --non-interactive
-bash diagnosis_server.sh --task diagnosis-train --non-interactive
-bash diagnosis_server.sh --task diagnose --diagnosis-split test --non-interactive
-bash diagnosis_server.sh --task diagnosis-evaluate --diagnosis-split test --non-interactive
+bash start_server.sh --status
 ```
 
-诊断步骤一律 CPU，不改变原分割的显卡设置。每次只派发选中的一步，先做环境检查。省略 `--non-interactive` 可以逐项输入路径；也可用 `--prepared`、`--predictions`（分割结果）、`--features`、`--diagnosis-labels`、`--classifier`、`--diagnoses`（诊断结果）覆盖相应输入。`--tree-depth` 与 `--min-leaf` 调整浅树大小；统一菜单的诊断集合参数为 `--diagnosis-split`，原分割集合仍为 `--split`。
+所有服务器入口默认后台提交，可断开 SSH。上一任务结束后，如果已有正式分割模型与对应缓存，但还没有全病例预测，可一次提交：
 
-输出在配置 `results` 的新时间戳目录，子目录分别是 `diagnosis-labels/`、`diagnosis-features/`、`diagnosis-train/`、`diagnose/`、`diagnosis-evaluate/`。短测或来源未确认的特征仅能用 `--allow-smoke` 做软件验证。不存在有效真实分类器时不会假装完成真实诊断。
+```bash
+bash start_server.sh \
+  --tasks predict,diagnosis-labels,diagnosis-features,diagnosis-train,diagnose,diagnosis-evaluate \
+  --models /完整路径/某次正式训练/train --gpu 0 --diagnosis-split test --non-interactive
+```
+
+这里假定 GPU 0 已分配可用；只有 `predict` 使用 GPU，诊断步骤都使用 CPU。不传分割的 `--split`，保证全病例预测覆盖诊断训练/验证所需病例。后续步骤自动接用本次输出；任何一步失败即停止。
+
+已有对应的全病例预测时，纯 CPU 链路不需要显卡参数：
+
+```bash
+bash start_server.sh \
+  --tasks diagnosis-labels,diagnosis-features,diagnosis-train,diagnose,diagnosis-evaluate \
+  --predictions /完整路径/全病例分割预测/predict --diagnosis-split test --non-interactive
+```
+
+要单独执行一步，使用 `bash diagnosis_server.sh --task diagnosis-features --non-interactive` 等入口。独立任务完成后再提交下一步，避免重复提交被锁拦截。省略 `--non-interactive` 可输入有关路径；纯 CPU 步骤不询问或保存显卡、分割模型配置。已有 GPU 偏好保留给后续训练。
+
+标签表默认位于 dataset 下的 `imageCHD_dataset_info.xlsx`，可用 `--dataset` 或 `--diagnosis-source` 覆盖。`--prepared`、`--predictions`（分割结果）、`--features`、`--diagnosis-labels`、`--classifier`、`--diagnoses`（诊断结果）可覆盖对应输入；`--tree-depth` 和 `--min-leaf` 调整浅树大小。诊断集合用 `--diagnosis-split`，分割集合用 `--split`。
+
+结果在 `<results>/<时间戳>_<标识>_workflow/steps/<序号>_<步骤>/`，其中包含对应 `diagnosis-features/`、`diagnosis-train/` 等产物目录。`--status` 显示各步骤路径，完整后台日志为 workflow 目录中的 `launcher.log`。短测或来源未确认的特征仅能用 `--allow-smoke` 做软件验证。
 
 ## 从哪里读代码
 

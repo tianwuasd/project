@@ -24,7 +24,7 @@ Windows 双击 **start.bat**，选择一个功能。数据路径可直接粘贴�
 | 评估 | `evaluate.py` | `evaluate_server.sh` | 预测 + 缓存真值 → Dice 报告 |
 | 诊断各步骤 | `diagnosis.py labels/features/train/predict/evaluate/demo` | `diagnosis_server.sh --task ...` | 标签导入、特征、浅树训练、判断解释、诊断评估分别启动 |
 
-服务器数据路径和 GPU 数统一在 `configs/servers/zmic44.json` 设置，也可在菜单选择；`smoke_server.sh` 是独立短测。多卡采用一张卡一个阶段，保留血池 LSTM 的编码器依赖。详见 [服务器分步启动](docs/server-start.md)。
+服务器运行 `bash start_server.sh` 可多选步骤，默认独立后台运行，断开 SSH 后继续；`bash start_server.sh --status` 查看进度。菜单只询问所选步骤需要的设置，CPU 预处理/评估/诊断无需配置显卡。默认数据路径和 GPU 数在 `configs/servers/zmic44.json`，也可在菜单覆盖；`smoke_server.sh` 是独立短测。多卡采用一张卡一个阶段，保留血池 LSTM 的编码器依赖。详见 [服务器分步启动](docs/server-start.md)。
 
 训练和预测不会重新预处理。分割预测不会读取真值或训练模型；分割评估与诊断各步骤分别启动。
 
@@ -72,7 +72,7 @@ chd-ct-reproduction/
 │   ├── diagnosis/                # 标签、解剖特征、规则、可解释树、诊断评估
 │   ├── models/                   # 原作者结构主干 / 网格适配 / gate / BiConvLSTM
 │   ├── quickstart/               # 桌面引导与环境检查
-│   └── server/                   # 环境安装、GPU检查、任务派发
+│   └── server/                   # 环境安装、按需设置、多选流程、后台状态
 ├── tests/                        # 当前主流程测试
 ├── docs/                         # 当前使用方式和复现边界
 └── back/paper-v1/                # 原版本的独立源代码快照

@@ -3,18 +3,41 @@
 import shutil
 import signal
 import sys
+from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
 from ..quickstart.commands import build_command
-from ..quickstart.diagnosis import DIAGNOSIS_TASKS, OUTPUT_KEYS
+from ..quickstart.diagnosis import OUTPUT_KEYS
 from .bootstrap import ensure_python, environment, run_logged
 from .launcher import ROOT, query_gpus, select_gpus, write_json
-from .settings import resolve_settings
+from .settings import effective_device, resolve_settings, task_configuration
 
 
-def run(args, profile):
+def select_with_handoff(count, requested, visible, minimum, recent_gpus):
+    rows = query_gpus()
+    try:
+        return select_gpus(rows, count, requested, visible, minimum)
+    except ValueError:
+        # Only wait for utilization left by this workflow; busy/unauthorized cards
+        # remain ineligible, and we never wait for another user's compute process.
+        candidates = select_gpus(
+            [dict(row, util=0) if row["uuid"] in recent_gpus else row for row in rows],
+            count,
+            requested,
+            visible,
+            minimum,
+        )
+        from ..imagechd.stage_queue import check_gpu_handoff
+
+        for gpu in candidates:
+            if gpu["uuid"] in recent_gpus:
+                check_gpu_handoff(gpu["uuid"], used=True)
+        return select_gpus(query_gpus(), count, requested, visible, minimum)
+
+
+def run(args, profile, *, output_dir=None, lock_held=False, recent_gpus=()):
     if sys.platform != "linux":
         print("服务器入口用于 Linux；本机请使用 start.py 或独立 Python 脚本。")
         return 1
@@ -58,10 +81,13 @@ def run(args, profile):
             raise ValueError("环境或结果盘可用空间不足")
         import fcntl
 
-        with (runtime / ".job.lock").open("a") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            output = results / (datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid4().hex[:6])
-            output.mkdir()
+        with nullcontext() if lock_held else (runtime / ".job.lock").open("a") as lock:
+            if not lock_held:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            output = output_dir or results / (
+                datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid4().hex[:6]
+            )
+            output.mkdir(parents=True, exist_ok=False)
             state = {
                 "status": "running",
                 "task": args.task,
@@ -70,18 +96,10 @@ def run(args, profile):
             }
             write_json(output / "status.json", state)
             write_json(settings_file, settings)
-            write_json(output / "server-settings.json", settings)
+            write_json(output / "server-settings.json", task_configuration(args))
             print("日志和结果：" + str(output), flush=True)
             env = environment(runtime, ROOT, profile.get("threads", 2))
-            device = (
-                "cpu"
-                if args.task in DIAGNOSIS_TASKS
-                or args.task in {"preprocess", "evaluate"}
-                or (args.task == "train" and args.mode == "check")
-                else args.device
-            )
-            if device == "auto":
-                device = "cuda"
+            device = effective_device(args)
             visible = env.get("CUDA_VISIBLE_DEVICES")
             count = args.gpu_count if args.task in {"train", "environment"} else 1
             requested = args.gpu
@@ -89,7 +107,7 @@ def run(args, profile):
                 requested = requested.split(",")[0].strip()
             minimum = 6000
             if device == "cuda":
-                select_gpus(query_gpus(), count, requested, visible, minimum)
+                select_with_handoff(count, requested, visible, minimum, recent_gpus)
             python = (
                 Path(args.python).expanduser().resolve()
                 if args.python

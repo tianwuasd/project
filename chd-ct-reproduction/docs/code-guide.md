@@ -13,7 +13,7 @@
 | 7 | imagechd/predict.py、fusion.py | 影像独立推理、区域定位、投票、血池细化、原空间恢复 |
 | 8 | imagechd/test.py、evaluate.py | 单独读取真值评估，不参与模型选择 |
 | 9 | quickstart/commands.py、wizard.py | 同一功能在本机的引导与环境检查 |
-| 10 | server/launcher.py、settings.py、imagechd.py、bootstrap.py | GPU/环境/目录设置和对应任务启动 |
+| 10 | server/launcher.py、workflow.py、settings.py、jobs.py、imagechd.py、bootstrap.py | 多选计划、按需设置、后台状态与单步任务执行 |
 
 测试 tests/test_chd_main.py 中的六阶段完整示例可作为最小使用例子；tests/test_launchers.py 检查入口分离和服务器失败处理。
 
@@ -21,6 +21,6 @@
 
 U-Net 请先读 [来源与结构对齐说明](unet-source.md)，再看 unet.py 的原始主干、grid.py 的边界适配、gate.py 的可选扩展。这三部分不要混为官方网络。
 
-服务器先看 configs/servers/zmic44.json，再读 server/settings.py 的设置优先级、server/imagechd.py 的单任务派发。多卡依赖在 imagechd/stage_queue.py；测试集的独立入口在 imagechd/test.py。tests/test_server_workflow.py 覆盖显卡分配、设置和进程失败清理。
+服务器先看 configs/servers/zmic44.json，再按 server/launcher.py → workflow.py → settings.py → jobs.py → imagechd.py 阅读：入口解析、多选计划、有关参数、后台执行、单步骤派发。bootstrap.py 管理环境和子进程。多卡训练依赖在 imagechd/stage_queue.py；测试集入口在 imagechd/test.py。tests/test_server_jobs.py 覆盖产物衔接与状态；test_server_posix.py 用真实 Linux 进程验证后台存活、锁、失败和中断。
 
 诊断阅读顺序：`labels.py` 看空白为阴性的来源记录，`features.py` 看 56 个结构描述，`classifier.py` 看训练及真实分支解释，`predict.py` 看 HTML 输出，`evaluate.py` 看独立评估。候选规则在 `rules.py` 与 `configs/diagnosis-rules.yaml`。运行方法见 [诊断说明](diagnosis.md)。
