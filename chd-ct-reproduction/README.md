@@ -19,7 +19,10 @@ Windows 双击 **start.bat**，选择一个功能。数据路径可直接粘贴�
 | 预处理 | `preprocess.py` | `preprocess_server.sh` | 已解压 CT/标签 → 缓存、划分、空间记录 |
 | 训练/短测 | `train.py` | `train_server.sh` | 缓存 → 六阶段权重、models.json |
 | 预测 | `predict.py` | `predict_server.sh` | 缓存影像 + 模型目录 → NIfTI 分割 |
+| 测试（预测 + 评估） | `test.py` | `test_server.sh` | 测试集缓存 + 模型 → 分割及 Dice |
 | 评估 | `evaluate.py` | `evaluate_server.sh` | 预测 + 缓存真值 → Dice 报告 |
+
+服务器数据路径和 GPU 数统一在 `configs/servers/zmic44.json` 设置，也可在菜单选择；`smoke_server.sh` 是独立短测。多卡采用一张卡一个阶段，保留血池 LSTM 的编码器依赖。详见 [服务器分步启动](docs/server-start.md)。
 
 训练和预测不会重新预处理。预测不会读取真值或训练模型；评估单独启动。
 
@@ -58,7 +61,7 @@ chd-ct-reproduction/
 │   ├── chd.yaml                  # 实用单卡配置
 │   ├── chd-smoke.yaml            # 16³ 软件短测
 │   ├── chd-author-unet.yaml      # 原作者主干宽度/深度，三维 gate 默认开启
-│   └── servers/zmic44.json       # 路径、环境、线程
+│   └── servers/zmic44.json       # 数据路径、GPU 数、环境、线程
 ├── src/chd_ct/
 │   ├── imagechd/                 # 数据、六阶段训练、融合预测、评估
 │   ├── models/                   # 原作者结构主干 / 网格适配 / gate / BiConvLSTM

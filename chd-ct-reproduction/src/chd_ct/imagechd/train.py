@@ -4,6 +4,8 @@ import argparse
 import copy
 import hashlib
 import json
+import os
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -47,6 +49,10 @@ def recurrent_features(encoder, sequence):
 
 
 def train_stage(directory, rows, stage, config, output, mode, manifest_hash):
+    torch.set_num_threads(config["threads"])
+    stage_seed = config["seed"] + STAGES.index(stage)
+    torch.manual_seed(stage_seed)
+    np.random.seed(stage_seed)
     spec = config["stages"][stage]
     model = build_model(stage, spec).to(config["device"])
     loaders = {
@@ -131,7 +137,19 @@ def train_stage(directory, rows, stage, config, output, mode, manifest_hash):
     return {"file": stage + ".pt", "sha256": file_hash(output / (stage + ".pt")), "best_val_loss": best}
 
 
-def train(prepared, output, config_path, mode="smoke", device="cpu"):
+def train(prepared, output, config_path, mode="smoke", device="cpu", gpu_ids=None):
+    if gpu_ids:
+        if device != "cuda" or mode == "check":
+            raise ValueError("多卡队列仅用于 CUDA 训练/短测/预检")
+        from ..server.launcher import query_gpus, select_gpus
+        from .stage_queue import check_gpu_handoff
+
+        if len(gpu_ids) != len(set(gpu_ids)) or not 1 <= len(gpu_ids) <= 5:
+            raise ValueError("需要 1—5 个不重复 GPU UUID")
+        # Preflight and CUDA probes may have just exited; allow sampling to settle.
+        for gpu in gpu_ids:
+            check_gpu_handoff(gpu, used=True)
+        select_gpus(query_gpus(), len(gpu_ids), ",".join(gpu_ids), os.environ.get("CUDA_VISIBLE_DEVICES"))
     directory, data = read_prepared(prepared)
     config = load_config(config_path)
     rows = training_rows(data)
@@ -191,11 +209,36 @@ def train(prepared, output, config_path, mode="smoke", device="cpu"):
         collection["config"] = config
         write_json(output / "effective-config.json", config)
         write_json(output / "models.json", collection)
-        for stage in STAGES:
-            collection["stages"][stage] = train_stage(
-                directory, rows, stage, config, output, mode, collection["prepared_sha256"]
-            )
-            write_json(output / "models.json", collection)
+        if gpu_ids:
+            from .stage_queue import check_gpu_handoff, run_queue
+
+            def command_for(stage):
+                return [
+                    sys.executable,
+                    "-m",
+                    "chd_ct.imagechd.stage_worker",
+                    "--prepared",
+                    directory,
+                    "--output",
+                    output,
+                    "--stage",
+                    stage,
+                    "--mode",
+                    mode,
+                ]
+
+            def on_complete(stage, info):
+                collection["stages"][stage] = info
+                write_json(output / "models.json", collection)
+
+            run_queue(STAGES, gpu_ids, output, command_for, os.environ.copy(), check_gpu_handoff, on_complete)
+            collection["stages"] = {s: collection["stages"][s] for s in STAGES}
+        else:
+            for stage in STAGES:
+                collection["stages"][stage] = train_stage(
+                    directory, rows, stage, config, output, mode, collection["prepared_sha256"]
+                )
+                write_json(output / "models.json", collection)
         collection["status"] = "complete"
         write_json(output / "models.json", collection)
         report.update(status="passed", models=str(output / "models.json"), stages=list(STAGES))
@@ -216,8 +259,16 @@ def main(argv=None):
     parser.add_argument("--config", default=str(config_path("chd.yaml")))
     parser.add_argument("--mode", choices=["check", "smoke", "preflight", "train"], default="smoke")
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
+    parser.add_argument("--gpu-ids", help="内部多卡队列：逗号分隔的已分配 GPU UUID")
     args = parser.parse_args(argv)
-    train(args.prepared, args.output, args.config, args.mode, args.device)
+    train(
+        args.prepared,
+        args.output,
+        args.config,
+        args.mode,
+        args.device,
+        args.gpu_ids.split(",") if args.gpu_ids else None,
+    )
     return 0
 
 

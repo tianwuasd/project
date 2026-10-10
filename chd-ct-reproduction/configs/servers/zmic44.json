@@ -16,5 +16,10 @@
     "gpus": "8 x RTX 3090 24 GiB",
     "driver": "580.173.02"
   },
-  "note": "Historical snapshot, not live availability. Keep large prepared data/results on NAS. Never modify project1 environment."
+  "note": "Historical snapshot, not live availability. Keep large prepared data/results on NAS. Never modify project1 environment.",
+  "dataset": "/data_nas/zhangruichen/baidu_import/ImageCHD_dataset",
+  "gpu_count": 1,
+  "gpu": "auto",
+  "config": "configs/chd.yaml",
+  "dataset_note": "约定默认路径；尚未确认服务器已上传，请按实际位置覆盖。"
 }

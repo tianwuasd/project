@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If this independent reproduction is useful, cite the original paper. This software is not the authors' implementation."
 title: "CHD CT independent research reproduction"
 type: software
-version: 0.3.0
+version: 0.4.0
 authors:
   - name: "tianwuasd"
 preferred-citation:

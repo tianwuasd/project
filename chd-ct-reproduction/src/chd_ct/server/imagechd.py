@@ -9,7 +9,8 @@ from uuid import uuid4
 
 from ..quickstart.commands import build_command
 from .bootstrap import ensure_python, environment, run_logged
-from .launcher import ROOT, choose, personal_path, query_gpus, select_gpu, write_json
+from .launcher import ROOT, query_gpus, select_gpus, write_json
+from .settings import resolve_settings
 
 
 def run(args, profile):
@@ -28,30 +29,25 @@ def run(args, profile):
     for sig in (signal.SIGTERM, signal.SIGHUP):
         handlers[sig] = signal.signal(sig, on_signal)
     try:
-        runtime = personal_path(choose(args.runtime, None, profile["runtime"], "环境与缓存目录", interactive))
-        results = personal_path(
-            choose(args.results, None, profile["results"], "模型/日志/预测结果目录", interactive)
-        )
-        if args.task in {"preprocess", "train", "predict", "evaluate"}:
-            args.prepared = str(
-                personal_path(choose(args.prepared, None, profile["prepared"], "预处理目录", interactive))
-            )
+        runtime, results, settings_file, settings = resolve_settings(args, profile, interactive)
+        if args.task in {"preprocess", "train", "predict", "evaluate", "test"}:
             if args.task == "preprocess":
-                args.dataset = choose(args.dataset, None, "", "已解压 ImageCHD 目录或待预测影像", interactive)
-                if not args.dataset or not Path(args.dataset).expanduser().exists():
-                    raise ValueError("预处理需要有效 --dataset")
+                if not Path(args.dataset).exists():
+                    raise ValueError(f"数据目录不存在：{args.dataset}；用 --dataset 覆盖默认路径")
                 if Path(args.prepared).exists():
-                    raise ValueError("预处理目录已存在；训练预测可直接复用，或指定新的输出目录")
+                    raise ValueError("预处理目录已存在；训练/测试可直接复用，或指定新的 --prepared")
             elif not (Path(args.prepared) / "dataset.json").is_file():
                 raise ValueError("缺少预处理结果；先独立运行 preprocess_server.sh")
-        if args.task == "predict":
-            args.models = choose(args.models, None, "", "完整六阶段模型目录", interactive)
-            if not args.models or not Path(args.models).expanduser().exists():
-                raise ValueError("请指定 --models")
-        if args.task == "evaluate":
-            args.predictions = choose(args.predictions, None, "", "预测结果目录", interactive)
-            if not args.predictions or not Path(args.predictions).expanduser().is_dir():
-                raise ValueError("请指定 --predictions")
+        if args.task in {"predict", "test"} and (
+            not args.models or not Path(args.models).expanduser().exists()
+        ):
+            raise ValueError("请指定 --models 完整六阶段模型目录")
+        if args.task == "evaluate" and (
+            not args.predictions or not Path(args.predictions).expanduser().is_dir()
+        ):
+            raise ValueError("请指定 --predictions")
+        if args.task == "train" and not Path(args.config).is_file():
+            raise ValueError("模型配置不存在：" + args.config)
         for folder in (runtime, results):
             folder.mkdir(parents=True, exist_ok=True)
         if (
@@ -72,6 +68,8 @@ def run(args, profile):
                 "server_profile_date": profile["source_updated"],
             }
             write_json(output / "status.json", state)
+            write_json(settings_file, settings)
+            write_json(output / "server-settings.json", settings)
             print("日志和结果：" + str(output), flush=True)
             env = environment(runtime, ROOT, profile.get("threads", 2))
             device = (
@@ -82,8 +80,13 @@ def run(args, profile):
             if device == "auto":
                 device = "cuda"
             visible = env.get("CUDA_VISIBLE_DEVICES")
+            count = args.gpu_count if args.task in {"train", "environment"} else 1
+            requested = args.gpu
+            if count == 1 and args.task not in {"train", "environment"} and requested != "auto":
+                requested = requested.split(",")[0].strip()
+            minimum = 6000
             if device == "cuda":
-                select_gpu(query_gpus(), args.gpu, visible)
+                select_gpus(query_gpus(), count, requested, visible, minimum)
             python = (
                 Path(args.python).expanduser().resolve()
                 if args.python
@@ -91,14 +94,14 @@ def run(args, profile):
             )
             if not python.is_file():
                 raise ValueError("Python 路径不存在")
-            if device == "cuda":
-                gpu = select_gpu(query_gpus(), args.gpu, visible)
-                env["CUDA_VISIBLE_DEVICES"] = gpu["uuid"]
-                state["gpu"] = gpu
-            else:
-                env["CUDA_VISIBLE_DEVICES"] = ""
-            commands = [
-                [
+            gpus = select_gpus(query_gpus(), count, requested, visible, minimum) if device == "cuda" else []
+            state["gpus"] = gpus
+            env["CUDA_VISIBLE_DEVICES"] = ",".join(gpu["uuid"] for gpu in gpus)
+            args.gpu_ids = [gpu["uuid"] for gpu in gpus] if args.task == "train" and len(gpus) > 1 else None
+            # Check every chosen card in a short-lived process before submitting work.
+            for index, gpu in enumerate(gpus or [None]):
+                probe_env = dict(env, CUDA_VISIBLE_DEVICES=gpu["uuid"] if gpu else "")
+                command = [
                     python,
                     ROOT / "start.py",
                     "--task",
@@ -107,9 +110,13 @@ def run(args, profile):
                     "--device",
                     device,
                     "--output",
-                    output / "environment",
+                    output / "environment" / str(index),
                 ]
-            ]
+                code = run_logged(command, probe_env, output / "server.log")
+                if code:
+                    state.update(status="failed", exit_code=code)
+                    return code
+            commands = []
             if args.task == "train" and args.mode == "train":
                 commands.append(
                     build_command(args, ROOT, python, output / "preflight", device, mode="preflight")
@@ -121,6 +128,13 @@ def run(args, profile):
                 if code:
                     state.update(status="failed", exit_code=code)
                     return code
+            if args.task == "train" and args.mode in {"train", "smoke", "preflight"}:
+                settings["last_models"] = str(output / "train")
+            if args.task in {"predict", "test"}:
+                settings["last_predictions"] = str(
+                    output / ("test/predictions" if args.task == "test" else "predict")
+                )
+            write_json(settings_file, settings)
             state["status"] = "passed"
             print("已完成 " + args.task + "：" + str(output))
             return 0

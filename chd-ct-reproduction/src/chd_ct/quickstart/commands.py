@@ -2,7 +2,7 @@
 
 from ..paths import config_path
 
-TASKS = ("environment", "preprocess", "train", "predict", "evaluate", "demo")
+TASKS = ("environment", "preprocess", "train", "predict", "evaluate", "demo", "test")
 
 
 def add_task_arguments(parser):
@@ -29,11 +29,13 @@ def choose_task(args, interactive):
     if args.task:
         return args.task
     if not interactive:
-        raise ValueError("非交互运行请指定 --task environment/preprocess/train/predict/evaluate/demo")
-    print("请选择一个独立功能：0 环境检查；1 预处理；2 训练/短测；3 预测；4 评估；5 合成全流程测试")
+        raise ValueError("非交互运行请指定 --task environment/preprocess/train/predict/evaluate/demo/test")
+    print(
+        "请选择一个独立功能：0 环境检查；1 预处理；2 训练/短测；3 预测；4 评估；5 合成全流程测试；6 测试集预测和评估"
+    )
     value = input("功能 [0]：").strip() or "0"
-    if value not in {str(i) for i in range(6)}:
-        raise ValueError("请选择 0 至 5")
+    if value not in {str(i) for i in range(7)}:
+        raise ValueError("请选择 0 至 6")
     return TASKS[int(value)]
 
 
@@ -74,7 +76,11 @@ def build_command(args, root, python, output, device, mode=None):
             "--device",
             device,
         ]
-    elif task == "predict":
+        if getattr(args, "gpu_ids", None):
+            command += ["--gpu-ids", ",".join(args.gpu_ids)]
+    elif task in {"predict", "test"}:
+        if task == "test" and args.case_id:
+            raise ValueError("test 评估完整 split；单病例请使用 predict")
         if not args.models:
             raise ValueError("预测需要 --models 完整模型目录")
         command += ["--models", args.models, "--device", device]

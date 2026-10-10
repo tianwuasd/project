@@ -53,9 +53,9 @@ def main(argv=None):
         if interactive:
             if args.task == "preprocess" and not args.dataset:
                 args.dataset = choose_path("选择已解压 ImageCHD 数据")
-            if args.task in {"train", "predict", "evaluate"} and not args.prepared:
+            if args.task in {"train", "predict", "evaluate", "test"} and not args.prepared:
                 args.prepared = choose_path("选择含 dataset.json 的预处理目录")
-            if args.task == "predict" and not args.models:
+            if args.task in {"predict", "test"} and not args.models:
                 args.models = choose_path("选择含 models.json 的模型目录")
             if args.task == "evaluate" and not args.predictions:
                 args.predictions = choose_path("选择含 prediction-report.json 的预测目录")
