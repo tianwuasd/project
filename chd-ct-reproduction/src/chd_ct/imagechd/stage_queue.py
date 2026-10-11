@@ -10,16 +10,39 @@ from pathlib import Path
 from ..server.launcher import write_json
 
 
-def run_queue(stages, gpu_ids, output, command_for, env, before_start=None, on_complete=None, lock_fds=()):
+def run_queue(
+    stages,
+    gpu_ids,
+    output,
+    command_for,
+    env,
+    before_start=None,
+    on_complete=None,
+    lock_fds=(),
+    available_gpus=None,
+    gpu_limit=None,
+    poll_interval=5,
+):
     """Only the coordinator writes models.json; workers write stage-specific files."""
     if not gpu_ids or len(set(gpu_ids)) != len(gpu_ids):
         raise ValueError("队列需要不重复的 GPU UUID")
+    limit = len(gpu_ids) if gpu_limit is None else gpu_limit
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 5:
+        raise ValueError("队列并发上限需要为 1—5")
     output = Path(output)
     logs = output / "stage_logs"
     logs.mkdir(exist_ok=True)
     pending, completed, active, used = list(stages), {}, {}, set()
     records = {stage: {"status": "pending"} for stage in stages}
-    state = {"status": "running", "gpu_uuids": list(gpu_ids), "stages": records}
+    state = {
+        "status": "running",
+        "gpu_uuids": list(gpu_ids),
+        "gpu_limit": limit,
+        "stages": records,
+        "sampled_at": time.time(),
+    }
+    last_scan, last_notice, started = float("-inf"), float("-inf"), time.monotonic()
+    last_summary = None
     handlers, stopped = {}, [False]
 
     def stop_requested(sig, frame):
@@ -35,12 +58,14 @@ def run_queue(stages, gpu_ids, output, command_for, env, before_start=None, on_c
         while pending or active:
             if stopped[0]:
                 raise KeyboardInterrupt("训练队列已中断")
+            finished = False
             for gpu, (process, stream, stage) in list(active.items()):
                 code = process.poll()
                 if code is None:
                     continue
                 stream.close()
                 del active[gpu]
+                finished = True
                 if code:
                     records[stage].update(status="failed", exit_code=code)
                     raise RuntimeError(f"阶段 {stage} 失败（{code}），查看 {logs / (stage + '.log')}")
@@ -49,14 +74,26 @@ def run_queue(stages, gpu_ids, output, command_for, env, before_start=None, on_c
                 records[stage]["status"] = "complete"
                 if on_complete:
                     on_complete(stage, info)
-            for gpu in gpu_ids:
+            moment = time.monotonic()
+            scan = available_gpus is None or finished or moment - last_scan >= poll_interval
+            candidates = []
+            if scan and pending and len(active) < limit:
+                candidates = list(available_gpus() if available_gpus else gpu_ids)
+                if not set(candidates).issubset(gpu_ids) or len(set(candidates)) != len(candidates):
+                    raise ValueError("可用 GPU 超出候选池或重复")
+                last_scan = moment
+            for gpu in candidates:
+                if len(active) >= limit:
+                    break
                 if gpu in active:
                     continue
                 ready = next((s for s in pending if s != "blood_lstm" or "blood2d" in completed), None)
                 if ready is None:
                     continue
-                if before_start:
-                    before_start(gpu, gpu in used)
+                if before_start and before_start(gpu, gpu in used) is False:
+                    # Another process acquired this card after the snapshot.
+                    # Continue other cards; do not fail or block the whole queue.
+                    continue
                 if stopped[0]:
                     raise KeyboardInterrupt("训练队列已中断")
                 stream = (logs / (ready + ".log")).open("a", encoding="utf-8")
@@ -97,10 +134,26 @@ def run_queue(stages, gpu_ids, output, command_for, env, before_start=None, on_c
                 )
                 write_json(output / "queue.json", state)
                 print(f"启动 {ready}，GPU={gpu}，日志：{logs / (ready + '.log')}", flush=True)
-            write_json(output / "queue.json", state)
-            if pending and not active:
+            ready = any(s != "blood_lstm" or "blood2d" in completed for s in pending)
+            if pending and not active and not ready:
                 raise RuntimeError("训练队列依赖无法满足")
-            if active:
+            state.update(
+                status="waiting_gpu" if pending and not active else "running",
+                active_gpus=len(active),
+                pending_stages=len(pending),
+                elapsed_seconds=int(time.monotonic() - started),
+                sampled_at=time.time(),
+            )
+            summary = (state["status"], len(active), len(pending))
+            if available_gpus and (summary != last_summary or time.monotonic() - last_notice >= 30):
+                message = "等待 GPU" if state["status"] == "waiting_gpu" else "训练进行中"
+                print(
+                    f"{message}：正在使用 {len(active)}/{limit} 张卡，待运行 {len(pending)} 个阶段；空闲卡不足时继续少卡运行。",
+                    flush=True,
+                )
+                last_notice, last_summary = time.monotonic(), summary
+            write_json(output / "queue.json", state)
+            if active or pending:
                 time.sleep(0.2)
         state["status"] = "complete"
         return completed

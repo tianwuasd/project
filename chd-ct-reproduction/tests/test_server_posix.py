@@ -265,6 +265,50 @@ with output_lock(sys.argv[1]): pass
         self.assertTrue(list((old_job / "attempts").glob("*/job_state.json")))
         self.assertTrue(list(partial.parent.glob("02_diagnosis-demo.interrupted-*")))
 
+    def test_elastic_wait_handles_sigterm_and_restarts_on_one_card(self):
+        output = Path(self.temp.name) / "elastic"
+        output.mkdir()
+        worker = Path(self.temp.name) / "elastic_worker.py"
+        worker.write_text("""import json, sys
+from pathlib import Path
+root, stage = Path(sys.argv[1]), sys.argv[2]
+(root / (stage + '.result.json')).write_text(json.dumps({'file': stage + '.pt'}))
+""")
+        script = """import os, sys
+from pathlib import Path
+from chd_ct.recovery import output_lock
+from chd_ct.imagechd.stage_queue import run_queue
+output = Path(sys.argv[1])
+with output_lock(output) as fd:
+    run_queue(['blood2d', 'blood_lstm', 'all64'], ['GPU-fixture'], output,
+              lambda stage: [sys.executable, sys.argv[2], str(output), stage], os.environ.copy(),
+              lock_fds=(fd,), gpu_limit=4, poll_interval=0.05,
+              available_gpus=lambda: ['GPU-fixture'] if (output/'ready').exists() else [])
+"""
+        env = dict(os.environ, PYTHONPATH=str(self.root / "src"))
+        command = [sys.executable, "-c", script, str(output), str(worker)]
+        parent = subprocess.Popen(command, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            queue = output / "queue.json"
+            deadline = time.monotonic() + 5
+            while not queue.exists() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            self.assertEqual(json.loads(queue.read_text())["status"], "waiting_gpu")
+            parent.terminate()
+            parent.wait(timeout=5)
+            self.assertEqual(json.loads(queue.read_text())["status"], "interrupted")
+            (output / "ready").touch()
+            result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            state = json.loads(queue.read_text())
+            self.assertEqual(state["status"], "complete")
+            self.assertEqual(state["gpu_limit"], 4)
+            self.assertTrue(all(s["status"] == "complete" for s in state["stages"].values()))
+        finally:
+            if parent.poll() is None:
+                parent.kill()
+                parent.wait(timeout=5)
+
 
 if __name__ == "__main__":
     unittest.main()

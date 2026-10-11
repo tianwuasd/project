@@ -188,26 +188,41 @@ def train_stage(directory, rows, stage, config, output, mode, manifest_hash, res
     return {"file": stage + ".pt", "sha256": file_hash(output / (stage + ".pt")), "best_val_loss": best}
 
 
-def train(prepared, output, config_path, mode="smoke", device="cpu", gpu_ids=None, resume=False):
+def train(
+    prepared, output, config_path, mode="smoke", device="cpu", gpu_ids=None, resume=False, gpu_limit=None
+):
     output = Path(output).expanduser().resolve()
     output.mkdir(parents=True, exist_ok=resume)
     with output_lock(output) as lock_fd:
-        return train_locked(prepared, output, config_path, mode, device, gpu_ids, resume, lock_fd)
+        return train_locked(prepared, output, config_path, mode, device, gpu_ids, resume, lock_fd, gpu_limit)
 
 
-def train_locked(prepared, output, config_path, mode, device, gpu_ids, resume, lock_fd):
+def train_locked(prepared, output, config_path, mode, device, gpu_ids, resume, lock_fd, gpu_limit=None):
+    if gpu_limit is not None and (
+        isinstance(gpu_limit, bool)
+        or not isinstance(gpu_limit, int)
+        or not 1 <= gpu_limit <= 5
+        or not gpu_ids
+    ):
+        raise ValueError("弹性队列需要候选 GPU 和 1—5 的并发上限")
     if gpu_ids:
         if device != "cuda" or mode == "check":
             raise ValueError("多卡队列仅用于 CUDA 训练/短测/预检")
-        from ..server.launcher import query_gpus, select_gpus
+        from ..server.launcher import gpu_pool, idle_gpus, query_gpus, select_gpus
         from .stage_queue import check_gpu_handoff
 
-        if len(gpu_ids) != len(set(gpu_ids)) or not 1 <= len(gpu_ids) <= 5:
-            raise ValueError("需要 1—5 个不重复 GPU UUID")
-        # Preflight and CUDA probes may have just exited; allow sampling to settle.
-        for gpu in gpu_ids:
-            check_gpu_handoff(gpu, used=True)
-        select_gpus(query_gpus(), len(gpu_ids), ",".join(gpu_ids), os.environ.get("CUDA_VISIBLE_DEVICES"))
+        if gpu_limit is not None:
+            gpu_ids = [
+                r["uuid"]
+                for r in gpu_pool(query_gpus(), ",".join(gpu_ids), os.environ.get("CUDA_VISIBLE_DEVICES"))
+            ]
+        else:
+            if len(gpu_ids) != len(set(gpu_ids)) or not 1 <= len(gpu_ids) <= 5:
+                raise ValueError("需要 1—5 个不重复 GPU UUID")
+            # Legacy direct calls keep their explicit, fixed-card semantics.
+            for gpu in gpu_ids:
+                check_gpu_handoff(gpu, used=True)
+            select_gpus(query_gpus(), len(gpu_ids), ",".join(gpu_ids), os.environ.get("CUDA_VISIBLE_DEVICES"))
     directory, data = read_prepared(prepared)
     config = load_config(config_path)
     rows = training_rows(data)
@@ -302,11 +317,18 @@ def train_locked(prepared, output, config_path, mode, device, gpu_ids, resume, l
                     "--mode",
                     mode,
                     *(["--resume"] if resume else []),
+                    *(["--check-environment"] if gpu_limit is not None else []),
                 ]
 
             def on_complete(stage, info):
                 collection["stages"][stage] = info
                 write_json(output / "models.json", collection)
+
+            def available():
+                devices = query_gpus()
+                if not set(gpu_ids).intersection(r["uuid"] for r in devices):
+                    raise ValueError("候选 GPU 已不可见，请检查设备或分配范围")
+                return [r["uuid"] for r in idle_gpus(devices, gpu_ids)]
 
             run_queue(
                 STAGES,
@@ -314,9 +336,11 @@ def train_locked(prepared, output, config_path, mode, device, gpu_ids, resume, l
                 output,
                 command_for,
                 os.environ.copy(),
-                check_gpu_handoff,
+                (lambda gpu, used: gpu in available()) if gpu_limit is not None else check_gpu_handoff,
                 on_complete,
                 lock_fds=(lock_fd,),
+                available_gpus=available if gpu_limit is not None else None,
+                gpu_limit=gpu_limit,
             )
             collection["stages"] = {s: collection["stages"][s] for s in STAGES}
         else:
@@ -351,6 +375,9 @@ def main(argv=None):
     parser.add_argument("--mode", choices=["check", "smoke", "preflight", "train"], default="smoke")
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
     parser.add_argument("--gpu-ids", help="内部多卡队列：逗号分隔的已分配 GPU UUID")
+    parser.add_argument(
+        "--gpu-limit", type=int, help="弹性队列并发上限（1—5）；gpu-ids 为候选池，无空闲卡时等待"
+    )
     parser.add_argument("--resume", action="store_true", help="从最后完整 epoch 恢复模型、优化器和随机状态")
     args = parser.parse_args(argv)
     train(
@@ -361,6 +388,7 @@ def main(argv=None):
         args.device,
         args.gpu_ids.split(",") if args.gpu_ids else None,
         args.resume,
+        args.gpu_limit,
     )
     return 0
 

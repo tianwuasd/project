@@ -170,7 +170,13 @@ def build_resume_plan(args, profile, interactive):
             if interactive and not prompted:
                 show_gpus()
                 args.gpu_count = int(
-                    choose(args.gpu_count, arguments.get("gpu_count"), 1, "恢复时使用几张 GPU（1—5）", True)
+                    choose(
+                        args.gpu_count,
+                        arguments.get("gpu_count"),
+                        1,
+                        "恢复时最多使用几张 GPU（1—5；不足时等待或少卡运行）",
+                        True,
+                    )
                 )
                 args.gpu = choose(
                     args.gpu, arguments.get("gpu"), "auto", "恢复使用 GPU 编号/UUID，逗号分隔，或 auto", True

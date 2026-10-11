@@ -85,6 +85,8 @@ def build_command(args, root, python, output, device, mode=None):
         ]
         if getattr(args, "gpu_ids", None):
             command += ["--gpu-ids", ",".join(args.gpu_ids)]
+        if getattr(args, "gpu_limit", None) is not None:
+            command += ["--gpu-limit", str(args.gpu_limit)]
     elif task in {"predict", "test"}:
         if task == "test" and args.case_id:
             raise ValueError("test 评估完整 split；单病例请使用 predict")

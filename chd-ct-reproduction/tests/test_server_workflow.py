@@ -94,15 +94,17 @@ def test_server_checks_every_gpu_and_dispatches_only_train(tmp_path, monkeypatch
         imagechd, "run_logged", lambda cmd, env, log: calls.append((list(map(str, cmd)), env.copy())) or 0
     )
     assert imagechd.run(args, profile) == 0
-    assert len(calls) == 3
-    assert [e["CUDA_VISIBLE_DEVICES"] for _, e in calls[:2]] == ["GPU-1", "GPU-3"]
-    command, env = calls[2]
+    assert len(calls) == 2  # Remaining/newly idle devices are probed by their stage workers.
+    assert calls[0][1]["CUDA_VISIBLE_DEVICES"] == "GPU-1"
+    command, env = calls[1]
     assert command[2] == "chd_ct.imagechd.train"
     assert command[command.index("--gpu-ids") + 1] == "GPU-1,GPU-3"
+    assert command[command.index("--gpu-limit") + 1] == "2"
     assert env["CUDA_VISIBLE_DEVICES"] == "GPU-1,GPU-3"
 
 
-def test_queue_obeys_dependency_and_failure_cleanup(tmp_path):
+@pytest.mark.parametrize("elastic", [False, True])
+def test_queue_obeys_dependency_and_failure_cleanup(tmp_path, elastic):
     from chd_ct.imagechd.stage_queue import run_queue
 
     worker = tmp_path / "worker.py"
@@ -127,7 +129,8 @@ else:
     def command(stage):
         return [sys.executable, worker, output, stage, "no"]
 
-    result = run_queue(stages, ["GPU-a", "GPU-b"], output, command, os.environ.copy())
+    options = dict(available_gpus=lambda: ["GPU-a", "GPU-b"], gpu_limit=2) if elastic else {}
+    result = run_queue(stages, ["GPU-a", "GPU-b"], output, command, os.environ.copy(), **options)
     assert set(result) == set(stages)
     assert (output / "blood2d.started").read_text() == "GPU-a"
     assert (output / "all64.started").read_text() == "GPU-b"
@@ -140,7 +143,7 @@ else:
         return [sys.executable, worker, output, stage, "yes"]
 
     with pytest.raises(RuntimeError, match="blood2d"):
-        run_queue(stages, ["GPU-a", "GPU-b"], output, command, os.environ.copy())
+        run_queue(stages, ["GPU-a", "GPU-b"], output, command, os.environ.copy(), **options)
     queue = json.loads((output / "queue.json").read_text(encoding="utf-8"))
     assert queue["status"] == "failed"
     assert queue["stages"]["all64"]["status"] == "interrupted"

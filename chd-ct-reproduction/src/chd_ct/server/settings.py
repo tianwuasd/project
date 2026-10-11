@@ -148,7 +148,7 @@ def resolve_settings(args, profile, interactive, saved_override=None):
         getattr(args, "gpu_count", None),
         saved.get("gpu_count"),
         profile.get("gpu_count", 1),
-        "训练使用几张 GPU（1—5）",
+        "训练最多同时使用几张 GPU（1—5；不足时少卡运行，无卡时等待）",
         interactive and args.task in {"train", "environment"},
     )
     try:
@@ -161,7 +161,7 @@ def resolve_settings(args, profile, interactive, saved_override=None):
         getattr(args, "gpu", None),
         saved.get("gpu"),
         profile.get("gpu", "auto"),
-        "GPU 编号/UUID，逗号分隔，或 auto",
+        "允许使用的候选 GPU 编号/UUID，逗号分隔，或 auto（卡数可少于/多于上限）",
         interactive,
     )
     saved["gpu"] = args.gpu

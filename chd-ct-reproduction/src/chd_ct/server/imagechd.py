@@ -3,6 +3,7 @@
 import shutil
 import signal
 import sys
+import time
 from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
@@ -12,7 +13,8 @@ from ..quickstart.commands import build_command
 from ..quickstart.diagnosis import OUTPUT_KEYS
 from ..recovery import archive_child
 from .bootstrap import ensure_python, environment, run_logged
-from .launcher import ROOT, query_gpus, select_gpus, write_json
+from .launcher import ROOT, gpu_pool, query_gpus, select_gpus, write_json
+from .resources import wait_for_gpus
 from .settings import effective_device, resolve_settings, task_configuration
 
 
@@ -108,11 +110,9 @@ def run(args, profile, *, output_dir=None, lock_held=False, recent_gpus=()):
             visible = env.get("CUDA_VISIBLE_DEVICES")
             count = args.gpu_count if args.task in {"train", "environment"} else 1
             requested = args.gpu
-            if count == 1 and args.task not in {"train", "environment"} and requested != "auto":
-                requested = requested.split(",")[0].strip()
-            minimum = 6000
+            pool = []
             if device == "cuda":
-                select_with_handoff(count, requested, visible, minimum, recent_gpus)
+                pool = [r["uuid"] for r in gpu_pool(query_gpus(), requested, visible)]
             python = (
                 Path(args.python).expanduser().resolve()
                 if args.python
@@ -120,12 +120,26 @@ def run(args, profile, *, output_dir=None, lock_held=False, recent_gpus=()):
             )
             if not python.is_file():
                 raise ValueError("Python 路径不存在")
-            gpus = select_gpus(query_gpus(), count, requested, visible, minimum) if device == "cuda" else []
+
+            def resource_update(status, detail):
+                state.update(status=status, gpu_resources=detail)
+                write_json(output / "status.json", state)
+
+            # Training checks each stage's actual device in its worker, including
+            # cards that become available later. Do not block on a full pool here.
+            gpus = wait_for_gpus(pool, count, query_gpus, resource_update) if pool else []
             state["gpus"] = gpus
-            env["CUDA_VISIBLE_DEVICES"] = ",".join(gpu["uuid"] for gpu in gpus)
-            args.gpu_ids = [gpu["uuid"] for gpu in gpus] if args.task == "train" and len(gpus) > 1 else None
-            # Check every chosen card in a short-lived process before submitting work.
-            for index, gpu in enumerate(gpus or [None]):
+            state["gpu_pool"] = pool
+            state["gpu_limit"] = count
+            env["CUDA_VISIBLE_DEVICES"] = ",".join(
+                pool if args.task == "train" else [r["uuid"] for r in gpus]
+            )
+            args.gpu_ids = pool if args.task == "train" and pool else None
+            args.gpu_limit = count if args.gpu_ids else None
+            write_json(output / "status.json", state)
+            # Probe only currently idle cards; the rest remain candidates, not reservations.
+            probes = gpus[:1] if args.task == "train" else gpus
+            for index, gpu in enumerate(probes or [None]):
                 probe_env = dict(env, CUDA_VISIBLE_DEVICES=gpu["uuid"] if gpu else "")
                 command = [
                     python,
@@ -150,6 +164,13 @@ def run(args, profile, *, output_dir=None, lock_held=False, recent_gpus=()):
             if args.task != "environment":
                 commands.append(build_command(args, ROOT, python, output / args.task, device))
             for command in commands:
+                state["phase"] = "preflight" if "--mode" in command and "preflight" in command else args.task
+                state["phase_started_at"] = time.time()
+                write_json(output / "status.json", state)
+                if device == "cuda" and args.task != "train":
+                    gpus = wait_for_gpus(pool, 1, query_gpus, resource_update)
+                    env["CUDA_VISIBLE_DEVICES"] = gpus[0]["uuid"]
+                    state["gpus"] = gpus
                 code = run_logged(command, env, output / "server.log")
                 if code:
                     state.update(status="failed", exit_code=code)

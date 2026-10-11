@@ -105,6 +105,38 @@ def select_gpu(rows, requested="auto", visible=None, minimum=6000):
     return select_gpus(rows, 1, requested, visible, minimum)[0]
 
 
+def gpu_pool(rows, requested="auto", visible=None):
+    """Resolve an allowed pool independently of current occupancy or target count."""
+    allowed = None if visible is None else {s.strip() for s in visible.split(",") if s.strip()}
+    candidates = [r for r in rows if allowed is None or {r["index"], r["uuid"]} & allowed]
+    if requested != "auto":
+        selected = []
+        for choice in requested.split(","):
+            matches = [r for r in candidates if choice.strip() in (r["index"], r["uuid"])]
+            if len(matches) != 1:
+                raise ValueError("GPU 不存在或不在获准可见范围内：" + choice)
+            selected.append(matches[0])
+        candidates = selected
+    if not candidates:
+        raise ValueError("获准可见范围内没有 GPU；请检查 GPU 编号和 CUDA_VISIBLE_DEVICES")
+    if len({r["uuid"] for r in candidates}) != len(candidates):
+        raise ValueError("不能重复选择同一张 GPU")
+    return candidates
+
+
+def idle_gpus(rows, pool, minimum=6000):
+    allowed = set(pool)
+    return sorted(
+        [
+            r
+            for r in rows
+            if r["uuid"] in allowed and not r["busy"] and r["free"] >= minimum and r["util"] <= 10
+        ],
+        key=lambda r: r["free"],
+        reverse=True,
+    )
+
+
 def select_gpus(rows, count=1, requested="auto", visible=None, minimum=6000):
     if isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= 5:
         raise ValueError("显卡数量需为 1 至 5：当前最多五个独立训练阶段同时运行")
@@ -145,8 +177,10 @@ def make_parser():
     )
     parser.add_argument("--runtime")
     parser.add_argument("--results")
-    parser.add_argument("--gpu", help="auto 或逗号分隔的物理编号/完整 UUID")
-    parser.add_argument("--gpu-count", type=int, help="训练显卡数，默认沿用设置或 1（最多 5）")
+    parser.add_argument("--gpu", help="允许使用的候选卡：auto 或逗号分隔的物理编号/完整 UUID")
+    parser.add_argument(
+        "--gpu-count", type=int, help="训练最多并行使用的卡数（1—5）；不足时少卡运行，无空闲卡时等待"
+    )
     parser.add_argument("--python", help="已有 Python 路径；不安装依赖，由环境检查决定是否可用")
     parser.add_argument("--server-config", default=str(SERVER_PROFILE))
     parser.add_argument(

@@ -271,6 +271,33 @@ def show_status(runtime):
         current = identity(owner["pid"])
         if current is None or (owner.get("identity") and current != owner["identity"]):
             status = "stale（原进程已退出或服务器已重启；保留最后记录，请查看日志）"
+    details = {}
+    if status == "running":
+        for step in state["steps"]:
+            if step["status"] != "running":
+                continue
+            report_path = Path(step["output"]) / "status.json"
+            if not report_path.is_file():
+                continue
+            report = read_json(report_path)
+            queue_path = (
+                Path(step["output"]) / report["phase"] / "queue.json" if report.get("phase") else None
+            )
+            queue = read_json(queue_path) if queue_path and queue_path.is_file() else {}
+            if queue.get("sampled_at", 0) < report.get("phase_started_at", 0):
+                queue = {}  # A resumed command has not published its new queue yet.
+            if report.get("status") == "waiting_gpu":
+                resources = report.get("gpu_resources", {})
+                label = "waiting_gpu（等待显卡）"
+                detail = f"可用 0/{resources.get('requested_gpus', '?')} 张卡，已等待 {resources.get('waited_seconds', 0)} 秒；{resources.get('reason', '')}"
+            elif queue.get("status") in {"waiting_gpu", "running"}:
+                label = "waiting_gpu（等待显卡）" if queue["status"] == "waiting_gpu" else "running"
+                detail = f"正在使用 {queue.get('active_gpus', 0)}/{queue.get('gpu_limit', '?')} 张卡，待运行 {queue.get('pending_stages', '?')} 个阶段"
+            else:
+                continue
+            details[step["name"]] = (label, detail)
+            if label.startswith("waiting_gpu"):
+                status = label
     print(f"状态：{status}\n任务：{directory}\n日志：{state['log']}")
     for step in state["steps"]:
         label = (
@@ -278,7 +305,11 @@ def show_status(runtime):
             if status.startswith("stale") and step["status"] == "running"
             else step["status"]
         )
+        if step["name"] in details:
+            label = details[step["name"]][0]
         print(f"  {step['name']}: {label} → {step['output']}")
+        if step["name"] in details:
+            print("    " + details[step["name"]][1])
     if status.startswith("stale") or status in {"failed", "interrupted"}:
         print(f"恢复：bash start_server.sh --resume-job '{directory}'")
     if state.get("error"):
