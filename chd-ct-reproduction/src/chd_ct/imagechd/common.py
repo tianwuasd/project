@@ -5,15 +5,13 @@ from pathlib import Path
 
 import numpy as np
 
+from ..recovery import write_json  # noqa: F401
+
 FORMAT = "imagechd7-v2"
 MODEL_FORMAT = "imagechd7-author-unet-v2"
 LABELS = ("BG", "LV", "RV", "LA", "RA", "MYO", "AO", "PA")
 IGNORE = 255
 NORMALIZATION = {"kind": "per_image_percentile", "low": 1, "high": 99}
-
-
-def write_json(path, value):
-    Path(path).write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
 
 
 def normalize(image):

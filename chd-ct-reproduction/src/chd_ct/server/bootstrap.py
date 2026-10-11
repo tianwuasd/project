@@ -76,11 +76,22 @@ def run_logged(command, env, log):
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             start_new_session=(os.name == "posix"),
+            **(
+                {"pass_fds": (int(env["CHD_RUNTIME_LOCK_FD"]),)}
+                if os.name == "posix" and env.get("CHD_RUNTIME_LOCK_FD")
+                else {}
+            ),
             text=True,
             encoding="utf-8",
             errors="replace",
         )
+        from .jobs import identity
+        from .launcher import write_json
+
+        receipt = Path(log).parent / "active-command.json"
+        record = dict(pid=process.pid, identity=identity(process.pid), running=True)
         try:
+            write_json(receipt, record)
             for line in process.stdout:
                 print(line, end="", flush=True)
                 stream.write(line)
@@ -91,6 +102,8 @@ def run_logged(command, env, log):
             raise
         finally:
             process.stdout.close()
+            record.update(running=False, exit_code=process.poll())
+            write_json(receipt, record)
 
 
 def checked(command, env, log):

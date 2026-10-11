@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from ..quickstart.commands import build_command
 from ..quickstart.diagnosis import OUTPUT_KEYS
+from ..recovery import archive_child
 from .bootstrap import ensure_python, environment, run_logged
 from .launcher import ROOT, query_gpus, select_gpus, write_json
 from .settings import effective_device, resolve_settings, task_configuration
@@ -58,7 +59,7 @@ def run(args, profile, *, output_dir=None, lock_held=False, recent_gpus=()):
             if args.task == "preprocess":
                 if not Path(args.dataset).exists():
                     raise ValueError(f"数据目录不存在：{args.dataset}；用 --dataset 覆盖默认路径")
-                if Path(args.prepared).exists():
+                if Path(args.prepared).exists() and not getattr(args, "resume", False):
                     raise ValueError("预处理目录已存在；训练/测试可直接复用，或指定新的 --prepared")
             elif not (Path(args.prepared) / "dataset.json").is_file():
                 raise ValueError("缺少预处理结果；先独立运行 preprocess_server.sh")
@@ -87,7 +88,11 @@ def run(args, profile, *, output_dir=None, lock_held=False, recent_gpus=()):
             output = output_dir or results / (
                 datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid4().hex[:6]
             )
-            output.mkdir(parents=True, exist_ok=False)
+            resuming = bool(getattr(args, "resume", False))
+            output.mkdir(parents=True, exist_ok=resuming)
+            if resuming:
+                archive_child(output / "environment")
+                archive_child(output / "preflight")
             state = {
                 "status": "running",
                 "task": args.task,

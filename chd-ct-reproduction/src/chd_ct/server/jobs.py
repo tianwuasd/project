@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -10,6 +11,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ..recovery import archive_child, read_json
 from .launcher import ROOT, make_parser, write_json
 
 
@@ -53,7 +55,12 @@ def initial_state(plan):
         "submitted_at": now(),
         "directory": plan["directory"],
         "log": plan["log"],
-        "steps": [{"name": s["name"], "output": s["output"], "status": "pending"} for s in plan["steps"]],
+        "steps": [
+            dict(s["reuse"], status="reused")
+            if s.get("reuse")
+            else {"name": s["name"], "output": s["output"], "status": "pending"}
+            for s in plan["steps"]
+        ],
     }
 
 
@@ -78,6 +85,15 @@ def execute(plan):
     try:
         for index, step in enumerate(plan["steps"]):
             current = state["steps"][index]
+            if step.get("reuse"):
+                current.update(step["reuse"], status="reused")
+                write_json(state_file, state)
+                print("已保留完成步骤：" + step["name"], flush=True)
+                continue
+            if step.get("restart"):
+                kept = archive_child(Path(step["output"]))
+                if kept:
+                    print("旧输出保留于：" + str(kept), flush=True)
             state["current_step"] = index
             current.update(status="running", started_at=now())
             write_json(state_file, state)
@@ -101,6 +117,11 @@ def execute(plan):
                     recent_gpus.update(
                         gpu["uuid"] for gpu in json.loads(report.read_text(encoding="utf-8")).get("gpus", [])
                     )
+            if code == 0 and (Path(step["output"]) / "status.json").exists():
+                from .resume import snapshot
+
+                print("记录恢复校验信息：" + step["name"], flush=True)
+                current["snapshot"] = snapshot(step)
             current.update(
                 status="passed" if code == 0 else "interrupted" if code in {130, 143, 129} else "failed",
                 exit_code=code,
@@ -136,7 +157,18 @@ def execute(plan):
 
 def submit(plan, lock, foreground=False):
     directory = Path(plan["directory"])
-    directory.mkdir(parents=True, exist_ok=False)
+    resuming = bool(plan.get("resume_existing"))
+    if resuming:
+        from .resume import reject_live_commands
+
+        reject_live_commands(plan)
+        attempt = directory / "attempts" / datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        attempt.mkdir(parents=True, exist_ok=False)
+        for name in ("plan.json", "job_state.json", "receipt.json"):
+            if (directory / name).is_file():
+                shutil.copy2(directory / name, attempt / name)
+    else:
+        directory.mkdir(parents=True, exist_ok=False)
     write_json(directory / "plan.json", plan)
     state = initial_state(plan)
     write_json(directory / "job_state.json", state)
@@ -157,7 +189,7 @@ def submit(plan, lock, foreground=False):
     env["PYTHONPATH"] = str(ROOT / "src")
     env.update(PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8", PYTHONNOUSERSITE="1")
     try:
-        with Path(plan["log"]).open("w", encoding="utf-8") as stream:
+        with Path(plan["log"]).open("a" if resuming else "w", encoding="utf-8") as stream:
             process = subprocess.Popen(
                 command,
                 stdin=subprocess.DEVNULL,
@@ -208,9 +240,22 @@ def worker(plan_file, lock_fd):
         if (actual.st_dev, actual.st_ino) != (expected.st_dev, expected.st_ino):
             raise ValueError("后台锁与本次 runtime 不匹配")
         fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        os.environ["CHD_RUNTIME_LOCK_FD"] = str(lock_fd)
         return execute(plan)
     finally:
         os.close(lock_fd)
+
+
+def job_owner(directory, state=None):
+    state = state if state is not None else read_json(directory / "job_state.json")
+    receipt = directory / "receipt.json"
+    candidates = [state, read_json(receipt) if receipt.is_file() else {}]
+    for owner in candidates:
+        if owner.get("pid"):
+            current = identity(owner["pid"])
+            if current and (not owner.get("identity") or current == owner["identity"]):
+                return owner
+    return next((owner for owner in candidates if owner.get("pid")), {})
 
 
 def show_status(runtime):
@@ -220,14 +265,7 @@ def show_status(runtime):
         return 0
     directory = Path(json.loads(pointer.read_text(encoding="utf-8"))["directory"])
     state = json.loads((directory / "job_state.json").read_text(encoding="utf-8"))
-    receipt = directory / "receipt.json"
-    owner = (
-        state
-        if state.get("pid")
-        else json.loads(receipt.read_text(encoding="utf-8"))
-        if receipt.is_file()
-        else {}
-    )
+    owner = job_owner(directory, state)
     status = state["status"]
     if status in {"queued", "running"} and owner.get("pid"):
         current = identity(owner["pid"])
@@ -235,7 +273,45 @@ def show_status(runtime):
             status = "stale（原进程已退出或服务器已重启；保留最后记录，请查看日志）"
     print(f"状态：{status}\n任务：{directory}\n日志：{state['log']}")
     for step in state["steps"]:
-        print(f"  {step['name']}: {step['status']} → {step['output']}")
+        label = (
+            "未知（主进程已退出，最后记录 running，子进程待核实）"
+            if status.startswith("stale") and step["status"] == "running"
+            else step["status"]
+        )
+        print(f"  {step['name']}: {label} → {step['output']}")
+    if status.startswith("stale") or status in {"failed", "interrupted"}:
+        print(f"恢复：bash start_server.sh --resume-job '{directory}'")
     if state.get("error"):
         print("错误：" + state["error"])
+    return 0
+
+
+def stop_job(runtime):
+    pointer = runtime / "last-job.json"
+    if not pointer.is_file():
+        raise ValueError("没有任务记录")
+    directory = Path(read_json(pointer)["directory"])
+    owner = job_owner(directory)
+    current = identity(owner["pid"]) if owner.get("pid") else None
+    if current and owner.get("identity") == current:
+        os.kill(owner["pid"], signal.SIGTERM)
+        print("已请求停止；等待 --status 显示已退出，再恢复。完整检查点保留。")
+        return 0
+    from .resume import live_commands
+
+    stopped = []
+    for command in live_commands(read_json(directory / "plan.json")):
+        try:
+            if command["process_group"]:
+                os.killpg(command["pid"], signal.SIGTERM)
+            else:
+                os.kill(command["pid"], signal.SIGTERM)
+            stopped.append(command["pid"])
+        except ProcessLookupError:
+            pass
+    print(
+        "已请求停止存活子进程：" + str(stopped)
+        if stopped
+        else "原任务进程已退出；可以使用 --resume-job 恢复。"
+    )
     return 0

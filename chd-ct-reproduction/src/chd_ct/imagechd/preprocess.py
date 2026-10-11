@@ -2,7 +2,6 @@
 
 import argparse
 import csv
-import hashlib
 import random
 from pathlib import Path
 
@@ -10,7 +9,8 @@ import nibabel as nib
 import numpy as np
 import torch
 
-from .common import FORMAT, IGNORE, LABELS, NORMALIZATION, normalize, write_json
+from ..recovery import atomic_path, file_hash, output_lock, read_json, write_json
+from .common import FORMAT, IGNORE, LABELS, NORMALIZATION, normalize
 from .geometry import resize
 
 
@@ -82,88 +82,166 @@ def assign_splits(cases, seed, split_file=None):
     return result
 
 
-def prepare(source, output, size=0, seed=42, for_prediction=False, split_file=None, limit=None):
+def prepare_case(case, image_path, label_path, size):
+    print("  读取影像与标签：" + case, flush=True)
+    original = nib.load(image_path)
+    if len(original.shape) != 3 or not np.isfinite(original.affine).all():
+        raise ValueError(f"{case}：无效的三维影像/affine")
+    if abs(np.linalg.det(original.affine[:3, :3])) < 1e-8:
+        raise ValueError(f"{case}：affine 不可逆")
+    canonical = nib.as_closest_canonical(original)
+    targets = {}
+    if label_path:
+        label = nib.load(label_path)
+        if label.shape != original.shape or not np.allclose(label.affine, original.affine, atol=1e-4):
+            raise ValueError(f"{case}：影像和标签网格不同")
+        target, missing, extra = map_labels(np.asanyarray(nib.as_closest_canonical(label).dataobj))
+        if missing:
+            return None, {"case_id": case, "reason": "missing_foreground_annotation", "missing_ids": missing}
+        targets["target"] = (resize(target, (size,) * 3, labels=True) if size else target).astype(np.uint8)
+    else:
+        extra = []
+    print("  归一化：" + case, flush=True)
+    image, intensity = normalize(canonical.get_fdata(dtype=np.float32))
+    cache = f"{case}.npz"
+    arrays = dict(image=(resize(image, (size,) * 3) if size else image).astype(np.float32), **targets)
+    row = {
+        "case_id": case,
+        "cache": cache,
+        "cache_shape": [size] * 3 if size else list(image.shape),
+        "extra_ids_ignored": extra,
+        "intensity": intensity,
+        "source_sha256": file_hash(image_path),
+        "source_name": image_path.name,
+        "native_shape": list(original.shape),
+        "native_affine": original.affine.tolist(),
+        "native_orientation": nib.orientations.io_orientation(original.affine).tolist(),
+        "canonical_shape": list(canonical.shape),
+        "canonical_affine": canonical.affine.tolist(),
+        "units": list(original.header.get_xyzt_units()),
+    }
+    return arrays, row
+
+
+def prepare(source, output, size=0, seed=42, for_prediction=False, split_file=None, limit=None, resume=False):
     if (size != 0 and size < 8) or (limit is not None and limit < 3):
         raise ValueError("size=0 保留原始网格，或至少为8；测试用 limit 至少为3")
-    torch.set_num_threads(2)
     output = Path(output).expanduser().resolve()
-    output.mkdir(parents=True, exist_ok=False)
-    report = {
-        "format": FORMAT,
-        "status": "running",
-        "size": size,
-        "resolution": "resized" if size else "native",
-        "seed": seed,
-        "for_prediction": for_prediction,
-        "normalization": NORMALIZATION,
-        "labels": list(LABELS),
-        "ignore_index": IGNORE,
-        "cases": [],
-        "excluded": [],
-        "limit": limit,
-        "id_policy": "explicit_patient_split" if split_file else "filename_as_patient",
-        "geometry": "native header retained; no claim that spacing or intensity units are calibrated",
-    }
-    write_json(output / "preprocess-report.json", report)
+    output.mkdir(parents=True, exist_ok=resume)
+    with output_lock(output):
+        return prepare_locked(source, output, size, seed, for_prediction, split_file, limit, resume)
+
+
+def prepare_locked(source, output, size, seed, for_prediction, split_file, limit, resume):
+    torch.set_num_threads(2)
+    options = dict(
+        format=FORMAT,
+        size=size,
+        seed=seed,
+        for_prediction=for_prediction,
+        normalization=NORMALIZATION,
+        labels=list(LABELS),
+        ignore_index=IGNORE,
+        limit=limit,
+        id_policy="explicit_patient_split" if split_file else "filename_as_patient",
+    )
+    pairs = discover(source, for_prediction)
+    contract = dict(
+        options=options,
+        sources=[[case, str(image), str(label) if label else None] for case, image, label in pairs],
+        split_sha256=file_hash(split_file) if split_file else None,
+    )
+    contract_file = output / "preprocess-contract.json"
+    report_file = output / "preprocess-report.json"
+    if contract_file.exists():
+        if read_json(contract_file) != contract:
+            raise ValueError("续跑的数据来源、划分或预处理参数改变；请使用新目录")
+    elif resume and report_file.exists():
+        prior = read_json(report_file)
+        if any(prior.get(k) != v for k, v in options.items()):
+            raise ValueError("旧缓存预处理参数不匹配；请使用原参数续跑")
+        print("旧版缓存：逐例重新读取原始数据并校验，完整缓存保留，不重新压缩。", flush=True)
+    elif resume and any(p.name != ".writer.lock" for p in output.iterdir()):
+        raise ValueError("无法识别已有预处理目录，缺少来源记录")
+    write_json(contract_file, contract)
+    complete_file = output / "dataset.json"
+    complete = read_json(complete_file) if complete_file.exists() else None
+    report = dict(
+        options,
+        status="running",
+        resolution="resized" if size else "native",
+        cases=[],
+        excluded=[],
+        discovered=len(pairs),
+        geometry="native header retained; no claim that spacing or intensity units are calibrated",
+    )
+    records = output / ".resume"
+    records.mkdir(exist_ok=True)
+    hashes = set()
     try:
-        pairs = discover(source, for_prediction)
-        report["discovered"] = len(pairs)
-        hashes = set()
         for index, (case, image_path, label_path) in enumerate(pairs):
             if limit and len(report["cases"]) >= limit:
                 break
-            print(f"预处理 {index + 1}/{len(pairs)}：{case}", flush=True)
-            original = nib.load(image_path)
-            if len(original.shape) != 3 or not np.isfinite(original.affine).all():
-                raise ValueError(f"{case}：无效的三维影像/affine")
-            if abs(np.linalg.det(original.affine[:3, :3])) < 1e-8:
-                raise ValueError(f"{case}：affine 不可逆")
-            canonical = nib.as_closest_canonical(original)
-            targets = {}
-            if label_path:
-                label = nib.load(label_path)
-                if label.shape != original.shape or not np.allclose(label.affine, original.affine, atol=1e-4):
-                    raise ValueError(f"{case}：影像和标签网格不同")
-                target, missing, extra = map_labels(np.asanyarray(nib.as_closest_canonical(label).dataobj))
-                if missing:
-                    report["excluded"].append(
-                        {"case_id": case, "reason": "missing_foreground_annotation", "missing_ids": missing}
-                    )
-                    continue
-                targets["target"] = (resize(target, (size,) * 3, labels=True) if size else target).astype(
-                    np.uint8
-                )
-            else:
-                extra = []
-            image, intensity = normalize(canonical.get_fdata(dtype=np.float32))
-            # Detect exact duplicate compressed images before assigning patient splits.
-            with image_path.open("rb") as stream:
-                digest = hashlib.file_digest(stream, "sha256").hexdigest()
-            if digest in hashes:
-                raise ValueError("检测到内容完全重复的影像；请先确认患者身份，避免跨集合泄漏")
-            hashes.add(digest)
-            cache = f"{case}.npz"
-            np.savez_compressed(
-                output / cache,
-                image=(resize(image, (size,) * 3) if size else image).astype(np.float32),
-                **targets,
+            print(f"预处理 {index + 1}/{len(pairs)}：{case}（校验/处理）", flush=True)
+            sources = dict(image=file_hash(image_path), label=file_hash(label_path) if label_path else None)
+            sidecar = records / (case + ".json")
+            cached = read_json(sidecar) if sidecar.exists() else None
+            if cached and cached["sources"] != sources:
+                raise ValueError(f"{case} 原始影像或标签已改变；不能混用已有实验")
+            cache_file = output / (case + ".npz")
+            valid = cached and (
+                cached.get("excluded")
+                or (cache_file.is_file() and file_hash(cache_file) == cached.get("cache_sha256"))
             )
-            row = {
-                "case_id": case,
-                "cache": cache,
-                "cache_shape": [size] * 3 if size else list(image.shape),
-                "extra_ids_ignored": extra,
-                "intensity": intensity,
-                "source_sha256": digest,
-                "source_name": image_path.name,
-                "native_shape": list(original.shape),
-                "native_affine": original.affine.tolist(),
-                "native_orientation": nib.orientations.io_orientation(original.affine).tolist(),
-                "canonical_shape": list(canonical.shape),
-                "canonical_affine": canonical.affine.tolist(),
-                "units": list(original.header.get_xyzt_units()),
-            }
-            report["cases"].append(row)
+            if valid:
+                row = cached["row"]
+                excluded = cached["excluded"]
+                print("  已校验，保留：" + case, flush=True)
+            else:
+                arrays, row = prepare_case(case, image_path, label_path, size)
+                excluded = arrays is None
+                if not excluded:
+                    same = False
+                    if cache_file.exists():
+                        try:
+                            with np.load(cache_file, allow_pickle=False) as previous:
+                                same = set(previous.files) == set(arrays) and all(
+                                    np.array_equal(previous[k], v) for k, v in arrays.items()
+                                )
+                        except (OSError, ValueError, EOFError):
+                            pass
+                        except Exception as error:
+                            # zipfile.BadZipFile and decompression errors are damaged caches.
+                            import zipfile
+                            import zlib
+
+                            if not isinstance(error, (zipfile.BadZipFile, zlib.error)):
+                                raise
+                    if not same:
+                        if complete:
+                            raise ValueError("已完成缓存损坏；请用新目录重建，避免改变已有实验")
+                        print("  写入缓存：" + case, flush=True)
+                        with atomic_path(cache_file) as temporary:
+                            np.savez_compressed(temporary, **arrays)
+                    print("  " + ("已校验旧缓存，保留：" if same else "已保存：") + case, flush=True)
+                cached = dict(
+                    sources=sources,
+                    row=row,
+                    excluded=excluded,
+                    cache_sha256=None if excluded else file_hash(cache_file),
+                )
+                write_json(sidecar, cached)
+                del arrays
+            if excluded:
+                report["excluded"].append(row)
+            else:
+                digest = row["source_sha256"]
+                if digest in hashes:
+                    raise ValueError("检测到内容完全重复的影像；请先确认患者身份，避免跨集合泄漏")
+                hashes.add(digest)
+                report["cases"].append(dict(row))
+            if not complete:
+                write_json(report_file, report)
         if not report["cases"]:
             raise ValueError("没有可用病例")
         if not for_prediction:
@@ -171,14 +249,21 @@ def prepare(source, output, size=0, seed=42, for_prediction=False, split_file=No
             for row in report["cases"]:
                 row.update(splits[row["case_id"]])
         report["status"] = "prepared"
-        write_json(output / "dataset.json", report)  # Only a completed preparation is consumable.
-        print(f"已准备 {len(report['cases'])} 例；排除 {len(report['excluded'])} 例：{output}")
+        if complete:
+            if complete["cases"] != report["cases"] or complete["excluded"] != report["excluded"]:
+                raise ValueError("已完成清单与原始数据不符；请使用新目录")
+            return complete  # Preserve its bytes/hash for downstream checkpoints.
+        write_json(complete_file, report)
+        print(f"已准备 {len(report['cases'])} 例；排除 {len(report['excluded'])} 例：{output}", flush=True)
         return report
     except BaseException as error:
-        report.update(status="failed", error=str(error))
+        report.update(
+            status="interrupted" if isinstance(error, KeyboardInterrupt) else "failed", error=str(error)
+        )
         raise
     finally:
-        write_json(output / "preprocess-report.json", report)
+        if not complete:
+            write_json(report_file, report)
 
 
 def main(argv=None):
@@ -190,8 +275,18 @@ def main(argv=None):
     parser.add_argument("--split-file", help="显式患者划分 CSV；case_id 示例 ct_1001")
     parser.add_argument("--for-prediction", action="store_true", help="无标签预处理，不生成训练划分")
     parser.add_argument("--limit", type=int, help="只用于软件试跑，保留前 N 个合格病例")
+    parser.add_argument("--resume", action="store_true", help="校验已有缓存并接续，参数和来源必须一致")
     args = parser.parse_args(argv)
-    prepare(args.input, args.output, args.size, args.seed, args.for_prediction, args.split_file, args.limit)
+    prepare(
+        args.input,
+        args.output,
+        args.size,
+        args.seed,
+        args.for_prediction,
+        args.split_file,
+        args.limit,
+        args.resume,
+    )
     return 0
 
 

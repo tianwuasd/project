@@ -35,6 +35,8 @@ def task_configuration(args):
         "diagnosis-demo": set(),
     }
     fields.update(by_task[args.task])
+    if args.task in {"preprocess", "train", "predict", "test"} and getattr(args, "resume", False):
+        fields.add("resume")
     if args.task in DIAGNOSIS_TASKS:
         fields.update(
             name for name, _, _ in INPUTS[args.task] if name != "classifier" or args.method != "rules"
@@ -137,6 +139,11 @@ def resolve_settings(args, profile, interactive, saved_override=None):
     if effective_device(args) != "cuda":
         args.gpu, args.gpu_count = "auto", 1
         return runtime, results, settings_file, saved
+    if interactive and not getattr(args, "gpu_shown", False):
+        from .launcher import show_gpus
+
+        show_gpus()
+        args.gpu_shown = True
     count = choose(
         getattr(args, "gpu_count", None),
         saved.get("gpu_count"),

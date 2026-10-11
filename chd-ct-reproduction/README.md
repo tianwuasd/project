@@ -24,7 +24,7 @@ Windows 双击 **start.bat**，选择一个功能。数据路径可直接粘贴�
 | 评估 | `evaluate.py` | `evaluate_server.sh` | 预测 + 缓存真值 → Dice 报告 |
 | 诊断各步骤 | `diagnosis.py labels/features/train/predict/evaluate/demo` | `diagnosis_server.sh --task ...` | 标签导入、特征、浅树训练、判断解释、诊断评估分别启动 |
 
-服务器运行 `bash start_server.sh` 可多选步骤，默认独立后台运行，断开 SSH 后继续；`bash start_server.sh --status` 查看进度。菜单只询问所选步骤需要的设置，CPU 预处理/评估/诊断无需配置显卡。默认数据路径和 GPU 数在 `configs/servers/zmic44.json`，也可在菜单覆盖；`smoke_server.sh` 是独立短测。多卡采用一张卡一个阶段，保留血池 LSTM 的编码器依赖。详见 [服务器分步启动](docs/server-start.md)。
+服务器运行 `bash start_server.sh` 可多选步骤，默认独立后台运行，断开 SSH 后继续；`bash start_server.sh --status` 查看进度。菜单只询问所选步骤需要的设置，CPU 预处理/评估/诊断无需配置显卡。默认数据路径和 GPU 数在 `configs/servers/zmic44.json`，也可在菜单覆盖；`smoke_server.sh` 是独立短测。多卡采用一张卡一个阶段，保留血池 LSTM 的编码器依赖。显卡选择前显示实时状态；`bash start_server.sh --resume-job` 恢复最近中断，`--stop` 请求停止。详见 [服务器分步启动](docs/server-start.md) 和 [中断恢复](docs/recovery.md)。
 
 训练和预测不会重新预处理。分割预测不会读取真值或训练模型；分割评估与诊断各步骤分别启动。
 

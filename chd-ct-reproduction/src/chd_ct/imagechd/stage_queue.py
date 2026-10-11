@@ -10,13 +10,13 @@ from pathlib import Path
 from ..server.launcher import write_json
 
 
-def run_queue(stages, gpu_ids, output, command_for, env, before_start=None, on_complete=None):
+def run_queue(stages, gpu_ids, output, command_for, env, before_start=None, on_complete=None, lock_fds=()):
     """Only the coordinator writes models.json; workers write stage-specific files."""
     if not gpu_ids or len(set(gpu_ids)) != len(gpu_ids):
         raise ValueError("队列需要不重复的 GPU UUID")
     output = Path(output)
     logs = output / "stage_logs"
-    logs.mkdir()
+    logs.mkdir(exist_ok=True)
     pending, completed, active, used = list(stages), {}, {}, set()
     records = {stage: {"status": "pending"} for stage in stages}
     state = {"status": "running", "gpu_uuids": list(gpu_ids), "stages": records}
@@ -59,7 +59,7 @@ def run_queue(stages, gpu_ids, output, command_for, env, before_start=None, on_c
                     before_start(gpu, gpu in used)
                 if stopped[0]:
                     raise KeyboardInterrupt("训练队列已中断")
-                stream = (logs / (ready + ".log")).open("w", encoding="utf-8")
+                stream = (logs / (ready + ".log")).open("a", encoding="utf-8")
                 try:
                     process = subprocess.Popen(
                         list(map(str, command_for(ready))),
@@ -69,6 +69,20 @@ def run_queue(stages, gpu_ids, output, command_for, env, before_start=None, on_c
                         stderr=subprocess.STDOUT,
                         # Keep workers in the coordinator's process group so server cleanup reaches all.
                         start_new_session=False,
+                        **(
+                            {
+                                "pass_fds": tuple(
+                                    set(lock_fds)
+                                    | (
+                                        {int(env["CHD_RUNTIME_LOCK_FD"])}
+                                        if env.get("CHD_RUNTIME_LOCK_FD")
+                                        else set()
+                                    )
+                                )
+                            }
+                            if os.name == "posix"
+                            else {}
+                        ),
                     )
                 except BaseException:
                     stream.close()
@@ -76,7 +90,12 @@ def run_queue(stages, gpu_ids, output, command_for, env, before_start=None, on_c
                 active[gpu] = (process, stream, ready)
                 pending.remove(ready)
                 used.add(gpu)
-                records[ready].update(status="running", gpu_uuid=gpu, pid=process.pid)
+                from ..server.jobs import identity
+
+                records[ready].update(
+                    status="running", gpu_uuid=gpu, pid=process.pid, identity=identity(process.pid)
+                )
+                write_json(output / "queue.json", state)
                 print(f"启动 {ready}，GPU={gpu}，日志：{logs / (ready + '.log')}", flush=True)
             write_json(output / "queue.json", state)
             if pending and not active:

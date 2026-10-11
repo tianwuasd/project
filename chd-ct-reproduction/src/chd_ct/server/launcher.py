@@ -83,6 +83,24 @@ def query_gpus():
     return rows
 
 
+def show_gpus():
+    print("\n当前显卡状态（此刻快照，空闲不代表已预约）：")
+    try:
+        rows = query_gpus()
+        visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+        allowed = None if visible is None else {x.strip() for x in visible.split(",")}
+        print("编号  型号                     空闲显存(MiB)  利用率  计算进程  可见范围")
+        for row in rows:
+            access = allowed is None or bool({row["index"], row["uuid"]} & allowed)
+            print(
+                f"{row['index']:>3}   {row['name']:<24} {row['free']:>8}       {row['util']:>3}%    "
+                f"{'占用' if row['busy'] else '无'}       {'范围内' if access else '范围外'}"
+            )
+        print("只选择本次获准使用的显卡；后台执行前还会重新检查。\n")
+    except (OSError, subprocess.SubprocessError, ValueError) as error:
+        print("无法取得显卡状态：" + str(error) + "；GPU 任务执行前必须检查通过。")
+
+
 def select_gpu(rows, requested="auto", visible=None, minimum=6000):
     return select_gpus(rows, 1, requested, visible, minimum)[0]
 
@@ -136,6 +154,8 @@ def make_parser():
     )
     parser.add_argument("--foreground", action="store_true", help="前台调试并等待完成；默认独立后台运行")
     parser.add_argument("--status", action="store_true", help="查看最近后台任务，不安装环境或查询GPU")
+    parser.add_argument("--resume-job", nargs="?", const="latest", help="恢复最近任务，或指定 workflow 目录")
+    parser.add_argument("--stop", action="store_true", help="请求中断最近任务，保留已提交的缓存和检查点")
     parser.add_argument("--worker", help=argparse.SUPPRESS)
     parser.add_argument("--lock-fd", type=int, help=argparse.SUPPRESS)
     return parser
@@ -149,13 +169,27 @@ def main(argv=None):
         if args.worker:
             return jobs.worker(Path(args.worker), args.lock_fd)
         profile = json.loads(Path(args.server_config).read_text(encoding="utf-8"))
+        if args.stop:
+            return jobs.stop_job(personal_path(args.runtime or profile["runtime"]))
         if args.status:
             return jobs.show_status(personal_path(args.runtime or profile["runtime"]))
         if sys.platform != "linux":
             raise ValueError("服务器入口用于 Linux；本机请使用 start.py 或独立 Python 脚本。")
         from .workflow import build_plan
 
-        plan = build_plan(args, profile, sys.stdin.isatty() and not args.non_interactive)
+        interactive = sys.stdin.isatty() and not args.non_interactive
+        if interactive and not (args.task or args.tasks or args.resume_job):
+            action = input("任务方式：n 新建 / r 恢复上次中断 [n]：").strip().lower() or "n"
+            if action not in {"n", "r"}:
+                raise ValueError("请选择 n 或 r")
+            if action == "r":
+                args.resume_job = "latest"
+        if args.resume_job:
+            from .resume import build_resume_plan
+
+            plan = build_resume_plan(args, profile, interactive)
+        else:
+            plan = build_plan(args, profile, interactive)
         print("执行顺序：" + " → ".join(step["name"] for step in plan["steps"]))
         for step in plan["steps"]:
             print(step["name"] + "：" + json.dumps(step["arguments"], ensure_ascii=False))

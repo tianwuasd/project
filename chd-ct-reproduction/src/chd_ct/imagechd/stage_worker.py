@@ -15,6 +15,7 @@ def main(argv=None):
     parser.add_argument("--output", required=True)
     parser.add_argument("--stage", choices=STAGES, required=True)
     parser.add_argument("--mode", choices=["smoke", "preflight", "train"], required=True)
+    parser.add_argument("--resume", action="store_true")
     args = parser.parse_args(argv)
     output = Path(args.output)
     config = json.loads((output / "effective-config.json").read_text(encoding="utf-8"))
@@ -27,6 +28,7 @@ def main(argv=None):
         output,
         args.mode,
         file_hash(directory / "dataset.json"),
+        args.resume,
     )
     write_json(output / (args.stage + ".result.json"), info)
     return 0

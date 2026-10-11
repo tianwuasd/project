@@ -21,6 +21,7 @@ def add_task_arguments(parser):
     parser.add_argument("--limit", type=int)
     parser.add_argument("--split-file")
     parser.add_argument("--for-prediction", action="store_true")
+    parser.add_argument("--resume", action="store_true", help="预处理/训练/预测/测试在原输出目录续跑")
     parser.add_argument("--case-id")
     parser.add_argument("--split", choices=["train", "val", "test"])
     parser.add_argument("--allow-smoke", action="store_true")
@@ -67,6 +68,8 @@ def build_command(args, root, python, output, device, mode=None):
             command += ["--limit", str(args.limit)]
         if args.split_file:
             command += ["--split-file", args.split_file]
+        if getattr(args, "resume", False):
+            command += ["--resume"]
         return command
     if not args.prepared:
         raise ValueError("需要 --prepared；请先单独运行预处理")
@@ -99,4 +102,6 @@ def build_command(args, root, python, output, device, mode=None):
         command += ["--predictions", args.predictions, "--split", args.split or "test"]
     else:
         raise ValueError("未知任务")
+    if getattr(args, "resume", False) and task in {"train", "predict", "test"}:
+        command += ["--resume"]
     return command

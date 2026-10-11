@@ -24,3 +24,5 @@ U-Net 请先读 [来源与结构对齐说明](unet-source.md)，再看 unet.py �
 服务器先看 configs/servers/zmic44.json，再按 server/launcher.py → workflow.py → settings.py → jobs.py → imagechd.py 阅读：入口解析、多选计划、有关参数、后台执行、单步骤派发。bootstrap.py 管理环境和子进程。多卡训练依赖在 imagechd/stage_queue.py；测试集入口在 imagechd/test.py。tests/test_server_jobs.py 覆盖产物衔接与状态；test_server_posix.py 用真实 Linux 进程验证后台存活、锁、失败和中断。
 
 诊断阅读顺序：`labels.py` 看空白为阴性的来源记录，`features.py` 看 56 个结构描述，`classifier.py` 看训练及真实分支解释，`predict.py` 看 HTML 输出，`evaluate.py` 看独立评估。候选规则在 `rules.py` 与 `configs/diagnosis-rules.yaml`。运行方法见 [诊断说明](diagnosis.md)。
+
+恢复逻辑先看 `server/resume.py`（原流程参数、完成校验、进程存活检查），再看 `recovery.py`（原子文件写入和输出锁）。病例恢复在 `imagechd/preprocess.py`、`predict.py`；轮次恢复在 `imagechd/train.py`。`tests/test_recovery.py` 对比中断与连续训练，`tests/test_server_posix.py` 检验 Linux 强制终止后的继承锁。

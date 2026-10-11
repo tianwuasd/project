@@ -7,6 +7,7 @@ import nibabel as nib
 import numpy as np
 import torch
 
+from ..recovery import atomic_path, output_lock, read_json
 from .checkpoints import load_stage, read_collection
 from .common import LABELS, load_case, read_prepared, write_json
 from .config import UNAVAILABLE, build_model
@@ -85,7 +86,16 @@ def restore_native(prediction, row):
     return result
 
 
-def predict(prepared, models, output, device="cpu", case_id=None, split=None, allow_smoke=False):
+def predict(
+    prepared, models, output, device="cpu", case_id=None, split=None, allow_smoke=False, resume=False
+):
+    output = Path(output).expanduser().resolve()
+    output.mkdir(parents=True, exist_ok=resume)
+    with output_lock(output):
+        return predict_locked(prepared, models, output, device, case_id, split, allow_smoke, resume)
+
+
+def predict_locked(prepared, models, output, device, case_id, split, allow_smoke, resume):
     cache, data = read_prepared(prepared)
     directory, collection = read_collection(models, allow_smoke)
     rows = [
@@ -96,7 +106,7 @@ def predict(prepared, models, output, device="cpu", case_id=None, split=None, al
     if not rows:
         raise ValueError("没有匹配的预测病例")
     output = Path(output).expanduser().resolve()
-    output.mkdir(parents=True, exist_ok=False)
+
     report = {
         "status": "running",
         "task": "chd_multistage_prediction",
@@ -110,18 +120,53 @@ def predict(prepared, models, output, device="cpu", case_id=None, split=None, al
         "unavailable": UNAVAILABLE,
         "geometry": "supplied original grid restored; millimetre calibration unverified",
     }
+    contract = {k: report[k] for k in ("prepared_sha256", "models_sha256", "model_mode")}
+    contract.update(
+        case_ids=[r["case_id"] for r in rows],
+        split=split,
+        case_id=case_id,
+        cache_hashes={r["case_id"]: file_hash(cache / r["cache"]) for r in rows},
+        recovery_version=1,
+    )
+    contract_file = output / "prediction-contract.json"
+    if contract_file.exists() and read_json(contract_file) != contract:
+        raise ValueError("预测输入、病例范围或模型改变，不能混用旧结果")
+    previous_file = output / "prediction-report.json"
+    previous = read_json(previous_file) if resume and previous_file.exists() else {}
+    if previous and any(previous.get(k) != report[k] for k in ("prepared_sha256", "models_sha256")):
+        raise ValueError("旧预测来源不同，不能续跑")
+    done = {r["case_id"]: r for r in previous.get("cases", [])}
+    report["cases"] = [done[r["case_id"]] for r in rows if r["case_id"] in done]
+    write_json(contract_file, contract)
     try:
         torch.set_num_threads(collection["config"]["threads"])
         for row in rows:
+            record = done.get(row["case_id"])
+            if record and all(
+                record.get(key + "_sha256")
+                and (output / record[key]).is_file()
+                and file_hash(output / record[key]) == record[key + "_sha256"]
+                for key in ("prediction", "grid_prediction")
+            ):
+                print("已校验，跳过预测：" + row["case_id"], flush=True)
+                continue
             image, _ = load_case(cache, row, labels=False)
             prediction, details = predict_volume(image, directory, collection, device)
             filename = row["case_id"] + "_seg.nii.gz"
-            nib.save(restore_native(prediction, row), output / filename)
+            with atomic_path(output / filename) as temporary:
+                nib.save(restore_native(prediction, row), temporary)
             grid = row["case_id"] + "_grid.npz"
-            np.savez_compressed(output / grid, prediction=prediction)
-            report["cases"].append(
-                {"case_id": row["case_id"], "prediction": filename, "grid_prediction": grid, **details}
-            )
+            with atomic_path(output / grid) as temporary:
+                np.savez_compressed(temporary, prediction=prediction)
+            done[row["case_id"]] = {
+                "case_id": row["case_id"],
+                "prediction": filename,
+                "grid_prediction": grid,
+                "prediction_sha256": file_hash(output / filename),
+                "grid_prediction_sha256": file_hash(output / grid),
+                **details,
+            }
+            report["cases"] = [done[r["case_id"]] for r in rows if r["case_id"] in done]
             write_json(output / "prediction-report.json", report)
             print("已预测：" + row["case_id"], flush=True)
         report["status"] = "passed"
@@ -142,8 +187,18 @@ def main(argv=None):
     parser.add_argument("--case-id")
     parser.add_argument("--split", choices=["train", "val", "test"])
     parser.add_argument("--allow-smoke", action="store_true")
+    parser.add_argument("--resume", action="store_true")
     args = parser.parse_args(argv)
-    predict(args.prepared, args.models, args.output, args.device, args.case_id, args.split, args.allow_smoke)
+    predict(
+        args.prepared,
+        args.models,
+        args.output,
+        args.device,
+        args.case_id,
+        args.split,
+        args.allow_smoke,
+        args.resume,
+    )
     return 0
 
 

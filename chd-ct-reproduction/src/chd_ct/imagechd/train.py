@@ -2,9 +2,10 @@
 
 import argparse
 import copy
-import hashlib
+import io
 import json
 import os
+import random
 import sys
 from pathlib import Path
 
@@ -15,16 +16,12 @@ from torch.utils.data import DataLoader
 from ..models.grid import GRID_ADAPTER
 from ..models.unet import ARCHITECTURE
 from ..paths import config_path
+from ..recovery import atomic_path, file_hash, output_lock, read_json
 from .augment import augment_batch
 from .common import LABELS, MODEL_FORMAT, NORMALIZATION, load_case, read_prepared, write_json
 from .config import STAGES, UNAVAILABLE, build_model, load_config, weights_for
 from .dataset import StageDataset
 from .losses import masked_loss
-
-
-def file_hash(path):
-    with Path(path).open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
 def training_rows(data):
@@ -48,11 +45,12 @@ def recurrent_features(encoder, sequence):
         return torch.stack([encoder.features(sequence[:, i]) for i in range(sequence.shape[1])], dim=1)
 
 
-def train_stage(directory, rows, stage, config, output, mode, manifest_hash):
+def train_stage(directory, rows, stage, config, output, mode, manifest_hash, resume=False):
     torch.set_num_threads(config["threads"])
     stage_seed = config["seed"] + STAGES.index(stage)
     torch.manual_seed(stage_seed)
     np.random.seed(stage_seed)
+    random.seed(stage_seed)
     spec = config["stages"][stage]
     model = build_model(stage, spec).to(config["device"])
     loaders = {
@@ -76,7 +74,42 @@ def train_stage(directory, rows, stage, config, output, mode, manifest_hash):
     history, best = [], float("inf")
     maximum = 1 if mode in {"smoke", "preflight"} else None
     epochs = 1 if maximum else spec["epochs"]
-    for epoch in range(epochs):
+    last_file = output / (stage + ".last.pt")
+    contract = dict(
+        recovery_version=1,
+        stage=stage,
+        config=config,
+        mode=mode,
+        prepared_sha256=manifest_hash,
+        architecture=ARCHITECTURE,
+        encoder_sha256=file_hash(output / "blood2d.pt") if encoder is not None else None,
+    )
+    start, best_bytes = 0, None
+    if resume and last_file.is_file():
+        last = torch.load(last_file, map_location="cpu", weights_only=True)
+        if last.get("contract") != contract:
+            raise ValueError("训练检查点的配置、数据或编码器来源不同：" + stage)
+        model.load_state_dict(last["state_dict"])
+        optimizer.load_state_dict(last["optimizer"])
+        start, history, best = last["epoch"], last["history"], last["best"]
+        best_bytes = last["best_bytes"]
+        if not 0 <= start <= epochs or len(history) != start:
+            raise ValueError("训练检查点轮次不完整：" + stage)
+        torch.set_rng_state(last["torch_rng"])
+        rng = last["numpy_rng"]
+        np.random.set_state((rng[0], np.asarray(rng[1], dtype=np.uint32), rng[2], rng[3], rng[4]))
+        random.setstate(last["python_rng"])
+        if config["device"] == "cuda":
+            torch.cuda.set_rng_state(last["cuda_rng"])
+        # The last checkpoint is the transaction: restore exports even if a crash
+        # occurred between publishing last.pt and best.pt/history.json.
+        with atomic_path(output / (stage + ".pt")) as temporary:
+            temporary.write_bytes(best_bytes)
+        write_json(output / (stage + ".history.json"), history)
+        print(f"{stage}：从已完成第 {start}/{epochs} 轮接续", flush=True)
+    elif resume and (output / (stage + ".pt")).exists():
+        raise ValueError("旧版训练权重不含优化器状态，不能精确续训；请另建训练任务：" + stage)
+    for epoch in range(start, epochs):
         fraction = epoch / epochs
         lr = config["learning_rate"] * (1 if fraction < 0.5 else 0.1 if fraction < 0.75 else 0.01)
         for group in optimizer.param_groups:
@@ -107,7 +140,6 @@ def train_stage(directory, rows, stage, config, output, mode, manifest_hash):
             losses[split], samples[split] = total / count, count
         history.append({"epoch": epoch + 1, "learning_rate": lr, "loss": losses, "samples_seen": samples})
         print(json.dumps({"stage": stage, **history[-1]}), flush=True)
-        write_json(output / (stage + ".history.json"), history)
         if losses["val"] < best:
             best = losses["val"]
             record = {
@@ -123,7 +155,7 @@ def train_stage(directory, rows, stage, config, output, mode, manifest_hash):
                 "prepared_sha256": manifest_hash,
                 "epoch": epoch + 1,
                 "val_loss": best,
-                "state_dict": {k: v.detach().cpu() for k, v in model.state_dict().items()},
+                "state_dict": {k: v.detach().cpu().clone() for k, v in model.state_dict().items()},
             }
             if encoder_record is not None:
                 record.update(
@@ -131,13 +163,39 @@ def train_stage(directory, rows, stage, config, output, mode, manifest_hash):
                     encoder_spec=config["stages"]["blood2d"],
                     encoder_sha256=file_hash(output / "blood2d.pt"),
                 )
-            temporary = output / (stage + ".tmp.pt")
-            torch.save(record, temporary)
-            temporary.replace(output / (stage + ".pt"))
+            buffer = io.BytesIO()
+            torch.save(record, buffer)
+            best_bytes = buffer.getvalue()
+        rng = np.random.get_state()
+        last = dict(
+            contract=contract,
+            epoch=epoch + 1,
+            history=history,
+            best=best,
+            best_bytes=best_bytes,
+            state_dict={k: v.detach().cpu().clone() for k, v in model.state_dict().items()},
+            optimizer=optimizer.state_dict(),
+            torch_rng=torch.get_rng_state(),
+            numpy_rng=(rng[0], rng[1].tolist(), rng[2], rng[3], rng[4]),
+            python_rng=random.getstate(),
+            cuda_rng=torch.cuda.get_rng_state() if config["device"] == "cuda" else None,
+        )
+        with atomic_path(last_file) as temporary:
+            torch.save(last, temporary)
+        with atomic_path(output / (stage + ".pt")) as temporary:
+            temporary.write_bytes(best_bytes)
+        write_json(output / (stage + ".history.json"), history)
     return {"file": stage + ".pt", "sha256": file_hash(output / (stage + ".pt")), "best_val_loss": best}
 
 
-def train(prepared, output, config_path, mode="smoke", device="cpu", gpu_ids=None):
+def train(prepared, output, config_path, mode="smoke", device="cpu", gpu_ids=None, resume=False):
+    output = Path(output).expanduser().resolve()
+    output.mkdir(parents=True, exist_ok=resume)
+    with output_lock(output) as lock_fd:
+        return train_locked(prepared, output, config_path, mode, device, gpu_ids, resume, lock_fd)
+
+
+def train_locked(prepared, output, config_path, mode, device, gpu_ids, resume, lock_fd):
     if gpu_ids:
         if device != "cuda" or mode == "check":
             raise ValueError("多卡队列仅用于 CUDA 训练/短测/预检")
@@ -160,7 +218,6 @@ def train(prepared, output, config_path, mode="smoke", device="cpu", gpu_ids=Non
     if mode == "train" and (data.get("limit") is not None or config.get("profile") == "smoke"):
         raise ValueError("limit 缓存/smoke 配置不能冒充正式训练")
     output = Path(output).expanduser().resolve()
-    output.mkdir(parents=True, exist_ok=False)
     report = {
         "status": "running",
         "task": "chd_multistage",
@@ -184,9 +241,12 @@ def train(prepared, output, config_path, mode="smoke", device="cpu", gpu_ids=Non
         "stages": {},
         "unavailable": UNAVAILABLE,
     }
-    write_json(output / "report.json", report)
+    validated = False
     try:
         if mode == "check":
+            if (output / "models.json").exists():
+                raise ValueError("缓存检查请使用独立输出目录")
+            validated = True
             for selected in rows.values():
                 for row in selected:
                     load_case(directory, row)
@@ -207,6 +267,22 @@ def train(prepared, output, config_path, mode="smoke", device="cpu", gpu_ids=Non
         torch.manual_seed(config["seed"])
         np.random.seed(config["seed"])
         collection["config"] = config
+        contract = dict(
+            config=config,
+            mode=mode,
+            prepared_sha256=collection["prepared_sha256"],
+            architecture=ARCHITECTURE,
+            recovery_version=1,
+            cache_hashes={r["case_id"]: file_hash(directory / r["cache"]) for r in data["cases"]},
+        )
+        contract_path = output / "training-contract.json"
+        if contract_path.exists() and read_json(contract_path) != contract:
+            raise ValueError("训练数据或配置已改变，不能续训")
+        if resume and not contract_path.exists() and (output / "models.json").exists():
+            raise ValueError("旧版训练未记录优化器，不能精确续训；请另建训练目录")
+        validated = True
+        write_json(output / "report.json", report)
+        write_json(contract_path, contract)
         write_json(output / "effective-config.json", config)
         write_json(output / "models.json", collection)
         if gpu_ids:
@@ -225,18 +301,28 @@ def train(prepared, output, config_path, mode="smoke", device="cpu", gpu_ids=Non
                     stage,
                     "--mode",
                     mode,
+                    *(["--resume"] if resume else []),
                 ]
 
             def on_complete(stage, info):
                 collection["stages"][stage] = info
                 write_json(output / "models.json", collection)
 
-            run_queue(STAGES, gpu_ids, output, command_for, os.environ.copy(), check_gpu_handoff, on_complete)
+            run_queue(
+                STAGES,
+                gpu_ids,
+                output,
+                command_for,
+                os.environ.copy(),
+                check_gpu_handoff,
+                on_complete,
+                lock_fds=(lock_fd,),
+            )
             collection["stages"] = {s: collection["stages"][s] for s in STAGES}
         else:
             for stage in STAGES:
                 collection["stages"][stage] = train_stage(
-                    directory, rows, stage, config, output, mode, collection["prepared_sha256"]
+                    directory, rows, stage, config, output, mode, collection["prepared_sha256"], resume
                 )
                 write_json(output / "models.json", collection)
         collection["status"] = "complete"
@@ -244,12 +330,17 @@ def train(prepared, output, config_path, mode="smoke", device="cpu", gpu_ids=Non
         report.update(status="passed", models=str(output / "models.json"), stages=list(STAGES))
         return report
     except BaseException as error:
-        report.update(status="failed", error=str(error))
+        if not validated:
+            raise
+        report.update(
+            status="interrupted" if isinstance(error, KeyboardInterrupt) else "failed", error=str(error)
+        )
         collection.update(status="failed", error=str(error))
         write_json(output / "models.json", collection)
         raise
     finally:
-        write_json(output / "report.json", report)
+        if validated:
+            write_json(output / "report.json", report)
 
 
 def main(argv=None):
@@ -260,6 +351,7 @@ def main(argv=None):
     parser.add_argument("--mode", choices=["check", "smoke", "preflight", "train"], default="smoke")
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
     parser.add_argument("--gpu-ids", help="内部多卡队列：逗号分隔的已分配 GPU UUID")
+    parser.add_argument("--resume", action="store_true", help="从最后完整 epoch 恢复模型、优化器和随机状态")
     args = parser.parse_args(argv)
     train(
         args.prepared,
@@ -268,6 +360,7 @@ def main(argv=None):
         args.mode,
         args.device,
         args.gpu_ids.split(",") if args.gpu_ids else None,
+        args.resume,
     )
     return 0
 

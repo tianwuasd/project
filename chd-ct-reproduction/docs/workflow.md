@@ -44,7 +44,7 @@ python train.py --prepared data/imagechd7_native --output runs/chd_full/models -
 3. `blood2d`：逐切片学习血池内部/边界/背景；血池由四心腔、AO、PA组成，MYO不属于血池。
 4. `blood_lstm`：冻结 blood2d 特征编码器，复用双向 ConvLSTM 和七切片序列。
 
-旧主干权重不能复用，需要重新训练；现有缓存无需重做。每阶段按验证损失保存最佳权重。`models.json` 只有六阶段完成后才标记 complete，记录配置、划分哈希和逐权重哈希。循环模型包含其实际使用的冻结编码器，防止模型混用。当前不提供优化器断点续训。
+旧主干权重不能复用，需要重新训练；现有缓存无需重做。每阶段按验证损失保存最佳权重。`models.json` 只有六阶段完成后才标记 complete，记录配置、划分哈希和逐权重哈希。循环模型包含其实际使用的冻结编码器，防止模型混用。0.7.0 起另存每阶段 `.last.pt`（模型、优化器、随机状态、历史、最佳权重原始字节），可从完整 epoch 接续；旧版仅有最佳权重不能精确续训。见 [中断恢复](recovery.md)。
 
 `configs/chd.yaml` 使用按原作者定义移植的有效卷积主干，3D 目标网格64³/128³、base16/4层，血池目标网格256²、base8/5层。网格适配会镜像扩展输入：实际3D输入为156³/220³，2D为444²。`configs/chd-author-unet.yaml` 使用作者主干宽度（3D base32、2D base64），类别数仍适配CHD；四个三维阶段默认接 gate，可分别用 `spatial_gate: false` 关闭。须先做 GPU preflight，尚未证实3090显存足够。来源、通道和开关详见 [U-Net说明](unet-source.md)。
 

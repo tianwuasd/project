@@ -8,6 +8,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from ..quickstart.diagnosis import DIAGNOSIS_TASKS, INPUTS, OUTPUT_KEYS
+from ..recovery import file_hash
 from .launcher import choose, personal_path
 from .settings import effective_device, resolve_settings, task_configuration
 
@@ -62,7 +63,7 @@ def validate_inputs(args, future):
     needed = []
     if args.task == "preprocess":
         needed.append(("dataset", args.dataset))
-        if Path(args.prepared).exists():
+        if Path(args.prepared).exists() and not getattr(args, "resume", False):
             raise ValueError("预处理目录已存在；取消选择预处理以复用缓存，或指定新的 --prepared")
     elif args.task in {"train", "predict", "test", "evaluate"}:
         needed.append(("prepared", args.prepared))
@@ -122,6 +123,7 @@ def build_plan(args, profile, interactive):
     prompted_gpu = False
     for i, name in enumerate(names):
         current = copy.deepcopy(base)
+        current.gpu_shown = prompted_gpu
         current.task = "train" if name in {"smoke", "preflight"} else name
         if name in {"smoke", "preflight"}:
             current.mode = name
@@ -177,6 +179,12 @@ def build_plan(args, profile, interactive):
                     raise ValueError(f"{field} 必须独立于环境和结果目录")
     return {
         "schema_version": 1,
+        "frozen_files": {
+            str(Path(s["arguments"][k]).resolve()): file_hash(s["arguments"][k])
+            for s in steps
+            for k in ("config", "split_file", "rules", "evidence")
+            if s["arguments"].get(k) and Path(s["arguments"][k]).is_file()
+        },
         "reset_settings": args.reset_settings,
         "runtime": str(runtime),
         "directory": str(directory),
