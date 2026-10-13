@@ -336,5 +336,52 @@
         ]
       }
     ]
+  },
+  {
+    "project": "pydicom",
+    "repository": "https://github.com/pydicom/pydicom",
+    "commit": "20aa4b73aef76bffb6fbc46a8827588dfa9bb89d",
+    "retrieved": "2026-10-13",
+    "license": "MIT; see bundled LICENSE for BSD portions",
+    "scope": "Selected source files for study; not a complete installable package",
+    "files": [
+      {
+        "upstream_path": "LICENSE",
+        "output": "upstream/pydicom/LICENSE",
+        "source_url": "https://raw.githubusercontent.com/pydicom/pydicom/20aa4b73aef76bffb6fbc46a8827588dfa9bb89d/LICENSE",
+        "source_sha256": "39b3259cb15151df25167119087df1fef33624765e639af42447ba6fe86dada3",
+        "export_sha256": "39b3259cb15151df25167119087df1fef33624765e639af42447ba6fe86dada3",
+        "bytes": 3141,
+        "changes": []
+      },
+      {
+        "upstream_path": "src/pydicom/pixels/processing.py",
+        "output": "upstream/pydicom/src/pydicom/pixels/processing.py",
+        "source_url": "https://raw.githubusercontent.com/pydicom/pydicom/20aa4b73aef76bffb6fbc46a8827588dfa9bb89d/src/pydicom/pixels/processing.py",
+        "source_sha256": "27b1b7da14fa9b0bed2a04425f544695b7f203b1df4951e4092721a765492b4b",
+        "export_sha256": "27b1b7da14fa9b0bed2a04425f544695b7f203b1df4951e4092721a765492b4b",
+        "bytes": 42293,
+        "changes": []
+      },
+      {
+        "upstream_path": "src/pydicom/pixels/utils.py",
+        "output": "upstream/pydicom/src/pydicom/pixels/utils.py",
+        "source_url": "https://raw.githubusercontent.com/pydicom/pydicom/20aa4b73aef76bffb6fbc46a8827588dfa9bb89d/src/pydicom/pixels/utils.py",
+        "source_sha256": "f78886030b7fe64c582a50434282879cf01cc7a84c466fc28c739c896bd0eb22",
+        "export_sha256": "f78886030b7fe64c582a50434282879cf01cc7a84c466fc28c739c896bd0eb22",
+        "bytes": 75398,
+        "changes": []
+      },
+      {
+        "upstream_path": "src/pydicom/pixel_data_handlers/util.py",
+        "output": "upstream/pydicom/src/pydicom/pixel_data_handlers/util.py",
+        "source_url": "https://raw.githubusercontent.com/pydicom/pydicom/20aa4b73aef76bffb6fbc46a8827588dfa9bb89d/src/pydicom/pixel_data_handlers/util.py",
+        "source_sha256": "431ae121f3dc85113de674059a9d74fd12ee9304620331a6fc308731fd9571c5",
+        "export_sha256": "431ae121f3dc85113de674059a9d74fd12ee9304620331a6fc308731fd9571c5",
+        "bytes": 3797,
+        "changes": []
+      }
+    ],
+    "version": "3.0.2"
   }
 ]

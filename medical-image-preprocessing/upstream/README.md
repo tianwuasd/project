@@ -1,6 +1,6 @@
 # 官方预处理源码精选
 
-本地未发现完整 nnU-Net/MONAI 源码树，因此在本地教程之外补充这些官方源码。采集日期为 2026-10-13；准确 commit、固定版本 URL、许可证与每个文件的 SHA-256 见 [sources.json](sources.json)。
+本目录只收录第三方官方公开项目的精选源码。采集日期为 2026-10-13；准确 commit、固定版本 URL、许可证与每个文件的 SHA-256 见 [sources.json](sources.json)。
 
 | 项目 | 本次收录 | 建议阅读入口 |
 | --- | --- | --- |
@@ -8,6 +8,7 @@
 | MONAI | spatial、intensity、croppad 的 array 与 dictionary 实现 | [空间字典变换](monai/monai/transforms/spatial/dictionary.py)、[强度字典变换](monai/monai/transforms/intensity/dictionary.py) |
 | TorchIO | 归一化、标准化、直方图标准化、截断、重定向、空间变换、裁剪填充与参考空间 | [normalize.py](torchio/src/torchio/transforms/intensity/normalize.py)、[spatial.py](torchio/src/torchio/transforms/spatial/spatial.py) |
 | SimpleITK | 变换与重采样、变换基础、分割概览、配准入门、数据增广，共 5 个 notebook | [变换与重采样](simpleitk/Python/21_Transforms_and_Resampling.ipynb)、[配准入门](simpleitk/Python/60_Registration_Introduction.ipynb) |
+| pydicom | 官方 v3.0.2 的像素处理、解码工具和兼容入口 | [processing.py](pydicom/src/pydicom/pixels/processing.py)、[utils.py](pydicom/src/pydicom/pixels/utils.py) |
 
 ## 读代码时核对什么
 
@@ -21,4 +22,4 @@
 
 ## 使用限制与改动
 
-四个上游快照均带各自 `LICENSE`。Python 源文件按原始内容保存；notebook 移除了输出和附带元数据，并添加来源与改动说明。本目录不是完整安装包，未执行 notebook，也未取得其外部演示数据。某些上游 Markdown 内链依赖完整官方仓库，应回到 `sources.json` 中的上游位置阅读。
+五个上游快照均带各自 `LICENSE`。Python 源文件按原始内容保存；notebook 移除了输出和附带元数据，并添加来源与改动说明。本目录不是完整安装包，未执行 notebook，也未取得其外部演示数据。某些上游 Markdown 内链依赖完整官方仓库，应回到 `sources.json` 中的上游位置阅读。

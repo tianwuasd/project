@@ -44,8 +44,8 @@
     },
     {
       "path": "CODE_INDEX.md",
-      "bytes": 6713,
-      "sha256": "7c318863a21e2cd9a1e2ccf1a6885638310425f9d8bd098c94be4c307d75f7c7"
+      "bytes": 3869,
+      "sha256": "e766d23c3826d4720049292e0d2798c41c30e1fb9676cb7fd36a2ea8fa32efbc"
     },
     {
       "path": "knowledge/code-inventory.md",
@@ -84,183 +84,33 @@
     },
     {
       "path": "PREPROCESSING_MAP.md",
-      "bytes": 4022,
-      "sha256": "6c7bcc090caa0d13dae7f04c3c571a7e8e9fc04d4c2bc56535cfa138eefed904"
-    },
-    {
-      "path": "projects/export-review.json",
-      "bytes": 4,
-      "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+      "bytes": 4011,
+      "sha256": "a5c2bd8abb434eb176ea500a7d2eba325f8eda53c63e6cf18eb9bc911398112e"
     },
     {
       "path": "projects/file-manifest.json",
-      "bytes": 40447,
-      "sha256": "78ca1ec1f84d948f24e32bc608017a9ab203b57d696ad6e3ea99ec18ec99c1f9"
+      "bytes": 24416,
+      "sha256": "942b1fd8951214443bdd14338f3ecccf927116a51b8a608acc1242538861f694"
     },
     {
       "path": "projects/inventory.json",
-      "bytes": 23735,
-      "sha256": "9b709f1d493c8494121768860bdcfdd438cd468f3c9c49253cded5d309f0309a"
-    },
-    {
-      "path": "projects/local-code/aaoca/common.py",
-      "bytes": 7923,
-      "sha256": "2a0381fcdff1acdbb5478d1e40ef4315bd92618330620faf9273b3fa70e9fbc3"
-    },
-    {
-      "path": "projects/local-code/aaoca/convert_ct.py",
-      "bytes": 11902,
-      "sha256": "859990a3d94a25508cce8c8fc15e5db6a989e2965596e69406395f3dcb74a16f"
-    },
-    {
-      "path": "projects/local-code/aaoca/convert_us.py",
-      "bytes": 10196,
-      "sha256": "8a61ac0c77f63079b16db6ffb9f9a474da0323b3c91c24fdc5793b489109fc62"
-    },
-    {
-      "path": "projects/local-code/aaoca/patient_pipeline/imaging.py",
-      "bytes": 7790,
-      "sha256": "8b9ff03e8f72bb0967292b1b53d8cd5e476fbd0786cf235ff2f4c66726f8ce0a"
-    },
-    {
-      "path": "projects/local-code/chd-ct/src/chd_ct/imagechd/augment.py",
-      "bytes": 1378,
-      "sha256": "e648c4e84cbce3aafef23577a68091b126b3f0556f5ad98d86fe3186605e7542"
-    },
-    {
-      "path": "projects/local-code/chd-ct/src/chd_ct/imagechd/common.py",
-      "bytes": 3789,
-      "sha256": "238e26dcc10645f3f3c3bc65cb1d86db2b173a0fb347ef5fe0f902cdf60fdeed"
-    },
-    {
-      "path": "projects/local-code/chd-ct/src/chd_ct/imagechd/geometry.py",
-      "bytes": 1393,
-      "sha256": "7ca3b4b38233d173b023462e7aee4724e36ba992d2d68f6da20da5cd8953c5db"
-    },
-    {
-      "path": "projects/local-code/chd-ct/src/chd_ct/imagechd/preprocess.py",
-      "bytes": 14288,
-      "sha256": "2a2244f325b5487f85200a71f01cbcb62111a92696d9cd109456d4b824205e24"
-    },
-    {
-      "path": "projects/local-code/chd-ct/src/chd_ct/recovery.py",
-      "bytes": 2597,
-      "sha256": "ac0a76c18cdb0adbbc673f15cde720de8df21ede8e259b4b9e121e1ce432cb16"
-    },
-    {
-      "path": "projects/local-code/whole-heart-pipeline/05_src/appearance.py",
-      "bytes": 2235,
-      "sha256": "718acdb44094d02dca47e635ff6834697f4ec7062606076699e47b150f1cd6a4"
-    },
-    {
-      "path": "projects/local-code/whole-heart-pipeline/05_src/data_pipeline.py",
-      "bytes": 8100,
-      "sha256": "de451a066e5e57a4805997c0cbce332b9879e99cd21348291c758d3da2c14a29"
-    },
-    {
-      "path": "projects/local-code/whole-heart-pipeline/05_src/prepare_nnunet.py",
-      "bytes": 3938,
-      "sha256": "147170844072eabc41cfc4bbbc3bc80ffd649d62ec73f7e5ce43e24bd3b10721"
-    },
-    {
-      "path": "projects/local-code/whole-heart-pipeline/tests/test_appearance.py",
-      "bytes": 2488,
-      "sha256": "a057cb85e5ef4f1cf68ee2e6de27fe7fa673eadbc30b7a033791aec91198b1bd"
-    },
-    {
-      "path": "projects/local-code/whole-heart-pipeline/tests/test_data_pipeline.py",
-      "bytes": 1894,
-      "sha256": "96fac64282d538bc13ea673680750ebc712663820a531877083bfcf23eee27d7"
-    },
-    {
-      "path": "projects/local-code/whole-heart-pipeline/tests/test_preparation_markers.py",
-      "bytes": 7113,
-      "sha256": "184e930c4aef24024258700a38998cf4029b6134cd5d42d4460de95e89e95e65"
-    },
-    {
-      "path": "projects/local-code/whole-heart-qc/medical.py",
-      "bytes": 12726,
-      "sha256": "ebad86a6286696942aeca321a8e2c0e8d6589de4a85bbe6b45da2c2000a3dbc4"
-    },
-    {
-      "path": "projects/local-code/whole-heart-qc/tests/test_medical.py",
-      "bytes": 5867,
-      "sha256": "4ccf89401076e4cc6fb63a253882248756a237bf2ee2bb8bddbd49d228c3094d"
+      "bytes": 3786,
+      "sha256": "9cc5c4b32d557f053833e7753286aa4b2220f694d6b154e138964494990be877"
     },
     {
       "path": "projects/README.md",
-      "bytes": 10601,
-      "sha256": "8087073bf35173e7a9f5029faf9d71236ce69e02fd2721e4bdd051b52d145c15"
-    },
-    {
-      "path": "projects/vendor/dicom-audit-tools/LICENSE.md",
-      "bytes": 1088,
-      "sha256": "5c793d8fe1c553d49c305f3c178ac360b6d32607bdf1bca06b10d3ba9881d78f"
-    },
-    {
-      "path": "projects/vendor/dicom-audit-tools/skills/pydicom/scripts/_common.py",
-      "bytes": 30728,
-      "sha256": "5400eeb7e7528bfdcea9d7e30f6fb53e10dce5da40b035918df66364a2a723d8"
-    },
-    {
-      "path": "projects/vendor/dicom-audit-tools/skills/pydicom/scripts/anonymize_dicom.py",
-      "bytes": 26518,
-      "sha256": "7b3416b9dd2e995f272392c60ee6748eafeed927bb87f151f0413a9a43def083"
-    },
-    {
-      "path": "projects/vendor/dicom-audit-tools/skills/pydicom/scripts/deidentification_audit.py",
-      "bytes": 13470,
-      "sha256": "29c173107a0bd48478e71eef9b12c09209135c45fe69ac2fabd1663f90472614"
-    },
-    {
-      "path": "projects/vendor/dicom-audit-tools/skills/pydicom/scripts/dicom_inventory.py",
-      "bytes": 13999,
-      "sha256": "732b49980b1106941f88eca6f89460b15ae9145295daaf96ef9a6b285bb87c06"
-    },
-    {
-      "path": "projects/vendor/dicom-audit-tools/skills/pydicom/scripts/pixel_frame_planner.py",
-      "bytes": 10433,
-      "sha256": "bbb05275c81b864ed3cb66229d184412d03c34871592dea801925b40a3bf6286"
-    },
-    {
-      "path": "projects/vendor/dicom-audit-tools/skills/pydicom/scripts/transfer_syntax_inspector.py",
-      "bytes": 8126,
-      "sha256": "08bb80e3b74331a97f876b3579104387468a96ff1cc7a23fb5a8cd8ce3e0683c"
-    },
-    {
-      "path": "projects/vendor/dicom-audit-tools/skills/pydicom/scripts/uid_mapping_validator.py",
-      "bytes": 8773,
-      "sha256": "6e4ed8bcfd7ab75ec127b0a56dc4bd30a3b6f477601eb68aec2dd4c562bc35c3"
-    },
-    {
-      "path": "projects/vendor/pydicom/pydicom/pixel_data_handlers/util.py",
-      "bytes": 3797,
-      "sha256": "431ae121f3dc85113de674059a9d74fd12ee9304620331a6fc308731fd9571c5"
-    },
-    {
-      "path": "projects/vendor/pydicom/pydicom/pixels/processing.py",
-      "bytes": 42293,
-      "sha256": "27b1b7da14fa9b0bed2a04425f544695b7f203b1df4951e4092721a765492b4b"
-    },
-    {
-      "path": "projects/vendor/pydicom/pydicom/pixels/utils.py",
-      "bytes": 75398,
-      "sha256": "f78886030b7fe64c582a50434282879cf01cc7a84c466fc28c739c896bd0eb22"
-    },
-    {
-      "path": "projects/vendor/pydicom/pydicom-3.0.2.dist-info/licenses/LICENSE",
-      "bytes": 3141,
-      "sha256": "39b3259cb15151df25167119087df1fef33624765e639af42447ba6fe86dada3"
+      "bytes": 3812,
+      "sha256": "89cb91d3c691386e5848ace71bab4ba650a0c190b959e9c980fb7a40dd5b27c7"
     },
     {
       "path": "README.md",
-      "bytes": 2815,
-      "sha256": "0d6c6ef0995d35d2006489c18cf5dad86ebfbee6d6d34a3dfbfc62ebcba35988"
+      "bytes": 2886,
+      "sha256": "70e1faafd6bbdbb6067a468e5f52feb21cd1e1a7d0eec70363c1cfdff9262525"
     },
     {
       "path": "SOURCES_AND_RIGHTS.md",
-      "bytes": 2125,
-      "sha256": "cdabfd846aef70b0a40ae851889dda3e1e7956eed165c8cf32b422e765eb684b"
+      "bytes": 2065,
+      "sha256": "1054e690d2bf6fd64ff34c0e653a4397c12f119878a0cbd52b50450af8c72d92"
     },
     {
       "path": "upstream/monai/LICENSE",
@@ -338,9 +188,29 @@
       "sha256": "085a7073fe18d49cea1b44c92e2533d4c7e8bdfd27a4a5dccefdbac3c137d501"
     },
     {
+      "path": "upstream/pydicom/LICENSE",
+      "bytes": 3141,
+      "sha256": "39b3259cb15151df25167119087df1fef33624765e639af42447ba6fe86dada3"
+    },
+    {
+      "path": "upstream/pydicom/src/pydicom/pixel_data_handlers/util.py",
+      "bytes": 3797,
+      "sha256": "431ae121f3dc85113de674059a9d74fd12ee9304620331a6fc308731fd9571c5"
+    },
+    {
+      "path": "upstream/pydicom/src/pydicom/pixels/processing.py",
+      "bytes": 42293,
+      "sha256": "27b1b7da14fa9b0bed2a04425f544695b7f203b1df4951e4092721a765492b4b"
+    },
+    {
+      "path": "upstream/pydicom/src/pydicom/pixels/utils.py",
+      "bytes": 75398,
+      "sha256": "f78886030b7fe64c582a50434282879cf01cc7a84c466fc28c739c896bd0eb22"
+    },
+    {
       "path": "upstream/README.md",
-      "bytes": 3013,
-      "sha256": "35a5cdf26d9866733fa81bb3f272d4e2e1a1b8af1f19a93de19c0bfea9cc3939"
+      "bytes": 3158,
+      "sha256": "864723ee7929c61eca212e166567ba167555691c346edaad105205bca559c8ce"
     },
     {
       "path": "upstream/simpleitk/LICENSE",
@@ -374,8 +244,8 @@
     },
     {
       "path": "upstream/sources.json",
-      "bytes": 20242,
-      "sha256": "39dc471a7c3d7011d658145774e37add477fbdc43d4c0c388598a619abda67c2"
+      "bytes": 22706,
+      "sha256": "77ec99a1e5c60237e66b7837c4e9b268bdefd68cd37fdc1ac2e84a2291a07ecb"
     },
     {
       "path": "upstream/torchio/docs/get-started/migration.md",
@@ -434,8 +304,8 @@
     },
     {
       "path": "VALIDATION.md",
-      "bytes": 2447,
-      "sha256": "223f9a58eae53a941b3a46920e32c8390e217405b50faee75684e309c2514a06"
+      "bytes": 2392,
+      "sha256": "f79ae10250d3115d43576f7127d41dcbae85963218003f4fefe71f9a5af63dfa"
     }
   ]
 }

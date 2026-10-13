@@ -1,670 +1,99 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "collected_at": "2026-10-13",
-  "source_root": "code_project",
-  "scope": "offline local workspace; no network, no git mutation; selected source excerpts rather than standalone package installations",
-  "exclusions": [
-    ".git",
-    ".ruff_cache",
-    ".runs",
-    ".tool-cache",
-    ".venv",
-    "04_data",
-    "07_experiments",
-    "Wholeheart_Train_Dataset",
-    "__pycache__",
-    "_deps",
-    "_export_deps",
-    "back",
-    "checkpoints",
-    "data",
-    "datasets",
-    "logs",
-    "medical-image-preprocessing",
-    "node_modules",
-    "project-medical-curation",
-    "venv",
-    "weights"
+  "scope": "Third-party official public repositories only; educational source excerpts, not complete installations",
+  "selection_criteria": [
+    "Official project repository",
+    "Pinned commit and file hashes",
+    "License retained",
+    "Relevant to medical image preprocessing"
   ],
   "projects": [
     {
-      "id": "whole-heart-pipeline",
-      "local_path": "code_project/whole_heart/project1",
-      "purpose": "whole-heart label remapping, geometric QC, source-only nnU-Net planning",
-      "preprocessing_entries": [
-        "05_src/data_pipeline.py",
-        "05_src/prepare_nnunet.py",
-        "05_src/appearance.py"
-      ],
-      "selected_files": [
-        "05_src/data_pipeline.py",
-        "05_src/prepare_nnunet.py",
-        "05_src/appearance.py",
-        "tests/test_data_pipeline.py",
-        "tests/test_appearance.py",
-        "tests/test_preparation_markers.py"
-      ],
-      "license": "NOASSERTION",
-      "license_file": null,
+      "id": "nnunet",
+      "upstream_url": "https://github.com/MIC-DKFZ/nnUNet",
+      "commit": "0a23eceec9c18c94e440fa758cfb1fc32d1ce601",
       "version": null,
-      "upstream_prefix": "",
-      "git_root": null,
-      "upstream_url": null,
-      "commit": null,
-      "export_area": "projects/local-code/whole-heart-pipeline",
-      "redistribution_review": "user-owned project excerpt, publicly shared; no new license granted (NOASSERTION)",
-      "published_repository": "https://github.com/tianwuasd/project",
-      "published_repository_head": "714a0a5b9ec5fdea605cebe52c019844dbfa7855",
-      "published_repository_directory": "whole_heart",
-      "published_evidence": "repository directory confirmed at HEAD; copied file equality not asserted"
+      "license": "Apache-2.0",
+      "export_area": "upstream/nnunet",
+      "selected_files": [
+        "LICENSE",
+        "nnunetv2/preprocessing/cropping/cropping.py",
+        "nnunetv2/preprocessing/normalization/default_normalization_schemes.py",
+        "nnunetv2/preprocessing/normalization/map_channel_name_to_normalization.py",
+        "nnunetv2/preprocessing/preprocessors/default_preprocessor.py",
+        "nnunetv2/preprocessing/resampling/default_resampling.py",
+        "nnunetv2/preprocessing/resampling/resample_torch.py",
+        "nnunetv2/experiment_planning/dataset_fingerprint/fingerprint_extractor.py"
+      ]
     },
     {
-      "id": "whole-heart-qc",
-      "local_path": "code_project/whole_heart/数据探索工具",
-      "purpose": "NIfTI geometry, spacing, units, label and finite-value read-only QC",
-      "preprocessing_entries": [
-        "medical.py",
-        "analyze.py"
-      ],
-      "selected_files": [
-        "medical.py",
-        "tests/test_medical.py"
-      ],
-      "license": "NOASSERTION",
-      "license_file": null,
+      "id": "monai",
+      "upstream_url": "https://github.com/Project-MONAI/MONAI",
+      "commit": "03e208f3ed9c6c051527f77a64ddab38ee059b50",
       "version": null,
-      "upstream_prefix": "",
-      "git_root": null,
-      "upstream_url": null,
-      "commit": null,
-      "export_area": "projects/local-code/whole-heart-qc",
-      "redistribution_review": "user-owned project excerpt, publicly shared; no new license granted (NOASSERTION)",
-      "published_repository": "https://github.com/tianwuasd/project",
-      "published_repository_head": "714a0a5b9ec5fdea605cebe52c019844dbfa7855",
-      "published_repository_directory": "whole_heart",
-      "published_evidence": "repository directory confirmed at HEAD; copied file equality not asserted"
+      "license": "Apache-2.0",
+      "export_area": "upstream/monai",
+      "selected_files": [
+        "LICENSE",
+        "monai/transforms/spatial/array.py",
+        "monai/transforms/spatial/dictionary.py",
+        "monai/transforms/intensity/array.py",
+        "monai/transforms/intensity/dictionary.py",
+        "monai/transforms/croppad/array.py",
+        "monai/transforms/croppad/dictionary.py"
+      ]
     },
     {
-      "id": "aaoca",
-      "local_path": "code_project/heart_disease/dicom_conversion",
-      "purpose": "CT DICOM-to-NIfTI with HU/affine preservation; US frames and timing",
-      "preprocessing_entries": [
-        "convert_ct.py",
-        "convert_us.py",
-        "common.py",
-        "patient_pipeline/imaging.py"
-      ],
-      "selected_files": [
-        "convert_ct.py",
-        "convert_us.py",
-        "common.py",
-        "patient_pipeline/imaging.py"
-      ],
-      "license": "NOASSERTION",
-      "license_file": null,
+      "id": "torchio",
+      "upstream_url": "https://github.com/TorchIO-project/torchio",
+      "commit": "ced7e41bf796f709bfd9ba58abf2d1828c99d7e3",
       "version": null,
-      "upstream_prefix": "",
-      "git_root": null,
-      "upstream_url": null,
-      "commit": null,
-      "export_area": "projects/local-code/aaoca",
-      "redistribution_review": "user-owned project excerpt, publicly shared; no new license granted (NOASSERTION)",
-      "published_repository": "https://github.com/tianwuasd/project",
-      "published_repository_head": "714a0a5b9ec5fdea605cebe52c019844dbfa7855",
-      "published_repository_directory": "AAOCA",
-      "published_evidence": "repository directory confirmed at HEAD; copied file equality not asserted"
+      "license": "Apache-2.0",
+      "export_area": "upstream/torchio",
+      "selected_files": [
+        "LICENSE",
+        "src/torchio/transforms/intensity/normalize.py",
+        "src/torchio/transforms/intensity/standardize.py",
+        "src/torchio/transforms/intensity/histogram_standardization.py",
+        "src/torchio/transforms/intensity/clamp.py",
+        "src/torchio/transforms/spatial/reorient.py",
+        "src/torchio/transforms/spatial/spatial.py",
+        "src/torchio/transforms/spatial/crop_or_pad.py",
+        "src/torchio/transforms/spatial/to_reference_space.py",
+        "docs/get-started/migration.md",
+        "docs/reference/transforms/resample.md"
+      ]
     },
     {
-      "id": "aaoca-public-copy",
-      "local_path": "code_project/heart_disease/AAOCA_publish/AAOCA",
-      "purpose": "Published copy indexed for comparison, not redundantly copied",
-      "preprocessing_entries": [
-        "convert_ct.py",
-        "convert_us.py",
-        "common.py"
-      ],
-      "selected_files": [],
-      "license": "NOASSERTION",
-      "license_file": null,
+      "id": "simpleitk",
+      "upstream_url": "https://github.com/InsightSoftwareConsortium/SimpleITK-Notebooks",
+      "commit": "1d872dc049d45dae8342729242b845dbbb580014",
       "version": null,
-      "upstream_prefix": "",
-      "git_root": "code_project/heart_disease/AAOCA_publish",
-      "upstream_url": "https://github.com/tianwuasd/project.git",
-      "commit": "7bf87ac21d5c749aefe118d7dcc55d17bf859920",
-      "export_area": null,
-      "redistribution_review": "index only; no files copied",
-      "published_repository": "https://github.com/tianwuasd/project",
-      "published_repository_head": "714a0a5b9ec5fdea605cebe52c019844dbfa7855",
-      "published_repository_directory": "AAOCA",
-      "published_evidence": "repository directory confirmed at HEAD; copied file equality not asserted"
-    },
-    {
-      "id": "chd-ct",
-      "local_path": "code_project/chd-ct-reproduction",
-      "purpose": "ImageCHD canonical orientation, percentile normalization, resize/crop, patient-aware split",
-      "preprocessing_entries": [
-        "src/chd_ct/imagechd/preprocess.py",
-        "src/chd_ct/imagechd/common.py",
-        "src/chd_ct/imagechd/geometry.py"
-      ],
+      "license": "Apache-2.0",
+      "export_area": "upstream/simpleitk",
       "selected_files": [
-        "src/chd_ct/imagechd/preprocess.py",
-        "src/chd_ct/imagechd/common.py",
-        "src/chd_ct/imagechd/geometry.py",
-        "src/chd_ct/imagechd/augment.py",
-        "src/chd_ct/recovery.py"
-      ],
-      "license": "NOASSERTION",
-      "license_file": null,
-      "version": null,
-      "upstream_prefix": "",
-      "git_root": "code_project/chd-ct-reproduction",
-      "upstream_url": null,
-      "commit": "85bb3d081f28cd35ecbfd5670a5e7356ca7e3ce8",
-      "export_area": "projects/local-code/chd-ct",
-      "redistribution_review": "user-owned project excerpt, publicly shared; no new license granted (NOASSERTION)",
-      "published_repository": "https://github.com/tianwuasd/project",
-      "published_repository_head": "714a0a5b9ec5fdea605cebe52c019844dbfa7855",
-      "published_repository_directory": "chd-ct-reproduction",
-      "published_evidence": "repository directory confirmed at HEAD; copied file equality not asserted"
-    },
-    {
-      "id": "radiopath",
-      "local_path": "code_project/RadioPath",
-      "purpose": "WSI stain normalization, tissue masks, stain extraction and patch selection",
-      "preprocessing_entries": [
-        "models/a_01stain_normalization/m_stain_normalization.py",
-        "models/a_02tissue_masking/m_tissue_masking.py",
-        "models/a_03patch_extraction/m_patch_extraction.py"
-      ],
-      "selected_files": [
-        "tiatoolbox/tools/stainnorm.py",
-        "tiatoolbox/tools/stainextract.py",
-        "tiatoolbox/tools/stainaugment.py",
-        "tiatoolbox/tools/tissuemask.py",
-        "tiatoolbox/tools/patchextraction.py",
-        "tiatoolbox/utils/transforms.py",
-        "tiatoolbox/utils/image.py"
-      ],
-      "license": "NOASSERTION",
-      "license_file": null,
-      "version": null,
-      "upstream_prefix": "",
-      "git_root": "code_project/RadioPath",
-      "upstream_url": "https://github.com/shangqigao/RadioPath.git",
-      "commit": "4f5f320e3d026067fffc49dde31526bd30ed5318",
-      "export_area": "local-only/projects/radiopath",
-      "redistribution_review": "local-only: license not locally evidenced, or license not permissive"
+        "LICENSE",
+        "Python/21_Transforms_and_Resampling.ipynb",
+        "Python/22_Transforms.ipynb",
+        "Python/300_Segmentation_Overview.ipynb",
+        "Python/60_Registration_Introduction.ipynb",
+        "Python/70_Data_Augmentation.ipynb"
+      ]
     },
     {
       "id": "pydicom",
-      "local_path": "code_project/heart_disease/AAOCA_quality_review_20260919/deps",
-      "purpose": "Installed pydicom 3.0.2: pixel LUT, windowing, colour conversion, reshape/decode utilities",
-      "preprocessing_entries": [
-        "pydicom/pixels/processing.py",
-        "pydicom/pixels/utils.py"
-      ],
-      "selected_files": [
-        "pydicom/pixels/processing.py",
-        "pydicom/pixels/utils.py",
-        "pydicom/pixel_data_handlers/util.py"
-      ],
-      "license": "MIT; bundled license also documents BSD portions",
-      "license_file": "pydicom-3.0.2.dist-info/licenses/LICENSE",
-      "version": "3.0.2",
-      "upstream_prefix": "",
-      "git_root": null,
       "upstream_url": "https://github.com/pydicom/pydicom",
-      "commit": null,
-      "upstream_url_evidence": "local package metadata or downloaded source guide; not a verified checkout remote",
-      "export_area": "projects/vendor/pydicom",
-      "redistribution_review": "permissive local license evidence retained"
-    },
-    {
-      "id": "dicom-audit-tools",
-      "local_path": "code_project/academic_tools/skills/scientific-agent-skills",
-      "purpose": "Bounded inventory, transfer-syntax/frame preflight and de-identification review helpers",
-      "preprocessing_entries": [
-        "skills/pydicom/scripts/dicom_inventory.py",
-        "skills/pydicom/scripts/deidentification_audit.py",
-        "skills/pydicom/scripts/anonymize_dicom.py"
-      ],
+      "commit": "20aa4b73aef76bffb6fbc46a8827588dfa9bb89d",
+      "version": "3.0.2",
+      "license": "MIT; see bundled LICENSE for BSD portions",
+      "export_area": "upstream/pydicom",
       "selected_files": [
-        "skills/pydicom/scripts/_common.py",
-        "skills/pydicom/scripts/dicom_inventory.py",
-        "skills/pydicom/scripts/pixel_frame_planner.py",
-        "skills/pydicom/scripts/transfer_syntax_inspector.py",
-        "skills/pydicom/scripts/deidentification_audit.py",
-        "skills/pydicom/scripts/anonymize_dicom.py",
-        "skills/pydicom/scripts/uid_mapping_validator.py"
-      ],
-      "license": "MIT",
-      "license_file": "LICENSE.md",
-      "version": null,
-      "upstream_prefix": "",
-      "git_root": "code_project/academic_tools/skills/scientific-agent-skills",
-      "upstream_url": "https://github.com/K-Dense-AI/scientific-agent-skills.git",
-      "commit": "36d8f13a1e754618794bf42f417884940077b4ae",
-      "export_area": "projects/vendor/dicom-audit-tools",
-      "redistribution_review": "permissive local license evidence retained"
-    },
-    {
-      "id": "forge-general-image-tools",
-      "local_path": "code_project/picture_train/stable-diffusion-webui-forge",
-      "purpose": "General natural-image diffusion preprocessing; not a physical-space medical image pipeline",
-      "preprocessing_entries": [
-        "modules_forge/supported_preprocessor.py"
-      ],
-      "selected_files": [
-        "modules_forge/supported_preprocessor.py"
-      ],
-      "license": "AGPL-3.0 (not permissive)",
-      "license_file": "LICENSE.txt",
-      "version": null,
-      "upstream_prefix": "",
-      "git_root": "code_project/picture_train/stable-diffusion-webui-forge",
-      "upstream_url": "https://github.com/lllyasviel/stable-diffusion-webui-forge.git",
-      "commit": "dfdcbab685e57677014f05a3309b48cc87383167",
-      "export_area": "local-only/projects/forge-general-image-tools",
-      "redistribution_review": "local-only: license not locally evidenced, or license not permissive"
-    },
-    {
-      "id": "monai-tutorials",
-      "local_path": "code_project/whole_heart/参考资料/04_MONAI_逐步实操",
-      "purpose": "Downloaded official MONAI notebooks; no full MONAI source checkout",
-      "preprocessing_entries": [
-        "MONAI_三维图像变换教程.ipynb",
-        "MONAI_三维脾脏分割教程.ipynb"
-      ],
-      "selected_files": [
-        "MONAI_三维图像变换教程.ipynb",
-        "MONAI_三维脾脏分割教程.ipynb"
-      ],
-      "license": "NOASSERTION",
-      "license_file": null,
-      "version": null,
-      "upstream_prefix": "",
-      "git_root": null,
-      "upstream_url": "https://github.com/Project-MONAI/tutorials",
-      "commit": null,
-      "upstream_url_evidence": "local package metadata or downloaded source guide; not a verified checkout remote",
-      "export_area": "local-only/projects/monai-tutorials",
-      "redistribution_review": "local-only: license not locally evidenced, or license not permissive"
-    },
-    {
-      "id": "nnunet-docs",
-      "local_path": "code_project/whole_heart/参考资料/03_nnUNet_自动化基线",
-      "purpose": "Downloaded official nnU-Net preparation/planning/normalization documentation; no full source checkout",
-      "preprocessing_entries": [
-        "03_规划与预处理.md",
-        "04_强度归一化.md"
-      ],
-      "selected_files": [
-        "01_数据准备.md",
-        "02_数据格式.md",
-        "03_规划与预处理.md",
-        "04_强度归一化.md",
-        "05_完整训练预测流程.md"
-      ],
-      "license": "NOASSERTION",
-      "license_file": null,
-      "version": null,
-      "upstream_prefix": "",
-      "git_root": null,
-      "upstream_url": "https://github.com/MIC-DKFZ/nnUNet",
-      "commit": null,
-      "upstream_url_evidence": "local package metadata or downloaded source guide; not a verified checkout remote",
-      "export_area": "local-only/projects/nnunet-docs",
-      "redistribution_review": "local-only: license not locally evidenced, or license not permissive"
+        "LICENSE",
+        "src/pydicom/pixels/processing.py",
+        "src/pydicom/pixels/utils.py",
+        "src/pydicom/pixel_data_handlers/util.py"
+      ]
     }
-  ],
-  "additional_discovery": {
-    "named_directories": [
-      "code_project/academic_tools/skills/scientific-agent-skills/skills/pydicom",
-      "code_project/academic_tools/skills/scientific-agent-skills/tests/pydicom",
-      "code_project/heart_disease/dicom_conversion",
-      "code_project/heart_disease/AAOCA_quality_review_20260919/deps/pydicom",
-      "code_project/heart_disease/AAOCA_quality_review_20260919/deps/pydicom-3.0.2.dist-info",
-      "code_project/whole_heart/参考资料/03_nnUNet_自动化基线",
-      "code_project/whole_heart/参考资料/04_MONAI_逐步实操"
-    ],
-    "relevant_import_files": [
-      {
-        "path": "code_project/chd-ct-reproduction/build/lib/chd_ct/imagechd/demo.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/chd-ct-reproduction/build/lib/chd_ct/imagechd/predict.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/chd-ct-reproduction/build/lib/chd_ct/imagechd/preprocess.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/chd-ct-reproduction/runs/archive-inspection/audit_imagechd.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/chd-ct-reproduction/runs/chd-main-migration/installed/chd_ct/imagechd/demo.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/chd-ct-reproduction/runs/chd-main-migration/installed/chd_ct/imagechd/predict.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/chd-ct-reproduction/runs/chd-main-migration/installed/chd_ct/imagechd/preprocess.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/chd-ct-reproduction/runs/unet-author-alignment/build/lib/chd_ct/imagechd/demo.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/chd-ct-reproduction/runs/unet-author-alignment/build/lib/chd_ct/imagechd/predict.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/chd-ct-reproduction/runs/unet-author-alignment/build/lib/chd_ct/imagechd/preprocess.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/chd-ct-reproduction/runs/unet-author-alignment/installed/chd_ct/imagechd/demo.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/chd-ct-reproduction/runs/unet-author-alignment/installed/chd_ct/imagechd/predict.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/chd-ct-reproduction/runs/unet-author-alignment/installed/chd_ct/imagechd/preprocess.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/chd-ct-reproduction/src/chd_ct/imagechd/demo.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/chd-ct-reproduction/src/chd_ct/imagechd/predict.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/chd-ct-reproduction/src/chd_ct/imagechd/preprocess.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/chd-ct-reproduction/tests/test_chd_main.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/heart_disease/AAOCA_publish/AAOCA/common.py",
-        "packages": [
-          "pydicom"
-        ]
-      },
-      {
-        "path": "code_project/heart_disease/AAOCA_publish/AAOCA/convert_ct.py",
-        "packages": [
-          "nibabel",
-          "pydicom"
-        ]
-      },
-      {
-        "path": "code_project/heart_disease/AAOCA_publish/AAOCA/convert_us.py",
-        "packages": [
-          "pydicom"
-        ]
-      },
-      {
-        "path": "code_project/heart_disease/AAOCA_publish/AAOCA/patient_pipeline/imaging.py",
-        "packages": [
-          "pydicom"
-        ]
-      },
-      {
-        "path": "code_project/heart_disease/AAOCA_publish/AAOCA/tests/test_converters.py",
-        "packages": [
-          "nibabel",
-          "pydicom"
-        ]
-      },
-      {
-        "path": "code_project/heart_disease/AAOCA_publish/AAOCA/tests/test_pipeline.py",
-        "packages": [
-          "pydicom"
-        ]
-      },
-      {
-        "path": "code_project/heart_disease/AAOCA_publish/AAOCA/tests/test_resume.py",
-        "packages": [
-          "pydicom"
-        ]
-      },
-      {
-        "path": "code_project/heart_disease/AAOCA_quality_review_20260919/audit.py",
-        "packages": [
-          "pydicom"
-        ]
-      },
-      {
-        "path": "code_project/heart_disease/AAOCA_quality_review_20260919/deep_checks.py",
-        "packages": [
-          "pydicom"
-        ]
-      },
-      {
-        "path": "code_project/heart_disease/AAOCA_quality_review_20260919/pixels.py",
-        "packages": [
-          "pydicom"
-        ]
-      },
-      {
-        "path": "code_project/heart_disease/dicom_conversion/common.py",
-        "packages": [
-          "pydicom"
-        ]
-      },
-      {
-        "path": "code_project/heart_disease/dicom_conversion/convert_ct.py",
-        "packages": [
-          "nibabel",
-          "pydicom"
-        ]
-      },
-      {
-        "path": "code_project/heart_disease/dicom_conversion/convert_us.py",
-        "packages": [
-          "pydicom"
-        ]
-      },
-      {
-        "path": "code_project/heart_disease/dicom_conversion/patient_pipeline/imaging.py",
-        "packages": [
-          "pydicom"
-        ]
-      },
-      {
-        "path": "code_project/RadioPath/models/a_04feature_extraction/m_feature_extraction.py",
-        "packages": [
-          "monai"
-        ]
-      },
-      {
-        "path": "code_project/RadioPath/models/a_05feature_aggregation/m_graph_construction.py",
-        "packages": [
-          "monai"
-        ]
-      },
-      {
-        "path": "code_project/RadioPath/tiatoolbox/models/architecture/swin_unetr.py",
-        "packages": [
-          "monai"
-        ]
-      },
-      {
-        "path": "code_project/RadioPath/tiatoolbox/tools/registration/wsi_registration.py",
-        "packages": [
-          "SimpleITK"
-        ]
-      },
-      {
-        "path": "code_project/whole_heart/project1/02_materials/code_reference/nnUNetTrainerLayer2BezierDualNorm.py",
-        "packages": [
-          "nnunetv2"
-        ]
-      },
-      {
-        "path": "code_project/whole_heart/project1/05_src/data_pipeline.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/whole_heart/project1/05_src/evaluation.py",
-        "packages": [
-          "nibabel",
-          "nnunetv2"
-        ]
-      },
-      {
-        "path": "code_project/whole_heart/project1/05_src/local_preexperiment.py",
-        "packages": [
-          "nibabel",
-          "nnunetv2"
-        ]
-      },
-      {
-        "path": "code_project/whole_heart/project1/05_src/prepare_nnunet.py",
-        "packages": [
-          "nnunetv2"
-        ]
-      },
-      {
-        "path": "code_project/whole_heart/project1/05_src/project_trainers.py",
-        "packages": [
-          "nnunetv2"
-        ]
-      },
-      {
-        "path": "code_project/whole_heart/project1/05_src/server_prepare.py",
-        "packages": [
-          "nnunetv2"
-        ]
-      },
-      {
-        "path": "code_project/whole_heart/project1/05_src/server_train.py",
-        "packages": [
-          "nnunetv2"
-        ]
-      },
-      {
-        "path": "code_project/whole_heart/project1/05_src/smoke_train.py",
-        "packages": [
-          "nibabel",
-          "nnunetv2"
-        ]
-      },
-      {
-        "path": "code_project/whole_heart/project1/tests/test_evaluation.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/whole_heart/project1/tests/test_preparation_markers.py",
-        "packages": [
-          "nnunetv2"
-        ]
-      },
-      {
-        "path": "code_project/whole_heart/project1/tests/test_server_launcher.py",
-        "packages": [
-          "nibabel",
-          "nnunetv2"
-        ]
-      },
-      {
-        "path": "code_project/whole_heart/数据探索工具/analyze.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/whole_heart/数据探索工具/charts.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/whole_heart/数据探索工具/medical.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/whole_heart/数据探索工具/tests/test_medical.py",
-        "packages": [
-          "nibabel"
-        ]
-      },
-      {
-        "path": "code_project/whole_heart/数据探索工具/tests/test_workflow.py",
-        "packages": [
-          "nibabel"
-        ]
-      }
-    ],
-    "medical_git_roots": [
-      "code_project/chd-ct-reproduction",
-      "code_project/heart_disease/AAOCA_publish",
-      "code_project/picture_train/stable-diffusion-webui-forge",
-      "code_project/picture_train/stable-diffusion-webui-forge/repositories/BLIP",
-      "code_project/picture_train/stable-diffusion-webui-forge/repositories/huggingface_guess",
-      "code_project/picture_train/stable-diffusion-webui-forge/repositories/stable-diffusion-webui-assets",
-      "code_project/RadioPath"
-    ]
-  },
-  "absence_notes": {
-    "nnunet": "Only downloaded docs and local API integration found, not a full source checkout.",
-    "monai": "Only downloaded tutorials and imports found, not a full source checkout.",
-    "simpleitk": "Downloaded geometry documentation; no complete source checkout found.",
-    "torchio": "No complete source checkout found.",
-    "nibabel": "Imported by local pipelines; no complete source checkout found.",
-    "dicom2nifti": "No standalone local code project found."
-  }
+  ]
 }
