@@ -1,0 +1,510 @@
+{
+  "schema_version": 1,
+  "page_convention": "physical PDF page is 1-based; printed page is transcribed only where visible in the extracted page",
+  "scope": "targeted reading of three local PDFs, not whole-book review",
+  "sources": [
+    {
+      "id": "dougherty-2009",
+      "title": "Digital Image Processing for Medical Applications",
+      "authors_or_editors": "Geoff Dougherty",
+      "year": 2009,
+      "source_pdf": "ebooks/编程/医疗图像/Digital image processing for medical applications (Dougherty G.) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
+      "text_layer": true,
+      "physical_page_ranges_extracted": [
+        [
+          1,
+          25
+        ],
+        [
+          126,
+          133
+        ],
+        [
+          138,
+          165
+        ],
+        [
+          177,
+          205
+        ],
+        [
+          222,
+          229
+        ],
+        [
+          244,
+          246
+        ],
+        [
+          260,
+          359
+        ],
+        [
+          455,
+          485
+        ]
+      ],
+      "relevant_sections": [
+        {
+          "chapter": "4.3 Picture archiving and communication systems — Multimodal registration",
+          "physical_pages": [
+            130,
+            133
+          ],
+          "printed_pages": [
+            115,
+            118
+          ]
+        },
+        {
+          "chapter": "5 Fundamentals of digital image processing",
+          "physical_pages": [
+            138,
+            165
+          ],
+          "printed_pages": [
+            123,
+            150
+          ]
+        },
+        {
+          "chapter": "6.3 Geometric operations and 6.4 Convolution-based operations",
+          "physical_pages": [
+            177,
+            205
+          ],
+          "printed_pages": [
+            162,
+            190
+          ]
+        },
+        {
+          "chapter": "7.7.4 Homomorphic filters",
+          "physical_pages": [
+            245,
+            245
+          ],
+          "printed_pages": [
+            230,
+            230
+          ]
+        },
+        {
+          "chapter": "8 Image restoration",
+          "physical_pages": [
+            261,
+            285
+          ],
+          "printed_pages": [
+            246,
+            270
+          ]
+        },
+        {
+          "chapter": "9 Morphological image processing",
+          "physical_pages": [
+            288,
+            320
+          ],
+          "printed_pages": [
+            273,
+            305
+          ]
+        },
+        {
+          "chapter": "10 Image segmentation",
+          "physical_pages": [
+            324,
+            353
+          ],
+          "printed_pages": [
+            309,
+            338
+          ]
+        }
+      ],
+      "local_text": [
+        "local-only/books/dougherty-frontmatter.txt",
+        "local-only/books/dougherty-p126-133.txt",
+        "local-only/books/dougherty-p138-165.txt",
+        "local-only/books/dougherty-p177-205.txt",
+        "local-only/books/dougherty-p222-229.txt",
+        "local-only/books/dougherty-p260-290.txt",
+        "local-only/books/dougherty-p288-305.txt",
+        "local-only/books/dougherty-p304-359.txt",
+        "local-only/books/dougherty-p455-464.txt",
+        "local-only/books/dougherty-p465-485.txt",
+        "local-only/books/dougherty-page-244.txt",
+        "local-only/books/dougherty-page-245.txt",
+        "local-only/books/dougherty-page-246.txt",
+        "local-only/books/dougherty-page-278.txt",
+        "local-only/books/dougherty-page-279.txt",
+        "local-only/books/dougherty-page-280.txt",
+        "local-only/books/dougherty-page-281.txt",
+        "local-only/books/dougherty-page-282.txt",
+        "local-only/books/dougherty-page-283.txt",
+        "local-only/books/dougherty-page-284.txt",
+        "local-only/books/dougherty-page-285.txt"
+      ],
+      "code_status": "Relevant read pages contain equations, worked examples and ImageJ activities; no standalone runnable source code or explicit pseudocode block verified. Formula extraction contains errors.",
+      "source_sha256": "548e9a712817351aeb5458dc77ebed03188a743060025739d85431710f8a6a28",
+      "local_evidence": [
+        {
+          "path": "local-only/books/dougherty-frontmatter.txt",
+          "sha256": "364cb81cca13f5d97fbb0e84f44ef8f25e53948062af71f766b5cb4bc8db7570"
+        },
+        {
+          "path": "local-only/books/dougherty-p126-133.txt",
+          "sha256": "2d5053521b7dc6b567258c0fe0b830f0de70666231ddc84b8bbc564096474bd1"
+        },
+        {
+          "path": "local-only/books/dougherty-p138-165.txt",
+          "sha256": "42c49e4785fe06d175a7e96b7373b41fd8b44e6a6c2fae64e31cbcffe38fe44f"
+        },
+        {
+          "path": "local-only/books/dougherty-p177-205.txt",
+          "sha256": "70c74191838892b4a8bed573eddea7106e4e165a2425494fdbc3dba450f8a111"
+        },
+        {
+          "path": "local-only/books/dougherty-p222-229.txt",
+          "sha256": "5cc0339e74e86cdf6031d6fbf2e742dd3e322c4787c8b12fd04fdcaf74324f19"
+        },
+        {
+          "path": "local-only/books/dougherty-p260-290.txt",
+          "sha256": "57b7675cce619406b33e57413bd4c0723f79db9a2d57e40b6619d3dda2cfd1f1"
+        },
+        {
+          "path": "local-only/books/dougherty-p288-305.txt",
+          "sha256": "c01c3bec0f7a178437beacf87f51a61b2dc562237f245bdc2ebd5369055c67c5"
+        },
+        {
+          "path": "local-only/books/dougherty-p304-359.txt",
+          "sha256": "c387720c208acf2cd43f83c39d8fcd43693c9528f478d9cf4b93ef3c7fc74cb8"
+        },
+        {
+          "path": "local-only/books/dougherty-p455-464.txt",
+          "sha256": "de5affdde23111678356a458c0010e711f64e6e421d0aab1b0e980df67abc0b2"
+        },
+        {
+          "path": "local-only/books/dougherty-p465-485.txt",
+          "sha256": "9d70eca9dcf0d4190864b37e27a9d26f17752e9dd057936234ce8e70a0b11225"
+        },
+        {
+          "path": "local-only/books/dougherty-page-244.txt",
+          "sha256": "7b71917d613741e2419e4a77fd02e336266f7bc7719ac7d13a6374bf6ce07053"
+        },
+        {
+          "path": "local-only/books/dougherty-page-245.txt",
+          "sha256": "20266a90af0925e79c22624698ea7dc7e2e42fc3c47865c7771c42a5b8a8a077"
+        },
+        {
+          "path": "local-only/books/dougherty-page-246.txt",
+          "sha256": "e48f8826fe75fd29e5d4afa885efafe99e88fbce9a6eaf25f58f07ae1c8e91a7"
+        },
+        {
+          "path": "local-only/books/dougherty-page-278.txt",
+          "sha256": "5829b023a181323e578d3bb624ddbd221aa17d3f1505e8f62393eef97f43c8c0"
+        },
+        {
+          "path": "local-only/books/dougherty-page-279.txt",
+          "sha256": "4fb0c2b106482c8f1ad7cc96078e595d79d6e08ce43dcf9a8845ea64002d6e5d"
+        },
+        {
+          "path": "local-only/books/dougherty-page-280.txt",
+          "sha256": "c8d590bb97d670b085fcd0354ca5bd92e6b6d53012c92e1aad86d29c02b53151"
+        },
+        {
+          "path": "local-only/books/dougherty-page-281.txt",
+          "sha256": "e1824ad4410f82a692fb6a86448ed69a266f97da3ab00724653436ca5c015757"
+        },
+        {
+          "path": "local-only/books/dougherty-page-282.txt",
+          "sha256": "77f343638159d319fb696ad6338a86a2a25ab397536ad2c8c3777a487146335e"
+        },
+        {
+          "path": "local-only/books/dougherty-page-283.txt",
+          "sha256": "0138862f2c36c99b7667143cbe23115170cf17a5d42b00cacca49cb2ca1b7ba0"
+        },
+        {
+          "path": "local-only/books/dougherty-page-284.txt",
+          "sha256": "2771c1fd4d3102dbd74f89a006ccf9a4e9dc09567f34e9affb72c1558ebb0c01"
+        },
+        {
+          "path": "local-only/books/dougherty-page-285.txt",
+          "sha256": "a7cd54655b4eddfee5fbbfcfb6b44d205aceea04625b19fd151c8079e9194677"
+        }
+      ]
+    },
+    {
+      "id": "indrakumari-et-al-2025",
+      "title": "Deep Learning in Medical Image Analysis: Recent Advances and Future Trends",
+      "authors_or_editors": "R. Indrakumari; T. Ganesh Kumar; D. Murugan; Sherimon P.C. (editors)",
+      "year": 2025,
+      "source_pdf": "ebooks/编程/医疗图像/Deep Learning in Medical Image Analysis Recent Advances and Future Trends ( etc.) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
+      "text_layer": true,
+      "physical_page_ranges_extracted": [
+        [
+          1,
+          25
+        ],
+        [
+          90,
+          115
+        ],
+        [
+          129,
+          161
+        ],
+        [
+          162,
+          183
+        ],
+        [
+          195,
+          197
+        ]
+      ],
+      "relevant_sections": [
+        {
+          "chapter": "5 A Deep Learning Framework to Detect Diabetic Retinopathy Using CNN; 5.8.2 Data Preprocessing",
+          "physical_pages": [
+            90,
+            115
+          ],
+          "printed_pages": [
+            79,
+            104
+          ],
+          "focus_physical_pages": [
+            102,
+            103
+          ],
+          "focus_printed_pages": [
+            91,
+            92
+          ]
+        },
+        {
+          "chapter": "7 Prediction of Epidermis Disease Outbreak Using Deep Learning",
+          "physical_pages": [
+            129,
+            142
+          ],
+          "printed_pages": [
+            118,
+            131
+          ]
+        },
+        {
+          "chapter": "8 Deep Learning-Based Medical Image Segmentation",
+          "physical_pages": [
+            143,
+            161
+          ],
+          "printed_pages": [
+            132,
+            150
+          ]
+        },
+        {
+          "chapter": "9 Unleashing the Potential of Deep Learning in Diabetic Retinopathy; 9.3 Traditional Approaches",
+          "physical_pages": [
+            162,
+            183
+          ],
+          "printed_pages": [
+            151,
+            172
+          ],
+          "focus_physical_pages": [
+            164,
+            164
+          ],
+          "focus_printed_pages": [
+            153,
+            153
+          ]
+        }
+      ],
+      "local_text": [
+        "local-only/books/recent-advances-frontmatter.txt",
+        "local-only/books/recent-advances-p090-115.txt",
+        "local-only/books/recent-advances-p129-160.txt",
+        "local-only/books/recent-advances-page161.txt",
+        "local-only/books/recent-advances-p162-183.txt",
+        "local-only/books/recent-advances-p195-197.txt"
+      ],
+      "local_page_image": [
+        "local-only/books/recent-advances-page103.png"
+      ],
+      "code_status": "No complete runnable MATLAB/Octave script or explicit algorithm pseudocode block verified in relevant read chapters; introductory blurb mentions scripts but does not establish their presence here.",
+      "source_sha256": "29161cca38a1143d3aa8ac44c12bf11e3d2bf1e9b9543afcda59dc0b79f6666e",
+      "local_evidence": [
+        {
+          "path": "local-only/books/recent-advances-frontmatter.txt",
+          "sha256": "6bc042ff6d945b5592a02044c2219f2c00e431a58e7385f2516e08ab54ed806f"
+        },
+        {
+          "path": "local-only/books/recent-advances-p090-115.txt",
+          "sha256": "d00548cd552bf4f785b837f8a9281ca618a53becf49793a3f2fbfb163dafaa25"
+        },
+        {
+          "path": "local-only/books/recent-advances-p129-160.txt",
+          "sha256": "8b6fbf145a2c12d5e2761ff34bac395c7e1117fab5c668058bff30439a006312"
+        },
+        {
+          "path": "local-only/books/recent-advances-page161.txt",
+          "sha256": "9062355bad27feab4f06897b32d7667f3abd94f8982595682ddbcbfa651957dc"
+        },
+        {
+          "path": "local-only/books/recent-advances-p162-183.txt",
+          "sha256": "18917d76a40aa58ff83e4560c4b7c2b05a2d14133517b59516f28d71f8b2311c"
+        },
+        {
+          "path": "local-only/books/recent-advances-p195-197.txt",
+          "sha256": "9ace75d942cb52a4f4b21401d04151a84aa64eb43cb9f4d0f720085a213494c6"
+        }
+      ]
+    },
+    {
+      "id": "mire-et-al-2022",
+      "title": "Advances in Deep Learning for Medical Image Analysis",
+      "authors_or_editors": "Archana Mire; Vinayak Elangovan; Shailaja Patil (editors)",
+      "year": 2022,
+      "source_pdf": "ebooks/编程/医疗图像/Advances in Deep Learning for Medical Image Analysis (Taylor  Francis Group) (z-library.sk, 1lib.sk, z-lib.sk).pdf",
+      "text_layer": true,
+      "physical_page_ranges_extracted": [
+        [
+          1,
+          25
+        ],
+        [
+          34,
+          52
+        ],
+        [
+          54,
+          65
+        ],
+        [
+          68,
+          82
+        ],
+        [
+          116,
+          138
+        ],
+        [
+          168,
+          169
+        ]
+      ],
+      "relevant_sections": [
+        {
+          "chapter": "2 Two-Stage Deep Learning Architecture for Chest X-Ray-Based COVID-19 Prediction; 2.3.1 Segmentation Network",
+          "physical_pages": [
+            34,
+            52
+          ],
+          "printed_pages": [
+            19,
+            37
+          ],
+          "focus_physical_pages": [
+            38,
+            39
+          ],
+          "focus_printed_pages": [
+            23,
+            24
+          ]
+        },
+        {
+          "chapter": "3 White Blood Cell Classification Using Conventional and Deep Learning Techniques; 3.2 Conventional Methods",
+          "physical_pages": [
+            54,
+            65
+          ],
+          "printed_pages": [
+            39,
+            50
+          ],
+          "focus_physical_pages": [
+            56,
+            57
+          ],
+          "focus_printed_pages": [
+            41,
+            42
+          ]
+        },
+        {
+          "chapter": "4 Comparison and Performance Evaluation Using CNN-Based Deep Learning Models for Skin Cancer Image Classification",
+          "physical_pages": [
+            68,
+            82
+          ],
+          "printed_pages": [
+            53,
+            67
+          ]
+        },
+        {
+          "chapter": "7 Detection of Diabetic Foot Ulcer Using Machine/Deep Learning; 7.2 Pre-processing Methods",
+          "physical_pages": [
+            116,
+            138
+          ],
+          "printed_pages": [
+            101,
+            123
+          ],
+          "focus_physical_pages": [
+            119,
+            120
+          ],
+          "focus_printed_pages": [
+            104,
+            105
+          ]
+        }
+      ],
+      "local_text": [
+        "local-only/books/advances-frontmatter.txt",
+        "local-only/books/advances-p034-052.txt",
+        "local-only/books/advances-p054-065.txt",
+        "local-only/books/advances-p068-082.txt",
+        "local-only/books/advances-p116-138.txt",
+        "local-only/books/advances-p168-169.txt"
+      ],
+      "code_status": "Chapter 2 names Python/TensorFlow/Keras/OpenCV and parameters, but no complete runnable source code verified in selected chapters; other selected chapters chiefly contain method descriptions, figures and tables. No explicit pseudocode block verified.",
+      "source_sha256": "bfc7746a74963cef787b054f50c99281671faec59c57eef0a1afc92616d0d442",
+      "local_evidence": [
+        {
+          "path": "local-only/books/advances-frontmatter.txt",
+          "sha256": "5e9bede74875abf51ac45a637f38f7372967046074bb945566e9ed48df7f99fd"
+        },
+        {
+          "path": "local-only/books/advances-p034-052.txt",
+          "sha256": "a9305e506e11b84f46bdd72b77012d0958c5ad590b92f48d75c390f11e2b1c08"
+        },
+        {
+          "path": "local-only/books/advances-p054-065.txt",
+          "sha256": "5f70f4898bdd6ee181d9c47ada2a6d1302671d19568e5fe87636a519a08e9f75"
+        },
+        {
+          "path": "local-only/books/advances-p068-082.txt",
+          "sha256": "2fd30adf31a372d268c75cdd86473eee9dcf2b5b037e7b47551964525397fde1"
+        },
+        {
+          "path": "local-only/books/advances-p116-138.txt",
+          "sha256": "34d5fc0c0691d16b3bc2b722ab0bd8181c78e49caab2ae24f9ac1defad2afe10"
+        },
+        {
+          "path": "local-only/books/advances-p168-169.txt",
+          "sha256": "57da7bfee824aba957d88604ccaf77d49017817f39e67720313dd2f2f38c71ae"
+        }
+      ]
+    }
+  ]
+}

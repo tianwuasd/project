@@ -1,0 +1,19 @@
+# Local source extracts, copyrighted course material and machine-specific records.
+/local-only/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.env
+.env.*
+*.dcm
+*.nii
+*.nii.gz
+*.mha
+*.mhd
+*.nrrd
+*.pt
+*.pth
+*.ckpt
+*.pdf
+*.zip
+*.7z

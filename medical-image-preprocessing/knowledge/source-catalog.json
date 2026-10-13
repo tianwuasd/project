@@ -1,0 +1,861 @@
+{
+  "schema_version": 1,
+  "created_date": "2026-10-13",
+  "description": "Relative provenance and SHA256 fingerprints. No source text, media, or extracted code is included.",
+  "statistics": {
+    "scanned_files": 3486,
+    "selected_sources": 84,
+    "unique_original_files": 84,
+    "duplicate_sources": 0,
+    "extensions": {
+      ".pdf": 22,
+      ".md": 50,
+      ".png": 6,
+      ".ipynb": 2,
+      ".svg": 4
+    },
+    "unique_code_snippets": 36
+  },
+  "sources": [
+    {
+      "source_id": "K001",
+      "source_relative_path": "course_files_export (1)/图像处理课件/0/1 data_image_basic.pdf",
+      "sha256": "7eac4805144190325989473de8995cb6c0e80c39184c2a802191967b63c8bb74",
+      "bytes": 10259043,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K002",
+      "source_relative_path": "course_files_export (1)/图像处理课件/0/2 intensity transform basic.pdf",
+      "sha256": "588004d200a161d15a70de20019de78d25e5633f1d03a4367614cd5315d7277e",
+      "bytes": 1668787,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K003",
+      "source_relative_path": "course_files_export (1)/图像处理课件/0/3 histogram-based.pdf",
+      "sha256": "9e30ceffabe693414b3552af5648fd8e937d5b41f993a026ba5cf493ede7dbe8",
+      "bytes": 3188871,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K004",
+      "source_relative_path": "course_files_export (1)/图像处理课件/0/4 basic thresholding.pdf",
+      "sha256": "5ed25440b957a4140028d851755e1fde23ec8b13bcfae0fe4bf5ed6cb984a250",
+      "bytes": 2141501,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K005",
+      "source_relative_path": "course_files_export (1)/图像处理课件/0/5 interpolation_sr.pdf",
+      "sha256": "97f350eb9e357372e3ef9c09c99047ed564e66539fe7bc83aee99f942d07cc6a",
+      "bytes": 3729131,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K006",
+      "source_relative_path": "course_files_export (1)/图像处理课件/0/6 filter.pdf",
+      "sha256": "68392e1b5a44a93e40cce30b472cc4a0ca53b1aa3b70764cdd0adc331abbfd2a",
+      "bytes": 2070620,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K007",
+      "source_relative_path": "course_files_export (1)/图像处理课件/1/10 frequency.pdf",
+      "sha256": "52d93c92eebd259930746ca9a31bdd70f11f1425d6a7ee2eebba1087aca896ce",
+      "bytes": 1954386,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K008",
+      "source_relative_path": "course_files_export (1)/图像处理课件/1/11 DFT.pdf",
+      "sha256": "48c236fd78634d330e57596350ada02c50188258ec36d5b1031c90c564660faf",
+      "bytes": 2478122,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K009",
+      "source_relative_path": "course_files_export (1)/图像处理课件/1/12 freq_filter.pdf",
+      "sha256": "e115271b8dc0430a93dbe8164fdb07b14dfd22a6c4dee65de76254f9e7ffba86",
+      "bytes": 2393786,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K010",
+      "source_relative_path": "course_files_export (1)/图像处理课件/1/13 image restoration - denoise.pdf",
+      "sha256": "6099322e0f5dcb13056907e44e8b01acc7420e4770ee1544b5a6906a5cac6e44",
+      "bytes": 2259206,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K011",
+      "source_relative_path": "course_files_export (1)/图像处理课件/1/14 image restoration - degrade.pdf",
+      "sha256": "a0fb2b41a1a2237f1b5af0f3ff89224829874d3fa992603edd2b986d3c83b19e",
+      "bytes": 1813798,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K012",
+      "source_relative_path": "course_files_export (1)/图像处理课件/2/20 image seg 1.pdf",
+      "sha256": "7d094f9659116f18eec447f86435d0a90bbb204cabcf62c733a9795cff4e2c2b",
+      "bytes": 2477561,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K013",
+      "source_relative_path": "course_files_export (1)/图像处理课件/2/21 image seg 2 morph.pdf",
+      "sha256": "188da17440606be03f0bf0438def07ac549bc38400ebb01bff5a183a12494e28",
+      "bytes": 1784646,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K014",
+      "source_relative_path": "course_files_export (1)/图像处理课件/2/22 image reg 1 transform.pdf",
+      "sha256": "8d02b290d490ec8ff6f8e3a7642b390ffea7c0ec294f46f15d61ab4e38a3cd6b",
+      "bytes": 4999841,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K015",
+      "source_relative_path": "course_files_export (1)/图像处理课件/2/23 image reg 2.pdf",
+      "sha256": "b69fb8139442e0a69668717a42afa5e9525edd98a7736a68bf77b576d8750de0",
+      "bytes": 2659791,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K016",
+      "source_relative_path": "course_files_export (1)/图像处理课件/3/30 render intro.pdf",
+      "sha256": "84a36275c9a7829d1ebb1892b353ed1e7977e112f1c80e5d3f4bf2c7f4438501",
+      "bytes": 2393124,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K017",
+      "source_relative_path": "course_files_export (1)/图像处理课件/3/31 surface render.pdf",
+      "sha256": "24180bccd48386e58c38a7d512ac5dedf60d25b7c26817062702535451d40670",
+      "bytes": 3393955,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K018",
+      "source_relative_path": "course_files_export (1)/图像处理课件/3/32 volume render.pdf",
+      "sha256": "bc4be5629e7374f65b8211f0f01eb38d41bdd98c2ef823be1fd644352b0a03a4",
+      "bytes": 7687570,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K019",
+      "source_relative_path": "course_files_export (1)/图像处理课件/3/33 tensorrender.pdf",
+      "sha256": "6b04e9947a403097d10d1baf129f54d87c2a8713a06a034cd8894f5fa1770469",
+      "bytes": 5402790,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K020",
+      "source_relative_path": "course_files_export (1)/图像处理课件/demo render Python + QT.pdf",
+      "sha256": "7d6245c5018b4cdaa9b8fd39d41cc0c307c96b4cac3dba5ad75c48fddcdb19e5",
+      "bytes": 1873303,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K021",
+      "source_relative_path": "course_files_export (1)/图像处理课件/demo render vtk examples.pdf",
+      "sha256": "9ce7b2e50617d6fd784196e2abcc1b1a183facc26bb9a6eaacb969d4fddd49e5",
+      "bytes": 5713872,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K022",
+      "source_relative_path": "course_files_export (1)/图像处理课件/demo render vtkrender.pdf",
+      "sha256": "7a8f15cc73902606e2a0d2cf49bc353956fdfb9d7ce3851534ee8a9a7a471ff8",
+      "bytes": 3353278,
+      "extension": ".pdf",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K023",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/0/04_Thresholding_Obsidian.md",
+      "sha256": "bf1e5161d25623e48aa98fd7115ee9a7a3fa7cddc01c4ad0f9e3d3cd98b6d446",
+      "bytes": 12991,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K024",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/0/1 data_image_basic_笔记.md",
+      "sha256": "f7c7543fe6e5a2151e040555916372660129c392c970524f458927bdcfd0af97",
+      "bytes": 20868,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K025",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/0/2 intensity transform basic_笔记.md",
+      "sha256": "f968ddbca6e1f715b9edc86f60759b7842b9ea75ba545786574aa2ffd50e5e25",
+      "bytes": 10411,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K026",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/0/3 histogram-based_笔记.md",
+      "sha256": "732a4ef0975d30b50d477a026729bcf63db9e86abbddb1b26d79f65c307927b9",
+      "bytes": 12964,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K027",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/0/4 basic thresholding_笔记.md",
+      "sha256": "2ba9e9d28332690feddcdea3b52300860c747bdfaf9be2228b5662916a8824ea",
+      "bytes": 12071,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K028",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/0/5 interpolation_sr_笔记.md",
+      "sha256": "c0fe02d24e111cede7276f8f89dd80c5c626bc82066fa87b1bb561bf4545b47c",
+      "bytes": 11663,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K029",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/0/6 filter_笔记.md",
+      "sha256": "0d4c599ea1d5732a9a709cbac242bc6c35bf79b546e3b6a906faa204a533528e",
+      "bytes": 12269,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K030",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/00_图像处理课件笔记总目录.md",
+      "sha256": "a8feae8f33b586e262de99f899c5b3a580ed93f11dc0f3ac7e82066184570a1f",
+      "bytes": 7092,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K031",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/01 图像处理学习目标与进度.md",
+      "sha256": "70565388a0c35094606ee22228ee21ad27be518bf9d9f5fac99f2484a3a90ef8",
+      "bytes": 8617,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K032",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/02 图像处理公式与方法选型.md",
+      "sha256": "4adf0887ee8a5b72163a6c0cdfa8ff0dabaf42d7e8c591ae1b45c7803578630a",
+      "bytes": 7830,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K033",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/03 图像处理综合练习与复盘.md",
+      "sha256": "b84fa86c85f4dbe1acd5c34d8ae7643dfe8cf96fc3c348366e6a71a4c4244cdd",
+      "bytes": 3849,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K034",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/1/10 frequency_笔记.md",
+      "sha256": "deb26cea6aa6aa798d465bb816282a707f0d4c4ea5ee9404731476af54d2bc6b",
+      "bytes": 10132,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K035",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/1/11 DFT_笔记.md",
+      "sha256": "c3429a2465b0518f9e97b01e963abfbb4a7ed1f821583dca513bfe86feb117e7",
+      "bytes": 11712,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K036",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/1/12 freq_filter_笔记.md",
+      "sha256": "c28adb08b055003a7284fd5a887173014f7dbe76daeebc243a23ff332984d26b",
+      "bytes": 10717,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K037",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/1/13 image restoration - denoise_笔记.md",
+      "sha256": "2563080183d331400975c0336e585fc65be475b5010e940312e5ecdcd1d19802",
+      "bytes": 13469,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K038",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/1/14 image restoration - degrade_笔记.md",
+      "sha256": "26fc4acdf6cc964d8545382679cfcf6df237884698d4a236591246c4f6f61e1c",
+      "bytes": 11312,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K039",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/2/20 image seg 1_笔记.md",
+      "sha256": "7dac19877e3be60b89402684e0e8f0c0215cde90a9de495538c4fd1175794eda",
+      "bytes": 12578,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K040",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/2/21 image seg 2 morph_笔记.md",
+      "sha256": "ecff4de5a9793ffc573e8db36524b25db18b3bbd4f0d5ec193ebee5e6cb44501",
+      "bytes": 11514,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K041",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/2/22 image reg 1 transform_笔记.md",
+      "sha256": "80a9893c9fb429db0a1c21dc064fd78a806d50cf25bcd815eef9e203a37659a1",
+      "bytes": 12769,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K042",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/2/23 image reg 2_笔记.md",
+      "sha256": "cd70ca42cdc527d19b2dc12c6c452d2a94f7e136f3b4a0107b32ab9d535980a8",
+      "bytes": 14179,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K043",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/3/30 render intro_笔记.md",
+      "sha256": "be015ef60b5be546541c68c0b5fe5ce6204b0a1309c1208b1378e11e03e791c0",
+      "bytes": 10600,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K044",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/3/31 surface render_笔记.md",
+      "sha256": "5874c076ef9c4d371d341433b7b8bdda533ec8b2ec4c241e6194e2e0503c6b4f",
+      "bytes": 10584,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K045",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/3/32 volume render_笔记.md",
+      "sha256": "3088a2484ca4fac1f1602ffa27cad23a8e3c4c47ab138373d2be9d6a72c5bc9e",
+      "bytes": 12217,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K046",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/3/33 tensorrender_笔记.md",
+      "sha256": "741ba0e15b86f5e9ade14bb36cb842c34a6ded01d90957dab405d686e5308e09",
+      "bytes": 11814,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K047",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/_assets/体渲染步长与顺序.png",
+      "sha256": "047b40c80f5cd5888014a6127ddb77c358e0669643713c99fed410440f888b4a",
+      "bytes": 71784,
+      "extension": ".png",
+      "selection_reason": "embedded_attachment_of_selected_note",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K048",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/_assets/流线迹线脉线对比.png",
+      "sha256": "85440e6d94dd030db8f1a6b4020736afc1ac1f5e7a54cb5535758eb907c51e0c",
+      "bytes": 80482,
+      "extension": ".png",
+      "selection_reason": "embedded_attachment_of_selected_note",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K049",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/demo render Python + QT_笔记.md",
+      "sha256": "adfcac6947647f0e8761c4067caa01f2b0271fc99081c83cd6522a5ac42724db",
+      "bytes": 12322,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K050",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/demo render vtk examples_笔记.md",
+      "sha256": "8305c9b3b1556bcaa34dc54aa5bfd19b49028eff0e995f6b9457b550f249d23e",
+      "bytes": 11794,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K051",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/demo render vtkrender_笔记.md",
+      "sha256": "99dacb21e911663ce0e8c420e10e6c2e2ca4900d6c18b937756f82006181bd0a",
+      "bytes": 12257,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K052",
+      "source_relative_path": "course_files_export (1)/图像处理课件笔记/大概流程.md",
+      "sha256": "92acd3c05e99d6159c59d944c595df328a71122853ee3f7ac6e42b91d90d2efc",
+      "bytes": 27106,
+      "extension": ".md",
+      "selection_reason": "complete_image_processing_course",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K053",
+      "source_relative_path": "introduction_to_deeplearning/CMU 11-785 Deep Learning S26/documents/labs/lab_5/CNN_Basics_Student_Notebook.ipynb",
+      "sha256": "2db3f6a3912e7595706f2d05cfb0fcbc5468e523cf1793ca2b7fc4143cb81265",
+      "bytes": 432042,
+      "extension": ".ipynb",
+      "selection_reason": "image_preprocessing_or_convolution_notebook",
+      "inspection": "selected_cells_static_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K054",
+      "source_relative_path": "introduction_to_deeplearning/CMU 11-785 Deep Learning S26/github_raw/CMU-IDeeL.github.io/S26/documents/recitation_0/0.16/0_16_Data_Preprocessing_Part_2.ipynb",
+      "sha256": "b39311eb06c96bc0bf562eda146c5d46b55b0f9f6215473c0539b26d24d110ea",
+      "bytes": 4372350,
+      "extension": ".ipynb",
+      "selection_reason": "image_preprocessing_or_convolution_notebook",
+      "inspection": "selected_cells_static_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K055",
+      "source_relative_path": "人工智能散落/知识点散落/卷积核.md",
+      "sha256": "496e4b311bce96c36f32ca4e8828259f398eeca3ecf7437be879e0a567f9b177",
+      "bytes": 9412,
+      "extension": ".md",
+      "selection_reason": "image_inverse_problem_or_convolution_support",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K056",
+      "source_relative_path": "动手学深度学习（PyTorch）/13.1 图像增广.md",
+      "sha256": "f37c4657338fa36fd1005eae4d13834d68858f00084452c8cb7d8c4301344da5",
+      "bytes": 6433,
+      "extension": ".md",
+      "selection_reason": "vision_data_geometry_convolution_segmentation",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K057",
+      "source_relative_path": "动手学深度学习（PyTorch）/13.10 转置卷积.md",
+      "sha256": "9e91a85cf20498f813145deefef9fe8ae93d9b09ddfdbe7af2cc831463233885",
+      "bytes": 6180,
+      "extension": ".md",
+      "selection_reason": "vision_data_geometry_convolution_segmentation",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K058",
+      "source_relative_path": "动手学深度学习（PyTorch）/13.11 全卷积网络.md",
+      "sha256": "9c48b66dcfa662f5b1e76f4635c95520c37323ee146b57f962c186d8cbb74387",
+      "bytes": 6767,
+      "extension": ".md",
+      "selection_reason": "vision_data_geometry_convolution_segmentation",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K059",
+      "source_relative_path": "动手学深度学习（PyTorch）/13.3 目标检测和边界框.md",
+      "sha256": "2b9c8086dea33a0ff33cfccae17059b196980399b685c412c8679bac2cc5e409",
+      "bytes": 4801,
+      "extension": ".md",
+      "selection_reason": "vision_data_geometry_convolution_segmentation",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K060",
+      "source_relative_path": "动手学深度学习（PyTorch）/13.6 目标检测数据集.md",
+      "sha256": "561886e226d29c776148d4fac1f8d6be8f84a6eb60cb31f6abd6467c35761a73",
+      "bytes": 6107,
+      "extension": ".md",
+      "selection_reason": "vision_data_geometry_convolution_segmentation",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K061",
+      "source_relative_path": "动手学深度学习（PyTorch）/13.9 语义分割和数据集.md",
+      "sha256": "e2f3ea7e19f6c1dd3f4185c7f5d2be11d04450a805c45069e52e0b6313214a72",
+      "bytes": 6667,
+      "extension": ".md",
+      "selection_reason": "vision_data_geometry_convolution_segmentation",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K062",
+      "source_relative_path": "动手学深度学习（PyTorch）/3.5 图像分类数据集.md",
+      "sha256": "264295c2554d92eab3f2c01fa0f04624b429c2771f98896981e60308f836b4c6",
+      "bytes": 7444,
+      "extension": ".md",
+      "selection_reason": "vision_data_geometry_convolution_segmentation",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K063",
+      "source_relative_path": "动手学深度学习（PyTorch）/6.1 从全连接层到卷积.md",
+      "sha256": "0360818f82bf24bc31bcbab3f727558e1a9f5074488ef7c0c7df3edbe2b096d2",
+      "bytes": 4496,
+      "extension": ".md",
+      "selection_reason": "vision_data_geometry_convolution_segmentation",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K064",
+      "source_relative_path": "动手学深度学习（PyTorch）/6.2 图像卷积.md",
+      "sha256": "67277d48e3df90527f6b14283106e1e827e4e9fd3c2b130b2497f9e78feacd58",
+      "bytes": 4597,
+      "extension": ".md",
+      "selection_reason": "vision_data_geometry_convolution_segmentation",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K065",
+      "source_relative_path": "动手学深度学习（PyTorch）/6.3 填充和步幅.md",
+      "sha256": "ed019ada38a3edf687f4cdd1d8168141491b078d7b0de3dcf18ccd0758ef157b",
+      "bytes": 3987,
+      "extension": ".md",
+      "selection_reason": "vision_data_geometry_convolution_segmentation",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K066",
+      "source_relative_path": "动手学深度学习（PyTorch）/6.4 多输入多输出通道.md",
+      "sha256": "40d21743dba7f16b9b383659de3041ccd507d92c4caad8284962db1af92ca9ee",
+      "bytes": 4210,
+      "extension": ".md",
+      "selection_reason": "vision_data_geometry_convolution_segmentation",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K067",
+      "source_relative_path": "动手学深度学习（PyTorch）/6.5 汇聚层.md",
+      "sha256": "5753610452c9b1a5648821263e48526d84f1671a00b045b549bbfbd3e8510349",
+      "bytes": 3970,
+      "extension": ".md",
+      "selection_reason": "vision_data_geometry_convolution_segmentation",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K068",
+      "source_relative_path": "动手学深度学习（PyTorch）/6.6 卷积神经网络（LeNet）.md",
+      "sha256": "44023a71d58f5422a2bb910896224cc28e3853927536cacb78ccb36925eb36f0",
+      "bytes": 5148,
+      "extension": ".md",
+      "selection_reason": "vision_data_geometry_convolution_segmentation",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K069",
+      "source_relative_path": "最优化：建模、算法与理论（第二版）/3.11 图像处理中的全变差模型.md",
+      "sha256": "3b98afd8b7d45b6db25d2f8744a5b4a0118e6a319763a6879c3372eb2bb0af9b",
+      "bytes": 10397,
+      "extension": ".md",
+      "selection_reason": "image_inverse_problem_or_convolution_support",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K070",
+      "source_relative_path": "最优化：建模、算法与理论（第二版）/3.12 小波模型.md",
+      "sha256": "202c4a8fa41b7212a8ac3510f38212a965368f796552a24dc2ac843b17ca3dad",
+      "bytes": 7614,
+      "extension": ".md",
+      "selection_reason": "image_inverse_problem_or_convolution_support",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K071",
+      "source_relative_path": "最优化：建模、算法与理论（第二版）/4.3 复合优化问题.md",
+      "sha256": "4adcf17f5d2ef625119ed4e339ba0856143a5ad0e508ec10f524db223b872071",
+      "bytes": 10899,
+      "extension": ".md",
+      "selection_reason": "image_inverse_problem_or_convolution_support",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K072",
+      "source_relative_path": "最优化：建模、算法与理论（第二版）/5.3 无约束不可微问题的最优性理论.md",
+      "sha256": "0be206eb765766ea552fdbdf5576a8572fed3485567f43a576c57afcd3256211",
+      "bytes": 13477,
+      "extension": ".md",
+      "selection_reason": "image_inverse_problem_or_convolution_support",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K073",
+      "source_relative_path": "最优化：建模、算法与理论（第二版）/6.2 梯度类算法.md",
+      "sha256": "96e401fd9c5ce62cfeea70b21a2c16633a5fc4e33a04ca4504aa15c2778b60bc",
+      "bytes": 15521,
+      "extension": ".md",
+      "selection_reason": "image_inverse_problem_or_convolution_support",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K074",
+      "source_relative_path": "最优化：建模、算法与理论（第二版）/8.6 交替方向乘子法.md",
+      "sha256": "1b1887ac6f731daa2f346dd22a0c3a4c29b53a9024415048aebaeb1abb2f37c9",
+      "bytes": 47092,
+      "extension": ".md",
+      "selection_reason": "image_inverse_problem_or_convolution_support",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K075",
+      "source_relative_path": "最优化：建模、算法与理论（第二版）/_assets/3.11-图3.5-图像去噪-原书裁图.png",
+      "sha256": "445a68abe32b7fbd4c424f66fd3ae37cf5460a3e45aa5045753bb56159dd2ad2",
+      "bytes": 120189,
+      "extension": ".png",
+      "selection_reason": "embedded_attachment_of_selected_note",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K076",
+      "source_relative_path": "最优化：建模、算法与理论（第二版）/_assets/3.12-图3.6-小波分解-原书裁图.png",
+      "sha256": "76e37d41e6115953e7ab036e2ef0a4e12e42e2478ddea4e6b4c8e5cd5cff1ff2",
+      "bytes": 91236,
+      "extension": ".png",
+      "selection_reason": "embedded_attachment_of_selected_note",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K077",
+      "source_relative_path": "最优化：建模、算法与理论（第二版）/_assets/8.6-图8.10所在原页-PDF509.png",
+      "sha256": "f504e3e79085f21d832d4da75a61c26ac7381e945f376526aa43d61edeff3296",
+      "bytes": 201812,
+      "extension": ".png",
+      "selection_reason": "embedded_attachment_of_selected_note",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K078",
+      "source_relative_path": "最优化：建模、算法与理论（第二版）/_assets/8.6-图8.9所在原页-PDF499.png",
+      "sha256": "da6194b6e8a3c6af0a92deab27123e4de7cc5c26bb02c04fb57e280668265be8",
+      "bytes": 152751,
+      "extension": ".png",
+      "selection_reason": "embedded_attachment_of_selected_note",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K079",
+      "source_relative_path": "最优化：建模、算法与理论（第二版）/图5.2-非凸函数次微分.svg",
+      "sha256": "2052c8a37bd6340dc54b3f1634501c3c4d04b90e2e865659d04e003d28177a69",
+      "bytes": 1582,
+      "extension": ".svg",
+      "selection_reason": "embedded_attachment_of_selected_note",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K080",
+      "source_relative_path": "最优化：建模、算法与理论（第二版）/图6.4-梯度法前15次迭代.svg",
+      "sha256": "5643b7514bcc7e8c6c920f7bb91f53a3b49fe28482f8af9a452a791a1a1262f7",
+      "bytes": 1364,
+      "extension": ".svg",
+      "selection_reason": "embedded_attachment_of_selected_note",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K081",
+      "source_relative_path": "最优化：建模、算法与理论（第二版）/图6.5-梯度法与BB方法.svg",
+      "sha256": "6693c1c3f42e2f7235eb1ccac7a4f89c35490000134e78162c8335b5addaf6fd",
+      "bytes": 1558,
+      "extension": ".svg",
+      "selection_reason": "embedded_attachment_of_selected_note",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K082",
+      "source_relative_path": "最优化：建模、算法与理论（第二版）/图6.6-Huber型绝对值光滑近似.svg",
+      "sha256": "12ede7c2adade5da59696d1884a2aefeac58acba86b141cc41c286ed73779510",
+      "bytes": 1576,
+      "extension": ".svg",
+      "selection_reason": "embedded_attachment_of_selected_note",
+      "inspection": "preserved_not_independently_read",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K083",
+      "source_relative_path": "线性代数与数据学习/3.4 对 l2 加 l1 的拆分算法.md",
+      "sha256": "a71a46c0423717d6568fbe8a133bffafb558d7452fce34189549516d30c71392",
+      "bytes": 10504,
+      "extension": ".md",
+      "selection_reason": "image_inverse_problem_or_convolution_support",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    },
+    {
+      "source_id": "K084",
+      "source_relative_path": "线性代数与数据学习/7.2 卷积神经网络.md",
+      "sha256": "3b913a6e9dbf71005e08a6f052715f6527cef29751b105be6004866208ff1301",
+      "bytes": 8087,
+      "extension": ".md",
+      "selection_reason": "image_inverse_problem_or_convolution_support",
+      "inspection": "text_and_selected_sections",
+      "upload_allowed": false
+    }
+  ]
+}

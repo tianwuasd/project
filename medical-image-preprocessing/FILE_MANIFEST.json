@@ -1,0 +1,441 @@
+{
+  "date": "2026-10-13",
+  "scope": "publication files; excludes this manifest itself and local-only/",
+  "files": [
+    {
+      "path": ".gitattributes",
+      "bytes": 89,
+      "sha256": "c966f23c43261f5a52d1c131f190351b875435f4a2c4219ce62c4ace81372517"
+    },
+    {
+      "path": ".gitignore",
+      "bytes": 222,
+      "sha256": "88fad6926dcd1f71ec61f3020cdd51ad770c5903854e02da7bdc3dd6f28188d3"
+    },
+    {
+      "path": "books/advances-deep-learning-medical-image-analysis.md",
+      "bytes": 2687,
+      "sha256": "8fa03b113a080d6c9bb2df3ea0144d066971a9cd8746fd952142ac596b829823"
+    },
+    {
+      "path": "books/book_sources.json",
+      "bytes": 16500,
+      "sha256": "433246206904af1996412c7407621cbfb99de4b74000114c9c34b5cc5acf8b63"
+    },
+    {
+      "path": "books/dougherty-digital-image-processing.md",
+      "bytes": 3027,
+      "sha256": "18d437b70efe6157785d4b793e9c6186f162c991a310a640788c670a3d65a9a2"
+    },
+    {
+      "path": "books/preprocessing-topics.md",
+      "bytes": 6450,
+      "sha256": "5af6625faf5695b937c65fbb8f958d1498cdf960f5cbe0cbe8291544c0ed3e5f"
+    },
+    {
+      "path": "books/README.md",
+      "bytes": 2483,
+      "sha256": "c2886c4205baa21c6dc818059e30ac4a9461f025f6f1df71b6def545bb80df58"
+    },
+    {
+      "path": "books/recent-advances-medical-image-analysis.md",
+      "bytes": 2565,
+      "sha256": "398cb5879a41d0b03cee80163e86fda65187c9d1f0bdbc2bf37a4f7471cb7a42"
+    },
+    {
+      "path": "CODE_INDEX.md",
+      "bytes": 6713,
+      "sha256": "7c318863a21e2cd9a1e2ccf1a6885638310425f9d8bd098c94be4c307d75f7c7"
+    },
+    {
+      "path": "knowledge/code-inventory.md",
+      "bytes": 6041,
+      "sha256": "4592641747d25c883c685bb5dda0a4033dca7ca18e66b6eb8230d493b6382dc5"
+    },
+    {
+      "path": "knowledge/course-index.md",
+      "bytes": 4818,
+      "sha256": "ec39bc2815964cec1c3d85bc859f8fa66a0c2f68be3d80e7ba04221642bacc22"
+    },
+    {
+      "path": "knowledge/formulas-and-pitfalls.md",
+      "bytes": 6505,
+      "sha256": "9821bf28795c57d2878cb244dba4b1caa9462fc589e2b05809a6f9b92c4b831a"
+    },
+    {
+      "path": "knowledge/learning-path.md",
+      "bytes": 3830,
+      "sha256": "93ceaf238dfb3e9363419a5511196a8f004c0456e5e4f70bcc26eb03f6372f7c"
+    },
+    {
+      "path": "knowledge/medical-preprocessing.md",
+      "bytes": 8025,
+      "sha256": "5aa5f2039403fda876c7ddb2b36a79dae221fd4cb6b6944bb66a20cfd2b707e2"
+    },
+    {
+      "path": "knowledge/README.md",
+      "bytes": 2737,
+      "sha256": "82f2c52e3410e8b7f5bd9be4a4e3836bcaa7219aa343b2cde01266c4c86860be"
+    },
+    {
+      "path": "knowledge/source-catalog.json",
+      "bytes": 37509,
+      "sha256": "8a8d26a56dc5ea07e215543e1e58748e652c03aeb706bfd4a938acfc5396e1f6"
+    },
+    {
+      "path": "PREPROCESSING_MAP.md",
+      "bytes": 4022,
+      "sha256": "6c7bcc090caa0d13dae7f04c3c571a7e8e9fc04d4c2bc56535cfa138eefed904"
+    },
+    {
+      "path": "projects/export-review.json",
+      "bytes": 4,
+      "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f"
+    },
+    {
+      "path": "projects/file-manifest.json",
+      "bytes": 40447,
+      "sha256": "78ca1ec1f84d948f24e32bc608017a9ab203b57d696ad6e3ea99ec18ec99c1f9"
+    },
+    {
+      "path": "projects/inventory.json",
+      "bytes": 23735,
+      "sha256": "9b709f1d493c8494121768860bdcfdd438cd468f3c9c49253cded5d309f0309a"
+    },
+    {
+      "path": "projects/local-code/aaoca/common.py",
+      "bytes": 7923,
+      "sha256": "2a0381fcdff1acdbb5478d1e40ef4315bd92618330620faf9273b3fa70e9fbc3"
+    },
+    {
+      "path": "projects/local-code/aaoca/convert_ct.py",
+      "bytes": 11902,
+      "sha256": "859990a3d94a25508cce8c8fc15e5db6a989e2965596e69406395f3dcb74a16f"
+    },
+    {
+      "path": "projects/local-code/aaoca/convert_us.py",
+      "bytes": 10196,
+      "sha256": "8a61ac0c77f63079b16db6ffb9f9a474da0323b3c91c24fdc5793b489109fc62"
+    },
+    {
+      "path": "projects/local-code/aaoca/patient_pipeline/imaging.py",
+      "bytes": 7790,
+      "sha256": "8b9ff03e8f72bb0967292b1b53d8cd5e476fbd0786cf235ff2f4c66726f8ce0a"
+    },
+    {
+      "path": "projects/local-code/chd-ct/src/chd_ct/imagechd/augment.py",
+      "bytes": 1378,
+      "sha256": "e648c4e84cbce3aafef23577a68091b126b3f0556f5ad98d86fe3186605e7542"
+    },
+    {
+      "path": "projects/local-code/chd-ct/src/chd_ct/imagechd/common.py",
+      "bytes": 3789,
+      "sha256": "238e26dcc10645f3f3c3bc65cb1d86db2b173a0fb347ef5fe0f902cdf60fdeed"
+    },
+    {
+      "path": "projects/local-code/chd-ct/src/chd_ct/imagechd/geometry.py",
+      "bytes": 1393,
+      "sha256": "7ca3b4b38233d173b023462e7aee4724e36ba992d2d68f6da20da5cd8953c5db"
+    },
+    {
+      "path": "projects/local-code/chd-ct/src/chd_ct/imagechd/preprocess.py",
+      "bytes": 14288,
+      "sha256": "2a2244f325b5487f85200a71f01cbcb62111a92696d9cd109456d4b824205e24"
+    },
+    {
+      "path": "projects/local-code/chd-ct/src/chd_ct/recovery.py",
+      "bytes": 2597,
+      "sha256": "ac0a76c18cdb0adbbc673f15cde720de8df21ede8e259b4b9e121e1ce432cb16"
+    },
+    {
+      "path": "projects/local-code/whole-heart-pipeline/05_src/appearance.py",
+      "bytes": 2235,
+      "sha256": "718acdb44094d02dca47e635ff6834697f4ec7062606076699e47b150f1cd6a4"
+    },
+    {
+      "path": "projects/local-code/whole-heart-pipeline/05_src/data_pipeline.py",
+      "bytes": 8100,
+      "sha256": "de451a066e5e57a4805997c0cbce332b9879e99cd21348291c758d3da2c14a29"
+    },
+    {
+      "path": "projects/local-code/whole-heart-pipeline/05_src/prepare_nnunet.py",
+      "bytes": 3938,
+      "sha256": "147170844072eabc41cfc4bbbc3bc80ffd649d62ec73f7e5ce43e24bd3b10721"
+    },
+    {
+      "path": "projects/local-code/whole-heart-pipeline/tests/test_appearance.py",
+      "bytes": 2488,
+      "sha256": "a057cb85e5ef4f1cf68ee2e6de27fe7fa673eadbc30b7a033791aec91198b1bd"
+    },
+    {
+      "path": "projects/local-code/whole-heart-pipeline/tests/test_data_pipeline.py",
+      "bytes": 1894,
+      "sha256": "96fac64282d538bc13ea673680750ebc712663820a531877083bfcf23eee27d7"
+    },
+    {
+      "path": "projects/local-code/whole-heart-pipeline/tests/test_preparation_markers.py",
+      "bytes": 7113,
+      "sha256": "184e930c4aef24024258700a38998cf4029b6134cd5d42d4460de95e89e95e65"
+    },
+    {
+      "path": "projects/local-code/whole-heart-qc/medical.py",
+      "bytes": 12726,
+      "sha256": "ebad86a6286696942aeca321a8e2c0e8d6589de4a85bbe6b45da2c2000a3dbc4"
+    },
+    {
+      "path": "projects/local-code/whole-heart-qc/tests/test_medical.py",
+      "bytes": 5867,
+      "sha256": "4ccf89401076e4cc6fb63a253882248756a237bf2ee2bb8bddbd49d228c3094d"
+    },
+    {
+      "path": "projects/README.md",
+      "bytes": 10601,
+      "sha256": "8087073bf35173e7a9f5029faf9d71236ce69e02fd2721e4bdd051b52d145c15"
+    },
+    {
+      "path": "projects/vendor/dicom-audit-tools/LICENSE.md",
+      "bytes": 1088,
+      "sha256": "5c793d8fe1c553d49c305f3c178ac360b6d32607bdf1bca06b10d3ba9881d78f"
+    },
+    {
+      "path": "projects/vendor/dicom-audit-tools/skills/pydicom/scripts/_common.py",
+      "bytes": 30728,
+      "sha256": "5400eeb7e7528bfdcea9d7e30f6fb53e10dce5da40b035918df66364a2a723d8"
+    },
+    {
+      "path": "projects/vendor/dicom-audit-tools/skills/pydicom/scripts/anonymize_dicom.py",
+      "bytes": 26518,
+      "sha256": "7b3416b9dd2e995f272392c60ee6748eafeed927bb87f151f0413a9a43def083"
+    },
+    {
+      "path": "projects/vendor/dicom-audit-tools/skills/pydicom/scripts/deidentification_audit.py",
+      "bytes": 13470,
+      "sha256": "29c173107a0bd48478e71eef9b12c09209135c45fe69ac2fabd1663f90472614"
+    },
+    {
+      "path": "projects/vendor/dicom-audit-tools/skills/pydicom/scripts/dicom_inventory.py",
+      "bytes": 13999,
+      "sha256": "732b49980b1106941f88eca6f89460b15ae9145295daaf96ef9a6b285bb87c06"
+    },
+    {
+      "path": "projects/vendor/dicom-audit-tools/skills/pydicom/scripts/pixel_frame_planner.py",
+      "bytes": 10433,
+      "sha256": "bbb05275c81b864ed3cb66229d184412d03c34871592dea801925b40a3bf6286"
+    },
+    {
+      "path": "projects/vendor/dicom-audit-tools/skills/pydicom/scripts/transfer_syntax_inspector.py",
+      "bytes": 8126,
+      "sha256": "08bb80e3b74331a97f876b3579104387468a96ff1cc7a23fb5a8cd8ce3e0683c"
+    },
+    {
+      "path": "projects/vendor/dicom-audit-tools/skills/pydicom/scripts/uid_mapping_validator.py",
+      "bytes": 8773,
+      "sha256": "6e4ed8bcfd7ab75ec127b0a56dc4bd30a3b6f477601eb68aec2dd4c562bc35c3"
+    },
+    {
+      "path": "projects/vendor/pydicom/pydicom/pixel_data_handlers/util.py",
+      "bytes": 3797,
+      "sha256": "431ae121f3dc85113de674059a9d74fd12ee9304620331a6fc308731fd9571c5"
+    },
+    {
+      "path": "projects/vendor/pydicom/pydicom/pixels/processing.py",
+      "bytes": 42293,
+      "sha256": "27b1b7da14fa9b0bed2a04425f544695b7f203b1df4951e4092721a765492b4b"
+    },
+    {
+      "path": "projects/vendor/pydicom/pydicom/pixels/utils.py",
+      "bytes": 75398,
+      "sha256": "f78886030b7fe64c582a50434282879cf01cc7a84c466fc28c739c896bd0eb22"
+    },
+    {
+      "path": "projects/vendor/pydicom/pydicom-3.0.2.dist-info/licenses/LICENSE",
+      "bytes": 3141,
+      "sha256": "39b3259cb15151df25167119087df1fef33624765e639af42447ba6fe86dada3"
+    },
+    {
+      "path": "README.md",
+      "bytes": 2815,
+      "sha256": "0d6c6ef0995d35d2006489c18cf5dad86ebfbee6d6d34a3dfbfc62ebcba35988"
+    },
+    {
+      "path": "SOURCES_AND_RIGHTS.md",
+      "bytes": 2125,
+      "sha256": "cdabfd846aef70b0a40ae851889dda3e1e7956eed165c8cf32b422e765eb684b"
+    },
+    {
+      "path": "upstream/monai/LICENSE",
+      "bytes": 11357,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "upstream/monai/monai/transforms/croppad/array.py",
+      "bytes": 75019,
+      "sha256": "533a9c297e7259f19cc0f1d92223ee0f7c1481cc968cd28909ec8de48967f7e2"
+    },
+    {
+      "path": "upstream/monai/monai/transforms/croppad/dictionary.py",
+      "bytes": 67020,
+      "sha256": "2e15ae3a3ff09f692a822296b9ac498746bed3d5c411a0a460031ed0a337eecb"
+    },
+    {
+      "path": "upstream/monai/monai/transforms/intensity/array.py",
+      "bytes": 129687,
+      "sha256": "9d5a8ff01a0db1950c7af536702031128cc8422130f5a643deba531699ec47ae"
+    },
+    {
+      "path": "upstream/monai/monai/transforms/intensity/dictionary.py",
+      "bytes": 86412,
+      "sha256": "780d1083687d27f91bc979e39c44e3abcfab074c1b1a32ee0907f2ca135e3e72"
+    },
+    {
+      "path": "upstream/monai/monai/transforms/spatial/array.py",
+      "bytes": 193412,
+      "sha256": "83958853f315a3fba9a203e16c6d1b6a187c6abde933cd8ecb051447f3e68051"
+    },
+    {
+      "path": "upstream/monai/monai/transforms/spatial/dictionary.py",
+      "bytes": 135803,
+      "sha256": "e30bcbb8af9fe00a37c9e68017b88b5129b4e3ac4a0a6a9449d26dd8bade854d"
+    },
+    {
+      "path": "upstream/nnunet/LICENSE",
+      "bytes": 11428,
+      "sha256": "ff93b6fdf1d59f7c48ca7f44f2d0db47bb7743a1c6fa0f4c5f4d7809f78ce70e"
+    },
+    {
+      "path": "upstream/nnunet/nnunetv2/experiment_planning/dataset_fingerprint/fingerprint_extractor.py",
+      "bytes": 12885,
+      "sha256": "ceb642941b1565e34218a2fb07b3666eb3ce7928f0b1a7d73d54dd58d320b0e5"
+    },
+    {
+      "path": "upstream/nnunet/nnunetv2/preprocessing/cropping/cropping.py",
+      "bytes": 1174,
+      "sha256": "57298102d27dc19a88945399048dba6e07c73d35c0f4cad42c698995c4d2f1ac"
+    },
+    {
+      "path": "upstream/nnunet/nnunetv2/preprocessing/normalization/default_normalization_schemes.py",
+      "bytes": 4689,
+      "sha256": "e260a437360df5b64f2279c283c12b255abc75927d52546fc7fb90987a1745e5"
+    },
+    {
+      "path": "upstream/nnunet/nnunetv2/preprocessing/normalization/map_channel_name_to_normalization.py",
+      "bytes": 976,
+      "sha256": "e195bc1f5cdfcf723b1a11c15e2539f15d11018bfcf20a758e18badca4b723fb"
+    },
+    {
+      "path": "upstream/nnunet/nnunetv2/preprocessing/preprocessors/default_preprocessor.py",
+      "bytes": 24441,
+      "sha256": "a2bb834d8a772ea47fab4281ddc83444d80d194ee84be53ee4ef6e689829695e"
+    },
+    {
+      "path": "upstream/nnunet/nnunetv2/preprocessing/resampling/default_resampling.py",
+      "bytes": 12908,
+      "sha256": "2075906413f30f528a75435fcf0d4f86bbbfd1a66aac046726e8f5804b93b076"
+    },
+    {
+      "path": "upstream/nnunet/nnunetv2/preprocessing/resampling/resample_torch.py",
+      "bytes": 22720,
+      "sha256": "085a7073fe18d49cea1b44c92e2533d4c7e8bdfd27a4a5dccefdbac3c137d501"
+    },
+    {
+      "path": "upstream/README.md",
+      "bytes": 3013,
+      "sha256": "35a5cdf26d9866733fa81bb3f272d4e2e1a1b8af1f19a93de19c0bfea9cc3939"
+    },
+    {
+      "path": "upstream/simpleitk/LICENSE",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "upstream/simpleitk/Python/21_Transforms_and_Resampling.ipynb",
+      "bytes": 49925,
+      "sha256": "22869ba374da32d91081f45585a913c57283f0ba92d94dba01768251d07c8f41"
+    },
+    {
+      "path": "upstream/simpleitk/Python/22_Transforms.ipynb",
+      "bytes": 71272,
+      "sha256": "4dca6e5dc5817cf5f819883c0c4f96cdc13662229552bc31407c53de95dda58c"
+    },
+    {
+      "path": "upstream/simpleitk/Python/300_Segmentation_Overview.ipynb",
+      "bytes": 13684,
+      "sha256": "1d691ac4b53b9cd1558d05904a5ea0c9190fd77cb3ca7c8ee0babfb6aefb072f"
+    },
+    {
+      "path": "upstream/simpleitk/Python/60_Registration_Introduction.ipynb",
+      "bytes": 21258,
+      "sha256": "d0fc4bc4fa50ad08bad4e50202a7923bc9daf213eac91e17791cb1c3af65c82a"
+    },
+    {
+      "path": "upstream/simpleitk/Python/70_Data_Augmentation.ipynb",
+      "bytes": 59450,
+      "sha256": "1963ea9ddab9f72f180259445df5dc01bfeaf31d0b6c0018e60d92b057465258"
+    },
+    {
+      "path": "upstream/sources.json",
+      "bytes": 20242,
+      "sha256": "39dc471a7c3d7011d658145774e37add477fbdc43d4c0c388598a619abda67c2"
+    },
+    {
+      "path": "upstream/torchio/docs/get-started/migration.md",
+      "bytes": 14841,
+      "sha256": "8e66687ef60df9bc12cef3218a3cb309cbc18d945c32e90f0d522e35fd3f1710"
+    },
+    {
+      "path": "upstream/torchio/docs/reference/transforms/resample.md",
+      "bytes": 77,
+      "sha256": "ebd67212ee9809c5328573f31042fb590214311643b9b7b4758d963d8b977ac0"
+    },
+    {
+      "path": "upstream/torchio/LICENSE",
+      "bytes": 11353,
+      "sha256": "e41c88c4f5d03adb410e70e0fd7a170f0834266c411774007525244c076fe8d9"
+    },
+    {
+      "path": "upstream/torchio/src/torchio/transforms/intensity/clamp.py",
+      "bytes": 1794,
+      "sha256": "4ad02072877c94a3ce9c447d2f0b1149caa9d66c309cb228272f3214f694e08c"
+    },
+    {
+      "path": "upstream/torchio/src/torchio/transforms/intensity/histogram_standardization.py",
+      "bytes": 10147,
+      "sha256": "83d070930ee6f1e86e5c82653920e386e42f0b43b9f1b5a2cf8e47d963bce381"
+    },
+    {
+      "path": "upstream/torchio/src/torchio/transforms/intensity/normalize.py",
+      "bytes": 13174,
+      "sha256": "fb6e8f6359d7b7ebc98474a949c0da8f4309f01ebcc9c7f0158e79c974f6e54b"
+    },
+    {
+      "path": "upstream/torchio/src/torchio/transforms/intensity/standardize.py",
+      "bytes": 6056,
+      "sha256": "9c0766f7a67148afadf99b657383d36d20525a554e2f69262cc228f4241c8aa4"
+    },
+    {
+      "path": "upstream/torchio/src/torchio/transforms/spatial/crop_or_pad.py",
+      "bytes": 20897,
+      "sha256": "c44e12a431365898453438f62eef810af8a09d8da4b51f40d9553445e6e1ed3e"
+    },
+    {
+      "path": "upstream/torchio/src/torchio/transforms/spatial/reorient.py",
+      "bytes": 5911,
+      "sha256": "7aa3ebe0aeabeb5d400927e3eef196e998597901e882409543ae472420f70490"
+    },
+    {
+      "path": "upstream/torchio/src/torchio/transforms/spatial/spatial.py",
+      "bytes": 100296,
+      "sha256": "ffc0197c7b7618d702c090fd988f12481a1b54a6ebb0095459e9b3f8668175ea"
+    },
+    {
+      "path": "upstream/torchio/src/torchio/transforms/spatial/to_reference_space.py",
+      "bytes": 4878,
+      "sha256": "4c0afcf07ef1d7f06d6950b2855bdcedfe58dc7ff01964c1c5f3358a76f845b3"
+    },
+    {
+      "path": "VALIDATION.md",
+      "bytes": 2447,
+      "sha256": "223f9a58eae53a941b3a46920e32c8390e217405b50faee75684e309c2514a06"
+    }
+  ]
+}

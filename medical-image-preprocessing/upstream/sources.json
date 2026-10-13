@@ -1,0 +1,340 @@
+[
+  {
+    "project": "nnunet",
+    "repository": "https://github.com/MIC-DKFZ/nnUNet",
+    "commit": "0a23eceec9c18c94e440fa758cfb1fc32d1ce601",
+    "retrieved": "2026-10-13",
+    "license": "Apache-2.0",
+    "scope": "Selected source files for study; not a complete installable package",
+    "files": [
+      {
+        "upstream_path": "LICENSE",
+        "output": "upstream/nnunet/LICENSE",
+        "source_url": "https://raw.githubusercontent.com/MIC-DKFZ/nnUNet/0a23eceec9c18c94e440fa758cfb1fc32d1ce601/LICENSE",
+        "source_sha256": "ff93b6fdf1d59f7c48ca7f44f2d0db47bb7743a1c6fa0f4c5f4d7809f78ce70e",
+        "export_sha256": "ff93b6fdf1d59f7c48ca7f44f2d0db47bb7743a1c6fa0f4c5f4d7809f78ce70e",
+        "bytes": 11428,
+        "changes": []
+      },
+      {
+        "upstream_path": "nnunetv2/preprocessing/cropping/cropping.py",
+        "output": "upstream/nnunet/nnunetv2/preprocessing/cropping/cropping.py",
+        "source_url": "https://raw.githubusercontent.com/MIC-DKFZ/nnUNet/0a23eceec9c18c94e440fa758cfb1fc32d1ce601/nnunetv2/preprocessing/cropping/cropping.py",
+        "source_sha256": "57298102d27dc19a88945399048dba6e07c73d35c0f4cad42c698995c4d2f1ac",
+        "export_sha256": "57298102d27dc19a88945399048dba6e07c73d35c0f4cad42c698995c4d2f1ac",
+        "bytes": 1174,
+        "changes": []
+      },
+      {
+        "upstream_path": "nnunetv2/preprocessing/normalization/default_normalization_schemes.py",
+        "output": "upstream/nnunet/nnunetv2/preprocessing/normalization/default_normalization_schemes.py",
+        "source_url": "https://raw.githubusercontent.com/MIC-DKFZ/nnUNet/0a23eceec9c18c94e440fa758cfb1fc32d1ce601/nnunetv2/preprocessing/normalization/default_normalization_schemes.py",
+        "source_sha256": "e260a437360df5b64f2279c283c12b255abc75927d52546fc7fb90987a1745e5",
+        "export_sha256": "e260a437360df5b64f2279c283c12b255abc75927d52546fc7fb90987a1745e5",
+        "bytes": 4689,
+        "changes": []
+      },
+      {
+        "upstream_path": "nnunetv2/preprocessing/normalization/map_channel_name_to_normalization.py",
+        "output": "upstream/nnunet/nnunetv2/preprocessing/normalization/map_channel_name_to_normalization.py",
+        "source_url": "https://raw.githubusercontent.com/MIC-DKFZ/nnUNet/0a23eceec9c18c94e440fa758cfb1fc32d1ce601/nnunetv2/preprocessing/normalization/map_channel_name_to_normalization.py",
+        "source_sha256": "e195bc1f5cdfcf723b1a11c15e2539f15d11018bfcf20a758e18badca4b723fb",
+        "export_sha256": "e195bc1f5cdfcf723b1a11c15e2539f15d11018bfcf20a758e18badca4b723fb",
+        "bytes": 976,
+        "changes": []
+      },
+      {
+        "upstream_path": "nnunetv2/preprocessing/preprocessors/default_preprocessor.py",
+        "output": "upstream/nnunet/nnunetv2/preprocessing/preprocessors/default_preprocessor.py",
+        "source_url": "https://raw.githubusercontent.com/MIC-DKFZ/nnUNet/0a23eceec9c18c94e440fa758cfb1fc32d1ce601/nnunetv2/preprocessing/preprocessors/default_preprocessor.py",
+        "source_sha256": "a2bb834d8a772ea47fab4281ddc83444d80d194ee84be53ee4ef6e689829695e",
+        "export_sha256": "a2bb834d8a772ea47fab4281ddc83444d80d194ee84be53ee4ef6e689829695e",
+        "bytes": 24441,
+        "changes": []
+      },
+      {
+        "upstream_path": "nnunetv2/preprocessing/resampling/default_resampling.py",
+        "output": "upstream/nnunet/nnunetv2/preprocessing/resampling/default_resampling.py",
+        "source_url": "https://raw.githubusercontent.com/MIC-DKFZ/nnUNet/0a23eceec9c18c94e440fa758cfb1fc32d1ce601/nnunetv2/preprocessing/resampling/default_resampling.py",
+        "source_sha256": "2075906413f30f528a75435fcf0d4f86bbbfd1a66aac046726e8f5804b93b076",
+        "export_sha256": "2075906413f30f528a75435fcf0d4f86bbbfd1a66aac046726e8f5804b93b076",
+        "bytes": 12908,
+        "changes": []
+      },
+      {
+        "upstream_path": "nnunetv2/preprocessing/resampling/resample_torch.py",
+        "output": "upstream/nnunet/nnunetv2/preprocessing/resampling/resample_torch.py",
+        "source_url": "https://raw.githubusercontent.com/MIC-DKFZ/nnUNet/0a23eceec9c18c94e440fa758cfb1fc32d1ce601/nnunetv2/preprocessing/resampling/resample_torch.py",
+        "source_sha256": "085a7073fe18d49cea1b44c92e2533d4c7e8bdfd27a4a5dccefdbac3c137d501",
+        "export_sha256": "085a7073fe18d49cea1b44c92e2533d4c7e8bdfd27a4a5dccefdbac3c137d501",
+        "bytes": 22720,
+        "changes": []
+      },
+      {
+        "upstream_path": "nnunetv2/experiment_planning/dataset_fingerprint/fingerprint_extractor.py",
+        "output": "upstream/nnunet/nnunetv2/experiment_planning/dataset_fingerprint/fingerprint_extractor.py",
+        "source_url": "https://raw.githubusercontent.com/MIC-DKFZ/nnUNet/0a23eceec9c18c94e440fa758cfb1fc32d1ce601/nnunetv2/experiment_planning/dataset_fingerprint/fingerprint_extractor.py",
+        "source_sha256": "ceb642941b1565e34218a2fb07b3666eb3ce7928f0b1a7d73d54dd58d320b0e5",
+        "export_sha256": "ceb642941b1565e34218a2fb07b3666eb3ce7928f0b1a7d73d54dd58d320b0e5",
+        "bytes": 12885,
+        "changes": []
+      }
+    ]
+  },
+  {
+    "project": "monai",
+    "repository": "https://github.com/Project-MONAI/MONAI",
+    "commit": "03e208f3ed9c6c051527f77a64ddab38ee059b50",
+    "retrieved": "2026-10-13",
+    "license": "Apache-2.0",
+    "scope": "Selected source files for study; not a complete installable package",
+    "files": [
+      {
+        "upstream_path": "LICENSE",
+        "output": "upstream/monai/LICENSE",
+        "source_url": "https://raw.githubusercontent.com/Project-MONAI/MONAI/03e208f3ed9c6c051527f77a64ddab38ee059b50/LICENSE",
+        "source_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "export_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "bytes": 11357,
+        "changes": []
+      },
+      {
+        "upstream_path": "monai/transforms/spatial/array.py",
+        "output": "upstream/monai/monai/transforms/spatial/array.py",
+        "source_url": "https://raw.githubusercontent.com/Project-MONAI/MONAI/03e208f3ed9c6c051527f77a64ddab38ee059b50/monai/transforms/spatial/array.py",
+        "source_sha256": "83958853f315a3fba9a203e16c6d1b6a187c6abde933cd8ecb051447f3e68051",
+        "export_sha256": "83958853f315a3fba9a203e16c6d1b6a187c6abde933cd8ecb051447f3e68051",
+        "bytes": 193412,
+        "changes": []
+      },
+      {
+        "upstream_path": "monai/transforms/spatial/dictionary.py",
+        "output": "upstream/monai/monai/transforms/spatial/dictionary.py",
+        "source_url": "https://raw.githubusercontent.com/Project-MONAI/MONAI/03e208f3ed9c6c051527f77a64ddab38ee059b50/monai/transforms/spatial/dictionary.py",
+        "source_sha256": "e30bcbb8af9fe00a37c9e68017b88b5129b4e3ac4a0a6a9449d26dd8bade854d",
+        "export_sha256": "e30bcbb8af9fe00a37c9e68017b88b5129b4e3ac4a0a6a9449d26dd8bade854d",
+        "bytes": 135803,
+        "changes": []
+      },
+      {
+        "upstream_path": "monai/transforms/intensity/array.py",
+        "output": "upstream/monai/monai/transforms/intensity/array.py",
+        "source_url": "https://raw.githubusercontent.com/Project-MONAI/MONAI/03e208f3ed9c6c051527f77a64ddab38ee059b50/monai/transforms/intensity/array.py",
+        "source_sha256": "9d5a8ff01a0db1950c7af536702031128cc8422130f5a643deba531699ec47ae",
+        "export_sha256": "9d5a8ff01a0db1950c7af536702031128cc8422130f5a643deba531699ec47ae",
+        "bytes": 129687,
+        "changes": []
+      },
+      {
+        "upstream_path": "monai/transforms/intensity/dictionary.py",
+        "output": "upstream/monai/monai/transforms/intensity/dictionary.py",
+        "source_url": "https://raw.githubusercontent.com/Project-MONAI/MONAI/03e208f3ed9c6c051527f77a64ddab38ee059b50/monai/transforms/intensity/dictionary.py",
+        "source_sha256": "780d1083687d27f91bc979e39c44e3abcfab074c1b1a32ee0907f2ca135e3e72",
+        "export_sha256": "780d1083687d27f91bc979e39c44e3abcfab074c1b1a32ee0907f2ca135e3e72",
+        "bytes": 86412,
+        "changes": []
+      },
+      {
+        "upstream_path": "monai/transforms/croppad/array.py",
+        "output": "upstream/monai/monai/transforms/croppad/array.py",
+        "source_url": "https://raw.githubusercontent.com/Project-MONAI/MONAI/03e208f3ed9c6c051527f77a64ddab38ee059b50/monai/transforms/croppad/array.py",
+        "source_sha256": "533a9c297e7259f19cc0f1d92223ee0f7c1481cc968cd28909ec8de48967f7e2",
+        "export_sha256": "533a9c297e7259f19cc0f1d92223ee0f7c1481cc968cd28909ec8de48967f7e2",
+        "bytes": 75019,
+        "changes": []
+      },
+      {
+        "upstream_path": "monai/transforms/croppad/dictionary.py",
+        "output": "upstream/monai/monai/transforms/croppad/dictionary.py",
+        "source_url": "https://raw.githubusercontent.com/Project-MONAI/MONAI/03e208f3ed9c6c051527f77a64ddab38ee059b50/monai/transforms/croppad/dictionary.py",
+        "source_sha256": "2e15ae3a3ff09f692a822296b9ac498746bed3d5c411a0a460031ed0a337eecb",
+        "export_sha256": "2e15ae3a3ff09f692a822296b9ac498746bed3d5c411a0a460031ed0a337eecb",
+        "bytes": 67020,
+        "changes": []
+      }
+    ]
+  },
+  {
+    "project": "torchio",
+    "repository": "https://github.com/TorchIO-project/torchio",
+    "commit": "ced7e41bf796f709bfd9ba58abf2d1828c99d7e3",
+    "retrieved": "2026-10-13",
+    "license": "Apache-2.0",
+    "scope": "Selected source files for study; not a complete installable package",
+    "files": [
+      {
+        "upstream_path": "LICENSE",
+        "output": "upstream/torchio/LICENSE",
+        "source_url": "https://raw.githubusercontent.com/TorchIO-project/torchio/ced7e41bf796f709bfd9ba58abf2d1828c99d7e3/LICENSE",
+        "source_sha256": "e41c88c4f5d03adb410e70e0fd7a170f0834266c411774007525244c076fe8d9",
+        "export_sha256": "e41c88c4f5d03adb410e70e0fd7a170f0834266c411774007525244c076fe8d9",
+        "bytes": 11353,
+        "changes": []
+      },
+      {
+        "upstream_path": "src/torchio/transforms/intensity/normalize.py",
+        "output": "upstream/torchio/src/torchio/transforms/intensity/normalize.py",
+        "source_url": "https://raw.githubusercontent.com/TorchIO-project/torchio/ced7e41bf796f709bfd9ba58abf2d1828c99d7e3/src/torchio/transforms/intensity/normalize.py",
+        "source_sha256": "fb6e8f6359d7b7ebc98474a949c0da8f4309f01ebcc9c7f0158e79c974f6e54b",
+        "export_sha256": "fb6e8f6359d7b7ebc98474a949c0da8f4309f01ebcc9c7f0158e79c974f6e54b",
+        "bytes": 13174,
+        "changes": []
+      },
+      {
+        "upstream_path": "src/torchio/transforms/intensity/standardize.py",
+        "output": "upstream/torchio/src/torchio/transforms/intensity/standardize.py",
+        "source_url": "https://raw.githubusercontent.com/TorchIO-project/torchio/ced7e41bf796f709bfd9ba58abf2d1828c99d7e3/src/torchio/transforms/intensity/standardize.py",
+        "source_sha256": "9c0766f7a67148afadf99b657383d36d20525a554e2f69262cc228f4241c8aa4",
+        "export_sha256": "9c0766f7a67148afadf99b657383d36d20525a554e2f69262cc228f4241c8aa4",
+        "bytes": 6056,
+        "changes": []
+      },
+      {
+        "upstream_path": "src/torchio/transforms/intensity/histogram_standardization.py",
+        "output": "upstream/torchio/src/torchio/transforms/intensity/histogram_standardization.py",
+        "source_url": "https://raw.githubusercontent.com/TorchIO-project/torchio/ced7e41bf796f709bfd9ba58abf2d1828c99d7e3/src/torchio/transforms/intensity/histogram_standardization.py",
+        "source_sha256": "83d070930ee6f1e86e5c82653920e386e42f0b43b9f1b5a2cf8e47d963bce381",
+        "export_sha256": "83d070930ee6f1e86e5c82653920e386e42f0b43b9f1b5a2cf8e47d963bce381",
+        "bytes": 10147,
+        "changes": []
+      },
+      {
+        "upstream_path": "src/torchio/transforms/intensity/clamp.py",
+        "output": "upstream/torchio/src/torchio/transforms/intensity/clamp.py",
+        "source_url": "https://raw.githubusercontent.com/TorchIO-project/torchio/ced7e41bf796f709bfd9ba58abf2d1828c99d7e3/src/torchio/transforms/intensity/clamp.py",
+        "source_sha256": "4ad02072877c94a3ce9c447d2f0b1149caa9d66c309cb228272f3214f694e08c",
+        "export_sha256": "4ad02072877c94a3ce9c447d2f0b1149caa9d66c309cb228272f3214f694e08c",
+        "bytes": 1794,
+        "changes": []
+      },
+      {
+        "upstream_path": "src/torchio/transforms/spatial/reorient.py",
+        "output": "upstream/torchio/src/torchio/transforms/spatial/reorient.py",
+        "source_url": "https://raw.githubusercontent.com/TorchIO-project/torchio/ced7e41bf796f709bfd9ba58abf2d1828c99d7e3/src/torchio/transforms/spatial/reorient.py",
+        "source_sha256": "7aa3ebe0aeabeb5d400927e3eef196e998597901e882409543ae472420f70490",
+        "export_sha256": "7aa3ebe0aeabeb5d400927e3eef196e998597901e882409543ae472420f70490",
+        "bytes": 5911,
+        "changes": []
+      },
+      {
+        "upstream_path": "src/torchio/transforms/spatial/spatial.py",
+        "output": "upstream/torchio/src/torchio/transforms/spatial/spatial.py",
+        "source_url": "https://raw.githubusercontent.com/TorchIO-project/torchio/ced7e41bf796f709bfd9ba58abf2d1828c99d7e3/src/torchio/transforms/spatial/spatial.py",
+        "source_sha256": "ffc0197c7b7618d702c090fd988f12481a1b54a6ebb0095459e9b3f8668175ea",
+        "export_sha256": "ffc0197c7b7618d702c090fd988f12481a1b54a6ebb0095459e9b3f8668175ea",
+        "bytes": 100296,
+        "changes": []
+      },
+      {
+        "upstream_path": "src/torchio/transforms/spatial/crop_or_pad.py",
+        "output": "upstream/torchio/src/torchio/transforms/spatial/crop_or_pad.py",
+        "source_url": "https://raw.githubusercontent.com/TorchIO-project/torchio/ced7e41bf796f709bfd9ba58abf2d1828c99d7e3/src/torchio/transforms/spatial/crop_or_pad.py",
+        "source_sha256": "c44e12a431365898453438f62eef810af8a09d8da4b51f40d9553445e6e1ed3e",
+        "export_sha256": "c44e12a431365898453438f62eef810af8a09d8da4b51f40d9553445e6e1ed3e",
+        "bytes": 20897,
+        "changes": []
+      },
+      {
+        "upstream_path": "src/torchio/transforms/spatial/to_reference_space.py",
+        "output": "upstream/torchio/src/torchio/transforms/spatial/to_reference_space.py",
+        "source_url": "https://raw.githubusercontent.com/TorchIO-project/torchio/ced7e41bf796f709bfd9ba58abf2d1828c99d7e3/src/torchio/transforms/spatial/to_reference_space.py",
+        "source_sha256": "4c0afcf07ef1d7f06d6950b2855bdcedfe58dc7ff01964c1c5f3358a76f845b3",
+        "export_sha256": "4c0afcf07ef1d7f06d6950b2855bdcedfe58dc7ff01964c1c5f3358a76f845b3",
+        "bytes": 4878,
+        "changes": []
+      },
+      {
+        "upstream_path": "docs/get-started/migration.md",
+        "output": "upstream/torchio/docs/get-started/migration.md",
+        "source_url": "https://raw.githubusercontent.com/TorchIO-project/torchio/ced7e41bf796f709bfd9ba58abf2d1828c99d7e3/docs/get-started/migration.md",
+        "source_sha256": "8e66687ef60df9bc12cef3218a3cb309cbc18d945c32e90f0d522e35fd3f1710",
+        "export_sha256": "8e66687ef60df9bc12cef3218a3cb309cbc18d945c32e90f0d522e35fd3f1710",
+        "bytes": 14841,
+        "changes": []
+      },
+      {
+        "upstream_path": "docs/reference/transforms/resample.md",
+        "output": "upstream/torchio/docs/reference/transforms/resample.md",
+        "source_url": "https://raw.githubusercontent.com/TorchIO-project/torchio/ced7e41bf796f709bfd9ba58abf2d1828c99d7e3/docs/reference/transforms/resample.md",
+        "source_sha256": "ebd67212ee9809c5328573f31042fb590214311643b9b7b4758d963d8b977ac0",
+        "export_sha256": "ebd67212ee9809c5328573f31042fb590214311643b9b7b4758d963d8b977ac0",
+        "bytes": 77,
+        "changes": []
+      }
+    ]
+  },
+  {
+    "project": "simpleitk",
+    "repository": "https://github.com/InsightSoftwareConsortium/SimpleITK-Notebooks",
+    "commit": "1d872dc049d45dae8342729242b845dbbb580014",
+    "retrieved": "2026-10-13",
+    "license": "Apache-2.0",
+    "scope": "Selected source files for study; not a complete installable package",
+    "files": [
+      {
+        "upstream_path": "LICENSE",
+        "output": "upstream/simpleitk/LICENSE",
+        "source_url": "https://raw.githubusercontent.com/InsightSoftwareConsortium/SimpleITK-Notebooks/1d872dc049d45dae8342729242b845dbbb580014/LICENSE",
+        "source_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "export_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "bytes": 11358,
+        "changes": []
+      },
+      {
+        "upstream_path": "Python/21_Transforms_and_Resampling.ipynb",
+        "output": "upstream/simpleitk/Python/21_Transforms_and_Resampling.ipynb",
+        "source_url": "https://raw.githubusercontent.com/InsightSoftwareConsortium/SimpleITK-Notebooks/1d872dc049d45dae8342729242b845dbbb580014/Python/21_Transforms_and_Resampling.ipynb",
+        "source_sha256": "a115e8213db30ad2f11b1e22a5ddd6c84b1adfe29b7dab8b6fcc730e80598bfd",
+        "export_sha256": "22869ba374da32d91081f45585a913c57283f0ba92d94dba01768251d07c8f41",
+        "bytes": 49925,
+        "changes": [
+          "removed outputs, execution counts, attachments and incidental metadata; added provenance cell"
+        ]
+      },
+      {
+        "upstream_path": "Python/22_Transforms.ipynb",
+        "output": "upstream/simpleitk/Python/22_Transforms.ipynb",
+        "source_url": "https://raw.githubusercontent.com/InsightSoftwareConsortium/SimpleITK-Notebooks/1d872dc049d45dae8342729242b845dbbb580014/Python/22_Transforms.ipynb",
+        "source_sha256": "3120a1d8d3994e3a4b3ef3ca4fa37de27d992a3d23cbfbc49949566649ca0231",
+        "export_sha256": "4dca6e5dc5817cf5f819883c0c4f96cdc13662229552bc31407c53de95dda58c",
+        "bytes": 71272,
+        "changes": [
+          "removed outputs, execution counts, attachments and incidental metadata; added provenance cell"
+        ]
+      },
+      {
+        "upstream_path": "Python/300_Segmentation_Overview.ipynb",
+        "output": "upstream/simpleitk/Python/300_Segmentation_Overview.ipynb",
+        "source_url": "https://raw.githubusercontent.com/InsightSoftwareConsortium/SimpleITK-Notebooks/1d872dc049d45dae8342729242b845dbbb580014/Python/300_Segmentation_Overview.ipynb",
+        "source_sha256": "bb33744e8611647aef29caecebff17ff6794cf16c8cbbdb73ee36b6c0d5dd121",
+        "export_sha256": "1d691ac4b53b9cd1558d05904a5ea0c9190fd77cb3ca7c8ee0babfb6aefb072f",
+        "bytes": 13684,
+        "changes": [
+          "removed outputs, execution counts, attachments and incidental metadata; added provenance cell"
+        ]
+      },
+      {
+        "upstream_path": "Python/60_Registration_Introduction.ipynb",
+        "output": "upstream/simpleitk/Python/60_Registration_Introduction.ipynb",
+        "source_url": "https://raw.githubusercontent.com/InsightSoftwareConsortium/SimpleITK-Notebooks/1d872dc049d45dae8342729242b845dbbb580014/Python/60_Registration_Introduction.ipynb",
+        "source_sha256": "cae8e3bbc7e120a469a31ac72762c529f3c5bf68d16f61f55b7dfc084e28021a",
+        "export_sha256": "d0fc4bc4fa50ad08bad4e50202a7923bc9daf213eac91e17791cb1c3af65c82a",
+        "bytes": 21258,
+        "changes": [
+          "removed outputs, execution counts, attachments and incidental metadata; added provenance cell"
+        ]
+      },
+      {
+        "upstream_path": "Python/70_Data_Augmentation.ipynb",
+        "output": "upstream/simpleitk/Python/70_Data_Augmentation.ipynb",
+        "source_url": "https://raw.githubusercontent.com/InsightSoftwareConsortium/SimpleITK-Notebooks/1d872dc049d45dae8342729242b845dbbb580014/Python/70_Data_Augmentation.ipynb",
+        "source_sha256": "fa70425124c78644bc27d9340c90a53384765fe2347fdfa9fd7dbc70cf4b4ca1",
+        "export_sha256": "1963ea9ddab9f72f180259445df5dc01bfeaf31d0b6c0018e60d92b057465258",
+        "bytes": 59450,
+        "changes": [
+          "removed outputs, execution counts, attachments and incidental metadata; added provenance cell"
+        ]
+      }
+    ]
+  }
+]

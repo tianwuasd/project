@@ -1,0 +1,2 @@
+# Preserve source snapshot bytes so recorded SHA-256 values remain reproducible.
+* -text
