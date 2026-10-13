@@ -30,6 +30,8 @@ Windows 双击 **start.bat**，选择一个功能。数据路径可直接粘贴�
 
 0.8.0 起，服务器选择的 GPU 数量是**最多并发数**。没有空闲卡时显示 `waiting_gpu` 并等待，有一张即可开跑，后来空闲的候选卡自动加入剩余阶段；长期只有一张可用也能串行完成。使用 `--status` 查看实际卡数，`--stop` 中断等待，`--resume-job` 恢复。候选卡始终受用户指定范围和 `CUDA_VISIBLE_DEVICES` 限制。
 
+0.9.0 起，`bash start_server.sh` 先显示任务面板：运行中可查询进度、显卡、模型日志或停止；空闲时可新建并命名，或选择历史任务续跑。新建后仍可多选步骤。直接查询用 `--query models` 查看 epoch/loss，`--query logs --follow` 跟随模型详细日志；Ctrl+C 只退出查看。重名实验保存在不同目录，续跑保留原名称和配置。
+
 诊断先试跑：`python start.py --task diagnosis-demo --device cpu --non-interactive`，随后查看输出中的 `diagnosis-demo/prediction/diagnosis-report.html`。
 
 ## 安装与先跑通

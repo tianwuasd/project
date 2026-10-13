@@ -96,6 +96,9 @@ def validate_inputs(args, future):
 
 
 def build_plan(args, profile, interactive):
+    run_name = choose(getattr(args, "name", None), None, "CHD 实验", "本次任务名称", interactive).strip()
+    if not run_name or len(run_name) > 80 or any(ord(c) < 32 or ord(c) == 127 for c in run_name):
+        raise ValueError("任务名称需要 1—80 个字符，不能包含换行或控制字符")
     names = choose_steps(args, interactive)
     if "diagnosis-features" in names and "diagnosis-train" in names:
         if ("test" in names and "predict" not in names) or (
@@ -179,6 +182,7 @@ def build_plan(args, profile, interactive):
                     raise ValueError(f"{field} 必须独立于环境和结果目录")
     return {
         "schema_version": 1,
+        "name": run_name,
         "frozen_files": {
             str(Path(s["arguments"][k]).resolve()): file_hash(s["arguments"][k])
             for s in steps

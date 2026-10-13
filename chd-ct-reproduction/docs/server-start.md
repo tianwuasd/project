@@ -28,7 +28,22 @@
 bash start_server.sh
 ```
 
-先选 `n` 新建任务（默认），或 `r` 恢复最近中断；新建时输入 `0,1,2,4,5`，即环境检查 → 预处理 → 软件短测 → 正式训练 → 测试；逗号、空格或中文逗号均可。已有预处理缓存时选 `0,2,4,5`。编号是服务器菜单的编号，桌面 `start.py` 仍为单选。
+0.9.0 起，先进入任务面板。确认 runtime 后自动查看最近任务的进程身份；有任务运行时可以查询或停止，没有任务运行时可以新建或选择历史任务续跑。面板按回车默认查询状态，不会直接启动。
+
+| 面板输入 | 功能 |
+|---|---|
+| `s` / `g` / `p` | 流程状态 / 显卡状态（含进程占用）/ 本用户的工程进程 |
+| `m` | 六个模型的已完成 epoch、目标轮数、train/val loss、学习率及 GPU UUID |
+| `l` | 选择步骤和模型查看详细日志；可看一次或持续刷新 |
+| `x` | 停止正在运行的任务；先显示目标名称和目录，再确认 |
+| `h` | 选择历史任务，查询其状态和日志 |
+| `n` | 无任务运行时新建，输入本次任务名称 |
+| `r` | 无任务运行时，从历史列表选择中断/失败任务续跑 |
+| `0` | 退出面板，后台任务继续 |
+
+新建后输入 `0,1,2,4,5`，即环境检查 → 预处理 → 软件短测 → 正式训练 → 测试；逗号、空格或中文逗号均可。已有预处理缓存时选 `0,2,4,5`。下表是**新建任务后的步骤菜单**，与上面的任务管理面板分开，桌面 `start.py` 仍为单选。
+
+名称可以包含中文和空格（1—80 个字符），只用于显示；底层目录仍为时间戳＋随机 ID，重名不会覆盖。续跑保留原名称、配置、目录和检查点；旧版无名称记录显示目录名。已全部完成的任务可查询，不重复续跑。历史列表包含同一 runtime 已登记的任务和结果目录中发现的旧任务；旧任务在其他目录时用 `--results /旧结果根目录` 查看，或 `--resume-job /完整workflow目录` 直接指定。
 
 | 编号 | 步骤 | 编号 | 步骤 |
 |---|---|---|---|
@@ -47,7 +62,7 @@ bash start_server.sh
 
 ```bash
 bash start_server.sh --tasks environment,preprocess,smoke,train,test \
-  --gpu-count 2 --gpu 0,1 --non-interactive
+  --name '首次训练' --gpu-count 2 --gpu 0,1 --non-interactive
 ```
 
 已有缓存时去掉 `preprocess`；更换数据来源加 `--dataset /实际路径/ImageCHD_dataset`。需要保留原缓存时给新数据指定新的 `--prepared`。仅预处理不需要显卡参数：
@@ -67,6 +82,36 @@ bash start_server.sh --status
 ```
 
 一个 runtime 同时只允许运行一个流程，重复提交会被拒绝。任一步失败则停止后续步骤；`pending` 表示未执行，`passed` 才表示完成，`stale` 表示进程已退出或主机重启但没有正常写入结束记录。不要手动删除运行中任务的锁文件。可给启动命令加 `--foreground` 在前台查看日志并等待退出码；此模式下 Ctrl+C 会终止本次流程。
+
+## 随时查询模型进度和详细日志
+
+在工程目录里直接运行。查询只需系统 Python，不安装训练环境、不占训练锁、不触发选卡或新任务；使用自定义 runtime 时，追加同一个 `--runtime /完整路径`。
+
+```bash
+# 当前流程、显卡和模型训练记录
+bash start_server.sh --query status
+bash start_server.sh --query gpu
+bash start_server.sh --query models
+# 每 3 秒刷新模型摘要；Ctrl+C 退出查看
+bash start_server.sh --query models --follow
+# 自动找到当前步骤的各模型日志；后启动的模型日志也会被发现
+bash start_server.sh --query logs --follow
+# 指定正式训练中的 all128，只显示末尾 80 行并持续刷新
+bash start_server.sh --query logs --step train --model all128 --lines 80 --follow
+# 软件短测、总流程日志、步骤调度日志
+bash start_server.sh --query logs --step smoke
+bash start_server.sh --query logs --step launcher
+bash start_server.sh --query logs --step train --model server
+# 本用户进程和历史任务
+bash start_server.sh --query processes
+bash start_server.sh --query history
+```
+
+查询历史任务可在 `--query models/logs/status` 后加 `--job-dir /完整workflow目录`，不会改变最近任务指针。步骤用名称定位，不假定训练一定在 `05_train`。独立 preflight 输出在 `train/`，正式训练内部预检在 `preflight/`，入口会识别当前阶段。
+
+日志中的 loss 在每轮训练及验证都完成后才更新，没有逐 batch 百分比或可靠剩余时间。队列心跳只表示调度器还在运行；`blood_lstm` 显示依赖等待时需要先完成 `blood2d`。恢复前的旧队列会明确标注，不能据其判断当前进度。无模型独立日志时暂时显示步骤 `server.log`，持续查看会发现后来生成的模型日志。首次日志读取最多取每个文件末尾 256 KiB，避免大日志拖慢查询。
+
+查询和面板中的 Ctrl+C 只退出查看/返回面板；`--foreground` 下 Ctrl+C 才会中断任务。停止任务请用面板 `x` 或 `--stop`，停止请求后再次查状态，确认进程退出再续跑。
 
 ## 每一步仍可单独运行
 

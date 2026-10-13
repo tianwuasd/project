@@ -246,7 +246,7 @@ with output_lock(sys.argv[1]): pass
                     pass
 
     def test_resume_cli_reuses_completed_step_and_archives_interrupted_short_step(self):
-        self.start("--tasks", "environment,diagnosis-demo")
+        self.start("--tasks", "environment,diagnosis-demo", "--name", "experiment A")
         old_job = self.directory
         partial = old_job / "steps/02_diagnosis-demo"
         deadline = time.monotonic() + 5
@@ -261,9 +261,78 @@ with output_lock(sys.argv[1]): pass
         self.assertEqual(self.directory, old_job)
         state = self.finished()
         self.assertEqual(state["status"], "passed")
+        self.assertEqual(state["name"], "experiment A")
         self.assertEqual([s["status"] for s in state["steps"]], ["reused", "passed"])
         self.assertTrue(list((old_job / "attempts").glob("*/job_state.json")))
         self.assertTrue(list(partial.parent.glob("02_diagnosis-demo.interrupted-*")))
+
+    def test_readonly_follow_ctrl_c_keeps_worker_alive(self):
+        self.profile["fixture_sleep"] = 30
+        self.config.write_text(json.dumps(self.profile))
+        self.start("--task", "environment", "--name", "live query")
+        state_file = self.directory / "job_state.json"
+        deadline = time.monotonic() + 5
+        while self.state()["status"] == "queued" and time.monotonic() < deadline:
+            time.sleep(0.05)
+        state_before = state_file.read_bytes()
+        for query in ("models", "history", "status", "processes"):
+            result = subprocess.run(
+                self.command + ["--query", query], capture_output=True, text=True, timeout=5
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+        with subprocess.Popen(
+            self.command + ["--query", "logs", "--step", "launcher", "--follow"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+        ) as viewer:
+            try:
+                time.sleep(0.5)
+                viewer.send_signal(signal.SIGINT)
+                stdout, stderr = viewer.communicate(timeout=5)
+                self.assertEqual(viewer.returncode, 0, stderr)
+                self.assertIn("退出查看", stdout)
+                os.kill(self.pid, 0)
+                self.assertEqual(state_file.read_bytes(), state_before)
+            finally:
+                if viewer.poll() is None:
+                    viewer.kill()
+                    viewer.wait(timeout=5)
+
+    def test_interactive_panel_shows_running_and_exits_without_stopping(self):
+        import pty
+        import select
+
+        self.profile["fixture_sleep"] = 30
+        self.config.write_text(json.dumps(self.profile))
+        self.start("--task", "environment", "--name", "panel running")
+        master, slave = pty.openpty()
+        command = [a for a in self.command if a != "--non-interactive"]
+        process = subprocess.Popen(
+            command + ["--runtime", str(self.runtime)],
+            stdin=slave,
+            stdout=slave,
+            stderr=slave,
+            start_new_session=True,
+        )
+        os.close(slave)
+        try:
+            data = b""
+            deadline = time.monotonic() + 5
+            while "请选择".encode() not in data and time.monotonic() < deadline:
+                if select.select([master], [], [], 0.1)[0]:
+                    data += os.read(master, 65536)
+            self.assertIn("停止当前任务", data.decode())
+            self.assertIn("panel running", data.decode())
+            os.write(master, b"0\n")
+            self.assertEqual(process.wait(timeout=5), 0)
+            os.kill(self.pid, 0)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5)
+            os.close(master)
 
     def test_elastic_wait_handles_sigterm_and_restarts_on_one_card(self):
         output = Path(self.temp.name) / "elastic"

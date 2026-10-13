@@ -177,6 +177,24 @@ def make_parser():
     )
     parser.add_argument("--runtime")
     parser.add_argument("--results")
+    parser.add_argument("--name", help="本次新任务的显示名称；重名也使用独立目录，续跑保留原名称")
+    parser.add_argument(
+        "--query",
+        choices=("status", "gpu", "models", "logs", "processes", "history"),
+        help="只读查询，不安装环境或启动任务",
+    )
+    parser.add_argument("--job-dir", help="查询指定历史 workflow 目录；默认最近任务")
+    parser.add_argument(
+        "--step", default="auto", help="查询步骤名称，如 train/smoke/preflight；launcher 为总日志"
+    )
+    parser.add_argument(
+        "--model",
+        default="all",
+        choices=("all", "server", "crop64", "crop128", "all64", "all128", "blood2d", "blood_lstm"),
+        help="日志模型；server 为步骤调度日志",
+    )
+    parser.add_argument("--follow", action="store_true", help="持续刷新查询；Ctrl+C 只退出查看")
+    parser.add_argument("--lines", type=int, default=60, help="各日志首次显示末尾多少行（1—1000）")
     parser.add_argument("--gpu", help="允许使用的候选卡：auto 或逗号分隔的物理编号/完整 UUID")
     parser.add_argument(
         "--gpu-count", type=int, help="训练最多并行使用的卡数（1—5）；不足时少卡运行，无空闲卡时等待"
@@ -200,9 +218,21 @@ def main(argv=None):
     try:
         from . import jobs
 
+        if args.query and (
+            args.task or args.tasks or args.resume_job or args.stop or args.worker or args.name or args.status
+        ):
+            raise ValueError("--query 是只读查询，不能同时指定启动、续跑、停止或 --status")
+        if not 1 <= args.lines <= 1000:
+            raise ValueError("--lines 需要在 1—1000 之间")
+        if not args.query and (args.job_dir or args.follow or args.step != "auto" or args.model != "all"):
+            raise ValueError("--job-dir/--follow/--step/--model 需要配合 --query")
         if args.worker:
             return jobs.worker(Path(args.worker), args.lock_fd)
         profile = json.loads(Path(args.server_config).read_text(encoding="utf-8"))
+        if args.query:
+            from .inspection import query
+
+            return query(args, profile)
         if args.stop:
             return jobs.stop_job(personal_path(args.runtime or profile["runtime"]))
         if args.status:
@@ -213,11 +243,10 @@ def main(argv=None):
 
         interactive = sys.stdin.isatty() and not args.non_interactive
         if interactive and not (args.task or args.tasks or args.resume_job):
-            action = input("任务方式：n 新建 / r 恢复上次中断 [n]：").strip().lower() or "n"
-            if action not in {"n", "r"}:
-                raise ValueError("请选择 n 或 r")
-            if action == "r":
-                args.resume_job = "latest"
+            from .panel import run
+
+            if not run(args, profile):
+                return 0
         if args.resume_job:
             from .resume import build_resume_plan
 

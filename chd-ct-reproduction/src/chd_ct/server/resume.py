@@ -118,8 +118,14 @@ def reject_live_commands(plan):
 def build_resume_plan(args, profile, interactive):
     from .jobs import identity, job_owner
 
-    if args.task or args.tasks or args.reset_settings or any(getattr(args, k, None) for k in INPUTS):
-        raise ValueError("--resume-job 使用原任务的数据、配置和步骤；不要同时改动输入/步骤")
+    if (
+        args.task
+        or args.tasks
+        or getattr(args, "name", None)
+        or args.reset_settings
+        or any(getattr(args, k, None) for k in INPUTS)
+    ):
+        raise ValueError("--resume-job 使用原任务的名称、数据、配置和步骤；不要同时改动名称/输入/步骤")
     if args.resume_job == "latest":
         runtime = personal_path(choose(args.runtime, None, profile["runtime"], "环境与缓存目录", interactive))
         pointer = runtime / "last-job.json"

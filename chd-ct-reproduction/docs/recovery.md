@@ -10,7 +10,7 @@ bash start_server.sh --stop
 bash start_server.sh --resume-job
 ```
 
-也可直接运行菜单 `bash start_server.sh`，第一项选择 `r`。GPU 步骤在选择前显示当前显卡状态，可重新选择获准且空闲的卡；纯 CPU 流程不询问 GPU。非交互恢复沿用原分配，也可显式覆盖 `--gpu` 和 `--gpu-count`。数据、模型设置、划分、步骤顺序和路径使用原 `plan.json`，不从最近新建任务的设置猜测。自定义 runtime 需要传相同的 `--runtime`。
+也可运行 `bash start_server.sh` 进入任务面板，0.9.0 起选 `r` 会列出历史任务，再选择需要续跑的编号；已完成任务只可查询，不能重复续跑。运行中选 `x` 显示目标名称/目录并确认停止，选 `s` 查询退出状态。恢复保留原名称，不用 `--name` 重命名。GPU 步骤在选择前显示当前显卡状态，可重新选择获准且空闲的卡；纯 CPU 流程不询问 GPU。非交互恢复沿用原分配，也可显式覆盖 `--gpu` 和 `--gpu-count`。数据、模型设置、划分、步骤顺序和路径使用原 `plan.json`，不从最近新建任务的设置猜测。自定义 runtime 需要传相同的 `--runtime`。
 
 恢复特定旧流程（将路径换成实际 workflow，不是步骤子目录）：
 

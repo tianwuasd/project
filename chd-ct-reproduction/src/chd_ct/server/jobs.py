@@ -52,6 +52,7 @@ def acquire_lock(runtime):
 def initial_state(plan):
     return {
         "status": "queued",
+        "name": plan.get("name") or Path(plan["directory"]).name,
         "submitted_at": now(),
         "directory": plan["directory"],
         "log": plan["log"],
@@ -173,6 +174,13 @@ def submit(plan, lock, foreground=False):
     state = initial_state(plan)
     write_json(directory / "job_state.json", state)
     runtime = Path(plan["runtime"])
+    history_file = runtime / "job-history.json"
+    records = read_json(history_file) if history_file.is_file() else []
+    previous = runtime / "last-job.json"
+    if previous.is_file():
+        records.append(read_json(previous)["directory"])
+    records.append(str(directory))
+    write_json(history_file, list(dict.fromkeys(records)))
     write_json(runtime / "last-job.json", {"directory": str(directory)})
     command = [
         sys.executable,
@@ -205,7 +213,7 @@ def submit(plan, lock, foreground=False):
         state.update(status="failed", error=str(error), ended_at=now())
         write_json(directory / "job_state.json", state)
         raise
-    print(f"已提交后台任务 PID={process.pid}，尚不代表训练完成。", flush=True)
+    print(f"已提交后台任务：{state['name']}，PID={process.pid}，尚不代表训练完成。", flush=True)
     print(
         f"日志：{plan['log']}\n状态：bash start_server.sh --status --runtime '{plan['runtime']}'", flush=True
     )
@@ -258,12 +266,16 @@ def job_owner(directory, state=None):
     return next((owner for owner in candidates if owner.get("pid")), {})
 
 
-def show_status(runtime):
+def show_status(runtime, directory=None):
     pointer = runtime / "last-job.json"
-    if not pointer.is_file():
+    if directory is None and not pointer.is_file():
         print("尚未提交后台任务；先运行 bash start_server.sh。")
         return 0
-    directory = Path(json.loads(pointer.read_text(encoding="utf-8"))["directory"])
+    directory = (
+        Path(directory)
+        if directory is not None
+        else Path(json.loads(pointer.read_text(encoding="utf-8"))["directory"])
+    )
     state = json.loads((directory / "job_state.json").read_text(encoding="utf-8"))
     owner = job_owner(directory, state)
     status = state["status"]
@@ -280,8 +292,12 @@ def show_status(runtime):
             if not report_path.is_file():
                 continue
             report = read_json(report_path)
+            from .inspection import run_directory
+
             queue_path = (
-                Path(step["output"]) / report["phase"] / "queue.json" if report.get("phase") else None
+                run_directory(Path(step["output"])) / "queue.json"
+                if report.get("phase") in {"train", "preflight", "smoke"}
+                else None
             )
             queue = read_json(queue_path) if queue_path and queue_path.is_file() else {}
             if queue.get("sampled_at", 0) < report.get("phase_started_at", 0):
@@ -298,7 +314,9 @@ def show_status(runtime):
             details[step["name"]] = (label, detail)
             if label.startswith("waiting_gpu"):
                 status = label
-    print(f"状态：{status}\n任务：{directory}\n日志：{state['log']}")
+    print(
+        f"名称：{state.get('name') or directory.name}\n状态：{status}\n任务：{directory}\n日志：{state.get('log', directory / 'launcher.log')}"
+    )
     for step in state["steps"]:
         label = (
             "未知（主进程已退出，最后记录 running，子进程待核实）"
@@ -317,11 +335,16 @@ def show_status(runtime):
     return 0
 
 
-def stop_job(runtime):
+def stop_job(runtime, directory=None):
+    explicit_target = directory is not None
     pointer = runtime / "last-job.json"
-    if not pointer.is_file():
+    if directory is None and not pointer.is_file():
         raise ValueError("没有任务记录")
-    directory = Path(read_json(pointer)["directory"])
+    directory = Path(directory) if directory is not None else Path(read_json(pointer)["directory"])
+    if explicit_target:
+        plan = read_json(directory / "plan.json")
+        if Path(plan["runtime"]).resolve() != runtime.resolve():
+            raise ValueError("停止目标与此 runtime 不符")
     owner = job_owner(directory)
     current = identity(owner["pid"]) if owner.get("pid") else None
     if current and owner.get("identity") == current:
