@@ -1,10 +1,14 @@
 # ImageCHD：多阶段分割与独立可解释诊断
 
-主目录现在只有一条默认流程：**预处理 → 六阶段训练 → 融合预测 → 独立评估**。数据使用当前 archive 中的 ImageCHD，U-Net 主干按原作者发布的 Caffe 网络定义移植，保留独立可关闭的 gate，并沿用 BiConvLSTM、心脏区域定位、多尺度投票与血池边界细化方法。
+项目发布在 [tianwuasd/project 的 chd-ct-reproduction 目录](https://github.com/tianwuasd/project/tree/main/chd-ct-reproduction)。本地独立源码仓库通过项目发布目录同步，源码仓库本身可以没有 Git remote。
+
+主目录默认流程：**预处理 → 三折、每折六阶段训练 → 融合预测 → 独立评估**。数据使用当前 archive 中的 ImageCHD，U-Net 主干按 CHD 论文图 4 的层数、通道、InstanceNorm、LeakyReLU 和位置关联分支实现，默认训练参数按表 3 设置，并保留 BiConvLSTM、心脏区域定位、多尺度投票与血池边界细化流程。
 
 这是原论文方法在现有七结构数据上的适配。当前没有初始血管标注、PV/SVC/IVC 标注与经验证的诊断规则，因此不运行两个 init 阶段。新增独立的解剖特征＋浅层决策树诊断，保留候选规则作对照；这是研究扩展，不宣称复现了论文临床准确率。
 
-**U-Net 来源与开关：** 见 [官方来源与移植说明](docs/unet-source.md)。三维 gate 默认开启。旧权重需要重新训练，预处理缓存可复用。
+**核心实现与范围：** 见 [论文对齐记录](docs/paper-mapping.md) 和 [网络说明](docs/unet-source.md)。三维位置关联默认开启，正式配置使用论文规模，短测仍使用缩小网络。旧权重需要重新训练，Excel 重采样和已有预处理缓存继续保留。修改前完整代码见 [备份说明](back/before-paper-alignment-20261013/SNAPSHOT.md)。
+
+三折按患者划分为约 56.7% 训练、10% 验证、33.3% 测试，每位开发集患者只进入一次测试折。开发集预测使用对应的留出折；独立新病例使用每阶段三个模型的概率平均。训练目录保存 `folds.json` 和 `training-summary.json`，服务器可查询各折 epoch/loss。三折修改前的 134 个文件另存于 [备份](back/before-threefold-training-20261015/SNAPSHOT.md)。
 
 ## 从哪里开始
 
@@ -18,7 +22,7 @@ Windows 双击 **start.bat**，选择一个功能。数据路径可直接粘贴�
 | 功能 | 独立入口 | 服务器入口 | 输入 → 输出 |
 |---|---|---|---|
 | 预处理 | `preprocess.py` | `preprocess_server.sh` | 已解压 CT/标签 → 缓存、划分、空间记录 |
-| 训练/短测 | `train.py` | `train_server.sh` | 缓存 → 六阶段权重、models.json |
+| 训练/短测 | `train.py` | `train_server.sh` | 缓存 → 三折各六阶段权重、models.json、训练摘要 |
 | 预测 | `predict.py` | `predict_server.sh` | 缓存影像 + 模型目录 → NIfTI 分割 |
 | 测试（预测 + 评估） | `test.py` | `test_server.sh` | 测试集缓存 + 模型 → 分割及 Dice |
 | 评估 | `evaluate.py` | `evaluate_server.sh` | 预测 + 缓存真值 → Dice 报告 |
@@ -47,10 +51,10 @@ python start.py --task demo --device cpu --non-interactive
 Windows 已有环境可使用 `.venv\Scripts\python.exe`。合成演示会明确生成测试影像并串起六阶段训练、预测、评估，只验证软件流程。自己的数据按下面四个独立步骤运行：
 
 ```bash
-python preprocess.py --input data/imagechd_raw/ImageCHD_dataset --output data/imagechd7_native
-python train.py --prepared data/imagechd7_native --output runs/chd_smoke/models --mode smoke --device cpu
-python predict.py --prepared data/imagechd7_native --models runs/chd_smoke/models --output runs/chd_smoke/predictions --split test --allow-smoke --device cpu
-python evaluate.py --prepared data/imagechd7_native --predictions runs/chd_smoke/predictions --output runs/chd_smoke/evaluation --split test
+python preprocess.py --input data/imagechd_raw/ImageCHD_dataset --output data/imagechd7_1mm --target-spacing 1 1 1
+python train.py --prepared data/imagechd7_1mm --output runs/chd_smoke/models --mode smoke --device cpu
+python predict.py --prepared data/imagechd7_1mm --models runs/chd_smoke/models --output runs/chd_smoke/predictions --split auto --allow-smoke --device cpu
+python evaluate.py --prepared data/imagechd7_1mm --predictions runs/chd_smoke/predictions --output runs/chd_smoke/evaluation --split auto
 ```
 
 所有输出目录须为新目录。正式训练命令、已有缓存复用与无标签预测见 [使用流程](docs/workflow.md)。
@@ -67,14 +71,15 @@ chd-ct-reproduction/
 ├── diagnosis.py                  # 独立诊断六个子命令
 ├── *_server.sh / start_server.py # 同一主流程的服务器入口
 ├── configs/
-│   ├── chd.yaml                  # 实用单卡配置
-│   ├── chd-smoke.yaml            # 16³ 软件短测
-│   ├── chd-author-unet.yaml      # 原作者主干宽度/深度，三维 gate 默认开启
+│   ├── chd.yaml                  # CHD 论文规模，默认三折
+│   ├── chd-smoke.yaml            # 16³ 单折软件短测/演示
+│   ├── chd-cv-smoke.yaml         # 16³ 三折、18 阶段软件短测
+│   ├── chd-author-unet.yaml      # 历史 Freiburg 配置，仅供备份版本使用
 │   └── servers/zmic44.json       # 数据路径、GPU 数、环境、线程
 ├── src/chd_ct/
 │   ├── imagechd/                 # 数据、六阶段训练、融合预测、评估
 │   ├── diagnosis/                # 标签、解剖特征、规则、可解释树、诊断评估
-│   ├── models/                   # 原作者结构主干 / 网格适配 / gate / BiConvLSTM
+│   ├── models/                   # CHD 论文主干 / 历史参考 / BiConvLSTM
 │   ├── quickstart/               # 桌面引导与环境检查
 │   └── server/                   # 环境安装、按需设置、多选流程、后台状态
 ├── tests/                        # 当前主流程测试

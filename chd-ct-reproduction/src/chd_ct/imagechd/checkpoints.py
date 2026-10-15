@@ -5,10 +5,10 @@ from pathlib import Path
 
 import torch
 
-from ..models.grid import GRID_ADAPTER
-from ..models.unet import ARCHITECTURE
+from ..models.chd_unet import ARCHITECTURE, GRID_ADAPTER
 from .common import LABELS, MODEL_FORMAT, NORMALIZATION, safe_child
 from .config import STAGES, build_model
+from .folds import CV_MODEL_FORMAT, validate_plan
 from .train import file_hash
 
 
@@ -19,8 +19,10 @@ def read_collection(directory, allow_smoke=False):
             raise ValueError("需要完整模型目录或 models.json；旧 best.pt 位于 back 流程")
         directory = directory.parent
     record = json.loads((directory / "models.json").read_text(encoding="utf-8"))
+    if record.get("format") == CV_MODEL_FORMAT:
+        return read_threefold(directory, record, allow_smoke)
     if record.get("format") != MODEL_FORMAT:
-        raise ValueError("旧版或不支持的模型结构；官方主干需要重新训练，现有预处理缓存可复用")
+        raise ValueError("旧版或不支持的模型结构；CHD 论文主干需要重新训练，现有预处理缓存可复用")
     if record.get("architecture") != ARCHITECTURE or record.get("grid_adapter") != GRID_ADAPTER:
         raise ValueError("模型主干/网格适配版本不匹配，需要重新训练")
     if (
@@ -65,7 +67,44 @@ def read_collection(directory, allow_smoke=False):
     return directory, record
 
 
+def read_threefold(directory, record, allow_smoke):
+    if record.get("status") != "complete" or set(record.get("folds", {})) != {f"fold_{i}" for i in range(3)}:
+        raise ValueError("三折模型未完成或缺少折次")
+    if (
+        record.get("architecture") != ARCHITECTURE
+        or record.get("grid_adapter") != GRID_ADAPTER
+        or record.get("labels") != list(LABELS)
+        or record.get("normalization") != NORMALIZATION
+    ):
+        raise ValueError("三折模型的主干/标签协议不匹配")
+    if record.get("mode") != "train" and not allow_smoke:
+        raise ValueError("短测 smoke/preflight 权重需显式 --allow-smoke")
+    validate_plan(record.get("split_plan", {}))
+    members = []
+    for fold in record["split_plan"]["folds"]:
+        key = f"fold_{fold['index']}"
+        ref = record["folds"][key]
+        if ref.get("index") != fold["index"] or ref.get("file") != key + "/models.json":
+            raise ValueError("三折模型路径或折号不匹配")
+        path = safe_child(directory, ref["file"])
+        if file_hash(path) != ref.get("sha256"):
+            raise ValueError("折模型清单校验失败")
+        if json.loads(path.read_text(encoding="utf-8")).get("format") != MODEL_FORMAT:
+            raise ValueError("每折必须是独立六阶段模型，不能嵌套三折集合")
+        child, saved = read_collection(path.parent, allow_smoke=allow_smoke)
+        expected = {**record["config"], "fold": fold}
+        if (
+            saved["config"] != expected
+            or saved["mode"] != record["mode"]
+            or saved["prepared_sha256"] != record["prepared_sha256"]
+        ):
+            raise ValueError("折模型来自不同配置、数据或折划分")
+        members.append({"index": fold["index"], "directory": str(child), "collection": saved})
+    return directory, {**record, "_members": members}
+
+
 def load_stage(directory, collection, stage, device):
+    directory = Path(directory).expanduser().resolve()
     checkpoint = torch.load(
         safe_child(directory, collection["stages"][stage]["file"]), map_location="cpu", weights_only=True
     )

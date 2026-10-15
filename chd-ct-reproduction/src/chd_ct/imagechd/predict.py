@@ -1,6 +1,7 @@
 """Image-only multi-stage inference; prediction never opens cached targets."""
 
 import argparse
+import tempfile
 from pathlib import Path
 
 import nibabel as nib
@@ -11,26 +12,44 @@ from ..recovery import atomic_path, output_lock, read_json
 from .checkpoints import load_stage, read_collection
 from .common import LABELS, load_case, read_prepared, write_json
 from .config import UNAVAILABLE, build_model
+from .folds import select_members, select_rows
 from .fusion import refine_with_blood, weighted_vote
 from .geometry import bounding_box, resize
+from .spacing import sample_grid
 from .train import file_hash
 
 
-def anatomy(image, stage, directory, collection, device):
+def inference_members(directory, collection):
+    return collection.get("_members", [{"directory": directory, "collection": collection}])
+
+
+def anatomy_probabilities(image, stage, directory, collection, device):
     model, record = load_stage(directory, collection, stage, device)
     size = record["spec"]["size"]
     with torch.inference_mode():
         tensor = torch.from_numpy(resize(image, (size,) * 3))[None, None].to(device)
-        return model(tensor).argmax(1)[0].cpu().numpy().astype(np.uint8)
+        return model(tensor).softmax(1)[0].cpu().numpy()
 
 
-def blood_prediction(image, directory, collection, device):
+def anatomy(image, stage, directory, collection, device):
+    total = None
+    for member in inference_members(directory, collection):
+        probabilities = anatomy_probabilities(image, stage, member["directory"], member["collection"], device)
+        if total is None:
+            total = probabilities
+        else:
+            total += probabilities
+    # Dividing by the member count cannot change the argmax.
+    return total.argmax(0).astype(np.uint8)
+
+
+def blood_probabilities(image, directory, collection, device):
+    """Yield one slice at a time from this fold's recurrent/encoder pair."""
     recurrent, record = load_stage(directory, collection, "blood_lstm", device)
     encoder = build_model("blood2d", record["encoder_spec"])
     encoder.load_state_dict(record["encoder_state_dict"])
     encoder.to(device).eval()
     size, sequence = record["spec"]["size"], record["spec"]["sequence"]
-    small = np.empty((size, size, image.shape[2]), np.uint8)
     # Cache only one sequence of feature maps, bounding memory on native volumes.
     features = {}
     with torch.inference_mode():
@@ -43,7 +62,38 @@ def blood_prediction(image, directory, collection, device):
                     x = torch.from_numpy(resize(image[:, :, i], (size, size)))[None, None].to(device)
                     features[i] = encoder.features(x)
             window = torch.stack([features[int(i)] for i in indices], dim=1)
-            small[:, :, z] = recurrent(window).argmax(1)[0].cpu().numpy()
+            yield z, recurrent(window).softmax(1)[0].cpu().numpy()
+
+
+def blood_prediction(image, directory, collection, device):
+    members = inference_members(directory, collection)
+    size = collection["config"]["stages"]["blood_lstm"]["size"]
+    small = np.empty((size, size, image.shape[2]), np.uint8)
+    if len(members) == 1:
+        member = members[0]
+        for z, probabilities in blood_probabilities(image, member["directory"], member["collection"], device):
+            small[:, :, z] = probabilities.argmax(0)
+    else:
+        # One fold on GPU at a time. A temporary disk-backed accumulator avoids
+        # holding three 2D encoders or a whole 512x512xdepth probability volume
+        # in Python RAM. Slice-major layout keeps updates contiguous.
+        with tempfile.TemporaryFile() as scratch:
+            shape = (image.shape[2], 3, size, size)
+            scratch.truncate(int(np.prod(shape)) * np.dtype(np.float32).itemsize)
+            totals = np.memmap(scratch, dtype=np.float32, mode="r+", shape=shape)
+            try:
+                for index, member in enumerate(members):
+                    for z, probabilities in blood_probabilities(
+                        image, member["directory"], member["collection"], device
+                    ):
+                        if index == 0:
+                            totals[z] = probabilities
+                        else:
+                            totals[z] += probabilities
+                for z in range(image.shape[2]):
+                    small[:, :, z] = totals[z].argmax(0)
+            finally:
+                totals._mmap.close()
     return resize(small, image.shape, labels=True).astype(np.uint8)
 
 
@@ -73,7 +123,17 @@ def predict_volume(image, directory, collection, device):
 
 
 def restore_native(prediction, row):
-    canonical = resize(prediction, row["canonical_shape"], labels=True).astype(np.uint8)
+    if row.get("resampling"):
+        geometry = row["resampling"]
+        resampled = resize(prediction, geometry["resampled_shape"], labels=True).astype(np.uint8)
+        canonical = sample_grid(
+            resampled,
+            row["canonical_shape"],
+            np.linalg.inv(np.asarray(geometry["output_to_canonical"])),
+            labels=True,
+        )
+    else:
+        canonical = resize(prediction, row["canonical_shape"], labels=True).astype(np.uint8)
     ras = nib.orientations.axcodes2ornt(("R", "A", "S"))
     transform = nib.orientations.ornt_transform(ras, np.asarray(row["native_orientation"]))
     native = nib.orientations.apply_orientation(canonical, transform)
@@ -98,11 +158,9 @@ def predict(
 def predict_locked(prepared, models, output, device, case_id, split, allow_smoke, resume):
     cache, data = read_prepared(prepared)
     directory, collection = read_collection(models, allow_smoke)
-    rows = [
-        r
-        for r in data["cases"]
-        if (case_id is None or r["case_id"] == case_id) and (split is None or r.get("split") == split)
-    ]
+    plan, fold = collection.get("split_plan"), collection["config"].get("fold")
+    rows, split = select_rows(data, split, plan=plan, fold=fold)
+    rows = [r for r in rows if case_id is None or r["case_id"] == case_id]
     if not rows:
         raise ValueError("没有匹配的预测病例")
     output = Path(output).expanduser().resolve()
@@ -116,6 +174,9 @@ def predict_locked(prepared, models, output, device, case_id, split, allow_smoke
         "model_mode": collection["mode"],
         "segmentation_prepared_sha256": collection["prepared_sha256"],
         "cache_resolution": data["resolution"],
+        "split": split,
+        "split_plan": plan,
+        "fold_context": fold,
         "cases": [],
         "unavailable": UNAVAILABLE,
         "geometry": "supplied original grid restored; millimetre calibration unverified",
@@ -151,7 +212,16 @@ def predict_locked(prepared, models, output, device, case_id, split, allow_smoke
                 print("已校验，跳过预测：" + row["case_id"], flush=True)
                 continue
             image, _ = load_case(cache, row, labels=False)
-            prediction, details = predict_volume(image, directory, collection, device)
+            selected, protocol = collection, "single_split"
+            fold_indices = []
+            if plan:
+                members, protocol = select_members(collection, row)
+                selected = {**collection, "_members": members}
+                fold_indices = [m["index"] for m in members]
+            elif fold:
+                fold_indices = [fold["index"]]
+                protocol = "single_fold"
+            prediction, details = predict_volume(image, directory, selected, device)
             filename = row["case_id"] + "_seg.nii.gz"
             with atomic_path(output / filename) as temporary:
                 nib.save(restore_native(prediction, row), temporary)
@@ -160,6 +230,8 @@ def predict_locked(prepared, models, output, device, case_id, split, allow_smoke
                 np.savez_compressed(temporary, prediction=prediction)
             done[row["case_id"]] = {
                 "case_id": row["case_id"],
+                "inference_protocol": protocol,
+                "fold_indices": fold_indices,
                 "prediction": filename,
                 "grid_prediction": grid,
                 "prediction_sha256": file_hash(output / filename),
@@ -185,7 +257,7 @@ def main(argv=None):
     parser.add_argument("--output", required=True)
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
     parser.add_argument("--case-id")
-    parser.add_argument("--split", choices=["train", "val", "test"])
+    parser.add_argument("--split", choices=["auto", "cv", "train", "val", "test"])
     parser.add_argument("--allow-smoke", action="store_true")
     parser.add_argument("--resume", action="store_true")
     args = parser.parse_args(argv)

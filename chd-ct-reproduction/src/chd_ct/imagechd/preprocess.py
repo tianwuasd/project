@@ -12,12 +12,21 @@ import torch
 from ..recovery import atomic_path, file_hash, output_lock, read_json, write_json
 from .common import FORMAT, IGNORE, LABELS, NORMALIZATION, normalize
 from .geometry import resize
+from .spacing import (
+    RESAMPLED_FORMAT,
+    find_spacing_excel,
+    read_spacing_excel,
+    resampling_grid,
+    sample_grid,
+    validate_spacing,
+)
 
 
 def discover(folder, for_prediction=False):
     folder = Path(folder).expanduser().resolve()
     if folder.is_file() and for_prediction and folder.name.endswith((".nii", ".nii.gz")):
-        return [(folder.name.removesuffix(".gz").removesuffix(".nii"), folder, None)]
+        case = folder.name.removesuffix(".gz").removesuffix(".nii").removesuffix("_image")
+        return [(case, folder, None)]
     if (folder / "ImageCHD_dataset").is_dir():
         folder = folder / "ImageCHD_dataset"
     images = sorted(folder.glob("ct_*_image.nii.gz"))
@@ -82,7 +91,7 @@ def assign_splits(cases, seed, split_file=None):
     return result
 
 
-def prepare_case(case, image_path, label_path, size):
+def prepare_case(case, image_path, label_path, size, spacing_record=None, target_spacing=(1, 1, 1)):
     print("  读取影像与标签：" + case, flush=True)
     original = nib.load(image_path)
     if len(original.shape) != 3 or not np.isfinite(original.affine).all():
@@ -98,11 +107,36 @@ def prepare_case(case, image_path, label_path, size):
         target, missing, extra = map_labels(np.asanyarray(nib.as_closest_canonical(label).dataobj))
         if missing:
             return None, {"case_id": case, "reason": "missing_foreground_annotation", "missing_ids": missing}
-        targets["target"] = (resize(target, (size,) * 3, labels=True) if size else target).astype(np.uint8)
+        targets["target"] = target
     else:
         extra = []
     print("  归一化：" + case, flush=True)
     image, intensity = normalize(canonical.get_fdata(dtype=np.float32))
+    resampling = None
+    if spacing_record:
+        native_spacing = validate_spacing(spacing_record["spacing_mm"])
+        # Excel axes describe the supplied array, before canonical reorientation.
+        order = np.argsort(nib.orientations.io_orientation(original.affine)[:, 0].astype(int))
+        source_spacing = native_spacing[order]
+        shape, transform = resampling_grid(image.shape, source_spacing, target_spacing)
+        print(f"  按 Excel 重采样：{case} -> {shape}，间距 {list(target_spacing)} mm", flush=True)
+        image = sample_grid(image, shape, transform)
+        if targets:
+            targets["target"] = sample_grid(targets["target"], shape, transform, labels=True)
+        resampling = {
+            "source": "imagechd_excel",
+            "excel_row": spacing_record["excel_row"],
+            "native_spacing_mm": native_spacing.tolist(),
+            "canonical_spacing_mm": source_spacing.tolist(),
+            "target_spacing_mm": list(map(float, target_spacing)),
+            "resampled_shape": shape,
+            "output_to_canonical": transform.tolist(),
+            "image_interpolation": "linear",
+            "label_interpolation": "nearest",
+            "grid_alignment": "volume_center",
+        }
+    if size and targets:
+        targets["target"] = resize(targets["target"], (size,) * 3, labels=True).astype(np.uint8)
     cache = f"{case}.npz"
     arrays = dict(image=(resize(image, (size,) * 3) if size else image).astype(np.float32), **targets)
     row = {
@@ -120,19 +154,57 @@ def prepare_case(case, image_path, label_path, size):
         "canonical_affine": canonical.affine.tolist(),
         "units": list(original.header.get_xyzt_units()),
     }
+    if resampling:
+        row["resampling"] = resampling
     return arrays, row
 
 
-def prepare(source, output, size=0, seed=42, for_prediction=False, split_file=None, limit=None, resume=False):
+def prepare(
+    source,
+    output,
+    size=0,
+    seed=42,
+    for_prediction=False,
+    split_file=None,
+    limit=None,
+    resume=False,
+    spacing_excel=None,
+    target_spacing=(1, 1, 1),
+    no_resample=False,
+):
     if (size != 0 and size < 8) or (limit is not None and limit < 3):
         raise ValueError("size=0 保留原始网格，或至少为8；测试用 limit 至少为3")
     output = Path(output).expanduser().resolve()
     output.mkdir(parents=True, exist_ok=resume)
     with output_lock(output):
-        return prepare_locked(source, output, size, seed, for_prediction, split_file, limit, resume)
+        return prepare_locked(
+            source,
+            output,
+            size,
+            seed,
+            for_prediction,
+            split_file,
+            limit,
+            resume,
+            spacing_excel,
+            target_spacing,
+            no_resample,
+        )
 
 
-def prepare_locked(source, output, size, seed, for_prediction, split_file, limit, resume):
+def prepare_locked(
+    source,
+    output,
+    size,
+    seed,
+    for_prediction,
+    split_file,
+    limit,
+    resume,
+    spacing_excel=None,
+    target_spacing=(1, 1, 1),
+    no_resample=False,
+):
     torch.set_num_threads(2)
     options = dict(
         format=FORMAT,
@@ -146,6 +218,25 @@ def prepare_locked(source, output, size, seed, for_prediction, split_file, limit
         id_policy="explicit_patient_split" if split_file else "filename_as_patient",
     )
     pairs = discover(source, for_prediction)
+    excel = find_spacing_excel(pairs[0][1], spacing_excel, no_resample)
+    spacings = read_spacing_excel(excel) if excel else {}
+    if excel:
+        target_spacing = validate_spacing(target_spacing).tolist()
+        missing = sorted({case for case, _, _ in pairs} - set(spacings))
+        if missing:
+            raise ValueError("Excel 缺少病例间距：" + ", ".join(missing))
+        options.update(
+            format=RESAMPLED_FORMAT,
+            resampling={
+                "source": "imagechd_excel",
+                "excel_name": excel.name,
+                "excel_sha256": file_hash(excel),
+                "target_spacing_mm": target_spacing,
+                "fields": ["PixelSpacing", "calculate_z_thick"],
+                "id_policy": "idx + 1000",
+                "algorithm": "center_aligned_linear_nearest_v1",
+            },
+        )
     contract = dict(
         options=options,
         sources=[[case, str(image), str(label) if label else None] for case, image, label in pairs],
@@ -169,11 +260,15 @@ def prepare_locked(source, output, size, seed, for_prediction, split_file, limit
     report = dict(
         options,
         status="running",
-        resolution="resized" if size else "native",
+        resolution="resized" if size else "resampled" if excel else "native",
         cases=[],
         excluded=[],
         discovered=len(pairs),
-        geometry="native header retained; no claim that spacing or intensity units are calibrated",
+        geometry=(
+            "Excel spacing used for resampling; original grid retained for prediction restoration"
+            if excel
+            else "native header retained; no claim that spacing or intensity units are calibrated"
+        ),
     )
     records = output / ".resume"
     records.mkdir(exist_ok=True)
@@ -198,7 +293,9 @@ def prepare_locked(source, output, size, seed, for_prediction, split_file, limit
                 excluded = cached["excluded"]
                 print("  已校验，保留：" + case, flush=True)
             else:
-                arrays, row = prepare_case(case, image_path, label_path, size)
+                arrays, row = prepare_case(
+                    case, image_path, label_path, size, spacings.get(case), target_spacing
+                )
                 excluded = arrays is None
                 if not excluded:
                     same = False
@@ -270,7 +367,19 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="仅预处理 ImageCHD；生成可复用缓存，不训练、不预测")
     parser.add_argument("--input", required=True, help="已解压的 ImageCHD 目录；预测模式也支持单个 NIfTI")
     parser.add_argument("--output", required=True, help="新的预处理结果目录")
-    parser.add_argument("--size", type=int, default=0, help="0 保留原始分辨率；正数仅用于生成缩小缓存")
+    parser.add_argument("--size", type=int, default=0, help="0 保留重采样后的网格；正数再缩放为立方体")
+    parser.add_argument(
+        "--spacing-excel", help="影像间距表；默认自动读取影像同目录的 imagechd_dataset_image_info.xlsx"
+    )
+    parser.add_argument(
+        "--target-spacing",
+        type=float,
+        nargs=3,
+        default=(1, 1, 1),
+        metavar=("X", "Y", "Z"),
+        help="重采样目标间距，默认 1 1 1 mm",
+    )
+    parser.add_argument("--no-resample", action="store_true", help="保留旧预处理行为，忽略同目录间距表")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--split-file", help="显式患者划分 CSV；case_id 示例 ct_1001")
     parser.add_argument("--for-prediction", action="store_true", help="无标签预处理，不生成训练划分")
@@ -286,6 +395,9 @@ def main(argv=None):
         args.split_file,
         args.limit,
         args.resume,
+        args.spacing_excel,
+        args.target_spacing,
+        args.no_resample,
     )
     return 0
 

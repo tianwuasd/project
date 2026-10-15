@@ -1,0 +1,15 @@
+Metadata-Version: 2.4
+Name: chd-ct-reproduction
+Version: 0.3.0
+Summary: ImageCHD primary multi-stage adaptation of Xu et al.; archived paper workflow in back
+Requires-Python: >=3.11
+Requires-Dist: numpy>=1.26
+Requires-Dist: scipy>=1.11
+Requires-Dist: torch>=2.6
+Requires-Dist: nibabel>=5.2
+Requires-Dist: PyYAML>=6
+Requires-Dist: scikit-image>=0.24
+Requires-Dist: networkx>=3.2
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"
+Requires-Dist: ruff>=0.9; extra == "dev"

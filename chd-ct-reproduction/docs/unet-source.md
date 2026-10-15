@@ -1,71 +1,41 @@
-# U-Net 原作者来源、移植与 gate 开关
+# CHD 论文网络与历史 U-Net 来源
 
-## 来源
+2026-10-15 起，当前六阶段工厂使用 [chd_unet.py](../src/chd_ct/models/chd_unet.py)，按 Xu 等 CHD 论文图 4 和表 3 实现。依据、未明确细节及参数量差异见 [论文对齐记录](paper-mapping.md)。这是根据论文实现的 PyTorch 网络，未取得原作者代码的逐层一致性证据。
 
-本项目 0.3 使用 **按原作者 Caffe 网络定义移植的 PyTorch 主干**。它不是作者发布的官方 PyTorch 软件，也不是第三方 wolny/pytorch-3dunet，更不等于 CHD 论文完整系统。
+## 当前网络
 
-- 二维：[Ronneberger / Fischer / Brox 官方页面](https://lmb.informatik.uni-freiburg.de/people/ronneber/u-net/)，2015-10-02 发布包中的 `phseg_v5-train.prototxt`。
-- 三维：[Çiçek 等官方代码页](https://lmb.informatik.uni-freiburg.de/lmbsoft/unet.en.html)，`3dUnet_miccai2016_no_BN.prototxt`，明确选用作者提供的无 BatchNorm 版本。
-- 原始定义、许可证、发布包及文件 SHA256 均保存在 [reference](../src/chd_ct/models/reference/sources.json)。不下载或加载官方细胞/肾组织权重作为心脏模型。
+| 网络 | 输入 | 编码通道 | 结构 |
+|---|---|---|---|
+| crop64 / all64 | 64³ | 64、128、256、512、1024 | 5 个分辨率层级 |
+| crop128 / all128 | 128³ | 48、96、192、384、768 | 5 个分辨率层级 |
+| blood2d | 512² | 32、64、128、256、512、1024、2048、4096 | 8 个分辨率层级 |
+| blood_lstm | 7×32×512² 特征 | 每个方向隐藏通道 32 | 2 层双向 ConvLSTM，中心切片输出 |
 
-## 主干对齐了什么
+每个 U-Net 编码/解码块包含两次 `Conv3 → InstanceNorm → LeakyReLU`；下采样使用 MaxPool2，上采样使用 ConvTranspose2，跳跃连接拼接特征，最后用 Conv1 得到类别输出。3D 输出为背景和 ImageCHD 七结构，共 8 类；血池输出为背景、内部、边界，共 3 类。blood2d 的最后分类卷积之前有 32 通道特征，冻结后提供给循环模型。
 
-| 项目 | 二维官方发布网络 | 三维官方 no-BN 网络 |
-|---|---|---|
-| 编码深度 | 5 层，4 次池化 | 4 层，3 次池化 |
-| 卷积 | 无 padding 的 3×3 卷积 | 无 padding 的 3×3×3 卷积 |
-| 激活 | ReLU，包括上采样后 | ReLU，包括上采样后 |
-| 归一化 | 无 | 无；没有混入 InstanceNorm/GroupNorm |
-| 跳跃连接 | 中心裁剪后，按上采样特征、编码特征顺序拼接 | 同左 |
-| Dropout | 编码最后两层，概率 0.5，训练时启用 | 无 |
-| 原始通道 | 每层 64/128/256/512/1024；最后上采样输出 **128**，按实际发布文件保留 | 各编码块先 32/64/128/256，再 64/128/256/512；上采样保持输入通道数 |
-| 参数初始化 | Caffe Xavier 默认 FAN_IN 规则 | Caffe MSRA 默认 FAN_IN；第一卷积 bias=-0.1 |
-| 原始尺寸例子 | 输入 572² → 输出 388² | 输入 116×132×132 → 输出 28×44×44 |
-
-二维发布文件的最后上采样通道与常见简化示意不同，本项目以实际发布文件为准。主干只负责神经网络，不移植官方 Caffe 数据层、训练优化器、数据增强或推理二进制。
-
-## 项目中的三个文件
-
-1. [models/unet.py](../src/chd_ct/models/unet.py)：有效卷积主干 `UNet`，自身输出比输入小，不包含 gate。默认参数使用该维度的作者通道数和深度。
-2. [models/grid.py](../src/chd_ct/models/grid.py)：`GridUNet` 对输入进行对称镜像扩展，把有效输出中心裁剪回目标网格；用于现有 CHD 标签、融合和空间还原。这里的边界适配是本项目实现，不能用插值把有效区域拉伸到整图。
-3. [models/gate.py](../src/chd_ct/models/gate.py)：保留的空间概率门控，明确属于本项目扩展。
-
-`features()` 返回完整编码、解码后的特征，blood_lstm 使用 blood2d 的冻结特征。训练/预测的独立脚本与数据缓存格式不变。
-
-## 默认开启 gate，如何关闭
-
-`configs/chd.yaml` 和作者通道配置中的 `crop64/crop128/all64/all128` 均默认 `spatial_gate: true`；blood2d 保持原来未接 gate 的设置，blood_lstm 结构不受此次修改影响。
-
-若要关闭某一阶段，在该阶段配置中写：
+位置关联仅在四个 3D 阶段默认开启：`MaxPool4 → Conv3+IN+LeakyReLU（8→64→64→8）→ ConvTranspose4`。U-Net 概率与位置先验逐点相乘；实现使用对数域，后续 softmax 归一化。该分支的拓扑来自图 4，概率激活选择见对齐记录。
 
 ```yaml
 stages:
   crop64:
-    spatial_gate: false
-    # 其余 size/base/levels/epochs/batch 参数保留
+    spatial_gate: false  # 消融时关闭；其余字段保持原配置
 ```
 
-完全关闭三维门控对照时，将上述四个阶段都改为 `false`。YAML 用布尔值，不要写字符串 `"false"`。开关会写入有效配置和模型记录。不能在预测时随意改变已训练模型的开关，需要按对应配置重新训练。
+四个 3D 阶段分别控制，开关记录在权重配置中；不能在预测时更改已训练模型的开关。2D 不接受该开关为 true，图 4(b) 没有画出对应分支。
 
-## 尺寸与显存
+## 网格、规模与权重
 
-配置的 `size` 现在表示适配后与标签一致的目标网格，原始主干实际接收的镜像扩展网格更大：
+标准 64³、128³、512² 网格直接进入主干，不再为有效卷积扩展到 156³、220³ 或 444²。自定义奇数/极小网格会对称镜像补齐到下采样倍数，再中心裁剪回原网格；不通过插值拉伸输出。
 
-| 当前配置 | 实际主干输入 | 主干有效输出 | 最终网格 |
-|---|---|---|---|
-| 3D、4层、size64 | 156³ | 68³ | 64³ |
-| 3D、4层、size128 | 220³ | 132³ | 128³ |
-| 2D、5层、size256 | 444² | 260² | 256² |
+`chd.yaml` 是论文明确参数规模；`chd-smoke.yaml` 和 `--mode smoke` 是 size16/base2/三层的软件短测。正式配置开启 `activation_checkpoint: true`：训练时重算编码/解码块和位置分支的中间结果，以减少保存的张量；不改变 batch4、参数量或损失的批次聚合。推理、冻结特征编码和 smoke 不启用重算。正式规模仍先做 GPU preflight，形状检查通过不代表显存足够。当前没有 full-size GPU 训练或论文精度结果。
 
-因此旧版同尺寸卷积的显存估算不适用；正式训练之前必须做 GPU preflight。当前未验证 RTX 3090 能否承载所有默认或作者通道配置。
+模型格式为 `imagechd7-chd-paper-v3`，architecture 为 `chd-media2023-fig4-v1`，grid_adapter 为 `same-pad-symmetric-lattice-crop-v1`。旧权重必须重新训练；模型集合检查和恢复契约会拒绝结构混用。预处理缓存与 Excel 重采样不因本次主干变更而失效。
 
-- `chd.yaml`：实用宽度，3D base16/4层，2D base8/5层；符合作者通道排列但宽度缩小。3D base 指每块第一卷积的基础通道，其第一块输出是 2×base。
-- `chd-author-unet.yaml`：作者主干宽度/深度，3D base32/4层，2D base64/5层。类别数仍适配 ImageCHD，三维 gate 默认开启，因此整个模型仍含本项目扩展。
-- `chd-smoke.yaml` 或 `--mode smoke`：缩小深度和通道，仅验证软件流程，不等同作者原规模模型。
-- 旧 `chd-paper-scale.yaml` 已移入 [历史目录](../back/custom-unet-v1/README.md)，防止旧八层配置造成误解。
+## 保留的历史参考
 
-## 权重与验证边界
+- [unet.py](../src/chd_ct/models/unet.py)：Freiburg 2015 二维与 2016 三维 no-BN Caffe 定义的 PyTorch 移植。
+- [grid.py](../src/chd_ct/models/grid.py)、[gate.py](../src/chd_ct/models/gate.py)：旧有效卷积网格适配与旧空间概率门控。当前主干只复用 grid.py 的通用镜像工具。
+- [reference/sources.json](../src/chd_ct/models/reference/sources.json)：原始网络定义、来源与 SHA-256；原始许可证继续保留。
+- [修改前完整备份](../back/before-paper-alignment-20261013/SNAPSHOT.md)：含旧工厂、配置、训练/预测、Excel 重采样和服务器代码。旧 `chd-author-unet.yaml` 只在这个版本运行。
 
-新模型格式为 `imagechd7-author-unet-v2`，记录主干和网格适配版本。旧 `imagechd7-multistage-v1` 权重无法兼容，必须重新训练；原始数据和预处理缓存可继续复用。
-
-测试逐项对照官方文件的卷积次序、核、通道、输出形状；另用独立解析官方网络图的 PyTorch 函数执行器，在相同随机权重下比较输出。官方宽度的形状检查采用 meta 张量，不代表真实显存测试。没有运行原始 Caffe 二进制进行跨框架数值一致性验证，也未复现官方原任务或 CHD 论文的训练结果。
+历史主干的独立网络图与数值一致性测试仍保留，但这些测试只证明历史移植，不证明当前 CHD 论文实现与原作者程序完全一致。

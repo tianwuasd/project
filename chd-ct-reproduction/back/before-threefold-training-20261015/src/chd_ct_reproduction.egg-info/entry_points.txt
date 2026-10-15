@@ -1,0 +1,2 @@
+[console_scripts]
+chd-ct = chd_ct.cli:main

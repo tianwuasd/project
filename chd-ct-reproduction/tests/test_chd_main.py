@@ -187,7 +187,7 @@ def test_preflight_keeps_model_size_and_marks_short_weights(raw_chd, tmp_path):
     cache, models = tmp_path / "cache", tmp_path / "models"
     prepare(raw_chd, cache, size=16)
     config = load_config(ROOT / "configs/chd-smoke.yaml")
-    config["stages"]["all128"].update(size=24, base=3, epochs=5)
+    config["stages"]["all128"].update(size=24, base=3, epochs=5, activation_checkpoint=True)
     path = tmp_path / "preflight.yaml"
     path.write_text(yaml.safe_dump(config))
     train(cache, models, path, mode="preflight")
@@ -195,6 +195,7 @@ def test_preflight_keeps_model_size_and_marks_short_weights(raw_chd, tmp_path):
     assert record["config"]["stages"]["all128"]["size"] == 24
     assert record["config"]["stages"]["all128"]["base"] == 3
     assert record["config"]["stages"]["all128"]["epochs"] == 1
+    assert record["config"]["stages"]["all128"]["activation_checkpoint"] is True
     with pytest.raises(ValueError, match="短测"):
         read_collection(models)
 
@@ -232,13 +233,13 @@ def test_source_unchanged_and_missing_annotations_are_excluded(raw_chd, tmp_path
         prepare(raw_chd, output, size=16)
 
 
-def test_author_scale_requires_cuda_and_limit_cannot_train(raw_chd, tmp_path):
+def test_paper_scale_requires_cuda_and_limit_cannot_train(raw_chd, tmp_path):
     from chd_ct.imagechd.train import train
 
     cache = tmp_path / "cache"
     prepare(raw_chd, cache, size=16, limit=3)
     with pytest.raises(ValueError, match="GPU"):
-        train(cache, tmp_path / "large", ROOT / "configs/chd-author-unet.yaml", mode="preflight")
+        train(cache, tmp_path / "large", ROOT / "configs/chd.yaml", mode="preflight")
     with pytest.raises(ValueError, match="limit"):
         train(cache, tmp_path / "formal", ROOT / "configs/chd.yaml", mode="train")
 

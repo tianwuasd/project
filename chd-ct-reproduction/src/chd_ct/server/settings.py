@@ -21,7 +21,18 @@ def task_configuration(args):
     fields = {"task", "python"}
     by_task = {
         "environment": set(),
-        "preprocess": {"dataset", "prepared", "size", "seed", "limit", "split_file", "for_prediction"},
+        "preprocess": {
+            "dataset",
+            "prepared",
+            "size",
+            "seed",
+            "limit",
+            "split_file",
+            "for_prediction",
+            "spacing_excel",
+            "target_spacing",
+            "no_resample",
+        },
         "train": {"prepared", "config", "mode"},
         "predict": {"prepared", "models", "case_id", "split", "allow_smoke"},
         "test": {"prepared", "models", "split", "allow_smoke"},

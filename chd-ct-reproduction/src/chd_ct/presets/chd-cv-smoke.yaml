@@ -1,0 +1,60 @@
+# Reduced 18-stage three-fold protocol test; not a formal training configuration.
+profile: smoke
+seed: 42
+threads: 2
+roi_margin: 2
+augment: false
+learning_rate: 0.0002
+weight_decay: 0.0
+stages:
+  crop64:
+    size: 16
+    base: 2
+    epochs: 1
+    batch: 1
+    levels: 3
+    spatial_gate: true
+    activation_checkpoint: false
+  crop128:
+    size: 16
+    base: 2
+    epochs: 1
+    batch: 1
+    levels: 3
+    spatial_gate: true
+    activation_checkpoint: false
+  all64:
+    size: 16
+    base: 2
+    epochs: 1
+    batch: 1
+    levels: 3
+    spatial_gate: true
+    activation_checkpoint: false
+  all128:
+    size: 16
+    base: 2
+    epochs: 1
+    batch: 1
+    levels: 3
+    spatial_gate: true
+    activation_checkpoint: false
+  blood2d:
+    size: 16
+    base: 2
+    epochs: 1
+    batch: 1
+    levels: 3
+    spatial_gate: false
+    activation_checkpoint: false
+  blood_lstm:
+    size: 16
+    base: 2
+    epochs: 1
+    batch: 1
+    layers: 2
+    sequence: 7
+architecture: chd-media2023-fig4-v1
+cross_validation:
+  folds: 3
+  development_scope: auto

@@ -1,0 +1,35 @@
+{
+  "snapshot_date": "2026-10-13",
+  "source_commit": "c41434277256588514895e39360964739c398bfa",
+  "scope": "Standalone preprocessing before Excel spacing resampling, including its local dependencies",
+  "files": [
+    {
+      "path": "preprocess.py",
+      "sha256": "d7f120db89c1385ffb6b58b8620aead5a5e5f6b34880ea4f90a15a3f95eb40e9"
+    },
+    {
+      "path": "src/chd_ct/__init__.py",
+      "sha256": "d0cd094f4e49e10e254c405497e0babe5c46d8eb8208574e15662516c2bd68ae"
+    },
+    {
+      "path": "src/chd_ct/recovery.py",
+      "sha256": "d8f8d821a05ffb12080d5ed1126e595afb7a5f5dc25fca21a63a6023c7c33697"
+    },
+    {
+      "path": "src/chd_ct/imagechd/__init__.py",
+      "sha256": "6006c3f8fc3a77ea0c5606174db6922ecfb464e009e03b3e7e51166b25b49bf0"
+    },
+    {
+      "path": "src/chd_ct/imagechd/preprocess.py",
+      "sha256": "9b3e8303e2c9283b49dd158fe70c42afa4ce6108b748638a025538faca3192ea"
+    },
+    {
+      "path": "src/chd_ct/imagechd/common.py",
+      "sha256": "2f9873ced22970b395e1c6357480b6302562f138f97dc24c438b9ced9a1140a1"
+    },
+    {
+      "path": "src/chd_ct/imagechd/geometry.py",
+      "sha256": "7fdd8a5aac65e1c6d96b7fc5ac317381a80185a300b2a89ca8b32720209d6812"
+    }
+  ]
+}

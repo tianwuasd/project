@@ -1,4 +1,8 @@
-"""Ignored voxels contribute to neither Dice nor weighted cross entropy."""
+"""Weighted Dice plus cross entropy; both terms ignore label 255.
+
+Section 4.3 assigns class weights to Dice. CE is unweighted and the terms
+have equal coefficients because the paper does not specify other values.
+"""
 
 from torch.nn import functional as F
 
@@ -15,8 +19,4 @@ def masked_loss(logits, target, weights=None):
     dice = (2 * (probabilities * onehot).sum(axes) + 1e-6) / (
         probabilities.sum(axes) + onehot.sum(axes) + 1e-6
     )
-    return (
-        1
-        - (dice * weights).sum() / weights.sum()
-        + F.cross_entropy(logits, target, weight=weights, ignore_index=255)
-    )
+    return 1 - (dice * weights).sum() / weights.sum() + F.cross_entropy(logits, target, ignore_index=255)

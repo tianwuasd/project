@@ -109,6 +109,8 @@ bash start_server.sh --query history
 
 查询历史任务可在 `--query models/logs/status` 后加 `--job-dir /完整workflow目录`，不会改变最近任务指针。步骤用名称定位，不假定训练一定在 `05_train`。独立 preflight 输出在 `train/`，正式训练内部预检在 `preflight/`，入口会识别当前阶段。
 
+三折训练时，模型查询先显示每折状态与 train/val/test 数量，再列出各折六阶段 epoch/loss；状态查询显示当前折及其队列。日志查询自动发现 `fold_0` 至 `fold_2` 的已有和后续日志，`--model all128` 可同时跟随三折对应模型。
+
 日志中的 loss 在每轮训练及验证都完成后才更新，没有逐 batch 百分比或可靠剩余时间。队列心跳只表示调度器还在运行；`blood_lstm` 显示依赖等待时需要先完成 `blood2d`。恢复前的旧队列会明确标注，不能据其判断当前进度。无模型独立日志时暂时显示步骤 `server.log`，持续查看会发现后来生成的模型日志。首次日志读取最多取每个文件末尾 256 KiB，避免大日志拖慢查询。
 
 查询和面板中的 Ctrl+C 只退出查看/返回面板；`--foreground` 下 Ctrl+C 才会中断任务。停止任务请用面板 `x` 或 `--stop`，停止请求后再次查状态，确认进程退出再续跑。
@@ -121,8 +123,8 @@ bash start_server.sh --query history
 bash smoke_server.sh --gpu-count 2 --gpu 0,1 --non-interactive
 bash train_server.sh --mode train --gpu-count 2 --gpu 0,1 --non-interactive
 bash test_server.sh --models /完整路径/某次正式训练/train --non-interactive
-bash predict_server.sh --models /完整路径/某次正式训练/train --split test --non-interactive
-bash evaluate_server.sh --predictions /完整路径/某次预测/predict --split test --non-interactive
+bash predict_server.sh --models /完整路径/某次正式训练/train --split auto --non-interactive
+bash evaluate_server.sh --predictions /完整路径/某次预测/predict --split auto --non-interactive
 bash train_server.sh --mode check --non-interactive
 ```
 
@@ -135,11 +137,12 @@ bash train_server.sh --mode check --non-interactive
 沿用 whole heart 的**一张卡一个模型任务**方式，不使用 DDP，也不把多张显卡显存合并。
 
 - `crop64`、`crop128`、`all64`、`all128`、`blood2d` 可独立训练，最多五个同时运行。
+- 默认三折依次执行，每折内部使用上述队列，共 18 个阶段实例。各折患者划分独立冻结，外层测试病例不参与该折训练或选模。
 - `blood_lstm` 必须等待本次 `blood2d` 成功，使用并冻结其编码器。
 - 子进程只可见自己分配的 GPU；开始下一阶段前重新检查该卡。任何阶段失败会停止新派发并结束本队列仍在运行的子进程，保留日志与已经完成的权重。
 - 同时运行的数量受 GPU 数和可运行阶段数共同限制，后期可能只有一张卡在工作。
 - 预处理、缓存检查和评估用 CPU。融合预测/测试从候选池中选择一张空闲卡。`gpu_count` 是训练并发上限，环境检查至多检查这么多张当前空闲卡，不要求凑齐。
-- 每个训练阶段采用 `seed + 阶段序号`，使单卡顺序运行与多进程运行有一致的随机种子。它改变旧版本后续阶段的随机数轨迹，但不改变网络或已有权重的加载格式。
+- 每个阶段采用 `seed + 10000 × 折号 + 阶段序号`，折号为 0/1/2；单折沿用 `seed + 阶段序号`。单卡顺序与多进程运行使用一致的阶段种子。
 
 菜单选择显卡前先显示实时物理编号、型号、空闲显存、利用率、计算进程占用和可见范围。执行时重新检查，不将菜单快照当作预约。保持尊重 `CUDA_VISIBLE_DEVICES`；卡上已有计算进程、低于 6000 MiB 空闲显存或利用率高于 10% 的卡暂不派发。不会切到 CPU、放宽门槛或扩展分配范围。空闲检查不是集群调度器预约，共享服务器仍应先确认分配。
 
@@ -174,9 +177,12 @@ steps/
   02_train/
     environment/            # 所用设备的实际计算检查
     preflight/              # 正式尺寸预检
-    train/                  # models.json、权重、history
-      stage_logs/           # 多卡时各阶段日志
-      queue.json            # 多卡依赖和状态
+    train/                  # 根 models.json、folds.json、training-summary.json
+      fold_0/               # 本折 models.json、六阶段权重、history
+        stage_logs/         # 多卡时本折各阶段日志
+        queue.json          # 本折多卡依赖和状态
+      fold_1/
+      fold_2/
   03_test/
     test/predictions/       # NIfTI 与预测记录
     test/evaluation/evaluation.json
@@ -185,7 +191,7 @@ steps/
 
 实际目录取决于所选步骤，示例中的编号不是固定菜单编号。缓存仍写入 `prepared` 指定位置。`<runtime>/last-job.json` 指向最近任务；`--status` 读取这一指针，旧任务的记录和日志仍保留。CPU 步骤不会新增 GPU 或无关模型设置，也不会改掉已保存的训练资源偏好；需要清除旧偏好时加 `--reset-settings`。
 
-只有六阶段全部完成，模型集合才标记 complete。0.7.0 起使用 `--resume-job` 恢复原流程，或菜单选 `r`：预处理/预测按病例接续，训练从最后完整 epoch 接续；评估与诊断等短步骤保留旧目录后重跑。日志追加，每次恢复前的计划、状态和进程回执保存于 `attempts/`。普通新建任务仍创建新目录。详见 [恢复策略与命令](recovery.md)。
+只有三折全部完成，根模型集合才标记 complete；单折配置仍要求六阶段完成。使用 `--resume-job` 恢复原流程，或菜单选 `r`：预处理/预测按病例接续；训练核验并保留已完成折，中断折从最后完整 epoch 接续；评估与诊断等短步骤保留旧目录后重跑。日志追加，每次恢复前的计划、状态和进程回执保存于 `attempts/`。普通新建任务仍创建新目录。详见 [恢复策略与命令](recovery.md)。
 
 ## 环境来源与验证范围
 
@@ -193,7 +199,7 @@ steps/
 
 复用已有 Conda 管理工具 `/data5/zhougaowei/zhangruichen_workspace/project1_runtime/tools/miniforge3/bin/conda`；CHD 使用自己 runtime 下的 `envs/chd_py311`，不向 whole heart 的 Python 环境安装依赖。默认 Python3.11、PyTorch2.8/CUDA12.8；未找到已有 Conda 时下载并校验 Miniforge。可用 `--python /已有环境/bin/python` 跳过安装，仍检查环境。网络设置沿用服务器环境。
 
-已有验证覆盖 CPU 多进程训练、独立测试入口与模拟显卡派发。2026-10-10 增加真实 Linux 进程测试：父进程退出后继续运行、继承锁阻止重复提交、失败停止后续步骤、信号中断记录和前台退出码。进程测试采用合成任务；未连接 zmic44，尚未做真实多 GPU 或 3090 显存验证。原作者宽度配置 `configs/chd-author-unet.yaml` 仍须在服务器做 preflight；主干来源与三维默认 gate 见 [U-Net 说明](unet-source.md)。
+已有验证覆盖 CPU 多进程训练、独立测试入口与模拟显卡派发。2026-10-10 增加真实 Linux 进程测试：父进程退出后继续运行、继承锁阻止重复提交、失败停止后续步骤、信号中断记录和前台退出码。进程测试采用合成任务；未连接 zmic44，尚未做真实多 GPU 或 3090 显存验证。当前论文规模配置 `configs/chd.yaml` 仍须在服务器做 preflight；多卡队列不拆分单阶段 batch4，真实单卡显存需求需实测。主干与默认三维位置关联见 [U-Net 说明](unet-source.md)。
 
 ## 独立诊断步骤
 

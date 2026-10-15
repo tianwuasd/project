@@ -6,9 +6,10 @@ from pathlib import Path
 import numpy as np
 
 from ..recovery import write_json  # noqa: F401
+from .spacing import RESAMPLED_FORMAT, validate_spacing
 
 FORMAT = "imagechd7-v2"
-MODEL_FORMAT = "imagechd7-author-unet-v2"
+MODEL_FORMAT = "imagechd7-chd-paper-v3"
 LABELS = ("BG", "LV", "RV", "LA", "RA", "MYO", "AO", "PA")
 IGNORE = 255
 NORMALIZATION = {"kind": "per_image_percentile", "low": 1, "high": 99}
@@ -36,7 +37,11 @@ def safe_child(directory, name):
 def read_prepared(directory):
     directory = Path(directory).expanduser().resolve()
     data = json.loads((directory / "dataset.json").read_text(encoding="utf-8"))
-    if data.get("status") != "prepared" or data.get("format") not in {FORMAT, "imagechd7-v1"}:
+    if data.get("status") != "prepared" or data.get("format") not in {
+        FORMAT,
+        "imagechd7-v1",
+        RESAMPLED_FORMAT,
+    }:
         raise ValueError("不是完整的 ImageCHD 预处理结果")
     if (
         data.get("labels") != list(LABELS)
@@ -50,7 +55,7 @@ def read_prepared(directory):
         if not isinstance(data.get("size"), int) or data["size"] < 8:
             raise ValueError("旧缓存尺寸无效")
         data["resolution"] = "resized"
-    elif data.get("resolution") not in {"native", "resized"}:
+    elif data.get("resolution") not in {"native", "resized", "resampled"}:
         raise ValueError("缺少缓存分辨率记录")
     seen = set()
     for row in data["cases"]:
@@ -71,6 +76,20 @@ def read_prepared(directory):
             shape = row[key]
             if len(shape) != 3 or any(not isinstance(x, int) or x < 2 for x in shape):
                 raise ValueError("缓存几何尺寸无效")
+        if data["format"] == RESAMPLED_FORMAT:
+            geometry = row.get("resampling", {})
+            validate_spacing(geometry.get("canonical_spacing_mm"))
+            validate_spacing(geometry.get("target_spacing_mm"))
+            shape = geometry.get("resampled_shape", [])
+            transform = np.asarray(geometry.get("output_to_canonical"), dtype=float)
+            if (
+                len(shape) != 3
+                or any(not isinstance(x, int) or x < 2 for x in shape)
+                or transform.shape != (4, 4)
+                or not np.isfinite(transform).all()
+                or abs(np.linalg.det(transform[:3, :3])) < 1e-8
+            ):
+                raise ValueError("重采样几何记录无效")
         affine = np.asarray(row["native_affine"], dtype=float)
         if (
             affine.shape != (4, 4)

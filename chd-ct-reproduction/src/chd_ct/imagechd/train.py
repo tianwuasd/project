@@ -1,7 +1,6 @@
 """Six-stage training from reusable caches; no raw-image preprocessing."""
 
 import argparse
-import copy
 import io
 import json
 import os
@@ -13,13 +12,12 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from ..models.grid import GRID_ADAPTER
-from ..models.unet import ARCHITECTURE
+from ..models.chd_unet import ARCHITECTURE, GRID_ADAPTER
 from ..paths import config_path
 from ..recovery import atomic_path, file_hash, output_lock, read_json
 from .augment import augment_batch
 from .common import LABELS, MODEL_FORMAT, NORMALIZATION, load_case, read_prepared, write_json
-from .config import STAGES, UNAVAILABLE, build_model, load_config, weights_for
+from .config import STAGES, UNAVAILABLE, build_model, effective_config, load_config, weights_for
 from .dataset import StageDataset
 from .losses import masked_loss
 
@@ -47,7 +45,7 @@ def recurrent_features(encoder, sequence):
 
 def train_stage(directory, rows, stage, config, output, mode, manifest_hash, resume=False):
     torch.set_num_threads(config["threads"])
-    stage_seed = config["seed"] + STAGES.index(stage)
+    stage_seed = config["seed"] + 10000 * config.get("fold", {}).get("index", 0) + STAGES.index(stage)
     torch.manual_seed(stage_seed)
     np.random.seed(stage_seed)
     random.seed(stage_seed)
@@ -185,19 +183,66 @@ def train_stage(directory, rows, stage, config, output, mode, manifest_hash, res
         with atomic_path(output / (stage + ".pt")) as temporary:
             temporary.write_bytes(best_bytes)
         write_json(output / (stage + ".history.json"), history)
-    return {"file": stage + ".pt", "sha256": file_hash(output / (stage + ".pt")), "best_val_loss": best}
+    return {
+        "file": stage + ".pt",
+        "sha256": file_hash(output / (stage + ".pt")),
+        "best_val_loss": best,
+        "best_epoch": min(history, key=lambda r: r["loss"]["val"])["epoch"],
+        "epochs_completed": len(history),
+    }
 
 
 def train(
-    prepared, output, config_path, mode="smoke", device="cpu", gpu_ids=None, resume=False, gpu_limit=None
+    prepared,
+    output,
+    config_path,
+    mode="smoke",
+    device="cpu",
+    gpu_ids=None,
+    resume=False,
+    gpu_limit=None,
+    *,
+    fold_context=None,
+    inherited_lock_fds=(),
 ):
     output = Path(output).expanduser().resolve()
     output.mkdir(parents=True, exist_ok=resume)
     with output_lock(output) as lock_fd:
-        return train_locked(prepared, output, config_path, mode, device, gpu_ids, resume, lock_fd, gpu_limit)
+        if fold_context is None and load_config(config_path)["cross_validation"]["folds"] == 3:
+            from .cross_validation import train_threefold
+
+            return train_threefold(
+                prepared, output, config_path, mode, device, gpu_ids, resume, gpu_limit, lock_fd
+            )
+        return train_locked(
+            prepared,
+            output,
+            config_path,
+            mode,
+            device,
+            gpu_ids,
+            resume,
+            lock_fd,
+            gpu_limit,
+            fold_context=fold_context,
+            inherited_lock_fds=inherited_lock_fds,
+        )
 
 
-def train_locked(prepared, output, config_path, mode, device, gpu_ids, resume, lock_fd, gpu_limit=None):
+def train_locked(
+    prepared,
+    output,
+    config_path,
+    mode,
+    device,
+    gpu_ids,
+    resume,
+    lock_fd,
+    gpu_limit=None,
+    *,
+    fold_context=None,
+    inherited_lock_fds=(),
+):
     if gpu_limit is not None and (
         isinstance(gpu_limit, bool)
         or not isinstance(gpu_limit, int)
@@ -225,13 +270,23 @@ def train_locked(prepared, output, config_path, mode, device, gpu_ids, resume, l
             select_gpus(query_gpus(), len(gpu_ids), ",".join(gpu_ids), os.environ.get("CUDA_VISIBLE_DEVICES"))
     directory, data = read_prepared(prepared)
     config = load_config(config_path)
+    config.pop("fold", None)
+    if fold_context is not None:
+        from .folds import apply_fold
+
+        data = apply_fold(data, fold_context)
+        config["fold"] = fold_context
     rows = training_rows(data)
-    if config.get("profile") == "author-unet" and device == "cpu" and mode not in {"check", "smoke"}:
-        raise ValueError("author-unet 需要 GPU 预检；CPU 仅支持 check/smoke")
     if mode not in {"check", "smoke", "preflight", "train"}:
         raise ValueError("未知训练模式")
     if mode == "train" and (data.get("limit") is not None or config.get("profile") == "smoke"):
         raise ValueError("limit 缓存/smoke 配置不能冒充正式训练")
+    if (
+        device == "cpu"
+        and mode not in {"check", "smoke"}
+        and any(s.get("base", 0) * 2 ** (s.get("levels", 1) - 1) >= 768 for s in config["stages"].values())
+    ):
+        raise ValueError("论文规模配置需要 GPU 预检；CPU 请使用 --mode smoke 或独立的缩小配置")
     output = Path(output).expanduser().resolve()
     report = {
         "status": "running",
@@ -267,17 +322,7 @@ def train_locked(prepared, output, config_path, mode, device, gpu_ids, resume, l
                     load_case(directory, row)
             report["status"] = "checked"
             return report
-        config = copy.deepcopy(config)
-        config["device"] = device
-        if mode == "smoke":
-            config["profile"], config["augment"] = "smoke", False
-            for stage, spec in config["stages"].items():
-                spec.update(size=16, base=2, batch=1, epochs=1)
-                if stage != "blood_lstm":
-                    spec["levels"] = 3
-        elif mode == "preflight":
-            for spec in config["stages"].values():
-                spec["epochs"] = 1
+        config = effective_config(config, mode, device)
         torch.set_num_threads(config["threads"])
         torch.manual_seed(config["seed"])
         np.random.seed(config["seed"])
@@ -338,7 +383,7 @@ def train_locked(prepared, output, config_path, mode, device, gpu_ids, resume, l
                 os.environ.copy(),
                 (lambda gpu, used: gpu in available()) if gpu_limit is not None else check_gpu_handoff,
                 on_complete,
-                lock_fds=(lock_fd,),
+                lock_fds=(*inherited_lock_fds, lock_fd),
                 available_gpus=available if gpu_limit is not None else None,
                 gpu_limit=gpu_limit,
             )

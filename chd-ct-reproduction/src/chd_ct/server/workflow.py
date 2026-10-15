@@ -63,6 +63,8 @@ def validate_inputs(args, future):
     needed = []
     if args.task == "preprocess":
         needed.append(("dataset", args.dataset))
+        if getattr(args, "spacing_excel", None):
+            needed.append(("spacing_excel", args.spacing_excel))
         if Path(args.prepared).exists() and not getattr(args, "resume", False):
             raise ValueError("预处理目录已存在；取消选择预处理以复用缓存，或指定新的 --prepared")
     elif args.task in {"train", "predict", "test", "evaluate"}:

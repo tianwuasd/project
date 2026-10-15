@@ -169,18 +169,18 @@ def test_raw_core_rejects_non_lattice_input_and_gate():
         model(torch.zeros(1, 1, 93, 92, 92))
 
 
-def test_main_factory_uses_author_core_with_switchable_gate(tmp_path):
+def test_main_factory_uses_chd_paper_core_with_switchable_gate(tmp_path):
     import yaml
 
     from chd_ct.imagechd.config import build_model, load_config
-    from chd_ct.models.unet import ARCHITECTURE
+    from chd_ct.models.chd_unet import ARCHITECTURE, PaperUNet
 
     root = REF.parents[3]
     config = load_config(root / "configs/chd.yaml")
     assert config["architecture"] == ARCHITECTURE
     spec = config["stages"]["crop64"]
     model = build_model("crop64", {**spec, "base": 1})
-    assert isinstance(model.core, UNet) and model.gate is not None
+    assert isinstance(model.core, PaperUNet) and model.gate is not None
     assert build_model("crop64", {**spec, "base": 1, "spatial_gate": False}).gate is None
     config["stages"]["crop64"]["spatial_gate"] = "false"
     file = tmp_path / "invalid.yaml"
@@ -189,14 +189,13 @@ def test_main_factory_uses_author_core_with_switchable_gate(tmp_path):
         load_config(file)
 
 
-def test_old_collection_is_rejected_with_retraining_guidance(tmp_path):
+@pytest.mark.parametrize("model_format", ["imagechd7-multistage-v1", "imagechd7-author-unet-v2"])
+def test_old_collection_is_rejected_with_retraining_guidance(tmp_path, model_format):
     from chd_ct.imagechd.checkpoints import read_collection
     from chd_ct.imagechd.config import STAGES
 
     (tmp_path / "models.json").write_text(
-        json.dumps(
-            {"format": "imagechd7-multistage-v1", "status": "complete", "stages": dict.fromkeys(STAGES, {})}
-        )
+        json.dumps({"format": model_format, "status": "complete", "stages": dict.fromkeys(STAGES, {})})
     )
     with pytest.raises(ValueError, match="重新训练"):
         read_collection(tmp_path, allow_smoke=True)

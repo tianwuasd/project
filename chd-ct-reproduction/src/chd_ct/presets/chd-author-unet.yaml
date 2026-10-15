@@ -1,3 +1,5 @@
+# HISTORICAL Freiburg configuration: use the pre-alignment backup to run it.
+# The current CHD paper factory uses chd.yaml and rejects this architecture.
 # Author backbone widths/depths; CHD labels, grid adapter, training and anatomy gate remain adaptations.
 profile: author-unet
 seed: 42

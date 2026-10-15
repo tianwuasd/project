@@ -292,13 +292,13 @@ def show_status(runtime, directory=None):
             if not report_path.is_file():
                 continue
             report = read_json(report_path)
-            from .inspection import run_directory
+            from .inspection import active_model_run, run_directory
 
-            queue_path = (
-                run_directory(Path(step["output"])) / "queue.json"
-                if report.get("phase") in {"train", "preflight", "smoke"}
-                else None
+            run = run_directory(Path(step["output"]))
+            active_run = (
+                active_model_run(run) if report.get("phase") in {"train", "preflight", "smoke"} else None
             )
+            queue_path = active_run / "queue.json" if active_run else None
             queue = read_json(queue_path) if queue_path and queue_path.is_file() else {}
             if queue.get("sampled_at", 0) < report.get("phase_started_at", 0):
                 queue = {}  # A resumed command has not published its new queue yet.
@@ -311,6 +311,8 @@ def show_status(runtime, directory=None):
                 detail = f"正在使用 {queue.get('active_gpus', 0)}/{queue.get('gpu_limit', '?')} 张卡，待运行 {queue.get('pending_stages', '?')} 个阶段"
             else:
                 continue
+            if active_run is not None and active_run != run:
+                detail = f"当前折：{active_run.name}；{detail}"
             details[step["name"]] = (label, detail)
             if label.startswith("waiting_gpu"):
                 status = label

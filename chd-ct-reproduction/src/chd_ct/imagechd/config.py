@@ -1,11 +1,12 @@
 """Six data-supported stages of the original multi-stage method."""
 
+import copy
 from pathlib import Path
 
 import yaml
 
-from ..models import BiConvLSTM, GridUNet
-from ..models.unet import ARCHITECTURE
+from ..models import BiConvLSTM, CHDUNet
+from ..models.chd_unet import ARCHITECTURE
 
 STAGES = ("crop64", "crop128", "all64", "all128", "blood2d", "blood_lstm")
 UNAVAILABLE = {
@@ -20,6 +21,15 @@ def load_config(path):
         raise ValueError("配置必须包含全部六个 CHD 阶段")
     if config.get("architecture") != ARCHITECTURE:
         raise ValueError("旧配置或主干 architecture 不匹配；请使用当前 configs/chd.yaml")
+    cv = config.setdefault("cross_validation", {"folds": 1, "development_scope": "auto"})
+    if (
+        not isinstance(cv, dict)
+        or type(cv.get("folds")) is not int
+        or cv["folds"] not in {1, 3}
+        or cv.get("development_scope", "auto") not in {"auto", "all", "train_val"}
+    ):
+        raise ValueError("cross_validation 需要 folds=1/3、development_scope=auto/all/train_val")
+    cv.setdefault("development_scope", "auto")
     config["stages"] = {stage: config["stages"][stage] for stage in STAGES}
     if (
         config.get("learning_rate", 0) <= 0
@@ -36,8 +46,13 @@ def load_config(path):
     for stage, spec in config["stages"].items():
         if stage != "blood_lstm":
             spec.setdefault("spatial_gate", not stage.startswith("blood"))
+            spec.setdefault("activation_checkpoint", False)
+            if not isinstance(spec["activation_checkpoint"], bool):
+                raise ValueError("activation_checkpoint 必须是 YAML 布尔值 true/false")
             if not isinstance(spec["spatial_gate"], bool):
                 raise ValueError("spatial_gate 必须是 YAML 布尔值 true/false")
+            if stage == "blood2d" and spec["spatial_gate"]:
+                raise ValueError("论文图 4 的位置关联分支仅用于 3D 阶段")
         for key in ("size", "base", "epochs", "batch"):
             if not isinstance(spec.get(key), int) or spec[key] < 1:
                 raise ValueError(f"{stage}: {key} 需为正整数")
@@ -51,9 +66,9 @@ def load_config(path):
         elif (
             not isinstance(spec.get("levels"), int)
             or spec["levels"] < 2
-            or spec["levels"] > (5 if stage == "blood2d" else 4)
+            or spec["levels"] > (8 if stage == "blood2d" else 5)
         ):
-            raise ValueError("网络深度需在 2 到官方层数之间；大于官方深度不是本配置支持的结构")
+            raise ValueError("网络深度需在 2 到论文层数之间：2D 最多 8 层，3D 最多 5 层")
     return config
 
 
@@ -62,14 +77,30 @@ def build_model(stage, spec):
         raise ValueError("未知阶段")
     if stage == "blood_lstm":
         return BiConvLSTM(spec["base"], spec["layers"], 3)
-    return GridUNet(
+    return CHDUNet(
         2 if stage == "blood2d" else 3,
         3 if stage == "blood2d" else 8,
         spec["base"],
         spec["levels"],
         spatial_gate=spec.get("spatial_gate", not stage.startswith("blood")),
+        activation_checkpoint=spec.get("activation_checkpoint", False),
     )
 
 
 def weights_for(stage):
     return [1, 2, 16] if stage.startswith("blood") else [1] + [2] * 7
+
+
+def effective_config(config, mode, device):
+    config = copy.deepcopy(config)
+    config["device"] = device
+    if mode == "smoke":
+        config["profile"], config["augment"] = "smoke", False
+        for stage, spec in config["stages"].items():
+            spec.update(size=16, base=2, batch=1, epochs=1)
+            if stage != "blood_lstm":
+                spec.update(levels=3, activation_checkpoint=False)
+    elif mode == "preflight":
+        for spec in config["stages"].values():
+            spec["epochs"] = 1
+    return config

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .common import read_prepared, write_json
 from .config import STAGES
+from .folds import apply_fold
 from .train import file_hash, train_stage, training_rows
 
 
@@ -30,6 +31,8 @@ def main(argv=None):
         if not report.get("ok") or not report.get("cuda"):
             raise RuntimeError("该阶段 GPU 环境检查未通过：" + str(report))
     directory, data = read_prepared(args.prepared)
+    if config.get("fold") is not None:
+        data = apply_fold(data, config["fold"])
     info = train_stage(
         directory,
         training_rows(data),

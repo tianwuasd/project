@@ -14,6 +14,7 @@ INPUTS = (
     "models",
     "predictions",
     "split_file",
+    "spacing_excel",
     "diagnosis_source",
     "diagnosis_labels",
     "features",
@@ -81,6 +82,7 @@ def verify_snapshot(record):
 
 
 def live_commands(plan):
+    from .inspection import model_runs
     from .jobs import identity
 
     live = {}
@@ -95,8 +97,12 @@ def live_commands(plan):
             ):
                 live[record["pid"]] = dict(record, process_group=True)
         for part in ("train", "preflight"):
-            queue = Path(step["output"]) / part / "queue.json"
-            if queue.is_file():
+            run = Path(step["output"]) / part
+            # Keep the legacy queue even when fold directories are already present.
+            queues = dict.fromkeys(folder / "queue.json" for folder in [run, *model_runs(run)])
+            for queue in queues:
+                if not queue.is_file() or not queue.resolve().is_relative_to(run.resolve()):
+                    continue
                 for record in read_json(queue).get("stages", {}).values():
                     if (
                         record.get("pid")

@@ -7,8 +7,8 @@ Windows双击 start.bat，其他系统执行 python start.py。菜单提供六�
 ```bash
 python start.py --task preprocess --dataset data/imagechd_raw/ImageCHD_dataset --prepared data/imagechd7_native
 python start.py --task train --prepared data/imagechd7_native --mode smoke --device cpu
-python start.py --task predict --prepared data/imagechd7_native --models /完整模型目录 --split test --device cuda
-python start.py --task evaluate --prepared data/imagechd7_native --predictions /完整预测目录 --split test
+python start.py --task predict --prepared data/imagechd7_native --models /完整模型目录 --split auto --device cuda
+python start.py --task evaluate --prepared data/imagechd7_native --predictions /完整预测目录 --split auto
 ```
 
 非交互任务加 --non-interactive，并给出所需路径。每次保存独立日志目录和 report.json。环境探测包括依赖版本、磁盘、CPU梯度计算和CUDA实际计算；桌面引导缺依赖时提示安装方法，服务器入口可以建立独立环境。

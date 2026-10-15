@@ -9,7 +9,7 @@ from .evaluate import evaluate
 from .predict import predict
 
 
-def run_test(prepared, models, output, device="cpu", split="test", allow_smoke=False, resume=False):
+def run_test(prepared, models, output, device="cpu", split="auto", allow_smoke=False, resume=False):
     output = Path(output).expanduser().resolve()
     output.mkdir(parents=True, exist_ok=resume)
     with output_lock(output):
@@ -18,7 +18,7 @@ def run_test(prepared, models, output, device="cpu", split="test", allow_smoke=F
 
 def test_locked(prepared, models, output, device, split, allow_smoke, resume):
     _, data = read_prepared(prepared)
-    if data.get("for_prediction") or not any(r["split"] == split for r in data["cases"]):
+    if data.get("for_prediction"):
         raise ValueError("测试需要带真值且含所选 split 的缓存；无标签数据请使用 predict")
     output = Path(output).expanduser().resolve()
 
@@ -38,6 +38,7 @@ def test_locked(prepared, models, output, device, split, allow_smoke, resume):
         metrics = evaluate(prepared, output / "predictions", output / "evaluation", split=split)
         report.update(
             status="passed",
+            split=metrics["split"],
             cases_evaluated=metrics["cases_evaluated"],
             predictions=str(output / "predictions"),
             evaluation=str(output / "evaluation/evaluation.json"),
@@ -56,7 +57,7 @@ def main(argv=None):
     parser.add_argument("--models", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
-    parser.add_argument("--split", choices=["train", "val", "test"], default="test")
+    parser.add_argument("--split", choices=["auto", "cv", "train", "val", "test"], default="auto")
     parser.add_argument("--allow-smoke", action="store_true")
     parser.add_argument("--resume", action="store_true")
     args = parser.parse_args(argv)

@@ -16,14 +16,24 @@ def add_task_arguments(parser):
     parser.add_argument("--config", help="六阶段配置，默认 configs/chd.yaml")
     parser.add_argument("--mode", choices=["check", "smoke", "preflight", "train"], default="smoke")
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
-    parser.add_argument("--size", type=int, default=0, help="预处理：0 保留原始网格；正数生成缩小缓存")
+    parser.add_argument("--size", type=int, default=0, help="预处理：0 保留重采样网格；正数生成缩小缓存")
+    parser.add_argument("--spacing-excel", help="预处理影像间距表；默认自动读取数据目录内的影像信息 Excel")
+    parser.add_argument(
+        "--target-spacing",
+        type=float,
+        nargs=3,
+        default=(1, 1, 1),
+        metavar=("X", "Y", "Z"),
+        help="预处理目标间距，默认 1 1 1 mm",
+    )
+    parser.add_argument("--no-resample", action="store_true", help="预处理保留旧行为，不按 Excel 重采样")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--split-file")
     parser.add_argument("--for-prediction", action="store_true")
     parser.add_argument("--resume", action="store_true", help="预处理/训练/预测/测试在原输出目录续跑")
     parser.add_argument("--case-id")
-    parser.add_argument("--split", choices=["train", "val", "test"])
+    parser.add_argument("--split", choices=["auto", "cv", "train", "val", "test"])
     parser.add_argument("--allow-smoke", action="store_true")
     parser.add_argument("--non-interactive", action="store_true")
 
@@ -68,6 +78,12 @@ def build_command(args, root, python, output, device, mode=None):
             command += ["--limit", str(args.limit)]
         if args.split_file:
             command += ["--split-file", args.split_file]
+        if getattr(args, "spacing_excel", None):
+            command += ["--spacing-excel", args.spacing_excel]
+        if getattr(args, "target_spacing", None) is not None:
+            command += ["--target-spacing", *map(str, args.target_spacing)]
+        if getattr(args, "no_resample", False):
+            command += ["--no-resample"]
         if getattr(args, "resume", False):
             command += ["--resume"]
         return command
@@ -101,7 +117,7 @@ def build_command(args, root, python, output, device, mode=None):
     elif task == "evaluate":
         if not args.predictions:
             raise ValueError("评估需要 --predictions")
-        command += ["--predictions", args.predictions, "--split", args.split or "test"]
+        command += ["--predictions", args.predictions, "--split", args.split or "auto"]
     else:
         raise ValueError("未知任务")
     if getattr(args, "resume", False) and task in {"train", "predict", "test"}:

@@ -8,6 +8,7 @@ from pathlib import Path
 
 MODELS = ("crop64", "crop128", "all64", "all128", "blood2d", "blood_lstm")
 MODEL_STEPS = {"smoke", "preflight", "train"}
+FOLDS = ("fold_0", "fold_1", "fold_2")
 
 
 def load(path, default=None):
@@ -99,6 +100,30 @@ def run_directory(step):
     return step / "train"
 
 
+def model_runs(run):
+    """Return legacy run or the fixed, contained fold paths, including future folds."""
+    run = Path(run)
+    root = run.resolve()
+    folds = [run / fold for fold in FOLDS if (run / fold).resolve().is_relative_to(root)]
+    if (
+        load(run / "report.json").get("task") == "chd_threefold"
+        or load(run / "models.json").get("format") == "imagechd7-threefold-v1"
+        or any(fold.is_dir() for fold in folds)
+    ):
+        return folds
+    return [run]
+
+
+def active_model_run(run):
+    """Select only the reported current fold, never a metadata-provided path."""
+    run = Path(run)
+    runs = model_runs(run)
+    if runs == [run]:
+        return run
+    current = load(run / "report.json").get("current_fold")
+    return next((fold for fold in runs if fold.name == current), None)
+
+
 def show_models(job, step="auto"):
     if step == "auto":
         steps = load(job / "job_state.json").get("steps", [])
@@ -112,12 +137,38 @@ def show_models(job, step="auto"):
         print("尚无模型训练记录。")
         return
     run = run_directory(output)
-    report, queue = load(output / "status.json"), load(run / "queue.json")
-    old_queue = queue.get("sampled_at", 0) < report.get("phase_started_at", 0)
+    report = load(output / "status.json")
     print(f"\n任务：{name(job)} | {status(job)}\n模型记录：{run}")
+    runs = model_runs(run)
+    if runs == [run]:
+        show_model_table(run, report)
+    else:
+        summary = load(run / "report.json")
+        folds = summary.get("folds", {})
+        complete = sum(folds.get(fold, {}).get("status") == "complete" for fold in FOLDS)
+        current = summary.get("current_fold")
+        current = current if current in FOLDS else "无"
+        print(f"三折进度：已完成 {complete}/3 | 当前折：{current} | 状态：{summary.get('status', '未记录')}")
+        config = load(run / "effective-config.json").get("stages", {})
+        for fold in runs:
+            item = folds.get(fold.name, {})
+            print(
+                f"\n{fold.name} | {item.get('status', '未记录')} | "
+                f"train={item.get('train_cases', '?')} val={item.get('val_cases', '?')} "
+                f"test={item.get('test_cases', '?')}\n模型记录：{fold}"
+            )
+            show_model_table(fold, report, config, completed=item.get("status") == "complete")
+    print("每轮训练和验证完成后更新 epoch/loss；心跳刷新不代表模型完成了一轮。")
+
+
+def show_model_table(run, report, fallback_config=None, completed=False):
+    queue = load(run / "queue.json")
+    old_queue = (
+        bool(queue) and not completed and queue.get("sampled_at", 0) < report.get("phase_started_at", 0)
+    )
     if old_queue:
         print("队列是恢复前的旧记录，尚无本轮调度状态。历史 epoch/loss 仅作参考。")
-    config = load(run / "effective-config.json").get("stages", {})
+    config = load(run / "effective-config.json").get("stages", fallback_config or {})
     stages = {} if old_queue else queue.get("stages", {})
     print("模型          记录状态          已完成 epoch/目标    train loss    val loss    学习率    GPU")
     for model in MODELS:
@@ -136,7 +187,6 @@ def show_models(job, step="auto"):
         print(
             f"{model:<13} {label:<14} {epoch:<18} {loss.get('train', '—')}    {loss.get('val', '—')}    {record.get('learning_rate', '—')}    {item.get('gpu_uuid', '—')}"
         )
-    print("每轮训练和验证完成后更新 epoch/loss；心跳刷新不代表模型完成了一轮。")
 
 
 def log_paths(job, step="auto", model="all"):
@@ -148,10 +198,12 @@ def log_paths(job, step="auto", model="all"):
     if model == "server":
         return [output / "server.log"]
     run = run_directory(output)
-    if model != "all":
+    runs = model_runs(run)
+    if model != "all" and runs == [run]:
         return [run / "stage_logs" / f"{model}.log"]
-    paths = [run / "stage_logs" / f"{m}.log" for m in MODELS]
-    existing = [p for p in paths if p.is_file()]
+    models = MODELS if model == "all" else (model,)
+    paths = [fold / "stage_logs" / f"{m}.log" for fold in runs for m in models]
+    existing = [p for p in paths if p.is_file() and p.resolve().is_relative_to(run.resolve())]
     return existing or [output / "server.log"]
 
 
