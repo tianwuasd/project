@@ -12,6 +12,7 @@ from uuid import uuid4
 from ..quickstart.commands import build_command
 from ..quickstart.diagnosis import OUTPUT_KEYS
 from ..recovery import archive_child
+from . import gpu_hold
 from .bootstrap import ensure_python, environment, run_logged
 from .launcher import ROOT, gpu_pool, query_gpus, select_gpus, write_json
 from .resources import wait_for_gpus
@@ -120,6 +121,9 @@ def run(args, profile, *, output_dir=None, lock_held=False, recent_gpus=()):
             )
             if not python.is_file():
                 raise ValueError("Python 路径不存在")
+            if pool:
+                gpu_hold.configure(pool)
+            claim = (lambda gpu: gpu_hold.acquire(gpu, python)) if args.task != "environment" else None
 
             def resource_update(status, detail):
                 state.update(status=status, gpu_resources=detail)
@@ -127,7 +131,7 @@ def run(args, profile, *, output_dir=None, lock_held=False, recent_gpus=()):
 
             # Training checks each stage's actual device in its worker, including
             # cards that become available later. Do not block on a full pool here.
-            gpus = wait_for_gpus(pool, count, query_gpus, resource_update) if pool else []
+            gpus = wait_for_gpus(pool, count, query_gpus, resource_update, claim=claim) if pool else []
             state["gpus"] = gpus
             state["gpu_pool"] = pool
             state["gpu_limit"] = count
@@ -168,7 +172,7 @@ def run(args, profile, *, output_dir=None, lock_held=False, recent_gpus=()):
                 state["phase_started_at"] = time.time()
                 write_json(output / "status.json", state)
                 if device == "cuda" and args.task != "train":
-                    gpus = wait_for_gpus(pool, 1, query_gpus, resource_update)
+                    gpus = wait_for_gpus(pool, 1, query_gpus, resource_update, claim=claim)
                     env["CUDA_VISIBLE_DEVICES"] = gpus[0]["uuid"]
                     state["gpus"] = gpus
                 code = run_logged(command, env, output / "server.log")

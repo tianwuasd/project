@@ -58,6 +58,9 @@ def personal_path(value):
 
 
 def query_gpus():
+    from .gpu_hold import owned_processes
+
+    held_processes = owned_processes()
     result = subprocess.run(
         [
             "nvidia-smi",
@@ -74,13 +77,27 @@ def query_gpus():
         index, uuid, name, free, util = [v.strip() for v in line.split(",")]
         rows.append(dict(index=index, uuid=uuid, name=name, free=int(free), util=int(util)))
     processes = subprocess.run(
-        ["nvidia-smi", "--query-compute-apps=gpu_uuid", "--format=csv,noheader"],
+        [
+            "nvidia-smi",
+            "--query-compute-apps=gpu_uuid" + (",pid" if held_processes else ""),
+            "--format=csv,noheader",
+        ],
         check=True,
         capture_output=True,
         text=True,
         timeout=15,
     )
-    busy = {line.strip() for line in processes.stdout.splitlines()}
+    busy = set()
+    for line in processes.stdout.splitlines():
+        if not line.strip():
+            continue
+        if held_processes:
+            gpu, pid = [s.strip() for s in line.split(",")]
+            if pid.isdigit() and held_processes.get(int(pid)) == gpu:
+                continue
+            busy.add(gpu)
+        else:
+            busy.add(line.strip())
     for row in rows:
         row["busy"] = row["uuid"] in busy
     return rows

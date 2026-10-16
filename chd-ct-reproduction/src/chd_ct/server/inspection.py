@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -251,6 +252,19 @@ def show_gpu():
         raise ValueError("显卡查询失败，请检查 NVIDIA 驱动与 nvidia-smi。")
 
 
+def watch_gpu():
+    """Refresh the read-only GPU view once per second until Ctrl+C."""
+    try:
+        while True:
+            if sys.stdout.isatty():
+                print("\033[2J\033[H", end="")
+            print("显卡状态：每 1 秒刷新；Ctrl+C 返回，后台训练继续。", flush=True)
+            show_gpu()
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n退出显卡查看，后台任务继续运行。")
+
+
 def show_processes():
     if not hasattr(os, "getuid"):
         print("进程查询需要在 Linux 服务器上执行。")
@@ -278,6 +292,9 @@ def query(args, profile):
         return 0
     if args.query == "logs":
         tail_logs(lambda: log_paths(job, args.step, args.model), args.lines, args.follow)
+        return 0
+    if args.query == "gpu" and args.follow:
+        watch_gpu()
         return 0
     try:
         while True:

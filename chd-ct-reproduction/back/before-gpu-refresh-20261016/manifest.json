@@ -1,0 +1,61 @@
+{
+  "files": [
+    {
+      "sha256": "474c95e4788f2764ec4a47d6e8023e7d28f021153f4c8c1e2280fdc6ac295f21",
+      "path": "src/chd_ct/server/inspection.py"
+    },
+    {
+      "sha256": "6b927817415d1f63d3662be38b6ba719b014697d073976db13e98c673db4be2c",
+      "path": "src/chd_ct/server/panel.py"
+    },
+    {
+      "sha256": "1cea89b517f27fc80b47b4a88c070cc9cd57d6d4dfb076ee39e7b37541062c42",
+      "path": "tests/test_server_panel.py"
+    },
+    {
+      "sha256": "fd42949b64916a42ad938be9e7937d392c4a0c0fdae8d85dacacafbe2c6d427b",
+      "path": "docs/server-start.md"
+    },
+    {
+      "sha256": "4c497c63de39f2dded9ad8b69f20a15494c2782c078041e92250457ecdbea12d",
+      "path": "pyproject.toml"
+    },
+    {
+      "sha256": "b59112c0a480ebe744e243260c83646ca676fd57d473f0d62f556d9b5e85003b",
+      "path": "src/chd_ct/__init__.py"
+    },
+    {
+      "sha256": "ecc7a2da1f67ee9bf5d0286474ff9eea22a5431f497d439adf4b3cb49a89f50a",
+      "path": ".gitattributes"
+    },
+    {
+      "path": "src/chd_ct/server/jobs.py",
+      "sha256": "7bc24311bf18072dd917fa00667f1e1b15d516fc96757310c5b68eecf8d7f6e4"
+    },
+    {
+      "path": "src/chd_ct/server/launcher.py",
+      "sha256": "bab2b57abc3555071d2db7f4d324554fc0ca87174762440495dfce826446684f"
+    },
+    {
+      "path": "src/chd_ct/server/imagechd.py",
+      "sha256": "acd067c33ad1cf36981af020dc30fe18e2902e067c2533232ee7cea44fea5a50"
+    },
+    {
+      "path": "src/chd_ct/server/resources.py",
+      "sha256": "9891d3dc08c0f9449208fc0d75cfa7813042e08c98cf66ed38f1f19536099674"
+    },
+    {
+      "path": "src/chd_ct/imagechd/train.py",
+      "sha256": "6880a05f671ac7a198ba17094ed9ebb22bb8e8439b3b2545aff390fdfa86ed0c"
+    },
+    {
+      "path": "src/chd_ct/imagechd/autotune.py",
+      "sha256": "e5a1a350851fd4ff66399044f3c8e69b7f9cd2622d78b5af092e9fbe3ecf6512"
+    },
+    {
+      "path": "src/chd_ct/server/resume.py",
+      "sha256": "3b5654a8b6c2f57fab0a9e888a03777ab4b6d8d056c03399e649e11465099349"
+    }
+  ],
+  "source_commit": "0c087e13c4962f800c3b6f223083bea0ce88392e"
+}

@@ -405,6 +405,7 @@ def train_locked(
         write_json(output / "effective-config.json", config)
         write_json(output / "models.json", collection)
         if gpu_ids:
+            from ..server import gpu_hold
             from .stage_queue import check_gpu_handoff, run_queue
 
             def command_for(stage):
@@ -432,7 +433,15 @@ def train_locked(
                 devices = query_gpus()
                 if not set(gpu_ids).intersection(r["uuid"] for r in devices):
                     raise ValueError("候选 GPU 已不可见，请检查设备或分配范围")
-                return [r["uuid"] for r in idle_gpus(devices, gpu_ids)]
+                return [r["uuid"] for r in gpu_hold.candidates(idle_gpus(devices, gpu_ids))]
+
+            def before_start(gpu, used):
+                if gpu_limit is not None:
+                    if gpu not in available():
+                        return False
+                else:
+                    check_gpu_handoff(gpu, used)
+                return gpu_hold.acquire(gpu)
 
             run_queue(
                 STAGES,
@@ -440,7 +449,7 @@ def train_locked(
                 output,
                 command_for,
                 os.environ.copy(),
-                (lambda gpu, used: gpu in available()) if gpu_limit is not None else check_gpu_handoff,
+                before_start,
                 on_complete,
                 lock_fds=(*inherited_lock_fds, lock_fd),
                 available_gpus=available if gpu_limit is not None else None,

@@ -124,9 +124,37 @@ def test_panel_queries_while_running_and_stop_requires_target_confirmation(sessi
     monkeypatch.setattr("builtins.input", lambda _: next(answers))
     seen = []
     monkeypatch.setattr(inspection, "show_gpu", lambda: seen.append("gpu"))
+
+    def leave_gpu_view(_):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(inspection.time, "sleep", leave_gpu_view)
     monkeypatch.setattr(jobs, "stop_job", lambda rt, directory: seen.append(("stop", rt, directory)) or 0)
     assert panel.run(args, profile) is False
     assert seen == ["gpu", ("stop", runtime, job)]
+
+
+def test_gpu_follow_refreshes_without_taking_training_lock(session, monkeypatch, capsys):
+    runtime, _, _, profile = session
+    args = launcher.make_parser().parse_args(["--query", "gpu", "--follow", "--runtime", str(runtime)])
+    seen = []
+    monkeypatch.setattr(inspection, "show_gpu", lambda: seen.append("sample"))
+    monkeypatch.setattr(jobs, "acquire_lock", lambda *a: pytest.fail("GPU view acquired training lock"))
+    monkeypatch.setattr(jobs, "stop_job", lambda *a, **kw: pytest.fail("GPU view stopped training"))
+
+    def advance(seconds):
+        seen.append(seconds)
+        if len(seen) >= 4:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(inspection.time, "sleep", advance)
+    assert inspection.query(args, profile) == 0
+    assert seen == ["sample", 1, "sample", 1]
+    assert "退出显卡查看" in capsys.readouterr().out
+    seen.clear()
+    args.follow = False
+    assert inspection.query(args, profile) == 0
+    assert seen == ["sample"]
 
 
 def test_history_resume_selects_exact_old_job_without_changing_pointer(session, monkeypatch):

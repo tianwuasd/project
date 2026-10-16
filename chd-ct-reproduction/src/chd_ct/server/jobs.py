@@ -66,7 +66,7 @@ def initial_state(plan):
 
 
 def execute(plan):
-    from . import imagechd
+    from . import gpu_hold, imagechd
 
     directory = Path(plan["directory"])
     state = initial_state(plan)
@@ -76,6 +76,8 @@ def execute(plan):
     code = 1
     recent_gpus = set()
     handlers = {}
+    hold_directory = None
+    previous_hold = os.environ.pop(gpu_hold.ENV, None)
 
     def interrupt(sig, frame):
         raise KeyboardInterrupt(f"收到信号 {sig}")
@@ -84,6 +86,9 @@ def execute(plan):
         if sig is not None:
             handlers[sig] = signal.signal(sig, interrupt)
     try:
+        hold_directory = gpu_hold.begin(plan)
+        if hold_directory is not None:
+            state["gpu_hold_directory"] = str(hold_directory)
         for index, step in enumerate(plan["steps"]):
             current = state["steps"][index]
             if step.get("reuse"):
@@ -147,6 +152,17 @@ def execute(plan):
         print("流程失败：" + str(error), file=sys.stderr, flush=True)
         return code
     finally:
+        cleanup_error = None
+        try:
+            gpu_hold.release(hold_directory)
+        except BaseException as error:
+            cleanup_error = error
+            code = 1
+            state.update(status="failed", error="GPU 保留清理失败：" + str(error))
+        finally:
+            os.environ.pop(gpu_hold.ENV, None)
+            if previous_hold is not None:
+                os.environ[gpu_hold.ENV] = previous_hold
         for step in state["steps"]:
             if step["status"] == "running":
                 step.update(status=state["status"], exit_code=code, ended_at=now())
@@ -154,6 +170,8 @@ def execute(plan):
         write_json(state_file, state)
         for sig, handler in handlers.items():
             signal.signal(sig, handler)
+        if cleanup_error is not None:
+            raise cleanup_error
 
 
 def submit(plan, lock, foreground=False):
@@ -319,6 +337,12 @@ def show_status(runtime, directory=None):
     print(
         f"名称：{state.get('name') or directory.name}\n状态：{status}\n任务：{directory}\n日志：{state.get('log', directory / 'launcher.log')}"
     )
+    if state.get("gpu_hold_directory"):
+        from .gpu_hold import alive, records
+
+        held = [r["gpu"] for r in records(Path(state["gpu_hold_directory"])) if alive(r)]
+        if held:
+            print(f"保留 {len(held)} 张 GPU 至整个所选流程结束：" + ", ".join(held))
     for step in state["steps"]:
         label = (
             "未知（主进程已退出，最后记录 running，子进程待核实）"

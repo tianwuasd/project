@@ -82,6 +82,7 @@ def verify_snapshot(record):
 
 
 def live_commands(plan):
+    from .gpu_hold import records
     from .inspection import model_runs
     from .jobs import identity
 
@@ -110,6 +111,10 @@ def live_commands(plan):
                         and identity(record["pid"]) == record["identity"]
                     ):
                         live[record["pid"]] = dict(record, process_group=False)
+    for folder in (Path(plan["directory"]) / "gpu-holds").glob("*"):
+        for record in records(folder):
+            if record.get("identity") and identity(record["pid"]) == record["identity"]:
+                live[record["pid"]] = dict(record, process_group=True)
     return list(live.values())
 
 

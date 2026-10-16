@@ -67,6 +67,11 @@ def trial(request, folder, seconds):
                 stdout=log,
                 stderr=subprocess.STDOUT,
                 start_new_session=os.name == "posix",
+                **(
+                    {"pass_fds": (int(env["CHD_RUNTIME_LOCK_FD"]),)}
+                    if os.name == "posix" and env.get("CHD_RUNTIME_LOCK_FD")
+                    else {}
+                ),
             )
             deadline = time.monotonic() + seconds
             while True:

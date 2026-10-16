@@ -68,7 +68,7 @@ def run(args, profile):
             )
         else:
             print("尚无任务记录。")
-        print("s 任务进度  g 显卡状态  m 模型 epoch/loss  l 详细日志  p 我的进程")
+        print("s 任务进度  g 显卡状态（1秒刷新）  m 模型 epoch/loss  l 详细日志  p 我的进程")
         print("h 历史任务与日志  u 更新程序（多镜像）  0/q 退出面板（后台任务继续）")
         print("x 中断当前任务（保留检查点）" if active else "n 新建并命名任务  r 选择历史任务续跑")
         print("各输入页：b 返回面板，q 退出程序。")
@@ -77,7 +77,7 @@ def run(args, profile):
             if action == "0":
                 return False
             if action == "g":
-                inspection.show_gpu()
+                inspection.watch_gpu()
             elif action == "p":
                 inspection.show_processes()
             elif action in {"s", "m", "l"}:

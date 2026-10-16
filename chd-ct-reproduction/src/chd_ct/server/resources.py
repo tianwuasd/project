@@ -2,17 +2,20 @@
 
 import time
 
+from . import gpu_hold
 from .launcher import idle_gpus
 
 
-def wait_for_gpus(pool, limit, query, on_update, interval=5):
+def wait_for_gpus(pool, limit, query, on_update, interval=5, claim=None):
     """Return up to limit cards as soon as ONE is idle; never wait to fill the cap."""
     started, announced = time.monotonic(), None
     while True:
         rows = query()  # Driver/query failures are errors, not a reason to wait forever.
         if not set(pool).intersection(r["uuid"] for r in rows):
             raise ValueError("候选 GPU 已不可见，请检查设备或分配范围")
-        ready = idle_gpus(rows, pool)[:limit]
+        ready = gpu_hold.candidates(idle_gpus(rows, pool))[:limit]
+        if claim:
+            ready = [r for r in ready if claim(r["uuid"])]
         elapsed = int(time.monotonic() - started)
         detail = dict(
             requested_gpus=limit,
