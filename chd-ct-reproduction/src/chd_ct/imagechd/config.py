@@ -7,6 +7,7 @@ import yaml
 
 from ..models import BiConvLSTM, CHDUNet
 from ..models.chd_unet import ARCHITECTURE
+from .loading import validate_settings
 
 STAGES = ("crop64", "crop128", "all64", "all128", "blood2d", "blood_lstm")
 UNAVAILABLE = {
@@ -21,6 +22,7 @@ def load_config(path):
         raise ValueError("配置必须包含全部六个 CHD 阶段")
     if config.get("architecture") != ARCHITECTURE:
         raise ValueError("旧配置或主干 architecture 不匹配；请使用当前 configs/chd.yaml")
+    validate_settings(config)
     cv = config.setdefault("cross_validation", {"folds": 1, "development_scope": "auto"})
     if (
         not isinstance(cv, dict)

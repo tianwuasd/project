@@ -7,3 +7,4 @@ src/chd_ct/models/reference/* -text -whitespace
 back/before-paper-alignment-20261013/** -text -whitespace
 back/before-threefold-training-20261015/** -text -whitespace
 back/preprocess-before-excel-20261013/** -text -whitespace
+back/before-cpu-optimization-20261016/** -text -whitespace

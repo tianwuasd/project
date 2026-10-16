@@ -2,6 +2,18 @@
 profile: chd
 seed: 42
 threads: 2
+data_loading:
+  auto_tune: true
+  workers: 4
+  worker_threads: 1
+  prefetch_factor: 2
+  persistent_workers: true
+  pin_memory: true
+  cache: mmap
+  cache_max_gib: 32
+  cache_reserve_gib: 2
+  tune_seconds: 180
+  progress_seconds: 30
 roi_margin: 3
 augment: true
 learning_rate: 0.0002

@@ -6,11 +6,11 @@ import json
 import os
 import random
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
 
 from ..models.chd_unet import ARCHITECTURE, GRID_ADAPTER
 from ..paths import config_path
@@ -19,6 +19,7 @@ from .augment import augment_batch
 from .common import LABELS, MODEL_FORMAT, NORMALIZATION, load_case, read_prepared, write_json
 from .config import STAGES, UNAVAILABLE, build_model, effective_config, load_config, weights_for
 from .dataset import StageDataset
+from .loading import close_loader, make_loader, settings, start_epoch
 from .losses import masked_loss
 
 
@@ -44,6 +45,24 @@ def recurrent_features(encoder, sequence):
 
 
 def train_stage(directory, rows, stage, config, output, mode, manifest_hash, resume=False):
+    from .autotune import cache_directory
+
+    torch.set_num_threads(config["threads"])
+    stage_seed = config["seed"] + 10000 * config.get("fold", {}).get("index", 0) + STAGES.index(stage)
+    loaders = {}
+    started = time.perf_counter()
+    try:
+        for split, selected in rows.items():
+            dataset = StageDataset(directory, selected, stage, config, cache_directory(directory, config))
+            loaders[split] = make_loader(dataset, config, stage, split, stage_seed)
+        print(f"[input-ready] {stage}: {time.perf_counter() - started:.2f}s", flush=True)
+        return _train_stage(directory, rows, stage, config, output, mode, manifest_hash, resume, loaders)
+    finally:
+        for loader in loaders.values():
+            close_loader(loader)
+
+
+def _train_stage(directory, rows, stage, config, output, mode, manifest_hash, resume, loaders):
     torch.set_num_threads(config["threads"])
     stage_seed = config["seed"] + 10000 * config.get("fold", {}).get("index", 0) + STAGES.index(stage)
     torch.manual_seed(stage_seed)
@@ -51,15 +70,6 @@ def train_stage(directory, rows, stage, config, output, mode, manifest_hash, res
     random.seed(stage_seed)
     spec = config["stages"][stage]
     model = build_model(stage, spec).to(config["device"])
-    loaders = {
-        s: DataLoader(
-            StageDataset(directory, rs, stage, config),
-            batch_size=spec["batch"],
-            shuffle=s == "train",
-            num_workers=0,
-        )
-        for s, rs in rows.items()
-    }
     encoder, encoder_record = None, None
     if stage == "blood_lstm":
         encoder_record = torch.load(output / "blood2d.pt", map_location="cpu", weights_only=True)
@@ -83,6 +93,8 @@ def train_stage(directory, rows, stage, config, output, mode, manifest_hash, res
         encoder_sha256=file_hash(output / "blood2d.pt") if encoder is not None else None,
     )
     start, best_bytes = 0, None
+    timing_path = output / (stage + ".timing.json")
+    timings = read_json(timing_path) if resume and timing_path.is_file() else []
     if resume and last_file.is_file():
         last = torch.load(last_file, map_location="cpu", weights_only=True)
         if last.get("contract") != contract:
@@ -113,13 +125,25 @@ def train_stage(directory, rows, stage, config, output, mode, manifest_hash, res
         for group in optimizer.param_groups:
             group["lr"] = lr
         losses, samples = {}, {}
+        epoch_timing = {"epoch": epoch + 1, "splits": {}}
         for split, loader in loaders.items():
             model.train(split == "train")
             total, count = 0.0, 0
-            for step, (image, target) in enumerate(loader):
-                if maximum is not None and step >= maximum:
-                    break
-                image, target = image.to(config["device"]), target.to(config["device"])
+            split_start = time.perf_counter()
+            iterator = start_epoch(loader, "data_loading" in config)
+            waiting, compute = 0.0, 0.0
+            last_progress = split_start
+            steps = min(maximum, len(loader)) if maximum else len(loader)
+            for step in range(steps):
+                before = time.perf_counter()
+                image, target = next(iterator)
+                waiting += time.perf_counter() - before
+                before = time.perf_counter()
+                non_blocking = config["device"] == "cuda" and settings(config)["pin_memory"]
+                image, target = (
+                    image.to(config["device"], non_blocking=non_blocking),
+                    target.to(config["device"], non_blocking=non_blocking),
+                )
                 if split == "train" and config.get("augment"):
                     image, target = augment_batch(image, target)
                 with torch.set_grad_enabled(split == "train"):
@@ -133,9 +157,39 @@ def train_stage(directory, rows, stage, config, output, mode, manifest_hash, res
                         optimizer.step()
                 total += float(loss.detach()) * len(image)
                 count += len(image)
+                # loss.item above synchronizes CUDA; this bucket includes transfer,
+                # augmentation and model work, not a misleading CPU launch time.
+                compute += time.perf_counter() - before
+                now = time.perf_counter()
+                if now - last_progress >= settings(config)["progress_seconds"]:
+                    print(
+                        json.dumps(
+                            dict(
+                                event="batch_progress",
+                                stage=stage,
+                                epoch=epoch + 1,
+                                split=split,
+                                batch=step + 1,
+                                batches=steps,
+                                samples=count,
+                                elapsed_seconds=now - split_start,
+                                data_wait_seconds=waiting,
+                            )
+                        ),
+                        flush=True,
+                    )
+                    last_progress = now
             if not count:
                 raise ValueError("阶段没有可用样本")
             losses[split], samples[split] = total / count, count
+            epoch_timing["splits"][split] = dict(
+                samples=count,
+                seconds=time.perf_counter() - split_start,
+                data_wait_seconds=waiting,
+                transfer_augment_compute_seconds=compute,
+            )
+        timings = [t for t in timings if t["epoch"] < epoch + 1] + [epoch_timing]
+        write_json(timing_path, timings)
         history.append({"epoch": epoch + 1, "learning_rate": lr, "loss": losses, "samples_seen": samples})
         print(json.dumps({"stage": stage, **history[-1]}), flush=True)
         if losses["val"] < best:
@@ -322,6 +376,11 @@ def train_locked(
                     load_case(directory, row)
             report["status"] = "checked"
             return report
+        from .autotune import resolve
+
+        config = resolve(
+            config, directory, rows["train"], output, gpu_limit or len(gpu_ids or []) or 1, resume
+        )
         config = effective_config(config, mode, device)
         torch.set_num_threads(config["threads"])
         torch.manual_seed(config["seed"])

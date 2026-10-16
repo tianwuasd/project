@@ -21,6 +21,13 @@ def train_threefold(prepared, output, config_path, mode, device, gpu_ids, resume
     if mode == "train" and (data.get("limit") is not None or source.get("profile") == "smoke"):
         raise ValueError("limit 缓存/smoke 配置不能冒充正式训练")
     plan = make_plan(data, source["seed"], source["cross_validation"]["development_scope"])
+    if mode != "check":
+        from .autotune import resolve
+        from .folds import apply_fold
+        from .train import training_rows
+
+        rows = training_rows(apply_fold(data, plan["folds"][0]))["train"]
+        source = resolve(source, directory, rows, output, gpu_limit or len(gpu_ids or []) or 1, resume)
     config = effective_config(source, mode, device)
     output = Path(output)
     contract = {

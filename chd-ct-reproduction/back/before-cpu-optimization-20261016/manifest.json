@@ -1,0 +1,15 @@
+{
+  "source_commit": "57dee0d0fddba5a357cf298a738c8487367ea473",
+  "files": {
+    "src/chd_ct/imagechd/dataset.py": "5f09531ee7786529896bc32a876bc8cdceb23c6ff3b82d61dc0db4e28e057013",
+    "src/chd_ct/imagechd/train.py": "2a170c3b9a93d280f451468d2e1d86156716f08d9e9b2c4e4c5968925ab9e7f7",
+    "src/chd_ct/imagechd/config.py": "ead5ae892c13c1df61a6960315d49edae5e45c72a1f0a16857ff3c80897343a1",
+    "configs/servers/zmic44.json": "e448b414c8303d896d3dae8a7656a8cb8013d373a91f6e1cf69a0b9c305ecd6c",
+    "docs/server-start.md": "d1b8b6f45be29b4a6e7ee1744a9d0e78df651d0351a05ca17faa2744dcefff07",
+    "README.md": "2f56d85699c350791814df7463594484798264fa4af67bb919e14fa564e6b694",
+    ".gitattributes": "503d7ec60d1c8410abc07839c5040feb5e80039986cbfc3b71cbf5a37de0975e",
+    "src/chd_ct/imagechd/cross_validation.py": "204a050a689455ff1af4cd141d727675167b4790301003d528b1a7a0a180e73a",
+    "configs/chd.yaml": "2129d85e34ae82e595742e28156af47c93f26314fba5a715768c927113227e41",
+    "src/chd_ct/presets/chd.yaml": "2129d85e34ae82e595742e28156af47c93f26314fba5a715768c927113227e41"
+  }
+}
