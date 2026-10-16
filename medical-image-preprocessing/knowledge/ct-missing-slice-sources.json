@@ -1,0 +1,410 @@
+{
+  "topic": "CT missing-slice estimation and interpolation",
+  "checked_date": "2026-10-16",
+  "scope": "Focused literature collection, not an exhaustive systematic review or a repair experiment. Public metadata excludes patient identifiers, medical files and local absolute paths.",
+  "queries": [
+    "CT missing slice interpolation github",
+    "medical slice interpolation 2024 2025 2026 github",
+    "cardiac slice interpolation CT",
+    "coronary missing slices interpolation CT",
+    "SAINT medical slice synthesis",
+    "Self-supervised medical slice interpolation controllable feature flow",
+    "An Anisotropic Cross-View Texture Transfer",
+    "Registration-based interpolation Penney",
+    "Medical image interpolation based on multi-resolution registration",
+    "SAGCNet missing slice CMR"
+  ],
+  "records": [
+    {
+      "id": "R01",
+      "title": "Registration-based interpolation",
+      "publication": "2004",
+      "venue": "IEEE Transactions on Medical Imaging",
+      "doi": "10.1109/TMI.2004.828352",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/15250644/",
+      "reading_level": "abstract_only",
+      "reading_scope": "PubMed abstract and author institution record",
+      "claim": "B-spline nonrigid registration followed by intensity interpolation along correspondences; abstract reports 20 tomographic datasets.",
+      "claim_type": "source_supported_summary",
+      "limitations": "Cohort details and coronary validation not verified.",
+      "checked_date": "2026-10-16",
+      "experiment_executed": false
+    },
+    {
+      "id": "R02",
+      "title": "A new method for registration-based medical image interpolation",
+      "publication": "2008",
+      "venue": "IEEE Transactions on Medical Imaging",
+      "doi": "10.1109/TMI.2007.907324",
+      "source_url": "https://pubmed.ncbi.nlm.nih.gov/18334432/",
+      "reading_level": "abstract_only",
+      "reading_scope": "PubMed abstract",
+      "claim": "Modified control-grid registration and cubic interpolation of corresponding intensities.",
+      "claim_type": "source_supported_summary",
+      "limitations": "No executable implementation or target-domain validation verified.",
+      "checked_date": "2026-10-16",
+      "experiment_executed": false
+    },
+    {
+      "id": "R03",
+      "title": "Medical image interpolation based on multi-resolution registration",
+      "publication": "2013",
+      "venue": "Computers & Mathematics with Applications",
+      "doi": "10.1016/j.camwa.2013.04.026",
+      "source_url": "https://www.sciencedirect.com/science/article/pii/S0898122113002538",
+      "reading_level": "publisher_abstract_indexed",
+      "reading_scope": "Publisher abstract; description and reference in R05",
+      "claim": "Multiresolution B-spline registration followed by linear or cubic intensity interpolation.",
+      "claim_type": "source_supported_summary",
+      "limitations": "Direct publisher open failed; full text not obtained. No code availability conclusion.",
+      "checked_date": "2026-10-16",
+      "experiment_executed": false
+    },
+    {
+      "id": "R04",
+      "title": "An Optimization Method For Slice Interpolation Of Medical Images",
+      "publication": "2014",
+      "venue": "arXiv",
+      "doi": "10.48550/arXiv.1402.0936",
+      "source_url": "https://arxiv.org/abs/1402.0936",
+      "reading_level": "targeted_full_text",
+      "reading_scope": "PDF pages 1 and 3; abstract",
+      "claim": "Curvature-constrained registration estimates intermediate slices between known images.",
+      "claim_type": "source_supported_summary",
+      "limitations": "Limited illustrative evaluation; no coronary CT validation established.",
+      "checked_date": "2026-10-16",
+      "experiment_executed": false,
+      "local_pdf": {
+        "filename": "2014_Optimization_Slice_Interpolation.pdf",
+        "sha256": "10643612246a623f7f29b75a0e4eac03424393d9be76972a8818b15f1fe2357c",
+        "pages": 4,
+        "distribution": "local-only; not committed",
+        "download_url": "https://arxiv.org/pdf/1402.0936v2"
+      }
+    },
+    {
+      "id": "R05",
+      "title": "Convolutional Neural Networks vs. Deformable Image Registration For Medical Slice Interpolation",
+      "publication": "2020",
+      "venue": "arXiv; submitted to LISAT 2020",
+      "doi": "10.48550/arXiv.2004.13784",
+      "source_url": "https://arxiv.org/abs/2004.13784",
+      "reading_level": "targeted_full_text",
+      "reading_scope": "HTML introduction, methods and evaluation; PDF pages 3-4",
+      "claim": "Comparison uses withheld even slices in chest CT and brain MRI, evaluating error, similarity and sharpness.",
+      "claim_type": "source_supported_summary",
+      "limitations": "Small experimental datasets; sharpness is not the same as faithful anatomy.",
+      "checked_date": "2026-10-16",
+      "experiment_executed": false,
+      "local_pdf": {
+        "filename": "2020_CNN_vs_Registration.pdf",
+        "sha256": "5026ec9f02caa2597aba68346db056b2743c06fec2de5d247b02239ac56e602c",
+        "pages": 5,
+        "distribution": "local-only; not committed",
+        "download_url": "https://arxiv.org/pdf/2004.13784"
+      }
+    },
+    {
+      "id": "R06",
+      "title": "SAINT: Spatially Aware Interpolation NeTwork for Medical Slice Synthesis",
+      "publication": "2020",
+      "venue": "CVPR",
+      "doi": null,
+      "source_url": "https://openaccess.thecvf.com/content_CVPR_2020/html/Peng_SAINT_Spatially_Aware_Interpolation_NeTwork_for_Medical_Slice_Synthesis_CVPR_2020_paper.html",
+      "reading_level": "abstract_and_repository",
+      "reading_scope": "Paper abstract and first-page introduction; author README and repository tree",
+      "claim": "Spatially aware medical slice synthesis evaluated on abdominal CT; author checkpoint documentation supports x4 and x6.",
+      "claim_type": "source_supported_summary",
+      "limitations": "Checkpoint availability is not execution verification; no confirmed x2/x3 checkpoint in inspected tree.",
+      "checked_date": "2026-10-16",
+      "experiment_executed": false,
+      "local_pdf": {
+        "filename": "2020_SAINT.pdf",
+        "sha256": "2cbe7cff8806d187baa92a4a5a2be12fd1ac9236ccbade3829a55da9dbc0e47a",
+        "pages": 10,
+        "distribution": "local-only; not committed",
+        "download_url": "https://openaccess.thecvf.com/content_CVPR_2020/papers/Peng_SAINT_Spatially_Aware_Interpolation_NeTwork_for_Medical_Slice_Synthesis_CVPR_2020_paper.pdf"
+      }
+    },
+    {
+      "id": "R07",
+      "title": "Slice imputation: Multiple intermediate slices interpolation for anisotropic 3D medical image segmentation",
+      "publication": "2022",
+      "venue": "Computers in Biology and Medicine",
+      "doi": "10.1016/j.compbiomed.2022.105667",
+      "source_url": "https://par.nsf.gov/servlets/purl/10479767",
+      "reading_level": "targeted_full_text",
+      "reading_scope": "Abstract, method overview, section 4.1 datasets and evaluation, PDF page 5",
+      "claim": "Synthesizes intermediate slices and labels, with evaluation including CT liver tumor and brain/prostate MRI segmentation.",
+      "claim_type": "source_supported_summary",
+      "limitations": "No author code confirmed in this search. Downstream segmentation benefits do not establish coronary missing-slice fidelity.",
+      "checked_date": "2026-10-16",
+      "experiment_executed": false,
+      "local_pdf": {
+        "filename": "2022_Slice_Imputation.pdf",
+        "sha256": "fce70ce1c0e00bfb7763c831bf503b5b78487eb96357a23d8daa1dcb23e4647e",
+        "pages": 10,
+        "distribution": "local-only; not committed",
+        "download_url": "https://par.nsf.gov/servlets/purl/10479767"
+      }
+    },
+    {
+      "id": "R08",
+      "title": "Self-supervised medical slice interpolation network using controllable feature flow",
+      "publication": "2024 issue; 2023 DOI",
+      "venue": "Expert Systems with Applications",
+      "doi": "10.1016/j.eswa.2023.121943",
+      "source_url": "https://www.sciencedirect.com/science/article/pii/S0957417423024454",
+      "reading_level": "publisher_abstract_and_repository",
+      "reading_scope": "Indexed publisher abstract; author README, full repository tree and test entry source",
+      "claim": "CFFNet uses position-conditioned feature flow; published abstract includes hepatic-vessel evaluation.",
+      "claim_type": "source_supported_summary",
+      "limitations": "Full paper not obtained. Test branch N_ot=2 uses 0.25,0.75, not equal-gap 1/3,2/3; imported utils/options directories not found in inspected tree.",
+      "checked_date": "2026-10-16",
+      "experiment_executed": false
+    },
+    {
+      "id": "R09",
+      "title": "I3Net: Inter-Intra-slice Interpolation Network for Medical Slice Synthesis",
+      "publication": "2024",
+      "venue": "IEEE Transactions on Medical Imaging",
+      "doi": "10.1109/TMI.2024.3394033",
+      "source_url": "https://arxiv.org/html/2405.02857v1",
+      "reading_level": "targeted_full_text_and_repository",
+      "reading_scope": "HTML method overview, section IV-A datasets/implementation, selected discussion; author repository tree",
+      "claim": "Inter/intra-slice and cross-view synthesis; abdominal CT and brain MRI; inspected Colon_x2/x4/x6 checkpoint files.",
+      "claim_type": "source_supported_summary",
+      "limitations": "No coronary validation or x3 checkpoint confirmed. Registry license field is null; this is not an inferred redistribution license.",
+      "checked_date": "2026-10-16",
+      "experiment_executed": false,
+      "local_pdf": {
+        "filename": "2024_I3Net.pdf",
+        "sha256": "7fbe166bc8a6f8e930b2f761a9c75b76c30b655c8e5c07675d2e7504312c864b",
+        "pages": 13,
+        "distribution": "local-only; not committed",
+        "download_url": "https://arxiv.org/pdf/2405.02857"
+      }
+    },
+    {
+      "id": "R10",
+      "title": "An Anisotropic Cross-View Texture Transfer with Multi-Reference Non-Local Attention for CT Slice Interpolation",
+      "publication": "2025 preprint; 2026 journal issue",
+      "venue": "IEEE Transactions on Medical Imaging",
+      "doi": "10.1109/TMI.2025.3596957",
+      "source_url": "https://arxiv.org/html/2509.20242v1",
+      "reading_level": "targeted_full_text_and_repository",
+      "reading_scope": "HTML method overview and dataset sections; repository README/tree; author institution publication record",
+      "claim": "ACVTT uses in-plane references for through-plane synthesis; includes RPLHR-CT real pairs and synthetically downsampled data.",
+      "claim_type": "source_supported_summary",
+      "limitations": "README supports x2,x3,x4,x5; no common-extension weight files found in inspected full tree. This does not rule out other distribution channels.",
+      "checked_date": "2026-10-16",
+      "experiment_executed": false,
+      "local_pdf": {
+        "filename": "2025_ACVTT_preprint.pdf",
+        "sha256": "e74a59fa46d67fb8fc1e48885de9b6decb69a0ac16dcff9fc958f0bbe8a0cff1",
+        "pages": 14,
+        "distribution": "local-only; not committed",
+        "download_url": "https://arxiv.org/pdf/2509.20242"
+      }
+    },
+    {
+      "id": "R11",
+      "title": "SAGCNet: Spatial-Aware Graph Completion Network for Missing Slice Imputation in Population CMR Imaging",
+      "publication": "2025",
+      "venue": "MICCAI",
+      "doi": null,
+      "source_url": "https://papers.miccai.org/miccai-2025/paper/0554_paper.pdf",
+      "reading_level": "targeted_full_text_and_repository",
+      "reading_scope": "PDF abstract and page 6 datasets; author README and tree",
+      "claim": "Missing-slice synthesis in cardiac MRI using volumetric graph/context information.",
+      "claim_type": "source_supported_summary",
+      "limitations": "Related modality, not CT; inspected author repository contains only README and says code will be uploaded soon.",
+      "checked_date": "2026-10-16",
+      "experiment_executed": false,
+      "local_pdf": {
+        "filename": "2025_SAGCNet_CMR.pdf",
+        "sha256": "c87ab3809a4ff668976217f5e4a9ddd7caa20842d2668f757c3b91f6cfac25d1",
+        "pages": 10,
+        "distribution": "local-only; not committed",
+        "download_url": "https://papers.miccai.org/miccai-2025/paper/0554_paper.pdf"
+      }
+    },
+    {
+      "id": "R12",
+      "title": "CardioInterp: Generative Modeling for Cardiovascular OCT Interpolation with Anatomical Continuity and Fidelity",
+      "publication": "2025",
+      "venue": "MICCAI",
+      "doi": null,
+      "source_url": "https://papers.miccai.org/miccai-2025/paper/2405_paper.pdf",
+      "reading_level": "targeted_full_text",
+      "reading_scope": "Abstract, introduction and method overview in online PDF",
+      "claim": "Intermediate B-slice synthesis for cardiovascular OCT.",
+      "claim_type": "source_supported_summary",
+      "limitations": "OCT is not coronary CT. Author code link noted but repository not independently inspected.",
+      "checked_date": "2026-10-16",
+      "experiment_executed": false,
+      "local_pdf": {
+        "filename": "2025_CardioInterp_OCT.pdf",
+        "sha256": "a6b7acf0d4f9122ea4ea24a1ef7d7663651e3f03d195d394e2f5dfcfb8bd4b87",
+        "pages": 10,
+        "distribution": "local-only; not committed",
+        "download_url": "https://papers.miccai.org/miccai-2025/paper/2405_paper.pdf"
+      }
+    },
+    {
+      "id": "R13",
+      "title": "VascuSR: Iterative Anatomy-Aware Diffusion for CT Super-Resolution",
+      "publication": "2026-10-14 preprint",
+      "venue": "arXiv",
+      "doi": "10.48550/arXiv.2610.20509",
+      "source_url": "https://arxiv.org/abs/2610.20509",
+      "reading_level": "targeted_full_text",
+      "reading_scope": "Abstract and PDF pages 4,24,25",
+      "claim": "In-plane CT super-resolution with 3D vascular guidance; appendix includes coronary examples.",
+      "claim_type": "source_supported_summary",
+      "limitations": "Not through-plane missing-slice interpolation; recent preprint, not independently reproduced.",
+      "checked_date": "2026-10-16",
+      "experiment_executed": false,
+      "local_pdf": {
+        "filename": "2026_VascuSR_preprint.pdf",
+        "sha256": "ee1fb00281025c71002d97977eab7e4e49c7103f42e979bd22e78f6cec958b2a",
+        "pages": 25,
+        "distribution": "local-only; not committed",
+        "download_url": "https://arxiv.org/pdf/2610.20509"
+      }
+    }
+  ],
+  "repository_checks": [
+    {
+      "repo": "cpeng93/SAINT",
+      "url": "https://github.com/cpeng93/SAINT",
+      "checked_date": "2026-10-16",
+      "code_executed": false,
+      "weights_loaded": false,
+      "status": "inspected",
+      "default_branch": "master",
+      "tree_truncated": false,
+      "license": null,
+      "weight_files": [
+        {
+          "path": "SAINT_ckpt/model_comb.pt",
+          "bytes": 12677009,
+          "git_sha": "41f2323cecfd7ea015cfef279b73db8d01796ea7"
+        },
+        {
+          "path": "test_set.pt",
+          "bytes": 11364,
+          "git_sha": "deab30658968113ebc314bd4588fa6ac62f66b07"
+        }
+      ],
+      "tree_response_sha": "a4a1b8f9c7b74a5c5d00b8b08132ff15a1e65802",
+      "commit_sha": "a4a1b8f9c7b74a5c5d00b8b08132ff15a1e65802",
+      "commit_tree_sha": "396c33aa0cd862bd8edd07166e8b6d5b07096b40"
+    },
+    {
+      "repo": "eeeric-code/I3Net",
+      "url": "https://github.com/eeeric-code/I3Net",
+      "checked_date": "2026-10-16",
+      "code_executed": false,
+      "weights_loaded": false,
+      "status": "inspected",
+      "default_branch": "master",
+      "tree_truncated": false,
+      "license": null,
+      "weight_files": [
+        {
+          "path": "data_prepare/test_set.pt",
+          "bytes": 11364,
+          "git_sha": "deab30658968113ebc314bd4588fa6ac62f66b07"
+        },
+        {
+          "path": "experiments/i3net/Colon_x2/pth/1500.pth",
+          "bytes": 93011609,
+          "git_sha": "f911dac105979035ee2e039c3df7b938706f7ade"
+        },
+        {
+          "path": "experiments/i3net/Colon_x4/pth/1500.pth",
+          "bytes": 93025433,
+          "git_sha": "65351bdfd66fe1e5a6f218ac5d11a81663077590"
+        },
+        {
+          "path": "experiments/i3net/Colon_x6/pth/1500.pth",
+          "bytes": 93039321,
+          "git_sha": "b36e31474cef78a4e3017a4f2cb04bfd61fc1967"
+        }
+      ],
+      "tree_response_sha": "30be7ba7b214de62a40be5b311867d9f430e6b2e",
+      "commit_sha": "30be7ba7b214de62a40be5b311867d9f430e6b2e",
+      "commit_tree_sha": "f00bdc0f6996dcf116787f4a637db50fa4203844"
+    },
+    {
+      "repo": "khuhm/ACVTT",
+      "url": "https://github.com/khuhm/ACVTT",
+      "checked_date": "2026-10-16",
+      "code_executed": false,
+      "weights_loaded": false,
+      "status": "inspected",
+      "default_branch": "main",
+      "tree_truncated": false,
+      "license": "Apache-2.0",
+      "weight_files": [],
+      "tree_response_sha": "118ac1bbfaedb9c25eef3a7dbb88fcecaf492f20",
+      "commit_sha": "118ac1bbfaedb9c25eef3a7dbb88fcecaf492f20",
+      "commit_tree_sha": "9975e84ef91d383fb6e9a527be8bc8d88b3ff7a6"
+    },
+    {
+      "repo": "lpcccc-cv/CFFNet",
+      "url": "https://github.com/lpcccc-cv/CFFNet",
+      "checked_date": "2026-10-16",
+      "code_executed": false,
+      "weights_loaded": false,
+      "status": "inspected",
+      "default_branch": "main",
+      "tree_truncated": false,
+      "license": "MIT",
+      "weight_files": [
+        {
+          "path": "check_points/x2.pth",
+          "bytes": 6058459,
+          "git_sha": "86375d544549bea11d0d4744494a0efb313f6057"
+        },
+        {
+          "path": "check_points/x4.pth",
+          "bytes": 6058459,
+          "git_sha": "09699fc10d542ce1565fdd474423bc153d53be34"
+        },
+        {
+          "path": "check_points/x6.pth",
+          "bytes": 6058459,
+          "git_sha": "368c2838472add2a5cd11197eb277257f9f40bcf"
+        }
+      ],
+      "availability_note": "Weights listed, not loaded; test entry has missing local import directories and N_ot=2 quarter-position branch.",
+      "tree_response_sha": "55646bab3a89fec260bbc157a348f5e1b01872b7",
+      "commit_sha": "55646bab3a89fec260bbc157a348f5e1b01872b7",
+      "commit_tree_sha": "fbd0acd459b4a73c368572d51f24600bce0367f2"
+    },
+    {
+      "repo": "JK-Liu7/SAGCNet",
+      "url": "https://github.com/JK-Liu7/SAGCNet",
+      "checked_date": "2026-10-16",
+      "code_executed": false,
+      "weights_loaded": false,
+      "status": "inspected",
+      "default_branch": "main",
+      "tree_truncated": false,
+      "license": null,
+      "weight_files": [],
+      "availability_note": "Only README exists in the inspected full repository tree; implementation pending.",
+      "tree_response_sha": "4e212f0499e3d9ed15d166a05c22664da1074240",
+      "commit_sha": "4e212f0499e3d9ed15d166a05c22664da1074240",
+      "commit_tree_sha": "b31101ba1cce206f1193f3d68eb7275d910d2162"
+    }
+  ],
+  "source_notes": [
+    "Published year, online year and preprint date are distinguished where verified.",
+    "Abstract-only evidence is not treated as full-paper review.",
+    "Downloaded PDF hashes identify reading copies; PDF files remain local-only.",
+    "Author code and weight metadata were inspected, but no training or inference ran."
+  ]
+}

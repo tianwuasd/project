@@ -4,6 +4,8 @@
 
 建议先读 [学习路线](learning-path.md)，再按问题查 [主题总结](medical-preprocessing.md) 与 [公式和陷阱](formulas-and-pitfalls.md)。[课程章节索引](course-index.md) 覆盖完整课程的 19 讲与 3 个演示，并串联 D2L、优化与卷积补充资料。[代码清单](code-inventory.md) 说明实际找到的代码、适用范围及需要修正的地方。
 
+新增 [CT 缺失切片补全专题](ct-missing-slice-reconstruction.md)：整理数学配准、切片合成网络、模型倍率限制和验证流程。[结构化来源清单](ct-missing-slice-sources.json) 记录 13 项研究及 5 个作者仓库的检查范围。论文原件与患者级检查记录仅在本地保存。
+
 ## 收集范围与证据
 
 2026-10-13 在“知识学习”根目录扫描 3,486 个文件，保留 84 份直接相关来源：50 篇 Markdown、22 份 PDF、2 个 Notebook、6 张 PNG 和 4 张 SVG。按文件 SHA256 去重后仍为 84 份；不存在完全相同的选中文件。Markdown 和 Notebook 的相关段落、公式、静态代码用于本次整理；PDF 和图片保留为原始证据，未在本轮逐页重新核验。

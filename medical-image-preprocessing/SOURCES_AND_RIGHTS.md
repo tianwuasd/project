@@ -7,6 +7,7 @@
 - [项目清单](projects/inventory.json)记录五个官方项目、版本、许可和所选源码入口；[文件清单](projects/file-manifest.json)按项目汇总导出文件。
 - [upstream/sources.json](upstream/sources.json)为官方源码的详细来源记录，每个项目记录 Git commit，每个文件记录固定版本 URL、原件 SHA-256、导出 SHA-256、字节数及改动。
 - 书籍和课程在各自目录中记录书名、章节、PDF 物理页码或原始笔记位置。书籍路径的 `ebooks/` 代表原电子书根目录，绝对路径仅保存在本地记录中。物理页码与印刷页码不可混用。
+- CT 缺失切片专题以 [knowledge/ct-missing-slice-sources.json](knowledge/ct-missing-slice-sources.json) 为准，记录原文链接、读取范围、PDF 指纹及作者仓库版本。2026-10-16 获取的 9 篇公开 PDF、提取文字和患者级核验资料保存在 `local-only/ct-missing-slice/`；公开版同步原创归纳与来源记录，不包含论文全文、模型权重或患者编号。
 - 清理过的 notebook 保留代码、说明与出处，删除输出、执行计数、附件及无关元数据，并添加改动说明。清理后哈希与原件不同是预期行为。
 
 ## 许可边界

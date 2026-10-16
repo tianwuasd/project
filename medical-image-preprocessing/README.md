@@ -7,6 +7,7 @@
 | 入口 | 内容 |
 | --- | --- |
 | [预处理方法对照](PREPROCESSING_MAP.md) | 从数学原理到医学图像工程，指出影像与标签处理的差异 |
+| [CT 缺失切片补全专题](knowledge/ct-missing-slice-reconstruction.md) | 2026-10-16 补充：数学插值、配准插值、13 项研究、公开代码核验与对照实验建议 |
 | [代码总索引](CODE_INDEX.md) | 按来源列出全部汇集的 Python 文件和 notebook，可直接打开阅读 |
 | [公开项目导读](projects/README.md) | 五个官方项目的定位、预处理流程、源码入口与适用场景 |
 | [官方源码对照](upstream/README.md) | 五个官方项目的固定版本源码与许可证 |
