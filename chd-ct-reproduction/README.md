@@ -38,6 +38,8 @@ Windows 双击 **start.bat**，选择一个功能。数据路径可直接粘贴�
 
 0.9.0 起，`bash start_server.sh` 先显示任务面板：运行中可查询进度、显卡、模型日志或停止；空闲时可新建并命名，或选择历史任务续跑。新建后仍可多选步骤。直接查询用 `--query models` 查看 epoch/loss，`--query logs --follow` 跟随模型详细日志；Ctrl+C 只退出查看。重名实验保存在不同目录，续跑保留原名称和配置。
 
+0.10.0 起，面板提供 `x` 中断当前任务（保留检查点）、`u` 多镜像更新、`q` 退出；各输入页支持 `b` 返回和 `q` 退出。更新前确认目标任务并等待退出，备份代码，只做 Git 快进更新。预处理发现已有可识别缓存时自动进入校验复用/接续流程，来源或参数不兼容则拒绝覆盖。详见 [更新与缓存处理](docs/server-start.md#更新程序与复用缓存)。修改前文件保存在 `back/before-panel-update-20261016/`。
+
 诊断先试跑：`python start.py --task diagnosis-demo --device cpu --non-interactive`，随后查看输出中的 `diagnosis-demo/prediction/diagnosis-report.html`。
 
 ## 安装与先跑通
@@ -59,7 +61,7 @@ python predict.py --prepared data/imagechd7_1mm --models runs/chd_smoke/models -
 python evaluate.py --prepared data/imagechd7_1mm --predictions runs/chd_smoke/predictions --output runs/chd_smoke/evaluation --split auto
 ```
 
-所有输出目录须为新目录。正式训练命令、已有缓存复用与无标签预测见 [使用流程](docs/workflow.md)。
+独立入口的输出目录默认须为新目录；服务器预处理可校验并复用已有缓存。正式训练命令、已有缓存复用与无标签预测见 [使用流程](docs/workflow.md)。
 
 ## 主目录结构
 

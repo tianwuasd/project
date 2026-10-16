@@ -323,7 +323,7 @@ with output_lock(sys.argv[1]): pass
             while "请选择".encode() not in data and time.monotonic() < deadline:
                 if select.select([master], [], [], 0.1)[0]:
                     data += os.read(master, 65536)
-            self.assertIn("停止当前任务", data.decode())
+            self.assertIn("中断当前任务", data.decode())
             self.assertIn("panel running", data.decode())
             os.write(master, b"0\n")
             self.assertEqual(process.wait(timeout=5), 0)

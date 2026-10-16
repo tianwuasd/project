@@ -66,6 +66,37 @@ def test_plan_chains_current_outputs_without_running_tasks(tmp_path):
     assert not Path(plan["directory"]).exists()
 
 
+@pytest.mark.parametrize("state", ["complete", "partial", "empty"])
+def test_existing_preprocessing_cache_enters_validated_resume(tmp_path, state):
+    from chd_ct.server.workflow import build_plan
+
+    args, profile = arguments(tmp_path, "--task", "preprocess")
+    Path(profile["dataset"]).mkdir()
+    prepared = Path(profile["prepared"])
+    prepared.mkdir()
+    if state != "empty":
+        (prepared / "preprocess-contract.json").write_text("{}")
+    if state == "complete":
+        (prepared / "dataset.json").write_text("{}")
+    before = {p: p.read_bytes() for p in prepared.iterdir()}
+    plan = build_plan(args, profile, False)
+    assert plan["steps"][0]["arguments"]["resume"] is True
+    assert before == {p: p.read_bytes() for p in prepared.iterdir()}
+
+
+def test_unrelated_existing_preprocess_directory_is_not_overwritten(tmp_path):
+    from chd_ct.server.workflow import build_plan
+
+    args, profile = arguments(tmp_path, "--task", "preprocess")
+    Path(profile["dataset"]).mkdir()
+    prepared = Path(profile["prepared"])
+    prepared.mkdir()
+    (prepared / "unrelated.txt").write_text("keep me")
+    with pytest.raises(ValueError, match="不是可识别"):
+        build_plan(args, profile, False)
+    assert (prepared / "unrelated.txt").read_text() == "keep me"
+
+
 def test_diagnosis_pipeline_binds_full_prediction_not_test_output(tmp_path):
     from chd_ct.server.workflow import build_plan
 

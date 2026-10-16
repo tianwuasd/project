@@ -1,12 +1,15 @@
 """zmic44 defaults and allocation-aware GPU selection."""
 
 import argparse
+import copy
 import json
 import os
 import subprocess
 import sys
 from pathlib import Path
 from uuid import uuid4
+
+from .prompts import PanelBack, UserExit, ask
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_RUNTIME = "/data5/zhougaowei/zhangruichen_workspace/chd_ct_runtime"
@@ -29,7 +32,7 @@ def choose(value, saved, default, label, interactive):
     suggestion = saved or default
     if not interactive:
         return suggestion
-    value = input(f"{label} [{suggestion}]：").strip()
+    value = ask(f"{label} [{suggestion}]：")
     if len(value) > 1 and value[0] == value[-1] and value[0] in {"'", chr(34)}:
         value = value[1:-1]
     return value or suggestion
@@ -242,23 +245,47 @@ def main(argv=None):
         from .workflow import build_plan
 
         interactive = sys.stdin.isatty() and not args.non_interactive
-        if interactive and not (args.task or args.tasks or args.resume_job):
-            from .panel import run
+        use_panel = interactive and not (args.task or args.tasks or args.resume_job)
+        original = copy.deepcopy(args)
+        while True:
+            try:
+                if use_panel:
+                    from .panel import run
 
-            if not run(args, profile):
+                    args = copy.deepcopy(original)
+                    if not run(args, profile):
+                        return 0
+                    original.runtime = args.runtime
+                if interactive:
+                    print("输入 b 返回面板，q 退出程序；Ctrl+C 取消当前输入。")
+                if args.resume_job:
+                    from .resume import build_resume_plan
+
+                    plan = build_resume_plan(args, profile, interactive)
+                else:
+                    plan = build_plan(args, profile, interactive)
+                break
+            except (UserExit, EOFError):
+                print("已退出，后台任务继续运行。")
                 return 0
-        if args.resume_job:
-            from .resume import build_resume_plan
-
-            plan = build_resume_plan(args, profile, interactive)
-        else:
-            plan = build_plan(args, profile, interactive)
+            except (PanelBack, KeyboardInterrupt):
+                if not interactive:
+                    raise
+                print("已取消当前输入，返回面板。")
+                use_panel = True
+                original.task = original.tasks = original.resume_job = None
+            except (ValueError, OSError) as error:
+                if not use_panel:
+                    raise
+                print("未通过：" + str(error) + "；已返回面板。")
         print("执行顺序：" + " → ".join(step["name"] for step in plan["steps"]))
         for step in plan["steps"]:
             print(step["name"] + "：" + json.dumps(step["arguments"], ensure_ascii=False))
         print("本次日志：" + plan["log"], flush=True)
         with jobs.acquire_lock(Path(plan["runtime"])) as lock:
             return jobs.submit(plan, lock, foreground=args.foreground)
+    except (UserExit, EOFError):
+        return 0
     except (Exception, KeyboardInterrupt) as error:
         print("未通过：" + str(error), file=sys.stderr)
         return 1

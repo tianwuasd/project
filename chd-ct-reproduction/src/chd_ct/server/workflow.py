@@ -10,6 +10,7 @@ from uuid import uuid4
 from ..quickstart.diagnosis import DIAGNOSIS_TASKS, INPUTS, OUTPUT_KEYS
 from ..recovery import file_hash
 from .launcher import choose, personal_path
+from .prompts import ask
 from .settings import effective_device, resolve_settings, task_configuration
 
 STEPS = (
@@ -56,7 +57,7 @@ def choose_steps(args, interactive):
     print("可多选，输入编号或名称，以逗号/空格分隔；按下列顺序执行，只运行选中的步骤：")
     for i, (_, label) in enumerate(STEPS):
         print(f"  {i:2d}  {label}")
-    return parse_steps(input("功能 [0]（例如 0,1,2,4,5）：") or "0")
+    return parse_steps(ask("功能 [0]（例如 0,1,2,4,5）：") or "0")
 
 
 def validate_inputs(args, future):
@@ -65,8 +66,20 @@ def validate_inputs(args, future):
         needed.append(("dataset", args.dataset))
         if getattr(args, "spacing_excel", None):
             needed.append(("spacing_excel", args.spacing_excel))
-        if Path(args.prepared).exists() and not getattr(args, "resume", False):
-            raise ValueError("预处理目录已存在；取消选择预处理以复用缓存，或指定新的 --prepared")
+        prepared = Path(args.prepared)
+        if prepared.exists():
+            if not prepared.is_dir():
+                raise ValueError("预处理路径不是目录：" + str(prepared))
+            recognized = any(
+                (prepared / name).is_file()
+                for name in ("preprocess-contract.json", "preprocess-report.json")
+            )
+            nonempty = any(p.name != ".writer.lock" for p in prepared.iterdir())
+            if nonempty and not recognized:
+                raise ValueError("已有目录不是可识别的预处理缓存，请指定新的 --prepared 目录")
+            args.resume = True
+            state = "完整缓存" if (prepared / "dataset.json").is_file() else "未完成缓存"
+            print(f"识别到{state}：将校验来源和参数，通过后复用或接续；不覆盖不兼容数据。")
     elif args.task in {"train", "predict", "test", "evaluate"}:
         needed.append(("prepared", args.prepared))
     if args.task == "train":

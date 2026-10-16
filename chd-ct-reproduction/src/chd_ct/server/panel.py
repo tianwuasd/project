@@ -4,13 +4,14 @@ import subprocess
 
 from . import inspection, jobs
 from .launcher import choose, personal_path
+from .prompts import PanelBack, UserExit, ask
 
 
 def pick_history(runtime, results, resume=False):
     records = inspection.show_history(runtime, results)
     if not records:
         return None
-    value = input("选择任务编号，0 返回：").strip()
+    value = ask("选择任务编号，0 返回：")
     if value in {"", "0"}:
         return None
     if not value.isdigit() or not 1 <= int(value) <= len(records):
@@ -30,7 +31,7 @@ def logs(job):
     print("0 总流程日志；a 当前步骤（自动跟随）")
     for i, step in enumerate(steps, 1):
         print(f"{i} {step['name']} | {step['status']}")
-    value = input("日志步骤 [a]：").strip().lower() or "a"
+    value = ask("日志步骤 [a]：").lower() or "a"
     if value == "0":
         step = "launcher"
     elif value == "a":
@@ -43,11 +44,11 @@ def logs(job):
     model = "all"
     if step != "launcher" and (step == "auto" or step in inspection.MODEL_STEPS):
         print("模型：all 全部 / server 调度日志 / " + " / ".join(inspection.MODELS))
-        model = input("查看哪个模型 [all]：").strip() or "all"
+        model = ask("查看哪个模型 [all]：") or "all"
         if model not in (*inspection.MODELS, "all", "server"):
             print("没有此模型。")
             return
-    follow = input("持续刷新？y 持续 / n 看一次 [n]：").strip().lower() == "y"
+    follow = ask("持续刷新？y 持续 / n 看一次 [n]：").lower() == "y"
     if follow:
         print("按 Ctrl+C 返回面板，后台任务继续运行。")
     inspection.tail_logs(lambda: inspection.log_paths(job, step, model), follow=follow)
@@ -68,10 +69,11 @@ def run(args, profile):
         else:
             print("尚无任务记录。")
         print("s 任务进度  g 显卡状态  m 模型 epoch/loss  l 详细日志  p 我的进程")
-        print("h 历史任务与日志  0 退出面板（后台任务继续）")
-        print("x 停止当前任务" if active else "n 新建并命名任务  r 选择历史任务续跑")
+        print("h 历史任务与日志  u 更新程序（多镜像）  0/q 退出面板（后台任务继续）")
+        print("x 中断当前任务（保留检查点）" if active else "n 新建并命名任务  r 选择历史任务续跑")
+        print("各输入页：b 返回面板，q 退出程序。")
         try:
-            action = input("请选择 [s]：").strip().lower() or "s"
+            action = ask("请选择 [s]：").lower() or "s"
             if action == "0":
                 return False
             if action == "g":
@@ -99,10 +101,35 @@ def run(args, profile):
                 print(
                     f"将请求停止：{inspection.name(current)}\n{current}\n保留完整检查点；恢复时未完成的当前轮可能需要重跑。"
                 )
-                if input("确认停止此任务？[y/N]：").strip().lower() == "y":
+                if ask("确认中断此任务？[y/N]：").lower() == "y":
                     if inspection.latest(runtime) != current:
                         raise ValueError("最近任务已改变，请重新选择停止目标。")
                     jobs.stop_job(runtime, directory=current)
+            elif action == "u":
+                from . import updater
+
+                # Reject a dirty/wrong checkout before interrupting any job.
+                repo = updater.inspect_repository()
+                print(f"更新仓库：{repo['root']}\n当前版本：{repo['head'][:12]}")
+                if active:
+                    print(f"将先中断：{inspection.name(current)}\n{current}\n保留检查点，确认退出后更新。")
+                    if ask("中断此任务并更新程序？[y/N]：").lower() != "y":
+                        continue
+                    if inspection.latest(runtime) != current:
+                        raise ValueError("最近任务已改变，请重新选择。")
+                    jobs.stop_job(runtime, directory=current)
+                elif ask("备份当前代码并更新程序？[y/N]：").lower() != "y":
+                    continue
+                with updater.idle_lock(runtime, current):
+                    try:
+                        changed = updater.update(repo, runtime)
+                    except (Exception, KeyboardInterrupt) as error:
+                        print("更新未完成：" + (str(error) or "用户中断"))
+                        print("本面板已退出。请检查更新记录后重新运行 bash start_server.sh。")
+                        return False
+                if changed:
+                    print("更新完成。本面板已退出，请重新运行 bash start_server.sh 加载新版。")
+                    return False
             elif action in {"n", "r"}:
                 if active:
                     print("此 runtime 已有任务在运行；请先查询或停止，不重复提交。")
@@ -115,9 +142,9 @@ def run(args, profile):
                 return True
             else:
                 print("请输入菜单中的字母或 0。")
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, PanelBack):
             print("\n已返回面板，后台任务继续运行。输入 0 退出。")
-        except EOFError:
+        except (EOFError, UserExit):
             return False
         except (OSError, ValueError, subprocess.SubprocessError) as error:
             print("查询/操作未完成：" + str(error))

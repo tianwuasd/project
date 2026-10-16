@@ -218,3 +218,61 @@ def test_gpu_timeout_returns_to_panel(session, monkeypatch, capsys):
     args = launcher.make_parser().parse_args(["--runtime", str(runtime)])
     assert panel.run(args, profile) is False
     assert "查询/操作未完成" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("answer", ["q", "退出"])
+def test_quit_from_nested_log_input_does_not_stop_task(session, monkeypatch, answer):
+    runtime, _, _, profile = session
+    answers = iter(["l", answer])
+    monkeypatch.setattr("builtins.input", lambda _: next(answers))
+    monkeypatch.setattr(jobs, "stop_job", lambda *a, **kw: pytest.fail("quit stopped a task"))
+    args = launcher.make_parser().parse_args(["--runtime", str(runtime)])
+    assert panel.run(args, profile) is False
+
+
+def test_back_from_nested_input_and_zero_is_still_valid(monkeypatch):
+    from chd_ct.server.prompts import PanelBack
+
+    answers = iter(["b", "0"])
+    monkeypatch.setattr("builtins.input", lambda _: next(answers))
+    with pytest.raises(PanelBack):
+        launcher.choose(None, None, "", "GPU", True)
+    assert launcher.choose(None, None, "", "GPU", True) == "0"
+
+
+def test_update_stops_exact_job_holds_lock_and_exits_old_panel(session, monkeypatch):
+    from contextlib import contextmanager
+
+    from chd_ct.server import updater
+
+    runtime, job, _, profile = session
+    answers = iter(["u", "y"])
+    monkeypatch.setattr("builtins.input", lambda _: next(answers))
+    monkeypatch.setattr(inspection, "job_active", lambda _: True)
+    monkeypatch.setattr(updater, "inspect_repository", lambda: {"root": "repo", "head": "abc"})
+    seen = []
+    monkeypatch.setattr(jobs, "stop_job", lambda rt, directory: seen.append(("stop", rt, directory)))
+
+    @contextmanager
+    def idle(rt, target):
+        seen.append(("locked", rt, target))
+        yield
+        seen.append("released")
+
+    monkeypatch.setattr(updater, "idle_lock", idle)
+    monkeypatch.setattr(updater, "update", lambda repo, rt: seen.append("updated") or True)
+    args = launcher.make_parser().parse_args(["--runtime", str(runtime)])
+    assert panel.run(args, profile) is False
+    assert seen == [("stop", runtime, job), ("locked", runtime, job), "updated", "released"]
+
+
+def test_failed_form_returns_to_panel_without_submitting(session, monkeypatch, tmp_path):
+    runtime, _, _, profile = session
+    config = tmp_path / "profile.json"
+    save(config, profile)
+    answers = iter(["n", "my run", "invalid-step", "q"])
+    monkeypatch.setattr("builtins.input", lambda _: next(answers))
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr(jobs, "submit", lambda *a, **kw: pytest.fail("invalid form submitted"))
+    assert launcher.main(["--runtime", str(runtime), "--server-config", str(config)]) == 0
