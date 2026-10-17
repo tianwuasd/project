@@ -102,13 +102,13 @@ def make_preview(volume, out):
     canvas.save(out/'preview.png')
 
 
-def convert_series(paths, destination, quality_callback=None, checkpoint=None):
+def convert_series(paths, destination, quality_callback=None, checkpoint=None, geometry_validator=None):
     paths = [Path(p) for p in paths]
     out = Path(destination)
     if out.exists():
         raise FileExistsError(out)
     headers = [read_dicom(p, header=True)[0] for p in paths]
-    order, affine, positions, step = geometry(headers)
+    order, affine, positions, step = (geometry_validator or geometry)(headers)
     paths = [paths[i] for i in order]
     sources = [source_info(p) for p in paths]
     first = headers[int(order[0])]

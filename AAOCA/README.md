@@ -1,65 +1,62 @@
-# AAOCA 病例与影像整理工具
+# AAOCA / TAPVC 病例与影像整理工具
 
-在本机统计患者的 CT/CTA、超声和病例资料，检查文件问题，并将可用影像转换为研究数据。提供中文窗口、进度条、暂停、安全停止和断点续跑。原始资料只读。
+在本地整理 CT、超声、PDF 和患者主表，逐文件/序列检查并转换可用影像，提供中文面板、进度、暂停、安全停止、增量处理和独立修复窗口。原始资料保留。
 
-**本目录只发布代码和说明，不含真实患者数据。** 测试会在临时目录生成模拟影像及文档。示例路径和编号均为虚构。
+本目录仅发布程序、合成测试及公开说明。真实患者资料、姓名编号映射、修复政策、数据库、报告和研究影像不在 Git 中。
 
-## 安装与开始
+## 安装和启动
 
-Windows 安装 Python 3.12 或以上，并包含 Tcl/Tk。下载仓库后，在本目录打开 PowerShell，执行一次：
+使用带 Tcl/Tk 的 Python 3.12 或以上版本：
 
 ```powershell
 python -m venv .venv
 & './.venv/Scripts/python.exe' -m pip install -r requirements.txt
 ```
 
-随后双击 **一键处理.cmd**，选择输入、输出文件夹，点击 **开始 / 续跑**。首次输出可用空文件夹；下次继续选择原输出文件夹。完成后点 **打开结果**。
+双击 **一键处理.cmd**。默认使用本目录 `.venv`；也可设置 `AAOCA_PYTHON` 指定 `pythonw.exe`。如果使用可移植 Python，可将与该解释器完全匹配的 Tcl/Tk 资源放在 `.venv/tcl`，程序会自动定位，不混用不同版本的资源。
 
-暂停和停止在安全检查点生效，当前解码或写入可能需要先完成。普通坏文件记入问题清单并继续，磁盘满或输入目录读不全等全局问题会保留进度并停止。
+## 四种操作
 
-完整说明：[一键处理说明](一键处理说明.md)；单独处理 CT 或超声：[独立转换器说明](独立转换器说明.md)。
+| 操作 | 行为 |
+|---|---|
+| 添加资料 / 继续处理 | 接收任意组合的 CT、超声、PDF、主表；登记新增/变化资料，复用有效成果 |
+| 修复数据… | 独立窗口选择唯一姓名匹配、验证完整副本、明确期相拆分，显示进度和统计变化 |
+| 仅更新报告 | 按已有登记刷新快照、分类及报告，不重新扫描和转换影像 |
+| 只检查，不转换影像 | 登记与核对，不把未转换的影像计为成功 |
 
-## 命令行
+缺任一种资料不会阻止其他资料处理。单个失败不连带阻断其他独立单元。结果按八种齐全组合分类，问题按编号关联、数据本身、资料缺失分组。PDF 文字不足只备注，CT 原始序列和期相输出体积分开统计。
+
+修复必须有唯一身份、完整像素或明确期相等证据。不会自动补缺失像素、猜测超声时间、OCR或作临床诊断。已有成功成果保留，失败重试不覆盖旧成果。详细行为见 [项目升级使用说明](项目升级使用说明.md)。
+
+## 当前命令行入口
 
 ```powershell
-& './.venv/Scripts/python.exe' -X utf8 './run_pipeline.py' --input 'D:/AAOCA_input' --output 'D:/AAOCA_results/run_01'
+python run_project.py --input 'D:/sample/new_batch' --output 'D:/sample/results'
+python run_project.py --output 'D:/sample/results' --action report
+python run_project.py --output 'D:/sample/results' --action retry --match-names --recover-copies --split-phases
 ```
 
-可选 `--patients 000123 000456` 限定患者；`--audit-only` 只检查而不转换影像；`--force` 强制重做。默认对指定输入范围执行统计、检查和转换。相同输入、输出和患者范围再次运行会核验并复用成功结果。
+最后一条会实际尝试选中的修复；不要将其当作查看状态。可用重复 `--input` 传入多批资料，`--patient` 限定转换编号。已有项目的数据库与成果应一起备份。旧 `run_pipeline.py` 是历史单批流程，不直接重跑已升级的正式结果。
 
-## 支持范围与产物
-
-- 输入：后缀 `.dcm` 的常规单帧 CT、常规二维超声，带患者编号列的 `.xlsx` 表格和 `.pdf` 病例。
-- 输出：患者及影像统计表、问题清单、病例文本、CT `.nii.gz`、超声静态 PNG 或全帧 NPZ，以及本地汇总网页。
-- CT/CTA 按标签证据分别记录；无法仅凭文件证明临床检查齐全。坏 CT 序列拒绝转换，不补片、不拼接缺片结果。
-- 不支持自动分割标注、自动 OCR、自动解压或自动诊断。压缩 DICOM 可能需额外解码插件。
-- 转换不等于脱敏；输出可能含患者信息，仍只应保存在受控的本地位置。
+报告标题可在结果目录 `project.json` 的 `report_title` 中配置；未配置时对 TAPVC_result 使用 TAPVC 名称，其余使用 AAOCA。只修改展示标题，不更改分类路径。
 
 ## 文件结构
 
-```text
-AAOCA/
-├── 一键处理.cmd            # Windows 窗口入口
-├── pipeline_gui.py        # 中文界面
-├── run_pipeline.py        # 完整流程和命令行入口
-├── patient_pipeline/      # 病例关联、影像检查、报告、续跑控制
-├── convert_ct.py          # 独立 CT 转换
-├── convert_us.py          # 独立超声转换
-├── common.py              # 公共校验与文件写入
-├── requirements.txt       # 运行依赖
-└── tests/                 # 仅模拟数据测试代码
-```
+- `pipeline_gui.py`：主面板及独立修复窗口。
+- `run_project.py`：增量处理、重试、报告命令行。
+- `patient_pipeline/project_*.py`：登记、身份、处理、修复、分类和报告。
+- `convert_ct.py` / `convert_us.py`：独立转换器，见 [说明](独立转换器说明.md)。
+- `repair_policy.py`：读取外部已确认政策，不包含真实患者映射。
+- `tools/research_ct/`：可选的研究 CT 整理、格式核对和重采样，见 [说明](tools/research_ct/README.md)。
+- `tests/`：仅使用合成资料的回归测试。
+- [PROJECT_HISTORY.md](PROJECT_HISTORY.md)：公开开发历程及接手说明。
+
+研究工具使用单独依赖环境和外部数据目录，不属于主面板自动处理步骤。无标注影像可做研究预处理和自监督学习准备；HU 保留、归一化、配准及模型训练应分别记录，不能混称已经完成。
 
 ## 测试
 
 ```powershell
-& './.venv/Scripts/python.exe' -X utf8 -m unittest discover -s tests -p 'test_*.py'
+python -m unittest discover -s tests -v
 ```
 
-包含54项自动测试，另有隐藏窗口操作测试（需要桌面及 Tk；也可单独运行 `tests/test_gui.py`）。所有测试资料临时生成，结束清理，不需要真实病例。覆盖几何和像素校验、病例匹配、暂停恢复、结果损坏、输入变化、故障隔离和重复运行跳过。
-
-## 上传范围
-
-只提交运行代码、依赖、说明和模拟数据测试代码。`.gitignore` 使用允许清单，仅开放根目录的指定核心文件，以及模块和测试目录中的 Python 源文件。原始数据、患者表、PDF、影像、结果清单、报告、数据库、环境、缓存、日志和备份均不提交。不要用 `git add -f` 绕过规则；源码中的真实病例内容也不能提交。
-
-本目录未附带数据集或第三方数据授权，使用者需自行准备有权使用的数据。
+Windows 建议用短临时路径。测试包含真实 Tk 控件和合成影像流程，需要可用的本地窗口环境。源码与本地部署镜像按哈希核对后同步；临床文件始终排除。

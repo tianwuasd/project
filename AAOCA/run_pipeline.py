@@ -11,6 +11,7 @@ import sys
 import traceback
 
 from common import token, write_json
+from repair_policy import apply_roster,load_policy
 from patient_pipeline.clinical import alias_map, normal_id, process_documents, read_roster
 from patient_pipeline.engine import process_patient
 from patient_pipeline.imaging import folder_id, read_header
@@ -26,6 +27,8 @@ def now():return datetime.now(timezone.utc).isoformat()
 
 def validate_paths(source,output):
     source=Path(source).expanduser().resolve();output=Path(output).expanduser().resolve()
+    if (output/'project.json').exists():
+        raise ValueError('此目录已升级为增量项目，请使用新版面板或 run_project.py，旧版单批处理不能覆盖。')
     if not source.is_dir():raise ValueError('输入必须是已解压的数据目录。')
     if source==output or source.is_relative_to(output):raise ValueError('输出不能等于输入或位于输入的上层目录。')
     if output.exists():
@@ -109,7 +112,14 @@ def _run(source,out,patients,audit,runtime):
         if inventory['scan_errors']:
             raise RuntimeError('输入目录扫描不完整，已保留原有结果和检查点。请恢复目录访问权限/磁盘连接后续跑。详情见 details/输入目录清单.json。')
         control.progress('headers',0,1,'读取患者表并检查文件头',True)
-        roster,issues=read_roster(inventory['xlsx'],control);aliases=alias_map(roster)
+        roster,issues=read_roster(inventory['xlsx'],control)
+        roster,issues=apply_roster(roster,issues)
+        aliases=alias_map(roster)
+        policy=load_policy()
+        if policy:
+            manifest['identity_note']='User-authorized exact-name and explicit roster-alias association; original source IDs retained. Patient-level only.'
+            manifest['repair_policy']=policy['version']
+            manifest['time_vector_action']='Not modified. Deferred by user.'
         issues.extend({'code':'DIRECTORY_SCAN_FAILED','message':e,'severity':'error'} for e in inventory['scan_errors'])
         selected={canonical(normal_id(i),aliases) for i in (patients or [])}
         if selected:roster={i:r for i,r in roster.items() if i in selected}
@@ -197,7 +207,7 @@ def _run(source,out,patients,audit,runtime):
                            已核实检验PDF数=sum(d['kind']=='检验' for d in linked),待确认PDF数=len(pending),
                            需OCR的PDF数=sum(bool(d['empty_pages']) for d in linked),
                            病例表标记=roster[ident].get('fields',{}),临床影像关联层级='患者级；同次就诊未确认')
-            if not linked:issues.append({'patient_id':ident,'code':'NO_VERIFIED_DOCUMENT','message':'没有经内容编号核实的病例PDF，不能视为完整病例。'})
+            if not linked:issues.append({'patient_id':ident,'code':'NO_VERIFIED_DOCUMENT','message':'没有已核实关联（编号或用户确认姓名）的PDF，不能视为完整病例。'})
             for kind,column in [('病例','病历'),('检验','检验')]:
                 expected=roster[ident].get('fields',{}).get(column)
                 present=any(d['kind']==kind for d in linked)
@@ -232,7 +242,7 @@ def _run(source,out,patients,audit,runtime):
             completeness_note='No inferred proof of clinical CTA coverage, ultrasound view coverage, or encounter pairing.')
         issue_rows=[{'患者编号':i.get('patient_id',''),'级别':i.get('severity','warning'),'问题代码':i.get('code',''),
                      '源文件':i.get('source',''),'说明':i.get('message','')} for i in issues]
-        doc_rows=[{'患者编号':d['patient_id'],'文件类型':d['kind'],'源文件':d['source'],'关联依据':d['match_basis'],
+        doc_rows=[{'患者编号':d['patient_id'],'文件类型':d['kind'],'源文件':d['source'],'关联依据':d['match_basis'],'关联已核实':bool(d.get('verified_link')),
                    '状态':d['status'],'总页数':d['pages'],'读取页数':d['pages_read'],'需OCR页码':d['empty_pages'],'输出文本':d['text_file']} for d in documents]
         write_csv(out/'患者总表.csv',summaries);write_csv(out/'CT序列表.csv',ct_rows)
         write_csv(out/'超声文件表.csv',us_rows);write_csv(out/'病例文档表.csv',doc_rows);write_csv(out/'问题清单.csv',issue_rows)

@@ -1,0 +1,7 @@
+nnunetv2==2.8.1
+numpy>=2,<3
+nibabel>=5.3,<6
+scipy>=1.11
+torch>=2.2
+psutil>=5.9
+Pillow>=11,<13

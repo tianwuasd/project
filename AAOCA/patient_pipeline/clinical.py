@@ -8,6 +8,7 @@ import unicodedata
 
 from common import sha256, token, write_json
 from patient_pipeline.runtime import fatal_io
+from repair_policy import approved_name_patient
 
 
 def normal_id(value):
@@ -107,6 +108,10 @@ def choose_document_patient(path,first_page,roster):
     names={ident for ident,r in roster.items() if name and r.get('name')==name}
     aliases=alias_map(roster); declared=document_ids(first_page,aliases)
     matches=set().union(*(aliases.get(i,set()) for i in declared)) if declared else set()
+    approved=approved_name_patient(name,roster)
+    if approved:
+        if declared and all(aliases.get(i,set())=={approved} for i in declared):return approved,'document_id'
+        return approved,'user_confirmed_name'
     if declared:
         if any(i not in aliases for i in declared):return None,'unknown_document_id'
         if len(matches)!=1:return None,'document_id_conflict'
@@ -157,7 +162,10 @@ def process_documents(paths,roster,out,selected=None,runtime=None):
                     if runtime and runtime.fingerprint([path],roster_signature)==sig:
                         runtime.save(key,sig,{'record':record,'issues':issues[start_issues:]})
                     results.append(record);continue
-                verified=basis=='document_id'
+                verified=basis in {'document_id','user_confirmed_name'}
+                approved_name=approved_name_patient(filename_name(path),roster)==ident
+                text_notes_only=bool(roster[ident].get('_name_merge_approved'))
+                record['name_association_authorized']=approved_name
                 pages=[];conflicting_pages=[];aliases=alias_map(roster)
                 for index in range(len(doc)):
                     if runtime:
@@ -169,10 +177,16 @@ def process_documents(paths,roster,out,selected=None,runtime=None):
                     if any(aliases.get(i,set())!={ident} for i in page_ids):conflicting_pages.append(index+1)
                     pages.append({'page':index+1,'text':text})
                 if conflicting_pages:
-                    verified=False;record['match_basis']='document_page_id_conflict'
                     record['conflicting_pages']=conflicting_pages
-                    issues.append({'patient_id':ident,'code':'DOCUMENT_PAGE_ID_CONFLICT','source':str(path),
-                                   'message':'PDF后续页面患者编号冲突，整份文档移入待确认目录。'})
+                    if approved_name:
+                        record['match_basis']='user_confirmed_name'
+                        record['id_discrepancy_resolution']='用户授权按主表姓名或已确认姓名别名关联，保留页面编号差异。'
+                        issues.append({'patient_id':ident,'severity':'info','code':'DOCUMENT_ID_RESOLVED_BY_NAME','source':str(path),
+                                       'message':'页面存在不同或未知编号，已按用户确认的姓名关联，原编号及页码保留于文档记录。'})
+                    else:
+                        verified=False;record['match_basis']='document_page_id_conflict'
+                        issues.append({'patient_id':ident,'code':'DOCUMENT_PAGE_ID_CONFLICT','source':str(path),
+                                       'message':'PDF后续页面患者编号冲突，整份文档移入待确认目录。'})
                 folder=out/('patients' if verified else 'pending_documents')/('patient_'+token(ident))/'clinical'
                 folder.mkdir(parents=True,exist_ok=True)
                 base=folder/('document_'+token(str(path.resolve())))
@@ -183,12 +197,17 @@ def process_documents(paths,roster,out,selected=None,runtime=None):
                 base.with_suffix('.txt').write_text('\n\n'.join(f'===== 第 {p["page"]} 页 =====\n{p["text"]}' for p in pages),encoding='utf-8')
                 record['text_file']=str(base.with_suffix('.txt').relative_to(out))
                 record['status']=('已提取' if verified else '关联待确认') if not record['empty_pages'] else '无有效文字页_需核对或OCR'
+                if text_notes_only and verified:
+                    record['status']='已关联_文字提取不足仅备注' if record['empty_pages'] else '已提取_关联已确认'
                 record['verified_link']=verified
                 write_json(base.with_suffix('.json'),{**record,'sha256':sha256(path),'pages_text':pages,
                     'scope':'patient-level association only; not encounter-level pairing',
                     'cleaning':['Unicode NFKC','normalize whitespace','retain page boundaries'],
                     'note':'Text layer only. Scanned or clipped content is not reconstructed; template statements are not diagnosis labels.'})
-                if not verified or record['empty_pages']:
+                if text_notes_only and verified and record['empty_pages']:
+                    issues.append({'patient_id':ident,'severity':'info','code':'PDF_TEXT_INCOMPLETE_NOTE','source':str(path),
+                                   'message':'患者关联已确认，部分页面文字提取不足仅作备注，不计错误。'})
+                elif not verified or record['empty_pages']:
                     issues.append({'patient_id':ident,'code':'DOCUMENT_REVIEW','source':str(path), 'message':record['status']})
                 if runtime:
                     if runtime.fingerprint([path],roster_signature)!=sig:raise OSError('提取期间PDF发生变化，请重试')

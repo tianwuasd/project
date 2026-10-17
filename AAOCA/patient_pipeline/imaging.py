@@ -23,7 +23,7 @@ FIELDS=['PatientID','IssuerOfPatientID','PatientName','PatientSex','PatientBirth
  'PixelRepresentation','PixelSpacing','SliceThickness','SpacingBetweenSlices','ImagePositionPatient',
  'ImageOrientationPatient','FrameOfReferenceUID','RescaleSlope','RescaleIntercept','RescaleType',
  'KVP','XRayTubeCurrent','Exposure','ConvolutionKernel','ReconstructionDiameter','CTDIvol',
- 'TemporalPositionIdentifier','TriggerTime','NominalInterval','HeartRate','NumberOfSeriesRelatedInstances',
+ 'TemporalPositionIdentifier','TriggerTime','NominalPercentageOfCardiacPhase','NominalInterval','HeartRate','NumberOfSeriesRelatedInstances',
  'NumberOfStudyRelatedInstances','FrameTime','FrameTimeVector','FrameIncrementPointer','FrameDelay',
  'CineRate','RecommendedDisplayFrameRate','LossyImageCompression','LossyImageCompressionRatio',
  'BurnedInAnnotation','SequenceOfUltrasoundRegions','SpecificCharacterSet']
@@ -43,7 +43,7 @@ def folder_id(path):
     return ''
 
 
-def read_header(path):
+def read_header(path, tolerate_timing=False):
     path=Path(path);pixel={};size=path.stat().st_size
     with path.open('rb') as stream, warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter('always')
@@ -61,7 +61,12 @@ def read_header(path):
         regions=[{k:finite_json(json_value(getattr(r,k,None))) for k in REGION_FIELDS} for r in getattr(ds,'SequenceOfUltrasoundRegions',[])]
         ts=getattr(ds.file_meta,'TransferSyntaxUID',None)
         compressed=bool(ts and ts.is_compressed)
-        timing=frame_timing(ds,int(getattr(ds,'NumberOfFrames',1))) if str(getattr(ds,'Modality',''))=='US' else None
+        timing_error=''
+        try:
+            timing=frame_timing(ds,int(getattr(ds,'NumberOfFrames',1))) if str(getattr(ds,'Modality',''))=='US' else None
+        except (ValueError,TypeError,RuntimeError) as exc:
+            if not tolerate_timing:raise
+            timing=None;timing_error=str(exc)
     ident=normal_id(tags.get('PatientID'));fallback=folder_id(path)
     status='missing';expected=None
     if pixel:
@@ -77,12 +82,14 @@ def read_header(path):
             except (TypeError,ValueError,KeyError):status='invalid_pixel_parameters'
             if pixel['offset']+length>size:status='truncated'
     if pixel and pixel['tag']!=0x7FE00010:status='unsupported_float_pixel_data'
-    return {'path':str(path.resolve()),'bytes':size,'mtime_ns':path.stat().st_mtime_ns,
+    result={'path':str(path.resolve()),'bytes':size,'mtime_ns':path.stat().st_mtime_ns,
             'patient_id':ident or fallback,'identity_basis':'PatientID' if ident else ('folder_unverified' if fallback else 'unknown'),
             'folder_patient_id':fallback,'issuer':str(tags.get('IssuerOfPatientID') or ''),
             'tags':tags,'pixel_status':status,'pixel_length':pixel.get('length'),'expected_pixel_bytes':expected,
             'transfer_syntax':str(ts or ''),'timing':timing,'ultrasound_regions':regions,
             'warning_types':sorted({w.category.__name__ for w in caught})}
+    if timing_error:result['timing_error']=timing_error
+    return result
 
 
 def dataset_from_tags(tags):

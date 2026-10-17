@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory() as temporary:
     assert app.pause_button['text']=='继续'
     app.stop();wait(root,lambda:not app.thread.is_alive())
     wait(root,lambda:str(app.start_button['state'])=='normal')
-    assert json.loads((output/'processing_manifest.json').read_text(encoding='utf-8'))['status']=='interrupted'
+    assert json.loads((output/'project_run_status.json').read_text(encoding='utf-8'))['status']=='interrupted'
     app.start();wait(root,lambda:not app.thread.is_alive())
     wait(root,lambda:str(app.start_button['state'])=='normal')
     assert float(app.overall['value'])==100
