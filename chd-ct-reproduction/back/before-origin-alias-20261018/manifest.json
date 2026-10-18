@@ -1,0 +1,33 @@
+{
+  "files": [
+    {
+      "path": ".gitattributes",
+      "sha256": "5766492ebecd75f8280dfe34644e8e704bf878e62740a847ea98be6a2239eb43"
+    },
+    {
+      "path": "pyproject.toml",
+      "sha256": "0fe30371b3cb48d33ec6f2c7635c750ddc479f0e8acb566e21e803af04a9705e"
+    },
+    {
+      "path": "src/chd_ct/__init__.py",
+      "sha256": "c4a4660c71a0a176d5f32ddebc2929288a3c9923a00c30edecc588fccf1d370f"
+    },
+    {
+      "path": "src/chd_ct/server/updater.py",
+      "sha256": "aaee674e5eaea2aa7728b08c6961b90a42ff168c253b8fcfbbc157c0b7fd21ab"
+    },
+    {
+      "path": "tests/test_server_update.py",
+      "sha256": "f1a4bdcd2ac5e1d9a6b6e563e60dea70595be4600cdc2614bb9559e0214e9487"
+    },
+    {
+      "path": "docs/server-start.md",
+      "sha256": "cb949027c694f782d239534e03ef744eb7ba97ce341780a4febf6297c2d5e7b0"
+    },
+    {
+      "path": "README.md",
+      "sha256": "591d562f4481402b70f425c7020a8c03de5d218ae055eacde4de072e5ad060aa"
+    }
+  ],
+  "source_commit": "efabc0eba427251075beaac197ed131f01e1d1dc"
+}

@@ -2,6 +2,8 @@
 
 项目发布在 [tianwuasd/project 的 chd-ct-reproduction 目录](https://github.com/tianwuasd/project/tree/main/chd-ct-reproduction)。本地独立源码仓库通过项目发布目录同步，源码仓库本身可以没有 Git remote。
 
+0.11.1 修复服务器面板拒绝 `gh-proxy.com` 镜像 origin 的问题，保留原地址并通过既有多镜像线路更新。旧面板的一次性升级方法见 [服务器说明](docs/server-start.md#更新程序与复用缓存)；修改前源码见 [备份清单](back/before-origin-alias-20261018/manifest.json)。
+
 主目录默认流程：**预处理 → 三折、每折六阶段训练 → 融合预测 → 独立评估**。数据使用当前 archive 中的 ImageCHD，U-Net 主干按 CHD 论文图 4 的层数、通道、InstanceNorm、LeakyReLU 和位置关联分支实现，默认训练参数按表 3 设置，并保留 BiConvLSTM、心脏区域定位、多尺度投票与血池边界细化流程。
 
 这是原论文方法在现有七结构数据上的适配。当前没有初始血管标注、PV/SVC/IVC 标注与经验证的诊断规则，因此不运行两个 init 阶段。新增独立的解剖特征＋浅层决策树诊断，保留候选规则作对照；这是研究扩展，不宣称复现了论文临床准确率。

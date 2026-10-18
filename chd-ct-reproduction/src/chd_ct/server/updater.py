@@ -20,6 +20,13 @@ MIRRORS = (
     "https://gitclone.com/github.com/tianwuasd/project.git",
     UPSTREAM,
 )
+# Recognize existing clones even when their origin is not a download route.
+# Keep retired, known origins here when changing MIRRORS.
+ORIGIN_URLS = (
+    *MIRRORS,
+    "https://gh-proxy.com/" + UPSTREAM,
+    "git@github.com:tianwuasd/project.git",
+)
 
 
 def git(root, *arguments, timeout=20, check=True):
@@ -98,9 +105,11 @@ def inspect_repository(project=ROOT):
     root = Path(git(project, "rev-parse", "--show-toplevel").stdout.strip()).resolve()
     subtree = Path(project).resolve().relative_to(root).as_posix()
     origin = git(root, "remote", "get-url", "origin").stdout.strip().rstrip("/")
-    allowed = {UPSTREAM, *MIRRORS, "git@github.com:tianwuasd/project.git"}
-    if origin.removesuffix(".git") not in {u.removesuffix(".git") for u in allowed}:
-        raise ValueError("自动更新仅适用于 tianwuasd/project 的发布仓库，请先核对 origin。")
+    if origin.removesuffix(".git") not in {u.removesuffix(".git") for u in ORIGIN_URLS}:
+        raise ValueError(
+            "自动更新仅适用于 tianwuasd/project 的发布仓库；"
+            "当前 origin 地址未识别，请运行 git remote get-url origin 核对。"
+        )
     if subtree != "chd-ct-reproduction":
         raise ValueError("自动更新需要 project/chd-ct-reproduction 发布目录。")
     if git(root, "branch", "--show-current").stdout.strip() != "main":

@@ -104,6 +104,8 @@ bash start_server.sh --status
 
 `u` 先检查发布仓库 `tianwuasd/project` 的 `main` 分支和工作区。有本地修改、未跟踪文件、未完成的 Git 操作或分叉时拒绝覆盖，不执行 reset/stash。有任务时确认中断目标，再等最多 60 秒取得同一 runtime 的锁；父进程或训练子进程未退出就取消更新。使用共享代码的其他 runtime 任务也应先停止。
 
+0.11.1 起同时识别 `https://gh-proxy.com/https://github.com/tianwuasd/project.git`，兼容省略 `.git` 和末尾 `/` 的写法。仓库地址识别与下载线路分开，认可这个历史镜像地址后仍走下面的固定线路，不修改 origin；其他仓库或未知镜像仍需核对来源。若旧面板还报“请先核对 origin”，先用 `git remote get-url origin` 确认确实指向本项目，再执行 `git remote set-url origin https://github.com/tianwuasd/project.git`，重新打开面板选 `u` 完成这一次更新。
+
 更新线路依次为 `gh-proxy.org`、`ghfast.top`、`gitclone.com`，最后 GitHub 原站。GitHub 版本查询限时 12 秒，每条下载线路限时 45 秒，失败自动切换。能取得 GitHub main 时要求下载提交一致；原站不可用则比较可访问镜像的提交历史，明确提示无法确认镜像是否最新。不能保证所有线路故障时仍更新成功，也不会把旧镜像直接当作最新版本。沿用服务器自身网络设置，不注入 Windows 本机代理，不向公共镜像传递 Git 凭据。
 
 快进前将当前提交的 CHD 代码保存到 `<runtime>/updates/<时间_编号>/code-before-update.tar`，同目录 `update.json` 记录旧版本、目标版本和各线路结果；数据、缓存和训练结果仍在原目录。成功后面板退出，重新运行 `bash start_server.sh` 加载新版；下载或应用阶段异常也会退出旧面板并提示检查记录。更新不会自动恢复训练。

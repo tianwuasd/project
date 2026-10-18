@@ -75,6 +75,48 @@ def test_failed_mirror_falls_back_and_backs_up_before_fast_forward(repository, t
     assert (root / "chd-ct-reproduction/code.py").read_text() == "new\n"
 
 
+@pytest.mark.parametrize("suffix", [".git", "", ".git/", "/"])
+def test_legacy_mirror_origin_can_update_without_rewriting_origin(repository, tmp_path, suffix):
+    repo, _, _, new, _ = repository
+    root = Path(repo["root"])
+    origin = "https://gh-proxy.com/https://github.com/tianwuasd/project" + suffix
+    local_git(root, "remote", "set-url", "origin", origin)
+    assert updater.inspect_repository(root / "chd-ct-reproduction") == repo
+    assert updater.update(repo, tmp_path / "runtime")
+    assert local_git(root, "rev-parse", "HEAD") == new
+    assert local_git(root, "remote", "get-url", "origin") == origin
+
+
+@pytest.mark.parametrize("origin", [*updater.MIRRORS, "git@github.com:tianwuasd/project.git"])
+def test_existing_origin_forms_remain_supported(repository, origin):
+    repo, _, _, _, _ = repository
+    root = Path(repo["root"])
+    local_git(root, "remote", "set-url", "origin", origin)
+    assert updater.inspect_repository(root / "chd-ct-reproduction") == repo
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "https://gh-proxy.com/https://github.com/other/project.git",
+        "https://gh-proxy.com/https://github.com/tianwuasd/other.git",
+        "https://gh-proxy.com.evil.invalid/https://github.com/tianwuasd/project.git",
+        "https://gh-proxy.com@evil.invalid/https://github.com/tianwuasd/project.git",
+        "https://gh-proxy.com/https://github.com/tianwuasd/project.git/extra",
+        "https://gh-proxy.com/https://github.com/tianwuasd/project.git?redirect=other",
+        "https://gh-proxy.com/https://github.com/tianwuasd/project.git#other",
+    ],
+)
+def test_similar_or_unrelated_mirror_origin_is_rejected(repository, origin):
+    repo, _, old, _, calls = repository
+    root = Path(repo["root"])
+    local_git(root, "remote", "set-url", "origin", origin)
+    with pytest.raises(ValueError, match="tianwuasd/project"):
+        updater.inspect_repository(root / "chd-ct-reproduction")
+    assert local_git(root, "rev-parse", "HEAD") == old
+    assert not any(c[0] in {"fetch", "ls-remote"} for c in calls)
+
+
 def test_all_mirrors_fail_preserves_checkout(repository, tmp_path, monkeypatch):
     repo, _, old, _, _ = repository
     monkeypatch.setattr(updater, "MIRRORS", (str(tmp_path / "missing"),))
