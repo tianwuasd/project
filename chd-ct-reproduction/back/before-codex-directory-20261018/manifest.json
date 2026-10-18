@@ -1,0 +1,13 @@
+{
+  "files": [
+    {
+      "sha256": "0f964925b7e5de70613f03c365882e49ba5a7356979bfdfbe962bc3c1bc6e089",
+      "path": "AGENTS.md"
+    },
+    {
+      "sha256": "03b28b845657e2a325990f126991b2698656a23157ad7f9db658e6cd31f13a17",
+      "path": ".gitattributes"
+    }
+  ],
+  "source_commit": "b2630e91cc7a95fc86ca68f41ede2d42dbc4e25f"
+}

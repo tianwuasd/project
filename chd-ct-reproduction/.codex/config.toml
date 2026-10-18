@@ -1,0 +1,5 @@
+# CT 项目级 Codex 配置。
+# 当前沿用用户的模型、权限和网络设置，不添加项目级覆盖。
+# 项目工作约定：../AGENTS.md
+# 接续工作、待办与验证状态：maintenance.md
+# 配置文档：https://learn.chatgpt.com/docs/config-file/config-basic
