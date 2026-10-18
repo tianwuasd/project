@@ -1,0 +1,57 @@
+{
+  "source_commit": "fce6af16c26651a4f45aad907436c2f004d5c7cf",
+  "files": [
+    {
+      "sha256": "bbd64b1c0a1b1239cc459d8bddd9bb81b7b2d008b04d231210639adec32043fc",
+      "path": ".gitattributes"
+    },
+    {
+      "sha256": "74a736a93059f1f557b3d691dd4804347282031207d1783fc9b14bdb7d0d9aeb",
+      "path": "pyproject.toml"
+    },
+    {
+      "sha256": "a5fa9699d0954a01c2817516258fae7fb0ac183a7a136336dc1f7adf036b5b3a",
+      "path": "src/chd_ct/__init__.py"
+    },
+    {
+      "sha256": "536fc7d87b861d8ff24b910ed37a4c31cc4fbe648d32bae37436524b379df624",
+      "path": "src/chd_ct/imagechd/train.py"
+    },
+    {
+      "sha256": "185226b2b025f584ec11c20faed6b2ffcac0b3611eb5093e6ace99c8bfb5c83e",
+      "path": "src/chd_ct/imagechd/cross_validation.py"
+    },
+    {
+      "sha256": "7272ee8eacd49bccac1fbacd76c8fe5153d089348fe47617bad7f55efaa39001",
+      "path": "src/chd_ct/imagechd/stage_queue.py"
+    },
+    {
+      "sha256": "d6d11b80f02f5d2913c05f6046abf39b7f12ffb8952bfa1c2e53f94c1d4602fd",
+      "path": "src/chd_ct/server/inspection.py"
+    },
+    {
+      "sha256": "cc440a1323086d4d6700b98393f9819ba3ea251f104f4769c921338792f4cf04",
+      "path": "src/chd_ct/server/jobs.py"
+    },
+    {
+      "sha256": "1c09fce8b4bda81dd55abdd0f86efd4ef8ed36a2aab801674cde01dbb8de57f4",
+      "path": "tests/test_cv_server.py"
+    },
+    {
+      "sha256": "285752586d26793ce281173f669bd10c010831148b8ed72ecac9eb7f585e7e76",
+      "path": "docs/server-start.md"
+    },
+    {
+      "sha256": "19355f500461669a3d971c2e86a5a8b72b38a8019b26580383232f16f6d58a5a",
+      "path": "README.md"
+    },
+    {
+      "sha256": "87719f6efa02bb509792657a654bcf573abdfa1ae30456c9fd28bbb6d67aa63f",
+      "path": "AGENTS.md"
+    },
+    {
+      "sha256": "b3baeef024b86c6b124a12590606303abe3d74e6a0742553062a8ec0532dae1c",
+      "path": ".codex/maintenance.md"
+    }
+  ]
+}

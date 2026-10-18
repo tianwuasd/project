@@ -179,6 +179,32 @@ def test_no_current_fold_does_not_reuse_an_old_queue(threefold, capsys):
     assert "5/5" not in capsys.readouterr().out
 
 
+def test_cross_fold_queries_show_total_resources_and_all_active_folds(threefold, capsys):
+    job, step, run, profile = threefold
+    state = json.loads((job / "job_state.json").read_text(encoding="utf-8"))
+    state["status"] = state["steps"][0]["status"] = "running"
+    save(job / "job_state.json", state)
+    summary = json.loads((run / "report.json").read_text(encoding="utf-8"))
+    summary.update(status="running", scheduling="cross_fold", current_folds=["fold_1", "fold_2"])
+    save(run / "report.json", summary)
+    save(
+        run / "queue.json",
+        dict(sampled_at=11, status="running", active_gpus=3, gpu_limit=3, pending_stages=7),
+    )
+    assert inspection.active_model_run(run) == run
+    jobs.show_status(profile.parent / "runtime", job)
+    inspection.show_models(job)
+    output = capsys.readouterr().out
+    assert "3/3 张卡" in output and "7 个阶段" in output
+    assert "当前运行折：fold_1, fold_2" in output and "跨折共享队列" in output
+    save(step / "status.json", dict(phase="train", phase_started_at=12))
+    jobs.show_status(profile.parent / "runtime", job)
+    assert "3/3 张卡" not in capsys.readouterr().out
+    summary.update(status="passed", current_fold=None, current_folds=[])
+    save(run / "report.json", summary)
+    assert inspection.active_model_run(run) is None
+
+
 def test_nested_workers_require_matching_identity_and_keep_legacy_queue(threefold, monkeypatch):
     job, step, run, _ = threefold
     valid = dict(boot="test-boot", start="123")

@@ -353,6 +353,9 @@ def show_status(runtime, directory=None):
                 continue
             if active_run is not None and active_run != run:
                 detail = f"当前折：{active_run.name}；{detail}"
+            elif active_run is not None and (run / "report.json").is_file():
+                if read_json(run / "report.json").get("scheduling") == "cross_fold":
+                    detail = "跨折共享队列；" + detail
             details[step["name"]] = (label, detail)
             if label.startswith("waiting_gpu"):
                 status = label

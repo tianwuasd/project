@@ -2,6 +2,8 @@
 
 项目发布在 [tianwuasd/project 的 chd-ct-reproduction 目录](https://github.com/tianwuasd/project/tree/main/chd-ct-reproduction)。本地独立源码仓库通过项目发布目录同步，源码仓库本身可以没有 Git remote。
 
+0.12.0 将三折 GPU 训练改为共享阶段队列：本折 `blood2d` 尚未结束时，空闲卡可提前训练后续折的独立模型。总并发受同一个 GPU 上限约束，每折 `blood_lstm` 仍只等待本折 `blood2d`；已完成折和完整 epoch 检查点可继续复用，CPU 训练保持逐折运行。改前源码见 [备份清单](back/before-cross-fold-queue-20261018/manifest.json)。
+
 0.11.1 修复服务器面板拒绝 `gh-proxy.com` 镜像 origin 的问题，保留原地址并通过既有多镜像线路更新。旧面板的一次性升级方法见 [服务器说明](docs/server-start.md#更新程序与复用缓存)；修改前源码见 [备份清单](back/before-origin-alias-20261018/manifest.json)。
 
 主目录默认流程：**预处理 → 三折、每折六阶段训练 → 融合预测 → 独立评估**。数据使用当前 archive 中的 ImageCHD，U-Net 主干按 CHD 论文图 4 的层数、通道、InstanceNorm、LeakyReLU 和位置关联分支实现，默认训练参数按表 3 设置，并保留 BiConvLSTM、心脏区域定位、多尺度投票与血池边界细化流程。

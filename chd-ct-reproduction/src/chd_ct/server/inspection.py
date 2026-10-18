@@ -116,12 +116,19 @@ def model_runs(run):
 
 
 def active_model_run(run):
-    """Select only the reported current fold, never a metadata-provided path."""
+    """Use the global cross-fold queue, or the legacy current fold's fixed path."""
     run = Path(run)
     runs = model_runs(run)
     if runs == [run]:
         return run
-    current = load(run / "report.json").get("current_fold")
+    summary = load(run / "report.json")
+    if summary.get("scheduling") == "cross_fold" and summary.get("status") in {
+        "running",
+        "interrupted",
+        "failed",
+    }:
+        return run
+    current = summary.get("current_fold")
     return next((fold for fold in runs if fold.name == current), None)
 
 
@@ -149,7 +156,12 @@ def show_models(job, step="auto"):
         complete = sum(folds.get(fold, {}).get("status") == "complete" for fold in FOLDS)
         current = summary.get("current_fold")
         current = current if current in FOLDS else "无"
-        print(f"三折进度：已完成 {complete}/3 | 当前折：{current} | 状态：{summary.get('status', '未记录')}")
+        if summary.get("scheduling") == "cross_fold":
+            active = ", ".join(f for f in summary.get("current_folds", []) if f in FOLDS) or "无"
+            position = "跨折共享队列 | 当前运行折：" + active
+        else:
+            position = "当前折：" + current
+        print(f"三折进度：已完成 {complete}/3 | {position} | 状态：{summary.get('status', '未记录')}")
         config = load(run / "effective-config.json").get("stages", {})
         for fold in runs:
             item = folds.get(fold.name, {})

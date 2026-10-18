@@ -22,6 +22,11 @@ def run_queue(
     available_gpus=None,
     gpu_limit=None,
     poll_interval=5,
+    *,
+    dependencies=None,
+    result_path_for=None,
+    log_path_for=None,
+    on_state=None,
 ):
     """Only the coordinator writes models.json; workers write stage-specific files."""
     if not gpu_ids or len(set(gpu_ids)) != len(gpu_ids):
@@ -33,6 +38,19 @@ def run_queue(
     logs = output / "stage_logs"
     logs.mkdir(exist_ok=True)
     pending, completed, active, used = list(stages), {}, {}, set()
+    if len(pending) != len(set(pending)):
+        raise ValueError("训练队列阶段重复")
+    dependencies = (
+        {"blood_lstm": ["blood2d"]}
+        if dependencies is None and "blood_lstm" in pending
+        else dependencies or {}
+    )
+    if not set(dependencies).issubset(pending) or any(
+        not set(required).issubset(pending) for required in dependencies.values()
+    ):
+        raise ValueError("训练队列依赖不在本次任务中")
+    result_path_for = result_path_for or (lambda stage: output / (stage + ".result.json"))
+    log_path_for = log_path_for or (lambda stage: logs / (stage + ".log"))
     records = {stage: {"status": "pending"} for stage in stages}
     state = {
         "status": "running",
@@ -44,6 +62,20 @@ def run_queue(
     last_scan, last_notice, started = float("-inf"), float("-inf"), time.monotonic()
     last_summary = None
     handlers, stopped = {}, [False]
+
+    def ready(stage):
+        return all(required in completed for required in dependencies.get(stage, ()))
+
+    def publish():
+        state.update(
+            active_gpus=len(active),
+            pending_stages=len(pending),
+            elapsed_seconds=int(time.monotonic() - started),
+            sampled_at=time.time(),
+        )
+        if on_state:
+            on_state(state)
+        write_json(output / "queue.json", state)
 
     def stop_requested(sig, frame):
         # Do not raise between process creation and registration.
@@ -68,8 +100,8 @@ def run_queue(
                 finished = True
                 if code:
                     records[stage].update(status="failed", exit_code=code)
-                    raise RuntimeError(f"阶段 {stage} 失败（{code}），查看 {logs / (stage + '.log')}")
-                info = json.loads((output / (stage + ".result.json")).read_text(encoding="utf-8"))
+                    raise RuntimeError(f"阶段 {stage} 失败（{code}），查看 {log_path_for(stage)}")
+                info = json.loads(Path(result_path_for(stage)).read_text(encoding="utf-8"))
                 completed[stage] = info
                 records[stage]["status"] = "complete"
                 if on_complete:
@@ -87,8 +119,8 @@ def run_queue(
                     break
                 if gpu in active:
                     continue
-                ready = next((s for s in pending if s != "blood_lstm" or "blood2d" in completed), None)
-                if ready is None:
+                selected = next((s for s in pending if ready(s)), None)
+                if selected is None:
                     continue
                 if before_start and before_start(gpu, gpu in used) is False:
                     # Another process acquired this card after the snapshot.
@@ -96,10 +128,12 @@ def run_queue(
                     continue
                 if stopped[0]:
                     raise KeyboardInterrupt("训练队列已中断")
-                stream = (logs / (ready + ".log")).open("a", encoding="utf-8")
+                log_path = Path(log_path_for(selected))
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                stream = log_path.open("a", encoding="utf-8")
                 try:
                     process = subprocess.Popen(
-                        list(map(str, command_for(ready))),
+                        list(map(str, command_for(selected))),
                         env=dict(env, CUDA_VISIBLE_DEVICES=gpu),
                         stdin=subprocess.DEVNULL,
                         stdout=stream,
@@ -124,18 +158,17 @@ def run_queue(
                 except BaseException:
                     stream.close()
                     raise
-                active[gpu] = (process, stream, ready)
-                pending.remove(ready)
+                active[gpu] = (process, stream, selected)
+                pending.remove(selected)
                 used.add(gpu)
                 from ..server.jobs import identity
 
-                records[ready].update(
+                records[selected].update(
                     status="running", gpu_uuid=gpu, pid=process.pid, identity=identity(process.pid)
                 )
-                write_json(output / "queue.json", state)
-                print(f"启动 {ready}，GPU={gpu}，日志：{logs / (ready + '.log')}", flush=True)
-            ready = any(s != "blood_lstm" or "blood2d" in completed for s in pending)
-            if pending and not active and not ready:
+                publish()
+                print(f"启动 {selected}，GPU={gpu}，日志：{log_path}", flush=True)
+            if pending and not active and not any(ready(s) for s in pending):
                 raise RuntimeError("训练队列依赖无法满足")
             state.update(
                 status="waiting_gpu" if pending and not active else "running",
@@ -152,7 +185,7 @@ def run_queue(
                     flush=True,
                 )
                 last_notice, last_summary = time.monotonic(), summary
-            write_json(output / "queue.json", state)
+            publish()
             if active or pending:
                 time.sleep(0.2)
         state["status"] = "complete"
@@ -175,11 +208,12 @@ def run_queue(
                 records[stage]["status"] = "interrupted"
         for stage in pending:
             records[stage]["status"] = "not_started"
+        active.clear()
         raise
     finally:
         for sig, handler in handlers.items():
             signal.signal(sig, handler)
-        write_json(output / "queue.json", state)
+        publish()
 
 
 def check_gpu_handoff(gpu, used):

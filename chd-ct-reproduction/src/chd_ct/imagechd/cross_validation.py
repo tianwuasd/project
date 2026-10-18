@@ -91,6 +91,51 @@ def train_threefold(prepared, output, config_path, mode, device, gpu_ids, resume
     write_json(contract_path, contract)
     write_json(output / "folds.json", plan)
     write_json(output / "effective-config.json", config)
+
+    def accept_fold(fold, saved):
+        key = f"fold_{fold['index']}"
+        child = output / key
+        summary = report["folds"][key]
+        if (
+            saved["config"] != {**config, "fold": fold}
+            or saved["prepared_sha256"] != contract["prepared_sha256"]
+            or saved["mode"] != mode
+        ):
+            raise ValueError("折模型来自不同配置或患者划分：" + key)
+        collection["folds"][key]["sha256"] = file_hash(child / "models.json")
+        summary.update(
+            status="complete",
+            stages={
+                stage: {
+                    k: saved["stages"][stage].get(k)
+                    for k in ("best_epoch", "best_val_loss", "epochs_completed")
+                }
+                for stage in STAGES
+            },
+        )
+        report["completed_folds"] += 1
+        write_json(output / "models.json", collection)
+        write_json(output / "report.json", report)
+        write_json(output / "training-summary.json", report)
+
+    def check_completed(fold):
+        key = f"fold_{fold['index']}"
+        child = output / key
+        prior_info = (previous or {}).get("folds", {}).get(key, {})
+        if not (resume and prior_info.get("sha256")):
+            return False
+        if not (child / "models.json").is_file() or file_hash(child / "models.json") != prior_info["sha256"]:
+            raise ValueError("已完成折的模型清单改变，不能续训：" + key)
+        _, saved = read_collection(child, allow_smoke=True)
+        accept_fold(fold, saved)
+        print("已核验，保留完成折：" + key, flush=True)
+        return True
+
+    def complete_fold(fold):
+        child = output / f"fold_{fold['index']}"
+        _, saved = read_collection(child, allow_smoke=True)
+        accept_fold(fold, saved)
+
     try:
         if mode == "check":
             for row in data["cases"]:
@@ -98,29 +143,41 @@ def train_threefold(prepared, output, config_path, mode, device, gpu_ids, resume
             report["status"] = "checked"
             return report
         write_json(output / "models.json", collection)
-        for fold in plan["folds"]:
-            key = f"fold_{fold['index']}"
-            child = output / key
-            report["current_fold"] = key
-            summary = report["folds"][key]
-            summary["status"] = "running"
+        if gpu_ids:
+            from .cross_fold_queue import run_folds
+
+            report.update(scheduling="cross_fold", current_folds=[])
             write_json(output / "report.json", report)
-            print(
-                f"第 {fold['index'] + 1}/3 折：训练 {summary['train_cases']}，"
-                f"验证 {summary['val_cases']}，测试 {summary['test_cases']} 例；测试折不参与更新或选模。",
-                flush=True,
+            print("三折共享 GPU 队列：独立模型可跨折并行，同折 blood_lstm 等待 blood2d。", flush=True)
+            run_folds(
+                directory,
+                output,
+                mode,
+                device,
+                gpu_ids,
+                resume,
+                gpu_limit,
+                lock_fd,
+                plan["folds"],
+                report,
+                check_completed,
+                complete_fold,
             )
-            prior_info = (previous or {}).get("folds", {}).get(key, {})
-            completed = resume and prior_info.get("sha256")
-            if completed:
-                if (
-                    not (child / "models.json").is_file()
-                    or file_hash(child / "models.json") != prior_info["sha256"]
-                ):
-                    raise ValueError("已完成折的模型清单改变，不能续训：" + key)
-                _, saved = read_collection(child, allow_smoke=True)
-                print("已核验，保留完成折：" + key, flush=True)
-            else:
+        else:
+            for fold in plan["folds"]:
+                key = f"fold_{fold['index']}"
+                child = output / key
+                report["current_fold"] = key
+                summary = report["folds"][key]
+                summary["status"] = "running"
+                write_json(output / "report.json", report)
+                print(
+                    f"第 {fold['index'] + 1}/3 折：训练 {summary['train_cases']}，"
+                    f"验证 {summary['val_cases']}，测试 {summary['test_cases']} 例；测试折不参与更新或选模。",
+                    flush=True,
+                )
+                if check_completed(fold):
+                    continue
                 train(
                     directory,
                     child,
@@ -133,38 +190,20 @@ def train_threefold(prepared, output, config_path, mode, device, gpu_ids, resume
                     fold_context=fold,
                     inherited_lock_fds=(lock_fd,),
                 )
-                _, saved = read_collection(child, allow_smoke=True)
-            if (
-                saved["config"] != {**config, "fold": fold}
-                or saved["prepared_sha256"] != contract["prepared_sha256"]
-                or saved["mode"] != mode
-            ):
-                raise ValueError("折模型来自不同配置或患者划分：" + key)
-            collection["folds"][key]["sha256"] = file_hash(child / "models.json")
-            summary.update(
-                status="complete",
-                stages={
-                    stage: {
-                        k: saved["stages"][stage].get(k)
-                        for k in ("best_epoch", "best_val_loss", "epochs_completed")
-                    }
-                    for stage in STAGES
-                },
-            )
-            report["completed_folds"] += 1
-            write_json(output / "models.json", collection)
-            write_json(output / "report.json", report)
-            write_json(output / "training-summary.json", report)
+                complete_fold(fold)
         collection["status"] = "complete"
-        report.update(status="passed", current_fold=None, models=str(output / "models.json"))
+        report.update(
+            status="passed", current_fold=None, current_folds=[], models=str(output / "models.json")
+        )
         write_json(output / "models.json", collection)
         return report
     except BaseException as error:
         status = "interrupted" if isinstance(error, KeyboardInterrupt) else "failed"
         report.update(status=status, error=str(error))
         collection.update(status=status, error=str(error))
-        if report["current_fold"]:
-            report["folds"][report["current_fold"]]["status"] = status
+        for summary in report["folds"].values():
+            if summary["status"] == "running":
+                summary["status"] = status
         write_json(output / "models.json", collection)
         raise
     finally:
