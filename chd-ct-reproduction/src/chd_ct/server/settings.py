@@ -22,6 +22,7 @@ def task_configuration(args):
     by_task = {
         "environment": set(),
         "preprocess": {
+            "preprocess_cache",
             "dataset",
             "prepared",
             "size",

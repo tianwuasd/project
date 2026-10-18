@@ -59,7 +59,12 @@ def initial_state(plan):
         "steps": [
             dict(s["reuse"], status="reused")
             if s.get("reuse")
-            else {"name": s["name"], "output": s["output"], "status": "pending"}
+            else {
+                "name": s["name"],
+                "output": s["output"],
+                "status": "pending",
+                **({"cache_selection": s["cache_selection"]} if s.get("cache_selection") else {}),
+            }
             for s in plan["steps"]
         ],
     }
@@ -117,6 +122,23 @@ def execute(plan):
                 lock_held=True,
                 recent_gpus=recent_gpus,
             )
+            from .cache_selection import fallback
+
+            event = fallback(plan, index, code)
+            if event:
+                current["cache_selection"] = event
+                write_json(state_file, state)
+                args.prepared, args.resume = event["prepared"], False
+                code = imagechd.run(
+                    args,
+                    plan["profile"],
+                    output_dir=Path(step["output"]),
+                    lock_held=True,
+                    recent_gpus=recent_gpus,
+                )
+            if step["arguments"]["task"] == "preprocess" and code == 0:
+                current["prepared"] = step["arguments"]["prepared"]
+                print("预处理完成，后续使用缓存：" + current["prepared"], flush=True)
             if code == 0:
                 report = Path(step["output"]) / "status.json"
                 if report.is_file():
@@ -352,6 +374,11 @@ def show_status(runtime, directory=None):
         if step["name"] in details:
             label = details[step["name"]][0]
         print(f"  {step['name']}: {label} → {step['output']}")
+        if step.get("cache_selection"):
+            event = step["cache_selection"]
+            print(f"    缓存自动新建：{event['reason']} → {event['prepared']}")
+        elif step.get("prepared"):
+            print("    预处理缓存：" + step["prepared"])
         if step["name"] in details:
             print("    " + details[step["name"]][1])
     if status.startswith("stale") or status in {"failed", "interrupted"}:

@@ -133,6 +133,7 @@ def build_resume_plan(args, profile, interactive):
         args.task
         or args.tasks
         or getattr(args, "name", None)
+        or getattr(args, "preprocess_cache", None)
         or args.reset_settings
         or any(getattr(args, k, None) for k in INPUTS)
     ):
@@ -171,6 +172,8 @@ def build_resume_plan(args, profile, interactive):
         step.pop("reuse", None)
         step.pop("restart", None)
         arguments = step["arguments"]
+        if arguments["task"] == "environment" and any(s["name"] == "preprocess" for s in plan["steps"]):
+            arguments["device"] = "cpu"
         if prior["status"] in {"passed", "reused"} and (
             prior.get("snapshot") or arguments["task"] == "environment"
         ):

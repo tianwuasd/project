@@ -92,8 +92,9 @@ def test_unrelated_existing_preprocess_directory_is_not_overwritten(tmp_path):
     prepared = Path(profile["prepared"])
     prepared.mkdir()
     (prepared / "unrelated.txt").write_text("keep me")
-    with pytest.raises(ValueError, match="不是可识别"):
-        build_plan(args, profile, False)
+    plan = build_plan(args, profile, False)
+    assert plan["steps"][0]["arguments"]["resume"] is True
+    assert plan["steps"][0]["arguments"]["preprocess_cache"] == "reuse"
     assert (prepared / "unrelated.txt").read_text() == "keep me"
 
 

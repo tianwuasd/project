@@ -40,6 +40,8 @@ Windows 双击 **start.bat**，选择一个功能。数据路径可直接粘贴�
 
 0.10.0 起，面板提供 `x` 中断当前任务（保留检查点）、`u` 多镜像更新、`q` 退出；各输入页支持 `b` 返回和 `q` 退出。更新前确认目标任务并等待退出，备份代码，只做 Git 快进更新。预处理发现已有可识别缓存时自动进入校验复用/接续流程，来源或参数不兼容则拒绝覆盖。详见 [更新与缓存处理](docs/server-start.md#更新程序与复用缓存)。修改前文件保存在 `back/before-panel-update-20261016/`。
 
+0.11.0 起，选择预处理时可以选“尝试沿用（失败自动新建）”或“新建”。缓存不兼容、损坏或无法识别时保留旧目录，自动生成新路径，记录原因并统一传给后续训练/预测。每次执行最多自动换目录重试一次；原始数据或系统错误正常报错。含预处理的流程先执行 CPU 环境检查和预处理，GPU 不足不会阻塞它们，实际 GPU 步骤才等待显卡。修改前代码见 `back/before-cache-selection-20261018/`。
+
 诊断先试跑：`python start.py --task diagnosis-demo --device cpu --non-interactive`，随后查看输出中的 `diagnosis-demo/prediction/diagnosis-report.html`。
 
 ## 安装与先跑通

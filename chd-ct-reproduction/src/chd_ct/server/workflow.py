@@ -70,16 +70,9 @@ def validate_inputs(args, future):
         if prepared.exists():
             if not prepared.is_dir():
                 raise ValueError("预处理路径不是目录：" + str(prepared))
-            recognized = any(
-                (prepared / name).is_file()
-                for name in ("preprocess-contract.json", "preprocess-report.json")
-            )
-            nonempty = any(p.name != ".writer.lock" for p in prepared.iterdir())
-            if nonempty and not recognized:
-                raise ValueError("已有目录不是可识别的预处理缓存，请指定新的 --prepared 目录")
             args.resume = True
             state = "完整缓存" if (prepared / "dataset.json").is_file() else "未完成缓存"
-            print(f"识别到{state}：将校验来源和参数，通过后复用或接续；不覆盖不兼容数据。")
+            print(f"发现{state}：通过校验后复用或接续；无法沿用则保留旧目录并自动新建。")
     elif args.task in {"train", "predict", "test", "evaluate"}:
         needed.append(("prepared", args.prepared))
     if args.task == "train":
@@ -115,6 +108,8 @@ def build_plan(args, profile, interactive):
     if not run_name or len(run_name) > 80 or any(ord(c) < 32 or ord(c) == 127 for c in run_name):
         raise ValueError("任务名称需要 1—80 个字符，不能包含换行或控制字符")
     names = choose_steps(args, interactive)
+    if getattr(args, "preprocess_cache", None) and "preprocess" not in names:
+        raise ValueError("--preprocess-cache 需要选择 preprocess 步骤")
     if "diagnosis-features" in names and "diagnosis-train" in names:
         if ("test" in names and "predict" not in names) or (
             "predict" in names and (args.split or args.case_id)
@@ -143,6 +138,8 @@ def build_plan(args, profile, interactive):
         current = copy.deepcopy(base)
         current.gpu_shown = prompted_gpu
         current.task = "train" if name in {"smoke", "preflight"} else name
+        if name == "environment" and "preprocess" in names:
+            current.device = "cpu"  # GPU checks happen at the first actual GPU step.
         if name in {"smoke", "preflight"}:
             current.mode = name
         elif name == "train" and not args.task:
@@ -161,6 +158,11 @@ def build_plan(args, profile, interactive):
             if getattr(current, field, None) is None and saved.get(source) in future:
                 setattr(current, field, saved[source])
         _, _, _, saved = resolve_settings(current, profile, interactive, saved_override=saved)
+        if current.task == "preprocess":
+            from .cache_selection import select
+
+            select(current, interactive)
+            saved["prepared"] = current.prepared
         # Freeze caller-relative paths before the worker changes its working directory.
         for field in ("python", "split_file", "evidence", "rules"):
             if field in task_configuration(current) and getattr(current, field, None):

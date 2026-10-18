@@ -199,6 +199,11 @@ def make_parser():
     parser.add_argument("--results")
     parser.add_argument("--name", help="本次新任务的显示名称；重名也使用独立目录，续跑保留原名称")
     parser.add_argument(
+        "--preprocess-cache",
+        choices=("reuse", "new"),
+        help="预处理缓存：reuse 尝试沿用、失败自动新建（默认）；new 使用独立新目录",
+    )
+    parser.add_argument(
         "--query",
         choices=("status", "gpu", "models", "logs", "processes", "history"),
         help="只读查询，不安装环境或启动任务",
@@ -239,7 +244,14 @@ def main(argv=None):
         from . import jobs
 
         if args.query and (
-            args.task or args.tasks or args.resume_job or args.stop or args.worker or args.name or args.status
+            args.task
+            or args.tasks
+            or args.resume_job
+            or args.stop
+            or args.worker
+            or args.name
+            or args.status
+            or args.preprocess_cache
         ):
             raise ValueError("--query 是只读查询，不能同时指定启动、续跑、停止或 --status")
         if not 1 <= args.lines <= 1000:

@@ -86,6 +86,8 @@ def build_command(args, root, python, output, device, mode=None):
             command += ["--no-resample"]
         if getattr(args, "resume", False):
             command += ["--resume"]
+        if getattr(args, "reuse_failure_report", None):
+            command += ["--reuse-failure-report", args.reuse_failure_report]
         return command
     if not args.prepared:
         raise ValueError("需要 --prepared；请先单独运行预处理")

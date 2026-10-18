@@ -93,6 +93,8 @@ def run(args, profile, *, output_dir=None, lock_held=False, recent_gpus=()):
             )
             resuming = bool(getattr(args, "resume", False))
             output.mkdir(parents=True, exist_ok=resuming)
+            if args.task == "preprocess":
+                (output / "cache-reuse-failure.json").unlink(missing_ok=True)
             if resuming:
                 archive_child(output / "environment")
                 archive_child(output / "preflight")
@@ -161,6 +163,8 @@ def run(args, profile, *, output_dir=None, lock_held=False, recent_gpus=()):
                     state.update(status="failed", exit_code=code)
                     return code
             commands = []
+            if args.task == "preprocess":
+                args.reuse_failure_report = str(output / "cache-reuse-failure.json")
             if args.task == "train" and args.mode == "train":
                 commands.append(
                     build_command(args, ROOT, python, output / "preflight", device, mode="preflight")

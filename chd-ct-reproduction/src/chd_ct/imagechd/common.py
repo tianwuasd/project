@@ -37,6 +37,11 @@ def safe_child(directory, name):
 def read_prepared(directory):
     directory = Path(directory).expanduser().resolve()
     data = json.loads((directory / "dataset.json").read_text(encoding="utf-8"))
+    return validate_prepared(directory, data)
+
+
+def validate_prepared(directory, data, *, require_files=True):
+    """Shared manifest/row validation, also used before resuming partial caches."""
     if data.get("status") != "prepared" or data.get("format") not in {
         FORMAT,
         "imagechd7-v1",
@@ -69,7 +74,10 @@ def read_prepared(directory):
         ):
             raise ValueError("病例编号无效或重复")
         seen.add(case)
-        safe_child(directory, row["cache"])
+        if require_files:
+            safe_child(directory, row["cache"])
+        elif not (directory / row["cache"]).resolve().is_relative_to(directory):
+            raise ValueError("缓存路径无效")
         if "cache_shape" not in row:
             row["cache_shape"] = [data["size"]] * 3
         for key in ("cache_shape", "native_shape", "canonical_shape"):

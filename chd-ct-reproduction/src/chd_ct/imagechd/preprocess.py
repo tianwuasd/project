@@ -3,6 +3,7 @@
 import argparse
 import csv
 import random
+import sys
 from pathlib import Path
 
 import nibabel as nib
@@ -10,6 +11,7 @@ import numpy as np
 import torch
 
 from ..recovery import atomic_path, file_hash, output_lock, read_json, write_json
+from .cache_reuse import CacheReuseError, changed_fields, inspect_sources, read_cache
 from .common import FORMAT, IGNORE, LABELS, NORMALIZATION, normalize
 from .geometry import resize
 from .spacing import (
@@ -245,18 +247,22 @@ def prepare_locked(
     contract_file = output / "preprocess-contract.json"
     report_file = output / "preprocess-report.json"
     if contract_file.exists():
-        if read_json(contract_file) != contract:
-            raise ValueError("续跑的数据来源、划分或预处理参数改变；请使用新目录")
+        differences = changed_fields(read_cache(contract_file), contract)
+        if differences:
+            raise CacheReuseError("预处理来源/参数改变：" + ", ".join(differences))
     elif resume and report_file.exists():
-        prior = read_json(report_file)
+        prior = read_cache(report_file)
         if any(prior.get(k) != v for k, v in options.items()):
-            raise ValueError("旧缓存预处理参数不匹配；请使用原参数续跑")
+            differences = changed_fields({k: prior.get(k) for k in options}, options)
+            raise CacheReuseError("旧缓存预处理参数不匹配：" + ", ".join(differences))
         print("旧版缓存：逐例重新读取原始数据并校验，完整缓存保留，不重新压缩。", flush=True)
     elif resume and any(p.name != ".writer.lock" for p in output.iterdir()):
-        raise ValueError("无法识别已有预处理目录，缺少来源记录")
-    write_json(contract_file, contract)
+        raise CacheReuseError("无法识别已有预处理目录，缺少来源记录")
     complete_file = output / "dataset.json"
-    complete = read_json(complete_file) if complete_file.exists() else None
+    complete = read_cache(complete_file) if complete_file.exists() else None
+    checked_sources, verified = inspect_sources(output, pairs, complete, options)
+    if complete is None:
+        write_json(contract_file, contract)
     report = dict(
         options,
         status="running",
@@ -278,7 +284,9 @@ def prepare_locked(
             if limit and len(report["cases"]) >= limit:
                 break
             print(f"预处理 {index + 1}/{len(pairs)}：{case}（校验/处理）", flush=True)
-            sources = dict(image=file_hash(image_path), label=file_hash(label_path) if label_path else None)
+            sources = checked_sources.get(case) or dict(
+                image=file_hash(image_path), label=file_hash(label_path) if label_path else None
+            )
             sidecar = records / (case + ".json")
             cached = read_json(sidecar) if sidecar.exists() else None
             if cached and cached["sources"] != sources:
@@ -286,6 +294,7 @@ def prepare_locked(
             cache_file = output / (case + ".npz")
             valid = cached and (
                 cached.get("excluded")
+                or case in verified
                 or (cache_file.is_file() and file_hash(cache_file) == cached.get("cache_sha256"))
             )
             if valid:
@@ -305,7 +314,7 @@ def prepare_locked(
                                 same = set(previous.files) == set(arrays) and all(
                                     np.array_equal(previous[k], v) for k, v in arrays.items()
                                 )
-                        except (OSError, ValueError, EOFError):
+                        except (ValueError, EOFError):
                             pass
                         except Exception as error:
                             # zipfile.BadZipFile and decompression errors are damaged caches.
@@ -316,7 +325,7 @@ def prepare_locked(
                                 raise
                     if not same:
                         if complete:
-                            raise ValueError("已完成缓存损坏；请用新目录重建，避免改变已有实验")
+                            raise CacheReuseError("已完成缓存损坏；请用新目录重建，避免改变已有实验")
                         print("  写入缓存：" + case, flush=True)
                         with atomic_path(cache_file) as temporary:
                             np.savez_compressed(temporary, **arrays)
@@ -327,7 +336,8 @@ def prepare_locked(
                     excluded=excluded,
                     cache_sha256=None if excluded else file_hash(cache_file),
                 )
-                write_json(sidecar, cached)
+                if complete is None:
+                    write_json(sidecar, cached)
                 del arrays
             if excluded:
                 report["excluded"].append(row)
@@ -348,7 +358,8 @@ def prepare_locked(
         report["status"] = "prepared"
         if complete:
             if complete["cases"] != report["cases"] or complete["excluded"] != report["excluded"]:
-                raise ValueError("已完成清单与原始数据不符；请使用新目录")
+                raise CacheReuseError("已完成清单与原始数据不符；请使用新目录")
+            print(f"预处理缓存沿用成功：{output}（{len(complete['cases'])} 例，未重复生成缓存）", flush=True)
             return complete  # Preserve its bytes/hash for downstream checkpoints.
         write_json(complete_file, report)
         print(f"已准备 {len(report['cases'])} 例；排除 {len(report['excluded'])} 例：{output}", flush=True)
@@ -385,20 +396,37 @@ def main(argv=None):
     parser.add_argument("--for-prediction", action="store_true", help="无标签预处理，不生成训练划分")
     parser.add_argument("--limit", type=int, help="只用于软件试跑，保留前 N 个合格病例")
     parser.add_argument("--resume", action="store_true", help="校验已有缓存并接续，参数和来源必须一致")
+    parser.add_argument("--reuse-failure-report", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
-    prepare(
-        args.input,
-        args.output,
-        args.size,
-        args.seed,
-        args.for_prediction,
-        args.split_file,
-        args.limit,
-        args.resume,
-        args.spacing_excel,
-        args.target_spacing,
-        args.no_resample,
-    )
+    if args.reuse_failure_report:
+        Path(args.reuse_failure_report).unlink(missing_ok=True)
+    try:
+        prepare(
+            args.input,
+            args.output,
+            args.size,
+            args.seed,
+            args.for_prediction,
+            args.split_file,
+            args.limit,
+            args.resume,
+            args.spacing_excel,
+            args.target_spacing,
+            args.no_resample,
+        )
+    except CacheReuseError as error:
+        if not args.reuse_failure_report:
+            raise
+        write_json(
+            Path(args.reuse_failure_report),
+            dict(
+                kind="cache_reuse_failed",
+                prepared=str(Path(args.output).expanduser().resolve()),
+                reason=str(error),
+            ),
+        )
+        print("预处理缓存不能沿用：" + str(error), file=sys.stderr, flush=True)
+        return 78
     return 0
 
 
