@@ -1,0 +1,4 @@
+numpy>=1.24
+nibabel>=5
+pyzipper>=0.3.6
+isal>=1.6

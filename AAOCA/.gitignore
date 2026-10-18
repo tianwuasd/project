@@ -26,9 +26,14 @@
 !/tests/test_*.py
 /tools/*
 !/tools/research_ct/
+!/tools/chd_dataset/
 /tools/research_ct/*
 !/tools/research_ct/*.py
 !/tools/research_ct/README.md
 !/tools/research_ct/requirements.txt
+/tools/chd_dataset/*
+!/tools/chd_dataset/*.py
+!/tools/chd_dataset/README.md
+!/tools/chd_dataset/requirements.txt
 __pycache__/
 *.py[cod]
