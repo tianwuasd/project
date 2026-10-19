@@ -111,6 +111,10 @@ def build_command(args, root, python, output, device, mode=None):
         if not args.models:
             raise ValueError("预测需要 --models 完整模型目录")
         command += ["--models", args.models, "--device", device]
+        if getattr(args, "gpu_ids", None):
+            command += ["--gpu-ids", ",".join(args.gpu_ids), "--gpu-limit", str(args.gpu_limit)]
+        if getattr(args, "inference_phase", None):
+            command += ["--phase", args.inference_phase]
         for flag, value in (("--case-id", args.case_id), ("--split", args.split)):
             if value:
                 command += [flag, value]

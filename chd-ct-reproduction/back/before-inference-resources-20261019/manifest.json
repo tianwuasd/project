@@ -1,0 +1,27 @@
+{
+  "commit": "a188523d588f3a7ae464662c08890dbc754572d8",
+  "files": {
+    ".gitattributes": "17927d9c4a98764b29ae328092e91913cbd5ff80af02bc39d11e29a0163fd2ea",
+    "AGENTS.md": "00a4362ee254b3e23100f497e2d958d13df3567787c0552ea6b3b5e806e3d958",
+    ".codex/maintenance.md": "85bbacd9ef7dae4b997957c1260312f3616faf161a97df354e3791904f01eece",
+    "README.md": "d9a7c5b12baaa2141f72f3561eb79c3f50d28f7d1581861cb1847c815c44da76",
+    "docs/server-start.md": "afd19efa6494ceae43f34310969bd703c6ddbfb3bbcf3b5bac894366318eb208",
+    "docs/recovery.md": "d3a83940b707e5f592f557593a297536f3299581a2e3dd9c87fa512d86bb9371",
+    "pyproject.toml": "6a875d93b5a21a45b8f99d8ccd933d39c04503bb0b27706b08d2552ecdfe7f65",
+    "src/chd_ct/__init__.py": "086e7b947901ad38199b54799bacd6414e58c03c4893ff7965b69f2e47f8c3bc",
+    "src/chd_ct/imagechd/preprocess.py": "15ed96faa70b8b9663237229cccd6a0a4e6bdf757ffadd7d49bd2992b4b0f68c",
+    "src/chd_ct/imagechd/predict.py": "530f2d41962ec07a0fe57e06d596eda831df347f161d15536ca4e1526e91ab15",
+    "src/chd_ct/imagechd/test.py": "99d05a527f2e2ef4c7c0f009da79f642d8b35a8a054dde9b948e4f8c2c1a9fb8",
+    "src/chd_ct/imagechd/evaluate.py": "93277ffa6631668d1339839fd7318ca89cfcbd425febe9edb0e019c78880e294",
+    "src/chd_ct/diagnosis/features.py": "c9e2b7c52e2159497150dba9728662af2b7bde5c63a59980f057e67f28cd0801",
+    "src/chd_ct/quickstart/commands.py": "f201acaee4393539132604a9b408e845d023dd87eba74a1a61800d0afca10173",
+    "src/chd_ct/server/jobs.py": "00aae37f059c7097b61906b04bf8a67df21d9aed47e694bb011160459e13c81f",
+    "src/chd_ct/server/imagechd.py": "22368483d3d2035cf61278fef68194714575f2609cbaaa62084f8b56353ada43",
+    "src/chd_ct/server/settings.py": "f01ae211f426624694275f6fc6c205deee645fbc84859164cdb89852d13b0122",
+    "src/chd_ct/server/workflow.py": "0aa5e998ea3a8e3eef5143105ead0d64de7373fab1726086b9639ac56264f766",
+    "src/chd_ct/server/resume.py": "26cc3a6741829df47a87491574fd44ada2b97413c496f3e3e1c56ce81109d61c",
+    "src/chd_ct/server/inspection.py": "47da9039e70b20e5f40afc39182a85fdfbc185f32df9e780accaed833df65ba8",
+    "src/chd_ct/server/panel.py": "044bec2401695ef740e2b75183042eb1e7fae96968011ae4b11849ef540f06da",
+    "tests/test_gpu_hold.py": "5fd2df307b7c12240d0a8ad603b4c73102a4f4da40360c406fc1bd9624e41d4c"
+  }
+}

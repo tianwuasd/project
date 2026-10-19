@@ -6,7 +6,9 @@ from pathlib import Path
 import numpy as np
 from scipy import ndimage as ndi
 
+from ..cpu_runtime import allocation, iter_cases, volume_bytes
 from ..imagechd.common import LABELS, read_prepared, safe_child
+from ..recovery import output_lock
 from .io import case_index, file_hash, new_output, read_artifact, save
 
 PAIRS = (("LV", "RV"), ("LA", "RA"), ("LV", "AO"), ("RV", "AO"), ("LV", "PA"), ("RV", "PA"), ("AO", "PA"))
@@ -104,26 +106,36 @@ def extract(prepared, predictions, output):
         "cases": [],
         "measurement_note": "Grid-normalized descriptors; one-voxel contact is a proxy, not proven anatomical communication. Clinical rule features require separately reviewed evidence.",
     }
-    for case, pred in predicted.items():
-        row = available[case]
-        path = safe_child(directory, pred["grid_prediction"])
-        with np.load(path, allow_pickle=False) as record:
-            mask = record["prediction"]
-        if list(mask.shape) != row["cache_shape"]:
-            raise ValueError("预测网格形状与清单不匹配")
-        result["cases"].append(
-            {
-                "case_id": case,
-                "patient_id": row.get("patient_id", case),
-                "split": row.get("split"),
-                "mask_sha256": file_hash(path),
-                **measure(mask),
-            }
+    output = new_output(output)
+    selected = allocation(
+        "diagnosis_features", output, len(predicted), volume_bytes(list(available.values()), 40)
+    )
+    items = [
+        dict(directory=str(directory), case=case, pred=pred, row=available[case])
+        for case, pred in predicted.items()
+    ]
+    with output_lock(output) as lock_fd:
+        result["cases"] = list(
+            iter_cases("chd_ct.diagnosis.features", "extract_case", items, output, selected, (lock_fd,))
         )
     case_index(result["cases"], splits=True)
-    output = new_output(output)
     save(output / "features.json", result)
     return result
+
+
+def extract_case(directory, case, pred, row):
+    path = safe_child(Path(directory), pred["grid_prediction"])
+    with np.load(path, allow_pickle=False) as record:
+        mask = record["prediction"]
+    if list(mask.shape) != row["cache_shape"]:
+        raise ValueError("预测网格形状与清单不匹配")
+    return dict(
+        case_id=case,
+        patient_id=row.get("patient_id", case),
+        split=row.get("split"),
+        mask_sha256=file_hash(path),
+        **measure(mask),
+    )
 
 
 def read_features(path):

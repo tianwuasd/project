@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+import os
 import random
 import sys
 from pathlib import Path
@@ -10,6 +11,7 @@ import nibabel as nib
 import numpy as np
 import torch
 
+from ..cpu_runtime import allocation, iter_cases
 from ..recovery import atomic_path, file_hash, output_lock, read_json, write_json
 from .cache_reuse import CacheReuseError, changed_fields, inspect_sources, read_cache
 from .common import FORMAT, IGNORE, LABELS, NORMALIZATION, normalize
@@ -178,7 +180,7 @@ def prepare(
         raise ValueError("size=0 保留原始网格，或至少为8；测试用 limit 至少为3")
     output = Path(output).expanduser().resolve()
     output.mkdir(parents=True, exist_ok=resume)
-    with output_lock(output):
+    with output_lock(output) as lock_fd:
         return prepare_locked(
             source,
             output,
@@ -191,6 +193,7 @@ def prepare(
             spacing_excel,
             target_spacing,
             no_resample,
+            lock_fd=lock_fd,
         )
 
 
@@ -206,8 +209,9 @@ def prepare_locked(
     spacing_excel=None,
     target_spacing=(1, 1, 1),
     no_resample=False,
+    lock_fd=None,
 ):
-    torch.set_num_threads(2)
+    torch.set_num_threads(int(os.environ.get("CHD_CPU_THREADS", "2")))
     options = dict(
         format=FORMAT,
         size=size,
@@ -279,76 +283,63 @@ def prepare_locked(
     records = output / ".resume"
     records.mkdir(exist_ok=True)
     hashes = set()
+    # Header-only estimate includes native and resampled arrays; no CT payload is loaded here.
+    peak = 512 * 1024**2
+    inspect_pairs = pairs if os.environ.get("CHD_CPU_AUTO") == "1" and not limit else []
+    for case, image_path, _ in inspect_pairs:
+        header = nib.load(image_path)
+        voxels = int(np.prod(header.shape))
+        if spacings.get(case):
+            shape, _ = resampling_grid(header.shape, spacings[case]["spacing_mm"], target_spacing)
+            voxels = max(voxels, int(np.prod(shape)))
+        peak = max(peak, voxels * 64)
+    selected = allocation("preprocess", output, len(pairs), peak)
+    # A limit counts accepted cases, not source rows; serial execution avoids speculative writes.
+    if limit:
+        selected["processes"] = 1
+    items = [
+        dict(
+            case=case,
+            image_path=str(image_path),
+            label_path=str(label_path) if label_path else None,
+            size=size,
+            spacing_record=spacings.get(case),
+            target_spacing=target_spacing,
+            output=str(output),
+            checked_sources=checked_sources.get(case),
+            verified=case in verified,
+            complete=bool(complete),
+        )
+        for case, image_path, label_path in pairs
+    ]
     try:
-        for index, (case, image_path, label_path) in enumerate(pairs):
-            if limit and len(report["cases"]) >= limit:
-                break
-            print(f"预处理 {index + 1}/{len(pairs)}：{case}（校验/处理）", flush=True)
-            sources = checked_sources.get(case) or dict(
-                image=file_hash(image_path), label=file_hash(label_path) if label_path else None
-            )
-            sidecar = records / (case + ".json")
-            cached = read_json(sidecar) if sidecar.exists() else None
-            if cached and cached["sources"] != sources:
-                raise ValueError(f"{case} 原始影像或标签已改变；不能混用已有实验")
-            cache_file = output / (case + ".npz")
-            valid = cached and (
-                cached.get("excluded")
-                or case in verified
-                or (cache_file.is_file() and file_hash(cache_file) == cached.get("cache_sha256"))
-            )
-            if valid:
-                row = cached["row"]
-                excluded = cached["excluded"]
-                print("  已校验，保留：" + case, flush=True)
-            else:
-                arrays, row = prepare_case(
-                    case, image_path, label_path, size, spacings.get(case), target_spacing
-                )
-                excluded = arrays is None
-                if not excluded:
-                    same = False
-                    if cache_file.exists():
-                        try:
-                            with np.load(cache_file, allow_pickle=False) as previous:
-                                same = set(previous.files) == set(arrays) and all(
-                                    np.array_equal(previous[k], v) for k, v in arrays.items()
-                                )
-                        except (ValueError, EOFError):
-                            pass
-                        except Exception as error:
-                            # zipfile.BadZipFile and decompression errors are damaged caches.
-                            import zipfile
-                            import zlib
+        from contextlib import closing
 
-                            if not isinstance(error, (zipfile.BadZipFile, zlib.error)):
-                                raise
-                    if not same:
-                        if complete:
-                            raise CacheReuseError("已完成缓存损坏；请用新目录重建，避免改变已有实验")
-                        print("  写入缓存：" + case, flush=True)
-                        with atomic_path(cache_file) as temporary:
-                            np.savez_compressed(temporary, **arrays)
-                    print("  " + ("已校验旧缓存，保留：" if same else "已保存：") + case, flush=True)
-                cached = dict(
-                    sources=sources,
-                    row=row,
-                    excluded=excluded,
-                    cache_sha256=None if excluded else file_hash(cache_file),
-                )
-                if complete is None:
-                    write_json(sidecar, cached)
-                del arrays
-            if excluded:
-                report["excluded"].append(row)
-            else:
-                digest = row["source_sha256"]
-                if digest in hashes:
-                    raise ValueError("检测到内容完全重复的影像；请先确认患者身份，避免跨集合泄漏")
-                hashes.add(digest)
-                report["cases"].append(dict(row))
-            if not complete:
-                write_json(report_file, report)
+        with closing(
+            iter_cases(
+                "chd_ct.imagechd.preprocess",
+                "prepare_cached_case",
+                items,
+                output,
+                selected,
+                (lock_fd,) if lock_fd is not None else (),
+            )
+        ) as results:
+            for index, cached in enumerate(results):
+                row, excluded = cached["row"], cached["excluded"]
+                print(f"预处理 {index + 1}/{len(pairs)}：{row['case_id']}", flush=True)
+                if excluded:
+                    report["excluded"].append(row)
+                else:
+                    digest = row["source_sha256"]
+                    if digest in hashes:
+                        raise ValueError("检测到内容完全重复的影像；请先确认患者身份，避免跨集合泄漏")
+                    hashes.add(digest)
+                    report["cases"].append(dict(row))
+                if not complete:
+                    write_json(report_file, report)
+                if limit and len(report["cases"]) >= limit:
+                    break
         if not report["cases"]:
             raise ValueError("没有可用病例")
         if not for_prediction:
@@ -372,6 +363,78 @@ def prepare_locked(
     finally:
         if not complete:
             write_json(report_file, report)
+
+
+def prepare_cached_case(
+    case,
+    image_path,
+    label_path,
+    size,
+    spacing_record,
+    target_spacing,
+    output,
+    checked_sources,
+    verified,
+    complete,
+):
+    output = Path(output)
+    image_path = Path(image_path)
+    label_path = Path(label_path) if label_path else None
+    records = output / ".resume"
+    sources = checked_sources or dict(
+        image=file_hash(image_path), label=file_hash(label_path) if label_path else None
+    )
+    sidecar = records / (case + ".json")
+    cached = read_json(sidecar) if sidecar.exists() else None
+    if cached and cached["sources"] != sources:
+        raise ValueError(f"{case} 原始影像或标签已改变；不能混用已有实验")
+    cache_file = output / (case + ".npz")
+    valid = cached and (
+        cached.get("excluded")
+        or verified
+        or (cache_file.is_file() and file_hash(cache_file) == cached.get("cache_sha256"))
+    )
+    if valid:
+        row = cached["row"]
+        excluded = cached["excluded"]
+        print("  已校验，保留：" + case, flush=True)
+    else:
+        arrays, row = prepare_case(case, image_path, label_path, size, spacing_record, target_spacing)
+        excluded = arrays is None
+        if not excluded:
+            same = False
+            if cache_file.exists():
+                try:
+                    with np.load(cache_file, allow_pickle=False) as previous:
+                        same = set(previous.files) == set(arrays) and all(
+                            np.array_equal(previous[k], v) for k, v in arrays.items()
+                        )
+                except (ValueError, EOFError):
+                    pass
+                except Exception as error:
+                    # zipfile.BadZipFile and decompression errors are damaged caches.
+                    import zipfile
+                    import zlib
+
+                    if not isinstance(error, (zipfile.BadZipFile, zlib.error)):
+                        raise
+            if not same:
+                if complete:
+                    raise CacheReuseError("已完成缓存损坏；请用新目录重建，避免改变已有实验")
+                print("  写入缓存：" + case, flush=True)
+                with atomic_path(cache_file) as temporary:
+                    np.savez_compressed(temporary, **arrays)
+            print("  " + ("已校验旧缓存，保留：" if same else "已保存：") + case, flush=True)
+        cached = dict(
+            sources=sources,
+            row=row,
+            excluded=excluded,
+            cache_sha256=None if excluded else file_hash(cache_file),
+        )
+        if not complete:
+            write_json(sidecar, cached)
+        del arrays
+    return {"row": row, "excluded": excluded}
 
 
 def main(argv=None):

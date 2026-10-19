@@ -1,6 +1,8 @@
 """Image-only multi-stage inference; prediction never opens cached targets."""
 
 import argparse
+import os
+import sys
 import tempfile
 from pathlib import Path
 
@@ -8,6 +10,7 @@ import nibabel as nib
 import numpy as np
 import torch
 
+from ..cpu_runtime import allocation, iter_cases, volume_bytes
 from ..recovery import atomic_path, output_lock, read_json
 from .checkpoints import load_stage, read_collection
 from .common import LABELS, load_case, read_prepared, write_json
@@ -147,18 +150,61 @@ def restore_native(prediction, row):
 
 
 def predict(
-    prepared, models, output, device="cpu", case_id=None, split=None, allow_smoke=False, resume=False
+    prepared,
+    models,
+    output,
+    device="cpu",
+    case_id=None,
+    split=None,
+    allow_smoke=False,
+    resume=False,
+    gpu_ids=None,
+    gpu_limit=None,
+    phase="all",
+    inherited_lock_fds=(),
 ):
     output = Path(output).expanduser().resolve()
     output.mkdir(parents=True, exist_ok=resume)
-    with output_lock(output):
-        return predict_locked(prepared, models, output, device, case_id, split, allow_smoke, resume)
+    with output_lock(output) as lock_fd:
+        return predict_locked(
+            prepared,
+            models,
+            output,
+            device,
+            case_id,
+            split,
+            allow_smoke,
+            resume,
+            gpu_ids,
+            gpu_limit,
+            phase,
+            lock_fd,
+            inherited_lock_fds,
+        )
 
 
-def predict_locked(prepared, models, output, device, case_id, split, allow_smoke, resume):
+def predict_locked(
+    prepared,
+    models,
+    output,
+    device,
+    case_id,
+    split,
+    allow_smoke,
+    resume,
+    gpu_ids=None,
+    gpu_limit=None,
+    phase="all",
+    lock_fd=None,
+    inherited_lock_fds=(),
+):
+    worker_locks = (*inherited_lock_fds, *((lock_fd,) if lock_fd is not None else ()))
+    if phase not in {"all", "gpu", "cpu"}:
+        raise ValueError("无效预测阶段")
     cache, data = read_prepared(prepared)
     directory, collection = read_collection(models, allow_smoke)
     plan, fold = collection.get("split_plan"), collection["config"].get("fold")
+    requested_split = split
     rows, split = select_rows(data, split, plan=plan, fold=fold)
     rows = [r for r in rows if case_id is None or r["case_id"] == case_id]
     if not rows:
@@ -199,48 +245,148 @@ def predict_locked(prepared, models, output, device, case_id, split, allow_smoke
     done = {r["case_id"]: r for r in previous.get("cases", [])}
     report["cases"] = [done[r["case_id"]] for r in rows if r["case_id"] in done]
     write_json(contract_file, contract)
+    scratch = output / ".gpu-results"
+    scratch.mkdir(exist_ok=True)
+    write_json(
+        scratch / "context.json",
+        dict(
+            cache=str(cache), directory=str(directory), collection=collection, output=str(output), rows=rows
+        ),
+    )
     try:
-        torch.set_num_threads(collection["config"]["threads"])
-        for row in rows:
-            record = done.get(row["case_id"])
-            if record and all(
-                record.get(key + "_sha256")
-                and (output / record[key]).is_file()
-                and file_hash(output / record[key]) == record[key + "_sha256"]
-                for key in ("prediction", "grid_prediction")
-            ):
-                print("已校验，跳过预测：" + row["case_id"], flush=True)
-                continue
-            image, _ = load_case(cache, row, labels=False)
-            selected, protocol = collection, "single_split"
-            fold_indices = []
-            if plan:
-                members, protocol = select_members(collection, row)
-                selected = {**collection, "_members": members}
-                fold_indices = [m["index"] for m in members]
-            elif fold:
-                fold_indices = [fold["index"]]
-                protocol = "single_fold"
-            prediction, details = predict_volume(image, directory, selected, device)
-            filename = row["case_id"] + "_seg.nii.gz"
-            with atomic_path(output / filename) as temporary:
-                nib.save(restore_native(prediction, row), temporary)
-            grid = row["case_id"] + "_grid.npz"
-            with atomic_path(output / grid) as temporary:
-                np.savez_compressed(temporary, prediction=prediction)
-            done[row["case_id"]] = {
-                "case_id": row["case_id"],
-                "inference_protocol": protocol,
-                "fold_indices": fold_indices,
-                "prediction": filename,
-                "grid_prediction": grid,
-                "prediction_sha256": file_hash(output / filename),
-                "grid_prediction_sha256": file_hash(output / grid),
-                **details,
-            }
+        threads = int(os.environ.get("CHD_CPU_THREADS", collection["config"]["threads"]))
+        torch.set_num_threads(threads)
+        valid = {row["case_id"] for row in rows if valid_record(output, done.get(row["case_id"]))}
+        remaining = [row for row in rows if row["case_id"] not in valid]
+        needed = [row for row in remaining if not valid_grid(scratch, row["case_id"])]
+        if phase == "cpu" and needed:
+            raise ValueError("GPU 中间结果缺失或校验失败；请先续跑预测阶段")
+        if phase != "cpu" and needed:
+            if gpu_ids:
+                from .gpu_queue import options
+                from .stage_queue import run_queue
+
+                selected = allocation("gpu_inference", output, len(needed), volume_bytes(needed, 64))
+                queue_options = options(gpu_ids, gpu_limit, device, "predict")
+                queue_options["gpu_limit"] = (
+                    min(gpu_limit or len(gpu_ids), selected["processes"])
+                    if os.environ.get("CHD_CPU_AUTO") == "1"
+                    else gpu_limit or len(gpu_ids)
+                )
+                from ..progress import Progress
+
+                progress = Progress(output, "gpu_inference", len(needed))
+                peak_active = 0
+
+                def observe(state):
+                    nonlocal peak_active
+                    peak_active = max(peak_active, state["active_gpus"])
+                    state["peak_active_gpus"] = peak_active
+                    progress.update(
+                        sum(r["status"] == "complete" for r in state["stages"].values()), state["status"]
+                    )
+
+                tokens = {f"case_{index:04d}": row for index, row in enumerate(needed)}
+
+                def command(token):
+                    return [
+                        sys.executable,
+                        "-m",
+                        "chd_ct.imagechd.inference_worker",
+                        str(scratch / "context.json"),
+                        tokens[token]["case_id"],
+                    ]
+
+                run_queue(
+                    list(tokens),
+                    output=output,
+                    command_for=command,
+                    env=dict(os.environ, CHD_CPU_THREADS=str(threads)),
+                    lock_fds=worker_locks,
+                    dependencies={},
+                    result_path_for=lambda token: scratch / (tokens[token]["case_id"] + ".json"),
+                    on_state=observe,
+                    **queue_options,
+                )
+            elif device == "cpu" and os.environ.get("CHD_CPU_AUTO") == "1":
+                selected = allocation("cpu_inference", output, len(needed), volume_bytes(needed, 64))
+                items = [
+                    dict(
+                        cache=str(cache),
+                        directory=str(directory),
+                        collection=collection,
+                        output=str(output),
+                        row=row,
+                        device=device,
+                    )
+                    for row in needed
+                ]
+                list(
+                    iter_cases(
+                        "chd_ct.imagechd.predict",
+                        "infer_case",
+                        items,
+                        output,
+                        selected,
+                        worker_locks,
+                    )
+                )
+            else:
+                for row in needed:
+                    infer_case(str(cache), str(directory), collection, str(output), row, device)
+                    if phase == "all":
+                        record = finish_case(str(output), row)
+                        done[row["case_id"]] = record
+                        valid.add(row["case_id"])
+                        report["cases"] = [done[r["case_id"]] for r in rows if r["case_id"] in done]
+                        write_json(output / "prediction-report.json", report)
+                        # Direct serial API keeps its original per-case durable boundary.
+                        (scratch / (row["case_id"] + ".json")).unlink()
+                        (scratch / (row["case_id"] + ".npy")).unlink()
+        remaining = [row for row in remaining if row["case_id"] not in valid]
+        if phase != "cpu":
+            case_files = {}
+            for row in rows:
+                case = row["case_id"]
+                if case in valid:
+                    record = done[case]
+                    case_files[case] = {
+                        record[key]: record[key + "_sha256"] for key in ("prediction", "grid_prediction")
+                    }
+                else:
+                    info_path = scratch / (case + ".json")
+                    info = read_json(info_path)
+                    case_files[case] = {
+                        ".gpu-results/" + info["raw_grid"]: info["raw_sha256"],
+                        ".gpu-results/" + info_path.name: file_hash(info_path),
+                    }
+            write_json(
+                output / "gpu-phase-ready.json",
+                dict(
+                    contract=contract,
+                    cases=case_files,
+                    request=dict(split=requested_split, case_id=case_id),
+                ),
+            )
+        if phase == "gpu":
+            report.update(status="pending_cpu", gpu_cases_completed=len(rows))
+            return report
+        selected = allocation(
+            "prediction_postprocess", output, len(remaining), volume_bytes(remaining, 48, native=True)
+        )
+        items = [dict(output=str(output), row=row) for row in remaining]
+        for record in iter_cases(
+            "chd_ct.imagechd.predict",
+            "finish_case",
+            items,
+            output,
+            selected,
+            worker_locks,
+        ):
+            done[record["case_id"]] = record
             report["cases"] = [done[r["case_id"]] for r in rows if r["case_id"] in done]
             write_json(output / "prediction-report.json", report)
-            print("已预测：" + row["case_id"], flush=True)
+            print("已预测并保存：" + record["case_id"], flush=True)
         report["status"] = "passed"
         return report
     except BaseException as error:
@@ -248,6 +394,79 @@ def predict_locked(prepared, models, output, device, case_id, split, allow_smoke
         raise
     finally:
         write_json(output / "prediction-report.json", report)
+
+
+def valid_record(output, record):
+    from .common import safe_child
+
+    return bool(record) and all(
+        record.get(key + "_sha256")
+        and safe_child(output, record[key]).is_file()
+        and file_hash(safe_child(output, record[key])) == record[key + "_sha256"]
+        for key in ("prediction", "grid_prediction")
+    )
+
+
+def valid_grid(scratch, case_id):
+    from .common import safe_child
+
+    path = scratch / (case_id + ".json")
+    if not path.exists():
+        return False
+    record = read_json(path)
+    grid = safe_child(scratch, record["raw_grid"])
+    return record.get("case_id") == case_id and grid.is_file() and file_hash(grid) == record["raw_sha256"]
+
+
+def infer_case(cache, directory, collection, output, row, device="cuda"):
+    image, _ = load_case(Path(cache), row, labels=False)
+    selected, protocol = collection, "single_split"
+    fold_indices = []
+    if collection.get("split_plan"):
+        members, protocol = select_members(collection, row)
+        selected = {**collection, "_members": members}
+        fold_indices = [m["index"] for m in members]
+    elif collection["config"].get("fold"):
+        fold_indices = [collection["config"]["fold"]["index"]]
+        protocol = "single_fold"
+    prediction, details = predict_volume(image, directory, selected, device)
+    scratch = Path(output) / ".gpu-results"
+    raw = row["case_id"] + ".npy"
+    with atomic_path(scratch / raw) as temporary:
+        np.save(temporary, prediction, allow_pickle=False)
+    record = dict(
+        case_id=row["case_id"],
+        inference_protocol=protocol,
+        fold_indices=fold_indices,
+        raw_grid=raw,
+        raw_sha256=file_hash(scratch / raw),
+        **details,
+    )
+    write_json(scratch / (row["case_id"] + ".json"), record)
+    return record
+
+
+def finish_case(output, row):
+    from .common import safe_child
+
+    output = Path(output)
+    scratch = output / ".gpu-results"
+    if not valid_grid(scratch, row["case_id"]):
+        raise ValueError("GPU 中间结果校验失败：" + row["case_id"])
+    info = read_json(scratch / (row["case_id"] + ".json"))
+    prediction = np.load(safe_child(scratch, info["raw_grid"]), mmap_mode="c", allow_pickle=False)
+    filename = row["case_id"] + "_seg.nii.gz"
+    with atomic_path(output / filename) as temporary:
+        nib.save(restore_native(prediction, row), temporary)
+    grid = row["case_id"] + "_grid.npz"
+    with atomic_path(output / grid) as temporary:
+        np.savez_compressed(temporary, prediction=prediction)
+    return {k: v for k, v in info.items() if k not in {"raw_grid", "raw_sha256"}} | dict(
+        prediction=filename,
+        grid_prediction=grid,
+        prediction_sha256=file_hash(output / filename),
+        grid_prediction_sha256=file_hash(output / grid),
+    )
 
 
 def main(argv=None):
@@ -260,6 +479,9 @@ def main(argv=None):
     parser.add_argument("--split", choices=["auto", "cv", "train", "val", "test"])
     parser.add_argument("--allow-smoke", action="store_true")
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--gpu-ids")
+    parser.add_argument("--gpu-limit", type=int)
+    parser.add_argument("--phase", choices=["all", "gpu", "cpu"], default="all")
     args = parser.parse_args(argv)
     predict(
         args.prepared,
@@ -270,6 +492,9 @@ def main(argv=None):
         args.split,
         args.allow_smoke,
         args.resume,
+        args.gpu_ids.split(",") if args.gpu_ids else None,
+        args.gpu_limit,
+        args.phase,
     )
     return 0
 

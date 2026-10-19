@@ -6,6 +6,8 @@ from pathlib import Path
 
 import numpy as np
 
+from ..cpu_runtime import allocation, iter_cases, volume_bytes
+from ..recovery import output_lock
 from .common import LABELS, load_case, read_prepared, safe_child, write_json
 from .folds import held_out_index, select_rows, validate_plan
 from .train import file_hash
@@ -49,7 +51,7 @@ def summarize_cases(rows):
     }
 
 
-def evaluate(prepared, predictions, output, split="auto"):
+def evaluate(prepared, predictions, output, split="auto", inherited_lock_fds=()):
     cache, data = read_prepared(prepared)
     directory = Path(predictions).expanduser().resolve()
     report = json.loads((directory / "prediction-report.json").read_text(encoding="utf-8"))
@@ -76,32 +78,27 @@ def evaluate(prepared, predictions, output, split="auto"):
     output = Path(output).expanduser().resolve()
     output.mkdir(parents=True, exist_ok=False)
     try:
-        for row in rows:
-            if row["case_id"] not in available:
-                raise ValueError("所选集合缺少预测，请先完成该集合的预测")
-            info = available[row["case_id"]]
-            if plan:
-                index = held_out_index(plan, row)
-                expected_protocol = "out_of_fold" if index is not None else "threefold_ensemble"
-                expected_folds = [index] if index is not None else [0, 1, 2]
-                if (
-                    info.get("inference_protocol") != expected_protocol
-                    or info.get("fold_indices") != expected_folds
-                ):
-                    raise ValueError("预测折次不符合独立评估要求，开发集必须使用未见过该患者的测试折")
-            path = safe_child(directory, info["grid_prediction"])
-            if info.get("grid_prediction_sha256") and file_hash(path) != info["grid_prediction_sha256"]:
-                raise ValueError("预测文件校验失败")
-            with np.load(path, allow_pickle=False) as record:
-                prediction = record["prediction"]
-            _, target = load_case(cache, row)
-            result["cases"].append(
-                {
-                    "case_id": row["case_id"],
-                    "inference_protocol": info.get("inference_protocol", "single_split"),
-                    "fold_indices": info.get("fold_indices", []),
-                    **dice_metrics(prediction, target),
-                }
+        selected = allocation("evaluate", output, len(rows), volume_bytes(rows, 32))
+        items = [
+            dict(
+                cache=str(cache),
+                directory=str(directory),
+                row=row,
+                available={row["case_id"]: available[row["case_id"]]} if row["case_id"] in available else {},
+                plan=plan,
+            )
+            for row in rows
+        ]
+        with output_lock(output) as lock_fd:
+            result["cases"] = list(
+                iter_cases(
+                    "chd_ct.imagechd.evaluate",
+                    "evaluate_case",
+                    items,
+                    output,
+                    selected,
+                    (*inherited_lock_fds, lock_fd),
+                )
             )
         for index in range(3):
             subset = [
@@ -119,6 +116,31 @@ def evaluate(prepared, predictions, output, split="auto"):
         raise
     finally:
         write_json(output / "evaluation.json", result)
+
+
+def evaluate_case(cache, directory, row, available, plan):
+    cache, directory = Path(cache), Path(directory)
+    if row["case_id"] not in available:
+        raise ValueError("所选集合缺少预测，请先完成该集合的预测")
+    info = available[row["case_id"]]
+    if plan:
+        index = held_out_index(plan, row)
+        expected_protocol = "out_of_fold" if index is not None else "threefold_ensemble"
+        expected_folds = [index] if index is not None else [0, 1, 2]
+        if info.get("inference_protocol") != expected_protocol or info.get("fold_indices") != expected_folds:
+            raise ValueError("预测折次不符合独立评估要求，开发集必须使用未见过该患者的测试折")
+    path = safe_child(directory, info["grid_prediction"])
+    if info.get("grid_prediction_sha256") and file_hash(path) != info["grid_prediction_sha256"]:
+        raise ValueError("预测文件校验失败")
+    with np.load(path, allow_pickle=False) as record:
+        prediction = record["prediction"]
+    _, target = load_case(cache, row)
+    return {
+        "case_id": row["case_id"],
+        "inference_protocol": info.get("inference_protocol", "single_split"),
+        "fold_indices": info.get("fold_indices", []),
+        **dice_metrics(prediction, target),
+    }
 
 
 def main(argv=None):

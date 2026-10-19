@@ -91,7 +91,7 @@ def test_claim_race_waits_without_counting_failed_claim_as_ready(tmp_path, monke
 
 
 @pytest.mark.parametrize("outcome", [0, 7, "interrupt"])
-def test_workflow_retains_through_cpu_step_then_releases(tmp_path, monkeypatch, outcome):
+def test_workflow_releases_before_cpu_step(tmp_path, monkeypatch, outcome):
     from chd_ct.server import imagechd
 
     monkeypatch.setenv(gpu_hold.ENV, "")
@@ -117,7 +117,7 @@ def test_workflow_retains_through_cpu_step_then_releases(tmp_path, monkeypatch, 
     seen = []
 
     def run(args, profile, **kwargs):
-        assert gpu_hold.directory() is not None
+        assert (gpu_hold.directory() is not None) == (args.task == "train")
         seen.append(args.task)
         if args.task == "evaluate":
             if outcome == "interrupt":
@@ -130,7 +130,7 @@ def test_workflow_retains_through_cpu_step_then_releases(tmp_path, monkeypatch, 
         gpu_hold, "release", lambda folder: seen.append(("release", Path(folder).parent.name))
     )
     assert jobs.execute(plan) == (130 if outcome == "interrupt" else outcome)
-    assert seen == ["train", "evaluate", ("release", "gpu-holds")]
+    assert seen == ["train", ("release", "gpu-holds"), "evaluate"]
     assert os.environ[gpu_hold.ENV] == ""
 
 

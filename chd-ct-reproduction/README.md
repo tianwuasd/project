@@ -1,5 +1,8 @@
 # ImageCHD：多阶段分割与独立可解释诊断
 
+0.13.0：测试和预测接入 GPU 并发上限；所有所选 GPU 工作完成后释放显卡，再恢复原网格、压缩和评估。非训练步骤内置 CPU 资源检查与有界病例并行，详细日志显示完成进度和估算剩余时间。训练已有的 CPU 调优、smoke/preflight 步骤与科学配置保持不变。改前文件见 [备份](back/before-inference-resources-20261019/manifest.json)，独立服务器小例子位于大 project 的 [server-resource-smoke](../server-resource-smoke/README.md)。
+
+
 项目发布在 [tianwuasd/project 的 chd-ct-reproduction 目录](https://github.com/tianwuasd/project/tree/main/chd-ct-reproduction)。本地独立源码仓库通过项目发布目录同步，源码仓库本身可以没有 Git remote。
 
 0.12.0 将三折 GPU 训练改为共享阶段队列：本折 `blood2d` 尚未结束时，空闲卡可提前训练后续折的独立模型。总并发受同一个 GPU 上限约束，每折 `blood_lstm` 仍只等待本折 `blood2d`；已完成折和完整 epoch 检查点可继续复用，CPU 训练保持逐折运行。改前源码见 [备份清单](back/before-cross-fold-queue-20261018/manifest.json)。

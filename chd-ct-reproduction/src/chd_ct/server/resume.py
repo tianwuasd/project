@@ -97,7 +97,7 @@ def live_commands(plan):
                 and identity(record["pid"]) == record["identity"]
             ):
                 live[record["pid"]] = dict(record, process_group=True)
-        for part in ("train", "preflight"):
+        for part in ("train", "preflight", "predict", "test/predictions"):
             run = Path(step["output"]) / part
             # Keep the legacy queue even when fold directories are already present.
             queues = dict.fromkeys(folder / "queue.json" for folder in [run, *model_runs(run)])
@@ -110,6 +110,15 @@ def live_commands(plan):
                         and record.get("identity")
                         and identity(record["pid"]) == record["identity"]
                     ):
+                        live[record["pid"]] = dict(record, process_group=False)
+    for step in plan["steps"]:
+        roots = [Path(step["output"])]
+        if step.get("arguments", {}).get("task") == "preprocess" and step["arguments"].get("prepared"):
+            roots.append(Path(step["arguments"]["prepared"]))
+        for root in roots:
+            for queue in root.rglob(".cpu-work/*/queue.json"):
+                for record in read_json(queue).get("stages", {}).values():
+                    if record.get("identity") and identity(record.get("pid")) == record["identity"]:
                         live[record["pid"]] = dict(record, process_group=False)
     for folder in (Path(plan["directory"]) / "gpu-holds").glob("*"):
         for record in records(folder):
@@ -186,7 +195,10 @@ def build_resume_plan(args, profile, interactive):
             arguments["resume"] = True
         else:
             step["restart"] = True
-        if arguments.get("device") == "cuda":
+        from .inference_phases import gpu_ready
+
+        cpu_tail = arguments["task"] in {"test", "predict"} and gpu_ready(step)
+        if arguments.get("device") == "cuda" and not cpu_tail:
             if interactive and not prompted:
                 show_gpus()
                 args.gpu_count = int(
@@ -204,7 +216,7 @@ def build_resume_plan(args, profile, interactive):
                 prompted = True
             if args.gpu is not None:
                 arguments["gpu"] = args.gpu
-            if args.gpu_count is not None and arguments["task"] in {"train", "environment"}:
+            if args.gpu_count is not None and arguments["task"] in {"train", "environment", "test", "predict"}:
                 arguments["gpu_count"] = args.gpu_count
         if args.python:
             arguments["python"] = str(Path(args.python).expanduser().resolve())

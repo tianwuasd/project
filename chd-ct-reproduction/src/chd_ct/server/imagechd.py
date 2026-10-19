@@ -111,7 +111,10 @@ def run(args, profile, *, output_dir=None, lock_held=False, recent_gpus=()):
             env = environment(runtime, ROOT, profile.get("threads", 2))
             device = effective_device(args)
             visible = env.get("CUDA_VISIBLE_DEVICES")
-            count = args.gpu_count if args.task in {"train", "environment"} else 1
+            count = args.gpu_count if args.task in {"train", "environment", "test", "predict"} else 1
+            from ..cpu_runtime import configure_env
+
+            env = configure_env(args.task, output, env, count if device == "cuda" else 1)
             requested = args.gpu
             pool = []
             if device == "cuda":
@@ -138,9 +141,9 @@ def run(args, profile, *, output_dir=None, lock_held=False, recent_gpus=()):
             state["gpu_pool"] = pool
             state["gpu_limit"] = count
             env["CUDA_VISIBLE_DEVICES"] = ",".join(
-                pool if args.task == "train" else [r["uuid"] for r in gpus]
+                pool if args.task in {"train", "test", "predict"} else [r["uuid"] for r in gpus]
             )
-            args.gpu_ids = pool if args.task == "train" and pool else None
+            args.gpu_ids = pool if args.task in {"train", "test", "predict"} and pool else None
             args.gpu_limit = count if args.gpu_ids else None
             write_json(output / "status.json", state)
             # Probe only currently idle cards; the rest remain candidates, not reservations.
@@ -175,7 +178,7 @@ def run(args, profile, *, output_dir=None, lock_held=False, recent_gpus=()):
                 state["phase"] = "preflight" if "--mode" in command and "preflight" in command else args.task
                 state["phase_started_at"] = time.time()
                 write_json(output / "status.json", state)
-                if device == "cuda" and args.task != "train":
+                if device == "cuda" and args.task not in {"train", "test", "predict"}:
                     gpus = wait_for_gpus(pool, 1, query_gpus, resource_update, claim=claim)
                     env["CUDA_VISIBLE_DEVICES"] = gpus[0]["uuid"]
                     state["gpus"] = gpus

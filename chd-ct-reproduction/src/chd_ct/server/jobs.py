@@ -91,17 +91,30 @@ def execute(plan):
         if sig is not None:
             handlers[sig] = signal.signal(sig, interrupt)
     try:
-        hold_directory = gpu_hold.begin(plan)
+        from .inference_phases import normalize_caps, operations
+
+        normalize_caps(plan)
+        scheduled = operations(plan)
+        gpu_positions = [
+            position
+            for position, (index, phase) in enumerate(scheduled)
+            if phase != "cpu"
+            and not plan["steps"][index].get("reuse")
+            and plan["steps"][index]["arguments"].get("device") == "cuda"
+        ]
+        active_plan = dict(plan, steps=[plan["steps"][scheduled[p][0]] for p in gpu_positions])
+        hold_directory = gpu_hold.begin(active_plan)
         if hold_directory is not None:
             state["gpu_hold_directory"] = str(hold_directory)
-        for index, step in enumerate(plan["steps"]):
+        for position, (index, phase) in enumerate(scheduled):
+            step = plan["steps"][index]
             current = state["steps"][index]
             if step.get("reuse"):
                 current.update(step["reuse"], status="reused")
                 write_json(state_file, state)
                 print("已保留完成步骤：" + step["name"], flush=True)
                 continue
-            if step.get("restart"):
+            if step.get("restart") and phase != "cpu":
                 kept = archive_child(Path(step["output"]))
                 if kept:
                     print("旧输出保留于：" + str(kept), flush=True)
@@ -111,6 +124,11 @@ def execute(plan):
             args = make_parser().parse_args(["--non-interactive"])
             for key, value in step["arguments"].items():
                 setattr(args, key, value)
+            if phase != "all":
+                args.inference_phase = phase
+            if phase == "cpu":
+                args.resume = True
+            current["phase"] = phase
             args.reset_settings = bool(plan.get("reset_settings")) and index == 0
             args.runtime = plan["runtime"]
             args.results = str(directory.parent)
@@ -145,6 +163,18 @@ def execute(plan):
                     recent_gpus.update(
                         gpu["uuid"] for gpu in json.loads(report.read_text(encoding="utf-8")).get("gpus", [])
                     )
+            if code == 0 and gpu_positions and position == gpu_positions[-1]:
+                gpu_hold.release(hold_directory)
+                hold_directory = None
+                os.environ.pop(gpu_hold.ENV, None)
+                state["gpu_released_at"] = now()
+                state["gpu_phase_complete"] = True
+                write_json(state_file, state)
+                print("所选 GPU 工作已结束，已释放显卡；后续执行 CPU 工作。", flush=True)
+            if code == 0 and phase == "gpu":
+                current.update(status="pending_cpu", gpu_ended_at=now())
+                write_json(state_file, state)
+                continue
             if code == 0 and (Path(step["output"]) / "status.json").exists():
                 from .resume import snapshot
 
@@ -176,7 +206,8 @@ def execute(plan):
     finally:
         cleanup_error = None
         try:
-            gpu_hold.release(hold_directory)
+            if hold_directory is not None:
+                gpu_hold.release(hold_directory)
         except BaseException as error:
             cleanup_error = error
             code = 1
@@ -338,6 +369,9 @@ def show_status(runtime, directory=None):
             active_run = (
                 active_model_run(run) if report.get("phase") in {"train", "preflight", "smoke"} else None
             )
+            if report.get("task") in {"test", "predict"}:
+                child = "test/predictions" if report["task"] == "test" else "predict"
+                active_run = Path(step["output"]) / child
             queue_path = active_run / "queue.json" if active_run else None
             queue = read_json(queue_path) if queue_path and queue_path.is_file() else {}
             if queue.get("sampled_at", 0) < report.get("phase_started_at", 0):
@@ -351,7 +385,7 @@ def show_status(runtime, directory=None):
                 detail = f"正在使用 {queue.get('active_gpus', 0)}/{queue.get('gpu_limit', '?')} 张卡，待运行 {queue.get('pending_stages', '?')} 个阶段"
             else:
                 continue
-            if active_run is not None and active_run != run:
+            if active_run is not None and active_run != run and report.get("task") not in {"test", "predict"}:
                 detail = f"当前折：{active_run.name}；{detail}"
             elif active_run is not None and (run / "report.json").is_file():
                 if read_json(run / "report.json").get("scheduling") == "cross_fold":
@@ -367,7 +401,9 @@ def show_status(runtime, directory=None):
 
         held = [r["gpu"] for r in records(Path(state["gpu_hold_directory"])) if alive(r)]
         if held:
-            print(f"保留 {len(held)} 张 GPU 至整个所选流程结束：" + ", ".join(held))
+            print(f"保留 {len(held)} 张 GPU 至所选 GPU 工作结束：" + ", ".join(held))
+    if state.get("gpu_released_at"):
+        print("GPU 已释放：" + state["gpu_released_at"] + "；后续为 CPU 工作。")
     for step in state["steps"]:
         label = (
             "未知（主进程已退出，最后记录 running，子进程待核实）"

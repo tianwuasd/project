@@ -210,6 +210,10 @@ def log_paths(job, step="auto", model="all"):
         return [job / "launcher.log"]
     if model == "server":
         return [output / "server.log"]
+    task = load(output / "status.json").get("task")
+    if task in {"test", "predict"}:
+        root = output / ("test/predictions" if task == "test" else "predict")
+        return [output / "server.log", *sorted((root / "stage_logs").glob("*.log"))]
     run = run_directory(output)
     runs = model_runs(run)
     if model != "all" and runs == [run]:
@@ -220,9 +224,10 @@ def log_paths(job, step="auto", model="all"):
     return existing or [output / "server.log"]
 
 
-def tail_logs(supplier, lines=60, follow=False):
+def tail_logs(supplier, lines=60, follow=False, progress=None):
     """Bound initial reads; follow newly created files and tolerate replacement/truncation."""
     positions, missing = {}, set()
+    last_progress = float("-inf")
     try:
         while True:
             paths = supplier()
@@ -250,6 +255,9 @@ def tail_logs(supplier, lines=60, follow=False):
                     if path not in missing:
                         print(f"日志尚未生成：{path}" + ("；继续等待。" if follow else ""))
                         missing.add(path)
+            if progress and time.monotonic() - last_progress >= 10:
+                progress()
+                last_progress = time.monotonic()
             if not follow:
                 return
             time.sleep(1)
@@ -303,7 +311,14 @@ def query(args, profile):
         print("没有任务记录；先新建任务，或用 --job-dir 指定历史 workflow 目录。")
         return 0
     if args.query == "logs":
-        tail_logs(lambda: log_paths(job, args.step, args.model), args.lines, args.follow)
+        from .log_progress import show_progress
+
+        tail_logs(
+            lambda: log_paths(job, args.step, args.model),
+            args.lines,
+            args.follow,
+            progress=lambda: show_progress(job, args.step, args.model),
+        )
         return 0
     if args.query == "gpu" and args.follow:
         watch_gpu()

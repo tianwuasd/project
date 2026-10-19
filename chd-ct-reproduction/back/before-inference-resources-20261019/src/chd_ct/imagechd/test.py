@@ -1,0 +1,69 @@
+"""Independent held-out prediction plus evaluation; no training or preprocessing."""
+
+import argparse
+from pathlib import Path
+
+from ..recovery import archive_child, output_lock
+from .common import read_prepared, write_json
+from .evaluate import evaluate
+from .predict import predict
+
+
+def run_test(prepared, models, output, device="cpu", split="auto", allow_smoke=False, resume=False):
+    output = Path(output).expanduser().resolve()
+    output.mkdir(parents=True, exist_ok=resume)
+    with output_lock(output):
+        return test_locked(prepared, models, output, device, split, allow_smoke, resume)
+
+
+def test_locked(prepared, models, output, device, split, allow_smoke, resume):
+    _, data = read_prepared(prepared)
+    if data.get("for_prediction"):
+        raise ValueError("测试需要带真值且含所选 split 的缓存；无标签数据请使用 predict")
+    output = Path(output).expanduser().resolve()
+
+    report = {"status": "running", "task": "test", "split": split, "models": str(models)}
+    try:
+        predict(
+            prepared,
+            models,
+            output / "predictions",
+            device=device,
+            split=split,
+            allow_smoke=allow_smoke,
+            resume=resume,
+        )
+        if resume:
+            archive_child(output / "evaluation")
+        metrics = evaluate(prepared, output / "predictions", output / "evaluation", split=split)
+        report.update(
+            status="passed",
+            split=metrics["split"],
+            cases_evaluated=metrics["cases_evaluated"],
+            predictions=str(output / "predictions"),
+            evaluation=str(output / "evaluation/evaluation.json"),
+        )
+        return report
+    except BaseException as error:
+        report.update(status="failed", error=str(error))
+        raise
+    finally:
+        write_json(output / "test-report.json", report)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--prepared", required=True)
+    parser.add_argument("--models", required=True)
+    parser.add_argument("--output", required=True)
+    parser.add_argument("--device", choices=["cpu", "cuda"], default="cpu")
+    parser.add_argument("--split", choices=["auto", "cv", "train", "val", "test"], default="auto")
+    parser.add_argument("--allow-smoke", action="store_true")
+    parser.add_argument("--resume", action="store_true")
+    args = parser.parse_args(argv)
+    run_test(args.prepared, args.models, args.output, args.device, args.split, args.allow_smoke, args.resume)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

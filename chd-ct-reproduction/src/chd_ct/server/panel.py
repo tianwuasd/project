@@ -51,7 +51,13 @@ def logs(job):
     follow = ask("持续刷新？y 持续 / n 看一次 [n]：").lower() == "y"
     if follow:
         print("按 Ctrl+C 返回面板，后台任务继续运行。")
-    inspection.tail_logs(lambda: inspection.log_paths(job, step, model), follow=follow)
+    from .log_progress import show_progress
+
+    inspection.tail_logs(
+        lambda: inspection.log_paths(job, step, model),
+        follow=follow,
+        progress=lambda: show_progress(job, step, model),
+    )
 
 
 def run(args, profile):

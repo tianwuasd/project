@@ -11,6 +11,8 @@ CPU_TASKS = {"preprocess", "evaluate", *DIAGNOSIS_TASKS}
 
 
 def effective_device(args):
+    if getattr(args, "inference_phase", None) == "cpu":
+        return "cpu"
     if args.task in CPU_TASKS or (args.task == "train" and args.mode == "check"):
         return "cpu"
     return "cuda" if args.device == "auto" else args.device
@@ -57,7 +59,7 @@ def task_configuration(args):
         fields.add("device")
     if effective_device(args) == "cuda":
         fields.add("gpu")
-        if args.task in {"train", "environment"}:
+        if args.task in {"train", "environment", "test", "predict"}:
             fields.add("gpu_count")
     result = {name: getattr(args, name) for name in sorted(fields) if getattr(args, name, None) is not None}
     if "device" in result:
@@ -160,8 +162,8 @@ def resolve_settings(args, profile, interactive, saved_override=None):
         getattr(args, "gpu_count", None),
         saved.get("gpu_count"),
         profile.get("gpu_count", 1),
-        "训练最多同时使用几张 GPU（1—5；不足时少卡运行，无卡时等待）",
-        interactive and args.task in {"train", "environment"},
+        "最多同时使用几张 GPU（1—5；不足时少卡运行，无卡时等待）",
+        interactive and args.task in {"train", "environment", "test", "predict"},
     )
     try:
         args.gpu_count = int(count)
@@ -177,6 +179,6 @@ def resolve_settings(args, profile, interactive, saved_override=None):
         interactive,
     )
     saved["gpu"] = args.gpu
-    if args.task in {"train", "environment"}:
+    if args.task in {"train", "environment", "test", "predict"}:
         saved["gpu_count"] = args.gpu_count
     return runtime, results, settings_file, saved
