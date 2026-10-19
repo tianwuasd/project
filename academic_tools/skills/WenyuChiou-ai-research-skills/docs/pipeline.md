@@ -1,0 +1,164 @@
+# Full Research Pipeline
+
+The 8 stages of a research project, with the skills that fit each one.
+This is the comprehensive reference — most users get what they need
+from the [README's Pick-by-goal table](../README.md#pick-by-goal)
+and never need to read this.
+
+繁中: [pipeline.zh-TW.md](pipeline.zh-TW.md)
+
+```text
+1. Discover lit  →  2. Organise & compare  →  3a. Frame  →  3b. Plan
+        →  4. Build model  →  5. Run & validate (C&V)  →  6. Visualise
+        →  7. Draft manuscript  →  8. Submit, respond, wrap up
+```
+
+Four skills don't belong to a specific stage — they're triggered by
+*task character*, not pipeline position. See **Cross-cutting tools**
+at the bottom.
+
+For end-to-end AI-for-science inputs, outputs, quality evidence, and researcher
+decisions at each existing stage, see [scientific lifecycle and quality gates](scientific-lifecycle.md).
+
+## 1. Discover literature
+
+> *"What has been done? What should I read?"*
+
+Tools you probably use: **Zotero · NotebookLM · Obsidian** *(no native
+OneNote skill — use Obsidian as the notes layer.)*
+
+| Skill | What it does |
+|---|---|
+| [`research-hub`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub/SKILL.md) | Search arXiv / Semantic Scholar / CrossRef / PubMed, ingest metadata, write paper notes into Obsidian. |
+| [`zotero-skills`](https://github.com/WenyuChiou/zotero-skills/blob/master/skills/zotero-skills/SKILL.md) | Add, tag, deduplicate, and clean Zotero items beyond the research-hub pipeline. |
+
+## 2. Organise & compare literature, find the gap
+
+> *"Where is the research gap? Which 5 papers actually matter?"*
+
+| Skill | What it does |
+|---|---|
+| [`literature-triage-matrix`](https://github.com/WenyuChiou/research-hub/blob/master/skills/literature-triage-matrix/SKILL.md) | Compare papers by method, data, claim, limitation, and relevance — without rereading every PDF. |
+| [`gap-to-topic`](https://github.com/WenyuChiou/research-hub/blob/master/skills/gap-to-topic/SKILL.md) | 3-gate go/no-go decision dossier for a candidate thesis/proposal topic (open? a contribution? feasible?). Hands `.gaps.yml` to Stage 3a (v0.3.12+). |
+| [`notebooklm-brief-verifier`](https://github.com/WenyuChiou/research-hub/blob/master/skills/notebooklm-brief-verifier/SKILL.md) | Verify a NotebookLM brief against the source bundle. Catches missed sources, unsupported claims, and contradictions. |
+| [`research-hub`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub/SKILL.md) | Build the Obsidian cluster and the NotebookLM source bundle that feed the matrix. |
+| [`zotero-library-curator`](https://github.com/WenyuChiou/research-hub/blob/master/skills/zotero-library-curator/SKILL.md) *(optional)* | Audit Zotero before comparison — find duplicate DOIs, orphan items, propose tag/collection cleanup. Read-only. |
+| [`zotero-skills`](https://github.com/WenyuChiou/zotero-skills/blob/master/skills/zotero-skills/SKILL.md) *(optional)* | Apply the cleanup the curator proposes — full CRUD on Zotero items. |
+
+## 3a. Frame the problem
+
+> *"Is my research question sharp enough to be falsifiable?"*
+
+A Socratic dialog partner that asks structured questions to surface
+what you'd otherwise leave implicit.
+
+| Skill | What it does |
+|---|---|
+| [`research-design-helper`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-design-helper/SKILL.md) | Walks you through 5 segments — research question → expected mechanism → identifiability check → validation plan → risk register — and writes `.research/design_brief.md`. **v0.3.12+**: auto-pre-fills segments 1 (RQ) and 5 (risks) from `.research/topic_dossier.gaps.yml` if a recent `gap-to-topic` run is present (verdict-aware candidate selection). |
+
+## 3b. Plan the project (capture the artifacts)
+
+> *"What am I claiming, with what data, and what's my plan?"*
+
+Once 3a has shaped the question, these skills capture the plan as
+machine-readable manifests so future AI sessions don't reread the whole
+repo.
+
+| Skill | What it does |
+|---|---|
+| [`research-context-compressor`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-context-compressor/SKILL.md) | Write `.research/project_manifest.yml`, `experiment_matrix.yml`, `data_dictionary.yml`. Picks up `design_brief.md` from 3a if present. |
+| [`research-project-orienter`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-project-orienter/SKILL.md) | Read those manifests and produce a fast orientation memo when you (or a new AI session) come back to the project. |
+
+## 4. Design and build the model
+
+> *"What architecture, equations, agents, or prompts do I need?"*
+
+Re-read `design_brief.md` from Stage 3a as design intent. Develop the
+project-specific implementation specification with the researcher before
+generating scaffolding; the design helper does not invent model architecture.
+
+| Skill | What it does |
+|---|---|
+| [`research-design-helper`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-design-helper/SKILL.md) | Same skill as 3a — re-read `.research/design_brief.md` here when translating "what to model" into "how to model". |
+
+For implementation scaffolding (test harness, plotting, batch edits),
+use the **Cross-cutting tools** (`codex-delegate`, `antigravity-delegate`)
+below. Long-context design review stays with the primary model. If a
+single round of work needs both delegates (e.g. Codex writes the test
+harness *and* Antigravity performs bounded fixture maintenance), route through the
+[`research-hub-multi-ai`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub-multi-ai/SKILL.md)
+router first — it writes `.coord/multi_ai_plan.md` and the leaves read
+their per-task brief.
+
+## 5. Run experiments, calibrate, and validate (C&V)
+
+> *"Is the run reproducible, checkable, extensible? Can I save tokens
+> across long sessions?"*
+
+| Skill | What it does |
+|---|---|
+| [`research-context-compressor`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-context-compressor/SKILL.md) | Token-saving manifests so each run-and-check session doesn't start from zero. |
+| [`research-project-orienter`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-project-orienter/SKILL.md) | Cheap re-onboarding when you switch experiments or come back days later. |
+
+For repeatable sweeps and post-fix verification, delegate via the
+**Cross-cutting tools** below. Multi-delegate rounds in this stage
+(e.g. one Codex run for the sweep, a parallel Codex run for the post-
+fix verification) go through the
+[`research-hub-multi-ai`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub-multi-ai/SKILL.md)
+router first.
+
+## 6. Visualise and interpret results
+
+> *"What does the figure actually show? Does my caption match?"*
+
+Tools: **matplotlib / plotly / your plotting stack of choice.**
+
+| Skill | What it does |
+|---|---|
+| [`codex-delegate`](https://github.com/WenyuChiou/codex-delegate/blob/master/skills/codex-delegate/SKILL.md) | Generate or refactor plotting scripts (consistent style across N figures, batch re-renders). |
+| [`antigravity-delegate`](https://github.com/WenyuChiou/antigravity-delegate/blob/master/skills/antigravity-delegate/SKILL.md) | Handle bounded non-honesty-critical mechanical plotting cleanups or fixture maintenance under Claude supervision. |
+
+Captioning, interpretation, and figure-to-claim honesty checks stay with
+the primary model. When a figure pass needs both delegates same round
+(e.g. Codex re-renders N figures and Antigravity applies bounded
+mechanical fixture edits), use the
+[`research-hub-multi-ai`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub-multi-ai/SKILL.md)
+router so the plan and per-task briefs stay in sync.
+
+## 7. Draft and revise the manuscript
+
+> *"Does the prose match the figure? Does it fit the target journal?
+> Does it sound human?"*
+
+| Skill | What it does |
+|---|---|
+| [`paper-memory-builder`](https://github.com/WenyuChiou/research-hub/blob/master/skills/paper-memory-builder/SKILL.md) | Extract `.paper/claims.yml` and `.paper/figures.yml` so writing tools see the same numbers as the figures. |
+| [`academic-writing-skills`](https://github.com/WenyuChiou/academic-writing-skills/blob/main/skills/academic-writing-skills/SKILL.md) | Extended outlines, paragraph and section drafting, evidence alignment, terminology, repetition, flow, cross-artifact revision, and release checks. |
+| [`paper-review`](https://github.com/WenyuChiou/academic-writing-skills/blob/main/skills/paper-review/SKILL.md) | General scientific review that progressively selects the applicable psychometrics/SEM, AI/LLM, water/CNHS, flood/hydrodynamics, or hybrid modules. |
+| [`zotero-skills`](https://github.com/WenyuChiou/zotero-skills/blob/master/skills/zotero-skills/SKILL.md) *(optional)* | Deep-edit bibliography entries when the writing skill flags references that need cleanup. |
+
+Long-form bilingual rewrites, 繁中 / CJK drafts, and review judgments stay
+with the primary model.
+
+## 8. Submit, respond to reviewers, wrap up
+
+> *"Are my claims defensible? Is the reviewer response complete? Is the
+> project state preserved for future me?"*
+
+| Skill | What it does |
+|---|---|
+| [`academic-writing-skills`](https://github.com/WenyuChiou/academic-writing-skills/blob/main/skills/academic-writing-skills/SKILL.md) | Cross-file synchronization, submission-package checks, and blocking release readiness. |
+| [`paper-review`](https://github.com/WenyuChiou/academic-writing-skills/blob/main/skills/paper-review/SKILL.md) | Round-calibrated top-to-bottom review and prior-comment regression checks; Ethan-style activates only when explicitly requested. |
+| [`research-context-compressor`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-context-compressor/SKILL.md) | Freeze the project's final state so future AI sessions (or future you) can resume in seconds. |
+
+## Cross-cutting tools — used at every stage
+
+Four skills don't belong to a specific stage — they're triggered by
+*task character*:
+
+| Skill | Trigger | What it does |
+|---|---|---|
+| [`research-workflow-orchestrator`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-workflow-orchestrator/SKILL.md) | Resumable multi-stage workflow | Coordinate existing stages, provenance and explicit human decision gates. |
+| [`codex-delegate`](https://github.com/WenyuChiou/codex-delegate/blob/master/skills/codex-delegate/SKILL.md) | Token-heavy mechanical work | Hand batch edits, scaffolding, refactors, test generation, plotting scripts to Codex CLI. |
+| [`antigravity-delegate`](https://github.com/WenyuChiou/antigravity-delegate/blob/master/skills/antigravity-delegate/SKILL.md) | Bounded non-honesty-critical mechanical work | Hand tightly scoped mechanical edits to Antigravity CLI under Claude supervision. |
+| [`research-hub-multi-ai`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub-multi-ai/SKILL.md) | "Who should do this?" | Stage-agnostic routing across Codex and Antigravity leaves — produces a delegation plan + handoff prompts. |

@@ -1,0 +1,344 @@
+import re
+from pathlib import Path
+
+import yaml
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_catalog_has_required_families():
+    data = yaml.safe_load((ROOT / "catalog" / "skills.yml").read_text(encoding="utf-8"))
+    family_ids = {family["id"] for family in data["families"]}
+    assert {
+        "research-workspace",
+        "academic-writing",
+        "zotero-operations",
+        "ai-delegation",
+    }.issubset(family_ids)
+
+
+def test_every_family_has_canonical_repo_and_skills():
+    data = yaml.safe_load((ROOT / "catalog" / "skills.yml").read_text(encoding="utf-8"))
+    for family in data["families"]:
+        assert family["canonical_repo"].startswith("https://github.com/WenyuChiou/")
+        assert family["default_branch"]
+        assert family["install"]["commands"], family["id"]
+        assert family["skills"], family["id"]
+        for skill in family["skills"]:
+            assert skill["name"]
+            assert skill["purpose"]
+            assert skill["repo_url"].startswith("https://github.com/WenyuChiou/")
+            assert "/blob/" in skill["skill_url"]
+            assert skill["use_when"], skill["name"]
+            assert skill["outputs"], skill["name"]
+
+
+def test_readme_mentions_core_tool_combinations():
+    """README must reference the core tools and audience the catalog
+    actually addresses — Zotero, Obsidian, NotebookLM as the data
+    surface; graduate students and research support staff as the
+    audience; the two main upstream skills (research-hub,
+    academic-writing-skills); and the two long-form docs
+    (install.md, verification.md). Marketing language like
+    "researcher-facing" is intentionally not asserted — it was trimmed
+    in the UX pass for being overclaim-y."""
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    for phrase in [
+        "graduate students",
+        "research support staff",
+        "Zotero",
+        "Obsidian",
+        "NotebookLM",
+        "research-hub",
+        "academic-writing-skills",
+        "docs/install.md",
+        "docs/verification.md",
+    ]:
+        assert phrase in readme
+
+
+def test_readme_has_persona_starting_points():
+    """The persona table is the README's primary entry point. After the UX
+    trim it has 3 goal-based rows + a librarian/RA/advisor callout."""
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    for persona_phrase in [
+        "Find & compare literature",
+        "Write or revise a paper",
+        "Manage a research project",
+        "Helping others adopt AI for research",
+    ]:
+        assert persona_phrase in readme, f"persona row missing: {persona_phrase}"
+
+
+def test_zh_readme_mirrors_persona_table():
+    """The zh-TW README must mirror the 3 goal-based persona rows + librarian callout."""
+    zh = (ROOT / "README.zh-TW.md").read_text(encoding="utf-8")
+    for phrase in [
+        "找到你的起點",
+        "找文獻、比較文獻",
+        "寫論文 / 改稿",
+        "管理研究專案",
+        "協助別人用 AI 做研究",
+        # Pipeline + cross-cutting tools moved to docs/pipeline.zh-TW.md
+        # to keep the README focused on install + how-to-use; the
+        # README must still link out to the moved doc.
+        "docs/pipeline.zh-TW.md",
+    ]:
+        assert phrase in zh, f"zh-TW phrase missing: {phrase}"
+
+
+def test_researcher_workflow_checklist_lists_core_research_combinations():
+    checklist = (ROOT / "docs" / "researcher-workflow-checklist.md").read_text(encoding="utf-8")
+    for phrase in [
+        "Zotero + Obsidian",
+        "Obsidian + NotebookLM",
+        "Zotero + NotebookLM",
+        "Zotero + Obsidian + NotebookLM",
+        "notebooklm-brief-verifier",
+        "literature-triage-matrix",
+        "paper-memory-builder",
+        "academic-writing-skills",
+        "zotero-skills",
+    ]:
+        assert phrase in checklist
+
+
+def test_skill_directory_has_every_catalog_skill():
+    data = yaml.safe_load((ROOT / "catalog" / "skills.yml").read_text(encoding="utf-8"))
+    directory = (ROOT / "docs" / "skill-directory.md").read_text(encoding="utf-8")
+    for family in data["families"]:
+        assert family["canonical_repo"] in directory
+        for skill in family["skills"]:
+            assert skill["name"] in directory
+            assert skill["skill_url"] in directory
+
+
+def test_no_model_project_specific_positioning():
+    text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in [ROOT / "README.md", ROOT / "README.zh-TW.md", ROOT / "catalog" / "skills.yml"]
+    )
+    project = "".join(["W", "A", "G", "F"])
+    lower_project = "".join(["w", "a", "g", "f"])
+    forbidden = r"\b" + project + r"\b|" + lower_project + "-skills|" + "domain" + "-pack"
+    assert not re.search(forbidden, text)
+
+
+def test_paper_review_is_generic_with_progressive_and_explicit_overlays():
+    data = yaml.safe_load((ROOT / "catalog" / "skills.yml").read_text(encoding="utf-8"))
+    academic = next(f for f in data["families"] if f["id"] == "academic-writing")
+    review = next(s for s in academic["skills"] if s["name"] == "paper-review")
+    use_when = " ".join(review["use_when"])
+
+    assert "Cross-disciplinary" in review["purpose"]
+    assert "progressively loaded" in review["purpose"]
+    assert "psychometrics or SEM" in use_when
+    assert "hybrid studies" in use_when
+    assert "explicitly request an Ethan-style" in use_when
+
+    marketplace = (ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8")
+    pipeline = (ROOT / "docs" / "pipeline.md").read_text(encoding="utf-8")
+    assert "general scientific review" in marketplace
+    assert "only when explicitly requested" in pipeline
+
+
+def test_claude_plugin_marketplace_is_well_formed():
+    """The .claude-plugin/marketplace.json file makes the catalog a Claude
+    Code plugin marketplace. Guard its basic structure so future edits
+    don't silently break `/plugin marketplace add`.
+
+    Ships 5 plugins: research-workspace, the two-skill
+    academic-writing-skills plugin, plus 3 single-skill plugins
+        (zotero-skills, codex-delegate, antigravity-delegate).
+    See .claude-plugin/README.md for the full story."""
+    import json
+    marketplace_path = ROOT / ".claude-plugin" / "marketplace.json"
+    assert marketplace_path.exists(), "missing .claude-plugin/marketplace.json"
+
+    with marketplace_path.open(encoding="utf-8") as f:
+        data = json.load(f)
+
+    # Top-level required fields
+    assert data.get("name") == "ai-research-skills"
+    assert "owner" in data and data["owner"].get("name")
+    assert "metadata" in data
+    assert "plugins" in data and isinstance(data["plugins"], list)
+    plugin_names = [plugin.get("name") for plugin in data["plugins"]]
+    assert plugin_names == [
+        "research-workspace",
+        "academic-writing-skills",
+        "zotero-skills",
+        "codex-delegate",
+        "antigravity-delegate",
+    ]
+
+    # Per-plugin required fields
+    for plugin in data["plugins"]:
+        assert plugin.get("name"), f"plugin missing name: {plugin}"
+        assert plugin.get("description"), f"plugin {plugin['name']} missing description"
+        assert plugin.get("category"), f"plugin {plugin['name']} missing category"
+        assert plugin.get("homepage"), f"plugin {plugin['name']} missing homepage"
+        assert "source" in plugin, f"plugin {plugin['name']} missing source"
+
+        src = plugin["source"]
+        # source can be a string (local path) or an object (github / url / git-subdir)
+        if isinstance(src, dict):
+            assert src.get("source") in {"github", "url", "git-subdir"}, (
+                f"plugin {plugin['name']} has unknown source type: {src.get('source')}"
+            )
+            if src["source"] == "github":
+                assert src.get("repo"), f"plugin {plugin['name']} github source missing repo"
+            elif src["source"] in {"url", "git-subdir"}:
+                assert src.get("url"), f"plugin {plugin['name']} {src['source']} missing url"
+        else:
+            assert isinstance(src, str) and src, (
+                f"plugin {plugin['name']} string source must be non-empty"
+            )
+
+
+def test_canonical_install_command_consistent_across_sources_of_truth():
+    """The catalog standardized on `research-hub setup` (interactive
+    onboarding) as the fresh-user command. README, install docs, and
+    the machine-readable YAML must all lead with `setup`, not bare
+    `install`. The README dropped `--persona <X>` because it was a
+    CLI-internal flag the README shouldn't be teaching; the interactive
+    setup asks the same questions without forcing the user to learn the
+    persona names. Per-doc files (docs/install.md, catalog/skills.yml,
+    etc.) may still reference `--persona` for completeness."""
+    docs_with_install = [
+        ROOT / "README.md",
+        ROOT / "README.zh-TW.md",
+        ROOT / "docs" / "install.md",
+        ROOT / "docs" / "skill-directory.md",
+        ROOT / "docs" / "researcher-workflow-checklist.md",
+        ROOT / "catalog" / "skills.yml",
+    ]
+    for doc in docs_with_install:
+        text = doc.read_text(encoding="utf-8")
+        assert "research-hub setup" in text, (
+            f"{doc.relative_to(ROOT)}: missing canonical `research-hub setup` command"
+        )
+
+
+def test_verification_counts_match_catalog():
+    """The catalog enumerates 17 skills with a specific verification-status
+    split. The machine-readable YAML must agree on the count."""
+    data = yaml.safe_load((ROOT / "catalog" / "skills.yml").read_text(encoding="utf-8"))
+    total_skills = sum(len(family["skills"]) for family in data["families"])
+    assert total_skills == 17, f"catalog has {total_skills} skills; expected 17"
+
+    statuses = [s.get("verification_status") for f in data["families"] for s in f["skills"]]
+    pass_count = statuses.count("pass")
+    caveat_count = statuses.count("caveat")
+    fail_count = statuses.count("fail")
+    not_yet_count = statuses.count("not_yet")
+
+    # YAML-side verification counts: 17 pass + 0 caveat + 0 fail + 0 not_yet = 17.
+    # (gap-to-topic added 2026-05-21 as not_yet; flipped to pass on 2026-05-21
+    # after a dogfood run end-to-end verified the skill — see its
+    # verification_notes.)
+    # (codex-delegate caveat resolved upstream 2026-05-09 by
+    # https://github.com/WenyuChiou/codex-delegate/pull/1; paper-summarize
+    # T2 -> T1 after upstream PR
+    # https://github.com/WenyuChiou/research-hub/pull/31 surfaced the
+    # existing 23-test end-to-end suite in the skill's Verification section.)
+    assert pass_count == 17, f"expected 17 pass, got {pass_count}"
+    assert caveat_count == 0, f"expected 0 caveat, got {caveat_count}"
+    assert fail_count == 0, f"expected 0 fail, got {fail_count}"
+    assert not_yet_count == 0, f"expected 0 not_yet, got {not_yet_count}"
+
+    # README intentionally does NOT advertise verification counts in its
+    # body (avoids self-aggrandizing tone). docs/verification.md carries
+    # the per-skill detail; this test only guards the YAML-side counts.
+
+
+def test_verification_tier_counts_match_bilingual_glossary():
+    data = yaml.safe_load((ROOT / "catalog" / "skills.yml").read_text(encoding="utf-8"))
+    tiers = [skill["verification_tier"] for family in data["families"] for skill in family["skills"]]
+    assert tiers.count("T1") == 15
+    assert tiers.count("T2") == 2
+    assert tiers.count("T3") == 0
+
+    glossary = (ROOT / "docs" / "glossary.md").read_text(encoding="utf-8")
+    glossary_zh = (ROOT / "docs" / "glossary.zh-TW.md").read_text(encoding="utf-8")
+    assert "15 at T1, 2 at T2" in glossary
+    assert "15 個 T1、2 個 T2" in glossary_zh
+
+
+def test_active_catalog_has_no_failed_or_retired_skills():
+    data = yaml.safe_load((ROOT / "catalog" / "skills.yml").read_text(encoding="utf-8"))
+    for family in data["families"]:
+        for skill in family["skills"]:
+            assert skill["lifecycle_status"] == "active", skill["name"]
+            assert skill["verification_status"] not in {"fail", "not_yet"}, skill["name"]
+
+
+def test_hitl_metadata_covers_end_to_end_workflow():
+    data = yaml.safe_load((ROOT / "catalog" / "skills.yml").read_text(encoding="utf-8"))
+    stages = {
+        stage
+        for family in data["families"]
+        for skill in family["skills"]
+        for stage in skill["workflow_stages"]
+    }
+    assert {
+        "orient",
+        "scope",
+        "discover",
+        "synthesize",
+        "design",
+        "execute",
+        "write",
+        "release",
+    } <= stages
+
+
+def test_write_capable_skills_declare_a_human_gate():
+    data = yaml.safe_load((ROOT / "catalog" / "skills.yml").read_text(encoding="utf-8"))
+    for family in data["families"]:
+        for skill in family["skills"]:
+            if skill["mutation_class"] in {"external-write", "mixed"}:
+                assert skill["human_gates"], skill["name"]
+
+
+def test_retired_gemini_is_replaced_by_healthy_antigravity_lane():
+    data = yaml.safe_load((ROOT / "catalog" / "skills.yml").read_text(encoding="utf-8"))
+    names = {
+        skill["name"]
+        for family in data["families"]
+        for skill in family["skills"]
+    }
+    assert "gemini-delegate" not in names
+    assert "antigravity-delegate" in names
+    assert "research-workflow-orchestrator" in names
+
+
+def test_direction_handoff_requires_human_choice_without_refreshing_historical_tiers():
+    data = yaml.safe_load((ROOT / "catalog/skills.yml").read_text(encoding="utf-8"))
+    skills = {skill["name"]: skill for family in data["families"] for skill in family["skills"]}
+    for name, date in (("gap-to-topic", "2026-05-21"), ("research-design-helper", "2026-04-25")):
+        skill = skills[name]
+        assert skill["verified_on"] == date
+        assert skill["verification_tier"] == "T1"
+        assert skill["human_gates"] == ["scope_commitment"]
+        assert "Historical T1 evidence" in skill["verification_notes"]
+        assert "Current accepted source contract (plugin 0.5.4)" in skill["verification_notes"]
+    notes = " ".join(skills["research-design-helper"]["verification_notes"].split())
+    for term in ("explicit human choice", "even one eligible candidate", "clear prior selection",
+                 "standalone/legacy dialogue", "candidate_version", "source bytes", "recheck"):
+        assert term in notes
+    assert "exactly 1 → auto-pre-fill" not in notes
+    assert "superseded" in notes
+
+
+def test_optional_direction_check_is_not_research_or_execution_approval():
+    data = yaml.safe_load((ROOT / "catalog/skills.yml").read_text(encoding="utf-8"))
+    gap = next(skill for family in data["families"] for skill in family["skills"] if skill["name"] == "gap-to-topic")
+    notes = " ".join(gap["verification_notes"].split())
+    for term in ("optional", "paper direction-check", "candidate_version", "complete candidate",
+                 "source bytes", "data/tool/model/license/cost/premise/validation-path",
+                 "unknown", "sharing basis", "no unit conversion", "missing required units",
+                 "human_selection: outside-checker", "execution_authorized: false",
+                 "Probe installed CLI capability", "installed Python wheel"):
+        assert term in notes

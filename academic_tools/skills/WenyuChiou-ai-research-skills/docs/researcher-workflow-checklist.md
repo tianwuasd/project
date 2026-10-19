@@ -1,0 +1,165 @@
+# Researcher Workflow Checklist
+
+Use this checklist if you work like many researchers: papers live in Zotero,
+notes live in Obsidian, source-grounded summaries come from NotebookLM, and
+manuscript work happens in Word, LaTeX, or Markdown.
+Read [runtime-contract.md](runtime-contract.md) alongside this checklist
+to distinguish portable `SKILL.md` instructions from the executable
+`research-hub` CLI runtime.
+
+For end-to-end AI-for-science inputs, outputs, quality evidence, and researcher
+decisions at each existing stage, see [scientific lifecycle and quality gates](scientific-lifecycle.md).
+
+## Quick Tool Checklist
+
+Check what you use now:
+
+- [ ] Zotero for references, PDFs, tags, and collections.
+- [ ] Obsidian for Markdown notes, project memory, and cluster dashboards.
+- [ ] NotebookLM for source-grounded briefs, audio, mind maps, or Q&A.
+- [ ] Word, LaTeX, or Markdown for manuscript drafts.
+- [ ] Claude, Codex, or Gemini for AI-assisted research work.
+
+Then install the matching skills below.
+
+## If You Use Zotero + Obsidian
+
+Install:
+
+```bash
+pip install research-hub-pipeline
+research-hub setup --persona researcher
+research-hub doctor
+research-hub auto "agent-based modeling" --max-papers 3 --no-nlm
+```
+
+Use these skills:
+
+- [research-hub](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub/SKILL.md): find papers, ingest metadata, write Obsidian paper notes, maintain clusters.
+- [literature-triage-matrix](https://github.com/WenyuChiou/research-hub/blob/master/skills/literature-triage-matrix/SKILL.md): compare papers by method, data, claim, limitation, and relevance.
+- [research-context-compressor](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-context-compressor/SKILL.md): create `.research/` manifests so AI sessions do not rescan the whole project.
+- [research-project-orienter](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-project-orienter/SKILL.md): read `.research/` manifests and produce a fast orientation memo.
+
+Add if needed:
+
+```bash
+claude plugin install zotero-skills@ai-research-skills
+```
+
+- [zotero-skills](https://github.com/WenyuChiou/zotero-skills/blob/master/skills/zotero-skills/SKILL.md): deep Zotero CRUD, batch cleanup, tags, collections, item edits, and PDF attachments.
+
+## If You Use Obsidian + NotebookLM
+
+Install:
+
+```bash
+pip install "research-hub-pipeline[playwright]"
+research-hub setup --persona analyst   # no Zotero in this combo
+research-hub notebooklm login --auto-detect
+```
+
+Use these skills:
+
+- [research-hub](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub/SKILL.md): import local PDFs, DOCX, Markdown, TXT, and URLs into an Obsidian-backed workspace.
+- [notebooklm-brief-verifier](https://github.com/WenyuChiou/research-hub/blob/master/skills/notebooklm-brief-verifier/SKILL.md): verify downloaded NotebookLM briefs against the source bundle.
+- [literature-triage-matrix](https://github.com/WenyuChiou/research-hub/blob/master/skills/literature-triage-matrix/SKILL.md): convert notes and briefs into a comparison matrix.
+
+Use this workflow:
+
+```text
+local files -> research-hub import-folder -> Obsidian notes
+Obsidian cluster -> NotebookLM bundle/upload/generate/download
+downloaded brief -> notebooklm-brief-verifier
+verified sources -> literature-triage-matrix
+```
+
+## If You Use Zotero + NotebookLM
+
+Install:
+
+```bash
+pip install "research-hub-pipeline[playwright]"
+research-hub setup --persona researcher
+research-hub notebooklm login --auto-detect
+```
+
+Use these skills:
+
+- [research-hub](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub/SKILL.md): select papers from Zotero, create source bundles, upload to NotebookLM, and download outputs.
+- [notebooklm-brief-verifier](https://github.com/WenyuChiou/research-hub/blob/master/skills/notebooklm-brief-verifier/SKILL.md): catch missed sources, unsupported claims, and contradictions.
+- [zotero-skills](https://github.com/WenyuChiou/zotero-skills/blob/master/skills/zotero-skills/SKILL.md): use only when you need item-level Zotero edits beyond the research-hub workflow.
+
+## If You Use All Three: Zotero + Obsidian + NotebookLM
+
+Install `research-hub` first:
+
+```bash
+pip install "research-hub-pipeline[playwright]"
+research-hub setup --persona researcher
+research-hub notebooklm login --auto-detect
+```
+
+Core skills:
+
+- [research-hub](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub/SKILL.md): full loop from search to ingest to organize to NotebookLM.
+- [literature-triage-matrix](https://github.com/WenyuChiou/research-hub/blob/master/skills/literature-triage-matrix/SKILL.md): literature comparison table.
+- [notebooklm-brief-verifier](https://github.com/WenyuChiou/research-hub/blob/master/skills/notebooklm-brief-verifier/SKILL.md): NotebookLM output verification.
+- [research-context-compressor](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-context-compressor/SKILL.md): project memory for future AI sessions.
+- [research-project-orienter](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-project-orienter/SKILL.md): fast project orientation.
+
+Typical loop:
+
+```text
+discover papers -> Zotero collection
+Zotero collection -> Obsidian paper notes
+Obsidian cluster -> NotebookLM source bundle
+NotebookLM brief -> verifier
+verified sources -> literature matrix
+literature matrix -> manuscript claims
+```
+
+## If You Are Writing A Paper
+
+Install:
+
+```bash
+claude plugin install academic-writing-skills@ai-research-skills
+```
+
+Use these skills:
+
+- [paper-memory-builder](https://github.com/WenyuChiou/research-hub/blob/master/skills/paper-memory-builder/SKILL.md): extract `.paper/claims.yml` and `.paper/figures.yml`.
+- [academic-writing-skills](https://github.com/WenyuChiou/academic-writing-skills/blob/main/skills/academic-writing-skills/SKILL.md): build extended outlines, draft and integrate paragraphs, manage evidence alignment and prose consistency, revise across artifacts, and verify release readiness.
+- [paper-review](https://github.com/WenyuChiou/academic-writing-skills/blob/main/skills/paper-review/SKILL.md): run a general scientific review that progressively loads only the applicable method, domain, round, or explicitly requested reviewer modules.
+
+Recommended manuscript workflow:
+
+```text
+manuscript + figures -> paper-memory-builder
+.paper/claims.yml + .paper/figures.yml -> authority sources in academic-writing-skills
+completed milestone -> paper-review with inferred modules -> accepted comments
+accepted comments -> academic-writing-skills revision -> top-to-bottom review -> release checks
+```
+
+## If You Use Multiple AI Assistants
+
+Install one or both:
+
+```bash
+claude plugin install codex-delegate@ai-research-skills
+claude plugin install antigravity-delegate@ai-research-skills
+```
+
+Use these skills:
+
+- [codex-delegate](https://github.com/WenyuChiou/codex-delegate/blob/master/skills/codex-delegate/SKILL.md): coding-heavy, repetitive, or many-file implementation work.
+- [antigravity-delegate](https://github.com/WenyuChiou/antigravity-delegate/blob/master/skills/antigravity-delegate/SKILL.md): bounded non-honesty-critical mechanical work under Claude supervision.
+- [research-hub-multi-ai](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub-multi-ai/SKILL.md): decide how the primary model, Codex, and Antigravity should share bounded mechanical research-hub work.
+
+## Minimal Recommendations
+
+- [ ] Most researchers: install `research-hub` and `academic-writing-skills`.
+- [ ] Heavy Zotero users: add `zotero-skills`.
+- [ ] Heavy coding users: add `codex-delegate`.
+- [ ] Bounded mechanical Antigravity users: add `antigravity-delegate`.
+- [ ] NotebookLM users: always use `notebooklm-brief-verifier` before trusting a brief.

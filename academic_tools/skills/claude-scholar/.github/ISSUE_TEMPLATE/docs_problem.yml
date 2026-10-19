@@ -1,0 +1,65 @@
+name: Documentation problem
+description: Report outdated, inconsistent, unclear, or incorrect documentation.
+title: "[Docs]: "
+labels:
+  - documentation
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for documentation issues such as:
+        - wrong commands or paths,
+        - branch-specific instructions that drifted,
+        - unclear wording,
+        - or setup docs that no longer match actual behavior.
+
+  - type: dropdown
+    id: doc_surface
+    attributes:
+      label: Affected document
+      options:
+        - README
+        - MCP_SETUP
+        - OBSIDIAN_SETUP
+        - CLAUDE / AGENTS docs
+        - Skill documentation
+        - Installer instructions
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: branch
+    attributes:
+      label: Affected branch
+      options:
+        - main
+        - codex
+        - opencode
+        - multiple branches
+        - unsure
+    validations:
+      required: true
+
+  - type: textarea
+    id: location
+    attributes:
+      label: Problematic location
+      description: Quote the current text, command, path, or section title.
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue
+    attributes:
+      label: What is wrong
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggested_fix
+    attributes:
+      label: Suggested fix
+      description: If you already know the corrected wording or command, propose it here.
+    validations:
+      required: false

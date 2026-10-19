@@ -1,0 +1,25 @@
+{
+  "checked_at": "2026-09-07T11:40:54.783750+00:00",
+  "scope": "Planning documents and probe-summary consistency only; no product tests executed",
+  "documents": [
+    {
+      "name": "2026-09-07-academic-agent-design.md",
+      "lines": 233,
+      "sha256": "323dd3a236149a76d863e084d706d3a0b7b9b58ca0cda626c629fb046f0a542f"
+    },
+    {
+      "name": "2026-09-07-academic-agent-roadmap.md",
+      "lines": 190,
+      "sha256": "8c3715a7527e7d2630fd48aee8f2a65f796197c25e316d994540f2dca91fa54f"
+    },
+    {
+      "name": "2026-09-07-research-and-review.md",
+      "lines": 159,
+      "sha256": "e287b1603ede0b0e148c94df0ea979040d0de755ca9b3ac97a87fd843a948bda"
+    }
+  ],
+  "local_link_occurrences_checked": 27,
+  "probe_summary_json_valid": true,
+  "unresolved_placeholder_count": 0,
+  "errors": []
+}

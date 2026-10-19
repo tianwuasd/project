@@ -1,0 +1,58 @@
+name: installer-smoke
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - codex
+      - opencode
+
+jobs:
+  installer-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify installer entrypoints exist
+        run: |
+          set -euo pipefail
+          test -f scripts/setup.sh
+          test -f scripts/uninstall.sh
+          test -f scripts/test_install_uninstall.sh
+          test -f README.md
+          test -f README.zh-CN.md
+          test -f README.ja-JP.md
+
+      - name: Syntax check installer scripts
+        run: bash -n scripts/setup.sh
+
+      - name: Run install/uninstall smoke tests
+        run: bash scripts/test_install_uninstall.sh
+
+      - name: Verify branch-specific top-level docs exist
+        run: |
+          set -euo pipefail
+          if [ -f CLAUDE.md ]; then
+            test -f CLAUDE.zh-CN.md
+            test -f CLAUDE.ja-JP.md
+          fi
+          if [ -f AGENTS.md ]; then
+            test -f AGENTS.md
+          fi
+          test -f MCP_SETUP.md
+          test -f MCP_SETUP.zh-CN.md
+          test -f MCP_SETUP.ja-JP.md
+          test -f OBSIDIAN_SETUP.md
+          test -f OBSIDIAN_SETUP.zh-CN.md
+          test -f OBSIDIAN_SETUP.ja-JP.md
+
+      - name: Verify key skills still exist
+        run: |
+          set -euo pipefail
+          test -f skills/research-ideation/SKILL.md
+          test -f skills/results-analysis/SKILL.md
+          test -f skills/results-report/SKILL.md
+          test -f skills/ml-paper-writing/SKILL.md
+          test -f skills/publication-chart-skill/SKILL.md

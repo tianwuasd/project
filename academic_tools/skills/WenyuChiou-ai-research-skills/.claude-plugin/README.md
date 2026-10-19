@@ -1,0 +1,101 @@
+# Claude Code Plugin Marketplace
+
+Marketplace configuration for the catalog. For end-user install
+instructions, see [the main README](../README.md). This file documents
+the marketplace internals (plugins shipped, schema notes, update
+behavior) for contributors and the curious.
+
+## Quick install
+
+```text
+claude plugin marketplace add WenyuChiou/ai-research-skills
+claude plugin marketplace list
+claude plugin install research-workspace@ai-research-skills
+claude plugin list
+```
+
+Expected checks:
+
+- `claude plugin marketplace list` should include `ai-research-skills`.
+- `claude plugin list` should include `research-workspace@ai-research-skills`.
+
+For shell-level diagnostics, use:
+
+```powershell
+claude plugin list --available --json
+```
+
+Do not use `/plugin marketplace info ai-research-skills` as a
+verification step on Claude Code 2.1.119; `marketplace info` is not a
+supported marketplace subcommand in that version.
+
+Also prefer the terminal `claude plugin install ...` command over the
+interactive `/plugin install` UI on Claude Code 2.1.119. The
+interactive path can try SSH (`git@github.com`) for GitHub sources and
+fail on machines without a configured GitHub SSH key.
+
+## Plugins shipped
+
+The marketplace ships **5 plugins** — one research bundle
+(`research-workspace`), the two-skill `academic-writing-skills` plugin,
+and 3 standalone single-skill plugins. Skills are discovered from each source
+repository's `skills/<name>/SKILL.md` layout.
+
+| Plugin | Source repo | Skills it ships |
+|---|---|---|
+| `research-workspace` | `WenyuChiou/research-hub` | 12 skills auto-discovered from `skills/<name>/SKILL.md`: research-hub, literature-triage-matrix, notebooklm-brief-verifier, zotero-library-curator, research-design-helper, research-context-compressor, research-project-orienter, research-hub-multi-ai, paper-memory-builder, paper-summarize, gap-to-topic, research-workflow-orchestrator |
+| `academic-writing-skills` | `WenyuChiou/academic-writing-skills` | 2 skills: lifecycle-aware writing core and general `paper-review` orchestrator with progressive display-provenance, method, domain, round, and optional reviewer modules |
+| `zotero-skills` | `WenyuChiou/zotero-skills` | Single skill: full Zotero CRUD (local + Web API) |
+| `codex-delegate` | `WenyuChiou/codex-delegate` | Single skill: hand token-heavy mechanical work to Codex CLI |
+| `antigravity-delegate` | `WenyuChiou/antigravity-delegate` | Single skill: hand bounded non-honesty-critical mechanical work to Antigravity CLI |
+
+### What each plugin gets you out of the box
+
+- **`research-workspace`** — 5 of its 12 skills work fully without any
+  extra setup (`literature-triage-matrix`, `research-design-helper`,
+  `research-context-compressor`, `research-project-orienter`,
+  `paper-memory-builder`). 1 works in fallback mode
+  (`notebooklm-brief-verifier`). The `research-workflow-orchestrator`
+  coordinates orient/scope/discover/synthesize/design/execute/write/release,
+  proceeds automatically for read-only or reversible work, and pauses at the
+  catalog human gates. CLI-backed skills need
+  `pip install research-hub-pipeline` to actually run; without it they
+  print a setup hint instead of hallucinating output.
+- **`academic-writing-skills`** — works fully on its own.
+- **`zotero-skills`** + **`zotero-library-curator`** (in
+  `research-workspace`) — need Zotero connectivity (local API on port
+  23119, or Web API key).
+- **`codex-delegate`** / **`antigravity-delegate`** — need their respective
+  CLI binaries installed; see each source repo's README.
+
+## Marketplace install vs. `pip install research-hub-pipeline`
+
+| You want… | Use this path |
+|---|---|
+| Just the SKILL.md instructions (skills auto-trigger inside Claude Code) | `claude plugin marketplace add` above — lighter, no Python env |
+| The full research-hub workflow with CLI commands (`research-hub auto`, `research-hub search`, NotebookLM upload automation, etc.) | `pip install research-hub-pipeline` then `research-hub setup` (interactive onboarding) |
+
+The research-workspace plugin and CLI installer expose the same 12 workspace
+skills, but their locations differ: marketplace content lives in the plugin
+cache; the CLI installer writes to the selected host skills directory.
+Neither path proves that another host loaded the instructions.
+
+## Schema reference
+
+This marketplace follows the [Claude Code plugin marketplace schema](https://code.claude.com/docs/en/plugin-marketplaces).
+The `research-workspace` plugin uses a remote `url` Git source, so
+installing pulls SKILL.md files directly from
+`WenyuChiou/research-hub` — no skill content lives in this catalog
+repo.
+
+## Updating the marketplace
+
+The marketplace tracks source default branches, but plugin versions remain
+cache/discovery metadata. After an accepted upstream change bumps its manifest,
+synchronize the catalog plugin version and run source/contract checks.
+A branch ref is not an immutable content lock, and an update does not certify
+successful host loading.
+
+To change which plugins are exposed, edit `marketplace.json`. The
+repo's `tests/test_catalog.py` guards the file's basic structure
+(parses, has at least one plugin, every plugin has `name` + `source`).

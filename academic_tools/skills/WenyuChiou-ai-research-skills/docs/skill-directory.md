@@ -1,0 +1,117 @@
+# Skill Directory
+
+This page is the practical index. Start with the tool combination you already
+use, then install the skill that matches your workflow.
+
+For a checklist organized around Zotero, Obsidian, NotebookLM, manuscript work,
+and AI assistants, see
+[researcher-workflow-checklist.md](researcher-workflow-checklist.md).
+For which skills need `research-hub-pipeline` versus only Markdown
+instructions, see [runtime-contract.md](runtime-contract.md).
+
+## Choose By Tool Combination
+
+| You use | Start with | Install |
+|---|---|---|
+| Zotero + Obsidian | `research-hub` | `pip install research-hub-pipeline` then `research-hub setup --persona researcher` |
+| Obsidian + NotebookLM | `research-hub` | `pip install "research-hub-pipeline[playwright]"` then `research-hub setup --persona analyst` |
+| Zotero + NotebookLM | `research-hub` | `pip install "research-hub-pipeline[playwright]"` then `research-hub setup --persona researcher` |
+| Humanities / qualitative work (Zotero, no code) | `research-hub` | `pip install research-hub-pipeline` then `research-hub setup --persona humanities` |
+| Manuscript drafts | `academic-writing-skills` | `claude plugin install academic-writing-skills@ai-research-skills` |
+| Large Zotero library cleanup | `zotero-skills` | `claude plugin install zotero-skills@ai-research-skills` |
+| Coding-heavy AI handoff | `codex-delegate` | `claude plugin install codex-delegate@ai-research-skills` |
+| Bounded mechanical AI handoff | `antigravity-delegate` | `claude plugin install antigravity-delegate@ai-research-skills` |
+
+## Complete Skill Inventory
+
+### research-hub
+
+Repo: [research-hub](https://github.com/WenyuChiou/research-hub)
+
+Install:
+
+```bash
+pip install research-hub-pipeline
+research-hub setup --persona researcher   # or: analyst | humanities | internal
+```
+
+`setup` is interactive — it picks Claude Code automatically, prompts for
+Zotero default collection (skipped on `analyst`), and offers NotebookLM
+login.
+
+Optional NotebookLM automation (also handled by `setup` if you say yes):
+
+```bash
+pip install "research-hub-pipeline[playwright]"
+research-hub notebooklm login --auto-detect
+```
+
+| Skill | Use when | Direct skill link |
+|---|---|---|
+| `research-hub` | You want the AI to find papers, ingest sources, operate Zotero/Obsidian/NotebookLM, open dashboards, or maintain a vault. | [SKILL.md](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub/SKILL.md) |
+| `research-hub-multi-ai` | You want the primary model, Codex, and Antigravity to split bounded mechanical research-hub work cleanly (cross-cutting routing). | [SKILL.md](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub-multi-ai/SKILL.md) |
+| `research-design-helper` | You want to sharpen a research question through 5 Socratic segments (RQ → mechanism → identifiability → validation → risks) and produce `.research/design_brief.md`. | [SKILL.md](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-design-helper/SKILL.md) |
+| `research-context-compressor` | You want to create `.research/` manifests so future AI sessions do not rescan the whole repo. | [SKILL.md](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-context-compressor/SKILL.md) |
+| `research-project-orienter` | The project already has `.research/` manifests and you want a fast orientation memo. | [SKILL.md](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-project-orienter/SKILL.md) |
+| `literature-triage-matrix` | You want a compact comparison table across a Zotero collection, Obsidian cluster, or manual paper list. | [SKILL.md](https://github.com/WenyuChiou/research-hub/blob/master/skills/literature-triage-matrix/SKILL.md) |
+| `paper-memory-builder` | You want `.paper/claims.yml` and `.paper/figures.yml` before manuscript writing or revision. | [SKILL.md](https://github.com/WenyuChiou/research-hub/blob/master/skills/paper-memory-builder/SKILL.md) |
+| `paper-summarize` | You just ran `research-hub auto` and the per-paper Key Findings / Methodology / Relevance sections are still TODO skeletons. Fills them in both Obsidian markdown and Zotero child notes via one LLM call per paper, atomically rolled back if Zotero write fails. | [SKILL.md](https://github.com/WenyuChiou/research-hub/blob/master/skills/paper-summarize/SKILL.md) |
+| `notebooklm-brief-verifier` | You downloaded a NotebookLM brief and want to verify source coverage, unsupported claims, or contradictions. | [SKILL.md](https://github.com/WenyuChiou/research-hub/blob/master/skills/notebooklm-brief-verifier/SKILL.md) |
+| `zotero-library-curator` | You want to audit a Zotero library — find duplicate DOIs, orphan items, propose tag/collection cleanup. Read-only; defers writes to `zotero-skills`. | [SKILL.md](https://github.com/WenyuChiou/research-hub/blob/master/skills/zotero-library-curator/SKILL.md) |
+| `gap-to-topic` | You're choosing a thesis or proposal topic and need a go/no-go call — produces a decision dossier that runs a candidate through a 3-gate test: is the gap open, is it a contribution, is it feasible. | [SKILL.md](https://github.com/WenyuChiou/research-hub/blob/master/skills/gap-to-topic/SKILL.md) |
+| `research-workflow-orchestrator` | You need a resumable controller for orient, scope, discover, synthesize, design, execute, write, and release, with automatic read-only/reversible steps and pauses at human gates. | [SKILL.md](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-workflow-orchestrator/SKILL.md) |
+
+### academic-writing-skills
+
+Repo: [academic-writing-skills](https://github.com/WenyuChiou/academic-writing-skills)
+
+Install:
+
+```bash
+claude plugin install academic-writing-skills@ai-research-skills
+```
+
+| Skill | Use when | Direct skill link |
+|---|---|---|
+| `academic-writing-skills` | You need an extended outline, paragraph or section drafting, terminology and flow checks, revision, evidence alignment, cross-artifact checks, or release readiness. | [SKILL.md](https://github.com/WenyuChiou/academic-writing-skills/blob/main/skills/academic-writing-skills/SKILL.md) |
+| `paper-review` | You need a review-only scientific critique with progressively selected equation/display provenance, psychometrics/SEM, AI/LLM, water/CNHS, flood/hydrodynamic, round, or explicitly requested reviewer modules. | [SKILL.md](https://github.com/WenyuChiou/academic-writing-skills/blob/main/skills/paper-review/SKILL.md) |
+
+### zotero-skills
+
+Repo: [zotero-skills](https://github.com/WenyuChiou/zotero-skills)
+
+Install:
+
+```bash
+claude plugin install zotero-skills@ai-research-skills
+```
+
+| Skill | Use when | Direct skill link |
+|---|---|---|
+| `zotero-skills` | You need full Zotero CRUD: search, add, update, delete, collections, tags, notes, or PDF attachments. | [SKILL.md](https://github.com/WenyuChiou/zotero-skills/blob/master/skills/zotero-skills/SKILL.md) |
+
+### AI delegation skills
+
+Repos: [codex-delegate](https://github.com/WenyuChiou/codex-delegate),
+[antigravity-delegate](https://github.com/WenyuChiou/antigravity-delegate)
+
+Install:
+
+```bash
+claude plugin install codex-delegate@ai-research-skills
+claude plugin install antigravity-delegate@ai-research-skills
+```
+
+| Skill | Use when | Direct skill link |
+|---|---|---|
+| `codex-delegate` | Coding work is repetitive, implementation-heavy, or spans many files, and Claude should supervise while Codex executes. | [SKILL.md](https://github.com/WenyuChiou/codex-delegate/blob/master/skills/codex-delegate/SKILL.md) |
+| `antigravity-delegate` | Work is bounded, mechanical, and non-honesty-critical, and Claude should supervise while Antigravity executes. | [SKILL.md](https://github.com/WenyuChiou/antigravity-delegate/blob/master/skills/antigravity-delegate/SKILL.md) |
+
+## Quick Recommendations
+
+- New research workspace: install `research-hub`.
+- Writing a paper: install `academic-writing-skills`.
+- Cleaning Zotero: install `zotero-skills`.
+- Using multiple AI CLIs for bounded mechanical work: install `codex-delegate` and/or `antigravity-delegate`.
+- Publishing a workflow to collaborators: send this directory first, then point
+  them to the exact skill repo they need.

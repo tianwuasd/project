@@ -1,0 +1,450 @@
+# AI Research Skills
+
+> **Vertical AI Research Reference Harness 的 catalog、安裝與視覺導覽層。**
+> 透過 17 個可攜式 skills、八階段 lifecycle、evidence-aware handoffs
+> 與明確 human gates，從研究定向一路推進到 release。
+
+設計給研究生、博士生、博士後、研究支援人員，以及需要可檢查研究流程、
+而非黑盒子的 agent/harness 建構者使用。
+本 repo 收錄 portable skills；`research-hub` 提供可執行的 runtime，選配的
+`agent-collab-harness` 則加入 policy/checkpoint 治理層。
+
+語言：[English](README.md) | [繁中](README.zh-TW.md) ·
+[Pipeline](docs/pipeline.md) ·
+[範例](docs/examples.md) ·
+[Runtime contract](docs/runtime-contract.zh-TW.md) ·
+[詞彙表](docs/glossary.md) ·
+[給 Agent/Harness 建構者](docs/for-agent-harness-builders.zh-TW.md)
+
+<sub><a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a></sub>
+
+> 📚 本項目為 [agentic AI 學習路線圖](https://github.com/WenyuChiou/awesome-agentic-ai-zh) 的一部分
+> ——收錄於 §13–14 (研究工作流程)。
+
+---
+
+## 從這裡開始 — Why、What、How
+
+### 先看完整研究生命週期
+
+[![17 個研究 skills 對應到從文獻探索至成果發布的八階段工作流程](docs/img/pipeline-overview.zh-TW.png)](docs/pipeline.zh-TW.md)
+
+<sub>17 個核心 skills 以可保存的交接產物串連：每個階段產出下一階段的輸入，跨階段工具則維持文脈、驗證與 delegation 邊界。</sub>
+
+| 您最先想問的問題 | 短答 | 深入閱讀 |
+|---|---|---|
+| **為什麼使用這些 skills？** | 保存研究文脈，在 claim 進入下游前驗證 evidence，並讓自動化在重要的人類決策點停下。 | [這個 catalog 解決的問題](#2-為什麼存在這個-catalog-why-this-catalog-exists) |
+| **裡面有什麼？** | 17 個 portable skills、8 個 lifecycle stages、5 個可安裝 plugins、可執行的研究 runtime，以及選配的 policy/checkpoint harness。 | [每個 skill 的產出](#5-查看每個-skill-的產出-see-what-each-skill-produces) |
+| **怎麼使用？** | 先安裝 12-skill research workspace，再用自然語言描述具體研究成果；需要時才加裝 writing、Zotero 或 delegation plugins。 | [30 秒安裝](#1-安裝-install--取得這套-skills) · [使用模式](#4-使用方法-use-it) |
+
+| 17 個核心 skills | 8 個研究階段 | 5 個依需求選裝的 plugins | 3 個 truth-store integrations |
+|---:|---:|---:|---:|
+| Portable `SKILL.md` contracts | 研究定向 → release | 從 1 個開始，最多擴充至 5 個 | Zotero · Obsidian · NotebookLM |
+
+### 先走最小可用路徑
+
+```bash
+claude plugin marketplace add WenyuChiou/ai-research-skills
+claude plugin install research-workspace@ai-research-skills
+```
+
+接著可以直接提出這類需求：
+
+> 為 human-in-the-loop research agents 建立文獻分流矩陣；驗證 identifiers、保留互相矛盾的結果，並在建議下一步前列出 evidence gaps。
+
+若需要可執行、可恢復的 workflow，而不只是 prompt-only skills，接著安裝
+`research-hub-pipeline`，再執行 `research-hub setup` 與 `research-hub doctor`。
+完整路徑請看[安裝章節](#1-安裝-install--取得這套-skills)。
+
+### 看懂兩個控制層
+
+#### Harness 架構 — 以 deterministic control 圍住 semantic work
+
+[![Vertical AI Research Reference Harness 架構，呈現使用者、research-hub runtime、role agents、evidence packets、truth stores、human gates 與選配的 agent-collab policy layer](docs/img/harness-architecture.zh-TW.png)](docs/for-agent-harness-builders.zh-TW.md)
+
+<sub>`research-hub` 負責研究領域 runtime 與可恢復狀態。Role agents 處理語意工作；deterministic validators、evidence contracts 與選配的 `agent-collab-harness` policy/checkpoint layer 控制工作是否能繼續。</sub>
+
+#### Human-in-the-loop — 自動流程必須在哪裡暫停
+
+[![Human-in-the-loop 工作流程狀態機，呈現自動化可逆工作、核准 gates、decline 與 revise 路徑、恢復流程及 release authorization](docs/img/hitl-state-machine.zh-TW.png)](docs/for-agent-harness-builders.zh-TW.md)
+
+<sub>Read-only 與可逆步驟可自動繼續；breaking contract、skill removal、external writes、semantic acceptance 與 release authorization 一律保留明確的人類決策。</sub>
+
+| 您是… | 最適合的下一頁 |
+|---|---|
+| 研究者或研究團隊 | 完成上方快速安裝後，依[八階段 pipeline](#3-the-pipeline--每個階段為下一階段交付什麼)執行。 |
+| Agent 或 harness 建構者 | 閱讀[架構、狀態、HITL、恢復與 evaluation 指南](docs/for-agent-harness-builders.zh-TW.md)。 |
+| 正在評估可攜性或 trust boundaries | 查看[相容性](#7-相容性-compatibility)、[runtime contract](docs/runtime-contract.zh-TW.md)與[限制](#8-限制-limitations)。 |
+
+---
+
+## 目錄 (Contents)
+
+1. [安裝 (Install) — 取得這套 skills](#1-安裝-install--取得這套-skills)
+2. [為什麼存在這個 catalog (Why this catalog exists)](#2-為什麼存在這個-catalog-why-this-catalog-exists)
+3. [The pipeline — 每個階段為下一階段交付什麼](#3-the-pipeline--每個階段為下一階段交付什麼)
+4. [使用方法 (Use it)](#4-使用方法-use-it)
+5. [查看每個 skill 的產出 (See what each skill produces)](#5-查看每個-skill-的產出-see-what-each-skill-produces)
+6. [常見問題 (FAQ)](#6-常見問題-faq)
+7. [相容性 (Compatibility)](#7-相容性-compatibility)
+8. [限制 (Limitations)](#8-限制-limitations)
+
+---
+
+## 1. 安裝 (Install) — 取得這套 skills
+
+核心資產是可攜的 `SKILL.md`；Claude Code marketplace 是方便安裝層。
+請依您使用的 host 選路徑：
+
+| Host | 路徑 |
+|---|---|
+| Claude Code | 使用下方 marketplace 指令；可保留自動觸發，並用 `claude plugin list` 驗證。 |
+| Codex CLI / Cursor / Windsurf | 把 canonical repo 的 `SKILL.md` 放進 host 的 skills / rules 目錄，或 inline 到 prompt。 |
+| Gemini CLI / 通用 API client | 把 `SKILL.md` inline 成 prompt 或 system context。 |
+| Hermes | 安裝 raw `SKILL.md`；本 repo 目前只有 `literature-triage-matrix` 做過 Hermes 0.13.0 skill-load 驗證。 |
+| OpenClaw | 在使用者的 OpenClaw 支援時，使用 `~/.openclaw/skills/<skill>/SKILL.md` 這類 directory 形狀；本 repo 尚未 release-verified。 |
+
+各 host 的完整範例在
+[docs/install.md → 在 Claude Code 之外使用這些 skills](docs/install.md#using-these-skills-outside-claude-code)。
+
+**Claude Code 最快路徑 — 30 秒搞定：**
+
+```bash
+claude plugin marketplace add WenyuChiou/ai-research-skills
+claude plugin install research-workspace@ai-research-skills
+```
+
+**Windows `cmd.exe`：** 請逐行執行。如果 `claude plugin list` 沒出現
+`research-workspace@ai-research-skills`，通常代表貼上時只執行了第一行；
+單行版 CMD 指令請看 [docs/install.md](docs/install.md)。
+
+對 Claude Code 而言，前兩個指令會安裝 12-skill 的
+`research-workspace` plugin。需要論文寫作、完整 Zotero 操作，或
+Claude-to-Codex/Antigravity delegation 時，再加裝選配 plugin。
+
+**漸進式安裝 — 每一步完成後，已安裝的功能即可使用：**
+
+```bash
+# 1. Marketplace + 12 個 research-hub skills
+claude plugin marketplace add WenyuChiou/ai-research-skills
+claude plugin install research-workspace@ai-research-skills
+
+# 2. 論文寫作 — outline、逐段撰寫、文字與證據稽核、科學審查 (14/17)
+claude plugin install academic-writing-skills@ai-research-skills
+
+# 3. Zotero CRUD (15/17；請先在 Zotero 桌面版啟用 local API — 見 docs/setup-guide.md §C)
+claude plugin install zotero-skills@ai-research-skills
+
+# 4. 多 CLI 代理 (17/17；請先安裝 codex / agy CLI 執行檔)
+claude plugin install codex-delegate@ai-research-skills
+claude plugin install antigravity-delegate@ai-research-skills
+
+# 5. 文獻 pipeline 自動化 (research-hub skills 背後的 Python CLI)
+pip install research-hub-pipeline
+research-hub setup --persona researcher
+research-hub doctor
+research-hub auto "agent-based modeling" --max-papers 3 --no-nlm
+```
+
+一次安裝全部 5 個 plugins：
+
+```bash
+bash scripts/install-all.sh        # macOS / Linux / git-bash
+pwsh scripts/install-all.ps1       # Windows PowerShell
+```
+
+**驗證：**
+
+```bash
+claude plugin list
+# 最快路徑：research-workspace@ai-research-skills 為 ✔ enabled。
+# 完整安裝：5 個 plugins 皆以 @ai-research-skills 結尾，且狀態為 ✔ enabled。
+```
+
+`claude plugin list` 只驗證 Claude Code marketplace 安裝狀態；它不能代表 Codex、Cursor、OpenClaw、Hermes 或通用 API client 已經載入這些 `SKILL.md`。
+Marketplace 安裝的 plugins 位於 `~/.claude/plugins/cache/...`，不是
+`~/.claude/skills/`。
+
+各 plugin 的詳細資訊：[docs/install.md](docs/install.md) ·
+若尚未設定 Python / Zotero / Git？請從
+[docs/setup-guide.md](docs/setup-guide.md) 開始。
+想確認哪些 skill 是 prompt-only、哪些需要 Python runtime？
+請看 [docs/runtime-contract.zh-TW.md](docs/runtime-contract.zh-TW.md)。
+
+<details>
+<summary><b>我想 clone 這個 repo</b> (貢獻者 / 除錯用)</summary>
+
+```bash
+git clone https://github.com/WenyuChiou/ai-research-skills.git
+cd ai-research-skills
+```
+
+這個 catalog 是一個 **註冊中心 (registry)**，不是一個 monorepo。每個
+plugin 的原始碼都放在各自的 repo 中：
+
+- `github.com/WenyuChiou/research-hub` — 12 個 `research-workspace` skills
+- `github.com/WenyuChiou/academic-writing-skills` — 2 個 skills
+- `github.com/WenyuChiou/zotero-skills` — 1 個 skill
+- `github.com/WenyuChiou/codex-delegate` — 1 個 skill
+- `github.com/WenyuChiou/antigravity-delegate` — 1 個 skill
+
+如果您想修改某個 plugin，請 clone **其** 原始碼 repo，而不是這個
+catalog。本 catalog 只維護 `marketplace.json`、文件、圖片資源以及
+catalog 層級的 `CHANGELOG.md`。
+
+</details>
+
+---
+
+## 2. 為什麼存在這個 catalog (Why this catalog exists)
+
+您可能已經很熟悉 AI 在研究上的痛點。以下五點是這個 catalog
+真正能解決的問題——不僅僅是紙上談兵。
+
+### P1 — "我每次跟 AI 開新對話都要重講一次"
+
+您打開一個新的 Claude / ChatGPT 對話，想繼續昨天的工作，但模型對您的研究問題、已完成的實驗、基準模型，或是上週找到的 gap 一無所知。您花了前十分鐘重新輸入所有內容。明天，又得再來一次。
+
+### P2 — "AI 會自信地給我不存在的論文"
+
+模型寫出 *"如 Chen 等人 (2024) 所證明的…"* — 但這篇論文根本不存在。您這次抓到了（這次）。在回覆審稿人意見時，一個幻覺引文就足以讓您的稿件被直接拒絕。
+
+### P3 — "我讀了 50 篇論文，還是不知道哪個 gap 值得做成一篇學位論文"
+
+有三個問題需要結構化的答案：(1) 這個 gap 真的還存在嗎？ (2) 填補這個 gap 是真正的貢獻，還是只是現有工作的排列組合？ (3) 我有足夠的時間完成它嗎？那些只產生一段「研究缺口摘要」的工具，根本沒有回答任何一個問題。
+
+### P4 — "AI 寫出來的論文一看就是 AI 寫的"
+
+*"此外"、"值得注意的是"*，充滿閃爍其詞、沒有明確主張的句子。審稿人（以及資深共同作者）看兩段就聞到那股味道，然後您的稿件在他們待辦事項列表中的優先級就下降了。
+
+### P5 — "在 Claude / Codex / Antigravity 之間切換，每次切換都像失憶"
+
+您用 Claude 設計 prompt，交給 Codex 建立程式碼骨架，再把有邊界、非誠實性關鍵的機械性後續交給 Antigravity。長文脈綜合、CJK 寫作、判斷、治理與最終審查留在 primary model。若交接沒有明確且可保存的 brief，每一次切換都會花時間重新說明背景。
+
+---
+
+### 三個設計原則，應用於 17 個 skills
+
+這個 catalog 圍繞三個有力的核心理念構建，而不只是一張功能清單：
+
+| 原則 | 功能 | 解決的痛點 |
+|---|---|---|
+| **1. Manifests** (`.research/`, `.paper/`) | 研究狀態儲存在受版本控制的 YAML / Markdown 檔案中。新的 AI 對話 session 會讀取 manifest 並自行了解背景 — 您不必再重覆解釋。 | P1, P5 |
+| **2. 帶有 anti-leakage 規則的 Schemas** | 每個跨 skill 的產出物都有一個 YAML schema。一個 `evidence_artifacts` 為空的 claim **會被強制** 標記為 `status: gap` 並附上 `gap_reason` — 絕不會是 `supported`。一個 `verdict: do-not-pursue` 的候選主題會與 `worth-pursuing` 的主題在結構上被分開。下游工具會拒絕傳遞過度自信的輸出。 | P2, P3, P4 |
+| **3. Character-driven routing (依任務性質分流)** | token 重的機械性批量工作 → Codex。有邊界、非誠實性關鍵的機械性工作 → Antigravity。長文脈、CJK、判斷、治理與最終審查留在 primary model。路由工具 (`research-hub-multi-ai`) 會寫一個協調檔案，讓每個代理只讀取自己的任務簡報，而非上層的完整文脈。 | P5 |
+
+上方的八階段視覺圖就是將這三個原則應用於真實研究工作流程的成果。
+
+---
+
+## 3. The pipeline — 每個階段為下一階段交付什麼
+
+從 *"我應該讀讀關於 X 的資料"* 到 *"稿件已送出"* 的八個階段。每個階段的輸出就是下一階段的輸入 — 交接是機械式的，而非憑感覺。
+
+如果要讓整個 lifecycle 有一個可恢復的 controller，使用
+`research-workflow-orchestrator`：它協調 orient、scope、discover、
+synthesize、design、execute、write、release；read-only 或可逆工作可自動前進；
+遇到五個 catalog human gates 時暫停等人確認。
+
+| # | 階段 | Skill(s) | 輸出 → 下一階段 |
+|---|---|---|---|
+| 1 | **找文獻** | `research-hub`, `paper-summarize` | `.bib` + 每篇論文的重點筆記 → 階段 2 |
+| 2 | **整理比較、找 gap** | `gap-to-topic`, `literature-triage-matrix`, `notebooklm-brief-verifier`, `zotero-library-curator` | `topic_dossier.gaps.yml` (包含 `verdict`, `verdict_reason`) → 階段 3a |
+| 3a | **框問題** | `research-design-helper` | `design_brief.md` (frontmatter `source: gaps.yml#G2`, `gap_verdict`) → 階段 3b + 階段 4 |
+| 3b | **寫計畫** | `research-context-compressor`, `research-project-orienter` | `project_manifest.yml` (`provenance.from_gap`) → 階段 4–8 |
+| 4 | **設計與建模** | *cookbook* — `codex-delegate` 用於 ≥5 個檔案的骨架，Claude 直接用於 ≤4 個檔案或判斷性工作 | 您專案 repo 中的程式碼 (見 [cookbook](docs/example-design-to-build.md)) → 階段 5 |
+| 5 | **執行、校正、驗證** | `research-context-compressor`, `research-project-orienter` | `.research/` run manifests 讓未來的 AI sessions 省去重新掃描 → 階段 6 |
+| 6 | **視覺化與結果解讀** | `codex-delegate`, `antigravity-delegate`, primary model | 圖表 + 分析腳本 → 階段 7 |
+| 7 | **論文撰寫與修改** | `paper-memory-builder`, `academic-writing-skills` | `.paper/claims.yml` (包含 `status` enum + anti-leakage) → 階段 8 |
+| 8 | **投稿、回覆審查、收尾** | `academic-writing-skills`, `research-context-compressor` | reviewer-response.md, 帶有版本標籤的 manifests → 完成 |
+
+跨 skills 的交接 (階段 2 → 3a → 3b → 8; 階段 7 → 8) 是以 **YAML schemas** 文件化的，而非自由文本。下游 skill 可以拒絕處理格式錯誤的交接——當 schema 違規可能傳播時（例如，`status: gap` 的 claims 沒有 `gap_reason` 會在階段 7 被拒絕），它確實會這麼做。
+
+**跨領域 (所有階段):** `research-workflow-orchestrator`, `codex-delegate`, `antigravity-delegate`, `research-hub-multi-ai`。它們位於 pipeline 旁側，而非在 pipeline 上 — orchestrator 保存 lifecycle 狀態與 gates；multi-agent routing 則用 Codex 與 Antigravity 作為有邊界機械性執行的 leaves。
+
+完整的流程敘述 + 各階段工具表：[docs/pipeline.md](docs/pipeline.md)。
+
+---
+
+## 4. 使用方法 (Use it)
+
+### 找到你的起點
+
+如果你不想讀完整 pipeline,可以直接從目標切入:
+
+| 你目前的目標 | 你會用到的 skills |
+|---|---|
+| **找文獻、比較文獻** | `research-hub` + `literature-triage-matrix` |
+| **寫論文 / 改稿** | `paper-memory-builder` + `academic-writing-skills` |
+| **管理研究專案** | `research-design-helper` + `research-context-compressor` + `zotero-library-curator` |
+
+> **協助別人用 AI 做研究** (圖書館員 / RA / 指導老師)?
+> 不需要安裝 — 把這份 README + [docs/install.md](docs/install.md) 給他們即可。
+
+完整 pipeline 敘述:[docs/pipeline.zh-TW.md](docs/pipeline.zh-TW.md)。
+
+### 或者,直接描述你想做的事
+
+用自然的語言描述您想做的事 — Claude Code 會將您的語句與對應的 skill 進行匹配。您不需要記住 skill 的名稱。
+
+| 當您說… | 觸發的 Skill |
+|---|---|
+| "比較這 5 篇論文的方法、數據、限制" | `literature-triage-matrix` |
+| "這個 gap 是否值得做成一篇學位論文？帶我走過三個檢核關卡" | `gap-to-topic` |
+| "在我開始寫程式前，帶我走一遍我的研究設計" | `research-design-helper` |
+| "檢查這段的術語一致性、重複用詞、流暢度與過度宣稱" | `academic-writing-skills` |
+| "審查這篇論文，依內容載入符號、衍生圖表、SEM、LLM、水資源或洪水檢查" | `paper-review` |
+
+完整的觸發對照表 (17 列)：[docs/skill-directory.md](docs/skill-directory.md)。
+如果自動觸發選錯了 skill，可以直接指名：
+*"用 `literature-triage-matrix` 比較這 5 篇論文。"*
+
+### 已經在用 Zotero / Obsidian / NotebookLM?
+
+> **手上已經有 Zotero / Obsidian / NotebookLM 任何一個?**
+> [`research-hub`](https://github.com/WenyuChiou/research-hub) 把你有的那幾個
+> 串成一個 library-management loop: 搜新文獻 (arXiv, Semantic Scholar) →
+> 存進 Zotero metadata + ingest → 每篇論文筆記同步到 Obsidian →
+> NotebookLM brief 對照原始 bundle 驗證。**三個工具都是 optional** —
+> `research-hub` 根據你有的子集自動調整 (一個都沒有也行,跑 sample-dashboard 模式)。
+> 後端走 Python CLI; `pip install research-hub-pipeline`。
+>
+> 已經在跑這些工具的獨立 MCP server (例如 `paper-search-mcp` / Zotero MCP /
+> NotebookLM MCP)? 共存 — skill 管 workflow 編排, MCP 給原始 tool access。
+> CLI 本身也可以暴露 MCP 介面 (`research-hub serve`)。完整設定 + 各路線:
+> [research-hub project README](https://github.com/WenyuChiou/research-hub)。
+
+### 全部 17 個 skills
+
+<details>
+<summary><b>來自 <a href="https://github.com/WenyuChiou/research-hub"><code>research-hub</code></a> (12 個 skills)</b> — 一次安裝，全部擁有</summary>
+
+- [`research-hub`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub/SKILL.md) — 在 Zotero / Obsidian / NotebookLM 之間搜尋、匯入、整理論文。*(階段 1, 2)*
+- [`literature-triage-matrix`](https://github.com/WenyuChiou/research-hub/blob/master/skills/literature-triage-matrix/SKILL.md) — 根據方法、數據、主張、限制建立比較矩陣。*(階段 2)*
+- [`notebooklm-brief-verifier`](https://github.com/WenyuChiou/research-hub/blob/master/skills/notebooklm-brief-verifier/SKILL.md) — 驗證 NotebookLM 的簡報是否與原始資料包一致。*(階段 2)*
+- [`zotero-library-curator`](https://github.com/WenyuChiou/research-hub/blob/master/skills/zotero-library-curator/SKILL.md) — 審核 Zotero，提出清理建議 (若無 `zotero-skills` 則僅為預覽)。*(階段 2)*
+- [`gap-to-topic`](https://github.com/WenyuChiou/research-hub/blob/master/skills/gap-to-topic/SKILL.md) — 為候選的學位/研究提案主題提供三關式（開放性？貢獻度？可行性？）的 go/no-go 決策檔案。產出 `.gaps.yml` 以便在階段 3a 交接給 `research-design-helper`。*(階段 2)*
+- [`research-design-helper`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-design-helper/SKILL.md) — 透過 Socratic dialog 引導完成 RQ → 機制 → 可識別性 → 驗證 → 風險評估。讀取 `.gaps.yml` 以預填第 1 和 5 部分；階段 4 的 [cookbook](docs/example-design-to-build.md) 會重用其產出的 `design_brief.md`。*(階段 3a, 4)*
+- [`research-context-compressor`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-context-compressor/SKILL.md) — 產生 `.research/` manifests，讓未來的 AI sessions 省去重新掃描的步驟。*(階段 3b, 5, 8)*
+- [`research-project-orienter`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-project-orienter/SKILL.md) — 從那些 manifests 快速生成專案導覽備忘錄。*(階段 3b, 5)*
+- [`research-hub-multi-ai`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub-multi-ai/SKILL.md) — 根據任務性質在 primary model / Codex / Antigravity 之間進行 character-driven routing。*(跨領域)*
+- [`research-workflow-orchestrator`](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-workflow-orchestrator/SKILL.md) — 可恢復的 controller，協調 orient → scope → discover → synthesize → design → execute → write → release；read-only / 可逆工作自動前進，遇到 catalog human gates 暫停。*(所有階段)*
+- [`paper-memory-builder`](https://github.com/WenyuChiou/research-hub/blob/master/skills/paper-memory-builder/SKILL.md) — 產生 `.paper/claims.yml` + `.paper/figures.yml` (包含狀態列舉、anti-leakage 規則、檔案哨兵)。*(階段 7)*
+- [`paper-summarize`](https://github.com/WenyuChiou/research-hub/blob/master/skills/paper-summarize/SKILL.md) — 在 `research-hub auto` 執行後，將每篇論文的重點發現 / 方法 / 關聯性，同時填入 Obsidian 和 Zotero 的子筆記中。*(階段 1)*
+
+</details>
+
+<details>
+<summary><b>獨立 repos (4 個 plugins)</b> — 每個 plugin 需單獨安裝</summary>
+
+- [`academic-writing-skills`](https://github.com/WenyuChiou/academic-writing-skills/blob/main/skills/academic-writing-skills/SKILL.md) — extended outline、依任務選用的寫前規劃與改後檢查、章節收尾、共用術語紀錄、四輪整稿 review、跨檔案 revision 與 release readiness。*(階段 7, 8)*
+- [`paper-review`](https://github.com/WenyuChiou/academic-writing-skills/blob/main/skills/paper-review/SKILL.md) — 通用科學審查，會按需選用 equation／derived-display provenance、psychometrics／SEM、AI／LLM、水資源／CNHS、洪水／hydrodynamics、round 與明確指定的 reviewer modules。*(階段 7, 8)*
+- [`zotero-skills`](https://github.com/WenyuChiou/zotero-skills/blob/master/skills/zotero-skills/SKILL.md) — 完整的 Zotero CRUD、批次處理 metadata、文獻庫維護。*(階段 1, 2, 7)*
+- [`codex-delegate`](https://github.com/WenyuChiou/codex-delegate/blob/master/skills/codex-delegate/SKILL.md) — 從 Claude → Codex CLI 的交接，處理程式碼密集 / 機械性工作。*(跨領域, 也用於階段 4, 6)*
+- [`antigravity-delegate`](https://github.com/WenyuChiou/antigravity-delegate/blob/master/skills/antigravity-delegate/SKILL.md) — 從 Claude → Antigravity CLI 的交接，只用於有邊界、非誠實性關鍵的機械性工作。*(跨領域, 也用於階段 4, 6)*
+
+</details>
+
+### 時間 + 成本預期
+
+根據 session 中實際使用的粗略估計 — 請根據您的輸入大小進行調整：
+
+| 任務 | 一般所需時間 | 對話輪次 | 備註 |
+|---|---|---|---|
+| 比較 5 篇論文 (`literature-triage-matrix`) | 1–3 分鐘 | 1–2 | 與論文數量成正比；20 篇約 5 分鐘 |
+| 3 關卡 gap 決策 (`gap-to-topic`) | 5–15 分鐘 | 3–6 | 取決於候選主題數量及文獻回溯深度 |
+| 審核單一段落的術語、重複與流暢度 (`academic-writing-skills`) | <1 分鐘 | 1 | 與稿件總長度無關 |
+| 回覆審稿人意見 (6 則) (`academic-writing-skills`) | 3–8 分鐘 | 3–5 | 取決於意見深度及所需修改幅度 |
+| 審核 800 條的 Zotero 文獻庫 (`zotero-library-curator`) | 2–4 分鐘 | 1 | 唯讀；標籤多樣性比文獻庫大小影響更大 |
+| 為每個叢集摘要 5 篇論文 (`paper-summarize`) | 4–10 分鐘 | 1 | 每篇論文一次 LLM call；失敗時會針對單篇論文進行回滾 |
+
+這些是 **維護者觀察到的範圍**，並非基準測試數據。您的 LLM 供應商、網路、文獻庫狀態以及 prompt 的寫法都會影響實際時間。
+
+### ⚠ 在進行任何 CRUD 操作前，請備份 Zotero
+
+`zotero-library-curator` 是唯讀的 — 它只會產出預覽報告。
+`zotero-skills` *可以* 寫入（合併重複項、刪除項目、重組收藏）。**在讓任何 AI 修改您的文獻庫之前，務必先匯出 Zotero 備份**：Zotero → File → "Export Library…" → Zotero RDF。這些 skills 不會自動為您執行此操作。
+
+---
+
+## 5. 查看每個 skill 的產出 (See what each skill produces)
+
+每個 pipeline 階段的交付物都有實作範例檔案,點下去直接看 artifact 長什麼樣 — 不是描述,是實物。
+
+| 階段 | skill 產出什麼 | 範例檔 |
+|---|---|---|
+| 1–2 | 文獻回顧交付物 (TL;DR + 每篇論文摘要 + tagged gap 分析) | [`example-literature-review-deliverable.md`](docs/example-literature-review-deliverable.md) · [`.docx`](docs/example-literature-review-deliverable.zh-TW.docx) |
+| 2 | 三關 gap 決策檔 (開放性 / 貢獻度 / 可行性) + machine-readable gap 清單 | [`example-topic-dossier.md`](docs/example-topic-dossier.md) + [`.gaps.yml`](docs/example-topic-dossier.gaps.yml) · [`.docx`](docs/example-topic-dossier.zh-TW.docx) |
+| 3a | 研究設計簡報 (含 dossier 來源追溯, Socratic 走過 RQ → 機制 → 可識別性 → 驗證 → 風險) | [`example-design-brief.md`](docs/example-design-brief.md) |
+| 3b | 帶 `provenance.from_gap` 的專案 manifest,讓未來 AI sessions 省去重新掃描 | [`example-project-manifest.yml`](docs/example-project-manifest.yml) |
+| 4 | Cookbook — 從 brief 到程式碼骨架的兩條路徑 (Claude-direct 用於 ≤4 個檔案;`codex-delegate` 用於 ≥5) | [`example-design-to-build.md`](docs/example-design-to-build.md) |
+| 7 | 論文 claim 清單 (含 `status: gap` anti-leakage 規則) + 圖表清單 (embedded-in-manuscript sentinel) | [`example-paper-memory-claims.yml`](docs/example-paper-memory-claims.yml) + [`example-paper-memory-figures.yml`](docs/example-paper-memory-figures.yml) |
+
+跨領域與編排型的 skills (`research-hub` ingestion、`research-project-orienter`、`research-hub-multi-ai`、`notebooklm-brief-verifier`) 不對應單一階段交付物 — 它們在 [`test-corpus/`](test-corpus/) 的真實 dogfood run 裡端到端跑過:一份
+[orientation memo](test-corpus/ai-agents-social-interaction/.research/orientation_memo.md)、
+一份 [multi-AI routing decision](test-corpus/ai-agents-social-interaction/.research/multi-ai-routing-decision.md)、
+以及一份 [NotebookLM brief 驗證](test-corpus/ai-agents-social-interaction/.research_hub/brief-verify-20260426T001559Z.md)。
+
+或從頭到尾閱讀 [`docs/examples.md`](docs/examples.md) 看每個 skill 的 input/output 對照表敘述版。
+
+---
+
+## 6. 常見問題 (FAQ)
+
+### 中文文獻也適用嗎?
+
+可以 — 這套 skills 是語言中立的。用中文跑,輸出就是中文。NotebookLM、
+Claude、Gemini 都能處理繁中跟簡中。
+
+### 怎麼把輸出存成 .docx 給指導老師看?
+
+Stage 2 dossier 跟 Stage 1–2 文獻回顧交付物有 `.docx` 生成器 — §5
+上方表格有直接連結。其他階段 (`design_brief.md`、`project_manifest.yml`、
+`claims.yml`) 目前只出 Markdown / YAML,需要 .docx 用 `pandoc` 或 Word
+的「開啟 Markdown」轉。
+
+---
+
+## 7. 相容性 (Compatibility)
+
+可攜層是 `SKILL.md` 指令檔，以及隨附的 `references/`、`scripts/` 和 workflow contracts。Claude Code marketplace 是其中一個 host-specific 包裝層，不是使用這些 skills 的唯一方式。
+
+| 層級 | 可攜內容 | 狀態 |
+|---|---|---|
+| 通用 `SKILL.md` 層 | Skill instructions、trigger descriptions、references、scripts，以及 project handoff contracts | 收錄 17 個 skills；既有原始碼路徑／manifest 檢查不代表 live host 行為已驗證 |
+| Host-specific 行為 | 自動觸發、plugin marketplace 安裝、`claude plugin list`、skill discovery、rules-directory 慣例 | 依 agent host 而定；請使用該 host 自己的 list / discovery 檢查 |
+| 目前 portability audit | 通用 `SKILL.md`-loading hosts | 2026-05-10 審核中 11/14 可零編輯移植；3/14 只需要外觀性的 `<skill-root>` 路徑修改，且已完成 |
+| 已驗證 host install | NousResearch/hermes-agent 0.13.0 | `literature-triage-matrix` 已端到端安裝，安全掃描 SAFE，註冊為 `enabled`；Hermes inference loop 尚未測試 |
+| OpenClaw | 在使用者的 OpenClaw 安裝支援時，可使用 `~/.openclaw/skills/<skill>/SKILL.md` 這類 `SKILL.md` directory 形狀 | 結構上相容，但本 repo 尚未做 release-grade verification |
+| 其他 agents | Codex CLI、Gemini CLI、Cursor、Windsurf、通用 API clients，以及其他 `SKILL.md`-loading hosts | 載入同一份 `SKILL.md` 作為 context，或放進 host 的 skill / rules 目錄；並非每個 host 都已個別測試 |
+
+`11/14` 的可移植性數據反映了 2026-05-10 的審核結果，當時 catalog 只有 14 個 skills；之後新增的 `gap-to-topic`、`paper-review`、`research-workflow-orchestrator` 與 `antigravity-delegate` 另依 catalog 記錄驗證，未納入那次可移植性審核。
+
+校準審核 + 實驗記錄：
+[`.research/hermes-compatibility-audit.md`](.research/hermes-compatibility-audit.md)。
+
+若要查看 Codex CLI / Gemini CLI / Cursor / Windsurf / Hermes 和 generic API 的範例，請參閱
+[docs/install.md → 在 Claude Code 之外使用這些 skills](docs/install.md#using-these-skills-outside-claude-code)。OpenClaw 目前請先採用上方的 `SKILL.md` directory 形狀；本 repo 尚未加入 release-grade OpenClaw verification。
+
+---
+
+## 8. 限制 (Limitations)
+
+- 由一位研究生研究員組裝和測試；未經大規模語料庫驗證。
+- 領域偏向水資源和代理人基模擬；未在社會科學、機器學習或臨床寫作領域進行驗證。
+- 在真實世界輸入下的行為正確性是原始碼 repo 的責任，而非本 catalog 的責任。
+- 每月 report-only health／drift 檢查會檢視上游 repositories、manifests、skill URLs 與驗證日期。HTTP 回應成功或原始碼路徑檢查通過，不代表 live host 行為已驗證，也不會更新人工驗證日期；未解決的發現仍需人工審查。
+- CI 不斷言 `claude plugin install` 的往返過程；marketplace registry 經過結構性檢查，但實際的安裝 + 觸發路徑由維護者在版本發布之間進行驗證（關於涵蓋範圍的詳細資訊，請參見 [docs/verification.md](docs/verification.md)）。
+- 目前 `research-workspace` 原始碼的 12 個 skills 已不含 `zotero-skills`，
+  以獨立 plugin 為 canonical。2026-05-20 的同名衝突屬歷史紀錄；
+  舊的 host cache 仍可能保留內嵌版本，請先檢查已安裝狀態，
+  不要把原始碼修正當成本機已更新。詳見 [verification.md](docs/verification.md)。
+
+完整的設計合約 — 包括哪些是機器檢查的，哪些不是 — 請參閱 [docs/design-philosophy.md](docs/design-philosophy.md)。
+
+---
+
+## 授權 (License)
+
+MIT. 每個 skill 都在其標準 repo 中維護 — 本 catalog 是一個索引，而非 monorepo。歡迎透過 issue 或 PR 進行貢獻。
+新 skill 的提案 → 若與工作流程整合，請至 `research-hub`；若為深度、單一目的的 CRUD，請建立獨立 repo。

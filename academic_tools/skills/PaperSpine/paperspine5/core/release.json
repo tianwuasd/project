@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.1",
+  "product": "PaperSpine5",
+  "version": "0.4.0-alpha.2",
+  "build_id": "w7a-89832cbebea903ce79b4",
+  "release_state": "prepared-prerelease",
+  "public_release": false,
+  "release_url": "https://github.com/WUBING2023/PaperSpine/releases/tag/v0.4.0-alpha.2",
+  "artifacts": {
+    "suite_bytes": 26463418,
+    "suite-linux-x86_64_bytes": 56218667,
+    "suite-macos-arm64_bytes": 40572863,
+    "suite-macos-x86_64_bytes": 40547382,
+    "standalone-skill_bytes": 700047
+  },
+  "update_policy": {
+    "check": "python scripts/paperspine_update.py --preflight --check-only",
+    "apply": "python scripts/paperspine_update.py --preflight --yes",
+    "automatic": true,
+    "task_data_retained": true,
+    "explicit_opt_out": true
+  },
+  "claim_boundary": {
+    "stable": false,
+    "windows_x64_full_suite": true,
+    "external_submission_authorized": false,
+    "linux_x86_64_full_suite": true,
+    "macos_arm64_full_suite": true,
+    "macos_x86_64_full_suite": true,
+    "macos_notarized": false
+  }
+}

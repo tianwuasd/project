@@ -1,0 +1,55 @@
+{
+  "purpose": "Read-only public API connectivity samples for academic-agent planning; not a product test or a user research topic",
+  "checked_at": "2026-09-07T11:22:37Z",
+  "credentials_used": false,
+  "routing": "Foreign hosts classified using decide-proxy-7897; proxy listener verified; all requests used http://127.0.0.1:7897",
+  "results": [
+    {
+      "source": "OpenAlex",
+      "url": "https://api.openalex.org/works?search=retrieval%20augmented%20generation&per_page=1&select=id,title,doi",
+      "http_status": 200,
+      "content_type": "application/json",
+      "records": 1,
+      "title": "Retrieval-Augmented Generation for Large Language Models: A Survey",
+      "seconds": 2.22
+    },
+    {
+      "source": "Crossref",
+      "url": "https://api.crossref.org/works?query.bibliographic=retrieval%20augmented%20generation&rows=1&select=DOI,title",
+      "http_status": 200,
+      "content_type": "application/json",
+      "records": 1,
+      "title": ["Retrieval\u2010Augmented Generation"],
+      "seconds": 1.73
+    },
+    {
+      "source": "arXiv",
+      "url": "https://export.arxiv.org/api/query?search_query=all:retrieval%20AND%20all:augmented&start=0&max_results=1",
+      "http_status": null,
+      "error": "TimeoutError: The read operation timed out",
+      "seconds": 18.31,
+      "retry": {
+        "client": "Windows curl/Schannel",
+        "http_status": null,
+        "exit_code": 35,
+        "error": "AcquireCredentialsHandle failed: SEC_E_NO_CREDENTIALS (0x8009030E)",
+        "interpretation": "Local TLS client failed before an HTTP result; not evidence of arXiv service outage. TLS verification was not disabled."
+      }
+    },
+    {
+      "source": "Semantic Scholar",
+      "url": "https://api.semanticscholar.org/graph/v1/paper/search?query=retrieval%20augmented%20generation&limit=1&fields=title,externalIds",
+      "http_status": 200,
+      "content_type": "application/json",
+      "records": 1,
+      "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+      "seconds": 5.07
+    }
+  ],
+  "limitations": [
+    "One query and one record per provider; no bulk pagination, quota, recall or relevance evaluation",
+    "No PDFs downloaded, no citation entailment checked, no model API called",
+    "No source repository code or test suite executed",
+    "Results describe this machine and time only"
+  ]
+}

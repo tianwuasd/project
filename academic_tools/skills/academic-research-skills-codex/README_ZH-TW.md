@@ -1,0 +1,440 @@
+# ARS-Codex
+
+[![Version](https://img.shields.io/badge/version-v3.23.1-blue)](VERSION)
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey)](https://creativecommons.org/licenses/by-nc/4.0/)
+[![Sponsor](https://img.shields.io/badge/sponsor-Buy%20Me%20a%20Coffee-orange?logo=buy-me-a-coffee)](https://buymeacoffee.com/crucify020v)
+
+ARS-Codex 是
+[Academic Research Skills（ARS）Claude Code 版](https://github.com/Imbad0202/academic-research-skills)
+的 Codex 原生 sibling。它是獨立的 Codex 發行版本，擁有自己的 plugin 識別碼、
+封裝與 runtime adapter；發行版號自 `3.22.0` 起與內嵌 ARS 同步。
+
+本倉庫將 ARS workflow 內容作為單一 Codex skill 提供：
+
+```text
+skills/academic-research-suite/
+  SKILL.md
+  manifest.json
+  agents/openai.yaml
+  ars/
+    deep-research/
+    academic-paper/
+    academic-paper-reviewer/
+    academic-pipeline/
+    sr-screener/
+    experiment-agent/
+    commands/
+    hooks/
+    docs/
+    tests/
+    shared/
+```
+
+原始 Claude Code ARS 的 checkout 不會被修改。上游內容從已核對的上游發行 commit 複製，
+並透過 `skills/academic-research-suite/SKILL.md` 中的 Codex router 進行適配。
+
+## 與 Claude Code ARS 的關係
+
+本倉庫是 ARS-Codex。如需原始 Claude Code ARS 發行版本，
+請使用 [Imbad0202/academic-research-skills](https://github.com/Imbad0202/academic-research-skills)。
+
+當您需要原生 Claude Code skill 佈局、Claude 專屬的 agent-team 行為，
+或原始 ARS 開發歷史時，請使用 Claude Code repo。
+當您需要 Codex 原生的單一套件 skill 時，請使用本 repo。
+
+## 版本控制
+
+此 ARS-Codex 套件版本為 `3.23.1`。倉庫根目錄的 `VERSION` 檔案、
+`skills/academic-research-suite/SKILL.md` 的 metadata 版本，
+以及 `skills/academic-research-suite/manifest.json` 的 `adapter_version`
+自 `3.22.0` 起與內嵌 ARS 套件使用相同版號；舊有 `0.1.x` 紀錄保留原版號。
+上游版本、tag 與完整 commit 記錄在 `manifest.source_repositories[]` 中。
+
+套件層級的變更摘要記錄在 [`CHANGELOG.md`](CHANGELOG.md) 中。
+
+目前內嵌的 ARS 原始碼對齊 **v3.23.1**：
+`Imbad0202/academic-research-skills@4c5449017f46eb64d112a301d4817d22c7c9f3d9`。
+此修補版修正 `sr-screener` 的 RFC 4180 CSV 匯入，保留上游 write-scope guard
+與 Windows launcher 修補作為未啟用的 Claude hook 參考，並明定訊息中段的
+`[direct-mode]` 不是 escape hatch。上游 Google 驗證模型改推薦
+`gemini-4-argon`（provisional）；`gemini-3.1-pro-preview` 保留上游 validated 標示。
+目前沒有 Gemini smoke script，也未宣稱通過 Codex provider 實測。
+Codex 沒有 `PreToolUse` 寫入圍欄，原生模型策略維持不變。本版沒有新增 workflow。
+確定性工具有合成測試；篩選準確率、prompt 遵循及 Codex 模型成效尚未實測。
+上游 #892 的 Claude smoke 未達驗收，issue 仍開啟。
+語言配對目前僅支援 `zh-tw-en`；西班牙文觸發詞不代表已提供西班牙文輸出語系包。
+Claude 模型稽核與插件評估素材保留供參考，不會改變 Codex 模型策略，也不代表已實測 Codex 效能。
+
+## 模型與執行方式
+
+本 checkout 的 [project 設定](.codex/config.toml) 為新開且信任此專案的
+Codex session 選用 `gpt-6-astra` 與 `xhigh` reasoning。安裝 skill 不會複製
+此設定，也無法切換已執行中的 session。Planner 對例行任務建議 `medium`、
+複雜任務建議 `xhigh`；這是起始策略，尚非實測最佳設定。`ultra` 僅供 Codex
+中明確選用的高難度工作使用，contained citation transport 會拒絕此設定。
+
+預設採原生自適應執行：適合平行處理的獨立工作可交給範圍明確的子 agent，
+主 agent 同時繼續其他工作。固定 full-runtime topology 與 hooks 仍須選用。
+詳見[模型執行策略](skills/academic-research-suite/codex/model-runtime-policy.md)
+與[系統卡對齊稽核](skills/academic-research-suite/codex/audits/2026-09-06-model-alignment.md)。
+
+## 安裝 ARS-Codex Plugin
+
+透過 Codex CLI 加入 GitHub marketplace 並安裝 ARS-Codex：
+
+```bash
+codex plugin marketplace add Imbad0202/academic-research-skills-codex --ref main
+codex plugin add ars-codex@ars-codex
+```
+
+日後更新 plugin：
+
+```bash
+codex plugin marketplace upgrade ars-codex
+codex plugin add ars-codex@ars-codex
+```
+
+在 Codex Desktop 中，也可以從 **Plugins** 加入此 repo，然後安裝
+**ARS-Codex**：
+
+```text
+Marketplace source: https://github.com/Imbad0202/academic-research-skills-codex.git
+Branch/ref: main
+Plugin: ars-codex
+```
+
+Plugin 根目錄為 `plugins/ars-codex/`。其中的 `skills/` 是
+`academic-research-suite` 的實體副本而非符號連結，確保 Windows 上的 Codex
+Desktop plugin 快取也能正確註冊 bundled skill。
+
+安裝後請開啟新的 Codex 對話，再呼叫 `$academic-research-suite`，或直接描述符合
+內建 workflow 的學術研究任務。
+
+## 直接安裝或更新 Skill
+
+除了 plugin 以外，也可以從本 repo 路徑直接安裝 skill。使用 `--method git`
+以確保公開和需要認證的
+GitHub 存取都能一致運作：
+
+```bash
+python "$HOME/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py" \
+  --repo Imbad0202/academic-research-skills-codex \
+  --ref main \
+  --path skills/academic-research-suite \
+  --method git
+```
+
+更新現有安裝：
+
+```bash
+rm -rf "$HOME/.codex/skills/academic-research-suite"
+python "$HOME/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py" \
+  --repo Imbad0202/academic-research-skills-codex \
+  --ref main \
+  --path skills/academic-research-suite \
+  --method git
+```
+
+安裝後請開啟新的 Codex 對話。現有的 Codex session 可能保留舊的 skill 快取；
+您不需要關閉不相關的 Claude 或 Codex session。
+
+使用 `/skills` 驗證：您應該會看到一個 ARS-Codex 項目，即
+`academic-research-suite` 或 `ARS-Codex`。您**不應該**看到來自本套件的獨立 `academic-paper`、
+`academic-pipeline`、`deep-research` 或 `academic-paper-reviewer` skill。
+如果出現，請使用上方的更新指令重新安裝，然後開啟新的 Codex 對話。
+
+## Codex 文件
+
+- [Codex 設定](skills/academic-research-suite/ars/docs/SETUP.md)涵蓋安裝、
+  `ars-*` 別名、選用工具、Material Passport 適配器，以及不支援的 Claude plugin 功能。
+- [Codex 架構](skills/academic-research-suite/ars/docs/ARCHITECTURE.md)
+  說明 ARS 邏輯 pipeline 與 Codex 執行時期疊層。
+
+## 使用方式
+
+使用 `$academic-research-suite`（單數形式）明確呼叫套件，然後描述研究任務，
+並提供任何原始檔案、筆記、草稿文本、審稿意見或輸出限制。
+
+```text
+Use $academic-research-suite to help me plan a systematic literature review on
+AI adoption in higher education quality assurance.
+```
+
+Codex adapter 會將請求路由至以下六個 ARS workflow 之一：
+
+| Workflow | 適用情境 | 範例提示 |
+|---|---|---|
+| `deep-research` | 研究問題精煉、文獻回顧、系統性回顧、後設分析、事實查核 | `Use $academic-research-suite to build a systematic review protocol for AI in higher education QA.` |
+| `academic-paper` | 論文大綱、撰寫、摘要、修改、引用格式、AI 使用聲明 | `Use $academic-research-suite to turn these notes into an IMRaD paper outline and drafting plan.` |
+| `academic-paper-reviewer` | 稿件審閱、模擬同儕審查、編輯決策、重新審查 | `Use $academic-research-suite to review this manuscript and produce a journal-style decision letter.` |
+| `academic-pipeline` | 端到端的研究至論文 workflow，包含誠信閘門、審查、修改與最終檢查 | `Use $academic-research-suite to run an end-to-end research-to-paper pipeline from topic to revised manuscript.` |
+| `sr-screener` | 明確要求的 eligibility 規則、標題／摘要或全文篩選、爭議裁決、稽核與報告 | `Use $academic-research-suite: sr-screener ta-screen these records against my confirmed protocol.` |
+| `experiment-agent` | 程式碼實驗規劃、人類研究方案、統計詮釋、可重現性驗證 | `Use $academic-research-suite to plan a code experiment and define reproducibility checks.` |
+
+`sr-screener` 提供八種模式：`protocol`、`quick`、`pilot`、`ta-screen`、
+`ft-screen`、`adjudicate`、`audit`、`report`。只有明確要求才啟動篩選，
+`deep-research` 的 `systematic-review` 不會自動轉交。研究團隊須確認納入／排除
+規則並核實 AI 決定；完整標題／摘要篩選前，pilot 必須與團隊標記比對，
+且不得漏掉團隊選擇晉級的紀錄，除非使用者留下 override 紀錄。
+兩位 reviewer 共同排除的紀錄須以可重現抽樣送資深 reviewer 做 QC
+（至少 20 筆、預設 100 筆；不足時全數複查），完成前的數量均為暫定。
+缺少或格式錯誤的決定維持 pending；腳本有合成測試，篩選準確率尚未實測。
+
+### Claude 風格別名
+
+Claude Code v3.7 安裝 `/ars-*` 斜線指令。Codex 沒有相同的 plugin 指令註冊機制，
+因此本套件在單一 `$academic-research-suite` skill 內模擬指令意圖。可使用以下任一形式：
+
+```text
+Use $academic-research-suite: ars-plan my paper on AI governance in universities.
+```
+
+或者，當您的 Codex 客戶端將斜線前綴的文字作為一般使用者訊息傳遞時：
+
+```text
+/ars-plan my paper on AI governance in universities.
+```
+
+如果斜線輸入被客戶端攔截，請使用純文字別名形式：
+
+```text
+ars-plan my paper on AI governance in universities.
+```
+
+| Claude 指令 | Codex 別名 | 路由的 workflow |
+|---|---|---|
+| `/ars-plan` | `ars-plan` | `academic-paper` `plan` 模式 |
+| `/ars-outline` | `ars-outline` | `academic-paper` `outline-only` 模式 |
+| `/ars-abstract` | `ars-abstract` | `academic-paper` `abstract-only` 模式 |
+| `/ars-lit-review` | `ars-lit-review` | `academic-paper` `lit-review` 模式 |
+| `/ars-citation-check` | `ars-citation-check` | `academic-paper` `citation-check` 模式 |
+| `/ars-disclosure` | `ars-disclosure` | `academic-paper` `disclosure` 模式 |
+| `/ars-format-convert` | `ars-format-convert` | `academic-paper` `format-convert` 模式 |
+| `/ars-revision-coach` | `ars-revision-coach` | `academic-paper` `revision-coach` 模式 |
+| `/ars-revision` | `ars-revision` | `academic-paper` `revision` 模式 |
+| `/ars-full` | `ars-full` | `academic-pipeline` 完整 workflow |
+
+### 使用模式
+
+為獲得最佳效果，請從 workflow 目標和您目前資料的狀態開始：
+
+```text
+Use $academic-research-suite.
+
+Goal: write a journal article.
+Current materials: I have a literature matrix and rough findings, but no outline.
+Output needed now: paper architecture and missing-evidence checklist.
+Constraints: English, APA 7, higher education policy audience.
+```
+
+如果您只有論文主題或大方向的研究領域，尚未有明確的研究問題，
+Codex router 應從 ARS 蘇格拉底式範圍界定開始：
+
+```text
+Use $academic-research-suite.
+
+I want to write a paper on AI adoption in higher education quality assurance.
+I do not yet have a clear research question.
+Please use SCR / Socratic dialogue to help me narrow the question first; do not write an outline yet.
+```
+
+預期路由：先進入 `deep-research` `socratic` 模式。ARS 應提出收斂問題，
+在研究問題收斂之前不應產生大綱或草稿。
+
+對於審查任務，請提供稿件或稿件路徑，以及您想要的審查模式：
+
+```text
+Use $academic-research-suite to review this paper.
+Mode: full review.
+Focus: methodology, contribution, citation integrity, and likely desk-reject risks.
+Output: reviewer reports plus editorial decision letter.
+```
+
+對於分階段的 pipeline，請要求設定檢查點，而非讓 Codex 靜默執行整個流程：
+
+```text
+Use $academic-research-suite to start an academic-pipeline run.
+Begin with Stage 0 intake and stop after producing the pipeline dashboard.
+```
+
+### 冒煙測試
+
+在新的 Codex 對話中：
+
+```text
+/skills
+```
+
+預期結果：僅一個 ARS 項目。
+
+然後測試蘇格拉底式路由：
+
+```text
+Use $academic-research-suite.
+I want to write a paper on AI adoption in higher education quality assurance.
+I do not yet have a clear research question.
+```
+
+預期結果：路由至 `deep-research` `socratic` 模式並提出收斂問題。
+
+CLI 冒煙測試：
+
+```bash
+codex exec --ephemeral --sandbox read-only \
+  -C /path/to/academic-research-skills-codex \
+  'Use $academic-research-suite. Router smoke test only. User request to classify: I want to write a paper on AI adoption in higher education quality assurance, but I do not yet have a clear research question. According to the academic-research-suite router, classify the workflow and mode.'
+```
+
+### 非阻斷性 Codex 警告
+
+以下 Codex 訊息不代表 ARS 安裝失敗：
+
+- `[features].codex_hooks is deprecated` — 方便時更新您的 Codex 設定；
+  ARS-Codex 在正常使用下不需要 hooks。
+- `hooks need review before they can run` — 如果您使用這些 hooks，
+  請另外審查。ARS-Codex 將內嵌的 Claude hooks 視為可追溯性 metadata，
+  不會要求它們。
+
+### Codex Adapter 行為
+
+ARS 最初是為 Claude Code 撰寫的。在此 Codex 套件中：
+
+- 內嵌的 `agents/*.md` 檔案作為角色與階段提示詞使用。
+- 內嵌的 `commands/ars-*.md` 檔案僅作為提示詞範本。Codex 不會將它們
+  註冊為斜線指令。
+- 內嵌的 `hooks/hooks.json` 檔案僅為上游可追溯性而保留。
+  Codex 不會從本套件安裝 Claude Code hooks。
+- Codex 可在目前任務與權限範圍內，透過原生子 agent 委派獨立工作；主 agent 同時繼續其他有用工作。
+- 網頁/來源驗證使用 Codex 瀏覽功能，在涉及即時或外部事實時必須引用來源。
+- 跨模型驗證預設為停用。在此 Codex 套件中明確要求時，
+  請依 `ars/shared/cross_model_verification.md` 設定 provider，先說明
+  provider、model 與會送出的內容類別，並在任何外部上傳前取得使用者明確同意。
+  外部審查者透過已設定的 provider API 呼叫，不會用目前的 Codex model 模擬。
+- 上游提及「fresh Claude Code session」在本套件中意指新的 Codex 對話；
+  Material Passport 重設語意仍然適用。
+- 如果引用、來源、統計數據或期刊政策無法驗證，Codex 應將其標記為未驗證，
+  而非虛構支持內容。
+
+### ARS v3.23.1 功能對等
+
+本套件在 Codex 具有對等概念之處，適配上游 ARS `v3.23.1`
+（`4c5449017f46eb64d112a301d4817d22c7c9f3d9`），並記錄模型與 runtime overlay。
+
+Codex adapter 對書目網路行為採以下明確邊界：
+
+| 研究路徑 | Codex 預設行為 | 專用 API／client 觸發條件 |
+|---|---|---|
+| 一般主題或候選文獻探索 | 使用 Codex browsing 與權威網頁來源 | 不啟動四個 Python resolver clients |
+| Prompt 層級 ingest、去重或來源驗證 | 使用 Codex browsing 或官方 metadata 頁面 | 內嵌 prompt 的「automatic lookup」文字不會啟動 Python client |
+| Script-backed citation-existence gate | `ars-full` 本身不等於授權；Stage 2.5／4.5 仍以預設 Codex 路徑完成 integrity checkpoint | 使用者明確要求 programmatic verification；之後非 manual reference 會依 cache 行為查 Crossref／OpenAlex／Semantic Scholar，arXiv 僅在有 `arxiv_id` 時執行 |
+| Claim-standing discovery | Stage 2.5／4.5 出現 eligible Claim Registry row 後才可提供 advisory | 另行由使用者要求並完成 plan-bound affirmative consent；使用 v3.21 discovery adapters，而非單篇 resolver clients |
+| Contamination backfill／migration | 不自動執行 | 僅限明確選定的 migration CLI |
+
+| 上游 ARS 功能 | Codex 套件行為 |
+|---|---|
+| 單一可安裝 plugin | 原生 Codex plugin `ars-codex`，內含單一 `academic-research-suite` skill |
+| `/ars-*` 斜線指令 | 透過 skill router 作為 `ars-*` 別名模擬；非原生斜線指令 |
+| 五個上游 skill 從 `skills/` 符號連結自動發現 | 單一 Codex router skill 選擇 workflow 並讀取內嵌的 workflow `WORKFLOW.md` 檔案 |
+| Plugin 隨附的 agent | 角色/階段提示詞依任務依賴與 runtime 權限，以內嵌或範圍明確的原生子 agent 執行 |
+| 四個指令（`ars-full`、`ars-reviewer`、`ars-revision-coach`、`ars-citation-check`）省略 `model:`，輕量模式保留 `model: sonnet` | 這些指令繼承目前 Codex session 模型；輕量模式的 `sonnet` 作為上游 Claude metadata 保留，不會覆寫 session 模型 |
+| `ARS_MODEL_TIERING=economy\|quality-boost` | 保留 judgment/execution 分類；僅在 Codex 支援逐次 dispatch 指定模型時套用，否則維持當前模型 |
+| 受保護 agent 的 `tools:` allowlist | 保留為最小權限角色邊界；被委派的 owner 不取得 Bash 或網路 transport |
+| Canonical cross-model handoff envelope | Dispatcher 驗證 envelope、取得同意後只傳送 payload，並依封閉的結果路由 contract 執行 |
+| Run ledger 與交接檢查 | 有 passport 檔案時，pipeline prompt 指示呼叫端在本機記錄使用者原話、步驟回條與檔案雜湊；確定性報告檢查壓縮、續跑及子 agent 回傳後的交接，不構成新的授權 |
+| 確定性縮寫檢查 | 呼叫端在本機檢查已儲存的草稿與摘要，明示不完整覆蓋；審查附件僅供參考，不作為決定、修訂路線圖或再審標準的依據 |
+| 指令與資料邊界及路由 | Workflow intake、dispatch 與工具讀取的第三方文字均視為資料；明確請求即使缺少輸入仍留在所選模式，Claude 啟動 hooks 維持不啟用 |
+| 中文 APA 7 引用檢查 | 保留作者縮寫例外與參考文獻作者欄，須有筆畫排序顛倒的證據才建議重排，並區分可見語法錯誤與未驗證的來源主張 |
+| 用途受限的 Codex citation transport | 僅在明確設定、要求並取得同意後，用於窄範圍 citation-integrity 檢查 |
+| 證據綁定的 review／revision | 保留持久 evidence row、已確認 criteria、非排序 roadmap、author adjudication 與 revision-evidence bundle |
+| Socratic 研究問題作者權 | 未收斂不會觸發系統代擬候選研究問題；必須由使用者明確要求才能離開 non-generation 模式 |
+| 類別式審稿判斷與 panel provenance | Live package 維持 `NOT_CALIBRATED`；不虛構數值分數、權重、總分、排名或二元 independence 宣稱 |
+| Review criteria 與 human-subjects authority | Venue／criteria 與 ethics／data-protection authority 必須由使用者確認；Codex 不推論或模擬核准 |
+| 選用 PDF 內容分類器 | sandbox classifier 是 opt-in advisory，不能覆蓋結構性 PDF preflight 結果 |
+| Cross-model Reviewer 2 與 re-review judge | 僅在 provider 已設定且取得內容傳輸同意時啟用；保留固定席次、Judge Record、單一模型家族與 fallback 揭露 |
+| 快取過期 advisory 與即時重驗 | 預設使用本地快取；過期列僅為 advisory，`ARS_CACHE_REVALIDATE=1` 才啟用即時書目重驗 |
+| 風險分層主張、範圍與新穎性檢查 | 保留高影響主張優先抽樣，以及不阻擋 gate 的 scope 與 search-bounded novelty advisory |
+| 本機 PDF 讀取完整性 preflight | 結構性 pypdf preflight 與 sidecar contract 維持預設；parser 無法使用或修復警告會明確保留為 `UNAVAILABLE` advisory，上述 v3.20 classifier 仍僅為 opt-in |
+| 人工閱讀範圍聲明 | 每個新標記都必須提供使用者擁有的 `read_scope`；舊紀錄缺少 scope 時仍為 unknown，部分覆蓋不會被視為全文閱讀 |
+| Claim coverage 與有界評估基礎設施 | 精確的 registered-claim coverage、drift disposition、claim-standing 工具與盲化 ideation assignment 保留 provenance 與未測量邊界，不證明語意完整性或正確性 |
+| 修訂主張漂移防護 | v3.20 非排序 roadmap 與 author-adjudication contract，搭配主張強度階梯、revision-evidence bundle、deterministic token-conservation checker 及 held-out 測量集 |
+| Panel／degradation／pipeline-boundary 可執行檢查 | 與 hermetic 測試一併內嵌，並由選用的 full-runtime manifest 公開 |
+| SessionStart 和 SubagentStop hooks（含更新提醒） | 僅為可追溯性而保留；Codex 不安裝或執行 Claude hooks |
+| Plugin marketplace 更新 | 執行 `codex plugin marketplace upgrade ars-codex` 後重新加入 `ars-codex@ars-codex`；直接安裝的 skill 仍以重新安裝或 pull 更新 |
+| Claude Code Agent Team | 原生 Codex 子 agent 依工作自適應安排；另設的固定 topology 仍須選用 |
+| 上游文件中的跨模型 provider 分派 | 預設停用；只有在明確設定 provider 並取得使用者同意時才可使用 |
+
+### 選用的外部跨模型審查者 API
+
+用於審查者校準或跨模型魔鬼代言人檢查時，請依
+`ars/shared/cross_model_verification.md` 設定其中一組 provider，例如：
+
+```bash
+export OPENAI_API_KEY="<your-openai-api-key>"
+export ARS_CROSS_MODEL="gpt-6-astra"
+```
+
+`gpt-6-astra` 在兩種驗證 transport 仍為 provisional。GPT session 使用 GPT
+驗證者屬同家族的另一個執行個體，不代表跨家族驗證；provider、內容與費用
+同意仍然適用。
+
+然後在提示中明確要求跨模型驗證。若未設定 provider 或未取得要送出內容類別的
+明確同意，ARS-Codex 將回退至單一執行時期審查，並應報告跨模型驗證不可用。
+
+## 支持與贊助
+
+如果 ARS-Codex 對您的研究 workflow 有所幫助，您可以透過
+[Buy Me a Coffee](https://buymeacoffee.com/crucify020v) 支持後續維護。
+
+## 安全性
+
+請勿為安全漏洞開設公開 issue。請遵循
+[`SECURITY.md`](SECURITY.md) 進行私密回報，
+並參閱[發布就緒與安全報告](security_best_practices_report.md)了解最新的本地驗證摘要。
+
+### 進階使用的檔案佈局
+
+入口點為：
+
+```text
+skills/academic-research-suite/SKILL.md
+```
+
+Workflow 內容位於：
+
+```text
+skills/academic-research-suite/ars/<workflow>/
+```
+
+共享的 schema、合規規則與跨 workflow 契約位於：
+
+```text
+skills/academic-research-suite/ars/shared/
+```
+
+在除錯或更新套件時，請保留這些路徑。許多 ARS workflow 檔案會交叉引用
+`shared/`、`scripts/`、`examples/` 及其他 workflow 目錄。
+
+## 更新政策
+
+更新會將精選的上游 ARS 內容同步至 `skills/academic-research-suite/ars/`。
+請勿盲目鏡像 Claude Code repo；應排除 Claude/plugin 載入器檔案，
+例如 `.claude/`、`.claude-plugin/`、原始 `.gitignore`，以及 Codex
+中不需要的僅符號連結別名目錄。可保留巢狀的上游 `.github/` workflow
+作為非活躍 traceability 與自測 fixture。
+
+### 非活躍的上游腳本
+
+部分上游維護腳本已內嵌但在本 Codex 套件中刻意保持非活躍狀態，
+因為它們需要非內嵌的 Claude Code 輸入，例如 `.claude/CLAUDE.md`。
+在將任何上游腳本接入 Codex CI 之前，請參閱
+`skills/academic-research-suite/manifest.json` 中的 `inactive_upstream_scripts`。
+
+## 貢獻者與致謝
+
+**Cheng-I Wu** — ARS 套件及本 Codex 發行版本的維護者。
+
+**Codex** — 在維護者指導下，協助 Codex adapter 封裝、router-policy 強化、
+測試修復與發布就緒審查。
+
+內嵌的上游 ARS 貢獻者名單見於
+[`skills/academic-research-suite/ars/README.md`](skills/academic-research-suite/ars/README.md#contributors)。

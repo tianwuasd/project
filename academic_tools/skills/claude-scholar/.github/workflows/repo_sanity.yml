@@ -1,0 +1,65 @@
+name: repo-sanity
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - codex
+      - opencode
+
+jobs:
+  repo-sanity:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check tracked top-level docs for obvious machine-specific paths
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True).splitlines()
+          allowed = {
+              'README.md', 'README.zh-CN.md', 'README.ja-JP.md',
+              'CLAUDE.md', 'CLAUDE.zh-CN.md', 'CLAUDE.ja-JP.md',
+              'AGENTS.md',
+              'MCP_SETUP.md', 'MCP_SETUP.zh-CN.md', 'MCP_SETUP.ja-JP.md',
+              'OBSIDIAN_SETUP.md', 'OBSIDIAN_SETUP.zh-CN.md', 'OBSIDIAN_SETUP.ja-JP.md',
+              'settings.json.template',
+              '.github/PULL_REQUEST_TEMPLATE.md',
+              '.github/ISSUE_TEMPLATE/bug_report.yml',
+              '.github/ISSUE_TEMPLATE/workflow_gap.yml',
+              '.github/ISSUE_TEMPLATE/docs_problem.yml',
+              '.github/ISSUE_TEMPLATE/config.yml',
+          }
+          pattern = re.compile(r'/Users/[A-Za-z0-9_.-]+|/home/[A-Za-z0-9_.-]+|[A-Za-z]:\\Users\\[A-Za-z0-9_. -]+')
+          bad = []
+          for rel in tracked:
+              if rel not in allowed:
+                  continue
+              try:
+                  text = Path(rel).read_text(encoding='utf-8')
+              except Exception:
+                  continue
+              if pattern.search(text):
+                  bad.append(rel)
+          if bad:
+              print('Found machine-specific paths in:')
+              for rel in bad:
+                  print(rel)
+              sys.exit(1)
+          PY
+
+      - name: Check tracked junk files
+        run: |
+          set -euo pipefail
+          if git ls-files | rg '(^|/)(\.DS_Store|Thumbs\.db|desktop\.ini)$'; then
+            echo "Tracked junk files detected."
+            exit 1
+          fi

@@ -1,0 +1,60 @@
+name: Workflow gap
+description: Report a missing, weak, or awkward handoff in a research workflow, even if nothing is technically broken.
+title: "[Workflow gap]: "
+labels:
+  - workflow
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template when Claude Scholar technically works, but the workflow is still incomplete.
+
+        Examples:
+        - the workflow stops too early,
+        - a handoff between stages is weak,
+        - the current output is not enough for real research use,
+        - or an expected research step is missing.
+
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Workflow stage
+      options:
+        - Ideation
+        - Literature review
+        - Zotero / paper intake
+        - Obsidian / project memory
+        - Experiment tracking
+        - Results analysis
+        - Publication artifacts (figures / tables)
+        - Results reporting
+        - Paper writing
+        - Rebuttal / review response
+        - Post-acceptance
+        - Cross-stage handoff
+    validations:
+      required: true
+
+  - type: textarea
+    id: gap
+    attributes:
+      label: Current gap
+      description: What is missing, awkward, or incomplete in the current workflow?
+    validations:
+      required: true
+
+  - type: textarea
+    id: desired_outcome
+    attributes:
+      label: Desired outcome
+      description: What should Claude Scholar help you produce, decide, or hand off here?
+    validations:
+      required: true
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Concrete example
+      description: Provide a representative prompt, artifact path, or research situation.
+    validations:
+      required: true

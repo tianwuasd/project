@@ -1,0 +1,174 @@
+# 研究者 Workflow Checklist
+
+英文版：[researcher-workflow-checklist.md](researcher-workflow-checklist.md)。
+`SKILL.md` 與 `research-hub` CLI runtime 的分工，請搭配
+[runtime-contract.zh-TW.md](runtime-contract.zh-TW.md) 閱讀。
+
+很多研究者的 setup 是：論文放 Zotero、筆記寫在 Obsidian、NotebookLM
+產出 source-grounded 摘要、稿子寫在 Word / LaTeX / Markdown。這份
+checklist 對應這個 setup。
+
+每個既有階段的 AI-for-science 輸入、輸出、品質證據與研究者決策，見
+[科學研究生命週期與品質關卡](scientific-lifecycle.zh-TW.md)。
+
+## 工具速查
+
+確認你現在用的：
+
+- [ ] Zotero：references、PDF、tag、collection。
+- [ ] Obsidian：Markdown 筆記、project memory、cluster dashboard。
+- [ ] NotebookLM：source-grounded 摘要、audio、mind map、Q&A。
+- [ ] Word / LaTeX / Markdown：論文草稿。
+- [ ] Claude / Codex / Antigravity：AI 輔助研究工作。
+
+然後對照下面安裝對應的 skill。
+
+## Zotero + Obsidian
+
+安裝：
+
+```bash
+claude plugin marketplace add WenyuChiou/ai-research-skills
+claude plugin install research-workspace@ai-research-skills
+pip install research-hub-pipeline
+research-hub setup --persona researcher
+research-hub doctor
+research-hub auto "agent-based modeling" --max-papers 3 --no-nlm
+```
+
+用這些 skill：
+
+- [research-hub](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub/SKILL.md)：找論文、ingest metadata、寫 Obsidian 筆記、維護 cluster。
+- [literature-triage-matrix](https://github.com/WenyuChiou/research-hub/blob/master/skills/literature-triage-matrix/SKILL.md)：依 method、data、claim、limitation、relevance 比較論文。
+- [research-context-compressor](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-context-compressor/SKILL.md)：產 `.research/` manifest，AI session 不必重掃整個 project。
+- [research-project-orienter](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-project-orienter/SKILL.md)：讀 `.research/` manifest，快速產 orientation memo。
+
+需要時加：
+
+```bash
+claude plugin install zotero-skills@ai-research-skills
+```
+
+- [zotero-skills](https://github.com/WenyuChiou/zotero-skills/blob/master/skills/zotero-skills/SKILL.md)：深度 Zotero CRUD、batch cleanup、tag、collection、item edit、PDF attachment。
+
+## Obsidian + NotebookLM
+
+安裝：
+
+```bash
+claude plugin marketplace add WenyuChiou/ai-research-skills
+claude plugin install research-workspace@ai-research-skills
+pip install "research-hub-pipeline[playwright]"
+research-hub setup        # 互動時選 analyst persona（無 Zotero）
+research-hub notebooklm login --auto-detect
+```
+
+用這些 skill：
+
+- [research-hub](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub/SKILL.md)：把本機 PDF / DOCX / Markdown / TXT / URL 匯入 Obsidian-backed workspace。
+- [notebooklm-brief-verifier](https://github.com/WenyuChiou/research-hub/blob/master/skills/notebooklm-brief-verifier/SKILL.md)：對照 source bundle 驗證下載的 NotebookLM brief。
+- [literature-triage-matrix](https://github.com/WenyuChiou/research-hub/blob/master/skills/literature-triage-matrix/SKILL.md)：把筆記跟 brief 轉成比較表。
+
+典型 workflow：
+
+```text
+本機檔案 -> research-hub import-folder -> Obsidian 筆記
+Obsidian cluster -> NotebookLM bundle/upload/generate/download
+下載的 brief -> notebooklm-brief-verifier
+verified sources -> literature-triage-matrix
+```
+
+## Zotero + NotebookLM
+
+安裝：
+
+```bash
+claude plugin marketplace add WenyuChiou/ai-research-skills
+claude plugin install research-workspace@ai-research-skills
+pip install "research-hub-pipeline[playwright]"
+research-hub setup        # researcher persona
+research-hub notebooklm login --auto-detect
+```
+
+用這些 skill：
+
+- [research-hub](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub/SKILL.md)：從 Zotero 選論文、做 source bundle、上傳 NotebookLM、下載輸出。
+- [notebooklm-brief-verifier](https://github.com/WenyuChiou/research-hub/blob/master/skills/notebooklm-brief-verifier/SKILL.md)：抓出漏掉的 source、未根據的 claim、矛盾敘述。
+- [zotero-skills](https://github.com/WenyuChiou/zotero-skills/blob/master/skills/zotero-skills/SKILL.md)：超出 research-hub workflow 的 item-level Zotero 編輯時用。
+
+## 三個都用：Zotero + Obsidian + NotebookLM
+
+先裝 `research-hub`：
+
+```bash
+claude plugin marketplace add WenyuChiou/ai-research-skills
+claude plugin install research-workspace@ai-research-skills
+pip install "research-hub-pipeline[playwright]"
+research-hub setup        # researcher persona
+research-hub notebooklm login --auto-detect
+```
+
+核心 skill：
+
+- [research-hub](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub/SKILL.md)：從搜尋到 ingest 到 organize 到 NotebookLM 的完整迴路。
+- [literature-triage-matrix](https://github.com/WenyuChiou/research-hub/blob/master/skills/literature-triage-matrix/SKILL.md)：文獻比較表。
+- [notebooklm-brief-verifier](https://github.com/WenyuChiou/research-hub/blob/master/skills/notebooklm-brief-verifier/SKILL.md)：NotebookLM 輸出驗證。
+- [research-context-compressor](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-context-compressor/SKILL.md)：project memory 供未來 AI session 用。
+- [research-project-orienter](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-project-orienter/SKILL.md)：快速 project orientation。
+
+典型迴路：
+
+```text
+找論文 -> Zotero collection
+Zotero collection -> Obsidian 論文筆記
+Obsidian cluster -> NotebookLM source bundle
+NotebookLM brief -> verifier
+verified sources -> literature matrix
+literature matrix -> 論文 claim
+```
+
+## 寫論文中
+
+安裝：
+
+```bash
+claude plugin install academic-writing-skills@ai-research-skills
+```
+
+用這些 skill：
+
+- [paper-memory-builder](https://github.com/WenyuChiou/research-hub/blob/master/skills/paper-memory-builder/SKILL.md)：抽出 `.paper/claims.yml` 與 `.paper/figures.yml`。
+- [academic-writing-skills](https://github.com/WenyuChiou/academic-writing-skills/blob/main/skills/academic-writing-skills/SKILL.md)：建立 extended outline、逐段撰寫與整合、管理 evidence alignment 與文字一致性、跨檔案 revision，並驗證 release readiness。
+- [paper-review](https://github.com/WenyuChiou/academic-writing-skills/blob/main/skills/paper-review/SKILL.md)：執行通用科學審查，只按需載入適用的 method、domain、round 或明確指定 reviewer modules。
+
+建議 manuscript workflow：
+
+```text
+manuscript + figures -> paper-memory-builder
+.paper/claims.yml + .paper/figures.yml -> academic-writing-skills 的 authority sources
+完成里程碑 -> paper-review 自動選 module -> 選定 comments
+選定 comments -> academic-writing-skills 修訂 -> top-to-bottom review -> release checks
+```
+
+## 多 AI assistant
+
+裝其中一個或兩個：
+
+```bash
+claude plugin install codex-delegate@ai-research-skills
+claude plugin install antigravity-delegate@ai-research-skills
+```
+
+用這些 skill：
+
+- [codex-delegate](https://github.com/WenyuChiou/codex-delegate/blob/master/skills/codex-delegate/SKILL.md)：code-heavy、機械性、跨多檔案的 implementation 工作。
+- [antigravity-delegate](https://github.com/WenyuChiou/antigravity-delegate/blob/master/skills/antigravity-delegate/SKILL.md)：在 Claude 監督下處理有邊界、非誠實性關鍵的機械性工作。
+- [research-hub-multi-ai](https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub-multi-ai/SKILL.md)：決定 primary model / Codex / Antigravity 怎麼分擔有邊界的機械性 research-hub 工作。
+
+## 最小建議
+
+- [ ] 大部分研究者：裝 `research-workspace`（含 12 個）+ `academic-writing-skills`。
+- [ ] Zotero 重度使用者：再加 `zotero-skills`。
+- [ ] Coding 重度使用者：再加 `codex-delegate`。
+- [ ] 有邊界的機械性 Antigravity 使用者：再加 `antigravity-delegate`。
+- [ ] NotebookLM 使用者：產出 brief 後一定要先過 `notebooklm-brief-verifier`，再採用。

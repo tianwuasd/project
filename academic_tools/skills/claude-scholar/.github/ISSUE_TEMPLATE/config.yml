@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Claude Scholar setup docs
+    url: https://github.com/Galaxy-Dawn/claude-scholar#quick-start
+    about: Please check the Quick Start section before opening an installation issue.
+  - name: Claude Scholar branch guide
+    url: https://github.com/Galaxy-Dawn/claude-scholar#why-claude-scholar
+    about: Confirm that you are using the correct branch for Claude Code, Codex, or OpenCode.

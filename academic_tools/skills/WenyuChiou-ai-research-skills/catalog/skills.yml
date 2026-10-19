@@ -1,0 +1,753 @@
+version: 4
+updated: "2026-10-03"
+catalog_name: ai-research-skills
+description: Curated AI skills for research workflows, literature management, academic writing, and multi-agent delegation.
+
+extensions:
+  - id: agent-collab-harness
+    type: optional-harness
+    required: false
+    source_repository: https://github.com/WenyuChiou/agent-collab-skills
+    install:
+      - pip install agent-collab-harness==0.4.0
+      - python -m pip install "https://github.com/WenyuChiou/agent-collab-skills/releases/download/v0.4.0/agent_collab_harness-0.4.0-py3-none-any.whl#sha256=991ca9d92ea0efb5a1282a5d616ab84152a7e0ee472af4ed21acb58389ebe22b"  # alternative if this registry route is unavailable
+    capabilities:
+      - policy-validation
+      - policy-evaluation
+      - checkpoint-validation
+      - fail-closed-doctor
+    compatibility: Legacy v3 consumers can run `python scripts/catalog_v3_view.py`; the extension is omitted and all 17 core skills remain unchanged.
+    verification:
+      status: locally-verified
+      evidence: v0.4.0 release artifact SHA-256 verified; actual hub workflow-runtime 22/22 checks pass with isolated 0.4.0 and 0.5.1 wheels. This checks the exercised legacy-v1 seam, not v2 migration or live-host behavior. Accepted source 4aa56e47011b15a416f128b5a1c395baae8d0581 adds declarative task-content evidence review with advisory mtime, not a runtime preset engine or a new wheel.
+    checked_on: "2026-10-02"
+
+families:
+  - id: research-workspace
+    name: Research workspace
+    canonical_repo: https://github.com/WenyuChiou/research-hub
+    default_branch: master
+    install:
+      summary: Install all packaged research-hub skills through the research-hub CLI; `setup` is the recommended onboarding (init + install + persona + optional NotebookLM login in one command).
+      commands:
+        - pip install research-hub-pipeline
+        - research-hub setup --persona researcher  # or: analyst | humanities | internal
+      optional_commands:
+        - pip install "research-hub-pipeline[playwright]"
+        - research-hub notebooklm login
+        - research-hub install --platform claude-code  # bare install if you skipped setup
+    tools:
+      - Zotero
+      - Obsidian
+      - NotebookLM
+    skills:
+      - name: research-hub
+        directory: skills/research-hub
+        repo_url: https://github.com/WenyuChiou/research-hub
+        skill_url: https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub/SKILL.md
+        purpose: Operate research-hub workflows for discovery, ingest, organization, NotebookLM, dashboard, and maintenance.
+        use_when:
+          - Find papers about a topic and organize them.
+          - Ingest local files into an Obsidian vault.
+          - Upload a cluster to NotebookLM and download a brief.
+          - Inspect or maintain a research-hub vault.
+        outputs:
+          - Zotero collections and tags
+          - Obsidian Markdown notes
+          - NotebookLM bundles and briefs
+          - research-hub dashboards
+        verified_on: "2026-04-25"
+        verification_status: pass
+        verification_tier: T1
+        verification_notes: doctor green; search returned 3 real results from CrossRef + DBLP
+        lifecycle_status: active
+        workflow_stages: [discover, synthesize, cross-cutting]
+        runtime_mode: hybrid
+        mutation_class: mixed
+        human_gates: [external_write, release_authorization]
+        integrations: [research-hub, mcp, cli, zotero, obsidian, notebooklm]
+      - name: research-hub-multi-ai
+        directory: skills/research-hub-multi-ai
+        repo_url: https://github.com/WenyuChiou/research-hub
+        skill_url: https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub-multi-ai/SKILL.md
+        purpose: Router that writes `.coord/multi_ai_plan.md` when a single round will need >=2 delegates (codex-delegate + antigravity-delegate, multiple parallel codex or agy sessions, or mixed handoffs). The router decides task splitting, dependency ordering, and reconciliation; codex-delegate and antigravity-delegate are the supported leaves for bounded mechanical execution while long-context, CJK, judgment, and review work stays primary.
+        use_when:
+          - One round of work will need two or more delegates (codex-delegate + antigravity-delegate, or multiple parallel codex or agy sessions).
+          - Need a dependency-aware multi-AI plan with shared success criteria.
+          - Reconcile heterogeneous outputs from two or more delegate runs against a single goal.
+        outputs:
+          - .coord/multi_ai_plan.md (YAML schema with plan_id, goal, success_criteria, tasks[], reconciliation)
+          - Heterogeneous per-task result files at the path each task declares
+        verified_on: "2026-05-09"
+        verification_status: pass
+        verification_tier: T1
+        verification_notes: |
+          T1 retained. Repositioned as router in router/leaves architecture
+          via upstream PR https://github.com/WenyuChiou/research-hub/pull/30:
+          tightened trigger to >=2 delegate same round (no longer competes
+          with codex-delegate / antigravity-delegate on bounded mechanical
+          work; long-context, CJK, judgment, and review stay primary);
+          added `.coord/multi_ai_plan.md` schema and template
+          under references/multi_ai_plan_template.md; rewrote evals so
+          single-delegate / single-LLM cases expect this skill NOT to
+          fire. Earlier 9-step routing-plan output at
+          test-corpus/ai-agents-social-interaction/.research/multi-ai-routing-decision.md
+          remains a valid pre-router-era artifact.
+          2026-08-30 catalog update records codex-delegate +
+          antigravity-delegate as the supported leaves and heterogeneous
+          per-task results as the reconciliation surface.
+        lifecycle_status: active
+        workflow_stages: [execute, cross-cutting]
+        runtime_mode: instructions
+        mutation_class: local-reversible
+        human_gates: []
+        integrations: [codex-delegate, antigravity-delegate, filesystem]
+      - name: research-context-compressor
+        directory: skills/research-context-compressor
+        repo_url: https://github.com/WenyuChiou/research-hub
+        skill_url: https://github.com/WenyuChiou/research-hub/blob/master/skills/research-context-compressor/SKILL.md
+        purpose: Create .research manifests so future AI sessions avoid repeated repo scans.
+        use_when:
+          - Start AI work in a research repo.
+          - Save project context for future agents.
+          - Reduce repeated token use across sessions.
+        outputs:
+          - .research/project_manifest.yml
+          - .research/experiment_matrix.yml
+          - .research/data_dictionary.yml
+        verified_on: "2026-04-25"
+        verification_status: pass
+        verification_tier: T1
+        verification_notes: |
+          T1 promoted. Output committed to
+          test-corpus/ai-agents-social-interaction/.research/{project_manifest,
+          experiment_matrix,data_dictionary}.yml + run_log.md +
+          open_questions.md. All 3 YAML files parse cleanly. Did not
+          invent research_question; left decisions.md empty (no ADRs);
+          surfaced 4 real open questions including the codex caveat.
+          Plugin v0.3.12 (PR #96) wires the Stage 3a → 3b handoff:
+          the compressor now reads `.research/design_brief.md`
+          frontmatter (`project`, `source`, `gap_verdict`) and section 1
+          (Research question). If frontmatter `source` is set, copies
+          that gap-id into the manifest's `provenance.from_gap` field
+          (registered in `docs/research-workspace-manifest.md`). Pure
+          additive: behaviour unchanged when `design_brief.md` is absent.
+          Plugin v0.3.13 (PR #97) adds an explicit `provenance.from_gap`
+          example block to `## Outputs you must produce` (the wire was
+          registered in the schema doc but the Output example didn't
+          show it). Also adds the absent-state rule (omit the
+          `provenance:` block entirely when there's no upstream; do
+          NOT write `provenance: {}` or `null`).
+        lifecycle_status: active
+        workflow_stages: [orient]
+        runtime_mode: instructions
+        mutation_class: local-reversible
+        human_gates: []
+        integrations: [filesystem]
+      - name: research-project-orienter
+        directory: skills/research-project-orienter
+        repo_url: https://github.com/WenyuChiou/research-hub
+        skill_url: https://github.com/WenyuChiou/research-hub/blob/master/skills/research-project-orienter/SKILL.md
+        purpose: Read .research manifests and produce a concise orientation memo.
+        use_when:
+          - Ask "what is this repo about?"
+          - Resume a research project after context has been compressed.
+        outputs:
+          - Orientation memo in conversation
+        verified_on: "2026-04-25"
+        verification_status: pass
+        verification_tier: T1
+        verification_notes: |
+          T1 promoted. Output committed to
+          test-corpus/ai-agents-social-interaction/.research/orientation_memo.md.
+          Followed the exact memo template in SKILL.md; read 0 source
+          files outside .research/ (per skill's token-saving rule).
+        lifecycle_status: active
+        workflow_stages: [orient]
+        runtime_mode: instructions
+        mutation_class: read-only
+        human_gates: []
+        integrations: [filesystem]
+      - name: research-design-helper
+        directory: skills/research-design-helper
+        repo_url: https://github.com/WenyuChiou/research-hub
+        skill_url: https://github.com/WenyuChiou/research-hub/blob/master/skills/research-design-helper/SKILL.md
+        purpose: Guide a researcher through 5 Socratic segments (research question sharpening, expected mechanism, identifiability check, validation plan, risk register) after an explicit human topic choice, and produce .research/design_brief.md. Does NOT write the model spec or invent the research question - guides the human to articulate them.
+        use_when:
+          - Frame a vague interest into a falsifiable research question.
+          - Sharpen a hypothesis before designing a model.
+          - Walk through study design before coding starts.
+          - Produce a design_brief artifact that compressor / orienter can read.
+        outputs:
+          - .research/design_brief.md
+        verified_on: "2026-04-25"
+        verification_status: pass
+        verification_tier: T1
+        verification_notes: |
+          Historical T1 evidence (2026-04-25). Output committed to
+          test-corpus/ai-agents-social-interaction/.research/design_brief.md.
+          5-segment Socratic dialog completed all sections (no _TODO_
+          left): RQ sharpened with concrete falsification condition
+          (Cliff's δ < 0.5, p > 0.05 in 2 non-poker tasks); 5 risks
+          each with early-warning + mitigation. Skill correctly did not
+          invent the RQ (built on Lin & Hou 2026's claim) and did not
+          propose model architecture (Stage 4 boundary respected).
+          Historical plugin v0.3.12 (PR #96) wired the Stage 2 → 3a handoff:
+          Input #2 reads `.research/topic_dossier.gaps.yml` (from
+          `gap-to-topic`); new Workflow §0 preamble pre-fills segment 1
+          (RQ) from the chosen `gaps[].statement` and segment 5 (risks)
+          from `open_questions[]` + the specific concern hinted by
+          `gaps[].feasibility`. Segments 2–4 (mechanism / identifiability
+          / validation) are never pre-filled — dossier doesn't carry that
+          material. That historical test filtered `gaps[]` to
+          `verdict in {conditional-go, go}` and auto-prefilled a sole
+          eligible candidate; this selection rule is superseded by the
+          explicit-choice contract below. Provenance flows forward via
+          `design_brief.md` frontmatter (`source`, `gap_verdict`). Pure
+          additive: behaviour unchanged when `.gaps.yml` absent. First
+          cross-skill handoff integration test ships at
+          `tests/test_handoff_gap_to_topic_design_helper.py`.
+          Plugin v0.3.13 (PR #97) clarifies the §0 segment-1 pre-fill
+          rule: write `gaps[].statement` verbatim into the design_brief
+          file, NO `_PRE-FILL_`-style annotation in file content (chat
+          message signals pre-fill instead). Plugin v0.3.14 (PR #98)
+          ships `scripts/brief_to_docx.js` so `design_brief.md` can be
+          converted to a Word document for advisor / committee review —
+          not contracted output, optional human-consumption only. Plugin
+          v0.3.15 (PR #99) ships the multi-eligible fixture exercising
+          the §0 "2+ candidates → ask the user" branch + the optional
+          `placeholder_segments: []` frontmatter field so dogfood /
+          test-fit content can be machine-flagged for downstream tools.
+          Current accepted source contract (plugin 0.5.4): require explicit
+          human choice before pre-filling, even one eligible candidate;
+          reuse a clear prior selection without asking again. Preserve a
+          chosen no-go option while surfacing its blocking assessment,
+          rather than silently substituting another direction. Missing
+          dossier/review retains the standalone/legacy dialogue. Optional
+          direction-review handoff preserves candidate_version, complete
+          candidate-content hash, review path and unresolved limitations;
+          changed candidate content/version or source bytes require a
+          recheck before reliance. Preserve human edits and ask before
+          replacing provenance. Record claim/time boundaries, an applicable
+          matched-information comparison, minimum worthwhile gain and the
+          smallest answerable version with nonclaims. No fixed prototype
+          duration establishes feasibility. This source-contract sync does
+          not refresh the historical verification date/tier or establish
+          a research-quality improvement.
+        lifecycle_status: active
+        workflow_stages: [scope, design]
+        runtime_mode: instructions
+        mutation_class: local-reversible
+        human_gates: [scope_commitment]
+        integrations: [filesystem]
+      - name: literature-triage-matrix
+        directory: skills/literature-triage-matrix
+        repo_url: https://github.com/WenyuChiou/research-hub
+        skill_url: https://github.com/WenyuChiou/research-hub/blob/master/skills/literature-triage-matrix/SKILL.md
+        purpose: Compare papers by method, data, claims, limitations, and relevance.
+        use_when:
+          - Compare a Zotero collection, Obsidian cluster, or manual paper list.
+          - Decide which papers are central to a literature review.
+        outputs:
+          - .research/literature_matrix.md
+        verified_on: "2026-04-25"
+        verification_status: pass
+        verification_tier: T1
+        verification_notes: |
+          T1 promoted. Output committed to
+          test-corpus/ai-agents-social-interaction/.research/literature_matrix.md.
+          5 papers x 9 columns matrix from test corpus
+          (test-corpus/ai-agents-social-interaction/papers/). Correctly
+          separated 3 method types (empirical/tooling/conceptual) and 5
+          domains - confirmed by the 3x5 sanity grid in the output.
+        lifecycle_status: active
+        workflow_stages: [discover, synthesize]
+        runtime_mode: hybrid
+        mutation_class: local-reversible
+        human_gates: []
+        integrations: [research-hub, zotero, obsidian, notebooklm]
+      - name: paper-memory-builder
+        directory: skills/paper-memory-builder
+        repo_url: https://github.com/WenyuChiou/research-hub
+        skill_url: https://github.com/WenyuChiou/research-hub/blob/master/skills/paper-memory-builder/SKILL.md
+        purpose: Extract .paper claims and figure memory for manuscript work.
+        use_when:
+          - Prepare a manuscript for academic-writing-skills.
+          - Extract claims, supporting evidence, and figure key numbers.
+        outputs:
+          - .paper/claims.yml
+          - .paper/figures.yml
+        verified_on: "2026-04-25"
+        verification_status: pass
+        verification_tier: T1
+        verification_notes: |
+          T1 promoted. Output committed to test-corpus/ai-agents-social-interaction/.paper/lim-2025/{claims,figures}.yml.
+          5 claims (C1-C5) extracted verbatim from Lim 2025 abstract;
+          C5 marked status:draft (non-significant trend). figures.yml
+          intentionally empty per "don't fabricate" rule, with
+          run_notes documenting the abstract-only scope.
+          Plugin v0.3.16 (PR #100) records two doc improvements
+          surfaced by the 2026-05-23 Stage 7-8 dogfood on the
+          LLM-ABM R2 manuscript: (a) `references/yaml-schemas.md`
+          adds a sentinel-values table for `figures[].file` covering
+          three documented values (`embedded-in-manuscript`,
+          `embedded-in-supporting-information`,
+          `embedded-in-presentation`) so figures with no separable
+          source file have an honest representation rather than a
+          placeholder; (b) SKILL.md Inputs gains a "Scanning the
+          paper repo for evidence artifacts" sub-section listing
+          four typical non-figure artifact types (simulation outputs,
+          analysis scripts, drawio sources, reviewer-response files)
+          with a concrete YAML example mirroring the LLM-ABM
+          chi-squared claim's CSV + script + manuscript-anchor
+          evidence chain. Pure additive doc change; mirrored in
+          skills_data; sentinel additions are documented as
+          limitation rather than permanent solution.
+        lifecycle_status: active
+        workflow_stages: [synthesize, write]
+        runtime_mode: instructions
+        mutation_class: local-reversible
+        human_gates: []
+        integrations: [filesystem]
+      - name: paper-summarize
+        directory: skills/paper-summarize
+        repo_url: https://github.com/WenyuChiou/research-hub
+        skill_url: https://github.com/WenyuChiou/research-hub/blob/master/skills/paper-summarize/SKILL.md
+        purpose: Fill per-paper Key Findings / Methodology / Relevance in both Obsidian markdown and Zotero child notes after `research-hub auto` ingests a cluster.
+        use_when:
+          - "User says: \"summarize the papers in cluster X\" or \"fill the TODO Key Findings\"."
+          - Just ran `research-hub auto` and per-paper notes are still TODO skeletons.
+          - Want Zotero notes and Obsidian markdown to stay in sync per paper.
+        outputs:
+          - Obsidian markdown blocks (`## Key Findings`, `## Methodology`, `## Relevance` per paper)
+          - Zotero child note HTML (one per paper, atomically rolled back if write fails)
+          - Fallback prompt at `<vault>/.research_hub/artifacts/<slug>/summarize-prompt.md` when no LLM CLI on PATH
+        verified_on: "2026-05-09"
+        verification_status: pass
+        verification_tier: T1
+        verification_notes: |
+          T1 promoted. The skill ships with 23 end-to-end tests across
+          three files (`tests/test_v069_summarize.py` 17 cases,
+          `tests/test_v073_parallel_summarize.py` 3 cases,
+          `tests/test_v080_resummarize.py` 3 cases) that stub the LLM CLI
+          but execute real Obsidian markdown writes against fixture vaults
+          and the Zotero rollback invariant. Upstream PR
+          https://github.com/WenyuChiou/research-hub/pull/31 surfaces this
+          coverage in the skill's own ## Verification section so the T1
+          claim is visible to consumers. Real-vault smoke runs remain a
+          manual fallback rather than a primary verification path.
+        lifecycle_status: active
+        workflow_stages: [synthesize]
+        runtime_mode: hybrid
+        mutation_class: external-write
+        human_gates: [external_write]
+        integrations: [research-hub, zotero, obsidian]
+      - name: notebooklm-brief-verifier
+        directory: skills/notebooklm-brief-verifier
+        repo_url: https://github.com/WenyuChiou/research-hub
+        skill_url: https://github.com/WenyuChiou/research-hub/blob/master/skills/notebooklm-brief-verifier/SKILL.md
+        purpose: Verify NotebookLM briefs against uploaded source bundles.
+        use_when:
+          - Check whether a NotebookLM brief missed sources.
+          - Identify unsupported claims or contradictions in a generated brief.
+        outputs:
+          - Verification report in conversation
+          - Follow-up NotebookLM prompts
+        verified_on: "2026-04-25"
+        verification_status: pass
+        verification_tier: T1
+        verification_notes: |
+          T1 verified in BOTH modes (research-hub-managed + Manual fallback).
+          Mode 1 (research-hub-managed, 2026-04-25): full cycle - cluster
+          create, 5-paper ingest, bundle, upload to live NLM, generate,
+          download, verify. Output: test-corpus/ai-agents-social-interaction/.research_hub/brief-verify-20260426T001559Z.md.
+          Caught real failure: NLM produced Kumar-only brief (1/5 sources)
+          despite "Multi-Agent and Embodied AI" title. Direct `notebooklm
+          ask` proved all 5 sources ARE indexed; failure is in NLM's
+          brief-generation step.
+          Mode 2 (Manual fallback, v0.68.2, 2026-04-26): fresh-user setup -
+          brief.txt + sources.md (markdown bullet list) at arbitrary
+          paths, NO research-hub paths read. Output:
+          test-corpus/manual-fallback-fresh-user/brief-verify-manual-fallback.md.
+          Produces IDENTICAL verification output to Mode 1: same 1/5
+          source coverage detected, same 4 missed sources, same 1
+          unsupported claim, same 5 follow-up prompts. Confirms a fresh
+          user who uploads to NotebookLM directly (no research-hub
+          workspace) gets the same verification quality.
+        lifecycle_status: active
+        workflow_stages: [synthesize]
+        runtime_mode: instructions
+        mutation_class: read-only
+        human_gates: []
+        integrations: [notebooklm, filesystem]
+      - name: gap-to-topic
+        directory: skills/gap-to-topic
+        repo_url: https://github.com/WenyuChiou/research-hub
+        skill_url: https://github.com/WenyuChiou/research-hub/blob/master/skills/gap-to-topic/SKILL.md
+        purpose: Turn a research area into a go/no-go decision dossier for candidate thesis or proposal topics, allowing zero or multiple justified options - a 3-gate verdict (gap open? a contribution? feasible?) with the evidence laid out so the researcher can verify it. Hands the final worth-it call and topic choice back to the researcher and advisor.
+        use_when:
+          - Decide whether a research gap is worth pursuing.
+          - Pick a thesis or proposal topic.
+          - Check whether a research idea is already taken.
+          - Vet a research idea before committing to it.
+        outputs:
+          - .research/topic_dossier.md (the 7-section decision memo plus appendices)
+          - .research/topic_dossier.docx (the matching Word deliverable)
+          - A .bib companion (the Gate 1 reference list)
+          - A .gaps.yml companion (structured gaps + open questions)
+          - An optional .direction-review.json companion (supplied records for offline checks; not required for an ordinary dossier)
+        verified_on: "2026-05-21"
+        verification_status: pass
+        verification_tier: T1
+        verification_notes: |
+          Historical T1 evidence: dogfood-verified end-to-end 2026-05-21;
+          a run on the topic
+          "LLM-generated agent profiles in agent-based models" produced a
+          complete five-section topic_dossier.md plus .bib and .gaps.yml
+          companions matching the dossier template. The run surfaced one
+          Gate 1 bug - the .bib instruction relied on `cite`, which
+          resolves only already-ingested Zotero items - fixed upstream in
+          research-hub plugin v0.3.1 (PR #75). SKILL.md and references
+          were also reviewed by the code-reviewer subagent across two
+          rounds when the skill was added. A follow-up workflow audit found
+          §1 named literature-triage-matrix as the default prior-art tool
+          without a step producing its matrix; fixed in plugin v0.3.2
+          (PR #76), and the skill was re-tested end-to-end on the topic
+          "LLM applications in water resources" on the corrected pipeline.
+          The dossier output was then iterated for readability through
+          plugin v0.3.5: reader-first layout (PR #78), scannability tables
+          incl. a Decision scorecard (PR #80), and evidence-strength tags
+          plus an upgrade/kill test from a Codex evaluation (PR #82).
+          Plugin v0.3.6 (PR #86) wired §1 onto the new `search --screen`
+          fit-check BM25 relevance gate, and the skill was re-tested
+          end-to-end on the screened pipeline. Plugin v0.3.7 (PR #87)
+          reworked the dossier to read as a plain summary report — no
+          machine codes, no glyphs, plain verdicts, an in-document index.
+          Plugin v0.3.8 (PR #89) reworked the dossier section-by-section for
+          researcher value — a Likert scorecard, a "what it would
+          contribute" claim and a validation sketch in Gate 2, design /
+          scale / proposal-vs-dissertation feasibility in Gate 3, and a
+          method-note Appendix. Plugin v0.3.9 (PR #92) reflowed the dossier
+          as a 7-section research-grade decision memo (Executive Summary
+          with verdict cards → Definitions → Per-candidate Scorecards →
+          Evidence Base → Gate-by-Gate → Risks & Kill Tests → Next Steps →
+          reproducibility-log Appendix). Plugin v0.3.10 (PR #93) ships
+          `dossier_to_docx.js` inside the skill so `.docx` is a contracted
+          deliverable (was operator-local) — bilingual verdict-cell colour
+          coding (en / zh-TW), en / zh-TW font auto-select, and Markdown
+          separator-row skip so `|---|---|` never leaks as literal "---"
+          cells in Word. Prereq: `npm install -g docx`. Plugin v0.3.11
+          (PR #95) refreshed the `.gaps.yml` schema reference in
+          `references/dossier-template.md` to match what the skill
+          actually emits since v0.3.6 / v0.3.9: top-level `run_type` /
+          `recall` (with full `screen` sub-block) / `pipeline`, per-gap
+          `open_confidence` / `dead_end_evidence` / `borderline_reason` /
+          `verdict` / `verdict_reason`. New `downstream_consumer:
+          research-design-helper` top-level key as forward-compat hook
+          recording the contract reader (Stage 3a wired in v0.3.12).
+          Current accepted source contract (plugin 0.5.4): optional offline
+          `paper direction-check` validates candidate_version and a hash of
+          the complete candidate, plus separate bindings to source bytes,
+          retaining actual material level and recorded publication-version
+          limits. Checks cover
+          data/tool/model/license/cost/premise/validation-path; unknown
+          stays explicit with a bounded next check. Aggregate components
+          only for declared candidate scope, with an explicit sharing basis
+          for shared work and no unit conversion; missing required units,
+          demand or capacity remain unknown. Revisions require rechecking;
+          source provenance and ordinary legacy dossiers remain intact.
+          `human_selection: outside-checker` and `execution_authorized: false`;
+          record validity does not verify semantic support, publication
+          authenticity, scientific feasibility or actual runtime spending.
+          Probe installed CLI capability before use: plugin 0.5.4 does not
+          update an installed Python wheel or establish command availability.
+          This source-contract sync does not refresh the historical T1
+          evidence or establish a research-quality improvement.
+        lifecycle_status: active
+        workflow_stages: [scope, discover]
+        runtime_mode: hybrid
+        mutation_class: local-reversible
+        human_gates: [scope_commitment]
+        integrations: [research-hub, scholarly-apis, filesystem]
+      - name: zotero-library-curator
+        directory: skills/zotero-library-curator
+        repo_url: https://github.com/WenyuChiou/research-hub
+        skill_url: https://github.com/WenyuChiou/research-hub/blob/master/skills/zotero-library-curator/SKILL.md
+        purpose: Audit and curate a Zotero library - find duplicate DOIs, orphan items missing required tags, propose collection rebinds, generate tag hygiene reports, emit preview-only cleanup plans. Defers all CRUD to the standalone zotero-skills skill or research-hub zotero CLI.
+        use_when:
+          - Audit a Zotero library before a literature review.
+          - Find duplicate DOIs or orphan items.
+          - Generate a tag hygiene report.
+          - Propose a Zotero cleanup plan (preview only, no writes).
+        outputs:
+          - Audit report in conversation
+          - Preview-only cleanup plan (handed to zotero-skills for apply)
+        verified_on: "2026-04-25"
+        verification_status: pass
+        verification_tier: T1
+        verification_notes: |
+          T1 promoted. Output committed to
+          test-corpus/ai-agents-social-interaction/.research_hub/zotero-curator-audit-20260425.md.
+          Read-only audit of real vault (我的文獻庫 + 1102 obsidian
+          notes): caught 10 duplicate DOIs (3 shown verbatim with
+          keep/merge advice), 44 case-only near-duplicate tag pairs
+          (e.g. ABM-Methodology vs ABM-methodology), 435 sparse tags
+          (89% of 488), 2 cluster-bloat candidates (>200 items), 1
+          orphan cluster (ai-agents-social-interaction-test residual).
+          Zero writes performed; all findings emitted as preview plans
+          with explicit handoff to zotero-skills / research-hub
+          clusters for any apply step.
+        lifecycle_status: active
+        workflow_stages: [discover, cross-cutting]
+        runtime_mode: hybrid
+        mutation_class: mixed
+        human_gates: [external_write]
+        integrations: [zotero, research-hub]
+      - name: research-workflow-orchestrator
+        directory: skills/research-workflow-orchestrator
+        repo_url: https://github.com/WenyuChiou/research-hub
+        skill_url: https://github.com/WenyuChiou/research-hub/blob/master/skills/research-workflow-orchestrator/SKILL.md
+        purpose: Resumable eight-stage HITL controller for orient, scope, discover, synthesize, design, execute, write, and release workflows.
+        use_when:
+          - Run a research workflow that must preserve state across sessions.
+          - Coordinate stage artifacts and human gates from orientation through release.
+          - Resume or audit an eight-stage HITL research workflow.
+        outputs:
+          - .research/workflow_state.yml
+          - Validated stage artifacts
+        verified_on: "2026-08-30"
+        verification_status: pass
+        verification_tier: T2
+        verification_notes: 86 targeted structural/parity tests plus a deterministic HITL smoke.
+        lifecycle_status: active
+        workflow_stages: [orient, scope, discover, synthesize, design, execute, write, release]
+        runtime_mode: hybrid
+        mutation_class: mixed
+        human_gates: [scope_commitment, external_write, experiment_authorization, semantic_revision, release_authorization]
+        integrations: [research-hub, mcp, cli, zotero, obsidian, notebooklm, github]
+
+  - id: academic-writing
+    name: Academic writing
+    canonical_repo: https://github.com/WenyuChiou/academic-writing-skills
+    default_branch: main
+    install:
+      summary: Install the two-skill academic-writing plugin from the marketplace.
+      commands:
+        - claude plugin install academic-writing-skills@ai-research-skills
+    tools:
+      - Word
+      - LaTeX
+      - Markdown
+      - Obsidian
+    skills:
+      - name: academic-writing-skills
+        directory: skills/academic-writing-skills
+        repo_url: https://github.com/WenyuChiou/academic-writing-skills
+        skill_url: https://github.com/WenyuChiou/academic-writing-skills/blob/main/skills/academic-writing-skills/SKILL.md
+        purpose: Lifecycle-aware outlining, paragraph and section drafting, evidence alignment, prose consistency, cross-artifact revision, and submission release checks.
+        use_when:
+          - Build an extended outline or draft and integrate manuscript paragraphs and sections.
+          - Audit methods, evidence, claims, terminology, repeated wording, stock phrasing, flow, figures, and companion files.
+          - Manage multi-artifact revisions or prepare an exact release candidate.
+          - Apply accepted review comments and rebuild summaries from the stabilized evidence map.
+        outputs:
+          - Revised manuscript prose
+          - Evidence and alignment audit
+          - Managed manuscript state
+          - Release-readiness report
+          - Functional-completeness retrospective
+        verified_on: "2026-08-30"
+        verification_status: pass
+        verification_tier: T1
+        verification_notes: |
+          Version 1.1 passed both skill validators, 11 package-integrity
+          tests, and 10 deterministic audit regressions. Forward tests cover
+          outline-to-paragraph contracts, technical-term preservation,
+          nontechnical repetition, prose-flow diagnostics, theoretical,
+          qualitative, and computational manuscripts, and exact-package
+          release gates without forcing IMRAD or unsupported mechanisms.
+          Source v1.1.6 passed 12 tests.
+        lifecycle_status: active
+        workflow_stages: [write, release]
+        runtime_mode: instructions
+        mutation_class: local-reversible
+        human_gates: [semantic_revision, release_authorization]
+        integrations: [filesystem, zotero, bibtex]
+      - name: paper-review
+        directory: skills/paper-review
+        repo_url: https://github.com/WenyuChiou/academic-writing-skills
+        skill_url: https://github.com/WenyuChiou/academic-writing-skills/blob/main/skills/paper-review/SKILL.md
+        purpose: Cross-disciplinary, evidence-safe scientific review with progressively loaded display-provenance, method, domain, round, and optional reviewer modules.
+        use_when:
+          - Critique an outline, section, manuscript, supplement, or exact submission package without editing it.
+          - Review psychometrics or SEM, AI or LLM, water or CNHS, flood or hydrodynamic, computational, or hybrid studies.
+          - Audit equation symbols, derived display quantities, normalization, aggregation, uncertainty displays, or cross-artifact notation consistency.
+          - Calibrate a developmental, substantive, integration, submission, or explicit R1-R4 review.
+          - Compare a current revision with supplied prior comments or explicitly request an Ethan-style lab review.
+        outputs:
+          - Priority-ranked scientific review memo
+          - Selected-module and review-basis header
+          - Scope, severity, evidence-status, and blocking-stage classifications
+          - Cross-round status when prior evidence is available
+          - Functional-completeness retrospective
+        verified_on: "2026-08-02"
+        verification_status: pass
+        verification_tier: T1
+        verification_notes: |
+          Version 1.1.1 routing tests confirmed hybrid psychometrics-plus-LLM
+          module composition, one-question handling of materially ambiguous
+          study design, neutral water review without Ethan-style activation,
+          explicit-only reviewer composition, round assessment without
+          invented prior comments, derived-display and notation provenance,
+          non-triggering for simple descriptive displays, current-artifact
+          verification of author replies, and evidence-safe treatment of
+          mechanisms and observable formulaic prose.
+
+        lifecycle_status: active
+        workflow_stages: [write, release]
+        runtime_mode: instructions
+        mutation_class: read-only
+        human_gates: []
+        integrations: [filesystem, bibtex]
+
+  - id: zotero-operations
+    name: Zotero operations
+    canonical_repo: https://github.com/WenyuChiou/zotero-skills
+    default_branch: master
+    install:
+      summary: Install the standalone Zotero plugin when you need deep library operations; portable hosts use the inner skills/zotero-skills directory.
+      commands:
+        - claude plugin install zotero-skills@ai-research-skills
+    tools:
+      - Zotero
+    skills:
+      - name: zotero-skills
+        directory: skills/zotero-skills
+        repo_url: https://github.com/WenyuChiou/zotero-skills
+        skill_url: https://github.com/WenyuChiou/zotero-skills/blob/master/skills/zotero-skills/SKILL.md
+        purpose: Deep Zotero CRUD, collections, tags, item edits, PDF attachments, and library maintenance.
+        use_when:
+          - Add, update, delete, or tag Zotero items.
+          - Batch-clean collections or metadata.
+          - Attach PDFs or notes to Zotero items.
+        outputs:
+          - Updated Zotero items
+          - Updated collections and tags
+        verified_on: "2026-04-25"
+        verification_status: pass
+        verification_tier: T1
+        verification_notes: Zotero local API returned real collection (key GH5CN2ZZ from library 我的文獻庫); add_literature.py and zotero_client.py present.
+        lifecycle_status: active
+        workflow_stages: [discover, synthesize]
+        runtime_mode: hybrid
+        mutation_class: external-write
+        human_gates: [external_write]
+        integrations: [zotero, mcp, api]
+
+  - id: ai-delegation
+    name: AI delegation
+    canonical_repo: https://github.com/WenyuChiou/codex-delegate
+    default_branch: master
+    install:
+      summary: Install one or both delegation skills depending on the external AI CLI you use.
+      commands:
+        - claude plugin install codex-delegate@ai-research-skills
+        - claude plugin install antigravity-delegate@ai-research-skills
+    tools:
+      - Claude
+      - Codex
+      - Antigravity
+    skills:
+      - name: codex-delegate
+        directory: skills/codex-delegate
+        repo_url: https://github.com/WenyuChiou/codex-delegate
+        skill_url: https://github.com/WenyuChiou/codex-delegate/blob/master/skills/codex-delegate/SKILL.md
+        purpose: Minimal synchronous Codex CLI compatibility adapter for bounded mechanical work and existing brief/result/sentinel consumers; the supervisor verifies scope and tests.
+        use_when:
+          - Preserve an existing .ai brief and result.json/sentinel consumer contract.
+          - Need Bash/PowerShell distribution for a synchronous mechanical task.
+          - Prefer native Codex or official codex-plugin-cc when it already meets the workflow; do not add another broker.
+          - Single delegate this round (one Codex session). For two or more delegates same round, route via research-hub-multi-ai instead.
+        outputs:
+          - Codex task brief at .ai/codex_task_<name>.md
+          - Wrapper result.json contract (status / files_changed / summary / risks)
+          - Supervisor review checklist
+        verified_on: "2026-07-03"
+        verification_status: pass
+        verification_tier: T1
+        verification_notes: |
+          2026-10-17 (0.1.3, `73eb7d8`): optional `--effort` / `-Effort`
+          (default from CODEX_DELEGATE_EFFORT) passes
+          `-c model_reasoning_effort=<level>`; with neither the flag nor the
+          env var, Codex's configured effort applies. Upstream CI green (run
+          39013327485, ubuntu+windows x py3.10-3.12) plus one live smoke
+          (`--effort low` reached Codex); T1 status not re-run.
+          2026-10-17 (0.1.2, `8207498`): wrappers pass no `-m` unless
+          `--model` / `-Model` is given, so Codex uses its own configured
+          default; the gpt-5.5 default described below no longer applies.
+          Not re-run live.
+          Re-verified 2026-07-03 (T1 held; model + environment re-run this
+          pass). The gpt-5.4 workaround in the prior pass below is now
+          OBSOLETE: codex-cli is 0.137.0, ~/.codex/config.toml sets
+          model = "gpt-5.5", and the shipped run_codex.sh / run_codex.ps1
+          default MODEL to gpt-5.5. Executed smoke test
+          `codex exec --sandbox read-only -m gpt-5.5` returned the model
+          reply with exit 0 — default gpt-5.5 no longer aborts. Wrapper
+          result.json / .fallback_claude / stdin-close logic re-confirmed by
+          code inspection; live quota-fallback + multi-agent coordination
+          carried from the 2026-05-09 pass, NOT re-executed this round.
+          (Observed but unrelated: codex logged a Linear-MCP OAuth
+          invalid_token warning; non-blocking, did not affect the model run.)
+
+          Prior pass (2026-05-09, T1 promoted): T1 promoted. The earlier T2
+          caveat (codex-cli 0.121.0 default model gpt-5.5 aborting) is now
+          resolved at the skill itself via upstream PR
+          https://github.com/WenyuChiou/codex-delegate/pull/1: new ## Model
+          Selection section documents the -m gpt-5.4 workaround and
+          ~/.codex/config.toml override; new ## Non-Interactive Shell Note
+          documents the < /dev/null requirement; new ## Quota Fallback
+          formalizes the .fallback_claude sentinel mechanism; new ## Multi-
+          Agent Coordination clarifies the leaf role; new ## Five Workflow
+          Patterns + references/patterns.md document context file / parallel /
+          resume / structured output / review mode. The shipped wrappers
+          already default to gpt-5.4.
+        lifecycle_status: active
+        workflow_stages: [execute, cross-cutting]
+        runtime_mode: cli
+        mutation_class: local-reversible
+        human_gates: [release_authorization]
+        integrations: [codex-cli, git, filesystem]
+      - name: antigravity-delegate
+        directory: skills/antigravity-delegate
+        repo_url: https://github.com/WenyuChiou/antigravity-delegate
+        skill_url: https://github.com/WenyuChiou/antigravity-delegate/blob/master/skills/antigravity-delegate/SKILL.md
+        purpose: Leaf delegate restricted to bounded non-honesty-critical mechanical work. Claude supervises; agy CLI executes.
+        use_when:
+          - Apply bounded mechanical edits with a clear local workspace scope.
+          - Run non-honesty-critical shell-wrapper or fixture maintenance.
+          - Single delegate this round (one agy session). For two or more delegates same round, route via research-hub-multi-ai instead.
+        outputs:
+          - Scoped workspace edits
+          - .ai/agy_result_*.md
+        verified_on: "2026-08-30"
+        verification_status: pass
+        verification_tier: T2
+        verification_notes: |
+          2026-10-17 (0.1.2, `6dbe89d`): optional `--model <id>` passed
+          through as `agy --model`; without it agy's own default applies.
+          Upstream shell suite 33/33 plus one live smoke on agy 1.4.0 with
+          `--model` and the verify flags; T2 status unchanged.
+          2026-08-30 pass: upstream 5/5 reliability gate plus local 17/17 shell wrapper regressions; the cited mc12 audit corpus is maintained outside this repository, so this catalog conservatively records T2 rather than T1.
+        lifecycle_status: active
+        workflow_stages: [execute, cross-cutting]
+        runtime_mode: cli
+        mutation_class: local-reversible
+        human_gates: [release_authorization]
+        integrations: [agy-cli, git, filesystem]
+
+boundaries:
+  research-hub: Zotero, Obsidian, NotebookLM, local research workspace, .research, .paper handoff files.
+  academic-writing-skills: Manuscript writing, reviewer response, journal compliance, claim-evidence audits.
+  zotero-skills: Deep Zotero library operations that are not tied to the research-hub pipeline.
+  delegation-skills: Multi-AI handoff patterns, not research-domain logic.
+  model-repos: Domain-specific simulations, governance, audit traces, and external model coupling contracts.

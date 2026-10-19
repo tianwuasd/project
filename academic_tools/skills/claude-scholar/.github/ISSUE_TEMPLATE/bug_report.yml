@@ -1,0 +1,104 @@
+name: Bug report
+description: Report an installation, runtime, compatibility, or behavior bug in Claude Scholar.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug.
+
+        Please keep this report concrete. The fastest bug reports for Claude Scholar include:
+        - the client and branch,
+        - the exact command or prompt,
+        - the full warning or traceback,
+        - and a short reproduction path.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked the README / setup docs for the branch I am using.
+          required: true
+        - label: I included the exact error text instead of paraphrasing it.
+          required: true
+
+  - type: dropdown
+    id: client
+    attributes:
+      label: Client
+      options:
+        - Claude Code
+        - Codex
+        - OpenCode
+        - Other / unsure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: branch
+    attributes:
+      label: Branch
+      options:
+        - main
+        - codex
+        - opencode
+        - unsure
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include only the details that matter for reproducing the issue.
+      placeholder: |
+        OS: macOS 15.4
+        Shell: zsh
+        Install mode: scripts/setup.sh
+        Client version: Claude Code 2.1.42
+    validations:
+      required: true
+
+  - type: textarea
+    id: exact_action
+    attributes:
+      label: Exact command or exact prompt
+      placeholder: |
+        bash scripts/setup.sh
+
+        or
+
+        Review my Zotero collection on brain foundation models.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: Actual behavior
+      description: Describe what happened, then paste the full error or terminal output below.
+    validations:
+      required: true
+
+  - type: textarea
+    id: error_output
+    attributes:
+      label: Full error / terminal output
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction_steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Clone branch ...
+        2. Run ...
+        3. Start client ...
+        4. Observe ...
+    validations:
+      required: true

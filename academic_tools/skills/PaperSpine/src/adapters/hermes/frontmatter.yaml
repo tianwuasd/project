@@ -1,0 +1,13 @@
+# Hermes CLI frontmatter overlay for the paper-spine skill.
+# sync injects these fields ahead of the shared SKILL.md body; body is identical to other hosts.
+name: paper-spine
+title: PaperSpine — Academic Paper & Report Writing
+description: Orchestrate evidence-bound paper work from intake through drafting, audit, and local package preparation without asserting unsupported readiness.
+category: academic-writing
+domain: academic-writing, scientific-manuscripts, latex, peer-review
+triggers:
+  - Orchestrate a journal/conference paper workflow from supplied evidence
+  - Build a paper or report from materials and results
+  - Produce LaTeX/PDF/Word manuscript with citations
+  - Generate highlights, cover letter, or reviewer response
+  - Restore an author's scholarly voice without changing claims or evidence
