@@ -305,6 +305,21 @@ def query(args, profile):
 
     runtime = Path(args.runtime or profile["runtime"]).expanduser().resolve()
     job = Path(args.job_dir).expanduser().resolve() if args.job_dir else latest(runtime)
+    if args.query == "results":
+        from .results import show_results
+
+        if job is None:
+            print("没有任务记录；用 --job-dir 指定历史 workflow 目录，或在面板 o 中选择。")
+            return 0
+        try:
+            while True:
+                show_results(job, args.step)
+                if not args.follow:
+                    return 0
+                time.sleep(3)
+        except KeyboardInterrupt:
+            print("\n退出结果查看，后台任务继续运行。")
+            return 0
     if args.query not in {"gpu", "processes", "history"} and (
         job is None or not (job / "job_state.json").is_file()
     ):

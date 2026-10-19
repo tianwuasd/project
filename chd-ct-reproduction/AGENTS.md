@@ -81,3 +81,7 @@ runtime：`/data5/zhougaowei/zhangruichen_workspace/chd_ct_runtime`。数据、�
 截至 2026-10-18，0.11.1 的 origin 识别修复、缓存选择与 CPU 前置流程规则已发布；skill 源码与安装版已同步。这是当时的软件基线，后续版本以 Git 和源码为准。
 
 当前待办与服务器验证状态集中在 `.codex/maintenance.md`。后续取得证据时更新并注明来源；不因发布成功自动将服务器验证标为完成。
+
+## 历史结果查询约定
+
+面板 `o` 与 `--query results` 共用只读实现。更新后应直接读取原 workflow 的旧版结果，不要求重跑或转换文件；按命名任务选择，原路径可手工输入。结果用中文摘要解释 Dice、有效分母、三折和短测范围，缺失值不得伪装成零或成功；展示可复制的查询命令。结果浏览可发现旧 runtime 的文件，恢复运行仍遵守原资格限制。查询必须无需 ML 依赖、GPU 或写入；保留 `last-job.json` 和所有旧结果字节与时间戳。复用规则同步 `server-engineering/references/result-viewing.md`。

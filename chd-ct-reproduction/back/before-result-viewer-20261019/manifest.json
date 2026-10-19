@@ -1,0 +1,15 @@
+{
+  "commit": "5e2dafe1623585728321108f7d41d122798ae8e7",
+  "files": {
+    ".gitattributes": "163469dba9f600029934a261dfb46433a2c433194a48191e2e8180e6af305450",
+    "AGENTS.md": "752248fb37b7661002ee78bb9542fa9ef3d1c535f0c8a4377be9fabd23d0e935",
+    "README.md": "81633d7f6c197e8ef800ffbbba55e6b58603b1de81978aa0add238b0a4299e32",
+    ".codex/maintenance.md": "a18e6f757cad99717e4d972c686ef5c2820bccbd0ae13d72429ec86ba4120e5b",
+    "docs/server-start.md": "dc65f0946a53f5a75f40bdd8b7f14b0108ec8899e280aa94cb836184dda60524",
+    "pyproject.toml": "f6dc1fc0c6a36d81a238a212607a16a1a931483136d4b38e193c5c90d11088c4",
+    "src/chd_ct/__init__.py": "a049151c92ff4b1d0b1ad098e4099616b101042cbf06362c1b40177789a5af60",
+    "src/chd_ct/server/panel.py": "0668df915670d57104e4dba18745259c9a532b145e162d6a165340dbe584f165",
+    "src/chd_ct/server/inspection.py": "5124b8864772b459616b50c009cfeaaf8cdf3ef8dba1529a2703b436f94f7487",
+    "src/chd_ct/server/launcher.py": "155969a196e05f634fd5c7c6aea618bc2ffab9b7799c5bf2843cc9da9169dc83"
+  }
+}

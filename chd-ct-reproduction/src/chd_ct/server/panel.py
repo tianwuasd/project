@@ -60,6 +60,35 @@ def logs(job):
     )
 
 
+def results_menu(runtime, results):
+    from . import results as viewer
+
+    records = viewer.result_history(runtime, results)
+    print("\n选择项目/任务查看结果（新到旧，旧版本已完成任务也可查看）：")
+    for index, job in enumerate(records, 1):
+        saved = viewer.read(job / "job_state.json")
+        print(f"  {index}. {viewer.title(job)} | {viewer.state(saved.get('status'))}\n     {viewer.text(job)}")
+    print("d 手动输入历史 workflow 目录；0 返回面板。")
+    current = inspection.latest(runtime)
+    default = str(records.index(current) + 1) if current in records else "1" if records else "d"
+    value = ask(f"项目/任务编号 [{default}]：").lower() or default
+    if value == "0":
+        return
+    if value == "d":
+        from pathlib import Path
+
+        entered = ask("历史 workflow 完整目录：").strip().strip("\"'")
+        if not entered:
+            return
+        job = Path(entered).expanduser().resolve()
+    elif value.isdigit() and 1 <= int(value) <= len(records):
+        job = records[int(value) - 1]
+    else:
+        print("请输入列表内的编号，或 d 输入目录。")
+        return
+    viewer.show_results(job)
+
+
 def run(args, profile):
     runtime = personal_path(choose(args.runtime, None, profile["runtime"], "环境与缓存目录", True))
     args.runtime = str(runtime)
@@ -75,7 +104,7 @@ def run(args, profile):
         else:
             print("尚无任务记录。")
         print("s 任务进度  g 显卡状态（1秒刷新）  m 模型 epoch/loss  l 详细日志  p 我的进程")
-        print("h 历史任务与日志  u 更新程序（多镜像）  0/q 退出面板（后台任务继续）")
+        print("o 查看结果（选择项目/任务）  h 历史任务与日志  u 更新程序（多镜像）  0/q 退出面板（后台任务继续）")
         print("x 中断当前任务（保留检查点）" if active else "n 新建并命名任务  r 选择历史任务续跑")
         print("各输入页：b 返回面板，q 退出程序。")
         try:
@@ -100,6 +129,8 @@ def run(args, profile):
                 if selected:
                     jobs.show_status(runtime, selected)
                     logs(selected)
+            elif action == "o":
+                results_menu(runtime, results)
             elif action == "x":
                 if not active:
                     print("没有正在运行的任务。")

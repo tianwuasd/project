@@ -205,7 +205,7 @@ def make_parser():
     )
     parser.add_argument(
         "--query",
-        choices=("status", "gpu", "models", "logs", "processes", "history"),
+        choices=("status", "gpu", "models", "logs", "processes", "history", "results"),
         help="只读查询，不安装环境或启动任务",
     )
     parser.add_argument("--job-dir", help="查询指定历史 workflow 目录；默认最近任务")

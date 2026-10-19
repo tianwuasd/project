@@ -107,3 +107,11 @@ chd-ct-reproduction/
 原论文：[A clinically applicable AI system for diagnosis of congenital heart diseases based on computed tomography images](https://doi.org/10.1016/j.media.2023.102953)。数据集、网络规模、标签、交叉验证与诊断部分的差异见 [论文对应关系](docs/paper-mapping.md)。
 
 本地的 `archive/`、`data/`、`runs/`、影像、缓存、权重都由 Git 忽略。执行结果与未验证范围见 [验证记录](docs/verification.md)。
+
+### 历史结果直接查看（0.14.0）
+
+服务器面板输入 `o`，按名称/编号选择项目任务，即可查看以前已完成任务的中文结果摘要。也可输入 `d` 指定原 workflow 路径。读取原有结果，不要求重跑或迁移；详情见 [结果查询](docs/server-start.md#历史结果查看0140)。
+
+```bash
+python3 start_server.py --query results --job-dir /原来的/任务_workflow
+```
