@@ -47,6 +47,33 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Staged upstream/dependent integration guidance with explicit structural,
   production-boundary, host-loading and research-quality verification limits.
 
+## [1.7.9] - 2026-10-19
+
+### Changed
+
+- Synchronize academic-writing-skills 1.3.20 at accepted source `d438241`.
+  The existing display/SM guide now explains supplementary reader functions,
+  preserves clear references, and distinguishes inference and variation levels.
+- Refresh only that source's immutable commit and plugin-version evidence.
+  Retain all other source identities, researcher verification dates, schemas,
+  and runtime operations. The bounded forward test and targeted over-edit check
+  are not a paired improvement or scientific-quality certification.
+
+## [1.7.8] - 2026-10-19
+
+### Changed
+
+- Synchronize academic-writing-skills 1.3.19 at accepted source `6162cbc`.
+  Include 1.3.18's paragraph-opening outline guidance and 1.3.19's layered
+  explanation, all-section continuity, and inference-preserving controls.
+- Refresh only that source's commit/version/date evidence and bilingual
+  assessment. The single paired prose run met 72/72 criteria in both versions;
+  no improvement or efficiency gain is claimed. Keep the additional first-use
+  correction distinct from first-pass evidence and human-reader validation.
+- Align the catalog version and bilingual glossary labels. Other source pins,
+  researcher verification records, runtime operations and approved images remain
+  unchanged. Source checks are not live host or scientific certification.
+
 ## [1.7.7] - 2026-10-17
 
 ### Changed
@@ -1797,7 +1824,9 @@ Pinning `marketplace.json` plugin `ref` to `v0.1.0` is deferred — see
   matching, default-branch ↔ marketplace `ref` matching.
 - `LICENSE` — MIT.
 
-[Unreleased]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.7...HEAD
+[Unreleased]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.9...HEAD
+[1.7.9]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.8...v1.7.9
+[1.7.8]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.7...v1.7.8
 [1.7.7]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.6...v1.7.7
 [1.7.6]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.5...v1.7.6
 [1.7.5]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.4...v1.7.5

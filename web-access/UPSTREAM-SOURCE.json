@@ -1,0 +1,11 @@
+{
+  "origin": "https://github.com/eze-is/web-access.git",
+  "branch": "main",
+  "commit": "d173a75978ceb2c63fa0b27f7408cd2bf7fe4310",
+  "upstream_tree": "e9fcbe7278a753d7e35fca76d5e9cc63a9e33f8d",
+  "checked_at": "2026-10-20T12:09:11.572613+08:00",
+  "upstream_files": 30,
+  "verification": "All upstream tracked files retain their original Git blob and mode. UPSTREAM-SOURCE.json is local provenance metadata.",
+  "license_note": "Upstream SKILL.md declares MIT; upstream has no standalone LICENSE file.",
+  "local_adapter": "https://github.com/tianwuasd/codex-skill/tree/main/web-access"
+}

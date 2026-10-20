@@ -1,31 +1,31 @@
 {
   "schema_version": 1,
-  "snapshot_date": "2026-10-19",
+  "snapshot_date": "2026-10-20",
   "timezone": "Asia/Shanghai",
-  "generated_at": "2026-10-19T19:08:31.749320+08:00",
+  "generated_at": "2026-10-20T12:06:53.060138+08:00",
   "representation": "Exact upstream Git trees, including executable modes, symlinks, and pinned gitlinks; repository history is not vendored.",
   "summary": {
     "repositories": 13,
-    "updated": 9,
-    "already_current": 4,
-    "files": 20330,
-    "tracked_bytes": 710618348,
+    "updated": 2,
+    "already_current": 11,
+    "files": 20344,
+    "tracked_bytes": 710677819,
     "gitlinks": 5,
     "symlinks": 5
   },
   "repositories": [
     {
       "name": "academic-research-skills",
-      "checked_at": "2026-10-19T19:02:15.470690+08:00",
+      "checked_at": "2026-10-20T12:06:47.631141+08:00",
       "origin": "https://github.com/Imbad0202/academic-research-skills.git",
-      "before": "5debcd2efb686dce0205ba9094b6413dae5f89c0",
+      "before": "cfd081d8f309ec65254d9f9f04c845ee78b1ec1d",
       "branch": "main",
       "after": "cfd081d8f309ec65254d9f9f04c845ee78b1ec1d",
       "remote": "cfd081d8f309ec65254d9f9f04c845ee78b1ec1d",
-      "changed_commits": 87,
+      "changed_commits": 0,
       "commit_date": "2026-10-18T09:25:36+08:00",
       "commit_subject": "fix(pi): compose ARS with structured prompt sections (#985)",
-      "status": "updated",
+      "status": "current",
       "tree": "ec7d835f1c8280ace1c2c8dc5c62ebd972cc1fd4",
       "submodules": [],
       "license_files": [
@@ -49,16 +49,16 @@
     },
     {
       "name": "academic-research-skills-codex",
-      "checked_at": "2026-10-19T19:02:20.476037+08:00",
+      "checked_at": "2026-10-20T12:06:48.247899+08:00",
       "origin": "https://github.com/Imbad0202/academic-research-skills-codex.git",
-      "before": "7600799a41266379ed5e7716eef963a7161277c0",
+      "before": "71528d9349bcdacfbe94111f06d9e2d82215a44d",
       "branch": "main",
       "after": "71528d9349bcdacfbe94111f06d9e2d82215a44d",
       "remote": "71528d9349bcdacfbe94111f06d9e2d82215a44d",
-      "changed_commits": 5,
+      "changed_commits": 0,
       "commit_date": "2026-10-16T17:22:19+08:00",
       "commit_subject": "chore(release): align ARS-Codex with ARS v3.23.1",
-      "status": "updated",
+      "status": "current",
       "tree": "1e646dd60602e22c5f1d3d9f41a3de0ec077325a",
       "submodules": [],
       "license_files": [
@@ -80,7 +80,7 @@
     },
     {
       "name": "AI-Research-SKILLs",
-      "checked_at": "2026-10-19T19:02:25.705098+08:00",
+      "checked_at": "2026-10-20T12:06:48.856888+08:00",
       "origin": "https://github.com/Orchestra-Research/AI-Research-SKILLs.git",
       "before": "773a52944ba4747a18bd4ae9ade53fff041adcbc",
       "branch": "main",
@@ -111,16 +111,16 @@
     },
     {
       "name": "Auto-claude-code-research-in-sleep",
-      "checked_at": "2026-10-19T19:02:28.241780+08:00",
+      "checked_at": "2026-10-20T12:06:49.131927+08:00",
       "origin": "https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git",
-      "before": "94d8093ed21d20a790830318190095b9f5036ce8",
+      "before": "43a5daf6f8a2db7b87b48cb51d45c6ddb3c9a6d3",
       "branch": "main",
       "after": "43a5daf6f8a2db7b87b48cb51d45c6ddb3c9a6d3",
       "remote": "43a5daf6f8a2db7b87b48cb51d45c6ddb3c9a6d3",
-      "changed_commits": 127,
+      "changed_commits": 0,
       "commit_date": "2026-10-19T14:20:47+08:00",
       "commit_subject": "Merge pull request #470 from SiyuanChenToDo/fix/433-codex-invocation-audit",
-      "status": "updated",
+      "status": "current",
       "tree": "635fd52f8013384fa983c27230924a436417d018",
       "submodules": [],
       "license_files": [
@@ -142,16 +142,16 @@
     },
     {
       "name": "auto-empirical",
-      "checked_at": "2026-10-19T19:02:32.881048+08:00",
+      "checked_at": "2026-10-20T12:06:49.573152+08:00",
       "origin": "https://github.com/brycewang-stanford/Auto-Empirical-Research-Skills.git",
-      "before": "517717f5a2bff347bccf1b65654ee7ba8fca243c",
+      "before": "09097ed9533ff9155cc1b64dd16b779d5e323074",
       "branch": "main",
       "after": "09097ed9533ff9155cc1b64dd16b779d5e323074",
       "remote": "09097ed9533ff9155cc1b64dd16b779d5e323074",
-      "changed_commits": 30,
+      "changed_commits": 0,
       "commit_date": "2026-10-19T10:22:13Z",
       "commit_subject": "chore(images): refresh star-history chart",
-      "status": "updated",
+      "status": "current",
       "tree": "80bd36cd927bf5eed3bd0cbc5a929593ec588e32",
       "submodules": [
         {
@@ -181,16 +181,16 @@
     },
     {
       "name": "claude-scholar",
-      "checked_at": "2026-10-19T19:02:37.310180+08:00",
+      "checked_at": "2026-10-20T12:06:50.413705+08:00",
       "origin": "https://github.com/Galaxy-Dawn/claude-scholar.git",
-      "before": "6ed46dac03191c7a734f49ed48b41195012098ff",
+      "before": "d394fb599ed9e6ea2212a9e6daa864345fe97a26",
       "branch": "main",
       "after": "d394fb599ed9e6ea2212a9e6daa864345fe97a26",
       "remote": "d394fb599ed9e6ea2212a9e6daa864345fe97a26",
-      "changed_commits": 13,
+      "changed_commits": 0,
       "commit_date": "2026-10-19T18:08:11+08:00",
       "commit_subject": "Merge pull request #57 from Galaxy-Dawn/docs/ofox-first-sponsor",
-      "status": "updated",
+      "status": "current",
       "tree": "12881baa9d11aa2c79208d7dddf75e8424f8fd4d",
       "submodules": [
         {
@@ -238,7 +238,7 @@
     },
     {
       "name": "codex-claude-academic-skills",
-      "checked_at": "2026-10-19T19:02:40.984136+08:00",
+      "checked_at": "2026-10-20T12:06:50.897290+08:00",
       "origin": "https://github.com/zLanqing/codex-claude-academic-skills.git",
       "before": "7ed6377f0efb6a38951b48ef03b19d996e454b1f",
       "branch": "main",
@@ -268,26 +268,26 @@
     },
     {
       "name": "nature-skills",
-      "checked_at": "2026-10-19T19:02:43.437554+08:00",
+      "checked_at": "2026-10-20T12:06:51.101758+08:00",
       "origin": "https://github.com/Yuan1z0825/nature-skills.git",
-      "before": "205ed18839181b0fe67323c7e42077a0807d8b03",
+      "before": "233ed09957d32d8cf45dd96c495663c5c5d8e447",
       "branch": "main",
-      "after": "233ed09957d32d8cf45dd96c495663c5c5d8e447",
-      "remote": "233ed09957d32d8cf45dd96c495663c5c5d8e447",
-      "changed_commits": 105,
-      "commit_date": "2026-10-19T02:39:23Z",
-      "commit_subject": "chore: update star history",
+      "after": "b0de5a9ec3f8439433c742782f4fbbe582a253d7",
+      "remote": "b0de5a9ec3f8439433c742782f4fbbe582a253d7",
+      "changed_commits": 26,
+      "commit_date": "2026-10-20T10:54:45+08:00",
+      "commit_subject": "Merge pull request #258 from CharlesYXW/harden/format-converter-egress-and-filenames",
       "status": "updated",
-      "tree": "fe78d4e50b92ec5fe73c5a6741b4b99dede7c411",
+      "tree": "d4e3e89a44e9e1c25ac61efbca14a6c61f7e4a5a",
       "submodules": [],
       "license_files": [
         "LICENSE"
       ],
-      "file_count": 861,
-      "tracked_bytes": 45165229,
+      "file_count": 875,
+      "tracked_bytes": 45222838,
       "skill_md_count": 23,
       "modes": {
-        "100644": 832,
+        "100644": 846,
         "100755": 29
       },
       "largest_file": {
@@ -295,11 +295,11 @@
         "bytes": 1794980
       },
       "local_path": "skills/nature-skills",
-      "commit_url": "https://github.com/Yuan1z0825/nature-skills/commit/233ed09957d32d8cf45dd96c495663c5c5d8e447"
+      "commit_url": "https://github.com/Yuan1z0825/nature-skills/commit/b0de5a9ec3f8439433c742782f4fbbe582a253d7"
     },
     {
       "name": "paper-craft-skills",
-      "checked_at": "2026-10-19T19:02:47.627616+08:00",
+      "checked_at": "2026-10-20T12:06:51.431329+08:00",
       "origin": "https://github.com/zsyggg/paper-craft-skills.git",
       "before": "3be47a2a53cc35a411c587bca5231a08de57287a",
       "branch": "main",
@@ -328,16 +328,16 @@
     },
     {
       "name": "PaperSpine",
-      "checked_at": "2026-10-19T19:02:50.038769+08:00",
+      "checked_at": "2026-10-20T12:06:51.620716+08:00",
       "origin": "https://github.com/WUBING2023/PaperSpine.git",
-      "before": "895f4e48f54d30070271f89f1465ad288a6a18cd",
+      "before": "42312b8d9c76ab25990cddfd76e3622276854118",
       "branch": "main",
       "after": "42312b8d9c76ab25990cddfd76e3622276854118",
       "remote": "42312b8d9c76ab25990cddfd76e3622276854118",
-      "changed_commits": 43,
+      "changed_commits": 0,
       "commit_date": "2026-10-14T12:01:29+08:00",
       "commit_subject": "docs: label homepage atlas image as a snapshot",
-      "status": "updated",
+      "status": "current",
       "tree": "980eb6dcd4dcbecd4d6fd2932b2a11f96932b73b",
       "submodules": [],
       "license_files": [
@@ -359,7 +359,7 @@
     },
     {
       "name": "Research-Paper-Writing-Skills",
-      "checked_at": "2026-10-19T19:02:58.623989+08:00",
+      "checked_at": "2026-10-20T12:06:51.933616+08:00",
       "origin": "https://github.com/Master-cai/Research-Paper-Writing-Skills.git",
       "before": "77e7c2c1ba06f7d71844873147665437a03aac1b",
       "branch": "main",
@@ -389,16 +389,16 @@
     },
     {
       "name": "scientific-agent-skills",
-      "checked_at": "2026-10-19T19:03:00.975652+08:00",
+      "checked_at": "2026-10-20T12:06:52.095804+08:00",
       "origin": "https://github.com/K-Dense-AI/scientific-agent-skills.git",
-      "before": "36d8f13a1e754618794bf42f417884940077b4ae",
+      "before": "593377bb048752abb0152deab9fbb1083a6087df",
       "branch": "main",
       "after": "593377bb048752abb0152deab9fbb1083a6087df",
       "remote": "593377bb048752abb0152deab9fbb1083a6087df",
-      "changed_commits": 64,
+      "changed_commits": 0,
       "commit_date": "2026-10-19T09:33:56Z",
       "commit_subject": "chore: update security scan report [skip ci]",
-      "status": "updated",
+      "status": "current",
       "tree": "d4d202beb151c1f1c6c15738be0692d65e0447af",
       "submodules": [],
       "license_files": [
@@ -420,23 +420,23 @@
     },
     {
       "name": "WenyuChiou-ai-research-skills",
-      "checked_at": "2026-10-19T19:03:26.887450+08:00",
+      "checked_at": "2026-10-20T12:06:52.870665+08:00",
       "origin": "https://github.com/WenyuChiou/ai-research-skills.git",
-      "before": "6fd3b23e55a578c57e330e9771b7bd6de7c5d871",
+      "before": "d619da6e921dcd76722f9274cf1d1904199134e2",
       "branch": "main",
-      "after": "d619da6e921dcd76722f9274cf1d1904199134e2",
-      "remote": "d619da6e921dcd76722f9274cf1d1904199134e2",
-      "changed_commits": 36,
-      "commit_date": "2026-10-18T13:09:50-04:00",
-      "commit_subject": "chore(release): Prepare catalog v1.7.7 (#80)",
+      "after": "22ac7e0c91fcc8208bb86b1167a7fe009d397642",
+      "remote": "22ac7e0c91fcc8208bb86b1167a7fe009d397642",
+      "changed_commits": 3,
+      "commit_date": "2026-10-19T13:08:06-04:00",
+      "commit_subject": "chore(marketplace): Sync academic-writing-skills 1.3.20 (#83)",
       "status": "updated",
-      "tree": "465756cd6565d6c4e3683e4620cc97006f85b983",
+      "tree": "aeda2bff0c2d6f25c608563958c841f8a5b31ac2",
       "submodules": [],
       "license_files": [
         "LICENSE"
       ],
       "file_count": 143,
-      "tracked_bytes": 10066888,
+      "tracked_bytes": 10068750,
       "skill_md_count": 0,
       "modes": {
         "100644": 143
@@ -446,7 +446,7 @@
         "bytes": 1648034
       },
       "local_path": "skills/WenyuChiou-ai-research-skills",
-      "commit_url": "https://github.com/WenyuChiou/ai-research-skills/commit/d619da6e921dcd76722f9274cf1d1904199134e2"
+      "commit_url": "https://github.com/WenyuChiou/ai-research-skills/commit/22ac7e0c91fcc8208bb86b1167a7fe009d397642"
     }
   ]
 }
