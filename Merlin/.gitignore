@@ -1,0 +1,26 @@
+# Local environments and caches
+.venv/
+**/.venv/
+**/__pycache__/
+**/*.egg-info/
+.env
+.env.*
+!.env.example
+
+# Model files, datasets and experiment outputs
+/data/
+/outputs/
+/runs/
+checkpoints/
+**/checkpoints/
+**/abct_data/
+**/abct_data_cache/
+**/*.pt
+**/*.pth
+**/*.ckpt
+**/*.safetensors
+**/*.nii
+**/*.nii.gz
+**/*.dcm
+**/*.h5
+**/*.hdf5

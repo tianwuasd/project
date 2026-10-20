@@ -1,0 +1,232 @@
+{
+  "repository": "https://github.com/StanfordMIMI/Merlin",
+  "commit": "e1552df771367aa2589ec7dcfd3151dc91f8ce74",
+  "commit_date": "2026-09-24",
+  "snapshot_date": "2026-10-20",
+  "license": "MIT",
+  "snapshot_directory": "upstream",
+  "file_count": 44,
+  "total_bytes": 3317928,
+  "files": [
+    {
+      "path": ".github/workflows/community.yml",
+      "bytes": 997,
+      "sha256": "b7fcd8071080eb31567c8112dd23cb80a77fb685a55c4270359dbaeb8d2186db"
+    },
+    {
+      "path": ".github/workflows/ruff.yml",
+      "bytes": 204,
+      "sha256": "4924c1e2566342616f36f4db37efcfe1844b0b80e5c3754c888ef0c801474c3c"
+    },
+    {
+      "path": ".gitignore",
+      "bytes": 85,
+      "sha256": "554dd531492662ec89befb620ee4c3a2e6a935f0f8ec271dae6cb5f644e1aed9"
+    },
+    {
+      "path": ".pre-commit-config.yaml",
+      "bytes": 456,
+      "sha256": "8c618277e0c5893c50048227f9c4f0da0dc7d3ac106e2119f0448404bfc24093"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 1073,
+      "sha256": "c198b8659270f5b5c4cc1d29dae71d6a11abbad952d0fd330c86e203669930e7"
+    },
+    {
+      "path": "README.md",
+      "bytes": 4876,
+      "sha256": "3bcd9f4e5794eb547221630e94fb8d2aa8460002509562e0953ca502b1e2e041"
+    },
+    {
+      "path": "community/CONTRIBUTING.md",
+      "bytes": 3166,
+      "sha256": "bc1f693b8fe29e361555e9ab333212f8eeef979107b4e82e6aee911299ac1b76"
+    },
+    {
+      "path": "community/README.md",
+      "bytes": 16730,
+      "sha256": "ad9cf56e76cdeed82fbb42303f016f5d31222377132ddb33979e3fdf2e87a917"
+    },
+    {
+      "path": "community/entries/merlin-cancer-net.yaml",
+      "bytes": 7156,
+      "sha256": "c8f4f1fe62821fd7870d450aa0d3388871f716c183b4da2b7f6b7a1bb43c260a"
+    },
+    {
+      "path": "community/entries/merlin-cancer-super.yaml",
+      "bytes": 7191,
+      "sha256": "1c31e3bb382020c599e5624894c4a3791ba544e56e8d3757175657d7e2f4dcfd"
+    },
+    {
+      "path": "community/entries/merlin-nnunet.yaml",
+      "bytes": 538,
+      "sha256": "e69507164c74853e5550afe76e236600fcf3d3c8b05d83eadc0f2fe9224b7552"
+    },
+    {
+      "path": "community/entries/merlin-plus.yaml",
+      "bytes": 3742,
+      "sha256": "ad9d4b274335e26a16e68959732dc16782d842a60fde3728a72760653ec53032"
+    },
+    {
+      "path": "community/entries/orca-3dct.yaml",
+      "bytes": 1280,
+      "sha256": "40ccf69eaf64422857853ca25be0e0519b86f2d2cb8d205f889269562b9bfe93"
+    },
+    {
+      "path": "community/template.yaml",
+      "bytes": 1914,
+      "sha256": "cd0d9d9fb5ce8ebaebd3373159c4905ec11460876222220a55ecb21056eb243a"
+    },
+    {
+      "path": "community/validate.py",
+      "bytes": 16736,
+      "sha256": "f0f2064d2fd5e1024f0b4a8ca9b80715a2bebf49f7bc5cee27ea3b1529aac8d6"
+    },
+    {
+      "path": "documentation/Merlin_CVPR26CTFM/Dockerfile",
+      "bytes": 1672,
+      "sha256": "a3582fe16973608a2cf7d93081e8dc3d5f52cae154a5e8565529d03df42b1f47"
+    },
+    {
+      "path": "documentation/Merlin_CVPR26CTFM/README.md",
+      "bytes": 4474,
+      "sha256": "a6cb2b2a41e92c4719e9586c2d02f6e67aa465373eafb1ee0b2f52ca083ec41a"
+    },
+    {
+      "path": "documentation/Merlin_CVPR26CTFM/build_docker.sh",
+      "bytes": 293,
+      "sha256": "e779e0f7dd1d85a35e82c8c77c6e2e1c0dc61628a483408f618317dce8112811"
+    },
+    {
+      "path": "documentation/Merlin_CVPR26CTFM/extract_feat_LP.py",
+      "bytes": 2700,
+      "sha256": "30fbee6d4dd43106ffc3fe04988dfed1338a39736ed18a20934f67d871f4e277"
+    },
+    {
+      "path": "documentation/Merlin_CVPR26CTFM/extract_feat_LP.sh",
+      "bytes": 330,
+      "sha256": "d45b1b02a2cde7bc184113730bd70c98ecd9b7de0898bd28fb7c10cab07a3dde"
+    },
+    {
+      "path": "documentation/Merlin_CVPR26CTFM/requirements.txt",
+      "bytes": 231,
+      "sha256": "21b9d722570f603e02f53f854311054e8f0b081395b441a528944b025aa3f19d"
+    },
+    {
+      "path": "documentation/Merlin_CVPR26CTFM/transforms.py",
+      "bytes": 4905,
+      "sha256": "3f4920c34b1c2f04a13d8bc7ad6ea4c725ffc96872d004c56ef89ac3c6ad32b2"
+    },
+    {
+      "path": "documentation/assets/overview.png",
+      "bytes": 2683347,
+      "sha256": "cfe5d7ae814875439b7577732379b078b1280f125100d3498e25af3bbf846929"
+    },
+    {
+      "path": "documentation/demo.py",
+      "bytes": 4617,
+      "sha256": "5394ac9a133e7bea3c5580c860a308a954aa5fce2aa7f9a25a3fce8efd13e5ce"
+    },
+    {
+      "path": "documentation/download.md",
+      "bytes": 7625,
+      "sha256": "4791cc80886f3dccc5cd5bd3d0e0fd3ca42050c08317da3972378547444cab13"
+    },
+    {
+      "path": "documentation/inference.md",
+      "bytes": 3583,
+      "sha256": "1c3b7b431ce5836142e4e133a77b418d55531d897365128bee19219f1f9039c1"
+    },
+    {
+      "path": "documentation/phenotypes.csv",
+      "bytes": 61186,
+      "sha256": "d85c7db81cce0163e5306310ec1eef245dfa30e5331fe81dbdb82ee77220a673"
+    },
+    {
+      "path": "documentation/report_generation.md",
+      "bytes": 2473,
+      "sha256": "47eb9037110fd4da9ac89f8f5ae3b0cc9364a50c5bfee15ff2026a6e6070ded2"
+    },
+    {
+      "path": "documentation/report_generation_demo.py",
+      "bytes": 3048,
+      "sha256": "468300f9cb001256c0b5c11f212b047d7474760e59aa51cd4f456dda06e735cc"
+    },
+    {
+      "path": "merlin/__init__.py",
+      "bytes": 55,
+      "sha256": "ab1074eb3e8947135e594520f9ae43ebf9607eb0caceaa8def76f79d11250cc1"
+    },
+    {
+      "path": "merlin/data/__init__.py",
+      "bytes": 156,
+      "sha256": "d404824ce9ab0476d947e9fbd97718d5c9996252e2d2cc480e497654a0211b0d"
+    },
+    {
+      "path": "merlin/data/dataloaders.py",
+      "bytes": 3560,
+      "sha256": "c4fb6b5e9ecf6ba01f32802998f121ee5237504d053310e64c0093e4553a436a"
+    },
+    {
+      "path": "merlin/data/download_data.py",
+      "bytes": 296,
+      "sha256": "86bb5cbd4e98f90f8e3ced76275c0d3704a870d8c0922d180dd4fff5e0999244"
+    },
+    {
+      "path": "merlin/data/monai_transforms.py",
+      "bytes": 785,
+      "sha256": "43ebe6d2605f476c67d1391829dbc94a1de4b1e7c39e5419fac172c94f5979b8"
+    },
+    {
+      "path": "merlin/models/__init__.py",
+      "bytes": 60,
+      "sha256": "da24cce7fae156fc1803d9698ab088248f0ef7cf8c2834a54838407ec931dc19"
+    },
+    {
+      "path": "merlin/models/build.py",
+      "bytes": 4618,
+      "sha256": "f751475fc71916553701a1c4fc01b9998f308e92cbb57cb8de07360d04763698"
+    },
+    {
+      "path": "merlin/models/i3res.py",
+      "bytes": 6316,
+      "sha256": "65e614f5e804761c5f2c9c0b284dbf11d9a5b328e57de7d67617fe1f2a2059e6"
+    },
+    {
+      "path": "merlin/models/inflate.py",
+      "bytes": 4285,
+      "sha256": "afb9e0b37123bd6b6c938505223cea6ee83d2c850269fcb5d26d8bf7178b2359"
+    },
+    {
+      "path": "merlin/models/load.py",
+      "bytes": 4602,
+      "sha256": "106a7bdf70b5143bcd97148854e3959ff84212aa77cde6f50d3f60fdb353ab07"
+    },
+    {
+      "path": "merlin/models/radiology_report_generation.py",
+      "bytes": 6419,
+      "sha256": "5c32c47b1aca029f79b66a7c1392c9ffa4374955243d69b14f84c36406229171"
+    },
+    {
+      "path": "merlin/utils/__init__.py",
+      "bytes": 89,
+      "sha256": "cc19d7e7d56f8a40995cb233ae989aa8b1569e51ce82b038a8c91452456655b8"
+    },
+    {
+      "path": "merlin/utils/huggingface_download.py",
+      "bytes": 381,
+      "sha256": "4ad2f43eb6b37eb8a3b41cf00d4b1b72fdd8234b171062e3d61b1d8b95d2bedd"
+    },
+    {
+      "path": "pyproject.toml",
+      "bytes": 2025,
+      "sha256": "9851430e020d816924814f91ebc15a296f5be68997cc31015b659b2ccf9ca01b"
+    },
+    {
+      "path": "uv.lock",
+      "bytes": 437653,
+      "sha256": "0fc947d4f3513b75c7e26986433f83bd4ce614d1f95642908b0a038d6af94ee9"
+    }
+  ]
+}
