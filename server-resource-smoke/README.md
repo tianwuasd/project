@@ -39,3 +39,16 @@ python3 chd-ct-reproduction/start_server.py --runtime /本次验收目录/runtim
 最后一条只准备并预览合成日志、指标、配置及权重上传包，不发送文件、不需要 GitHub 登录。核对清单包含三折 best/last 权重，且不含原始影像和缓存。若确实需要发布，再执行程序打印的带实际包路径的 `--upload-package ... --yes-upload` 命令；它使用官方 GitHub CLI 认证。
 
 运行锁、重复步骤拒绝、旧权重字节/时间戳不变和假 GitHub 失败重试由 CT 项目回归覆盖。真实镜像/上传权限与网络需服务器自行验证，不能把预览成功当成发布成功。
+
+## 续跑校验读取验收（需要 CT 0.16.0）
+
+无需安装训练环境、不用 GPU。用服务器系统 Python 在大 project 目录运行：
+
+```bash
+python3 server-resource-smoke/check_resume.py \
+  --work-root /data_nas/zhangruichen/chd_ct_results/resume-read-smoke
+```
+
+创建唯一测试目录和 6 个共 48 MiB 的合成文件，模拟五个步骤共享缓存。实际调用与面板相同的校验器，打印自动选择的线程数、进度和速度，验证 30 次文件引用合并为 6 个文件、只读取 48 MiB，原内容/mtime 不变，以及保持大小/mtime 的内容损坏仍会被拒绝。成功输出 PASS 并保存 acceptance.json。测试不读写真实 CT、模型或任务，只在合成文件中制造损坏并保留目录；无需重跑前面的训练案例。
+
+这是功能验收，短任务可能来不及显示多次刷新。速度会受操作系统缓存影响，不能用它推断正式 NAS 上的加速倍数。实际任务更新并重开面板后，仍通过 `r` 选择原任务，校验自动使用同一优化。

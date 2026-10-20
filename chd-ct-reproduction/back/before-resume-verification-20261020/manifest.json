@@ -1,0 +1,33 @@
+{
+  "base_commit": "5d2328d3460d470ea93847f91768ebb8fc4976a6",
+  "files": [
+    {
+      "path": "src/chd_ct/server/resume.py",
+      "sha256": "b3034f5e62d0df01a7c75a8ad97aa043357669e2058ebe65cd627bcf291702ce"
+    },
+    {
+      "path": "pyproject.toml",
+      "sha256": "f4d5c408f4c07fc3fc2361a6dd5cdcfaa740c5bb0afcea620acb34b40a93770f"
+    },
+    {
+      "path": "src/chd_ct/__init__.py",
+      "sha256": "214cfda25eb403e66b55ba87de3a633f1a8b8ead9f646a5161e27ee4f0436de4"
+    },
+    {
+      "path": "docs/recovery.md",
+      "sha256": "7ca7a8e00f7cba97512470130517c4ec0325d234461e81b4f302213eac3dac81"
+    },
+    {
+      "path": "docs/server-start.md",
+      "sha256": "973c0fd33407f930550f1dd7dda67954a5fd232bddc77adb61da36505aa72681"
+    },
+    {
+      "path": ".codex/maintenance.md",
+      "sha256": "252182edbcc1d6ddfe4f6c04fc009140da286750cbbb15903ab2001f9bc3db49"
+    },
+    {
+      "path": ".gitattributes",
+      "sha256": "80f29e22f296349ada499dc23e890e6a18ec6a85ccd4087a6c7d86328df7b36c"
+    }
+  ]
+}

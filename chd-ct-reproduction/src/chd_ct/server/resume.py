@@ -67,18 +67,9 @@ def snapshot(step):
 
 
 def verify_snapshot(record):
-    for group, roots in (("inputs", "input_roots"), ("outputs", "output_roots")):
-        if roots in record:
-            actual = {}
-            for root in record[roots]:
-                actual.update(tree_hashes(root))
-            if actual != record[group]:
-                raise ValueError("已完成步骤的输入或输出改变（包含新增/缺失文件），不能直接续跑")
-            continue
-        for name, digest in record[group].items():
-            path = Path(name)
-            if not path.is_file() or file_hash(path) != digest:
-                raise ValueError("已完成步骤的输入或输出已改变，不能直接续跑：" + name)
+    from .verification import verify_snapshots
+
+    return verify_snapshots([("当前步骤", record)])
 
 
 def live_commands(plan):
@@ -178,6 +169,18 @@ def build_resume_plan(args, profile, interactive):
     if not names and any(getattr(args, key, None) for key in INPUTS):
         raise ValueError("续跑使用原任务输入；新增输入只能用于 --append-tasks 的新步骤")
     print("校验已完成步骤与输入来源，请等待……", flush=True)
+    from .verification import verify_snapshots
+
+    records = []
+    for step, prior in zip(plan["steps"], state["steps"]):
+        if step["name"] != prior["name"] or step["output"] != prior["output"]:
+            raise ValueError("任务状态和计划步骤不符")
+        if prior["status"] in {"passed", "reused"}:
+            if not prior.get("snapshot") and step["arguments"]["task"] != "environment":
+                raise ValueError("已完成步骤缺少校验记录，保留产物但不能自动重跑：" + step["name"])
+            if prior.get("snapshot"):
+                records.append((step["name"], prior["snapshot"]))
+    verify_snapshots(records)
     prompted = False
     for step, prior in zip(plan["steps"], state["steps"]):
         if step["name"] != prior["name"] or step["output"] != prior["output"]:
@@ -188,10 +191,6 @@ def build_resume_plan(args, profile, interactive):
         if arguments["task"] == "environment" and any(s["name"] == "preprocess" for s in plan["steps"]):
             arguments["device"] = "cpu"
         if prior["status"] in {"passed", "reused"}:
-            if not prior.get("snapshot") and arguments["task"] != "environment":
-                raise ValueError("已完成步骤缺少校验记录，保留产物但不能自动重跑：" + step["name"])
-            if prior.get("snapshot"):
-                verify_snapshot(prior["snapshot"])
             step["reuse"] = prior
             print("保留已完成步骤：" + step["name"], flush=True)
             continue

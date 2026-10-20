@@ -79,3 +79,15 @@
 - server-engineering 源码、安装版、GitHub 六文件同步且格式校验通过；本地源提交 879ec8e，远端整合提交 5dea81418fddf22ba564f5026c1b1a0ee23da271。远端同期有其他 skill 更新，在独立发布工作区合并；原 skills 工作区的 bilibili 未提交修改保持原样（内容已与其远端提交一致），未替用户清理或暂存。
 
 服务器是否更新、真实历史 workflow 追加与 GitHub 认证/大文件传输仍需服务器验证；本地通过不代表服务器已更新。操作见 docs/results-publishing.md。
+
+## 0.16.0 续跑校验读取优化（2026-10-20）
+
+- `r` / `--resume-job` / 追加步骤将所有成功步骤的来源和产物合并校验，同一规范路径只完整读取一次，保留 SHA256、旧快照兼容及新增/缺失文件检查。冲突或变化拒绝恢复；末尾复核集合与状态，不存跨运行哈希缓存。
+- 约 0.2 秒 CPU 采样结合实际 affinity/cgroup、空闲比例、内存和挂载/块设备，自动选择有界读取线程：网络盘上限 4，SSD/内存盘 8，机械块设备 1，未知 2，小于 32 MiB 为 1。启发式配置，不宣称最佳线程数或实际 NAS 性能。
+- 每秒心跳覆盖清单扫描、分块读取、复核与取消等待；显示实际唯一字节量、文件数、速度和读取 ETA，读取结束与校验通过区分。取消等待全部读取线程退出，清理时暂缓重复 SIGINT；网络调用阻塞时不能承诺即刻返回。
+- 训练器、独立训练 CPU 调优、科学配置、步骤结束快照生成均未修改；旧历史结果仍直接可查。
+- 8 个原文件在 `back/before-resume-verification-20261020/` 保存，原始字节 SHA256 已核验；skill 原 2 文件在 `D:/code_project/.runs/skill-before-resume-verification-20261020/`。skill 源码与安装版同步且格式校验通过。
+- 完整 Windows 回归：390 passed / 22 skipped。独立审查发现清理阶段重复 Ctrl+C 可能遗留线程，已修复；修复后相关回归 108 passed，Linux 实际单次/双次 SIGINT 及追加/锁检查 4 passed，受影响 Python 文件 Ruff 通过。未为此重跑真实训练。
+- 大 project 独立新增 `server-resource-smoke/check_resume.py`，Windows 和 Linux 系统 Python 均实际通过：6 个共 48 MiB 文件跨五步引用只读一次，保持大小/mtime 的内容损坏被拒绝，校验时原内容和 mtime 不变。生成唯一目录与 acceptance.json，不用真实 CT 或 GPU。
+
+发布目的地仍为 tianwuasd/project 与 tianwuasd/codex-skill，具体提交以 Git 和交付记录为准。服务器是否更新、历史大任务校验用时和 NAS 吞吐需用户实测，当前未连接 zmic44。
