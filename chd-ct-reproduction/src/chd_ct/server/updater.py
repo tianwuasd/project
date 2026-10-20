@@ -173,10 +173,12 @@ def update(repo, runtime):
             report["upstream_head"] = expected
         except (OSError, ValueError, subprocess.SubprocessError) as error:
             report["upstream_error"] = str(error)
-            print("GitHub 版本查询不可用，将比较可访问镜像；无法保证镜像已同步最新版本。", flush=True)
+            print(
+                "GitHub 版本查询不可用，将采用首个校验通过的线路；无法保证镜像已同步最新版本。",
+                flush=True,
+            )
         selected = before
         reachable = False
-        divergent = False
         for index, url in enumerate(MIRRORS, 1):
             print(f"更新线路 {index}/{len(MIRRORS)}：{url}（最多 45 秒）", flush=True)
             ref = "refs/chd-update/" + uuid4().hex
@@ -200,32 +202,24 @@ def update(repo, runtime):
                     raise ValueError("线路提交与本次 GitHub main 不一致，继续切换")
                 if not ancestor(root, before, head):
                     raise ValueError("线路版本较旧或与本地分支分叉，继续切换")
-                if not ancestor(root, selected, head):
-                    if ancestor(root, head, selected):
-                        attempt["status"] = "older_mirror"
-                        continue
-                    divergent = True
-                    raise ValueError("镜像提交历史互相分叉，无法确定更新版本")
                 selected, reachable = head, True
                 attempt["status"] = "verified"
-                if expected:
-                    break
+                # Equal HEAD is valid too; later routes cannot replace this candidate.
+                break
             except (OSError, ValueError, subprocess.SubprocessError) as error:
                 attempt.update(status="failed", error=str(error))
                 print("此线路未通过：" + str(error), flush=True)
             finally:
                 write_json(report_file, report)
-        if divergent:
-            raise ValueError("可访问镜像历史分叉，未更新代码；请待 GitHub 可用后重试。")
         if not reachable:
             raise ValueError("所有更新线路均未通过；代码未更新。请稍后重试，记录：" + str(report_file))
         report["selected"] = selected
         if selected == before:
-            report["status"] = "current" if expected else "no_newer_mirror"
+            report["status"] = "current" if expected else "mirror_current"
             print(
                 "已是 GitHub 本次查询的版本。"
                 if expected
-                else "可访问镜像没有更新版本；GitHub 最新状态未能确认。"
+                else "当前线路与本地版本一致；GitHub 最新状态未能确认。"
             )
             return False
         if inspect_repository(project) != repo:

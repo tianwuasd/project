@@ -231,8 +231,10 @@ def submit(plan, lock, foreground=False):
     directory = Path(plan["directory"])
     resuming = bool(plan.get("resume_existing"))
     if resuming:
+        from .extension import verify_source
         from .resume import reject_live_commands
 
+        verify_source(plan)
         reject_live_commands(plan)
         attempt = directory / "attempts" / datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         attempt.mkdir(parents=True, exist_ok=False)

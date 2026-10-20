@@ -24,3 +24,18 @@ python3 chd-ct-reproduction/start_server.py --runtime /本次验收目录/runtim
 ```
 
 Ctrl+C 退出日志查看不会停止任务；运行验收脚本时 Ctrl+C 会请求停止它创建的验收流程。CPU 尾部续跑、低内存预算和中断清理由 CT 项目内自动回归测试补充覆盖；此小型验收用于服务器实际软件联通性核验。
+
+## 追加与上传入口验收（需要 CT 0.15.0）
+
+上述小型案例成功后，使用它实际打印的验收目录替换下面路径。先在原 workflow 追加合成诊断测试，再查看包含新增步骤的结果。成功步骤应显示保留，不应重新训练：
+
+```bash
+python3 chd-ct-reproduction/start_server.py --runtime /本次验收目录/runtime \
+  --resume-job --append-tasks diagnosis-demo --device cpu --foreground --non-interactive
+python3 chd-ct-reproduction/start_server.py --runtime /本次验收目录/runtime --query results
+python3 chd-ct-reproduction/start_server.py --runtime /本次验收目录/runtime --upload-job --non-interactive
+```
+
+最后一条只准备并预览合成日志、指标、配置及权重上传包，不发送文件、不需要 GitHub 登录。核对清单包含三折 best/last 权重，且不含原始影像和缓存。若确实需要发布，再执行程序打印的带实际包路径的 `--upload-package ... --yes-upload` 命令；它使用官方 GitHub CLI 认证。
+
+运行锁、重复步骤拒绝、旧权重字节/时间戳不变和假 GitHub 失败重试由 CT 项目回归覆盖。真实镜像/上传权限与网络需服务器自行验证，不能把预览成功当成发布成功。

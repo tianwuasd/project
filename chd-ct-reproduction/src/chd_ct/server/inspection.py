@@ -72,7 +72,7 @@ def history(runtime, results):
 
 def show_history(runtime, results):
     records = history(runtime, results)
-    print("\n历史任务（新到旧；完成任务可查询，中断任务可续跑）：")
+    print("\n历史任务（新到旧；完成任务可查询/追加未执行步骤，中断任务可续跑）：")
     for i, job in enumerate(records, 1):
         print(f"  {i}. {name(job)} | {status(job)}\n     {job}")
     if not records:

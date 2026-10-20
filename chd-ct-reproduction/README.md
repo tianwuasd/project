@@ -115,3 +115,5 @@ chd-ct-reproduction/
 ```bash
 python3 start_server.py --query results --job-dir /原来的/任务_workflow
 ```
+
+0.15.0 支持为已完成 workflow 追加未执行步骤（面板 `r` / `--append-tasks`），成功步骤校验后锁定复用，后续结果仍在面板 `o` 中显示。更新器首条有效线路成功即停止。新增面板 `v` / `--upload-job`，将日志、配置、指标及 best/last 模型权重打包为 GitHub Release 附件；先预览再发布，失败可重试。详见 [追加与上传](docs/results-publishing.md)。

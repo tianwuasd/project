@@ -344,6 +344,11 @@ def show_results(job, step="auto"):
     print("任务目录：" + text(job))
     if current.get("ended_at"):
         print("结束时间：" + text(current["ended_at"]))
+    for receipt in sorted((job / "uploads").glob("*.json")):
+        record = read(receipt)
+        url = record.get("url", "")
+        if isinstance(url, str) and url.startswith("https://github.com/tianwuasd/project/releases/"):
+            print("已上传结果与权重：" + text(url))
     print("读取已有结果，不重新训练或评估；文件哈希未重新校验。")
     if not selected:
         print("未找到可读取的步骤记录；请核对原 workflow 目录。")

@@ -1,5 +1,6 @@
 """Interactive server console: inspect safely, then explicitly start/resume/stop."""
 
+import copy
 import subprocess
 
 from . import inspection, jobs
@@ -18,10 +19,8 @@ def pick_history(runtime, results, resume=False):
         print("请输入列表内的任务编号。")
         return None
     job = records[int(value) - 1]
-    if resume and (
-        inspection.job_active(job) or inspection.load(job / "job_state.json").get("status") == "passed"
-    ):
-        print("此任务正在运行或已全部完成；可以查询，不能重复续跑。")
+    if resume and inspection.job_active(job):
+        print("此任务正在运行；可以查询，不能重复续跑。")
         return None
     return job
 
@@ -105,7 +104,8 @@ def run(args, profile):
             print("尚无任务记录。")
         print("s 任务进度  g 显卡状态（1秒刷新）  m 模型 epoch/loss  l 详细日志  p 我的进程")
         print("o 查看结果（选择项目/任务）  h 历史任务与日志  u 更新程序（多镜像）  0/q 退出面板（后台任务继续）")
-        print("x 中断当前任务（保留检查点）" if active else "n 新建并命名任务  r 选择历史任务续跑")
+        print("v 上传日志、配置、指标和模型权重（GitHub Release）")
+        print("x 中断当前任务（保留检查点）" if active else "n 新建并命名任务  r 历史任务续跑/追加未执行步骤")
         print("各输入页：b 返回面板，q 退出程序。")
         try:
             action = ask("请选择 [s]：").lower() or "s"
@@ -131,6 +131,16 @@ def run(args, profile):
                     logs(selected)
             elif action == "o":
                 results_menu(runtime, results)
+            elif action == "v":
+                from .sharing import run_upload
+
+                selected = pick_history(runtime, results)
+                if selected:
+                    sharing_args = copy.deepcopy(args)
+                    sharing_args.upload_job = str(selected)
+                    sharing_args.upload_package = None
+                    sharing_args.yes_upload = False
+                    run_upload(sharing_args, profile, True)
             elif action == "x":
                 if not active:
                     print("没有正在运行的任务。")

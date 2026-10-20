@@ -136,6 +136,7 @@ def reject_live_commands(plan):
 
 
 def build_resume_plan(args, profile, interactive):
+    from .extension import append_steps, choose_append, source_stamp, verify_source
     from .jobs import identity, job_owner
 
     if (
@@ -144,7 +145,6 @@ def build_resume_plan(args, profile, interactive):
         or getattr(args, "name", None)
         or getattr(args, "preprocess_cache", None)
         or args.reset_settings
-        or any(getattr(args, k, None) for k in INPUTS)
     ):
         raise ValueError("--resume-job 使用原任务的名称、数据、配置和步骤；不要同时改动名称/输入/步骤")
     if args.resume_job == "latest":
@@ -155,7 +155,10 @@ def build_resume_plan(args, profile, interactive):
         directory = Path(read_json(pointer)["directory"]).resolve()
     else:
         directory = Path(args.resume_job).expanduser().resolve()
+    stamp = source_stamp(directory)
     plan = copy.deepcopy(read_json(directory / "plan.json"))
+    plan["resume_source"] = stamp
+    plan.setdefault("profile", profile)
     if plan.get("schema_version") != 1 or Path(plan["directory"]).resolve() != directory:
         raise ValueError("任务计划版本或路径不符")
     if args.runtime and Path(args.runtime).expanduser().resolve() != Path(plan["runtime"]).resolve():
@@ -169,10 +172,11 @@ def build_resume_plan(args, profile, interactive):
     for name, digest in plan.get("frozen_files", {}).items():
         if not Path(name).is_file() or file_hash(name) != digest:
             raise ValueError("任务配置文件已经改变：" + name)
-    if state["status"] == "passed":
-        raise ValueError("此流程已经完成；如需新实验请新建任务")
     if len(state["steps"]) != len(plan["steps"]):
         raise ValueError("任务状态和计划步骤数量不符")
+    names = choose_append(args, plan, state["status"] == "passed", interactive)
+    if not names and any(getattr(args, key, None) for key in INPUTS):
+        raise ValueError("续跑使用原任务输入；新增输入只能用于 --append-tasks 的新步骤")
     print("校验已完成步骤与输入来源，请等待……", flush=True)
     prompted = False
     for step, prior in zip(plan["steps"], state["steps"]):
@@ -183,9 +187,9 @@ def build_resume_plan(args, profile, interactive):
         arguments = step["arguments"]
         if arguments["task"] == "environment" and any(s["name"] == "preprocess" for s in plan["steps"]):
             arguments["device"] = "cpu"
-        if prior["status"] in {"passed", "reused"} and (
-            prior.get("snapshot") or arguments["task"] == "environment"
-        ):
+        if prior["status"] in {"passed", "reused"}:
+            if not prior.get("snapshot") and arguments["task"] != "environment":
+                raise ValueError("已完成步骤缺少校验记录，保留产物但不能自动重跑：" + step["name"])
             if prior.get("snapshot"):
                 verify_snapshot(prior["snapshot"])
             step["reuse"] = prior
@@ -221,4 +225,6 @@ def build_resume_plan(args, profile, interactive):
         if args.python:
             arguments["python"] = str(Path(args.python).expanduser().resolve())
     plan.update(resume_existing=True, reset_settings=False)
+    plan = append_steps(args, plan, names, interactive)
+    verify_source(plan)
     return plan

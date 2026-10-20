@@ -210,14 +210,14 @@ def test_models_display_actual_gpu_uuid(session, capsys):
     assert "GPU-example" in capsys.readouterr().out
 
 
-def test_completed_history_cannot_resume_and_returns_to_menu(session, monkeypatch):
+def test_completed_history_can_be_selected_for_extension(session, monkeypatch):
     runtime, job, _, profile = session
     save(job / "job_state.json", dict(status="passed", steps=[]))
     answers = iter(["r", "1", "0"])
     monkeypatch.setattr("builtins.input", lambda _: next(answers))
     args = launcher.make_parser().parse_args(["--runtime", str(runtime)])
-    assert panel.run(args, profile) is False
-    assert args.resume_job is None
+    assert panel.run(args, profile) is True
+    assert args.resume_job == str(job)
 
 
 def test_no_model_steps_does_not_invent_model_output(session, capsys):

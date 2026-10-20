@@ -132,7 +132,42 @@ def build_plan(args, profile, interactive):
     directory = results / (datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid4().hex[:8] + "_workflow")
     base = copy.deepcopy(args)
     base.runtime, base.results = str(runtime), str(results)
-    steps, future = [], set()
+    steps, base = resolve_steps(base, profile, interactive, directory, saved, names)
+    for field in ("dataset", "prepared"):
+        value = getattr(base, field, None)
+        if value:
+            path = Path(value).expanduser().resolve()
+            for work in (runtime, results):
+                if path == work or path in work.parents or work in path.parents:
+                    raise ValueError(f"{field} 必须独立于环境和结果目录")
+    return {
+        "schema_version": 1,
+        "name": run_name,
+        "frozen_files": frozen_files(steps),
+        "reset_settings": args.reset_settings,
+        "runtime": str(runtime),
+        "directory": str(directory),
+        "log": str(directory / "launcher.log"),
+        "profile": profile,
+        "steps": steps,
+    }
+
+
+def frozen_files(steps):
+    return {
+        str(Path(s["arguments"][k]).resolve()): file_hash(s["arguments"][k])
+        for s in steps
+        for k in ("config", "split_file", "rules", "evidence")
+        if s["arguments"].get(k) and Path(s["arguments"][k]).is_file()
+    }
+
+
+def resolve_steps(
+    args, profile, interactive, directory, saved, names, *, offset=0, future=None, freeze_links=False
+):
+    """Resolve new steps against explicitly supplied preferences and predecessors."""
+    base = copy.deepcopy(args)
+    steps, future = [], set(future or ())
     prompted_gpu = False
     for i, name in enumerate(names):
         current = copy.deepcopy(base)
@@ -155,7 +190,11 @@ def build_plan(args, profile, interactive):
         if current.task in DIAGNOSIS_TASKS:
             links += [(key, source) for key, _, source in INPUTS[current.task]]
         for field, source in links:
-            if getattr(current, field, None) is None and saved.get(source) in future:
+            if (
+                getattr(current, field, None) is None
+                and saved.get(source)
+                and (freeze_links or saved[source] in future)
+            ):
                 setattr(current, field, saved[source])
         _, _, _, saved = resolve_settings(current, profile, interactive, saved_override=saved)
         if current.task == "preprocess":
@@ -168,7 +207,7 @@ def build_plan(args, profile, interactive):
             if field in task_configuration(current) and getattr(current, field, None):
                 setattr(current, field, str(Path(getattr(current, field)).expanduser().resolve()))
         validate_inputs(current, future)
-        output = directory / "steps" / f"{i + 1:02d}_{name}"
+        output = directory / "steps" / f"{offset + i + 1:02d}_{name}"
         steps.append({"name": name, "output": str(output), "arguments": task_configuration(current)})
         for field in ("dataset", "prepared", "config"):
             if field in steps[-1]["arguments"]:
@@ -190,26 +229,4 @@ def build_plan(args, profile, interactive):
             saved[OUTPUT_KEYS[name]] = produced
         if produced:
             future.add(str(Path(produced).resolve()))
-    for field in ("dataset", "prepared"):
-        value = getattr(base, field, None)
-        if value:
-            path = Path(value).expanduser().resolve()
-            for work in (runtime, results):
-                if path == work or path in work.parents or work in path.parents:
-                    raise ValueError(f"{field} 必须独立于环境和结果目录")
-    return {
-        "schema_version": 1,
-        "name": run_name,
-        "frozen_files": {
-            str(Path(s["arguments"][k]).resolve()): file_hash(s["arguments"][k])
-            for s in steps
-            for k in ("config", "split_file", "rules", "evidence")
-            if s["arguments"].get(k) and Path(s["arguments"][k]).is_file()
-        },
-        "reset_settings": args.reset_settings,
-        "runtime": str(runtime),
-        "directory": str(directory),
-        "log": str(directory / "launcher.log"),
-        "profile": profile,
-        "steps": steps,
-    }
+    return steps, base

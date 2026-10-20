@@ -58,8 +58,11 @@ def repository(tmp_path, monkeypatch):
     return repo, remote, old, new, calls
 
 
-def test_failed_mirror_falls_back_and_backs_up_before_fast_forward(repository, tmp_path):
+def test_failed_mirror_falls_back_and_backs_up_before_fast_forward(repository, tmp_path, monkeypatch):
     repo, remote, old, new, calls = repository
+    monkeypatch.setattr(
+        updater, "MIRRORS", (str(tmp_path / "missing"), str(remote), str(tmp_path / "unneeded"))
+    )
     runtime = tmp_path / "runtime"
     assert updater.update(repo, runtime)
     root = Path(repo["root"])
@@ -69,6 +72,7 @@ def test_failed_mirror_falls_back_and_backs_up_before_fast_forward(repository, t
     report_path = next(runtime.glob("updates/*/update.json"))
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert [x["status"] for x in report["attempts"]] == ["failed", "verified"]
+    assert [c[4] for c in calls if c[0] == "fetch"] == [str(tmp_path / "missing"), str(remote)]
     assert report["after"] == new and report["before"] == old
     with tarfile.open(report["backup"]) as archive:
         assert archive.extractfile("chd-ct-reproduction/code.py").read() == b"old\n"
@@ -125,19 +129,69 @@ def test_all_mirrors_fail_preserves_checkout(repository, tmp_path, monkeypatch):
     assert local_git(Path(repo["root"]), "rev-parse", "HEAD") == old
 
 
-def test_equal_stale_mirror_does_not_prevent_trying_newer_one(repository, tmp_path, monkeypatch):
+@pytest.mark.parametrize("known_upstream", [False, True])
+def test_first_current_mirror_stops_without_checking_later_routes(
+    repository, tmp_path, monkeypatch, capsys, known_upstream
+):
     repo, remote, old, new, calls = repository
-    stale = tmp_path / "stale"
-    local_git(tmp_path, "clone", str(remote), str(stale))
-    local_git(stale, "reset", "--hard", old)
-    monkeypatch.setattr(updater, "MIRRORS", (str(stale), str(remote)))
-    assert updater.update(repo, tmp_path / "runtime")
-    assert local_git(Path(repo["root"]), "rev-parse", "HEAD") == new
-    assert len([c for c in calls if c[0] == "fetch"]) == 2
+    current = tmp_path / "current"
+    local_git(tmp_path, "clone", str(remote), str(current))
+    local_git(current, "reset", "--hard", old)
+    if known_upstream:
+        previous = updater.git
+
+        def known(root, *args, **kwargs):
+            if args[0] == "ls-remote":
+                return subprocess.CompletedProcess(args, 0, old + "\trefs/heads/main\n", "")
+            return previous(root, *args, **kwargs)
+
+        monkeypatch.setattr(updater, "git", known)
+    monkeypatch.setattr(updater, "MIRRORS", (str(current), str(remote)))
+    runtime = tmp_path / "runtime"
+    assert not updater.update(repo, runtime)
+    root = Path(repo["root"])
+    assert local_git(root, "rev-parse", "HEAD") == old != new
+    assert [c[4] for c in calls if c[0] == "fetch"] == [str(current)]
+    assert not any(c[0] == "merge" for c in calls)
+    assert not local_git(root, "for-each-ref", "refs/chd-update")
+    report = json.loads(next(runtime.glob("updates/*/update.json")).read_text(encoding="utf-8"))
+    assert report["status"] == ("current" if known_upstream else "mirror_current")
+    assert report["selected"] == old
+    assert [x["status"] for x in report["attempts"]] == ["verified"]
+    assert "backup" not in report
+    if not known_upstream:
+        assert "当前线路与本地版本一致；GitHub 最新状态未能确认。" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("later_route", ["newer", "diverged", "unreachable"])
+def test_first_valid_mirror_stops_without_comparing_later_routes(
+    repository, tmp_path, monkeypatch, later_route
+):
+    repo, remote, old, new, calls = repository
+    first = tmp_path / "first"
+    local_git(tmp_path, "clone", str(remote), str(first))
+    later = remote
+    if later_route == "unreachable":
+        later = tmp_path / "missing"
+    else:
+        if later_route == "diverged":
+            local_git(remote, "reset", "--hard", old)
+        (remote / "chd-ct-reproduction/code.py").write_text("another update\n")
+        local_git(remote, "commit", "-am", "later route")
+    monkeypatch.setattr(updater, "MIRRORS", (str(first), str(later)))
+    runtime = tmp_path / "runtime"
+    assert updater.update(repo, runtime)
+    root = Path(repo["root"])
+    assert local_git(root, "rev-parse", "HEAD") == new
+    assert [c[4] for c in calls if c[0] == "fetch"] == [str(first)]
+    assert not local_git(root, "for-each-ref", "refs/chd-update")
+    report = json.loads(next(runtime.glob("updates/*/update.json")).read_text(encoding="utf-8"))
+    assert report["selected"] == new
+    assert [x["status"] for x in report["attempts"]] == ["verified"]
 
 
 def test_known_upstream_rejects_stale_mirror(repository, tmp_path, monkeypatch):
-    repo, remote, old, new, _ = repository
+    repo, remote, old, new, calls = repository
     stale = tmp_path / "stale"
     local_git(tmp_path, "clone", str(remote), str(stale))
     local_git(stale, "reset", "--hard", old)
@@ -149,13 +203,72 @@ def test_known_upstream_rejects_stale_mirror(repository, tmp_path, monkeypatch):
         return previous(root, *args, **kwargs)
 
     monkeypatch.setattr(updater, "git", known)
-    monkeypatch.setattr(updater, "MIRRORS", (str(stale), str(remote)))
+    monkeypatch.setattr(updater, "MIRRORS", (str(stale), str(remote), str(tmp_path / "unneeded")))
     assert updater.update(repo, tmp_path / "runtime")
     report = json.loads(
         next((tmp_path / "runtime").glob("updates/*/update.json")).read_text(encoding="utf-8")
     )
-    assert report["attempts"][0]["status"] == "failed"
+    assert [x["status"] for x in report["attempts"]] == ["failed", "verified"]
     assert report["upstream_head"] == new
+    assert [c[4] for c in calls if c[0] == "fetch"] == [str(stale), str(remote)]
+
+
+@pytest.mark.parametrize("invalid_history", ["behind", "diverged"])
+def test_invalid_history_continues_until_a_fast_forward_candidate(
+    repository, tmp_path, monkeypatch, invalid_history
+):
+    repo, remote, old, new, calls = repository
+    root = Path(repo["root"])
+    local_git(root, "fetch", str(remote), "main")
+    local_git(root, "merge", "--ff-only", "FETCH_HEAD")
+    repo = updater.inspect_repository(root / "chd-ct-reproduction")
+    invalid = tmp_path / "invalid"
+    local_git(tmp_path, "clone", str(remote), str(invalid))
+    local_git(invalid, "reset", "--hard", old)
+    if invalid_history == "diverged":
+        local_git(invalid, "config", "user.email", "test@example.invalid")
+        local_git(invalid, "config", "user.name", "Test")
+        (invalid / "chd-ct-reproduction/code.py").write_text("divergent update\n")
+        local_git(invalid, "commit", "-am", "divergent")
+    (remote / "chd-ct-reproduction/code.py").write_text("newest\n")
+    local_git(remote, "commit", "-am", "newest")
+    newest = local_git(remote, "rev-parse", "HEAD")
+    monkeypatch.setattr(updater, "MIRRORS", (str(invalid), str(remote), str(tmp_path / "unneeded")))
+    runtime = tmp_path / "runtime"
+    assert updater.update(repo, runtime)
+    assert local_git(root, "rev-parse", "HEAD") == newest != new
+    assert [c[4] for c in calls if c[0] == "fetch"] == [str(invalid), str(remote)]
+    report = json.loads(next(runtime.glob("updates/*/update.json")).read_text(encoding="utf-8"))
+    assert [x["status"] for x in report["attempts"]] == ["failed", "verified"]
+
+
+@pytest.mark.parametrize("failure", ["timeout", "invalid_ref"])
+def test_failed_candidate_validation_continues_to_next_route(
+    repository, tmp_path, monkeypatch, failure
+):
+    repo, remote, _, new, _ = repository
+    previous = updater.git
+    first = str(tmp_path / "broken")
+    attempted = []
+
+    def broken(root, *args, **kwargs):
+        if args[0] == "fetch":
+            attempted.append(args[4])
+            if args[4] == first:
+                if failure == "timeout":
+                    raise subprocess.TimeoutExpired("git fetch", kwargs["timeout"])
+                # A successful transfer alone is insufficient: its commit ref must resolve.
+                return subprocess.CompletedProcess(args, 0, "", "")
+        return previous(root, *args, **kwargs)
+
+    monkeypatch.setattr(updater, "git", broken)
+    monkeypatch.setattr(updater, "MIRRORS", (first, str(remote), str(tmp_path / "unneeded")))
+    runtime = tmp_path / "runtime"
+    assert updater.update(repo, runtime)
+    assert local_git(Path(repo["root"]), "rev-parse", "HEAD") == new
+    assert attempted == [first, str(remote)]
+    report = json.loads(next(runtime.glob("updates/*/update.json")).read_text(encoding="utf-8"))
+    assert [x["status"] for x in report["attempts"]] == ["failed", "verified"]
 
 
 @pytest.mark.parametrize("change", ["dirty", "untracked", "branch", "origin"])
