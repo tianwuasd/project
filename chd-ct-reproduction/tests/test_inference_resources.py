@@ -73,7 +73,9 @@ def test_test_workers_receive_outer_output_lock(tmp_path, monkeypatch):
     assert len(seen) == 2 and seen[0] == seen[1]
 
 
-def test_interactive_cpu_tail_resume_does_not_query_gpu(tmp_path, monkeypatch):
+@pytest.mark.parametrize("mode", ["full", "simple", "none"])
+@pytest.mark.parametrize("prior_status", ["pending_cpu", "failed"])
+def test_interactive_cpu_tail_resume_does_not_query_gpu(tmp_path, monkeypatch, mode, prior_status):
     from chd_ct.server import inference_phases, resume
     from chd_ct.server.launcher import make_parser
 
@@ -85,11 +87,15 @@ def test_interactive_cpu_tail_resume_does_not_query_gpu(tmp_path, monkeypatch):
         dict(schema_version=1, directory=str(tmp_path), runtime=str(tmp_path / "runtime"), steps=[step]),
     )
     write_json(
-        tmp_path / "job_state.json", dict(status="interrupted", steps=[dict(step, status="pending_cpu")])
+        tmp_path / "job_state.json", dict(status="interrupted", steps=[dict(step, status=prior_status)])
     )
-    monkeypatch.setattr(inference_phases, "gpu_ready", lambda _: True)
+    if prior_status == "failed":
+        (Path(step["output"]) / "predict").mkdir(parents=True)
+        write_json(Path(step["output"]) / "predict/gpu-phase-ready.json", {})
+    monkeypatch.setattr(inference_phases, "gpu_ready", lambda _: pytest.fail("hidden full cache read"))
     monkeypatch.setattr(resume, "show_gpus", lambda: pytest.fail("CPU-only resume queried GPU"))
-    args = make_parser().parse_args(["--resume-job", str(tmp_path)])
+    monkeypatch.setattr("builtins.input", lambda _: "")  # Accept the default simple check.
+    args = make_parser().parse_args(["--resume-job", str(tmp_path), "--resume-check", mode])
     plan = resume.build_resume_plan(args, {}, True)
     assert plan["steps"][0]["arguments"]["resume"]
 

@@ -64,7 +64,9 @@ def finished(tmp_path, monkeypatch):
 
 
 def arguments(job, *extra):
-    return launcher.make_parser().parse_args(["--resume-job", str(job), "--device", "cpu", *extra])
+    return launcher.make_parser().parse_args(
+        ["--resume-job", str(job), "--resume-check", "full", "--device", "cpu", *extra]
+    )
 
 
 def test_append_uses_original_data_and_links_new_outputs(finished):
@@ -81,6 +83,34 @@ def test_append_uses_original_data_and_links_new_outputs(finished):
     assert evaluate["arguments"]["predictions"] == str(Path(predict["output"]) / "predict")
     assert Path(test["output"]).name == "02_test"
     assert before == {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in job.rglob("*") if p.is_file()}
+
+
+def test_simple_append_skips_outputs_that_will_be_produced(finished):
+    job, _, _, profile = finished
+    plan = build_resume_plan(
+        arguments(job, "--resume-check", "simple", "--append-tasks", "test,predict,evaluate"), profile, False
+    )
+    check = plan["resume_verification"]
+    assert check["mode"] == "simple" and check["files"] == 4
+    assert not any("evaluate/predictions" in dep for dep in check["checked_dependencies"])
+    assert plan["steps"][0]["reuse"]
+
+
+def test_append_does_not_replace_frozen_config_digest(finished):
+    from chd_ct.server.resume import file_hash
+
+    job, _, old, profile = finished
+    config = Path(old["steps"][0]["arguments"]["config"])
+    old["frozen_files"] = {str(config): file_hash(config)}
+    save(job / "plan.json", old)
+    config.write_text("seed: 999\n")
+    # A plan-building refresh must not silently trust the changed file.
+    plan = build_resume_plan(
+        arguments(job, "--resume-check", "none", "--append-tasks", "test"), profile, False
+    )
+    assert plan["frozen_files"][str(config)] == old["frozen_files"][str(config)]
+    with pytest.raises(ValueError, match="改变"):
+        build_resume_plan(arguments(job, "--append-tasks", "test"), profile, False)
 
 
 def test_execute_only_new_steps_and_results_include_them(finished, monkeypatch, capsys):

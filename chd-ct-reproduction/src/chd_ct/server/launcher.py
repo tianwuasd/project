@@ -232,9 +232,16 @@ def make_parser():
     parser.add_argument("--foreground", action="store_true", help="前台调试并等待完成；默认独立后台运行")
     parser.add_argument("--status", action="store_true", help="查看最近后台任务，不安装环境或查询GPU")
     parser.add_argument("--resume-job", nargs="?", const="latest", help="恢复最近任务，或指定 workflow 目录")
+    parser.add_argument(
+        "--resume-check",
+        choices=["full", "simple", "none"],
+        help="续跑前检查：full 全面 / simple 简单（默认）/ none 跳过产物校验",
+    )
     parser.add_argument("--append-tasks", help="配合 --resume-job 追加原计划没有的步骤，成功步骤不会重跑")
     publication = parser.add_mutually_exclusive_group()
-    publication.add_argument("--upload-job", nargs="?", const="latest", help="准备任务日志、配置、指标和权重上传包")
+    publication.add_argument(
+        "--upload-job", nargs="?", const="latest", help="准备任务日志、配置、指标和权重上传包"
+    )
     publication.add_argument("--upload-package", help="上传或重试已准备的包目录")
     parser.add_argument("--yes-upload", action="store_true", help="确认发布所选上传包至 GitHub Release")
     parser.add_argument("--stop", action="store_true", help="请求中断最近任务，保留已提交的缓存和检查点")
@@ -250,12 +257,22 @@ def main(argv=None):
 
         if args.append_tasks and not args.resume_job:
             raise ValueError("--append-tasks 需要配合 --resume-job")
+        if args.resume_check and not args.resume_job:
+            raise ValueError("--resume-check 需要配合 --resume-job")
         publishing = args.upload_job or args.upload_package
         if args.yes_upload and not publishing:
             raise ValueError("--yes-upload 需要配合 --upload-job 或 --upload-package")
         if publishing and (
-            args.task or args.tasks or args.resume_job or args.query or args.worker
-            or args.stop or args.status or args.name or args.preprocess_cache or args.reset_settings
+            args.task
+            or args.tasks
+            or args.resume_job
+            or args.query
+            or args.worker
+            or args.stop
+            or args.status
+            or args.name
+            or args.preprocess_cache
+            or args.reset_settings
         ):
             raise ValueError("上传不能与启动、续跑、查询、停止或修改设置混用")
         if args.query and (

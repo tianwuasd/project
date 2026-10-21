@@ -101,3 +101,16 @@
 - 修改前 10 个文件保存于 back/before-diagnosis-ids-20261021/，包含原提交与 SHA256。新增完整/短编号、显式编号、重复编号、缺失/混合来源、旧产物只读恢复，以及训练→预测→评估一致性回归；原 XLSX 稀疏/公式测试扩展到完整编号并已复现旧版失败。
 - 验证：诊断、编号、Excel 重采样、服务器步骤分派、工作流追加、恢复校验及启动器相关回归共 121 passed；受影响 Python 文件 Ruff/格式检查通过，10 个备份哈希核验通过。真实标签校验报告保存在本机忽略的 runs/diagnosis-id-check-20261021_174117/，不发布病例数据。
 - 本次不改训练器、科学配置、CPU/GPU 调度或通用服务器模板；项目特有编号约定记录在 docs/diagnosis.md。服务器更新与原失败任务恢复仍待 zmic44 实测。
+
+## 0.17.0 续跑检查分级与混合存储读取（2026-10-21）
+
+- 面板 `r` 续跑/追加前提供全面、简单、不检查，默认简单；CLI 为 `--resume-job ... --resume-check full|simple|none`，非交互也默认 simple。选项只影响历史产物检查，三种模式均复用成功步骤，保留存活进程、运行锁、计划/状态一致性与步骤内部兼容性检查。
+- 简单只检查待执行步骤实际使用的直接依赖，跳过前面待执行步骤将生成的结果。诊断训练仅读取 features.json/labels.json 等，不追溯原始 CT；有历史摘要且 ≤8 MiB 才核验内容，大文件或无摘要文件只查存在/清单及本次状态稳定，明确披露无法证明内容完整。
+- 全面保留全部已完成步骤的 SHA256 和冻结配置核验；无记录/内容变化停止。追加时不再覆盖旧冻结摘要。选择、范围、读取字节量与未记录摘要依赖保存到 plan.resume_verification，skip 不伪装为通过。
+- 读取按文件系统分组排队：机械盘 1、网络盘最多 4、SSD/内存盘最多 8、未知 2，总预算受实际 CPU/内存约束且最多 16；混合存储不会因机械盘将 NAS 一并限制为 1。去重、每秒扫描/读取/复核进度、实际读取 ETA 与取消清理保持。
+- 测试/预测续跑的 GPU 参数询问只作阶段记录轻量判断，不提前隐式全读缓存；执行调度器复用 GPU 中间结果前仍保留原验证，可能耗时。训练算法、训练 CPU 调优和科学配置未修改。
+- 修改前 15 个原文件保存在 back/before-resume-modes-20261021/，清单记录 c901ff62d3a245700778d7e04e12109de8acb3cf 与原始 SHA256，全部字节核验通过。skill/独立快速案例的 7 个原文件另存 D:/code_project/.runs/before-resume-modes-20261021/。
+- 最终 Windows 完整回归 438 passed / 23 skipped（runs/p17all）；实际 Linux 单次/重复 SIGINT、追加归档及运行锁 4 passed；受影响 Python 文件 Ruff、CLI 帮助与差异检查通过。之前长临时目录触发 Windows 路径长度限制，改用短测试目录后完整通过，未改训练调优代码。
+- 大 project 的 server-resource-smoke/check_resume.py 已更新，Windows/Linux 实际通过：6 个共 48 MiB 文件跨五步去重；三档通过真实计划入口，full 读取缓存与依赖，simple 仅两份合成 JSON 共 4 字节，none 跳过；旧记录/成功产物保持。报告保存本机 .runs/resume-mode-acceptance-win 与 resume-mode-acceptance-linux，不包含真实 CT/GPU 运行。
+- server-engineering 5 文件源码/安装版/发布副本哈希一致、格式有效；场景测试发现两处旧强制校验描述，已修正并复核。源提交 4c06f94，GitHub 发布 6882344；无关 bilibili 工作区改动保留。GitHub 使用本机 7897 代理，未把该地址写入服务器配置。
+- CT 发布目标为 tianwuasd/project/main；程序发布、镜像核对与服务器更新需区分。未连接 zmic44，正式任务耗时与服务器升级仍待用户实际验证。

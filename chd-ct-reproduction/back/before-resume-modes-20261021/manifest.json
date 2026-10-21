@@ -1,0 +1,65 @@
+{
+  "source_commit": "c901ff62d3a245700778d7e04e12109de8acb3cf",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "7ed2474c7c373e5e85663d85d02a3c67a17f22d138a1b78acfbf39df2449cb13"
+    },
+    {
+      "path": ".codex/maintenance.md",
+      "sha256": "a60ab207aac72c879bdb1ff91c53e528966825dbcfe7bbc01f07d675cd90c83c"
+    },
+    {
+      "path": ".gitattributes",
+      "sha256": "2900654865e0904ad7c6ea6945c36984832ec3ae74615f43fbea76c89edc1c7e"
+    },
+    {
+      "path": "pyproject.toml",
+      "sha256": "028a39799ccad4f907dca3ffe3c8a20047f1a355e0e14ea3281e9417ae62b86e"
+    },
+    {
+      "path": "src/chd_ct/__init__.py",
+      "sha256": "30218b476db2175b83f4b4012d1e82623db0ccb9739248249298f632b8d0dc31"
+    },
+    {
+      "path": "src/chd_ct/server/launcher.py",
+      "sha256": "143cc6aba5c46dbf9e798118c4864653d668ed5f181650c49c2b7c7a2e62b616"
+    },
+    {
+      "path": "src/chd_ct/server/resume.py",
+      "sha256": "7cfb3baa098f3ec607d929bc7a13dca0da73356f0ee2f0bd610a4630c4655055"
+    },
+    {
+      "path": "src/chd_ct/server/verification.py",
+      "sha256": "253c07d70a684068296496786aa7375430f47a7fca85337bbc4259e1211fc987"
+    },
+    {
+      "path": "docs/recovery.md",
+      "sha256": "6a8b6863b26b2383089bded2b88aebe5f3550a3441d4c94c6d04c7d39dc1cdb7"
+    },
+    {
+      "path": "docs/server-start.md",
+      "sha256": "216c841b5158d24029d3e20869ad72ac6143c9e8bdd63f172a1492861b7566ce"
+    },
+    {
+      "path": "tests/test_resume_verification.py",
+      "sha256": "51e29ad13330179e2c00c42f2b7984d6c83f0c0de2b3ec21b7aa06056822065d"
+    },
+    {
+      "path": "tests/test_workflow_extension.py",
+      "sha256": "d6bade42d7983e60696dc1226e9e31772f5d31e29885849e50507b14958e36ee"
+    },
+    {
+      "path": "tests/test_recovery.py",
+      "sha256": "b29bbb7d1061208bc44288574a328236c48f23478c53896455208116aafc26ca"
+    },
+    {
+      "path": "src/chd_ct/server/extension.py",
+      "sha256": "188b6cc68811b1928e031af61070cd1e22367886002586762865990644535dac"
+    },
+    {
+      "path": "tests/test_inference_resources.py",
+      "sha256": "e0f01df51f897c3dcc7f5ee15aa55c6bd32f6b2c7663541f76324b8f8eb0851e"
+    }
+  ]
+}

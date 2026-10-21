@@ -8,12 +8,15 @@ import signal
 import stat
 import threading
 import time
+from collections import Counter, deque
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextlib import contextmanager
 from pathlib import Path
 
 MIB = 1024**2
 BLOCK = 4 * MIB
+SIMPLE_HASH_LIMIT = 8 * MIB
+STORAGE_CAPS = {"network": 4, "ssd": 8, "memory": 8, "hdd": 1, "unknown": 2}
 CHANGED = "已完成步骤的输入或输出改变（包含新增/缺失文件），不能直接续跑"
 
 
@@ -110,8 +113,7 @@ def choose_threads(hardware, kinds, count, total):
     idle = hardware.get("idle_fraction")
     cpus = max(1, hardware["cpus"])
     budget = max(1, math.floor(cpus * (0.75 if idle is None else min(0.75, max(0, idle)))))
-    caps = {"network": 4, "ssd": 8, "memory": 8, "hdd": 1, "unknown": 2}
-    storage_cap = min((caps[k] for k in kinds), default=2)
+    storage_cap = min(16, sum(STORAGE_CAPS[k] for k in kinds)) if kinds else 2
     memory_cap = max(1, int(hardware["memory_available"] * 0.1 // (2 * BLOCK)))
     workers = max(1, min(budget, storage_cap, memory_cap, count))
     if total < 32 * MIB:
@@ -122,8 +124,9 @@ def choose_threads(hardware, kinds, count, total):
 class ReadProgress:
     """A heartbeat also remains visible during a slow directory/stat/read syscall."""
 
-    def __init__(self, enabled=True, interval=1):
+    def __init__(self, enabled=True, interval=1, success_label="校验通过"):
         self.enabled = enabled
+        self.success_label = success_label
         self.interval = interval
         self.lock = threading.Lock()
         self.stop = threading.Event()
@@ -173,6 +176,16 @@ class ReadProgress:
                     f"合并 {references - count} 次重复文件引用，只完整读取一遍。",
                     flush=True,
                 )
+                if selected.get("storage_groups"):
+                    print(
+                        "分存储并发上限："
+                        + "；".join(
+                            f"{labels[g['kind']]} {g['limit']} 线程 / {g['files']} 文件"
+                            for g in selected["storage_groups"]
+                        )
+                        + "。各组分别限流，共享 CPU/内存总预算。",
+                        flush=True,
+                    )
         self.render()
 
     def advance(self, size):
@@ -216,7 +229,7 @@ class ReadProgress:
             if error_type is KeyboardInterrupt
             else "校验失败，未提交续跑"
             if error_type
-            else "校验通过"
+            else self.success_label
         )
         self.render()
 
@@ -251,24 +264,37 @@ def hash_one(path, expected_stat, progress, cancelled):
     return digest.hexdigest()
 
 
-def read_hashes(files, stamps, workers, progress, expected):
+def read_hashes(files, stamps, workers, progress, expected, limits=None):
     """Keep at most workers open/pending files, and join all readers on exit."""
     cancelled = threading.Event()
     pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="chd-verify-reader")
     pending = {}
-    iterator = iter(sorted(files))
+    groups = {}
+    for name in sorted(files, key=lambda n: stamps[n][2], reverse=True):
+        groups.setdefault(stamps[name][0], deque()).append(name)
+    order, active = deque(groups), Counter()
+    limits = limits or dict.fromkeys(groups, workers)
     try:
         while True:
             while len(pending) < workers:
-                name = next(iterator, None)
-                if name is None:
+                chosen = None
+                for _ in range(len(order)):
+                    device = order[0]
+                    order.rotate(-1)
+                    if groups[device] and active[device] < limits[device]:
+                        chosen = device
+                        break
+                if chosen is None:
                     break
-                pending[pool.submit(hash_one, Path(name), stamps[name], progress, cancelled)] = name
+                name = groups[chosen].popleft()
+                active[chosen] += 1
+                pending[pool.submit(hash_one, Path(name), stamps[name], progress, cancelled)] = (name, chosen)
             if not pending:
                 break
             ready, _ = wait(pending, timeout=0.2, return_when=FIRST_COMPLETED)
             for future in ready:
-                name = pending.pop(future)
+                name, device = pending.pop(future)
+                active[device] -= 1
                 if future.result() != expected[name]:
                     raise ValueError(CHANGED + "：" + name)
     except BaseException:
@@ -282,14 +308,27 @@ def read_hashes(files, stamps, workers, progress, expected):
             pool.shutdown(wait=True, cancel_futures=True)
 
 
-def verify_snapshots(records, show_progress=True):
-    """Verify all successful steps together; no persistent/metadata-only hash cache."""
+def verify_snapshots(records, show_progress=True, mode="full"):
+    """Full hashes or explicitly requested small-file hashes and large-file metadata."""
     from ..cpu_runtime import inspect
 
-    with ReadProgress(show_progress) as progress:
+    if mode not in {"full", "simple"}:
+        raise ValueError("文件校验模式必须为 full 或 simple")
+    label = "校验通过（全面检查）" if mode == "full" else "简单检查通过（未验证大文件内容）"
+    with ReadProgress(show_progress, success_label=label) as progress:
         roots, files, expected, aliases = {}, set(), {}, {}
         references = 0
         for label, record in records:
+            for root in record.get("unrecorded_roots", []):
+                if mode != "simple":
+                    raise ValueError("全面检查需要原始校验记录：" + root)
+                members = tree_files(root, progress.found)
+                roots[root] = members
+                for name in members:
+                    files.add(name)
+                    expected.setdefault(name, None)
+                    aliases[name] = name
+                    references += 1
             for group, root_key in (("inputs", "input_roots"), ("outputs", "output_roots")):
                 progress.stage("扫描文件清单", f"{label} / {group}")
                 recorded = record[group]
@@ -305,22 +344,42 @@ def verify_snapshots(records, show_progress=True):
                 for name, digest in recorded.items():
                     canonical = str(Path(name).resolve())
                     aliases[name] = canonical
-                    if canonical in expected and expected[canonical] != digest:
+                    if expected.get(canonical) is not None and expected[canonical] != digest:
                         raise ValueError(CHANGED + "（步骤之间记录冲突）：" + name)
                     expected[canonical] = digest
                     files.add(canonical)
                     references += 1
         stamps = {name: fingerprint(Path(name)) for name in sorted(files)}
+        readable = {
+            name
+            for name in files
+            if mode == "full" or (stamps[name][2] <= SIMPLE_HASH_LIMIT and expected.get(name) is not None)
+        }
+        if mode == "simple" and show_progress:
+            print(
+                f"简单检查：{len(files)} 个必需文件；{len(readable)} 个有历史摘要的小文件核验内容，"
+                f"{len(files) - len(readable)} 个大文件/无摘要文件仅检查存在与本次状态稳定。",
+                flush=True,
+            )
         # Classify each unique filesystem once, even when the cache has thousands of files.
         devices = {}
-        for name, stamp in stamps.items():
-            devices.setdefault(stamp[0], Path(name))
-        kinds = {storage_kind(path) for path in devices.values()}
-        total = sum(stamp[2] for stamp in stamps.values())
-        hardware = inspect() if files else dict(cpus=1, memory_available=0)
-        selected = choose_threads(hardware, kinds, len(files), total)
-        progress.reading(total, len(files), selected, kinds, references)
-        read_hashes(files, stamps, selected["workers"], progress, expected)
+        for name in sorted(readable):
+            devices.setdefault(stamps[name][0], Path(name))
+        kinds_by_device = {device: storage_kind(path) for device, path in devices.items()}
+        kinds = set(kinds_by_device.values())
+        total = sum(stamps[name][2] for name in readable)
+        hardware = inspect() if readable else dict(cpus=1, memory_available=0)
+        selected = choose_threads(hardware, kinds, len(readable), total)
+        limits = {
+            device: min(STORAGE_CAPS[kind], selected["workers"]) for device, kind in kinds_by_device.items()
+        }
+        counts = Counter(stamps[name][0] for name in readable)
+        selected["storage_groups"] = [
+            dict(kind=kind, limit=limits[device], files=counts[device])
+            for device, kind in kinds_by_device.items()
+        ]
+        progress.reading(total, len(readable), selected, kinds, references - len(files) + len(readable))
+        read_hashes(readable, stamps, selected["workers"], progress, expected, limits)
         progress.render()
         progress.stage("复核文件状态")
         progress.render()
@@ -333,4 +392,11 @@ def verify_snapshots(records, show_progress=True):
         for name, canonical in aliases.items():
             if str(Path(name).resolve()) != canonical:
                 raise ValueError(CHANGED + "：" + name)
-        return dict(files=len(files), bytes=total, references=references, **selected)
+        return dict(
+            files=len(files),
+            hashed_files=len(readable),
+            metadata_only_files=len(files) - len(readable),
+            bytes=total,
+            references=references,
+            **selected,
+        )

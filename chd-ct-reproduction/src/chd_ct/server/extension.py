@@ -143,6 +143,7 @@ def append_steps(args, plan, names, interactive):
         if Path(step["output"]).exists():
             raise ValueError("追加步骤目录已存在，不能覆盖：" + step["output"])
     plan["steps"].extend(new)
-    plan.setdefault("frozen_files", {}).update(frozen_files(new))
+    for path, digest in frozen_files(new).items():
+        plan.setdefault("frozen_files", {}).setdefault(path, digest)
     plan["appended_steps"] = names
     return plan

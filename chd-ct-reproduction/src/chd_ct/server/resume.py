@@ -129,6 +129,7 @@ def reject_live_commands(plan):
 def build_resume_plan(args, profile, interactive):
     from .extension import append_steps, choose_append, source_stamp, verify_source
     from .jobs import identity, job_owner
+    from .resume_checks import check_plan, choose_mode
 
     if (
         args.task
@@ -160,27 +161,12 @@ def build_resume_plan(args, profile, interactive):
         if not owner.get("identity") or identity(owner["pid"]) == owner["identity"]:
             raise ValueError("原任务进程仍在，请先查看 --status 或 --stop")
     reject_live_commands(plan)
-    for name, digest in plan.get("frozen_files", {}).items():
-        if not Path(name).is_file() or file_hash(name) != digest:
-            raise ValueError("任务配置文件已经改变：" + name)
     if len(state["steps"]) != len(plan["steps"]):
         raise ValueError("任务状态和计划步骤数量不符")
     names = choose_append(args, plan, state["status"] == "passed", interactive)
     if not names and any(getattr(args, key, None) for key in INPUTS):
         raise ValueError("续跑使用原任务输入；新增输入只能用于 --append-tasks 的新步骤")
-    print("校验已完成步骤与输入来源，请等待……", flush=True)
-    from .verification import verify_snapshots
-
-    records = []
-    for step, prior in zip(plan["steps"], state["steps"]):
-        if step["name"] != prior["name"] or step["output"] != prior["output"]:
-            raise ValueError("任务状态和计划步骤不符")
-        if prior["status"] in {"passed", "reused"}:
-            if not prior.get("snapshot") and step["arguments"]["task"] != "environment":
-                raise ValueError("已完成步骤缺少校验记录，保留产物但不能自动重跑：" + step["name"])
-            if prior.get("snapshot"):
-                records.append((step["name"], prior["snapshot"]))
-    verify_snapshots(records)
+    check_mode = choose_mode(getattr(args, "resume_check", None), interactive)
     prompted = False
     for step, prior in zip(plan["steps"], state["steps"]):
         if step["name"] != prior["name"] or step["output"] != prior["output"]:
@@ -198,9 +184,13 @@ def build_resume_plan(args, profile, interactive):
             arguments["resume"] = True
         else:
             step["restart"] = True
-        from .inference_phases import gpu_ready
-
-        cpu_tail = arguments["task"] in {"test", "predict"} and gpu_ready(step)
+        # This only decides whether to show GPU prompts. The execution scheduler
+        # validates the GPU receipt before reusing it; do not silently hash entire
+        # inference caches here before the user-selected resume check even starts.
+        phase_root = Path(step["output"]) / ("test/predictions" if arguments["task"] == "test" else "predict")
+        cpu_tail = arguments["task"] in {"test", "predict"} and (
+            prior["status"] == "pending_cpu" or (phase_root / "gpu-phase-ready.json").is_file()
+        )
         if arguments.get("device") == "cuda" and not cpu_tail:
             if interactive and not prompted:
                 show_gpus()
@@ -219,11 +209,17 @@ def build_resume_plan(args, profile, interactive):
                 prompted = True
             if args.gpu is not None:
                 arguments["gpu"] = args.gpu
-            if args.gpu_count is not None and arguments["task"] in {"train", "environment", "test", "predict"}:
+            if args.gpu_count is not None and arguments["task"] in {
+                "train",
+                "environment",
+                "test",
+                "predict",
+            }:
                 arguments["gpu_count"] = args.gpu_count
         if args.python:
             arguments["python"] = str(Path(args.python).expanduser().resolve())
     plan.update(resume_existing=True, reset_settings=False)
     plan = append_steps(args, plan, names, interactive)
+    plan["resume_verification"] = check_plan(plan, check_mode)
     verify_source(plan)
     return plan

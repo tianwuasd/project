@@ -4,6 +4,7 @@ import hashlib
 import os
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -22,6 +23,7 @@ def fixture_record(tmp_path, count=3):
 
 
 def threads(monkeypatch, number):
+    monkeypatch.setattr(v, "storage_kind", lambda _: "ssd")
     monkeypatch.setattr(
         v, "choose_threads", lambda *args: dict(workers=number, cpus=8, budget=6, storage_cap=number)
     )
@@ -219,3 +221,59 @@ def test_new_session_always_rereads_content(tmp_path, monkeypatch):
         v.verify_snapshots([("train", record)], False)
     assert len(counts) == 2
     assert hashlib.sha256(counts[0].read_bytes()).hexdigest() in record["inputs"].values()
+
+
+def test_mixed_storage_budget_does_not_collapse_to_one():
+    hardware = dict(cpus=256, idle_fraction=0.97, memory_available=128 * 1024**3)
+    assert v.choose_threads(hardware, {"hdd", "network"}, 1111, 135 * 1024**3)["workers"] == 5
+
+
+def test_read_scheduler_obeys_per_device_limits_without_head_of_line_blocking(tmp_path, monkeypatch):
+    names = [str(tmp_path / f"hdd{i}") for i in range(2)] + [str(tmp_path / f"nas{i}") for i in range(4)]
+    stamps = {name: (1 if Path(name).name.startswith("hdd") else 2, 0, 64 * v.MIB, 0, 0) for name in names}
+    expected = dict.fromkeys(names, "digest")
+    active, peak = {1: 0, 2: 0}, {1: 0, 2: 0}
+    lock, ready = threading.Lock(), threading.Event()
+
+    def read(path, stamp, progress, cancelled):
+        device = stamp[0]
+        with lock:
+            active[device] += 1
+            peak[device] = max(peak[device], active[device])
+            if active == {1: 1, 2: 4}:
+                ready.set()
+        try:
+            assert ready.wait(3), "NAS readers were blocked behind HDD readers"
+            return "digest"
+        finally:
+            with lock:
+                active[device] -= 1
+
+    monkeypatch.setattr(v, "hash_one", read)
+    v.read_hashes(names, stamps, 5, v.ReadProgress(False), expected, {1: 1, 2: 4})
+    assert peak == {1: 1, 2: 4} and active == {1: 0, 2: 0}
+
+
+def test_simple_large_file_metadata_only_is_disclosed_and_full_detects_corruption(tmp_path, monkeypatch):
+    directory = tmp_path / "models"
+    directory.mkdir()
+    large = directory / "best.pt"
+    large.write_bytes(b"0" * (v.SIMPLE_HASH_LIMIT + 1))
+    manifest = directory / "models.json"
+    manifest.write_text('{"status":"passed"}')
+    record = dict(inputs=tree_hashes(directory), outputs={}, input_roots=[str(directory)])
+    with large.open("r+b") as stream:
+        stream.write(b"x")
+    calls = []
+    original = v.hash_one
+
+    def counted(path, *args):
+        calls.append(path.name)
+        return original(path, *args)
+
+    monkeypatch.setattr(v, "hash_one", counted)
+    result = v.verify_snapshots([("models", record)], False, mode="simple")
+    assert calls == ["models.json"]
+    assert result["metadata_only_files"] == 1 and result["hashed_files"] == 1
+    with pytest.raises(ValueError, match="改变"):
+        v.verify_snapshots([("models", record)], False, mode="full")

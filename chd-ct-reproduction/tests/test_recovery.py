@@ -203,7 +203,7 @@ def test_resume_plan_uses_frozen_settings_and_preserves_completed_steps(tmp_path
     write_json(folder / "receipt.json", dict(pid=999, identity={"boot": "old", "start": "1"}))
     write_json(runtime / "last-job.json", dict(directory=str(folder)))
     monkeypatch.setattr(jobs, "identity", lambda pid: None)
-    args = launcher.make_parser().parse_args(["--resume-job", "--runtime", str(runtime)])
+    args = launcher.make_parser().parse_args(["--resume-job", "--runtime", str(runtime), "--resume-check", "none"])
     result = build_resume_plan(args, {"runtime": str(runtime)}, False)
     assert result["steps"][0]["reuse"]["status"] == "passed"
     assert result["steps"][1]["arguments"]["resume"]
