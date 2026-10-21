@@ -1,0 +1,45 @@
+{
+  "source_commit": "3e410a7d94eba15ceadd674dc6d0aecc9b9f9ffe",
+  "files": [
+    {
+      "path": "src/chd_ct/diagnosis/labels.py",
+      "sha256": "3bfe43f768ae0a36628234e4a2a61e5df4ee7f43984f30f4091d0515616d5f06"
+    },
+    {
+      "path": "src/chd_ct/diagnosis/classifier.py",
+      "sha256": "ba657eb24d9e92f547e611477a601cd8e76e6f95470067f6897c934e253016ab"
+    },
+    {
+      "path": "src/chd_ct/diagnosis/evaluate.py",
+      "sha256": "3ea2c37220275a8e696f5a77765f7d984751d8649ee0ff688a19a38db72d8355"
+    },
+    {
+      "path": "tests/test_diagnosis.py",
+      "sha256": "d61a4f1e1c01ba35f0d5ef83e7ae176fc345e398dd49bae793eae8353a540260"
+    },
+    {
+      "path": "docs/diagnosis.md",
+      "sha256": "2877713ac40738918e16e5d5f86dd63f69395bf8df10917d9eb216b298bfe4eb"
+    },
+    {
+      "path": "docs/server-start.md",
+      "sha256": "a7366ad04a122a82337ecc6b1f4d9ce2ef1f728a724707ce1df38c8a48d6c4d1"
+    },
+    {
+      "path": ".codex/maintenance.md",
+      "sha256": "07a1726d0bbdd0c445075aab71ca3c6ea24fb5959736e7969afa4c69289f6e09"
+    },
+    {
+      "path": "pyproject.toml",
+      "sha256": "29ebf5c69e62bddfd20b0616a7a0bd1fac1defc014a02d53e57b06cc52c21a18"
+    },
+    {
+      "path": "src/chd_ct/__init__.py",
+      "sha256": "170bb51665e16ddd8ce0e933fc92228c451a4692e595c960b6597102ed327136"
+    },
+    {
+      "path": ".gitattributes",
+      "sha256": "78ce82c22cb60e52253e56459b9f9228a9fec1bbbea342357ba28ab665b8d9ad"
+    }
+  ]
+}

@@ -4,8 +4,8 @@ import numpy as np
 from sklearn.tree import DecisionTreeClassifier
 
 from .features import FEATURE_NAMES, FEATURE_SCHEMA, read_features
-from .io import DISEASES, case_index, file_hash, new_output, read_artifact, save
-from .labels import read_labels
+from .io import DISEASES, file_hash, new_output, read_artifact, save
+from .labels import align_labels, read_labels
 
 
 def matrix(rows):
@@ -43,10 +43,8 @@ def train_classifier(features, labels, output, allow_smoke=False, max_depth=4, m
         raise ValueError("短测/来源未确认的分割特征只能用 --allow-smoke 验证软件流程")
     if data.get("segmentation_prepared_sha256") != data["prepared_sha256"] and not allow_smoke:
         raise ValueError("诊断训练须复用分割训练的同一预处理清单与患者划分；请重新预测/提取特征")
-    indexed = case_index(truth["cases"])
     rows = data["cases"]
-    if any(r["case_id"] not in indexed for r in rows):
-        raise ValueError("诊断标签未覆盖特征病例；检查 ImageCHD index 映射")
+    indexed, labels_alignment = align_labels(truth, (r["case_id"] for r in rows))
     train = [r for r in rows if r["split"] == "train"]
     val = [r for r in rows if r["split"] == "val"]
     if not train or not val:
@@ -58,6 +56,7 @@ def train_classifier(features, labels, output, allow_smoke=False, max_depth=4, m
         "blank_policy": truth["blank_policy"],
         "features_sha256": file_hash(fpath),
         "labels_sha256": file_hash(lpath),
+        "labels_alignment": labels_alignment,
         "test_cases_used": 0,
         "training_cases": len(train),
         "validation_cases": len(val),
@@ -83,6 +82,7 @@ def train_classifier(features, labels, output, allow_smoke=False, max_depth=4, m
         "development_cases": [r["case_id"] for r in train + val],
         "features_sha256": report["features_sha256"],
         "labels_sha256": report["labels_sha256"],
+        "labels_alignment": labels_alignment,
         "threshold": 0.5,
         "probability_note": "Unweighted positive fraction in training leaf; uncalibrated, not clinical risk.",
         "research_only": True,

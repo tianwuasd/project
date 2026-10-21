@@ -10,6 +10,20 @@ from zipfile import ZipFile
 from .io import DISEASES, case_index, file_hash, new_output, read_artifact, save
 
 NS = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+LEGACY_ID_POLICY = "ImageCHD index + 1000"
+INDEX_ID_POLICY = "ImageCHD full index; short index + 1000"
+
+
+def index_case_id(value):
+    """Diagnosis indices already include 1000; retain short-index compatibility."""
+    try:
+        index = float(value)
+        if not index.is_integer() or index < 0:
+            raise ValueError()
+        number = int(index)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise ValueError("ImageCHD index 必须是非负整数") from error
+    return "ct_" + str(number if number >= 1000 else 1000 + number)
 
 
 def xlsx_rows(path):
@@ -76,20 +90,14 @@ def import_labels(source, output, blank_policy="negative"):
         "blank_policy": blank_policy,
         "source_sha256": file_hash(source),
         "source_name": source.name,
-        "id_policy": "case_id" if "case_id" in rows[0] else "ImageCHD index + 1000",
+        "id_policy": "case_id" if "case_id" in rows[0] else INDEX_ID_POLICY,
         "cases": [],
     }
     for row in rows:
         if "case_id" in row:
             case = row["case_id"].strip()
         elif "index" in row:
-            try:
-                index = float(row["index"])
-                if not index.is_integer() or index < 0:
-                    raise ValueError()
-                case = "ct_" + str(1000 + int(index))
-            except (TypeError, ValueError) as error:
-                raise ValueError("ImageCHD index 必须是非负整数") from error
+            case = index_case_id(row["index"])
         else:
             raise ValueError("需要 case_id 或 ImageCHD 原始 index 列")
         labels, assumed = {}, []
@@ -135,6 +143,46 @@ def import_labels(source, output, blank_policy="negative"):
                 }
             )
     return result
+
+
+def align_labels(truth, case_ids):
+    """Match exact IDs first; recover only the documented v0.16.0 offset bug.
+
+    Older successful workflow artifacts must keep their original bytes/hashes.
+    A legacy import may be translated in memory only when *all* its IDs are
+    ct_2xxx, none match the requested cohort, and subtracting 1000 covers the
+    entire cohort one-to-one. Explicit case IDs and ambiguous mixtures fail.
+    """
+    indexed = case_index(truth["cases"])
+    expected = set(case_ids)
+    if not expected:
+        raise ValueError("没有待匹配的诊断特征病例")
+    audit = {"mode": "exact", "source_id_policy": truth.get("id_policy"), "matched_cases": len(expected)}
+    if expected.issubset(indexed):
+        return indexed, audit
+    if (
+        truth.get("id_policy") == LEGACY_ID_POLICY
+        and not expected.intersection(indexed)
+        and all(re.fullmatch(r"ct_2[0-9]{3}", case) for case in indexed)
+    ):
+        mapping = {case: "ct_" + str(int(case[3:]) - 1000) for case in indexed}
+        recovered = case_index([{**row, "case_id": mapping[case]} for case, row in indexed.items()])
+        if expected.issubset(recovered):
+            audit.update(mode="legacy_index_offset_recovery", mapping=mapping)
+            example = next(iter(mapping))
+            print(
+                f"检测到旧版诊断编号重复加 1000：{example} → {mapping[example]}；"
+                f"已完整匹配 {len(expected)} 例，仅在读取时恢复，原标签文件保持不变。",
+                flush=True,
+            )
+            return recovered, audit
+    missing = sorted(expected.difference(indexed))
+    examples = ", ".join(missing[:5])
+    available = ", ".join(sorted(indexed)[:5])
+    raise ValueError(
+        f"诊断标签未覆盖 {len(missing)}/{len(expected)} 个特征病例（如 {examples}）；"
+        f"标签编号示例：{available}。无法确认旧版偏移映射，请核对原始诊断表并导入新目录。"
+    )
 
 
 def read_labels(path):

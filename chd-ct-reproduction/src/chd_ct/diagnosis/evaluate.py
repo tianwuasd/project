@@ -5,7 +5,7 @@ from sklearn.metrics import roc_auc_score
 
 from .features import read_features
 from .io import DISEASES, case_index, file_hash, new_output, read_artifact, save
-from .labels import read_labels
+from .labels import align_labels, read_labels
 
 
 def metrics(pairs):
@@ -51,7 +51,8 @@ def evaluate_diagnosis(features, labels, predictions, output, split="test"):
     rows = [r for r in data["cases"] if r["split"] == split]
     if not rows:
         raise ValueError("所选评估集合为空")
-    pindex, lindex = case_index(predicted["cases"], splits=True), case_index(truth["cases"])
+    pindex = case_index(predicted["cases"], splits=True)
+    lindex, labels_alignment = align_labels(truth, (r["case_id"] for r in rows))
     if split == "test" and (
         set(r["patient_id"] for r in rows) & set(predicted["development_patients"])
         or set(r["case_id"] for r in rows) & set(predicted["development_cases"])
@@ -78,6 +79,7 @@ def evaluate_diagnosis(features, labels, predictions, output, split="test"):
         "blank_policy": truth["blank_policy"],
         "training_blank_policy": predicted.get("classifier_blank_policy"),
         "labels_sha256": file_hash(lpath),
+        "labels_alignment": labels_alignment,
         "predictions_sha256": file_hash(ppath),
         "research_only": True,
         "segmentation_mode": predicted["segmentation_mode"],

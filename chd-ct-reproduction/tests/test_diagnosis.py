@@ -349,7 +349,8 @@ def test_installed_diagnosis_layout_has_rules_preset(tmp_path):
     assert report["effective_rules"]["name"] == "independent_candidate_rules_v2"
 
 
-def test_sparse_xlsx_blank_cells_and_formula_rejection(tmp_path):
+@pytest.mark.parametrize("index,expected", [(1, "ct_1001"), (1001, "ct_1001"), (1178, "ct_1178")])
+def test_sparse_xlsx_blank_cells_and_formula_rejection(tmp_path, index, expected):
     from zipfile import ZipFile
 
     from chd_ct.diagnosis.labels import import_labels
@@ -365,10 +366,11 @@ def test_sparse_xlsx_blank_cells_and_formula_rejection(tmp_path):
             z.writestr("xl/_rels/workbook.xml.rels", relationships)
             z.writestr("xl/worksheets/sheet1.xml", text)
 
+    sheet = sheet.replace('<c r="A2"><v>1</v>', f'<c r="A2"><v>{index}</v>')
     make(sheet)
     result = import_labels(source, tmp_path / "imported")
     row = result["cases"][0]
-    assert row["case_id"] == "ct_1001" and row["labels"]["ASD"] == 0 and row["labels"]["VSD"] == 1
+    assert row["case_id"] == expected and row["labels"]["ASD"] == 0 and row["labels"]["VSD"] == 1
     assert row["assumed_negative"] == ["ASD"]
     make(sheet.replace("<v>1</v></c></row>", "<f>1+0</f><v>1</v></c></row>"))
     with pytest.raises(ValueError, match="公式"):
