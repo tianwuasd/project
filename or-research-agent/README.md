@@ -25,7 +25,7 @@
 
 - [Agent 技能入口](skill/SKILL.md)：三阶段流程、证据规则与工具调用。
 - [低空物流强化学习研究](studies/trc_capacity_rl/README.md)：公开LaDe数据、共享起降/机队/充电预约、单调后决策TD、基线、消融、五训练种子。
-- [英文论文初稿](studies/trc_capacity_rl/manuscript.tex)：完整模型、证明、方法、实验及局限；LaTeX可编辑，当前宿主编译器环境错误，排版编译尚未验证。
+- [英文论文 PDF](studies/trc_capacity_rl/manuscript.pdf)、[LaTeX 源码](studies/trc_capacity_rl/manuscript.tex)：完整模型、证明、方法、实验及局限。2026-10-22 已用独立 Tectonic 0.17.0 编译并检查全部15页；宿主编辑器的内置预览仍有 Windows 应用包执行权限问题。
 - [创新审查](studies/trc_capacity_rl/NOVELTY.md)、[审查修复记录](studies/trc_capacity_rl/REVIEW.md)、[实验结果](studies/trc_capacity_rl/results/summary.json)。
 
 本次单调RL测试日均节省69.05，贪心63.93，容量定价74.93（均为模拟广义成本单位）。研究初稿如实报告：RL尚未超过最强已实现在线基线，创新性与TRC投稿水平尚未确证。

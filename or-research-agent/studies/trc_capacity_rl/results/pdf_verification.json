@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-22",
+  "compiler": "Tectonic 0.17.0, official standalone Windows x86_64 build",
+  "compiler_release": "https://github.com/tectonic-typesetting/tectonic/releases/tag/tectonic%400.17.0",
+  "compiler_archive_sha256": "f61ce51f0b0ade1015b7de7ef368541c5424e9756ecbd0d7af97d6d48030845f",
+  "exit_code": 0,
+  "pdf": "manuscript.pdf",
+  "pages": 15,
+  "pdf_sha256": "621ce610ffa146bee55b8221fae8e1258ba0b57283693021411a27690adb2098",
+  "tex_sha256": "2601d7d9cf889817b2b6805c214f35217a7a36ac82ce85086456fc133bbeae89",
+  "pdf_bytes": 120529,
+  "latex_warnings": [],
+  "all_fonts_embedded": true,
+  "undefined_citations": false,
+  "text_blocks_outside_page": 0,
+  "visual_review": "passed: all 15 pages inspected as rendered PNGs; no clipped text, overlapping tables or missing mathematical glyphs observed",
+  "nonfatal_runtime_message": "Fontconfig cannot load default system configuration; this document uses embedded TeX Latin Modern fonts and final rendering was verified.",
+  "built_in_preview": "unresolved Windows package execution access; standalone PDF is independently compiled",
+  "scope": "Compilation and layout only; research novelty, scientific validity and submission readiness are not certified."
+}

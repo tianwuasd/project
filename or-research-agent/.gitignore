@@ -15,3 +15,5 @@ remote_state.json
 *.aux
 *.log
 *.out
+/local-only/
+*.synctex.gz

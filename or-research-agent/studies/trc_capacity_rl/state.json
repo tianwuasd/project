@@ -55,7 +55,7 @@
     ],
     "fresh_confirmation": "not_started",
     "independent_review_scope": "oracle and risk TD pipeline reviewed; training/selection audit omission fixed in separate audited entry point",
-    "latex_status": "unverified: compiler process denied access (Windows error 5)",
+    "latex_status": "PDF compiled and visually checked (15 pages) with standalone Tectonic 0.17.0; built-in editor preview remains blocked by package execution access (Windows error 5)",
     "record_updated": "2026-10-22",
     "supplementary_replay": {
       "training_episodes": 400,

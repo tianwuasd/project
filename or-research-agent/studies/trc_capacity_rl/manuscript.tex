@@ -129,6 +129,7 @@ Validation&33&2,559&08-19--09-20\\
 Test&17&911&09-21--10-21\\\bottomrule
 \end{tabular}
 \end{table}
+
 Only destinations and courier acceptance events are empirical inputs. Drone capacities, speeds, deadlines, range, charging times, handling, and costs are simulated assumptions. The official dataset card identifies an Apache-2.0 license. We distribute a downloader and checksums rather than republishing order records. Five test days contain only one retained task. These days remain in the primary evaluation, and the resulting 17-day sample is too small for strong generalization claims.
 
 \subsection{Baselines and statistical protocol}
@@ -143,6 +144,7 @@ Both learning variants use seeds 11, 22, 33, 44, and 55 and 400 training episode
 For comparisons we average the five learned-policy outcomes within each day and then form paired day differences. The 85 seed--day observations are not treated as 85 independent demand realizations. Ten thousand fixed-seed bootstrap replicates provide descriptive percentile intervals. We also report circular blocks of three consecutive \emph{observed} days because serial dependence may invalidate independent-day resampling. These intervals condition on the five fitted models, and do not measure the full uncertainty from retraining, model selection, or a different city.
 
 \section{Results}
+
 \begin{table}[ht]
 \centering\caption{Held-out performance. Higher saving is better. Decision time is the unweighted mean of daily means; ground is an unlimited reference.}
 \begin{tabular}{lrrr}\toprule
@@ -156,6 +158,7 @@ Monotone RL&69.05&4.65&0.437\\
 Perfect-information MILP incumbent&97.11&---&---\\\bottomrule
 \end{tabular}
 \end{table}
+
 The monotone model improves mean saving over greedy by 5.12 units (8.01\%), but falls below resource pricing by 5.88 units (7.85\%). Its mean remains approximately 28.9\% below the perfect-information incumbent, which has an informational advantage. Across training seeds, monotone daily means range from 67.82 to 71.10, while signed-weight means range from 65.66 to 70.00. All evaluated online episodes satisfy the simulator's resource checks. This outcome is enforced by candidate feasibility and cannot be attributed to learning a safety mechanism.
 
 \begin{table}[ht]
@@ -168,6 +171,7 @@ Sampled rollout&3.12&[-1.84,8.54]&[-2.12,8.32]\\
 Signed-weight RL&0.61&[-1.98,3.34]&[-1.70,3.62]\\\bottomrule
 \end{tabular}
 \end{table}
+
 The independent-day interval against greedy only narrowly excludes zero; the block interval includes it. Both intervals for the architecture comparison include zero. The study therefore does not establish that monotonicity materially improves performance, and it should not be summarized as a significant superiority result. By contrast, the observed shortfall against resource pricing is consistent across the reported resampling schemes. These are exploratory comparisons without a multiple-testing correction.
 
 \begin{table}[ht]
@@ -180,6 +184,7 @@ Signed-weight RL&48.68&68.44&67.45\\
 Monotone RL&47.73&69.05&68.79\\\bottomrule
 \end{tabular}
 \end{table}
+
 The reduced-fleet case is particularly unfavorable to the learned policies. Monotone RL achieves less saving than greedy with two aircraft. Increasing the fleet to six does not improve these online outcomes, although the optimal value cannot decrease. This is not a contradiction: policy quality may deteriorate, and normalization divides each calendar by its scenario capacity, so the monotonicity guarantee applies within a fixed representation and context rather than across these differently normalized scenarios. An initially full fleet looks identical to the network regardless of its absolute size. Transfer to changed capacities is consequently a substantial unresolved issue.
 
 A post hoc diagnostic excluding the five singleton days leaves 12 days. Their mean savings are 91.25 for monotone RL, 90.22 for signed-weight RL, 99.12 for resource pricing, and 83.53 for greedy. The principal ordering persists. This diagnostic does not replace the prespecified full test sample. The complete run took approximately 520 seconds on the local CPU environment with one PyTorch computation thread; timings include training and evaluation and are descriptive, not a hardware-independent speed claim.
@@ -198,7 +203,7 @@ We formulate online drone dispatch as a joint infrastructure-reservation problem
 The repository contains the data downloader, input hash, transformation, simulator, training code, tests, daily results, training logs, and statistical summary. Python 3.14.3, NumPy 2.4.2, SciPy 1.17.1, and PyTorch 2.10.0+cpu were used; the machine-readable experiment records are authoritative for versions. All experiment numbers in this draft derive from saved outputs. The original LaDe records and the researchers' private literature library are excluded from the release. No real drone deployment or controlled operational experiment was conducted. Authorship, affiliations, funding, conflicts of interest, and final data-use declarations must be completed and verified by the human researchers before submission. Generative AI assisted formulation, code, analysis, and drafting; human authors must verify and take responsibility for any submitted version. Current TRC formatting and declaration requirements have not been verified in this draft.
 
 \appendix
-\section{Development extension: joint-scenario reservations and resource-pattern values}
+\section[Development extension: joint-scenario reservations and resource-pattern values]{Development extension: joint-scenario reservations\\and resource-pattern values}
 \label{app:development}
 This appendix records an exploratory successor to the completed pilot above. It does not replace the original experiment or claim a confirmed modeling or algorithmic contribution. The original test outcomes have already been observed, and a new independent confirmation set has not been evaluated. The current aim is to distinguish an operational mechanism from a change of function approximator.
 
@@ -242,6 +247,7 @@ The accompanying baseline selects up to three training-day continuations conditi
 
 \subsection{Development outcomes, not independent confirmation}
 The revised development run uses the 89 original training days and 33 validation days, with 200 sampled training episodes for each of five seeds (11, 22, 33, 44, 55). All three critics receive the same eight-dimensional observed context; their parameter counts and feature scales differ. Checkpoint selection and price/lookahead tuning use these validation days, so the following comparison is exploratory.
+
 \begin{table}[ht]
 \centering\caption{Development validation: mean simulated saving per day.}
 \begin{tabular}{lr}\toprule
@@ -254,9 +260,10 @@ Resource-pattern TD &83.54\\
 Conditional training-path LP &84.13\\\bottomrule
 \end{tabular}
 \end{table}
+
 Resource-pattern TD improves over the selected price by 3.28\% but remains 0.70\% below the conditional LP. Its five seed means range from 82.47 to 85.06; the best seed is not substituted for the mean. All 693 stored policy-day evaluations, including alternative lookahead weights, pass the finite-scenario audit; they represent only 33 distinct demand days. The selected lookahead weight of 0.5 encounters four empirical count-support misses and no solver failures. These results motivate further investigation of interactions, but do not meet the intended superiority criterion or establish confirmed novelty. The source, checkpoints, daily outcomes and the earlier unsuccessful prototypes are retained separately. Newly acquired public single-drone measurements have not yet calibrated this model and cannot by themselves establish multi-aircraft disturbance dependence.
 
-\section{Partial dependence, joint capacity risk, and a negative method diagnostic}
+\section[Partial dependence, joint capacity risk, and a negative method diagnostic]{Partial dependence, joint capacity risk,\\and a negative method diagnostic}
 \label{app:risk}
 The following experiments were completed on 4 October and checked against saved source identities on 22 October 2026. They revise the scope of the preceding development mechanism. They do not constitute independent confirmation, a validated disturbance model, or a demonstrated algorithmic contribution.
 
@@ -281,7 +288,7 @@ Indeed, maximization of a coordinate's sum over the Cartesian product of task la
 For the two-task example in Appendix~\ref{app:development}, the unique conflicting label pair has probability $q_0q_1\eta(2-\eta)$. At $q=(0.7,0.3)$ and $\eta=0.001$, correlation is still 0.998001 but the conflict probability is 0.00041979. At $\eta=0.01$ and 0.05, it is respectively 0.004179 and 0.020475. Passing the two common-scenario checks therefore does not certify feasibility under partially independent perturbations.
 
 \subsection{Restricted joint-chance admission and finite-law evaluation}
-The successor candidate retains the common-scenario hard constraints and adds a whole-reservation-set constraint
+The successor candidate retains the common-scenario hard constraints and adds a joint constraint over the entire reservation set:
 \begin{equation}
  r(A):=\Pr\!\left(\exists(r,t):\sum_{i\in A}U_{iY_i,rt}>K_{rt}\right)\leq\alpha.
 \end{equation}
@@ -315,15 +322,21 @@ Risk-insertion TD &79.99&0.933\\
 Conditional training-path LP &82.17&4.803\\\bottomrule
 \end{tabular}
 \end{table}
+
 All stored final policy-day audits satisfy the finite-law risk bound; the largest bound is approximately 0.008358 and no oracle state limit occurs. Both learned variants select their 40-episode checkpoint and fail to improve consistently with further training. The proposed feature is approximately 2.66\% below the strongest listed baseline and offers no observed advantage over the pattern control. This version is therefore not advanced as a successful method contribution. The saving objective also omits tail-conflict recourse costs and remains a gross simulated work proxy rather than realized operating profit. Fixed exogenous training sequences, value-ranking diagnostics, stronger adapted methods, disturbance calibration and independent confirmation remain necessary.
 
-A subsequent development diagnostic evaluates frozen continuation-value multipliers $\{0,0.25,0.5,0.75,1,1.5,2\}$. Zero reproduces greedy dispatch on every validation day and one reproduces the stored learned policies. The best grid values are 81.13 for the pattern control and 80.34 for risk-insertion TD, both at multiplier two and both below the conditional LP. This is additional post hoc validation tuning, not independent improvement or evidence that the boundary grid point is globally optimal. Simple rescaling does not close the observed baseline gap.
+A subsequent development diagnostic evaluates frozen continuation-value multipliers
+\[
+ \{0,0.25,0.5,0.75,1,1.5,2\}.
+\]
+Zero reproduces greedy dispatch on every validation day and one reproduces the stored learned policies. The best grid values are 81.13 for the pattern control and 80.34 for risk-insertion TD, both at multiplier two and both below the conditional LP. This is additional post hoc validation tuning, not independent improvement or evidence that the boundary grid point is globally optimal. Simple rescaling does not close the observed baseline gap.
 
 An independent review reproduced both stored checkpoints on all 33 validation days but identified a protocol-coverage omission: the historical training loop did not independently audit each training-day completion and discarded oracle-limit counts during checkpoint-selection validation. Final stored-policy feasibility is supported; the original files cannot establish that every training query was resolved. A separate audited entry point now records all these episodes without changing the frozen source identity; supplementary runs are identified separately. This distinction is necessary to avoid presenting newly produced audit logs as evidence saved during the original execution.
 
 Chance-constrained UAM occupancy control already appears in Pang et al.\ \cite{pangchance}; its full formulation has not yet been inspected here. Similarly, conference evidence documents partially joint chance-constrained UAV parcel assignment. These references preclude claiming that chance constraints or action filtering alone establish novelty. The current contribution status remains unconfirmed.
 
 \begin{thebibliography}{12}
+\raggedright
 \bibitem{chen} X. Chen, M. W. Ulmer, B. W. Thomas (2022). Deep Q-learning for same-day delivery with vehicles and drones. \emph{European Journal of Operational Research}, 298(3), 939--952. \href{https://doi.org/10.1016/j.ejor.2021.06.021}{doi:10.1016/j.ejor.2021.06.021}.
 \bibitem{campuzano} G. Campuzano, E. Lalla-Ruiz, M. Mes (2022). The Dynamic Drone Scheduling Delivery Problem. \emph{Computational Logistics}, LNCS 13557, 260--274. \href{https://doi.org/10.1007/978-3-031-16579-5_18}{doi:10.1007/978-3-031-16579-5\_18}.
 \bibitem{hu} Y. Hu, Y. Du, S. Li (2025). Real-time coordination of human couriers and drones for on-demand food-delivery platforms: A multi-stage risk-aware multi-agent reinforcement learning framework. \emph{Transportation Research Part C}, 181, 105381. \href{https://doi.org/10.1016/j.trc.2025.105381}{doi:10.1016/j.trc.2025.105381}.

@@ -2,7 +2,7 @@
 
 这是面向 TRC 选题要求完成的一次可复现研究试验，含场景、数学模型、强化学习求解、公开数据和真实运行结果。当前是研究初稿，**未达到已确认创新或可直接投稿的状态**。
 
-- [英文论文源文件](manuscript.tex)：完整模型、结构命题、算法、实验与局限。
+- [英文论文 PDF](manuscript.pdf)、[LaTeX 源文件](manuscript.tex)：完整模型、结构命题、算法、实验与局限。15页，已完成编译和逐页排版检查。
 - [创新审查与下一步](NOVELTY.md)、[独立审查处理记录](REVIEW.md)。
 - [逐日实验记录](results/experiment.json)、[统计汇总](results/summary.json)、[结果图](figures/test_results.png)。
 - [公开数据清单](data/manifest.json)：来源、哈希、切分与假设。
@@ -29,6 +29,8 @@ RL使用5个训练种子，每个400个抽样训练日。单调RL对贪心均值
 ![测试集结果](figures/test_results.png)
 
 ## 复现
+
+论文使用官方独立版 Tectonic 0.17.0 编译。在本研究目录执行 `tectonic -X compile --untrusted --keep-logs manuscript.tex`；首次需要联网获取 TeX 资源，之后可增加 `--only-cached` 离线重编译。编译器、缓存和本机诊断日志不随仓库分发。当前宿主内置预览的 Windows 权限问题不影响已经生成的 PDF；[编译检查记录](results/pdf_verification.json)保留文件哈希与检查范围。
 
 在仓库中的 `or-research-agent` 目录执行。Python环境需要 NumPy、SciPy、PyTorch、Matplotlib，具体运行版本见结果JSON。先安装根目录的 `requirements.txt`，不需要模型API密钥或GPU。
 
