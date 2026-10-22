@@ -72,5 +72,15 @@
     },
     "study_checks_passed": 35,
     "publication_status": "iteration_03_public_snapshot; publication commit and verification are recorded in repository history and the local release log"
+  },
+  "method_search_2026_10_22": {
+    "status": "completed_bounded_search_and_archive",
+    "tool": "Academic Agent 0.4.0",
+    "queries": 9,
+    "candidate_bibliographic_groups": 146,
+    "downloaded_unique_pdfs": 9,
+    "additional_model_backend_jobs": 0,
+    "summary": "literature/method_search_2026-10-22/SYNTHESIS.md",
+    "no_new_training_or_confirmation": true
   }
 }

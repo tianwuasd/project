@@ -19,6 +19,7 @@
 
 ## 先看成果
 
+- [方法难点的文献检索与下一步选择](studies/trc_capacity_rl/literature/method_search_2026-10-22/SYNTHESIS.md)：实际调用 Academic Agent 完成三路、9条查询；9篇开放全文已保存于本机，报告列出价值诊断、LP策略改进与风险特征的候选实验，尚未运行新实验。
 - [持续研究目标](RESEARCH_GOAL.md)：建模区别、结构匹配方法、独立数据上的可靠优势，三项同时验收；目标进行中。
 - [第二轮开发模型](studies/trc_capacity_rl/development/scenario_model.md)、[全文对照](studies/trc_capacity_rl/literature/fulltext_comparison.md)：共同扰动下的返航预约与资源组合价值。当前仅探索性候选，尚未确认创新。
 - [第三轮风险模型与结果](studies/trc_capacity_rl/development/RESULTS_03.md)：209份实飞日志审计、部分相关扰动反例和联合概率约束。新特征79.99对同约束强基线82.17，未达优势目标。

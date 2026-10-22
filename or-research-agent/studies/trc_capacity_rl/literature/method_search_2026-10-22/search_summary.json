@@ -1,0 +1,45 @@
+{
+  "created_utc": "2026-10-22T11:10:09.572163+00:00",
+  "tool": "Academic Agent 0.4.0 Runner.search / Runner.fetch",
+  "routes": [
+    {
+      "route": "route_a_td",
+      "queries": 3,
+      "library_records": 48,
+      "search_retained_ids": 48,
+      "supplementary_records": 0,
+      "model_jobs": 0
+    },
+    {
+      "route": "route_b_hybrid",
+      "queries": 3,
+      "library_records": 49,
+      "search_retained_ids": 49,
+      "supplementary_records": 0,
+      "model_jobs": 0
+    },
+    {
+      "route": "route_c_risk",
+      "queries": 3,
+      "library_records": 58,
+      "search_retained_ids": 55,
+      "supplementary_records": 3,
+      "model_jobs": 0
+    }
+  ],
+  "queries": 9,
+  "route_library_records_sum": 155,
+  "cross_route_bibliographic_groups": 146,
+  "grouping_note": "Conservative DOI/arXiv/exact-title grouping, not independently verified study count.",
+  "downloaded_unique_pdfs": 9,
+  "model_jobs": 0,
+  "raw_source_records": 165,
+  "source_statuses": {
+    "openalex:ok": 9,
+    "semantic_scholar:rate_limited": 5,
+    "crossref:ok": 9,
+    "arxiv:ok": 9,
+    "semantic_scholar:ok": 1
+  },
+  "scope": "Bounded method search; no systematic coverage or novelty claim."
+}

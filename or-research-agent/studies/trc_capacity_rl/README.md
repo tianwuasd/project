@@ -2,6 +2,7 @@
 
 这是面向 TRC 选题要求完成的一次可复现研究试验，含场景、数学模型、强化学习求解、公开数据和真实运行结果。当前是研究初稿，**未达到已确认创新或可直接投稿的状态**。
 
+- [针对当前方法难点的三路检索](literature/method_search_2026-10-22/SYNTHESIS.md)：9条 Academic Agent 查询与9份已保存开放全文；具体来源、阅读范围和下一步证伪实验均有记录。全文仅本机保存，公开仓库保留报告与引用信息。
 - [英文论文 PDF](manuscript.pdf)、[LaTeX 源文件](manuscript.tex)：完整模型、结构命题、算法、实验与局限。15页，已完成编译和逐页排版检查。
 - [创新审查与下一步](NOVELTY.md)、[独立审查处理记录](REVIEW.md)。
 - [逐日实验记录](results/experiment.json)、[统计汇总](results/summary.json)、[结果图](figures/test_results.png)。
