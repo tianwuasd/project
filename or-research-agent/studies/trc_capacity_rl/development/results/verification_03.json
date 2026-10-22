@@ -1,0 +1,37 @@
+{
+  "verified_utc": "2026-10-22T07:44:34.460846+00:00",
+  "supplementary_replay": [
+    {
+      "variant": "pattern",
+      "checkpoint_tensors_identical": true,
+      "checkpoint_validation_logs_identical": true,
+      "training_episodes": 200,
+      "validation_episodes": 165,
+      "oracle_limits": 0,
+      "max_final_risk_upper": 0.00835800000001319,
+      "all_feasible": true
+    },
+    {
+      "variant": "risk_insertion",
+      "checkpoint_tensors_identical": true,
+      "checkpoint_validation_logs_identical": true,
+      "training_episodes": 200,
+      "validation_episodes": 165,
+      "oracle_limits": 0,
+      "max_final_risk_upper": 0.00835800000001319,
+      "all_feasible": true
+    }
+  ],
+  "identities_match": [
+    "pilot_002",
+    "risk_pilot_001",
+    "risk_pilot_audit_001"
+  ],
+  "tests": {
+    "agent": 13,
+    "study": 35
+  },
+  "latex": "unverified: compiler process cannot start; Windows error 5",
+  "publication": "prepared; GitHub connection unavailable",
+  "goal": "active_not_achieved"
+}

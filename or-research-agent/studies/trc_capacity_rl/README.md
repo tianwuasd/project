@@ -7,6 +7,9 @@
 - [逐日实验记录](results/experiment.json)、[统计汇总](results/summary.json)、[结果图](figures/test_results.png)。
 - [公开数据清单](data/manifest.json)：来源、哈希、切分与假设。
 - [第二轮开发结果](development/RESULTS_02.md)：联合情景预约、资源组合TD与条件LP前瞻；五种子验证83.54对84.13，仍未达到目标。[公开飞行测量数据](development/PUBLIC_FLIGHT_DATA.md)已取得，尚未用于校准。
+- [第三轮审计与风险约束结果](development/RESULTS_03.md)：共同扰动鲁棒保证在独立残差下失效；实现联合概率计算器并审计209份实飞日志。首个风险特征试验79.99对强基线82.17，仍无方法优势，确认实验尚未启动。
+
+后续风险实验请使用带完整训练/选型审计的入口 `src/run_risk_development_audited.py`；原入口保留用于历史结果复现。第三轮两个大型诊断JSON在公开包中使用 `.json.gz` 无损压缩。
 
 ## 已运行结果
 

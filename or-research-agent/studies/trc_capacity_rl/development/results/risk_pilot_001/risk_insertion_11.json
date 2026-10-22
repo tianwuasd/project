@@ -1,0 +1,42 @@
+{
+  "variant": "risk_insertion",
+  "seed": 11,
+  "epochs": 200,
+  "steps": 10720,
+  "updates": 2665,
+  "parameter_count": 12425,
+  "log": [
+    {
+      "episode": 40,
+      "validation_mean": 79.98999426452909,
+      "steps": 1871,
+      "updates": 452
+    },
+    {
+      "episode": 80,
+      "validation_mean": 76.33891713368415,
+      "steps": 4147,
+      "updates": 1021
+    },
+    {
+      "episode": 120,
+      "validation_mean": 78.32133651855362,
+      "steps": 6437,
+      "updates": 1594
+    },
+    {
+      "episode": 160,
+      "validation_mean": 77.82436311640188,
+      "steps": 8678,
+      "updates": 2154
+    },
+    {
+      "episode": 200,
+      "validation_mean": 78.0545501670021,
+      "steps": 10720,
+      "updates": 2665
+    }
+  ],
+  "best_validation_mean": 79.98999426452909,
+  "seconds": 30.75097110000206
+}

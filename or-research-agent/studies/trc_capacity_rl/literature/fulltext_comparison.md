@@ -22,3 +22,12 @@
 [OptNet（Amos & Kolter, 2017）](https://proceedings.mlr.press/v70/amos17a.html)已经把可微优化作为网络层；[Zanon、Gros等的MPC研究](https://cse.lab.imtlucca.it/~bemporad/publications/papers/ecc19-Qlearning.pdf)已结合Q学习和预测控制。本轮资源模式特征并非可微优化层，不能把“优化+学习”包装成新方法。尚须系统比较组合资源特征、网络收益管理和近似动态规划的相关工作。
 
 结论：可继续开发候选机制并证伪，但全文覆盖尚不足以确认建模或方法创新。当前最可靠的新证据是本研究首版分离值函数的表达局限及待验证修正，不是文献首次性。
+
+## 第三轮风险模型的新增近邻（2026-10-04检索）
+
+- Pang, Low & Duong, TRC 2024, [Chance-constrained UAM traffic flow optimization with fast disruption recovery under uncertain waypoint occupancy time](https://doi.org/10.1016/j.trc.2024.104547)。已读出版商摘要和[作者主页](https://bizhao001.github.io/)描述，含概率分离约束、航路点占用时间及分层随机搜索；完整模型公式尚未取得。因此机会约束或不确定占用时间本身不能列为本研究创新。
+- Wang, Cui, Bilegan, Rei & Duchenne, [VeRoLog 2025会议摘要](https://verolog2025.unitn.it/2025.06.11_Program_.pdf)，UAV Parcel Delivery Problem under Battery Degradation: A Partially Joint Chance-Constrained Approach。已读官方会议摘要，使用随机航程容量、广义装箱和部分联合机会约束；不是已复核完整论文。无人机配送中“联合机会约束”本身已有先例。
+- Pang等2026年的MAF-Net及MAF-DAC：作者主页列出约束多智能体RL和多头动作筛选。当前仅作者介绍，尚未读取论文；把风险筛选叠加RL不足以证明算法创新。
+- [Rodrigues等，Scientific Data 2021预印本](https://arxiv.org/html/2103.13313v1)：已读数据、方法、使用说明及传感器附录文本。公开飞行数据的相对气流读数有偏差和自运动成分，单平台测试不能校准多机同时扰动。数据外推限制与本研究审计详见development/RESULTS_03.md。
+
+以上证据用于排除过宽的创新声明，不等同于完成全文差异审查。

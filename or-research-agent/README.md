@@ -2,10 +2,26 @@
 
 基于论文证据推进 **找场景 → 数学建模 → 求解算法与验证**。包含可安装的 `$or-research` 技能、可追溯文献索引工具，以及已运行的低空物流强化学习研究试验。由当前宿主agent推理，本地工具管理证据与计算；没有独立常驻模型服务，不需要另外配置付费模型API。
 
+公开代码位于 [tianwuasd/project 的 or-research-agent 子目录](https://github.com/tianwuasd/project/tree/main/or-research-agent)。
+
+## 项目包括什么
+
+| 部分 | 现有内容 | 入口 |
+|---|---|---|
+| 研究 Agent | 找场景、建模、算法设计三阶段流程，证据规则和实验规范 | [skill/SKILL.md](skill/SKILL.md) |
+| 文献工具 | 文献建库、关键词检索、来源追溯、正文片段提取；个人数据库仅保留在本机 | [skill/scripts](skill/scripts) |
+| 低空物流案例 | 共享起降、机队、充电预约，联合情景与部分相关扰动下的概率约束 | [研究说明](studies/trc_capacity_rl/README.md) |
+| 求解与实验 | 后决策TD、单调及资源组合特征、风险插入特征；贪心、容量定价、条件LP前瞻及先知MILP对照 | [src](studies/trc_capacity_rl/src) |
+| 数据与审计 | LaDe公开配送任务、209份公开飞行日志的派生统计、模型检查点、逐日结果、可行性审计 | [最新结果](studies/trc_capacity_rl/development/RESULTS_03.md) |
+| 论文与目标 | 英文LaTeX研究初稿、最邻近文献对照、创新审查及持续研究验收要求 | [论文](studies/trc_capacity_rl/manuscript.tex)、[目标](RESEARCH_GOAL.md) |
+
+截至2026-10-22，项目完成了三轮开发试验，研究目标仍在进行。第三轮事后价值缩放诊断的最好均值为81.13，同约束条件LP基线为82.17；尚无可靠的方法优势。补充回放审计覆盖400个训练日和330个选型验证日，均满足所建模型的可行性检查；这不构成真实飞行安全验证。全新确认实验尚未启动。
+
 ## 先看成果
 
 - [持续研究目标](RESEARCH_GOAL.md)：建模区别、结构匹配方法、独立数据上的可靠优势，三项同时验收；目标进行中。
 - [第二轮开发模型](studies/trc_capacity_rl/development/scenario_model.md)、[全文对照](studies/trc_capacity_rl/literature/fulltext_comparison.md)：共同扰动下的返航预约与资源组合价值。当前仅探索性候选，尚未确认创新。
+- [第三轮风险模型与结果](studies/trc_capacity_rl/development/RESULTS_03.md)：209份实飞日志审计、部分相关扰动反例和联合概率约束。新特征79.99对同约束强基线82.17，未达优势目标。
 
 - [Agent 技能入口](skill/SKILL.md)：三阶段流程、证据规则与工具调用。
 - [低空物流强化学习研究](studies/trc_capacity_rl/README.md)：公开LaDe数据、共享起降/机队/充电预约、单调后决策TD、基线、消融、五训练种子。
@@ -43,4 +59,4 @@ python -X utf8 -m unittest discover -s tests -v
 
 依赖见 [requirements.txt](requirements.txt)，完整训练命令见[研究说明](studies/trc_capacity_rl/README.md)。原始公开数据由下载脚本重建；论文数据库、收藏PDF、个人阅读笔记及本机配置不进入公共仓库。公开包保留代码、技能、检查点、汇总与逐日结果，便于审查。
 
-Agent工具测试13项、研究测试18项通过（含第二轮9项检查）。图表数值来自实际运行。单调命题的条件、额外凹性假设、部分观测近似、合成揭示时序与统计局限均在论文中明确。
+Agent工具测试13项、研究测试35项通过（含第三轮概率约束与完整训练审计检查）。图表数值来自实际运行。单调命题的条件、额外凹性假设、部分观测近似、合成揭示时序与统计局限均在论文中明确。

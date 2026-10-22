@@ -7,7 +7,7 @@
   "publication_status": "exploratory_draft_not_submission_ready",
   "novelty_status": "not_confirmed",
   "data_status": "public_ground_delivery_replay_with_synthetic_drone_settings",
-  "next_action": "Audit public CMU flight measurements and disturbance assumptions; assess development training budget and nearest literature before any independent confirmation",
+  "next_action": "Diagnose TD value ranking and bootstrap error with fixed exogenous training streams; complete nearest-literature full-text checks and physical-scale validation before confirmation.",
   "artifacts": [
     "manuscript.tex",
     "NOVELTY.md",
@@ -20,7 +20,11 @@
     "literature/fulltext_comparison.md",
     "development/RESULTS_02.md",
     "development/PUBLIC_FLIGHT_DATA.md",
-    "data/drone_measurement_manifest.json"
+    "data/drone_measurement_manifest.json",
+    "development/RESULTS_03.md",
+    "development/iteration_03_plan.md",
+    "development/risk_method_plan.md",
+    "development/results/risk_pilot_001/experiment.json"
   ],
   "tested_meaning": "Specified implementation and experiment checks passed; this is not a guarantee of scientific validity, novelty, deployment performance or acceptance",
   "active_research_goal": "model_and_method_innovation_with_reliable_baseline_improvement",
@@ -35,5 +39,38 @@
     "review": "same-slot omission fixed; 18 study checks passed",
     "pattern_mean": 83.53558523744384,
     "conditional_lp_mean": 84.12614990148309
+  },
+  "development_iteration_03": {
+    "status": "completed_development_diagnostic_below_strong_baseline",
+    "model": "core scenarios plus whole-ledger joint chance constraint under partial dependence",
+    "flight_records_audited": 209,
+    "complete_route_records": 196,
+    "data_calibration": "not_established",
+    "method": "risk-insertion opportunity TD",
+    "pattern_mean": 80.02748025962295,
+    "risk_insertion_mean": 79.98999426452909,
+    "conditional_lp_mean": 82.17442185820593,
+    "new_training_seeds": [
+      11
+    ],
+    "fresh_confirmation": "not_started",
+    "independent_review_scope": "oracle and risk TD pipeline reviewed; training/selection audit omission fixed in separate audited entry point",
+    "latex_status": "unverified: compiler process denied access (Windows error 5)",
+    "record_updated": "2026-10-22",
+    "supplementary_replay": {
+      "training_episodes": 400,
+      "validation_episodes": 330,
+      "all_feasible": true,
+      "oracle_limits": 0,
+      "checkpoint_tensors_match_original": true
+    },
+    "value_scale_diagnostic": {
+      "pattern": 81.12781056532091,
+      "risk_insertion": 80.33785345852932,
+      "selected_multiplier": 2,
+      "status": "post_hoc_validation_tuning_below_lp"
+    },
+    "study_checks_passed": 35,
+    "publication_status": "iteration_03_public_snapshot; publication commit and verification are recorded in repository history and the local release log"
   }
 }

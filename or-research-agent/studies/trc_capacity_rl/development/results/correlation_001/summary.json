@@ -1,0 +1,147 @@
+{
+  "purpose": "exact_synthetic_counterexample_not_performance_claim",
+  "common_probabilities": [
+    0.7,
+    0.3
+  ],
+  "rows": [
+    {
+      "delta": 0.0,
+      "pair_correlation": 1.0,
+      "one_flight_adverse_probability": 0.3,
+      "violation_probability": 0.0,
+      "robust_feasible": true,
+      "positive_probability_outcomes": 2,
+      "bad_outcomes": [],
+      "satisfies_one_percent_joint_risk": true
+    },
+    {
+      "delta": 0.001,
+      "pair_correlation": 0.998001,
+      "one_flight_adverse_probability": 0.29999999999999993,
+      "violation_probability": 0.00041978999999999996,
+      "robust_feasible": false,
+      "positive_probability_outcomes": 4,
+      "bad_outcomes": [
+        {
+          "labels": [
+            1,
+            0
+          ],
+          "probability": 0.00041978999999999996
+        }
+      ],
+      "satisfies_one_percent_joint_risk": true
+    },
+    {
+      "delta": 0.01,
+      "pair_correlation": 0.9801000000000001,
+      "one_flight_adverse_probability": 0.3,
+      "violation_probability": 0.0041789999999999996,
+      "robust_feasible": false,
+      "positive_probability_outcomes": 4,
+      "bad_outcomes": [
+        {
+          "labels": [
+            1,
+            0
+          ],
+          "probability": 0.0041789999999999996
+        }
+      ],
+      "satisfies_one_percent_joint_risk": true
+    },
+    {
+      "delta": 0.05,
+      "pair_correlation": 0.9024999999999999,
+      "one_flight_adverse_probability": 0.3,
+      "violation_probability": 0.020474999999999997,
+      "robust_feasible": false,
+      "positive_probability_outcomes": 4,
+      "bad_outcomes": [
+        {
+          "labels": [
+            1,
+            0
+          ],
+          "probability": 0.020474999999999997
+        }
+      ],
+      "satisfies_one_percent_joint_risk": false
+    },
+    {
+      "delta": 0.1,
+      "pair_correlation": 0.8100000000000002,
+      "one_flight_adverse_probability": 0.30000000000000004,
+      "violation_probability": 0.03989999999999999,
+      "robust_feasible": false,
+      "positive_probability_outcomes": 4,
+      "bad_outcomes": [
+        {
+          "labels": [
+            1,
+            0
+          ],
+          "probability": 0.03989999999999999
+        }
+      ],
+      "satisfies_one_percent_joint_risk": false
+    },
+    {
+      "delta": 0.25,
+      "pair_correlation": 0.5625000000000001,
+      "one_flight_adverse_probability": 0.29999999999999993,
+      "violation_probability": 0.09187499999999998,
+      "robust_feasible": false,
+      "positive_probability_outcomes": 4,
+      "bad_outcomes": [
+        {
+          "labels": [
+            1,
+            0
+          ],
+          "probability": 0.09187499999999998
+        }
+      ],
+      "satisfies_one_percent_joint_risk": false
+    },
+    {
+      "delta": 0.5,
+      "pair_correlation": 0.2500000000000001,
+      "one_flight_adverse_probability": 0.3,
+      "violation_probability": 0.15749999999999997,
+      "robust_feasible": false,
+      "positive_probability_outcomes": 4,
+      "bad_outcomes": [
+        {
+          "labels": [
+            1,
+            0
+          ],
+          "probability": 0.15749999999999997
+        }
+      ],
+      "satisfies_one_percent_joint_risk": false
+    },
+    {
+      "delta": 1.0,
+      "pair_correlation": 0.0,
+      "one_flight_adverse_probability": 0.3,
+      "violation_probability": 0.21,
+      "robust_feasible": false,
+      "positive_probability_outcomes": 4,
+      "bad_outcomes": [
+        {
+          "labels": [
+            1,
+            0
+          ],
+          "probability": 0.21
+        }
+      ],
+      "satisfies_one_percent_joint_risk": false
+    }
+  ],
+  "conclusion": "Every positive resampling probability gives full product support. Robust feasibility then equals per-flight envelope constraints, despite arbitrarily high correlation.",
+  "independent_outcome_violation_probability": 0.21
+}

@@ -8,7 +8,7 @@
 \newcommand{\R}{\mathbb{R}}
 \title{Learning the Opportunity Cost of Shared Drone Infrastructure:\\A Capacity-Monotone Reservation Model and Public-Data Replay Study}
 \author{Research draft --- authorship and affiliations to be supplied by the researchers}
-\date{4 October 2026}
+\date{22 October 2026 (development record updated)}
 \begin{document}
 \maketitle
 \noindent\textbf{Status.} TRC-oriented exploratory research draft. This document reports a completed computational pilot, including unfavorable comparisons. Novelty and submission readiness have not been established.
@@ -256,7 +256,74 @@ Conditional training-path LP &84.13\\\bottomrule
 \end{table}
 Resource-pattern TD improves over the selected price by 3.28\% but remains 0.70\% below the conditional LP. Its five seed means range from 82.47 to 85.06; the best seed is not substituted for the mean. All 693 stored policy-day evaluations, including alternative lookahead weights, pass the finite-scenario audit; they represent only 33 distinct demand days. The selected lookahead weight of 0.5 encounters four empirical count-support misses and no solver failures. These results motivate further investigation of interactions, but do not meet the intended superiority criterion or establish confirmed novelty. The source, checkpoints, daily outcomes and the earlier unsuccessful prototypes are retained separately. Newly acquired public single-drone measurements have not yet calibrated this model and cannot by themselves establish multi-aircraft disturbance dependence.
 
-\begin{thebibliography}{10}
+\section{Partial dependence, joint capacity risk, and a negative method diagnostic}
+\label{app:risk}
+The following experiments were completed on 4 October and checked against saved source identities on 22 October 2026. They revise the scope of the preceding development mechanism. They do not constitute independent confirmation, a validated disturbance model, or a demonstrated algorithmic contribution.
+
+\subsection{What the public flight measurements support}
+We audited all 209 logs from the public CMU quadcopter dataset \cite{rodriguesdata}, preserving ground and hover records separately. The parameter file identifies 196 records with full-flight route labels. Their median whole-log duration is 184 seconds, median horizontal velocity-integrated path is 458.06 metres, and median voltage--current-integrated energy is 20.73 Wh. The corresponding 5th--95th percentile intervals are 135.88--252.85 seconds, 445.01--480.94 metres, and 14.21--29.00 Wh. These quantities include preflight and postflight logging; no phase-segmented airborne duration is claimed.
+
+No nonfinite measurements or nonincreasing timestamps were found by the stated checks. Whole-log path totals differ from the source paper's approximate distance summary; that discrepancy remains unresolved rather than being removed by rescaling. The data concern short controlled routes and contain neither charging-site measurements nor simultaneous multi-aircraft operations. They therefore do not calibrate our kilometre-scale missions, five-minute discretization, charging durations, or dependence parameters. Relative airflow measurements also require correction before interpretation as ambient wind. These limitations prevent using the dataset as evidence for the earlier common-disturbance assumption.
+
+\subsection{A fixed-marginal perturbation invalidates the full-support guarantee}
+Let $Z\in\{0,1\}$ have positive prior $q=(q_0,q_1)$. Conditional on $Z$, each accepted task has an independent label $Y_i$ with
+\begin{equation}
+ \Pr(Y_i=y\mid Z=z)=(1-\eta)\mathbf{1}\{y=z\}+\eta q_y,
+ \qquad 0\leq\eta\leq1.
+\end{equation}
+Every task retains marginal distribution $q$, while the pairwise correlation of the binary labels is $(1-\eta)^2$. This is a synthetic dependence stress test, not an estimated weather model. For any $\eta>0$, every binary label vector has positive probability. Consequently, all-support robust feasibility is equivalent to
+\begin{equation}
+ \sum_{i\in A}\max_{y\in\{0,1\}}U_{iy,rt}\leq K_{rt}
+ \quad\text{for every resource--time coordinate }(r,t).
+\end{equation}
+Indeed, maximization of a coordinate's sum over the Cartesian product of task labels separates across tasks; requiring every coordinate for every vector gives the displayed inequalities. Thus the previous common-scenario feasible-set advantage over an individual envelope vanishes under any positive resampling probability when the requirement is robustness to every supported outcome. This elementary support argument is not claimed as a new general theorem.
+
+For the two-task example in Appendix~\ref{app:development}, the unique conflicting label pair has probability $q_0q_1\eta(2-\eta)$. At $q=(0.7,0.3)$ and $\eta=0.001$, correlation is still 0.998001 but the conflict probability is 0.00041979. At $\eta=0.01$ and 0.05, it is respectively 0.004179 and 0.020475. Passing the two common-scenario checks therefore does not certify feasibility under partially independent perturbations.
+
+\subsection{Restricted joint-chance admission and finite-law evaluation}
+The successor candidate retains the common-scenario hard constraints and adds a whole-reservation-set constraint
+\begin{equation}
+ r(A):=\Pr\!\left(\exists(r,t):\sum_{i\in A}U_{iY_i,rt}>K_{rt}\right)\leq\alpha.
+\end{equation}
+The same $\alpha$ applies to the union of all resource--time conflicts across the entire accepted set. It is not renewed independently at each admission or allocated separately to every coordinate. Launch commitments remain irrevocable, and task outcomes are never revealed to this restricted controller. Demand is assumed independent of the synthetic disturbance law; no observed weather is used to select favorable conditional probabilities. Keeping the common-scenario hard constraints is an additional conservative restriction, so the experiment does not explore the unrestricted joint-chance feasible set.
+
+The probability oracle uses variable elimination along time. It introduces a task label at its first possible occupied slot, checks current loads, and retires it after its last possible occupied slot. It retains separate joint probability masses for the two values of $Z$ when merging retired labels; averaging these masses earlier would discard cross-window dependence. The method has exponential worst-case dependence on the active label frontier, rather than a polynomial worst-case claim. A state-count or mask-width limit returns unresolved status with risk upper bound one, and the candidate is rejected. Outward rounding and positive-summation error bounds propagate a lower bound on success probability used for admission. ``Exact'' denotes evaluation of the specified finite law by variable elimination, with probability arithmetic controlled as stated, not a real-world reliability certificate.
+
+Seven oracle tests and an independent review's 120 additional rational-enumeration cases found no false acceptance under that law. A review also exposed a diagnostic-summary failure when an unresolved probability was averaged as a number; regression tests now require explicit unresolved counts and an all-record risk-upper-bound mean. The original and repaired diagnostic outputs are retained separately. At $\eta=0.01$, 39 of the earlier pattern policy's 165 seed--day records exceed a 1\% joint-risk threshold without the new filter. These records cover only 33 distinct demand days. Greedy and resource pricing exceed the threshold on 4 and 3 of those days. This is evidence about omitted disturbances in the earlier model, not evidence of superiority for a new learning method.
+
+\subsection{Risk-insertion features and their first falsification}
+For unit occupancy $U_{py,rt}\in\{0,1\}$, let $L_{rt}$ denote the load from accepted set $A$. Conditional independence gives the following bound on additional joint failure:
+\begin{align}
+ r(A\cup\{p\})-r(A)&\leq D(A,p),\\
+ D(A,p)&:=\sum_z q_z\sum_{r,t}
+       \Pr(L_{rt}=K_{rt}\mid z)\Pr(U_{pY_p,rt}=1\mid z).
+\end{align}
+To see this, a newly failed set that was previously feasible must contain a coordinate that was exactly full and receives unit additional load. Apply the union bound over these events and conditional independence. A truncated Poisson-binomial recursion computes the saturation probabilities. The bound can count a single failing trajectory multiple times; it is not an exact marginal failure probability.
+
+The candidate critic replaces each ordinary insertion feature by its core-feasibility indicator times $\min\{1,(\alpha-r^{\rm upper}(A))/D(A,p)\}$, maximizing over launch alternatives. The factor is one when $D(A,p)=0$. It describes an approximate risk-limited insertion opportunity, not simultaneous feasibility of many templates. Floating-point feature calculations do not certify actions; admission still uses the joint oracle. A matched-dimensional control uses the original pattern features with the same risk-remaining and accepted-count context. Both networks have 12,425 parameters.
+
+The first development comparison uses seed 11, 200 sampled training days and validation selection every 40 episodes. Action-dependent random-number consumption produces different sampled training trajectories, with 10,898 versus 10,720 environment transitions and 2,709 versus 2,665 gradient updates. The comparison is not an exactly paired exogenous-day experiment. Resource prices are selected from eight values and the conditional three-training-path LP weight from $\{0.25,0.5,1\}$. All current actions face the same joint-risk filter with $\eta=\alpha=0.01$. Future LPs relax integrality and omit future joint-risk constraints.
+
+\begin{table}[ht]
+\centering\caption{Development validation under the synthetic joint-risk constraint. One new training seed; no independent confirmation.}
+\begin{tabular}{lrr}\toprule
+Policy & Saving/day & Mean decision ms\\\midrule
+Greedy &75.05&0.176\\
+Tuned resource price &79.90&0.211\\
+Pattern TD with risk context &80.03&0.566\\
+Risk-insertion TD &79.99&0.933\\
+Conditional training-path LP &82.17&4.803\\\bottomrule
+\end{tabular}
+\end{table}
+All stored final policy-day audits satisfy the finite-law risk bound; the largest bound is approximately 0.008358 and no oracle state limit occurs. Both learned variants select their 40-episode checkpoint and fail to improve consistently with further training. The proposed feature is approximately 2.66\% below the strongest listed baseline and offers no observed advantage over the pattern control. This version is therefore not advanced as a successful method contribution. The saving objective also omits tail-conflict recourse costs and remains a gross simulated work proxy rather than realized operating profit. Fixed exogenous training sequences, value-ranking diagnostics, stronger adapted methods, disturbance calibration and independent confirmation remain necessary.
+
+A subsequent development diagnostic evaluates frozen continuation-value multipliers $\{0,0.25,0.5,0.75,1,1.5,2\}$. Zero reproduces greedy dispatch on every validation day and one reproduces the stored learned policies. The best grid values are 81.13 for the pattern control and 80.34 for risk-insertion TD, both at multiplier two and both below the conditional LP. This is additional post hoc validation tuning, not independent improvement or evidence that the boundary grid point is globally optimal. Simple rescaling does not close the observed baseline gap.
+
+An independent review reproduced both stored checkpoints on all 33 validation days but identified a protocol-coverage omission: the historical training loop did not independently audit each training-day completion and discarded oracle-limit counts during checkpoint-selection validation. Final stored-policy feasibility is supported; the original files cannot establish that every training query was resolved. A separate audited entry point now records all these episodes without changing the frozen source identity; supplementary runs are identified separately. This distinction is necessary to avoid presenting newly produced audit logs as evidence saved during the original execution.
+
+Chance-constrained UAM occupancy control already appears in Pang et al.\ \cite{pangchance}; its full formulation has not yet been inspected here. Similarly, conference evidence documents partially joint chance-constrained UAV parcel assignment. These references preclude claiming that chance constraints or action filtering alone establish novelty. The current contribution status remains unconfirmed.
+
+\begin{thebibliography}{12}
 \bibitem{chen} X. Chen, M. W. Ulmer, B. W. Thomas (2022). Deep Q-learning for same-day delivery with vehicles and drones. \emph{European Journal of Operational Research}, 298(3), 939--952. \href{https://doi.org/10.1016/j.ejor.2021.06.021}{doi:10.1016/j.ejor.2021.06.021}.
 \bibitem{campuzano} G. Campuzano, E. Lalla-Ruiz, M. Mes (2022). The Dynamic Drone Scheduling Delivery Problem. \emph{Computational Logistics}, LNCS 13557, 260--274. \href{https://doi.org/10.1007/978-3-031-16579-5_18}{doi:10.1007/978-3-031-16579-5\_18}.
 \bibitem{hu} Y. Hu, Y. Du, S. Li (2025). Real-time coordination of human couriers and drones for on-demand food-delivery platforms: A multi-stage risk-aware multi-agent reinforcement learning framework. \emph{Transportation Research Part C}, 181, 105381. \href{https://doi.org/10.1016/j.trc.2025.105381}{doi:10.1016/j.trc.2025.105381}.
@@ -267,5 +334,7 @@ Resource-pattern TD improves over the selected price by 3.28\% but remains 0.70\
 \bibitem{chencharging} J. Chen (2019). Integrated Routing and Charging Scheduling for Autonomous Electric Aerial Vehicle System. \emph{Digital Avionics Systems Conference}. \href{https://doi.org/10.1109/DASC43569.2019.9081655}{doi:10.1109/DASC43569.2019.9081655}.
 \bibitem{ren} G. Ren, B. Shahzaad, B. Alkouz, A. Lakhdari, A. Bouguettaya (2025). Energy-Predictive Planning for Optimizing Drone Service Delivery. \href{https://arxiv.org/abs/2508.01671}{arXiv:2508.01671}.
 \bibitem{nasa} L. Spirkovska (2023). Vertiport Dynamic Density. NASA/TM--20230012622. \href{https://ntrs.nasa.gov/citations/20230012622}{NASA Technical Reports Server}.
+\bibitem{rodriguesdata} T. A. Rodrigues et al. (2021). In-flight positional and energy use data set of a DJI Matrice 100 quadcopter for small package delivery. \emph{Scientific Data}. \href{https://doi.org/10.1038/s41597-021-00930-x}{doi:10.1038/s41597-021-00930-x}. Dataset: \href{https://doi.org/10.1184/R1/12683453.v1}{doi:10.1184/R1/12683453.v1}, CC BY 4.0.
+\bibitem{pangchance} B. Pang, K. H. Low, V. N. Duong (2024). Chance-constrained UAM traffic flow optimization with fast disruption recovery under uncertain waypoint occupancy time. \emph{Transportation Research Part C}, 161, 104547. \href{https://doi.org/10.1016/j.trc.2024.104547}{doi:10.1016/j.trc.2024.104547}.
 \end{thebibliography}
 \end{document}
