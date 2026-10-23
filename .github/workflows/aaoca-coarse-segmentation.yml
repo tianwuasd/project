@@ -6,6 +6,9 @@ on:
       - 'AAOCA/tools/coarse_segmentation/**'
       - 'AAOCA/start_segmentation.*'
       - 'AAOCA/aaoca_preprocessing/**'
+      - 'AAOCA/aaoca_server/**'
+      - 'AAOCA/start_aaoca_server.*'
+      - 'AAOCA/setup_aaoca_environment.py'
       - 'AAOCA/tests/test_aaoca*.py'
       - 'AAOCA/requirements-preprocess.txt'
       - '.github/workflows/aaoca-coarse-segmentation.yml'
@@ -14,6 +17,9 @@ on:
       - 'AAOCA/tools/coarse_segmentation/**'
       - 'AAOCA/start_segmentation.*'
       - 'AAOCA/aaoca_preprocessing/**'
+      - 'AAOCA/aaoca_server/**'
+      - 'AAOCA/start_aaoca_server.*'
+      - 'AAOCA/setup_aaoca_environment.py'
       - 'AAOCA/tests/test_aaoca*.py'
       - 'AAOCA/requirements-preprocess.txt'
       - '.github/workflows/aaoca-coarse-segmentation.yml'
@@ -37,6 +43,8 @@ jobs:
         run: |
           python -S AAOCA/tools/coarse_segmentation/server.py --help
           python -S AAOCA/start_segmentation.py --help
+          python -S AAOCA/start_aaoca_server.py --help
+          python -S AAOCA/setup_aaoca_environment.py --help
       - name: Segmentation contract, private setup and detached lifecycle
         run: python -m unittest discover -s AAOCA/tools/coarse_segmentation/tests -v
       - name: Preprocessing and actual paired-output integration

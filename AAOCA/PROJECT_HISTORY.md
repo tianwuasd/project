@@ -2,6 +2,10 @@
 
 This is the public, non-patient-specific history. Detailed patient mappings and local paths belong to the private workspace memory.
 
+## 2026-10-23: ordered mirrors and measured processing progress
+
+The preprocessing workbench adds ordered update routes, isolated releases, backups and recorded code/interpreter paths for historical resume. A verified unchanged candidate also ends mirror fallback. Environment setup is separate, creates a new venv, tries one PyPI mirror at a time and stops after installation/import validation. The panel provides live case and available slice progress with explicit failure counts and stage labels. Numerical preprocessing code is unchanged; no server speed or real CT validation is implied. See SERVER_WORKBENCH.md.
+
 ## 2026-10-23: paired preprocessing 1.3 and segmentation 0.3
 
 Preprocessing now publishes normalized float32 CT and unclipped resampled HU together on one grid, with separate hashes and round-trip validation. The independent segmentation terminal defaults to selecting a completed preprocessing task and uses its HU companion for TotalSegmentator. Frozen source receipts, writer exclusion, paired-image hashes and geometry checks protect selection, execution and reuse. Labels align with the normalized CT; results remain separate from preprocessing. Legacy raw-HU manifests and frozen segmentation jobs remain available. Normalized-only older preprocessing tasks require a new task from original HU for this workflow; clipped intensities cannot be inverted. Synthetic tests cover actual producer-to-consumer integration, mocked inference and corrupt/incomplete input rejection; no target-server or real-model run is implied.

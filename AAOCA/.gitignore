@@ -15,6 +15,7 @@
 !/aaoca_preprocessing/
 !/aaoca_server/
 !/start_aaoca_server.py
+!/setup_aaoca_environment.py
 !/start_aaoca_server.sh
 !/start_segmentation.py
 !/start_segmentation.sh

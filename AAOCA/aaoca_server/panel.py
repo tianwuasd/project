@@ -2,10 +2,10 @@
 import argparse
 from datetime import datetime
 import importlib.util
-import json
 import math
 import os
 from pathlib import Path
+import subprocess
 import sys
 import time
 import uuid
@@ -90,17 +90,35 @@ class Panel:
         self.emit(f"任务：{entry['name']} | {STATES.get(status['state'], status['state'])}")
         self.emit(f"输出：{entry['output']}\n后台进程：{status['alive']}；停止请求：{status['stop_requested']}")
         progress = status['progress']
-        self.emit('病例：' + ' / '.join(f'{k}={progress.get(k, 0)}' for k in ['total', 'completed', 'reused', 'failed', 'pending']))
+        if status['state'] in {'submitted', 'checking'}:
+            self.emit('正在启动/校验输入；上一轮完成数尚待复核。')
+            progress = {}
+        from .progress import lines
+        for line in lines(progress):
+            self.emit(line)
         if status['worker'].get('error'):
             self.emit('原因：' + status['worker']['error'])
-        for case in progress.get('active', {}).values():
-            self.emit('当前阶段：' + json.dumps(case, ensure_ascii=False))
         resources = status['resources'].get('selected')
         if resources:
             self.emit(f"本次实际选择：CPU {resources['cpu_limit']}，病例并发 {resources['workers']}，"
                       f"计算线程/病例 {resources['compute_threads']}，内存 {resources['memory_budget_gib']:.2f} GiB")
         for item in progress.get('errors', [])[:5]:
             self.emit('失败：' + str(item.get('error', item)))
+
+    def watch_progress(self):
+        self.current()
+        try:
+            while True:
+                if sys.stdout.isatty():
+                    self.emit('\033[2J\033[H')
+                self.emit('实时进度（每秒刷新；Ctrl+C 返回，后台继续运行）')
+                self.show_status()
+                if job_status(self.current()['output'])['alive'] is not True:
+                    self.emit('当前没有可确认的运行进程；已结束刷新。')
+                    return
+                time.sleep(1)
+        except KeyboardInterrupt:
+            self.emit('已返回面板，后台任务继续运行。')
 
     def history(self):
         entries = self.registry.entries()
@@ -206,7 +224,10 @@ class Panel:
         from aaoca_preprocessing import jobs
         with dispatch_lock(self.registry.root):
             self.registry.ensure_idle()
-            entry = {'id': task_id, 'name': name, 'output': str(output), 'created_at': now()}
+            from .updater import CODE_ROOT, ensure_current
+            ensure_current(self.registry.root)
+            entry = {'id': task_id, 'name': name, 'output': str(output), 'created_at': now(),
+                     'code_root': str(CODE_ROOT), 'python': sys.executable}
             # Persist history BEFORE spawning, so a terminal crash cannot orphan
             # a successfully submitted worker from this registry.
             self.registry.register(entry)
@@ -217,7 +238,7 @@ class Panel:
             result = jobs.start(settings['input'], output, config, settings['manifest'] or None,
                                 scratch, spacing, resource_request={k: settings[k] for k in RESOURCE_FIELDS})
             write(Path(result['runtime']) / 'preview.json', {'resources': resources, 'spacing': spacing})
-        self.emit('已提交后台预处理。退出面板或断开终端后继续运行；用 s 看进度、l 看日志。')
+        self.emit('已提交后台预处理。退出面板或断开终端后继续运行；用 p 看实时进度条、s 查进度、l 看日志。')
         return True
 
     def new(self):
@@ -237,10 +258,13 @@ class Panel:
         self.emit(f"续跑：{entry['name']}\n输出：{entry['output']}\n沿用冻结的输入和间距，自动资源重新估算。")
         if self.prompt('输入 y 确认续跑：').lower() != 'y':
             return
-        from aaoca_preprocessing import jobs
         with dispatch_lock(self.registry.root):
             self.registry.ensure_idle()
-            jobs.resume(entry['output'])
+            from .updater import ensure_current, resume_saved
+            ensure_current(self.registry.root)
+            # Re-read after locking: another terminal may have migrated history.
+            entry = next((item for item in self.registry.entries() if item['output'] == entry['output']), entry)
+            resume_saved(entry)
         self.emit('已提交续跑。')
 
     def stop(self):
@@ -259,6 +283,34 @@ class Panel:
         for name in ('numpy', 'scipy', 'nibabel', 'psutil'):
             self.emit(f'{name}：' + ('可导入位置已找到' if importlib.util.find_spec(name) else '未安装'))
         self.emit('本模块仅用 CPU；启动需安装本项目预处理依赖。')
+        self.emit('独立安装入口：python3 setup_aaoca_environment.py --env /path/to/new/venv --runtime ' + str(self.registry.root))
+
+    def mirrors(self):
+        from . import mirrors
+        draft = mirrors.load(self.registry.root)
+        while True:
+            for kind, choices in [('code', mirrors.CODE), ('pypi', mirrors.PYPI)]:
+                self.emit(kind + ' 当前顺序：' + ' → '.join(draft[kind]))
+                self.emit('可用线路：' + '；'.join(f'{name}={url}' for name, url in choices.items()))
+            self.emit('1 程序更新顺序  2 环境安装顺序  w 保存  b 返回  q 退出')
+            action = self.prompt('镜像设置：').lower()
+            if action == 'w':
+                with dispatch_lock(self.registry.root):
+                    mirrors.save(self.registry.root, draft)
+                self.emit('镜像顺序已保存；首个成功后停止。')
+                return
+            if action in {'1', '2'}:
+                kind = 'code' if action == '1' else 'pypi'
+                candidate = dict(draft)
+                candidate[kind] = self.prompt('按优先顺序输入线路名称，以空格分隔：').lower().split()
+                draft = mirrors.validate(candidate)
+
+    def update(self):
+        from .updater import update
+        result = update(self.registry, self.emit)
+        self.emit(result['message'])
+        if result['changed']:
+            raise Exit()
 
     def run(self):
         self.emit('AAOCA 服务器工作台 — 独立于原始资料整理入口')
@@ -269,11 +321,12 @@ class Panel:
                     self.emit(f"\n当前任务：{self.selected['name']} | {STATES.get(state, state)}")
                 else:
                     self.emit('\n当前任务：暂无')
-                self.emit('n 新建任务  c 预处理配置  s 进度  l 日志  f 实时日志\nh 历史任务  o 结果位置  r 续跑  x 停止  e 环境  q/0 退出')
+                self.emit('n 新建任务  c 预处理配置  s 进度  p 实时进度条  l 日志  f 实时日志\nh 历史任务  o 结果位置  r 续跑  x 停止  e 环境\nu 更新程序  m 镜像配置  q/0 退出')
                 action = self.prompt('操作 [s]：').lower() or 's'
                 actions = {'n': self.new, 'c': self.configure, 's': self.show_status, 'l': self.logs,
                            'f': lambda: self.logs(True), 'h': self.history, 'r': self.resume,
-                           'x': self.stop, 'e': self.environment,
+                           'x': self.stop, 'e': self.environment, 'u': self.update, 'm': self.mirrors,
+                           'p': self.watch_progress,
                            'o': lambda: self.emit('结果目录：' + self.current()['output'])}
                 if action in actions:
                     actions[action]()
@@ -284,7 +337,7 @@ class Panel:
             except (Exit, EOFError, KeyboardInterrupt):
                 self.emit('已退出面板，已提交的后台任务继续运行。')
                 return 0
-            except (ValueError, RuntimeError, OSError, ImportError) as exc:
+            except (ValueError, RuntimeError, OSError, ImportError, subprocess.TimeoutExpired) as exc:
                 self.emit('未完成：' + str(exc))
 
 
@@ -293,18 +346,36 @@ def main(argv=None):
     parser.add_argument('--runtime', default=os.environ.get('AAOCA_SERVER_RUNTIME', '~/.local/state/aaoca-server'), help='面板配置与任务历史目录')
     parser.add_argument('--input', help='已转换且保留 HU 的 NIfTI 根目录')
     parser.add_argument('--results', help='独立预处理结果根目录')
+    parser.add_argument('--checkout', help='更新用的 Git 项目目录；安装后的 aaoca-server 可显式指定')
     queries = parser.add_mutually_exclusive_group()
     queries.add_argument('--status', action='store_true', help='只读最近任务状态后退出')
     queries.add_argument('--logs', action='store_true', help='只读最近任务日志后退出')
+    queries.add_argument('--update', action='store_true', help='按配置镜像更新程序后退出，不安装依赖')
+    queries.add_argument('--watch', action='store_true', help='每秒刷新最近任务进度条，Ctrl+C 退出查看')
     args = parser.parse_args(argv)
     try:
+        from .updater import CODE_ROOT, managed_release
+        runtime = Path(args.runtime).expanduser().resolve()
+        release = managed_release(runtime)
+        if release is not None and release != CODE_ROOT:
+            os.execv(sys.executable, [sys.executable, str(release / 'start_aaoca_server.py'),
+                                     *(sys.argv[1:] if argv is None else argv)])
         overrides = {key: parse_setting(key, getattr(args, key)) for key in ('input', 'results') if getattr(args, key)}
         panel = Panel(args.runtime, overrides)
+        if args.checkout:
+            os.environ['AAOCA_PREPROCESS_CHECKOUT'] = str(Path(args.checkout).expanduser().resolve())
+        if args.update:
+            from .updater import update
+            print(update(panel.registry)['message'])
+            return 0
         if args.status or args.logs:
             (panel.show_status if args.status else panel.logs)()
             return 0
+        if args.watch:
+            panel.watch_progress()
+            return 0
         return panel.run()
-    except (ValueError, RuntimeError, OSError, ImportError) as exc:
+    except (ValueError, RuntimeError, OSError, ImportError, subprocess.TimeoutExpired) as exc:
         print('未完成：' + str(exc), file=sys.stderr)
         return 1
 

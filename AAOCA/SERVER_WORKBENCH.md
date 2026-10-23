@@ -9,8 +9,8 @@
 在本仓库 `AAOCA` 目录中，使用独立的 Python 3.10+ 预处理环境：
 
 ```bash
-python3 -m venv .venv-preprocess
-.venv-preprocess/bin/python -m pip install .
+python3 setup_aaoca_environment.py --env /path/to/aaoca_env --runtime /path/to/aaoca_panel
+export AAOCA_PREPROCESS_PYTHON=/path/to/aaoca_env/bin/python
 bash start_aaoca_server.sh \
   --input /path/to/hu_nifti \
   --results /path/to/preprocessed \
@@ -30,7 +30,8 @@ AAOCA 服务器工作台
 n 新建任务    c 预处理配置    s 进度
 l 日志        f 实时日志      h 历史任务
 o 结果位置    r 续跑          x 停止
-e 环境        q/0 退出
+e 环境        p 实时进度条
+u 更新程序    m 镜像配置      q/0 退出
 
 n → 输入任务名称 → 1 预处理 → 配置页
     1  HU NIfTI 输入目录
@@ -51,6 +52,46 @@ n → 输入任务名称 → 1 预处理 → 配置页
 主页 `c` 可单独保存配置。`p` 只读头信息，`w` 只保存配置。新任务的 `s` 展示间距、病例数、输出体积估算及资源预算，输入 `y` 才启动。主页回车查看状态。各输入支持 `b` 返回、`q` 退出；名称只用于展示，目录使用时间和随机 ID。
 
 `l` 显示最近最多 64 KiB 日志，`f` 持续查看，Ctrl+C 返回面板。退出面板或断开 SSH 后，已提交任务继续运行。`x` 请求停止当前选定任务，可能等待正在进行的压缩写入完成；`r` 续跑并校验、复用完成的病例。停止/续跑前会显示具体任务和路径。
+
+## 数据处理进度条
+
+主页 `s` 查看一次，`p` 每秒刷新；也可直接运行：
+
+```bash
+bash start_aaoca_server.sh --runtime /path/to/aaoca_panel --watch
+```
+
+显示示例（示意数值）：
+
+```text
+病例进度 [##############----------] 60.0% (6/10)
+新完成 3 | 复用 2 | 失败 1 | 剩余 4
+case_a：重采样 [########--------] 50.0% (40/80) 层
+```
+
+病例进度计入已完成、复用和已失败病例，失败单列，100% 不代表全部成功。切片进度只展示后台已记录的重采样/归一化计数；解压、压缩和校验阶段显示实际阶段，不虚构百分比。没有统计时显示等待统计。后台进度通常在阶段改变或约 2 秒后落盘，因此每秒刷新不代表每秒都有新数据。Ctrl+C 只结束查看，后台任务继续。
+
+## 按顺序更新与镜像配置
+
+主页 `u` 或 `--update` 更新预处理工作台，`m` 配置顺序。默认代码线路为 **GH-Proxy.com → GHfast → GitClone → GitHub 原站**。这是可调整的优先级，不是 zmic44 的速度测量结果；不会先遍历所有镜像测速。配置保存到面板目录的 `mirrors.json`，例如：
+
+```json
+{"code": ["gh-proxy", "ghfast", "gitclone", "official"], "pypi": ["tuna", "sjtu", "aliyun"]}
+```
+
+更新先限时 12 秒查询官方提交，再按顺序下载。每个线路的 Git 获取与按需代码提取分别限时 45 秒。**首个通过提交关系、归档和入口检查的版本即停止尝试其他镜像**；若与当前版本相同也立即结束。官方可达时拒绝落后镜像；官方不可达时明确提示“官方最新状态未确认”。全部失败时保留当前代码，并在 `update-last.json` 记录原因。
+
+更新要求已下载的 `main` Git 工作副本、干净工作区，以及在仓库外的 `--runtime`。已知历史镜像 origin 可识别，无需重写 origin。安装后的 `aaoca-server` 可用 `--checkout /path/to/project` 指定 Git 工作副本。存在本面板登记的运行任务时不更新；未知状态也不放行。
+
+只把预处理代码安装到 `<runtime>/releases/<提交号>/`，不替换共享 Git checkout，不更新独立分割面板或原始资料整理模块。旧代码保存在 `<runtime>/backups/`；任务历史记录原代码和 Python 路径，续跑仍核对原实现与依赖。其他打开的旧面板不能继续提交新任务，需重新打开。更新成功退出面板，使用原启动命令和相同 runtime 再次打开即可载入新版。下载工作目录保存在 `<runtime>/downloads/` 供核查，当前不自动清理。
+
+### 环境安装单独进行
+
+`setup_aaoca_environment.py` 只创建**尚不存在的新环境**，按清华 TUNA → 上海交大 SJTUG → 阿里云顺序尝试，单次安装最多 300 秒，连接超时 20 秒、重试一次。每次只使用一个包索引，安装及导入检查成功后停止；不使用 `extra-index-url` 同时请求多个镜像，不改全局配置。镜像地址依据 [TUNA 文档](https://mirrors.tuna.tsinghua.edu.cn/help/pypi/) 和 [SJTUG PyPI](https://mirror.sjtu.edu.cn/pypi/web/simple/)。
+
+程序更新不运行 pip。需要新依赖时用独立安装入口和新的环境目录；它读取同一 runtime 当前发布目录作为安装来源。安装记录在新环境的 `install-report.json`；失败环境保留供排查，重试选择新目录。历史环境继续留给历史任务，不在运行时升级。安装后按输出的 Python 路径设置 `AAOCA_PREPROCESS_PYTHON`。
+
+旧版本尚无 `u/m/p` 时，需要先下载包含本功能的 GitHub 代码；旧面板不会自动获得新菜单。
 
 ## 自动间距与强度
 
