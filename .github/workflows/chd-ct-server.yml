@@ -1,0 +1,41 @@
+name: CHD CT server workflows
+
+on:
+  push:
+    paths:
+      - 'chd-ct-reproduction/src/**'
+      - 'chd-ct-reproduction/tests/**'
+      - 'chd-ct-reproduction/pyproject.toml'
+      - '.github/workflows/chd-ct-server.yml'
+  pull_request:
+    paths:
+      - 'chd-ct-reproduction/**'
+      - '.github/workflows/chd-ct-server.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: chd-ct-reproduction
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install CPU-only synthetic test environment
+        run: |
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e '.[dev]'
+      - name: Workflow, input lineage and detached lifecycle regressions
+        run: >-
+          python -m pytest -q tests/test_task_lineage.py tests/test_rerun_posix.py
+          tests/test_server_jobs.py tests/test_server_panel.py tests/test_server_workflow.py
+          tests/test_server_posix.py tests/test_extension_posix.py tests/test_workflow_extension.py
+          tests/test_resume_modes.py tests/test_result_viewer.py tests/test_cache_selection.py
+          tests/test_resume_verification.py tests/test_verification_posix.py
