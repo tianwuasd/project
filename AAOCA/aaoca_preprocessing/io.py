@@ -13,10 +13,12 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def file_hash(path):
+def file_hash(path, check=None):
     digest = hashlib.sha256()
     with Path(path).open('rb') as stream:
         for block in iter(lambda: stream.read(8 * 1024 * 1024), b''):
+            if check:
+                check()
             digest.update(block)
     return digest.hexdigest()
 
@@ -106,16 +108,21 @@ def discover(input_root, manifest=None):
             digest = row.get('sha256')
             if digest is not None and not re.fullmatch(r'[0-9a-fA-F]{64}', str(digest)):
                 raise ValueError('manifest sha256 must be a 64-character hexadecimal hash')
-            selected.append((root / relative, str(digest).lower() if digest is not None else None))
+            expected_stat = None
+            if 'size' in row or 'mtime_ns' in row:
+                if any(isinstance(row.get(key), bool) or not isinstance(row.get(key), int) or row[key] < 0 for key in ['size', 'mtime_ns']):
+                    raise ValueError('frozen source size and mtime_ns must be nonnegative integers')
+                expected_stat = [row['size'], row['mtime_ns']]
+            selected.append((root / relative, str(digest).lower() if digest is not None else None, expected_stat))
     else:
         def discovery_error(error):
             raise error
         for directory, folders, files in os.walk(root, followlinks=False, onerror=discovery_error):
             folders[:] = sorted(name for name in folders
                                 if not derived_directory(name) and not (Path(directory) / name).is_symlink())
-            selected.extend((Path(directory) / name, None) for name in sorted(files) if image_name(name))
+            selected.extend((Path(directory) / name, None, None) for name in sorted(files) if image_name(name))
     cases, seen = [], set()
-    for path, digest in selected:
+    for path, digest, expected_stat in selected:
         resolved = path.resolve()
         if not resolved.is_relative_to(root):
             raise ValueError('source path escapes input root')
@@ -126,7 +133,7 @@ def discover(input_root, manifest=None):
             raise ValueError('duplicate source in input manifest')
         seen.add(resolved)
         cases.append({'case_id': hashlib.sha256(relative.encode('utf-8')).hexdigest()[:24],
-                      'input': relative, 'source': resolved, 'expected_sha256': digest})
+                      'input': relative, 'source': resolved, 'expected_sha256': digest, 'expected_stat': expected_stat})
     if not cases:
         raise ValueError('no native AAOCA NIfTI CT images found')
     return sorted(cases, key=lambda case: case['input'])

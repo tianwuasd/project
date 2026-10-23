@@ -25,6 +25,8 @@ Windows 对应环境解释器位于 `aaoca_env/Scripts/python.exe`。若只需�
 
 ## 推荐执行顺序
 
+1.1 版增加完整的“强度归一化 + 重采样”入口、自动间距建议、CPU 调度和后台停止/续跑。服务器建议按 [PREPROCESSING_WORKFLOW.md](PREPROCESSING_WORKFLOW.md) 执行 `doctor → suggest-spacing/plan → benchmark → start → status`。下面 `run` 保留仅归一化的兼容用法；`prepare`、`start` 必须显式选择 `--spacing auto` 或三个毫米数值，没有隐含的 0.5 mm 默认值。
+
 `--input` 指向原始 HU NIfTI 目录，`--output` 指向独立的新目录，两者不得相互包含。下面路径为示例，需要替换为自己的目录。
 
 ```bash
@@ -43,9 +45,9 @@ aaoca-preprocess status --output /path/to/AAOCA_normalized_v1
 
 默认 `--workers 1 --chunk-depth 8 --max-case-gib 8`。CPU 是主要计算资源，压缩读写也会影响速度；共享 NAS 建议从 1 个病例开始，按实际内存和 I/O 测量再提高 `--workers`，不要按整机逻辑线程数直接开满。运行前检查个人配额，程序检查到的文件系统空闲空间不代表个人配额。
 
-`--max-case-gib` 限制保守估算的单病例数组工作内存，不是操作系统硬上限；源体积仍需读入内存，输出使用磁盘映射与分块插值。并发工作内存估计超过当前可用内存的 75% 会拒绝启动；能识别的 Linux cgroup 内存限额也参与检查。CPU affinity 只约束可见范围，不能证明共享服务器分配。调高限额前核实实际获准资源。
+`--max-case-gib` 限制保守估算的单病例工作内存，不是操作系统硬上限；源体积仍需读入内存，输出使用磁盘映射与分块插值。1.1 版按当前可用内存的 75% 与显式 `--memory-budget-gib` 中较小者逐例调度；病例自身超过预算会单独拒绝。可识别的 Linux cgroup 父级 CPU/RAM 限额和进程 affinity 参与计算。它们只约束可见范围，不能证明共享服务器分配。调高限额前核实实际获准资源。
 
-大体积的临时 float32 数组默认写入 `OUTPUT/.scratch`；可用 `--scratch /path/to/allocated-scratch` 显式选择已获准、容量足够的路径。不会自动把 NAS 数据搬到本地盘，也不假定本地盘更快。首次失败、参数冲突或容量不足均有明确错误信息。
+临时解压 NIfTI 和 float32 数组默认写入 `OUTPUT/.scratch`；压缩源只完整解压一次，并读到 gzip 尾部校验。可用 `--scratch /path/to/allocated-scratch` 显式选择已获准、容量足够的路径，不假定本地盘更快。磁盘预检计入解压源和输出数组。首次失败、参数冲突或容量不足均有明确错误信息。
 
 ## 可选空间重采样
 
@@ -97,7 +99,7 @@ OUTPUT/
 
 输出影像和记录在同一临时目录完成，全像素解压回读、CRC、空间头校验通过后一起发布。单病例失败不影响其他病例。输出目录有操作系统互斥锁；锁文件留在磁盘不等于仍在运行，不要手动删除它。必须使用支持互斥锁及同文件系统原子重命名的文件系统。
 
-Ctrl+C 取消未开始的病例，等待已经开始的病例结束，然后记为中断。强制终止或断电可能留下 `.staging` / `.scratch` 临时目录；它们不会被当作完成，也不会在续跑时自动删除历史残留。确认无运行进程后再人工检查清理。`status` 是最后保存的快照，进程被强杀时可能仍显示 running；它不是存活监控。
+Ctrl+C 停止接收新病例，并在解压、哈希或插值分块检查点协作退出；正在保存的 gzip 可能要等写出结束。中断病例不发布。强制终止或断电可能留下 `.staging` / `.scratch` 临时目录；它们不会被当作完成，也不会在续跑时自动删除历史残留。确认无运行进程后再人工检查清理。普通前台 `run` 的 `status` 读取最后快照；通过 `start` 创建的任务还核验 PID 与进程创建时间，并显示独立 worker 状态。
 
 记录含源相对路径、几何和处理信息，应保存在私人结果目录。公开 Git 只发布代码、合成测试和说明，不上传输入 CT、真实运行清单、服务器笔记或输出影像。
 
@@ -112,7 +114,7 @@ bash /path/to/project/AAOCA/preprocess_server.sh run \
   --input /path/to/AAOCA --output /path/to/AAOCA_normalized_v1
 ```
 
-脚本不安装环境、不自动更新 Git、不占 GPU。若要断开 SSH 后继续运行，先选择独立的私人日志目录：
+脚本不安装环境、不自动更新 Git、不占 GPU。1.1 版推荐使用内置 `start/status/stop/resume`，详见工作流文档。下列手动 `nohup run` 仍可使用，但没有内置后台任务的冻结配置与控制记录：
 
 ```bash
 mkdir -p /path/to/private-logs
@@ -135,7 +137,7 @@ summary = run('/path/to/AAOCA', '/path/to/AAOCA_normalized_v1', config)
 ```
 
 ```bash
-python -m unittest discover -s tests -p 'test_aaoca_preprocessing.py' -v
+python -m unittest discover -s tests -p 'test_aaoca_*.py' -v
 ```
 
 测试只生成合成影像，覆盖 HU 边界、缩放、空间方向、剪切、完整视野、独立采样对照、分块、输入发现、失败隔离、校验续跑、锁和命令行。数值网格复用 `tools/research_ct/research_preprocess.py` 的项目实现；CPU 分块内核使用 SciPy，不需要导入旧脚本的 nnU-Net 环境。原 HU 保留型研究脚本保持独立，旧的 0.5 mm 样例不自动当成新的归一化成果。

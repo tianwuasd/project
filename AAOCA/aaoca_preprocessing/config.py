@@ -13,6 +13,10 @@ class Config:
     workers: int = 1
     chunk_depth: int = 8
     max_case_gib: float = 8.0
+    compute_threads: int = 1
+    read_workers: int = 1
+    memory_budget_gib: float | None = None
+    compression_level: int = 1
 
     def __post_init__(self):
         if self.target_spacing is not None:
@@ -20,12 +24,17 @@ class Config:
             if len(spacing) != 3 or not all(math.isfinite(v) and v > 0 for v in spacing):
                 raise ValueError('target spacing must contain three positive finite millimetre values')
             object.__setattr__(self, 'target_spacing', spacing)
-        for name, maximum in [('workers', 32), ('chunk_depth', 1024)]:
+        for name, maximum in [('workers', 32), ('chunk_depth', 1024),
+                              ('compute_threads', 32), ('read_workers', 32)]:
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= maximum:
                 raise ValueError(f'{name} must be an integer in [1,{maximum}]')
         if not math.isfinite(self.max_case_gib) or self.max_case_gib <= 0:
             raise ValueError('max_case_gib must be positive and finite')
+        if self.memory_budget_gib is not None and (not math.isfinite(self.memory_budget_gib) or self.memory_budget_gib <= 0):
+            raise ValueError('memory_budget_gib must be positive and finite')
+        if isinstance(self.compression_level, bool) or not isinstance(self.compression_level, int) or not 0 <= self.compression_level <= 9:
+            raise ValueError('compression_level must be an integer in [0,9]')
 
     def recipe(self):
         return {
@@ -37,6 +46,7 @@ class Config:
             'orientation': 'RAS axis order, preserve obliquity and shear',
             'grid': 'rounded shape; preserve voxel-cell FOV and centre; actual spacing in affine',
             'interpolation': 'scipy affine_transform order=1 mode=nearest prefilter=False',
+            'antialias': False,
             'crop': None, 'registration': None, 'dtype': 'float32',
             'packages': {p: importlib.metadata.version(p) for p in ('numpy', 'scipy', 'nibabel')},
             'implementation_sha256': hashlib.sha256(b''.join(

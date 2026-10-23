@@ -7,12 +7,16 @@ import gzip
 import hashlib
 import math
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+from collections import deque
+import time
 
 import nibabel as nib
 import numpy as np
 from scipy.ndimage import affine_transform
 
 from .config import Config
+from .control import Control
 
 
 def normalize_hu(array):
@@ -76,7 +80,7 @@ def inspect_image(path, config: Config):
     shape, affine, mapping = output_grid(canonical_shape, canonical_affine, config.target_spacing)
     # Conservative array working-set estimate; filesystem cache and other processes are separate.
     source_bytes = math.prod(image.shape) * max(8, image.get_data_dtype().itemsize)
-    slab_bytes = shape[0] * shape[1] * min(config.chunk_depth, shape[2]) * 12
+    slab_bytes = shape[0] * shape[1] * min(config.chunk_depth, shape[2]) * 16 * config.compute_threads
     return {
         'original_shape': list(image.shape), 'original_affine': image.affine.tolist(),
         'canonical_shape': list(canonical_shape), 'canonical_affine': canonical_affine.tolist(),
@@ -84,9 +88,16 @@ def inspect_image(path, config: Config):
         'actual_spacing_mm': nib.affines.voxel_sizes(affine).tolist(),
         'output_index_to_canonical_index': mapping.tolist(),
         'output_index_to_original_index': (np.linalg.inv(image.affine) @ affine).tolist(),
+        'original_index_to_output_index': (np.linalg.inv(affine) @ image.affine).tolist(),
+        'canonical_spacing_mm': nib.affines.voxel_sizes(canonical_affine).tolist(),
+        'downsample_axes_RAS': [axis for axis, old, new in zip('RAS', canonical_shape, shape) if new < old],
+        'axis_size_factors_RAS': (np.array(shape) / canonical_shape).tolist(),
+        'antialias': False,
         'input_scaling': {'slope': float(image.dataobj.slope), 'intercept': float(image.dataobj.inter)},
         'output_bytes_uncompressed': math.prod(shape) * 4,
-        'estimated_working_bytes': source_bytes * 3 + slab_bytes,
+        'estimated_working_bytes': source_bytes * 3 + slab_bytes + math.prod(shape) * 4,
+        'scratch_bytes': math.prod(shape) * 4 + (int(image.dataobj.offset) +
+                         math.prod(image.shape) * image.get_data_dtype().itemsize if str(path).lower().endswith('.gz') else 0),
     }
 
 
@@ -97,19 +108,45 @@ def check_gzip(path):
                 pass  # Read to EOF to validate gzip CRC/trailer, not just NIfTI voxel count.
 
 
-def preprocess_image(source: Path, destination: Path, scratch: Path, config: Config, info: dict):
-    image = nib.load(source)
-    canonical = nib.as_closest_canonical(image)
-    data = canonical.get_fdata(dtype=np.float32, caching='unchanged')
-    if not np.isfinite(data).all():
-        raise ValueError('CT contains nonfinite pixels (NaN/Inf)')
-    check_gzip(source)
+def preprocess_image(source: Path, destination: Path, scratch: Path, config: Config, info: dict,
+                     control=None, case_id=''):
+    control = control or Control()
+    timings = {}
+    control.stage(case_id, 'decode_load')
+    started = time.monotonic()
+    with control.io():
+        local = source
+        if str(source).lower().endswith('.gz'):
+            local = scratch / 'source.nii'
+            # One sequential decompression, including CRC/trailer. Bound expansion
+            # to the header-declared payload to avoid unbounded scratch usage.
+            source_header = nib.load(source)
+            expected = int(source_header.dataobj.offset) + math.prod(source_header.shape) * source_header.get_data_dtype().itemsize
+            written = 0
+            with gzip.open(source, 'rb') as reader, local.open('xb') as writer:
+                while block := reader.read(8 * 1024 * 1024):
+                    control.check()
+                    written += len(block)
+                    if written > expected:
+                        raise ValueError('unexpected bytes after NIfTI payload')
+                    writer.write(block)
+            if written != expected:
+                raise ValueError('truncated source NIfTI payload')
+        # mmap=False releases scratch files reliably on Windows after loading.
+        canonical = nib.as_closest_canonical(nib.load(local, mmap=False))
+        data = canonical.get_fdata(dtype=np.float32, caching='unchanged')
+        if not np.isfinite(data).all():
+            raise ValueError('CT contains nonfinite pixels (NaN/Inf)')
+    timings['decode_load'] = time.monotonic() - started
     shape = tuple(info['output_shape'])
     mapping = np.array(info['output_index_to_canonical_index'])
     output = np.memmap(scratch / 'normalized.float32', dtype=np.float32, mode='w+', shape=shape, order='F')
     lo, hi, below, above, total, squares = float('inf'), -float('inf'), 0, 0, 0.0, 0.0
     try:
-        for z in range(0, shape[2], config.chunk_depth):
+        control.stage(case_id, 'compute', total_slices=shape[2])
+        started = time.monotonic()
+        def slab(z):
+            control.check()
             depth = min(config.chunk_depth, shape[2] - z)
             if config.target_spacing is None:
                 block = np.array(data[:, :, z:z+depth], dtype=np.float32, copy=True)
@@ -118,15 +155,31 @@ def preprocess_image(source: Path, destination: Path, scratch: Path, config: Con
                 block = affine_transform(data, mapping[:3, :3], offset=offset,
                                          output_shape=(shape[0], shape[1], depth), output=np.float32,
                                          order=1, mode='nearest', prefilter=False)
-            below += int(np.count_nonzero(block < -1000))
-            above += int(np.count_nonzero(block > 1000))
-            np.clip(block, -1000, 1000, out=block)
-            block /= np.float32(1000)
-            lo, hi = min(lo, float(block.min())), max(hi, float(block.max()))
-            total += float(block.sum(dtype=np.float64))
-            squares += float(np.square(block, dtype=np.float64).sum())
-            output[:, :, z:z+depth] = block
+            return z, block
+
+        # Keep at most compute_threads futures; consume in z order for stable
+        # statistics and bounded memory even when an early slab is slow.
+        positions = iter(range(0, shape[2], config.chunk_depth))
+        with ThreadPoolExecutor(max_workers=config.compute_threads) as pool:
+            pending = deque(pool.submit(slab, z) for z in [next(positions, None) for _ in range(config.compute_threads)] if z is not None)
+            while pending:
+                z, block = pending.popleft().result()
+                control.check()
+                depth = block.shape[2]
+                below += int(np.count_nonzero(block < -1000))
+                above += int(np.count_nonzero(block > 1000))
+                np.clip(block, -1000, 1000, out=block)
+                block /= np.float32(1000)
+                lo, hi = min(lo, float(block.min())), max(hi, float(block.max()))
+                total += float(block.sum(dtype=np.float64))
+                squares += float(np.square(block, dtype=np.float64).sum())
+                output[:, :, z:z+depth] = block
+                control.stage(case_id, 'compute', completed_slices=z+depth, total_slices=shape[2])
+                next_z = next(positions, None)
+                if next_z is not None:
+                    pending.append(pool.submit(slab, next_z))
         output.flush()
+        timings['compute'] = time.monotonic() - started
         affine = np.array(info['output_affine'])
         result = nib.Nifti1Image(output, affine)  # fresh header: no source names/free-text/extensions
         result.set_sform(affine, code=1)
@@ -136,8 +189,17 @@ def preprocess_image(source: Path, destination: Path, scratch: Path, config: Con
         result.header.set_xyzt_units('mm')
         result.header.set_slope_inter(1, 0)
         result.header['descrip'] = b'aaoca_preprocessing v1; normalized [-1,1]; NOT HU'
-        nib.save(result, destination)
-        verification = validate_written(destination, output, affine, config.chunk_depth)
+        control.stage(case_id, 'save')
+        started = time.monotonic()
+        with control.io(), destination.open('xb') as raw:
+            with gzip.GzipFile(filename='', fileobj=raw, mode='wb', compresslevel=config.compression_level, mtime=0) as stream:
+                result.to_file_map({'image': nib.FileHolder(fileobj=stream)})
+        timings['save'] = time.monotonic() - started
+        control.stage(case_id, 'verify')
+        started = time.monotonic()
+        with control.io():
+            verification = validate_written(destination, output, affine, config.chunk_depth, control)
+        timings['verify'] = time.monotonic() - started
         count = math.prod(shape)
         return {
             'input_statistics_hu': {'min': float(data.min()), 'max': float(data.max())},
@@ -145,12 +207,13 @@ def preprocess_image(source: Path, destination: Path, scratch: Path, config: Con
                                   'std': math.sqrt(max(0.0, squares / count - (total / count)**2)),
                                   'voxels': count, 'clipped_below': below, 'clipped_above': above},
             'verification': verification,
+            'timings_seconds': timings, 'compression_level': config.compression_level,
         }
     finally:
         output._mmap.close()
 
 
-def validate_written(path, expected, affine, chunk_depth=8):
+def validate_written(path, expected, affine, chunk_depth=8, control=None):
     image = nib.load(path)
     if (image.shape != expected.shape or image.get_data_dtype() != np.dtype('float32')
             or image.header.get_xyzt_units()[0] != 'mm'
@@ -165,6 +228,8 @@ def validate_written(path, expected, affine, chunk_depth=8):
         if len(stream.read(offset)) != offset:
             raise ValueError('truncated output header')
         for z in range(0, expected.shape[2], chunk_depth):
+            if control:
+                control.check()
             block = np.asarray(expected[:, :, z:z+chunk_depth], dtype='<f4').tobytes(order='F')
             saved = stream.read(len(block))
             if saved != block:

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aaoca-preprocessing"
-version = "1.0.0"
+version = "1.1.0"
 description = "Portable CPU preprocessing of HU-calibrated AAOCA NIfTI CT"
 readme = "PREPROCESSING.md"
 requires-python = ">=3.10"

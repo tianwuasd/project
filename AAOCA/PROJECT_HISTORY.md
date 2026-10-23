@@ -38,6 +38,14 @@ Added an independently installable CPU package with fixed HU clipping [-1000,100
 
 Added header-only planning, original-manifest or directory input, isolated case failures, source/configuration/output hash checks, full voxel round-trip validation, atomic case publication, OS locking, resource preflight, CLI/status and a Linux launcher. Source scans and prior successful results are preserved. Synthetic tests cover numerical, geometry, integrity, restart and CLI behavior. This release does not claim a production server deployment or a full-dataset processing run.
 
+## October 23: preprocessing 1.1 workflow and CPU controls
+
+Added explicit combined prepare/start commands, inspectable nnU-Net-inspired spacing suggestions, and a bounded representative-case benchmark. Automatic geometry uses full-FOV RAS headers and does not run nnU-Net network planning or its default CT normalization. Fixed clip[-1000,1000]/1000 remains unchanged; there is no implicit 0.5 mm target.
+
+Compressed sources are expanded once with CRC validation. Bounded slab threads, independently limited I/O, ancestor cgroup CPU/RAM checks and memory-aware case admission expose resource controls without changing voxel results. Records include inverse coordinate mappings, downsampling axes and stage/performance measurements. Detached jobs freeze inputs/configuration, validate process creation identity, support cooperative stop and verified resume, and retain separate worker logs. Code and dependency changes require a new output directory.
+
+Synthetic preprocessing tests and existing desktop regression passed; package installation and background lifecycle were checked locally on Windows. Target Linux/server performance and real-data preprocessing were not executed. Local synthetic measurements are not server speedup claims.
+
 ## Maintenance contract
 
 Maintain the code and its synthetic tests together. Local deployment and this code mirror must be compared by file hashes before synchronization. Keep all local clinical records out of Git. Do not repeat completed historical recovery scripts or launch full data processing merely to update handoff documentation.

@@ -9,6 +9,7 @@
 !/requirements-preprocess.txt
 !/pyproject.toml
 !/PREPROCESSING.md
+!/PREPROCESSING_WORKFLOW.md
 !/preprocess_aaoca.py
 !/preprocess_server.sh
 !/aaoca_preprocessing/

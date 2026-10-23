@@ -6,9 +6,11 @@
 
 ## AAOCA 独立预处理
 
-新增可安装的 CPU 预处理模块：对原始 HU NIfTI CT 执行 `clip(HU, -1000, 1000) / 1000`，输出 float32 `[-1,1]`。默认保留原分辨率、重排为 RAS 轴顺序，也支持显式指定近 0.5 mm 等目标间距。提供只读计划、批量运行、哈希校验续跑、进度和独立输出记录。**预处理环境支持 Python 3.10+，不需要下面桌面面板的 GUI 依赖。**
+可安装的 CPU 预处理模块：对原始 HU NIfTI CT 执行线性重采样与 `clip(HU, -1000, 1000) / 1000`，输出 float32 `[-1,1]`。完整预处理入口要求显式选择自动间距或三个毫米数值；兼容的 `run` 入口仍可只归一化。支持资源限额、分块并行、阶段耗时、后台停止/续跑与哈希校验。**预处理环境支持 Python 3.10+，不需要下面桌面面板的 GUI 依赖。**
 
 安装与 Linux 服务器运行见 [PREPROCESSING.md](PREPROCESSING.md)。主入口：`python preprocess_aaoca.py --help`；安装后为 `aaoca-preprocess`。这次发布的是代码，不能据此认定真实数据已全量处理。
+
+1.1 工作流与 nnU-Net 自动间距的区别见 [PREPROCESSING_WORKFLOW.md](PREPROCESSING_WORKFLOW.md)；自动建议不等于完整 nnU-Net 规划，也不替代任务效果验证。
 
 ## 安装和启动
 
