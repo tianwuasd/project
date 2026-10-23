@@ -326,7 +326,12 @@ class TerminalTests(unittest.TestCase):
                                 check=True, capture_output=True, text=True)
         target = Path(result.stdout.strip())
         target.mkdir(parents=True, exist_ok=True)
-        (target / 'synthetic-test-deps.pth').write_text('\n'.join(site.getsitepackages()) + '\n')
+        # Some research environments expose packages through their own .pth files;
+        # nested .pth files are not processed when this child adds their directory.
+        dependency_paths = [*site.getsitepackages(), str(Path(nib.__file__).parents[1]), str(Path(np.__file__).parents[1])]
+        # Python 3.11 reads .pth using the Windows locale even in UTF-8 mode.
+        (target / 'synthetic-test-deps.pth').write_text(
+            'import sys; sys.path[:0] = ' + ascii(dependency_paths) + '\n', encoding='ascii')
         job = self.create(['plan'])
         request = (job / 'request.json').read_bytes()
         for _ in range(2):

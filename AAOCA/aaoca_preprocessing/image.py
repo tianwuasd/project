@@ -6,10 +6,10 @@ No nnU-Net planning, foreground statistics, training or GPU initialization.
 import gzip
 import hashlib
 import math
-from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
-from collections import deque
 import time
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import nibabel as nib
 import numpy as np
@@ -94,7 +94,7 @@ def inspect_image(path, config: Config):
         'axis_size_factors_RAS': (np.array(shape) / canonical_shape).tolist(),
         'antialias': False,
         'input_scaling': {'slope': float(image.dataobj.slope), 'intercept': float(image.dataobj.inter)},
-        'output_bytes_uncompressed': math.prod(shape) * 4,
+        'output_bytes_uncompressed': math.prod(shape) * 4 * 2,
         'estimated_working_bytes': source_bytes * 3 + slab_bytes + math.prod(shape) * 4,
         'scratch_bytes': math.prod(shape) * 4 + (int(image.dataobj.offset) +
                          math.prod(image.shape) * image.get_data_dtype().itemsize if str(path).lower().endswith('.gz') else 0),
@@ -140,7 +140,7 @@ def preprocess_image(source: Path, destination: Path, scratch: Path, config: Con
     timings['decode_load'] = time.monotonic() - started
     shape = tuple(info['output_shape'])
     mapping = np.array(info['output_index_to_canonical_index'])
-    output = np.memmap(scratch / 'normalized.float32', dtype=np.float32, mode='w+', shape=shape, order='F')
+    output = np.memmap(scratch / 'resampled.float32', dtype=np.float32, mode='w+', shape=shape, order='F')
     lo, hi, below, above, total, squares = float('inf'), -float('inf'), 0, 0, 0.0, 0.0
     try:
         control.stage(case_id, 'compute', total_slices=shape[2])
@@ -166,13 +166,6 @@ def preprocess_image(source: Path, destination: Path, scratch: Path, config: Con
                 z, block = pending.popleft().result()
                 control.check()
                 depth = block.shape[2]
-                below += int(np.count_nonzero(block < -1000))
-                above += int(np.count_nonzero(block > 1000))
-                np.clip(block, -1000, 1000, out=block)
-                block /= np.float32(1000)
-                lo, hi = min(lo, float(block.min())), max(hi, float(block.max()))
-                total += float(block.sum(dtype=np.float64))
-                squares += float(np.square(block, dtype=np.float64).sum())
                 output[:, :, z:z+depth] = block
                 control.stage(case_id, 'compute', completed_slices=z+depth, total_slices=shape[2])
                 next_z = next(positions, None)
@@ -188,6 +181,35 @@ def preprocess_image(source: Path, destination: Path, scratch: Path, config: Con
         result.set_qform(affine, code=1 if orthogonal else 0)
         result.header.set_xyzt_units('mm')
         result.header.set_slope_inter(1, 0)
+        # Preserve the exact resampled HU before clipping. Reuse this memmap for
+        # normalization after HU publication/verification: no second full array.
+        hu_path = destination.with_name('image_hu.nii.gz')
+        result.header['descrip'] = b'aaoca_preprocessing HU; resampled; unclipped'
+        control.stage(case_id, 'save_hu')
+        started = time.monotonic()
+        with control.io(), hu_path.open('xb') as raw:
+            with gzip.GzipFile(filename='', fileobj=raw, mode='wb', compresslevel=config.compression_level, mtime=0) as stream:
+                result.to_file_map({'image': nib.FileHolder(fileobj=stream)})
+        timings['save_hu'] = time.monotonic() - started
+        control.stage(case_id, 'verify_hu')
+        started = time.monotonic()
+        with control.io():
+            hu_verification = validate_written(hu_path, output, affine, config.chunk_depth, control)
+        timings['verify_hu'] = time.monotonic() - started
+        started = time.monotonic()
+        for z in range(0, shape[2], config.chunk_depth):
+            control.check()
+            block = output[:, :, z:z+config.chunk_depth]
+            below += int(np.count_nonzero(block < -1000))
+            above += int(np.count_nonzero(block > 1000))
+            np.clip(block, -1000, 1000, out=block)
+            block /= np.float32(1000)
+            lo, hi = min(lo, float(block.min())), max(hi, float(block.max()))
+            total += float(block.sum(dtype=np.float64))
+            squares += float(np.square(block, dtype=np.float64).sum())
+            control.stage(case_id, 'normalize', completed_slices=min(z+config.chunk_depth, shape[2]), total_slices=shape[2])
+        output.flush()
+        timings['normalize'] = time.monotonic() - started
         result.header['descrip'] = b'aaoca_preprocessing v1; normalized [-1,1]; NOT HU'
         control.stage(case_id, 'save')
         started = time.monotonic()
@@ -207,6 +229,7 @@ def preprocess_image(source: Path, destination: Path, scratch: Path, config: Con
                                   'std': math.sqrt(max(0.0, squares / count - (total / count)**2)),
                                   'voxels': count, 'clipped_below': below, 'clipped_above': above},
             'verification': verification,
+            'hu_verification': hu_verification,
             'timings_seconds': timings, 'compression_level': config.compression_level,
         }
     finally:

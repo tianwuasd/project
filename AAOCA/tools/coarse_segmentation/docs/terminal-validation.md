@@ -1,5 +1,17 @@
 # Independent terminal validation
 
+## Paired preprocessing 1.3 / terminal 0.3 (2026-10-23)
+
+The terminal now consumes completed paired preprocessing artifacts. Windows: preprocessing and actual producer-to-consumer integration **61 passed**; segmentation **79 collected, 77 passed, 2 POSIX-only skipped** (29.924 seconds). New synthetic tests exercise unclipped HU preservation, exact normalized pairing, both output hashes, frozen provenance, active-writer exclusion, invalid metadata, read-only source locks, path containment without source writes, historical input reuse and mocked inference with labels aligned to normalized CT.
+
+The preprocessing 1.3 wheel built offline, installed into a separate directory and produced verified paired synthetic images. Dependency-free terminal help/history, Bash syntax and Ruff F/I checks on changed modules passed. The Linux workflow also runs preprocessing and integration tests; a published run is recorded separately after completion.
+
+Independent review found and verified fixes for mutation before invalid runtime-path rejection, malformed progress summaries crashing selection and unnecessary write access to the source lock. The server-engineering method reference passed baseline gap identification and a follow-up retrieval/application scenario for both paired and older normalized-only caches.
+
+No target-server deployment, real model inference or patient-data processing occurred. Grid/contract correctness does not validate real segmentation quality or performance. Historical validation below describes the earlier release.
+
+## Previous terminal 0.2
+
 Baseline: GitHub main `1bc139a19137af0950d0d45022b9b04bf0e8e8d7`, fetched and confirmed before changes on 2026-10-23. Product version 0.2.0.
 
 Tests use synthetic 8×8×8 CT volumes, mock TotalSegmentator masks and synthetic process owners. Covered: preserved image bytes and native geometry, full mask/source verification, frozen requests/code, input changes while queued, independent rerun directories and lineage, merge-only reuse, cgroup ancestors, one shared thread/memory budget, delayed and partial GPU availability, two simultaneously active mock GPU inference workers, serialized cold cache, CPU-only merge, stop while waiting, persisted error logs, menu cancellation, read-only dependency-free queries, managed release reopening and detached real CPU planning/resume.

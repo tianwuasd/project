@@ -13,6 +13,8 @@ def inspect_image(path, full=False):
     if not path.is_file() or not str(path).lower().endswith((".nii", ".nii.gz")):
         raise ValueError(f"需要存在的 NIfTI 文件: {path}")
     image = nib.load(str(path), keep_file_open=True)
+    if b'normalized [-1,1]; NOT HU' in bytes(image.header['descrip']):
+        raise ValueError('不能把[-1,1]直接作为HU输入，请选择预处理任务的image_hu.nii.gz配套影像')
     if len(image.shape) != 3 or min(image.shape) < 2:
         raise ValueError("需要三维单通道体积，每轴至少两个体素")
     if image.header.get_xyzt_units()[0] != "mm":

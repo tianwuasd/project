@@ -1,9 +1,9 @@
 """Fixed intensity contract and validated, explicit resource settings."""
-from dataclasses import dataclass
 import hashlib
 import importlib.metadata
 import json
 import math
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -47,6 +47,7 @@ class Config:
             'schema': 1, 'algorithm': 'aaoca-linear-cell-fov-v1',
             'input_units': 'HU', 'clip_hu': [-1000, 1000], 'output_range': [-1, 1],
             'formula': 'clip(HU, -1000, 1000) / 1000',
+            'hu_companion': 'resampled_unclipped_HU_v1',
             'intensity_order': 'linear resampling in HU, then clipping and normalization',
             'nominal_spacing_mm': self.target_spacing,
             'orientation': 'RAS axis order, preserve obliquity and shear',

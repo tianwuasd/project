@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .images import combine, inspect_image
 from .pipeline import commands, sha256, stop_child
+from .preprocessed import validate_case
 from .schema import LABELS
 from .service_state import process_identity, read_json, timestamp, write_json
 
@@ -18,6 +19,7 @@ def lock_fds():
 
 
 def checkpoint(path, case):
+    validate_case(case, full=True)
     record = read_json(path)
     if not isinstance(record, dict) or record.get('status') != 'inferred':
         raise ValueError('缺少完整推理检查点')
@@ -25,6 +27,8 @@ def checkpoint(path, case):
         raise ValueError('推理检查点输入来源不符')
     if record.get('source_sha256') != sha256(case['image']):
         raise ValueError('原始影像已改变，不能复用旧掩膜')
+    if record.get('preprocessing') != case.get('preprocessing'):
+        raise ValueError('推理检查点的预处理来源不符')
     root = Path(record['mask_root']).resolve()
     expected = {str(Path(task) / f'{name}.nii.gz') for _, name, _, task in LABELS}
     if set(record.get('artifacts', {})) != expected:
@@ -54,6 +58,7 @@ def execute_model(command, log, stop, registry):
 
 
 def infer(case, attempt, threads, device, stop, identity):
+    validate_case(case, full=True)
     attempt = Path(attempt)
     attempt.mkdir(parents=True, exist_ok=True)
     source_hash = sha256(case['image'])
@@ -85,12 +90,15 @@ def infer(case, attempt, threads, device, stop, identity):
             execute_model(command, attempt / f'{task}.log', stop, attempt / 'model-process.json')
         if sha256(case['image']) != source_hash:
             raise ValueError('推理期间输入改变')
+        validate_case(case, full=True)
         artifacts = {str(Path(task) / f'{name}.nii.gz'): sha256(attempt / task / f'{name}.nii.gz')
                      for _, name, _, task in LABELS}
         record = {'status': 'inferred', 'case_id': case['case_id'], 'source': str(Path(case['image']).resolve()),
                   'source_sha256': source_hash, 'geometry': geometry, 'mask_root': str(attempt.resolve()),
                   'artifacts': artifacts, 'identity': identity, 'seconds': time.monotonic() - started,
                   'ended_at': timestamp()}
+        if case.get('preprocessing'):
+            record['preprocessing'] = case['preprocessing']
         write_json(attempt / 'inference.json', record)
         return record
     finally:
@@ -104,10 +112,14 @@ def merge(case, source, destination):
     files, report = combine(case['image'], destination, record['mask_root'])
     if sha256(case['image']) != record['source_sha256']:
         raise ValueError('质检期间输入改变')
+    validate_case(case, full=True)
     result = {'status': 'completed', 'case_id': case['case_id'], 'inference': str(Path(source).resolve()),
               'source_sha256': record['source_sha256'], 'review_required': True,
               'empty_masks': report['empty_masks'], 'ended_at': timestamp(),
               'artifacts': {str(p.resolve()): sha256(p) for p in files}}
+    if case.get('preprocessing'):
+        result['preprocessing'] = case['preprocessing']
+        result['label_reference_image'] = case['preprocessing']['normalized_image']
     write_json(destination / 'result.json', result)
     return result
 

@@ -6,11 +6,13 @@
 
 ## AAOCA 独立粗分割
 
-在本目录运行 `bash start_segmentation.sh --runtime /srv/private/aaoca-seg-terminal`，打开与 CT 任务管理方式一致的中文终端面板。支持环境/许可配置、多 GPU 病例并行、统一 CPU/内存/读写预算、后台运行、历史输入、续跑及另建任务重跑。输入必须是保留 HU/mm 的原图，不能直接使用下面预处理产生的 `[-1,1]` 图像。操作见 [独立分割面板](SEGMENTATION_WORKBENCH.md)。
+在本目录运行 `bash start_segmentation.sh --runtime /srv/private/aaoca-seg-terminal`，打开与 CT 任务管理方式一致的中文终端面板。0.3 默认选择已完成的 AAOCA 预处理任务，自动读取 1.3 产生的未截断 HU 配套影像，标签对齐同网格的 `[-1,1]` CT。支持环境/许可配置、多 GPU 病例并行、统一 CPU/内存/读写预算、后台运行、历史输入、续跑及另建任务重跑。操作见 [独立分割面板](SEGMENTATION_WORKBENCH.md)。
 
 ## AAOCA 独立预处理
 
 可安装的 CPU 预处理模块：对原始 HU NIfTI CT 执行线性重采样与 `clip(HU, -1000, 1000) / 1000`，输出 float32 `[-1,1]`。完整预处理入口要求显式选择自动间距或三个毫米数值；兼容的 `run` 入口仍可只归一化。支持资源限额、分块并行、阶段耗时、后台停止/续跑与哈希校验。**预处理环境支持 Python 3.10+，不需要下面桌面面板的 GUI 依赖。**
+
+1.3 同时输出 `image.nii.gz`（归一化）与 `image_hu.nii.gz`（未截断 HU）。分割读取后者；不能将前者乘回 1000 假定恢复原 HU。旧任务继续使用原代码，需要此衔接功能时从原始 HU 新建任务。
 
 安装与 Linux 服务器运行见 [PREPROCESSING.md](PREPROCESSING.md)。主入口：`python preprocess_aaoca.py --help`；安装后为 `aaoca-preprocess`。这次发布的是代码，不能据此认定真实数据已全量处理。
 
@@ -62,7 +64,7 @@ python run_project.py --output 'D:/sample/results' --action retry --match-names 
 - `convert_ct.py` / `convert_us.py`：独立转换器，见 [说明](独立转换器说明.md)。
 - `repair_policy.py`：读取外部已确认政策，不包含真实患者映射。
 - `tools/research_ct/`：可选的研究 CT 整理、格式核对和重采样，见 [说明](tools/research_ct/README.md)。
-- `tools/coarse_segmentation/`：[AAOCA 11 类粗分割与独立服务器网页面板](tools/coarse_segmentation/README.md)，支持预检、批处理、复用核验和模型日志；输入为原始 HU CT，环境独立。
+- `tools/coarse_segmentation/`：[AAOCA 11 类粗分割](tools/coarse_segmentation/README.md)，独立终端支持预处理 HU 配套输入；旧网页/CSV 保留 HU CT 输入，环境独立。
 - `aaoca_preprocessing/`：独立预处理 Python 包；`preprocess_aaoca.py` 与 `preprocess_server.sh` 为源码入口。
 - `tools/chd_dataset/`：加密标签解压、NIfTI 影像/标注完整检查及原字节整理，见 [说明](tools/chd_dataset/README.md)。空间网格不同的文件单独保留待复核，不自动移动标签或改头。
 - `tests/`：仅使用合成资料的回归测试。

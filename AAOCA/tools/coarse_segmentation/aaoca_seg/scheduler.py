@@ -11,6 +11,7 @@ from pathlib import Path
 from .executor import lock_fds
 from .images import inspect_image
 from .pipeline import environment, require_backend, sha256
+from .preprocessed import validate_case
 from .resources import GIB, available_devices, budget, child_env, estimate
 from .service_state import file_lock, process_identity, read_json, timestamp, write_json
 
@@ -36,7 +37,8 @@ def run(job, probe=None, gpu_query=None, allocation=None, popen=None, backend=No
     write_json(job / 'resources.json', alloc)
     identity = {'versions': (backend or environment())['versions'],
                 'source': {p.name: sha256(p) for p in Path(__file__).parent.glob('*.py')},
-                'method': 'aaoca-totalseg-2.18.0-native-hu-11-v1'}
+                'method': ('aaoca-totalseg-2.18.0-resampled-hu-11-v1' if request.get('preprocessing_source')
+                           else 'aaoca-totalseg-2.18.0-native-hu-11-v1')}
     previous = read_json(job / 'identity.json')
     if previous and previous != identity:
         raise ValueError('依赖版本或代码快照改变，请恢复原环境或新建任务')
@@ -52,6 +54,9 @@ def run(job, probe=None, gpu_query=None, allocation=None, popen=None, backend=No
         try:
             if stop.exists():
                 break
+            if case.get('preprocessing'):
+                print(f"[{case['case_id']}] CPU 预处理配套影像与空间信息核验", flush=True)
+                validate_case(case, full=True)
             before = Path(case['image']).stat()
             signature = {'size': before.st_size, 'mtime_ns': before.st_mtime_ns}
             if case.get('source_stat') != signature:

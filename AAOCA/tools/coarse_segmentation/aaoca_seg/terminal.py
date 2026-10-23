@@ -57,7 +57,7 @@ class Panel:
         info = status(job)
         self.emit(f"任务：{request['name']} | {info['status']} | 后台存活：{info['active']}")
         self.emit('结果：' + request['output'])
-        self.emit('来源任务：' + str(request.get('input_job') or '手动原始 HU 清单'))
+        self.emit('来源任务：' + str(request.get('input_job') or request.get('preprocessing_source') or '手动原始 HU 清单'))
         progress = read_json(Path(request['output']) / 'status.json', {})
         self.emit(f"完成 {progress.get('finished', 0)}/{progress.get('total', len(request['cases']))}，"
                   f"失败 {progress.get('failed', 0)}，复用 {progress.get('reused', 0)}")
@@ -78,7 +78,8 @@ class Panel:
         fields = [('manifest', '原始 HU/mm CSV 清单'), ('results', '结果根目录'),
                   ('cpu_limit', 'CPU 总预算'), ('memory_gib', '内存 GiB'), ('workers', '总病例并发上限'),
                   ('threads', '每病例线程上限'), ('io_workers', '读写并发上限'),
-                  ('gpu_count', 'GPU 并发上限'), ('min_gpu_gib', '最低空闲显存 GiB')]
+                  ('gpu_count', 'GPU 并发上限'), ('min_gpu_gib', '最低空闲显存 GiB'),
+                  ('preprocess_output', '预处理任务目录或结果根目录')]
         while True:
             self.emit('\n分割配置（auto 会按 affinity/cgroup、当前负载和可用内存收缩）')
             for i, (key, label) in enumerate(fields, 1):
@@ -107,7 +108,7 @@ class Panel:
             elif action.isdigit() and 1 <= int(action) <= len(fields):
                 key, label = fields[int(action)-1]
                 value = self.prompt(label + '（b 返回，资源可填 auto）：')
-                if key in {'manifest', 'results'}:
+                if key in {'manifest', 'results', 'preprocess_output'}:
                     draft[key] = str(Path(value).expanduser().resolve())
                 elif value == 'auto':
                     draft[key] = None
@@ -124,21 +125,44 @@ class Panel:
             raise ValueError('请选择 1、2、3') from None
 
     def new(self):
-        self.work.idle()
         name = self.prompt('新任务名称：')
-        source = self.prompt('输入来源：0 配置中的原始 HU 清单，h 历史任务 [0]：', '0')
+        source = self.prompt('输入来源：p 预处理结果，0 原始 HU 清单，h 历史分割任务 [p]：', 'p')
         parent = self.choose() if source == 'h' else None
-        if source not in {'0', 'h'}:
-            raise ValueError('请选择 0 或 h')
+        if source not in {'p', '0', 'h'}:
+            raise ValueError('请选择 p、0 或 h')
+        preprocessed = self.choose_preprocessed() if source == 'p' else None
         steps = self.steps()
         subset = self.prompt('病例代号，逗号分隔；回车全部：')
         ids = [v.strip() for v in subset.split(',')] if subset else None
-        self.emit('输入须为原始 HU/mm 影像。历史预处理的 [-1,1] 图像不能用于本模型。')
+        self.emit('预处理输入使用同网格的未截断 HU 配套影像；分割标签将与归一化 CT 对齐。'
+                  if preprocessed else '使用所选来源的 HU/mm 影像；不会把[-1,1]直接传给模型。')
         if self.prompt('输入 y 创建并提交后台任务，b 返回：') != 'y':
             return
-        self.selected = self.work.create(name, steps, input_job=parent.name if parent else None, case_ids=ids)
+        self.selected = self.work.create(name, steps, input_job=parent.name if parent else None,
+                                         case_ids=ids, preprocessed=preprocessed)
         self.work.start(self.selected)
         self.emit('已提交；退出面板、断开 SSH 后继续运行。')
+
+    def choose_preprocessed(self):
+        from .preprocessed import candidates, load
+        default = self.work.settings['preprocess_output']
+        path = self.prompt(f'预处理任务目录或结果根目录 [{default}]：', default)
+        if not path:
+            raise ValueError('请填写已完成预处理任务的位置')
+        options = candidates(path)
+        if not options:
+            raise ValueError('该目录中没有预处理任务')
+        for index, root in enumerate(options, 1):
+            progress = read_json(root / 'progress.json', {})
+            state = progress.get('state', '未知') if isinstance(progress, dict) else '记录无效'
+            self.emit(f"{index}. {root.name} | {state} | {root}")
+        index = int(self.prompt('选择预处理任务编号 [1]：', '1')) - 1
+        if not 0 <= index < len(options):
+            raise ValueError('编号不在列表中')
+        selected = options[index]
+        rows = load(selected)
+        self.emit(f'已选择 {len(rows)} 个预处理体积；执行前完整校验 HU/归一化配套影像。')
+        return selected
 
     def resume(self):
         self.selected = self.choose()
@@ -226,7 +250,7 @@ class Panel:
         self.emit('粗分割仍需人工复核；result.json/qc.json 记录输出及空掩膜、重叠。')
 
     def run(self):
-        self.emit('AAOCA 独立粗分割面板 — TotalSegmentator / 原始 HU / 11 类')
+        self.emit('AAOCA 独立粗分割面板 — 预处理结果 / TotalSegmentator / 11 类')
         while True:
             try:
                 self.emit('\nn 新建任务  c 配置  h 历史  s 进度  o 结果\nr 续跑  k 已完成任务重跑  x 停止  l 日志  f 持续日志\ng 显卡  e 环境/许可  a 环境日志  u 更新  q/0 退出')

@@ -27,7 +27,7 @@ from .service_state import (
 
 DEFAULTS = {'manifest': '', 'results': '', 'mode': 'cpu', 'devices': [], 'gpu_count': 1,
             'min_gpu_gib': 8, 'cpu_limit': None, 'memory_gib': None, 'workers': None,
-            'threads': None, 'io_workers': None}
+            'threads': None, 'io_workers': None, 'preprocess_output': ''}
 
 
 def digest(path):
@@ -123,11 +123,26 @@ class Workbench:
             source = Path(row['image']).resolve()
             if root.is_relative_to(source.parent) or source.is_relative_to(root):
                 raise ValueError('输入与结果目录必须分开')
+            if row.get('preprocessing'):
+                producer = Path(row['preprocessing']['root'])
+                self._producer_runtime(producer)
+                if root.is_relative_to(producer) or producer.is_relative_to(root):
+                    raise ValueError('分割结果和运行目录不能写入或包含来源预处理任务')
         return root
 
-    def create(self, name, steps, settings=None, input_job=None, case_ids=None, rerun_of=None):
-        settings = dict(settings or self.settings)
+    def _producer_runtime(self, producer):
+        producer = Path(producer).expanduser().resolve()
+        if self.root.is_relative_to(producer) or producer.is_relative_to(self.root):
+            raise ValueError('分割运行目录必须与来源预处理任务分开')
+
+    def create(self, name, steps, settings=None, input_job=None, case_ids=None, rerun_of=None, preprocessed=None):
+        settings = {**DEFAULTS, **(settings or self.settings)}
         validate_settings(settings)
+        if input_job and preprocessed:
+            raise ValueError('历史分割输入和预处理输入不能同时选择')
+        # Check before control/operation locks create or chmod the runtime.
+        if preprocessed:
+            self._producer_runtime(preprocessed)
         if not 1 <= len(name) <= 80 or any(ord(c) < 32 for c in name):
             raise ValueError('名称须为 1–80 字且不含控制字符')
         if not steps or set(steps) - {'plan', 'infer', 'merge'} or len(set(steps)) != len(steps):
@@ -137,7 +152,12 @@ class Workbench:
             self.idle()
             parent = self.resolve(input_job) if input_job else None
             source = read_json(parent / 'request.json') if parent else None
-            cases = source['cases'] if parent else read_manifest(settings['manifest'])
+            if preprocessed:
+                from .preprocessed import load
+                cases = load(preprocessed)
+                settings['preprocess_output'] = str(Path(preprocessed).expanduser().resolve())
+            else:
+                cases = source['cases'] if parent else read_manifest(settings['manifest'])
             if case_ids:
                 wanted = set(case_ids)
                 if wanted - {r['case_id'] for r in cases}:
@@ -168,6 +188,8 @@ class Workbench:
             request = {'kind': 'segmentation', 'id': job_id, 'name': name, 'created_at': timestamp(),
                        'steps': steps, 'settings': settings, 'cases': cases, 'inputs': inputs,
                        'output': str(root / ('seg-' + job_id[:12])), 'input_job': input_job, 'rerun_of': rerun_of,
+                       'preprocessing_source': (str(Path(preprocessed).expanduser().resolve()) if preprocessed
+                                                else (source or {}).get('preprocessing_source')),
                        'source_request_sha256': digest(parent / 'request.json') if parent else None,
                        'code_hashes': {str(p.relative_to(code)): digest(p) for p in code.rglob('*') if p.is_file()}}
             write_json(job / 'request.json', request)

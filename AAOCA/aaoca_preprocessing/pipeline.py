@@ -1,20 +1,20 @@
 """Bounded CPU batches with case-level atomic publication and verified reuse."""
-from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
-from dataclasses import asdict
-from pathlib import Path
 import platform
 import shutil
 import tempfile
-import time
 import threading
+import time
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from dataclasses import asdict
+from pathlib import Path
 
 import numpy as np
 
 from .config import Config
+from .control import Control, StopRequested
 from .image import inspect_image, preprocess_image
 from .io import RunLock, discover, file_hash, now, read_json, write_json
-from .control import Control, StopRequested
-from .resources import allocation, RuntimeSampler
+from .resources import RuntimeSampler, allocation
 
 
 def suggest_spacing(input_root, manifest=None):
@@ -92,8 +92,10 @@ def process_case(case, output, scratch_root, config, signature, info, control=No
         with control.io():
             if file_hash(image_path, control.check) != record['output_sha256']:
                 raise ValueError('existing output failed SHA256 validation; preserved for inspection')
+            if file_hash(destination / 'image_hu.nii.gz', control.check) != record.get('hu_output_sha256'):
+                raise ValueError('existing HU companion failed SHA256 validation; preserved for inspection')
         return {'case_id': case['case_id'], 'input': case['input'], 'state': 'reused',
-                'output': record['output'], 'seconds': time.monotonic() - started}
+                'output': record['output'], 'hu_output': record['hu_output'], 'seconds': time.monotonic() - started}
     if info['estimated_working_bytes'] > config.max_case_gib * 2**30:
         raise ValueError('estimated case memory exceeds --max-case-gib; review the plan and resource allocation')
     # Private temporary directories; only these generated temporary paths are cleaned up.
@@ -108,10 +110,13 @@ def process_case(case, output, scratch_root, config, signature, info, control=No
             if (initial_stat.st_size, initial_stat.st_mtime_ns) != (final_stat.st_size, final_stat.st_mtime_ns) or file_hash(source, control.check) != digest:
                 raise ValueError('source changed while processing; no output was published')
             output_hash = file_hash(stage / 'image.nii.gz', control.check)
+            hu_hash = file_hash(stage / 'image_hu.nii.gz', control.check)
         checks['timings_seconds'].update(input_hash=hash_seconds, source_and_output_hash=time.monotonic()-check_started)
         relative_output = (Path('cases') / case['case_id'] / 'image.nii.gz').as_posix()
-        record = {'schema': 1, 'status': 'complete', 'case_id': case['case_id'],
+        relative_hu = (Path('cases') / case['case_id'] / 'image_hu.nii.gz').as_posix()
+        record = {'schema': 2, 'status': 'complete', 'case_id': case['case_id'],
                   'input': case['input'], 'output': relative_output,
+                  'hu_output': relative_hu, 'hu_output_sha256': hu_hash,
                   'input_sha256': digest, 'output_sha256': output_hash,
                   'config_sha256': signature, 'config': config.recipe(), **info, **checks,
                   'completed_at': now(), 'seconds': time.monotonic() - started}
@@ -119,7 +124,7 @@ def process_case(case, output, scratch_root, config, signature, info, control=No
         # Destination never exists here; the directory rename publishes image and record together.
         stage.rename(destination)
     return {'case_id': case['case_id'], 'input': case['input'], 'state': 'completed',
-            'output': relative_output, 'seconds': time.monotonic() - started}
+            'output': relative_output, 'hu_output': relative_hu, 'seconds': time.monotonic() - started}
 
 
 def run(input_root, output_root, config=Config(), manifest=None, scratch_root=None, progress=None, stop=None, event=None, spacing_report=None):

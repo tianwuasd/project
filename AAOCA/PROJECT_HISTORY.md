@@ -2,6 +2,10 @@
 
 This is the public, non-patient-specific history. Detailed patient mappings and local paths belong to the private workspace memory.
 
+## 2026-10-23: paired preprocessing 1.3 and segmentation 0.3
+
+Preprocessing now publishes normalized float32 CT and unclipped resampled HU together on one grid, with separate hashes and round-trip validation. The independent segmentation terminal defaults to selecting a completed preprocessing task and uses its HU companion for TotalSegmentator. Frozen source receipts, writer exclusion, paired-image hashes and geometry checks protect selection, execution and reuse. Labels align with the normalized CT; results remain separate from preprocessing. Legacy raw-HU manifests and frozen segmentation jobs remain available. Normalized-only older preprocessing tasks require a new task from original HU for this workflow; clipped intensities cannot be inverted. Synthetic tests cover actual producer-to-consumer integration, mocked inference and corrupt/incomplete input rejection; no target-server or real-model run is implied.
+
 ## 2026-10-23: independent server workbench 1.2
 
 Added a Chinese terminal workbench following the CHD task/configuration layout, with separate startup from raw-data conversion. Only preprocessing is connected. Spacing, CPU and RAM default to automatic selection with manual overrides. Resource allocation uses visible affinity/cgroup limits, sampled idle CPU, 90% available memory, case working-set estimates and bounded I/O; concrete spacing is frozen while automatic resources are refreshed at each attempt. Named history, read-only queries, explicit background start/stop/resume, logs and registry dispatch locking reuse the existing preprocessing engine. Synthetic tests cover menu cancellation, allocation boundaries and verified background reuse; no patient processing or target-server deployment is implied. See SERVER_WORKBENCH.md.

@@ -1,19 +1,26 @@
 """Synthetic workbench/resource tests. Never reference research datasets."""
-import json
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from aaoca_server.panel import Panel, parse_setting
-from aaoca_server.state import Registry, dispatch_lock, job_status, read, validate_paths, write
+from aaoca_server.state import (
+    Registry,
+    dispatch_lock,
+    job_status,
+    read,
+    validate_paths,
+    write,
+)
 
 try:
     import nibabel as nib
     import numpy as np
+
     from aaoca_preprocessing import jobs
     from aaoca_preprocessing.autoresources import select_resources
     from aaoca_preprocessing.config import Config
@@ -221,7 +228,7 @@ class AutomaticTests(unittest.TestCase):
         second = read(runtime / 'resources.json')
         self.assertNotEqual(first['attempt'], second['attempt'])
         self.assertEqual(read(runtime / 'job.json'), spec)
-        for path in (output / 'cases').glob('*/*.nii.gz'):
+        for path in (output / 'cases').glob('*/image.nii.gz'):
             array = nib.load(path).get_fdata()
             self.assertGreaterEqual(array.min(), -1)
             self.assertLessEqual(array.max(), 1)

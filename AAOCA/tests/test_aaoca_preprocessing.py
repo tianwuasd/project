@@ -1,22 +1,22 @@
 """Portable preprocessing tests. All images and identifiers are synthetic."""
 import json
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 try:
     import nibabel as nib
     import numpy as np
+    import psutil  # noqa: F401 -- optional dependency availability check
     from scipy.ndimage import map_coordinates
-    import psutil
 except ImportError as exc:
     raise unittest.SkipTest('Install requirements-preprocess.txt to run optional preprocessing tests') from exc
 
 from aaoca_preprocessing.config import Config
-from aaoca_preprocessing.image import normalize_hu, output_grid, inspect_image
+from aaoca_preprocessing.image import inspect_image, normalize_hu, output_grid
 from aaoca_preprocessing.io import RunLock, discover, file_hash
 from aaoca_preprocessing.pipeline import plan, run
 
@@ -53,6 +53,25 @@ class PreprocessingTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 normalize_hu(np.array([value]))
 
+    def test_resampled_hu_companion_preserves_unclipped_values_and_pair_integrity(self):
+        self.image()
+        config = Config(target_spacing=(.5, .6, .7))
+        result = run(self.src, self.out, config)
+        self.assertEqual(result['completed'], 1)
+        record = self.record()
+        hu = nib.load(self.out / record['hu_output'])
+        normalized = nib.load(self.out / record['output'])
+        self.assertLess(hu.get_fdata().min(), -1000)
+        self.assertGreater(hu.get_fdata().max(), 1000)
+        np.testing.assert_allclose(hu.affine, normalized.affine, atol=0, rtol=0)
+        np.testing.assert_array_equal(normalized.get_fdata(), normalize_hu(hu.get_fdata()))
+        self.assertEqual(record['hu_output_sha256'], file_hash(self.out / record['hu_output']))
+        self.assertEqual(record['output_bytes_uncompressed'], 2 * np.prod(hu.shape) * 4)
+        self.assertEqual(run(self.src, self.out, config)['reused'], 1)
+        path = self.out / record['hu_output']
+        path.write_bytes(path.read_bytes() + b'damaged')
+        self.assertEqual(run(self.src, self.out, config)['failed'], 1)
+
     def test_grid_preserves_all_cell_corners_and_centre(self):
         affine = np.array([[.7, -.2, .1, 34], [.2, .8, 0, -18], [0, 0, 1.5, 12], [0, 0, 0, 1]])
         shape, target, mapping = output_grid((7, 9, 11), affine, (.5, .5, .5))
@@ -63,6 +82,21 @@ class PreprocessingTests(unittest.TestCase):
         np.testing.assert_allclose(affine @ np.r_[(np.array([7, 9, 11])-1)/2, 1],
                                    target @ np.r_[(np.array(shape)-1)/2, 1])
         np.testing.assert_allclose(target, affine @ mapping)
+
+    def test_real_preprocessing_output_can_be_selected_for_segmentation(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools' / 'coarse_segmentation'))
+        from aaoca_seg.preprocessed import load, validate_case
+        from aaoca_seg.service_state import read_json
+        from aaoca_seg.workbench import Workbench
+        self.image()
+        self.assertEqual(run(self.src, self.out, Config(target_spacing=(.5, .6, .7)))['completed'], 1)
+        rows = load(self.out)
+        self.assertEqual(len(rows), 1)
+        validate_case(rows[0])
+        job = Workbench(self.root / 'seg-runtime').create('synthetic paired input', ['plan'], preprocessed=self.out)
+        request = read_json(job / 'request.json')
+        self.assertEqual(request['cases'][0]['image'], str(self.out / self.record()['hu_output']))
+        self.assertEqual(request['cases'][0]['preprocessing']['normalized_image'], str(self.out / self.record()['output']))
 
     def test_native_run_preserves_source_and_reuses_verified_output(self):
         source = self.image()
