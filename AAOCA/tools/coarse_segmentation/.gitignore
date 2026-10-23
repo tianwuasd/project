@@ -1,0 +1,20 @@
+# Publish code and synthetic examples only. Runtime files belong outside this tree.
+*
+!.gitignore
+!README.md
+!requirements*.txt
+!run.py
+!aaoca_seg/
+!aaoca_seg/*.py
+!tests/
+!tests/test_*.py
+!web/
+!web/index.html
+!web/app.js
+!web/style.css
+!docs/
+!docs/*.md
+!examples/
+!examples/manifest.example.csv
+__pycache__/
+*.pyc

@@ -35,6 +35,17 @@
 /tools/*
 !/tools/research_ct/
 !/tools/chd_dataset/
+!/tools/coarse_segmentation/
+/tools/coarse_segmentation/*
+!/tools/coarse_segmentation/.gitignore
+!/tools/coarse_segmentation/README.md
+!/tools/coarse_segmentation/requirements*.txt
+!/tools/coarse_segmentation/run.py
+!/tools/coarse_segmentation/aaoca_seg/
+!/tools/coarse_segmentation/tests/
+!/tools/coarse_segmentation/web/
+!/tools/coarse_segmentation/docs/
+!/tools/coarse_segmentation/examples/
 /tools/research_ct/*
 !/tools/research_ct/*.py
 !/tools/research_ct/README.md

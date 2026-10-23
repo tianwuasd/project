@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AAOCA · 粗分割工作台</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<header><div class="brand"><span class="mark">A</span><div><strong>AAOCA</strong><span class="sub">粗分割工作台</span></div></div><span class="badge">独立服务器面板</span></header>
+<main>
+<section class="intro"><div><p class="eyebrow">CT → 11 类结构 → 人工复核</p><h1>为冠脉研究准备第一版标注</h1><p class="muted">心腔、大血管和冠脉分别预测，保留二值掩膜和原始空间坐标。</p></div><span id="connection" class="connection">尚未连接</span></section>
+<section class="card login" id="login"><label for="token">访问令牌</label><input id="token" type="password" autocomplete="off" placeholder="粘贴服务器启动时显示的令牌"><button id="connect" class="primary">连接工作台</button><p class="muted">通过 SSH 转发访问。令牌仅保存在当前页面内存中。</p></section>
+<div id="notice" role="status" hidden></div>
+<div id="workspace" hidden>
+<section class="metrics"><article class="card"><span>清单体积</span><strong id="total">—</strong><small>同一病例可能包含多个期相</small></article><article class="card"><span>已有粗分割</span><strong id="done">—</strong><small>结果仍需人工复核</small></article><article class="card"><span>本次失败</span><strong id="failed">—</strong><small>其他病例继续处理</small></article><article class="card"><span>运行状态</span><strong id="phase" class="phase">待开始</strong><small id="phaseDetail">先选择少量体积进行预检</small></article></section>
+<div class="columns"><section class="card cases"><div class="section-head"><div><h2>选择处理体积</h2><p class="muted">首次建议选择 3 例；再次运行会核验并复用完整结果。</p></div><span id="selected" class="badge">已选 0</span></div><div class="toolbar"><input id="filter" type="search" placeholder="筛选研究代号" aria-label="筛选研究代号"><button id="first3">选前 3 例</button><button id="all">全选</button><button id="none">清空</button></div><div class="table-wrap"><table><thead><tr><th>选择</th><th>研究代号</th><th>状态</th><th>需关注</th></tr></thead><tbody id="cases"></tbody></table></div><div class="actions"><button id="plan">只预检</button><button id="start" class="primary">开始粗分割</button><button id="stop" class="danger" disabled>停止本次任务</button></div><p class="muted footnote">停止会保留已完成结果。面板不调整原始影像，不进行冠脉分支命名或疾病分型。</p></section>
+<aside><section class="card"><h2>运行设置</h2><dl><dt>设备</dt><dd id="device">—</dd><dt>可见 GPU 范围</dt><dd id="visible">—</dd><dt>模型版本</dt><dd id="version">—</dd><dt>心腔与冠脉许可</dt><dd id="license">—</dd><dt>清单</dt><dd id="manifest" class="path">—</dd><dt>结果目录</dt><dd id="output" class="path">—</dd></dl><p class="muted">设备和路径由服务器启动参数固定。GPU 空闲不代表已获分配。</p></section><section class="card"><div class="section-head"><h2>GPU 状态</h2><button id="gpuRefresh" class="text-button">刷新</button></div><p class="muted">编号 / UUID / 型号 / 已用 MB / 总 MB / 利用率 %</p><pre id="gpu" class="gpu">连接后可查询</pre></section></aside></div>
+<section class="card progress-card"><div class="section-head"><h2>本次进度</h2><span id="progressText">尚未开始</span></div><progress id="progress" value="0" max="1"></progress><p id="current" class="muted">这里显示已结束的体积数；模型内部进度请查看日志。</p></section>
+<section class="card"><div class="section-head"><h2>任务日志</h2><span class="muted">每 3 秒刷新 · 关闭页面不停止任务</span></div><pre id="logs" class="logs">暂无日志。</pre></section>
+<section class="card" id="preflight" hidden><h2>预检结果</h2><pre id="planResult"></pre></section>
+</div><footer>AAOCA · 冠脉开口、近端走行及细小分支需要逐例复核。生成结果是粗标注。</footer>
+</main></body></html>

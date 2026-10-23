@@ -1,0 +1,3 @@
+case_id,image,spacing_confirmed,hu_confirmed
+demo_case_001,/srv/private/aaoca/ct_001.nii.gz,true,true
+demo_case_002,/srv/private/aaoca/ct_002.nii.gz,true,true

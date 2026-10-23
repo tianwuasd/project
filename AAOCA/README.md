@@ -54,6 +54,7 @@ python run_project.py --output 'D:/sample/results' --action retry --match-names 
 - `convert_ct.py` / `convert_us.py`：独立转换器，见 [说明](独立转换器说明.md)。
 - `repair_policy.py`：读取外部已确认政策，不包含真实患者映射。
 - `tools/research_ct/`：可选的研究 CT 整理、格式核对和重采样，见 [说明](tools/research_ct/README.md)。
+- `tools/coarse_segmentation/`：[AAOCA 11 类粗分割与独立服务器网页面板](tools/coarse_segmentation/README.md)，支持预检、批处理、复用核验和模型日志；输入为原始 HU CT，环境独立。
 - `aaoca_preprocessing/`：独立预处理 Python 包；`preprocess_aaoca.py` 与 `preprocess_server.sh` 为源码入口。
 - `tools/chd_dataset/`：加密标签解压、NIfTI 影像/标注完整检查及原字节整理，见 [说明](tools/chd_dataset/README.md)。空间网格不同的文件单独保留待复核，不自动移动标签或改头。
 - `tests/`：仅使用合成资料的回归测试。
