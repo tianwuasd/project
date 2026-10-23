@@ -20,7 +20,26 @@
 
 这是本工具自定义的标签编号，不应直接套用其他论文或数据集的编号。冠脉不细分 LAD/LCx/RCA，不自动判断异常开口、壁内段或风险。通用预训练模型在先心畸形上的质量必须逐例核查。
 
-## 安装
+## 推荐：一体化服务器面板
+
+无需提前安装模型依赖，在 Linux 服务器的本目录执行（Python 3.11–3.13）：
+
+```bash
+python3 server.py --workspace /srv/private/aaoca-seg
+```
+
+默认脱离终端在后台运行，显示面板地址和私有访问令牌。通过 SSH / VS Code 转发 8787 端口，在网页内依次完成：**环境安装 → 许可验证 → 清单导入与设备设置 → 选少量体积预检 → 粗分割**。安装和分割在独立后台进程执行，SSH 或网页断开后继续；重连仍能查询日志和请求停止。
+
+可用 `--profile /srv/private/server.private.json` 导入私人配置。普通设置和许可分开保存；许可通过 stdin 传给官方验证函数，不写入命令行、公开代码或 API 返回。网页只接受固定操作，不接受任意 shell 命令。
+
+```bash
+# 重连时查看地址与令牌；也可直接重复原启动命令
+python3 server.py --workspace /srv/private/aaoca-seg --status
+```
+
+详细步骤、配置格式和恢复边界见 [服务器面板说明](docs/server.md)。旧 `run.py panel` 入口保留，仅适用于已准备环境和固定路径的手动运行。
+
+## 手动安装（可选）
 
 使用独立 Python 3.11 或以上环境。从本目录运行：
 
@@ -61,9 +80,9 @@ demo_001,/srv/private/aaoca/ct_001.nii.gz,true,true
 
 相对路径以 CSV 所在目录为基准。确认字段须有 DICOM/转换记录等依据；不能为了通过检查而把未知间距或归一化图像标为 `true`。一个三维期相对应一行；代号不能重复，同一影像不能重复列入。
 
-## 独立服务器面板
+## 原固定配置面板（兼容入口）
 
-完整步骤见 [服务器运行说明](docs/server.md)。在服务器运行：
+此旧入口不管理依赖安装，也不提供重连后的任务接管。新部署请使用上面的 `server.py`。手动运行：
 
 ```bash
 python run.py panel --manifest /srv/private/preseg/aaoca.csv \

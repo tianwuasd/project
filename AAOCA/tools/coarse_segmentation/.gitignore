@@ -4,6 +4,7 @@
 !README.md
 !requirements*.txt
 !run.py
+!server.py
 !aaoca_seg/
 !aaoca_seg/*.py
 !tests/

@@ -1,0 +1,31 @@
+name: AAOCA coarse segmentation
+
+on:
+  push:
+    paths:
+      - 'AAOCA/tools/coarse_segmentation/**'
+      - '.github/workflows/aaoca-coarse-segmentation.yml'
+  pull_request:
+    paths:
+      - 'AAOCA/tools/coarse_segmentation/**'
+      - '.github/workflows/aaoca-coarse-segmentation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install only synthetic test dependencies
+        run: python -m pip install -r AAOCA/tools/coarse_segmentation/requirements.txt
+      - name: Dependency-free server bootstrap
+        run: python -S AAOCA/tools/coarse_segmentation/server.py --help
+      - name: Segmentation contract, private setup and detached lifecycle
+        run: python -m unittest discover -s AAOCA/tools/coarse_segmentation/tests -v

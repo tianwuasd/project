@@ -11,8 +11,23 @@ import threading
 from urllib.parse import urlsplit
 import uuid
 
-from .pipeline import CODE_ROOT, environment, plan, require_backend, validate_device, validate_output
 from .schema import FIELDS, TASKS, read_manifest
+from .service_state import CODE_ROOT, redact
+
+
+def environment():
+    from .pipeline import environment as implementation
+    return implementation()
+
+
+def plan(*args):
+    from .pipeline import plan as implementation
+    return implementation(*args)
+
+
+def require_backend():
+    from .pipeline import require_backend as implementation
+    return implementation()
 
 
 def read_json(path, default=None):
@@ -43,6 +58,7 @@ def gpu_info():
 
 class Controller:
     def __init__(self, manifest, root, device="gpu:0", threads=2):
+        from .pipeline import validate_device, validate_output
         self.manifest = Path(manifest).resolve()
         self.root = validate_output(root, read_manifest(self.manifest))
         self.device = validate_device(device)
@@ -179,17 +195,19 @@ def make_server(controller, port=8787, token=None):
                     self.send(controller.logs())
                 elif path == "/api/gpu":
                     self.send({"text": gpu_info()})
+                elif path == "/api/host" and hasattr(controller, "host"):
+                    self.send(controller.host())
                 else:
                     self.send({"error": "接口不存在"}, 404)
             except Exception as error:
-                self.send({"error": str(error)}, 400)
+                self.send({"error": redact(error)}, 400)
 
         def do_POST(self):
             if not self.authorized():
                 return
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if not 0 < length <= 65536:
+                if not 0 < length <= 2 * 1024 * 1024:
                     raise ValueError("请求长度无效")
                 payload = json.loads(self.rfile.read(length))
                 path = urlsplit(self.path).path
@@ -199,10 +217,15 @@ def make_server(controller, port=8787, token=None):
                     self.send(controller.start(payload))
                 elif path == "/api/stop" and payload == {}:
                     self.send(controller.stop())
+                elif path.startswith("/api/setup/") and hasattr(controller, "setup"):
+                    self.send(controller.setup(path.rsplit("/", 1)[1], payload))
+                elif path == "/api/panel-stop" and payload == {} and hasattr(controller, "setup"):
+                    self.send({"stopping": True})
+                    threading.Thread(target=self.server.shutdown, daemon=True).start()
                 else:
                     self.send({"error": "接口或参数无效"}, 404)
             except Exception as error:
-                self.send({"error": str(error)}, 400)
+                self.send({"error": redact(error)}, 400)
 
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     server.daemon_threads = True

@@ -42,6 +42,7 @@
 !/tools/coarse_segmentation/README.md
 !/tools/coarse_segmentation/requirements*.txt
 !/tools/coarse_segmentation/run.py
+!/tools/coarse_segmentation/server.py
 !/tools/coarse_segmentation/aaoca_seg/
 !/tools/coarse_segmentation/tests/
 !/tools/coarse_segmentation/web/
