@@ -6,6 +6,12 @@
 !/一键处理说明.md
 !/独立转换器说明.md
 !/requirements.txt
+!/requirements-preprocess.txt
+!/pyproject.toml
+!/PREPROCESSING.md
+!/preprocess_aaoca.py
+!/preprocess_server.sh
+!/aaoca_preprocessing/
 !/一键处理.cmd
 !/common.py
 !/convert_ct.py
@@ -24,6 +30,8 @@
 !/patient_pipeline/*.py
 /tests/*
 !/tests/test_*.py
+/aaoca_preprocessing/*
+!/aaoca_preprocessing/*.py
 /tools/*
 !/tools/research_ct/
 !/tools/chd_dataset/

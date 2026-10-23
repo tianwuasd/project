@@ -32,6 +32,12 @@ The research tools select only registered successful CT outputs, preserve proven
 
 Added a standalone resumable batch tool for AES ZIP segmentation labels and paired NIfTI images. It validates archive paths, reads full voxel payloads and gzip trailers, checks integer label values and image/label grids, and verifies lossless research copies with SHA256. Readable pairs with mismatched geometry are retained separately for review; geometry, intensity units and anatomical label meanings are not guessed. No resampling, normalization, registration or training is performed. Credentials and dataset manifests remain local. Synthetic tests cover damaged inputs, grid differences, unsafe archives, source changes, output conflicts, restart behavior and process locking.
 
+## October 23: portable AAOCA preprocessing
+
+Added an independently installable CPU package with fixed HU clipping [-1000,1000] and normalization to [-1,1]. Native resolution is retained by default; explicit target spacing uses the research tool's voxel-cell FOV and centre-preserving grid with slab-based linear interpolation, RAS axis ordering and preserved obliquity. The package records actual geometry and applies NIfTI intensity scaling once.
+
+Added header-only planning, original-manifest or directory input, isolated case failures, source/configuration/output hash checks, full voxel round-trip validation, atomic case publication, OS locking, resource preflight, CLI/status and a Linux launcher. Source scans and prior successful results are preserved. Synthetic tests cover numerical, geometry, integrity, restart and CLI behavior. This release does not claim a production server deployment or a full-dataset processing run.
+
 ## Maintenance contract
 
 Maintain the code and its synthetic tests together. Local deployment and this code mirror must be compared by file hashes before synchronization. Keep all local clinical records out of Git. Do not repeat completed historical recovery scripts or launch full data processing merely to update handoff documentation.

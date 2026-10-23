@@ -1,0 +1,5 @@
+# Independent CPU preprocessing environment; no GUI, torch or nnU-Net needed.
+numpy>=1.26,<3
+scipy>=1.11,<2
+nibabel>=5.2,<6
+psutil>=5.9,<8

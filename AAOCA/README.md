@@ -4,6 +4,12 @@
 
 本目录仅发布程序、合成测试及公开说明。真实患者资料、姓名编号映射、修复政策、数据库、报告和研究影像不在 Git 中。
 
+## AAOCA 独立预处理
+
+新增可安装的 CPU 预处理模块：对原始 HU NIfTI CT 执行 `clip(HU, -1000, 1000) / 1000`，输出 float32 `[-1,1]`。默认保留原分辨率、重排为 RAS 轴顺序，也支持显式指定近 0.5 mm 等目标间距。提供只读计划、批量运行、哈希校验续跑、进度和独立输出记录。**预处理环境支持 Python 3.10+，不需要下面桌面面板的 GUI 依赖。**
+
+安装与 Linux 服务器运行见 [PREPROCESSING.md](PREPROCESSING.md)。主入口：`python preprocess_aaoca.py --help`；安装后为 `aaoca-preprocess`。这次发布的是代码，不能据此认定真实数据已全量处理。
+
 ## 安装和启动
 
 使用带 Tcl/Tk 的 Python 3.12 或以上版本：
@@ -48,6 +54,7 @@ python run_project.py --output 'D:/sample/results' --action retry --match-names 
 - `convert_ct.py` / `convert_us.py`：独立转换器，见 [说明](独立转换器说明.md)。
 - `repair_policy.py`：读取外部已确认政策，不包含真实患者映射。
 - `tools/research_ct/`：可选的研究 CT 整理、格式核对和重采样，见 [说明](tools/research_ct/README.md)。
+- `aaoca_preprocessing/`：独立预处理 Python 包；`preprocess_aaoca.py` 与 `preprocess_server.sh` 为源码入口。
 - `tools/chd_dataset/`：加密标签解压、NIfTI 影像/标注完整检查及原字节整理，见 [说明](tools/chd_dataset/README.md)。空间网格不同的文件单独保留待复核，不自动移动标签或改头。
 - `tests/`：仅使用合成资料的回归测试。
 - [PROJECT_HISTORY.md](PROJECT_HISTORY.md)：公开开发历程及接手说明。
