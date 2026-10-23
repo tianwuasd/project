@@ -1,6 +1,8 @@
 # AAOCA 粗分割与独立服务器面板
 
-使用 TotalSegmentator 2.18.0，为 AAOCA CT 生成心腔、大血管、冠脉的 **11 类粗标注**。包含命令行批处理和独立中文网页面板；不依赖资料整理的桌面 GUI，也不需要重新训练模型。
+使用 TotalSegmentator 2.18.0，为 AAOCA CT 生成心腔、大血管、冠脉的 **11 类粗标注**。包含独立中文终端面板、网页面板和命令行批处理；不依赖资料整理的桌面 GUI，也不需要重新训练模型。
+
+**新的独立终端入口：** 在 AAOCA 根目录执行 `bash start_segmentation.sh --runtime /srv/private/aaoca-seg-terminal`。支持命名任务、历史输入、续跑、另建任务重跑、多 GPU 病例并行、统一 CPU/RAM/I/O 预算、后台运行和 CPU 质检分离。见 [终端面板完整操作说明](../../SEGMENTATION_WORKBENCH.md)。下方网页与手动批处理入口继续兼容；其旧串行模式不会自动获得新队列功能。
 
 输入为已确认 HU 和真实毫米几何的原分辨率三维 NIfTI。**不要输入被截断并缩放至 `[-1,1]` 的训练预处理图像。** TotalSegmentator 自行执行模型所需的重采样和归一化；本工具不提前做一次额外插值，输出要求与输入网格一致。
 

@@ -29,6 +29,7 @@ def runtime_env(workspace):
 
 def hardware(workspace):
     gpus = []
+    processes = []
     error = None
     try:
         result = subprocess.run(["nvidia-smi", "--query-gpu=index,uuid,name,driver_version,memory.used,memory.total,utilization.gpu",
@@ -41,10 +42,22 @@ def hardware(workspace):
                 gpus.append(dict(zip(("index", "uuid", "name", "driver", "used_mb", "total_mb", "utilization"), values)))
     except (OSError, subprocess.TimeoutExpired):
         error = "未检测到 NVIDIA 查询工具"
-    disk = shutil.disk_usage(workspace)
+    try:
+        result = subprocess.run(['nvidia-smi', '--query-compute-apps=gpu_uuid,pid,used_gpu_memory',
+                                 '--format=csv,noheader,nounits'], capture_output=True, text=True, timeout=5)
+        for line in result.stdout.splitlines() if result.returncode == 0 else []:
+            values = [v.strip() for v in line.split(',')]
+            if len(values) == 3:
+                processes.append(dict(zip(('gpu_uuid', 'pid', 'memory_mb'), values)))
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    disk_path = Path(workspace)
+    while not disk_path.exists() and disk_path != disk_path.parent:
+        disk_path = disk_path.parent
+    disk = shutil.disk_usage(disk_path)
     return {"system": platform.platform(), "python": platform.python_version(),
             "cpu_count": os.cpu_count(), "disk_free_gib": round(disk.free / 2**30, 1),
-            "gpus": gpus, "gpu_error": error,
+            "gpus": gpus, "compute_processes": processes, "gpu_error": error,
             "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES", "未设置；请按服务器分配选择")}
 
 

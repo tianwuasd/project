@@ -12,6 +12,7 @@ from .operations import (BUILDS, apply_license, check_device, hardware, install,
                          probe, python_path, runtime_env, stage_license)
 from .schema import FIELDS, TASKS, read_manifest
 from .service_state import (CODE_ROOT, alive, detached, file_lock, private_dir,
+                            managed_release,
                             process_identity, read_json, redact, tail, timestamp,
                             write_json, write_private)
 
@@ -37,7 +38,8 @@ def validate_paths(config, workspace):
 class ManagedController:
     def __init__(self, workspace):
         self.workspace = Path(workspace).expanduser().resolve()
-        if self.workspace == CODE_ROOT or self.workspace.is_relative_to(CODE_ROOT) or CODE_ROOT.is_relative_to(self.workspace):
+        if (self.workspace.is_relative_to(CODE_ROOT)
+                or (CODE_ROOT.is_relative_to(self.workspace) and not managed_release(self.workspace))):
             raise ValueError("工作区必须在源码目录之外")
         private_dir(self.workspace)
         self.config_path = self.workspace / "settings.json"

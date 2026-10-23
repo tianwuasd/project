@@ -48,7 +48,7 @@ def inspect_image(path, full=False):
     return result
 
 
-def combine(image_path, attempt):
+def combine(image_path, attempt, mask_root=None):
     source = nib.load(str(image_path))
     combined = np.zeros(source.shape, dtype=np.uint8)
     # Later writes win: veins < chambers/myocardium/arteries < coronaries.
@@ -57,7 +57,7 @@ def combine(image_path, attempt):
     voxel_mm3 = abs(float(np.linalg.det(source.affine[:3, :3])))
     for label_id in order:
         _, name, chinese, task = LABELS[label_id - 1]
-        path = Path(attempt) / task / f"{name}.nii.gz"
+        path = Path(mask_root or attempt) / task / f"{name}.nii.gz"
         mask = nib.load(str(path))
         if mask.header.get_xyzt_units()[0] != "mm":
             raise ValueError(f"{name}: 输出空间单位不是 mm")

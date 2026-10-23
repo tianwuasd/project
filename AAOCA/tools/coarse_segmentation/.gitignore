@@ -5,6 +5,8 @@
 !requirements*.txt
 !run.py
 !server.py
+!launch_job.py
+!queue_job.py
 !aaoca_seg/
 !aaoca_seg/*.py
 !tests/

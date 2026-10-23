@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - 'AAOCA/tools/coarse_segmentation/**'
+      - 'AAOCA/start_segmentation.*'
       - '.github/workflows/aaoca-coarse-segmentation.yml'
   pull_request:
     paths:
       - 'AAOCA/tools/coarse_segmentation/**'
+      - 'AAOCA/start_segmentation.*'
       - '.github/workflows/aaoca-coarse-segmentation.yml'
   workflow_dispatch:
 
@@ -26,6 +28,8 @@ jobs:
       - name: Install only synthetic test dependencies
         run: python -m pip install -r AAOCA/tools/coarse_segmentation/requirements.txt
       - name: Dependency-free server bootstrap
-        run: python -S AAOCA/tools/coarse_segmentation/server.py --help
+        run: |
+          python -S AAOCA/tools/coarse_segmentation/server.py --help
+          python -S AAOCA/start_segmentation.py --help
       - name: Segmentation contract, private setup and detached lifecycle
         run: python -m unittest discover -s AAOCA/tools/coarse_segmentation/tests -v

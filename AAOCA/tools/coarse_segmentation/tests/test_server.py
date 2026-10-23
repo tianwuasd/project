@@ -252,7 +252,7 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(token, (self.workspace / "private" / "panel.token").read_text())
         finally:
             subprocess.run(base + ["--stop-panel"], capture_output=True, timeout=15)
-            wait_for(lambda: not alive(read_json(self.workspace / "service.json", {}).get("owner")))
+            wait_for(lambda: not alive(owner))
 
 
 if __name__ == "__main__":

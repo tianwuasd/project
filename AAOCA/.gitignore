@@ -16,6 +16,9 @@
 !/aaoca_server/
 !/start_aaoca_server.py
 !/start_aaoca_server.sh
+!/start_segmentation.py
+!/start_segmentation.sh
+!/SEGMENTATION_WORKBENCH.md
 !/SERVER_WORKBENCH.md
 !/一键处理.cmd
 !/common.py
@@ -49,6 +52,8 @@
 !/tools/coarse_segmentation/requirements*.txt
 !/tools/coarse_segmentation/run.py
 !/tools/coarse_segmentation/server.py
+!/tools/coarse_segmentation/launch_job.py
+!/tools/coarse_segmentation/queue_job.py
 !/tools/coarse_segmentation/aaoca_seg/
 !/tools/coarse_segmentation/tests/
 !/tools/coarse_segmentation/web/

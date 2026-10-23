@@ -50,6 +50,12 @@ Compressed sources are expanded once with CRC validation. Bounded slab threads, 
 
 Synthetic preprocessing tests and existing desktop regression passed; package installation and background lifecycle were checked locally on Windows. Target Linux/server performance and real-data preprocessing were not executed. Local synthetic measurements are not server speedup claims.
 
+## October 23: independent segmentation terminal 0.2
+
+Added a separate root segmentation launcher and Chinese terminal workflow while retaining the original web panel. Named immutable jobs record raw-HU input lineage, code snapshots, full source/artifact hashes, resumable inference checkpoints and separate rerun outputs. CPU merge/QC can reuse verified masks after GPU workers exit. A shared resource queue intersects explicitly allocated UUIDs with inherited visibility and bounds case concurrency, CPU threads, estimated memory and I/O. Cold model-cache initialization is serialized; compressed inputs are expanded losslessly once per attempt. Scientific model flags, eleven labels and native geometry are unchanged.
+
+POSIX descendant locks, registered orphan cleanup, independent release updates, private license setup and synthetic lifecycle/parallel tests accompany the change. Validation scope is documented separately; publication does not imply deployment or real CT/model/GPU throughput validation.
+
 ## Maintenance contract
 
 Maintain the code and its synthetic tests together. Local deployment and this code mirror must be compared by file hashes before synchronization. Keep all local clinical records out of Git. Do not repeat completed historical recovery scripts or launch full data processing merely to update handoff documentation.

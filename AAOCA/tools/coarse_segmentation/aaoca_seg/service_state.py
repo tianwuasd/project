@@ -11,6 +11,16 @@ import uuid
 CODE_ROOT = Path(__file__).resolve().parents[1]
 
 
+def managed_release(workspace):
+    """Only the exact private release selected by the verified updater is allowed."""
+    workspace = Path(workspace).resolve()
+    selected = read_json(workspace / 'release.json', {})
+    return (isinstance(selected, dict) and re.fullmatch('[a-f0-9]{40}', CODE_ROOT.name) is not None
+            and CODE_ROOT.parent == workspace / 'releases'
+            and selected.get('path') == str(CODE_ROOT)
+            and selected.get('commit') == CODE_ROOT.name)
+
+
 def read_json(path, default=None):
     try:
         return json.loads(Path(path).read_text(encoding="utf-8-sig"))
@@ -62,7 +72,7 @@ def file_lock(path):
             import fcntl
             fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
         locked = True
-        yield
+        yield stream.fileno()
     except OSError as error:
         if not locked:
             raise ValueError("已有操作正在进行，请稍后重试") from error
@@ -72,8 +82,8 @@ def file_lock(path):
             if os.name == "nt":
                 stream.seek(0)
                 msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                fcntl.flock(stream, fcntl.LOCK_UN)
+            # POSIX: close only. Explicit LOCK_UN would also unlock the shared
+            # open file description inherited by still-running descendants.
         stream.close()
 
 
@@ -112,7 +122,27 @@ def process_identity(pid=None):
 
 
 def alive(identity):
-    return bool(identity and process_identity(identity.get("pid", -1)) == identity)
+    return bool(isinstance(identity, dict) and isinstance(identity.get('pid'), int)
+                and process_identity(identity['pid']) == identity)
+
+
+def terminate_owned(identity):
+    """Request termination of a registered orphan's own process group only."""
+    if not alive(identity):
+        return False
+    pid = identity['pid']
+    if os.name == 'nt':
+        subprocess.run(['taskkill', '/PID', str(pid), '/T'], capture_output=True, timeout=15, check=False)
+    else:
+        import signal
+        try:
+            if os.getpgid(pid) == pid and alive(identity):
+                os.killpg(pid, signal.SIGTERM)
+            elif alive(identity):
+                os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            return False
+    return True
 
 
 def detached(command, log_path, env=None):
