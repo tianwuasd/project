@@ -342,6 +342,11 @@ def show_results(job, step="auto"):
         f"{sum(s.get('status') in {'passed', 'reused'} for s in steps)}/{len(steps)}"
     )
     print("任务目录：" + text(job))
+    plan = read(job / "plan.json")
+    for key, label in (("input_job", "预处理输入任务"), ("rerun_of", "重跑来源任务")):
+        source = mapping(plan.get(key))
+        if source:
+            print(label + "：" + text(source.get("name")) + " | " + text(source.get("directory")))
     if current.get("ended_at"):
         print("结束时间：" + text(current["ended_at"]))
     for receipt in sorted((job / "uploads").glob("*.json")):

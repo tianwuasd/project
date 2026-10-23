@@ -93,7 +93,7 @@ def validate_inputs(args, future):
         if not value:
             raise ValueError(f"{args.task} 需要 --{key.replace('_', '-')}")
         path = Path(value).expanduser().resolve()
-        if str(path) in future:
+        if any(path == Path(root) or path.is_relative_to(Path(root)) for root in future):
             continue
         if not path.exists():
             raise ValueError(f"{args.task} 输入不存在：{key}={path}")
@@ -132,6 +132,13 @@ def build_plan(args, profile, interactive):
     directory = results / (datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid4().hex[:8] + "_workflow")
     base = copy.deepcopy(args)
     base.runtime, base.results = str(runtime), str(results)
+    from .lineage import choose_input
+
+    input_job = choose_input(base, names, runtime, results, interactive)
+    if input_job:
+        names = [name for name in names if name != "preprocess"]
+        if not names:
+            raise ValueError("已选择完整预处理输入；请选择后续步骤，或不复用并重新预处理")
     steps, base = resolve_steps(base, profile, interactive, directory, saved, names)
     for field in ("dataset", "prepared"):
         value = getattr(base, field, None)
@@ -150,6 +157,7 @@ def build_plan(args, profile, interactive):
         "log": str(directory / "launcher.log"),
         "profile": profile,
         "steps": steps,
+        **({"input_job": input_job} if input_job else {}),
     }
 
 

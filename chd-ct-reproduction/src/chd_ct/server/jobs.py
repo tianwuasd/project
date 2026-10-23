@@ -72,6 +72,7 @@ def initial_state(plan):
 
 def execute(plan):
     from . import gpu_hold, imagechd
+    from .lineage import verify_lineage
 
     directory = Path(plan["directory"])
     state = initial_state(plan)
@@ -93,6 +94,7 @@ def execute(plan):
     try:
         from .inference_phases import normalize_caps, operations
 
+        verify_lineage(plan)
         normalize_caps(plan)
         scheduled = operations(plan)
         gpu_positions = [
@@ -228,6 +230,9 @@ def execute(plan):
 
 
 def submit(plan, lock, foreground=False):
+    from .lineage import verify_lineage
+
+    verify_lineage(plan)
     directory = Path(plan["directory"])
     resuming = bool(plan.get("resume_existing"))
     if resuming:

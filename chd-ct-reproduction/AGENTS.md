@@ -47,6 +47,8 @@
 
 ## Skill 同步位置
 
+本机 2026-10-23 核对：当前可用发布源码是 `D:/projects/project/chd-ct-reproduction`，skill 源码是 `D:/projects/codex-skill/server-engineering`，安装版为 `C:/Users/Lenovo/.codex/skills/server-engineering`。下表的另一台机器路径只作历史定位，先检查实际存在性与 Git 状态，不能重建旧根目录。
+
 服务器工程相关改动使用 `server-engineering` skill，先读其 `SKILL.md` 及涉及的参考文件。
 
 | 用途 | 位置 |
@@ -87,5 +89,9 @@ runtime：`/data5/zhougaowei/zhangruichen_workspace/chd_ct_runtime`。数据、�
 面板 `o` 与 `--query results` 共用只读实现。更新后应直接读取原 workflow 的旧版结果，不要求重跑或转换文件；按命名任务选择，原路径可手工输入。结果用中文摘要解释 Dice、有效分母、三折和短测范围，缺失值不得伪装成零或成功；展示可复制的查询命令。结果浏览可发现旧 runtime 的文件，恢复运行仍遵守原资格限制。查询必须无需 ML 依赖、GPU 或写入；保留 `last-job.json` 和所有旧结果字节与时间戳。复用规则同步 `server-engineering/references/result-viewing.md`。
 
 ## 任务追加与上传
+
+0.18.0：新建任务可显式选择历史预处理作为输入；使用历史最终缓存、跳过预处理并记录来源。主动重跑与普通续跑分开：`k` / `--rerun-job` 对完成任务选步骤，在独立新 workflow 计算；`r` 仍复用成功步骤。选中生产步骤时更新本次依赖，未选时保持原输入，预处理重跑使用唯一新缓存；不覆写旧权重/结果。提交前持锁复核输入任务记录及配置，活跃源任务拒绝。跨 runtime 不直接复用历史任务入口，以原 runtime 为准。
+
+整体模板和处理方法同步到 server-engineering 的 `references/project-template.md`、`references/processing-methods.md` 与 `references/task-input-rerun.md`。用户要求后续更好的做法也更新模板：在本次授权项目内验证后，记录依据、适用范围、兼容性和迁移方式，再更新版本、测试、参考实现、技能源码与安装版。工程优化与科学方法分开，历史实验保持冻结；不能把更快自动等同于更准确，也不扩大为更改其他项目或正在运行的实验。
 
 完成 workflow 允许追加原计划没有的步骤，保留同一名称、目录及原输入来源；续跑提供全面、简单和不检查三种模式，默认简单；简单只查待执行步骤的直接前置依赖，小文件核验历史摘要，大文件仅检查存在与本次状态稳定。全面模式保留全部历史 SHA256 验证，缺少记录或内容变化时停止；不检查模式明确记录跳过，不能伪装成校验通过。所有模式都复用成功步骤，禁止自动重跑，并保留运行锁和各步骤自身契约检查。未完成步骤保留原恢复策略。提交前持锁复核原计划/状态/回执，旧版本归档到 attempts，结果页覆盖新增步骤。更新器遇到首个通过校验的可快进提交即停止，官方不可达时只声明该线路结果。上传走官方 GitHub 认证的 Release API/CLI，不向公共下载镜像传凭据；失败保留本地包和同一 release tag 供重试。同步 skill 的 workflow-extension-upload 模板。

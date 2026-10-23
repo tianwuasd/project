@@ -198,6 +198,9 @@ def make_parser():
     parser.add_argument("--runtime")
     parser.add_argument("--results")
     parser.add_argument("--name", help="本次新任务的显示名称；重名也使用独立目录，续跑保留原名称")
+    parser.add_argument("--input-job", help="新建任务复用指定 workflow 的预处理结果；none 不复用并新建预处理")
+    parser.add_argument("--rerun-job", help="选择已完成 workflow，在独立新任务中重新计算")
+    parser.add_argument("--rerun-tasks", help="配合 --rerun-job 选择原任务步骤，逗号分隔；默认 all")
     parser.add_argument(
         "--preprocess-cache",
         choices=("reuse", "new"),
@@ -255,6 +258,16 @@ def main(argv=None):
     try:
         from . import jobs
 
+        if args.rerun_tasks and not args.rerun_job:
+            raise ValueError("--rerun-tasks 需要配合 --rerun-job")
+        if args.rerun_job and (args.resume_job or args.input_job or args.task or args.tasks):
+            raise ValueError("重跑不能与续跑、新建输入或 --task/--tasks 混用")
+        if args.input_job and args.resume_job:
+            raise ValueError("续跑保留原输入任务，不能更换")
+        if (args.input_job or args.rerun_job) and (
+            args.query or args.status or args.stop or args.worker or args.upload_job or args.upload_package
+        ):
+            raise ValueError("输入任务/重跑参数不能与查询、停止、worker 或上传混用")
         if args.append_tasks and not args.resume_job:
             raise ValueError("--append-tasks 需要配合 --resume-job")
         if args.resume_check and not args.resume_job:
@@ -310,7 +323,7 @@ def main(argv=None):
         from .workflow import build_plan
 
         interactive = sys.stdin.isatty() and not args.non_interactive
-        use_panel = interactive and not (args.task or args.tasks or args.resume_job)
+        use_panel = interactive and not (args.task or args.tasks or args.resume_job or args.rerun_job)
         original = copy.deepcopy(args)
         while True:
             try:
@@ -323,7 +336,11 @@ def main(argv=None):
                     original.runtime = args.runtime
                 if interactive:
                     print("输入 b 返回面板，q 退出程序；Ctrl+C 取消当前输入。")
-                if args.resume_job:
+                if args.rerun_job:
+                    from .rerun import build_rerun_plan
+
+                    plan = build_rerun_plan(args, profile, interactive)
+                elif args.resume_job:
                     from .resume import build_resume_plan
 
                     plan = build_resume_plan(args, profile, interactive)
@@ -340,6 +357,7 @@ def main(argv=None):
                 use_panel = True
                 original.task = original.tasks = original.resume_job = None
                 original.append_tasks = None
+                original.input_job = original.rerun_job = original.rerun_tasks = None
             except (ValueError, OSError) as error:
                 if not use_panel:
                     raise

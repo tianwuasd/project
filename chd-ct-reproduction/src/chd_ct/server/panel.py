@@ -19,6 +19,9 @@ def pick_history(runtime, results, resume=False):
         print("请输入列表内的任务编号。")
         return None
     job = records[int(value) - 1]
+    if inspection.status(job).startswith("unavailable"):
+        print("此任务记录损坏；请选择其他任务或核对原文件。")
+        return None
     if resume and inspection.job_active(job):
         print("此任务正在运行；可以查询，不能重复续跑。")
         return None
@@ -105,7 +108,8 @@ def run(args, profile):
         print("s 任务进度  g 显卡状态（1秒刷新）  m 模型 epoch/loss  l 详细日志  p 我的进程")
         print("o 查看结果（选择项目/任务）  h 历史任务与日志  u 更新程序（多镜像）  0/q 退出面板（后台任务继续）")
         print("v 上传日志、配置、指标和模型权重（GitHub Release）")
-        print("x 中断当前任务（保留检查点）" if active else "n 新建并命名任务  r 历史任务续跑/追加未执行步骤")
+        print("x 中断当前任务（保留检查点）" if active else
+              "n 新建任务（可选输入任务）  r 续跑/追加  k 已完成任务重跑（独立新结果）")
         print("各输入页：b 返回面板，q 退出程序。")
         try:
             action = ask("请选择 [s]：").lower() or "s"
@@ -177,15 +181,18 @@ def run(args, profile):
                 if changed:
                     print("更新完成。本面板已退出，请重新运行 bash start_server.sh 加载新版。")
                     return False
-            elif action in {"n", "r"}:
+            elif action in {"n", "r", "k"}:
                 if active:
                     print("此 runtime 已有任务在运行；请先查询或停止，不重复提交。")
                     continue
-                if action == "r":
+                if action in {"r", "k"}:
                     selected = pick_history(runtime, results, resume=True)
                     if selected is None:
                         continue
-                    args.resume_job = str(selected)
+                    if action == "k":
+                        args.rerun_job = str(selected)
+                    else:
+                        args.resume_job = str(selected)
                 return True
             else:
                 print("请输入菜单中的字母或 0。")

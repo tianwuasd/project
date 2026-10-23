@@ -136,6 +136,8 @@ def build_resume_plan(args, profile, interactive):
         or args.tasks
         or getattr(args, "name", None)
         or getattr(args, "preprocess_cache", None)
+        or getattr(args, "input_job", None)
+        or getattr(args, "rerun_job", None)
         or args.reset_settings
     ):
         raise ValueError("--resume-job 使用原任务的名称、数据、配置和步骤；不要同时改动名称/输入/步骤")

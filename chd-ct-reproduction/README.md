@@ -1,5 +1,7 @@
 # ImageCHD：多阶段分割与独立可解释诊断
 
+0.18.0：新建任务可选择历史任务的预处理结果作为“输入任务”，直接沿用其最终缓存并跳过预处理。面板 `k` 可选择已完成任务和步骤，从头计算到独立的新任务目录；原权重、日志和结果保持不变。普通 `r` 仍是续跑/追加，不会自动重跑成功步骤。具体选择与命令见 [输入任务与重跑](docs/server-start.md#输入任务与主动重跑0180)。
+
 0.13.0：测试和预测接入 GPU 并发上限；所有所选 GPU 工作完成后释放显卡，再恢复原网格、压缩和评估。非训练步骤内置 CPU 资源检查与有界病例并行，详细日志显示完成进度和估算剩余时间。训练已有的 CPU 调优、smoke/preflight 步骤与科学配置保持不变。改前文件见 [备份](back/before-inference-resources-20261019/manifest.json)，独立服务器小例子位于大 project 的 [server-resource-smoke](../server-resource-smoke/README.md)。
 
 

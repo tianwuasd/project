@@ -17,6 +17,7 @@ INPUTS = {
     "diagnose": ("features", "classifier", "rules", "evidence"),
     "diagnosis-evaluate": ("features", "diagnosis_labels", "diagnoses"),
     "diagnosis-demo": (),
+    "demo": (),
 }
 ARTIFACT_FILES = {
     "features": "features.json",

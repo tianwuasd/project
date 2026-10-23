@@ -25,7 +25,10 @@ def latest(runtime):
 
 
 def name(job):
-    return load(job / "job_state.json").get("name") or load(job / "plan.json").get("name") or job.name
+    state, plan = load(job / "job_state.json"), load(job / "plan.json")
+    return (state.get("name") if isinstance(state, dict) else None) or (
+        plan.get("name") if isinstance(plan, dict) else None
+    ) or job.name
 
 
 def job_active(job):
@@ -42,8 +45,15 @@ def job_active(job):
 
 
 def status(job):
-    saved = load(job / "job_state.json").get("status", "unknown")
-    if job_active(job):
+    record = load(job / "job_state.json")
+    if not isinstance(record, dict):
+        return "unavailable（记录损坏，请核对该任务）"
+    saved = record.get("status", "unknown")
+    try:
+        active = job_active(job)
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return "unavailable（记录损坏，请核对该任务）"
+    if active:
         return "running" if saved in {"running", "queued"} else "running（仍有子进程）"
     return "stale（记录中的进程已退出）" if saved in {"running", "queued"} else saved
 
@@ -64,7 +74,8 @@ def history(runtime, results):
         candidates.add(pointer)
     found = []
     for job in candidates:
-        recorded = load(job / "plan.json").get("runtime")
+        plan = load(job / "plan.json")
+        recorded = plan.get("runtime") if isinstance(plan, dict) else None
         if recorded and Path(recorded).expanduser().resolve() == runtime:
             found.append(job)
     return sorted(found, key=lambda p: p.name, reverse=True)
@@ -72,7 +83,7 @@ def history(runtime, results):
 
 def show_history(runtime, results):
     records = history(runtime, results)
-    print("\n历史任务（新到旧；完成任务可查询/追加未执行步骤，中断任务可续跑）：")
+    print("\n历史任务（新到旧；完成任务可查询/追加/独立重跑，中断任务可续跑）：")
     for i, job in enumerate(records, 1):
         print(f"  {i}. {name(job)} | {status(job)}\n     {job}")
     if not records:

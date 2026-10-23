@@ -1,0 +1,24 @@
+*.sh text eol=lf
+
+# Preserve downloaded author sources and their recorded hashes byte-for-byte.
+src/chd_ct/models/reference/* -text -whitespace
+
+# Source snapshots have recorded byte hashes; preserve their original line endings.
+back/before-paper-alignment-20261013/** -text -whitespace
+back/before-threefold-training-20261015/** -text -whitespace
+back/preprocess-before-excel-20261013/** -text -whitespace
+back/before-cpu-optimization-20261016/** -text -whitespace
+back/before-panel-update-20261016/** -text -whitespace
+back/before-gpu-refresh-20261016/** -text -whitespace
+back/before-cache-selection-20261018/** -text -whitespace
+back/before-origin-alias-20261018/** -text -whitespace
+back/before-codex-directory-20261018/** -text -whitespace
+back/before-cross-fold-queue-20261018/** -text -whitespace
+back/before-inference-resources-20261019/** -text -whitespace
+
+back/before-result-viewer-20261019/** -text -whitespace
+back/before-workflow-extension-upload-20261020/** -text -whitespace
+back/before-resume-verification-20261020/** -text -whitespace
+back/before-diagnosis-ids-20261021/** -text -whitespace
+
+back/before-resume-modes-20261021/** -text -whitespace
