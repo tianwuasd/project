@@ -17,6 +17,8 @@ class Config:
     read_workers: int = 1
     memory_budget_gib: float | None = None
     compression_level: int = 1
+    memory_fraction: float = .75
+    cpu_limit: int | None = None
 
     def __post_init__(self):
         if self.target_spacing is not None:
@@ -35,6 +37,10 @@ class Config:
             raise ValueError('memory_budget_gib must be positive and finite')
         if isinstance(self.compression_level, bool) or not isinstance(self.compression_level, int) or not 0 <= self.compression_level <= 9:
             raise ValueError('compression_level must be an integer in [0,9]')
+        if not math.isfinite(self.memory_fraction) or not 0 < self.memory_fraction <= .95:
+            raise ValueError('memory_fraction must be in (0,.95]')
+        if self.cpu_limit is not None and (isinstance(self.cpu_limit, bool) or not isinstance(self.cpu_limit, int) or self.cpu_limit < 1):
+            raise ValueError('cpu_limit must be a positive integer')
 
     def recipe(self):
         return {

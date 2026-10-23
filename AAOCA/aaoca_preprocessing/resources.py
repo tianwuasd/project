@@ -64,7 +64,9 @@ def allocation(config, root='/sys/fs/cgroup', membership='/proc/self/cgroup'):
                 memory = min(memory, max(0, limit - used))
             except (OSError, ValueError):
                 pass
-    budget = int(memory * .75)
+    if config.cpu_limit is not None:
+        cpu = min(cpu, config.cpu_limit)
+    budget = int(memory * config.memory_fraction)
     if config.memory_budget_gib is not None:
         budget = min(budget, int(config.memory_budget_gib * 2**30))
     slots = min(config.workers, max(1, math.floor(cpu / config.compute_threads)))

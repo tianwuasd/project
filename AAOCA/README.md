@@ -12,6 +12,8 @@
 
 1.1 工作流与 nnU-Net 自动间距的区别见 [PREPROCESSING_WORKFLOW.md](PREPROCESSING_WORKFLOW.md)；自动建议不等于完整 nnU-Net 规划，也不替代任务效果验证。
 
+1.2 新增 [中文服务器工作台](SERVER_WORKBENCH.md)：`bash start_aaoca_server.sh` 或安装后的 `aaoca-server`。结构参考 CHD 任务面板，保留配置菜单；目标间距、CPU、内存默认自动估算，可手动调整，支持命名任务、进度、日志、历史、停止和续跑。该入口独立于下面的原始资料整理/转换面板，目前仅接入预处理。
+
 ## 安装和启动
 
 使用带 Tcl/Tk 的 Python 3.12 或以上版本：

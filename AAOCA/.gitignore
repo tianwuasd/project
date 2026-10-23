@@ -13,6 +13,10 @@
 !/preprocess_aaoca.py
 !/preprocess_server.sh
 !/aaoca_preprocessing/
+!/aaoca_server/
+!/start_aaoca_server.py
+!/start_aaoca_server.sh
+!/SERVER_WORKBENCH.md
 !/一键处理.cmd
 !/common.py
 !/convert_ct.py
@@ -33,6 +37,8 @@
 !/tests/test_*.py
 /aaoca_preprocessing/*
 !/aaoca_preprocessing/*.py
+/aaoca_server/*
+!/aaoca_server/*.py
 /tools/*
 !/tools/research_ct/
 !/tools/chd_dataset/

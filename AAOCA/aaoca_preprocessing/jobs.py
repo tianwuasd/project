@@ -77,7 +77,7 @@ def _launch(runtime, spec):
             'note': 'submission is not completion; inspect status and worker.log'}
 
 
-def start(input_root, output_root, config, manifest=None, scratch=None, spacing_report=None):
+def start(input_root, output_root, config, manifest=None, scratch=None, spacing_report=None, resource_request=None):
     source, output = Path(input_root).expanduser().resolve(), Path(output_root).expanduser().resolve()
     runtime = runtime_path(output)
     if config.target_spacing is None:
@@ -103,6 +103,8 @@ def start(input_root, output_root, config, manifest=None, scratch=None, spacing_
         spec = {'schema': 1, 'created_at': now(), 'input': str(source), 'output': str(output),
                 'scratch': str(scratch), 'config': asdict(config), 'config_sha256': config.signature(),
                 'spacing_selection': spacing_report, 'inputs': inputs}
+        if resource_request is not None:
+            spec['resource_request'] = resource_request
         write_json(runtime / 'inputs.json', inputs)
         write_json(runtime / 'job.json', spec)
         return _launch(runtime, spec)
@@ -140,6 +142,12 @@ def worker(runtime, attempt):
                 stat = case['source'].stat()
                 if (stat.st_size, stat.st_mtime_ns) != (frozen['size'], frozen['mtime_ns']):
                     raise ValueError('input changed since job creation; use a new output/job')
+            if 'resource_request' in spec:
+                from .autoresources import select_resources
+                config, resources, _ = select_resources(spec['input'], config.target_spacing,
+                                                        spec['resource_request'], runtime / 'inputs.json')
+                write_json(runtime / 'resources.json', {'attempt': attempt, 'selected_at': now(), **resources})
+                print(f'{now()} automatic resources: {resources["selected"]}', flush=True)
             report('running')
             def progress(case, state):
                 print(f"{now()} {case['case_id']} {case['state']} pending={state['pending']}", flush=True)

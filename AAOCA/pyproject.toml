@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aaoca-preprocessing"
-version = "1.1.0"
+version = "1.2.0"
 description = "Portable CPU preprocessing of HU-calibrated AAOCA NIfTI CT"
 readme = "PREPROCESSING.md"
 requires-python = ">=3.10"
@@ -12,6 +12,7 @@ dependencies = ["numpy>=1.26,<3", "scipy>=1.11,<2", "nibabel>=5.2,<6", "psutil>=
 
 [project.scripts]
 aaoca-preprocess = "aaoca_preprocessing.cli:main"
+aaoca-server = "aaoca_server.panel:main"
 
 [tool.setuptools]
-packages = ["aaoca_preprocessing"]
+packages = ["aaoca_preprocessing", "aaoca_server"]

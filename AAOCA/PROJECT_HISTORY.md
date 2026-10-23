@@ -2,6 +2,10 @@
 
 This is the public, non-patient-specific history. Detailed patient mappings and local paths belong to the private workspace memory.
 
+## 2026-10-23: independent server workbench 1.2
+
+Added a Chinese terminal workbench following the CHD task/configuration layout, with separate startup from raw-data conversion. Only preprocessing is connected. Spacing, CPU and RAM default to automatic selection with manual overrides. Resource allocation uses visible affinity/cgroup limits, sampled idle CPU, 90% available memory, case working-set estimates and bounded I/O; concrete spacing is frozen while automatic resources are refreshed at each attempt. Named history, read-only queries, explicit background start/stop/resume, logs and registry dispatch locking reuse the existing preprocessing engine. Synthetic tests cover menu cancellation, allocation boundaries and verified background reuse; no patient processing or target-server deployment is implied. See SERVER_WORKBENCH.md.
+
 ## September 2026: conversion and inspection
 
 Added local DICOM, roster and PDF inventory, identity checks, CT NIfTI conversion, ultrasound frame/static-image output, reports, progress, pause and resumable processing. Investigated identifier conflicts, duplicate SOP identifiers, missing pixel payloads, incomplete geometry and invalid frame timing. Keep original files and audit evidence.
