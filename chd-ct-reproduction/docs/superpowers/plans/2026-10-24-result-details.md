@@ -25,4 +25,4 @@
 - [x] 更新版本、README、server-start 和维护约定；补充实际验证记录。
 - [x] 修改 server-engineering 的结果模板及整体模板路由，用实际场景复核，验证 skill 格式和源码/安装版哈希。
 - [x] 运行相关面板/查询/工作流回归与 Ruff；结果见 docs/validation-result-details.md。
-- [ ] 检查差异后分别提交推送 CT 和 skill，核验远端与镜像，报告服务器未部署（状态以对应提交的发布记录为准）。
+- [x] 检查差异后分别提交推送 CT 和 skill，核验官方远端与 CT 镜像；skill 镜像未能公开访问。Linux CI 202 passed，服务器未部署，详见 docs/validation-result-details.md。
