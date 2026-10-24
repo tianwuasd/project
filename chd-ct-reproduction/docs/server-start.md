@@ -320,25 +320,29 @@ GPU 中间结果是 `.gpu-results/` 下的未压缩工作网格，需额外磁�
 
 案例位于与 CT 并列的 `server-resource-smoke/`，本地为 `D:/code_project/server-resource-smoke/`。使用 6 例合成 CT、缩小三折六阶段模型，调用实际服务器入口，检查 CPU 记录、推理队列上限、OOF、GPU 释放顺序和残留进程。命令见 [案例说明](../../server-resource-smoke/README.md)。它不改正式数据或缓存，不证明真实 CT 显存/内存容量或医学效果。
 
-## 历史结果查看（0.19.0）
+## 历史结果查看（0.20.0）
 
 更新代码并重新打开面板，输入 `o` → 选择项目/任务编号。这里的项目指已经命名的 workflow，例如 `CHD_1`；同名记录以目录区分。默认选中最近任务，也能选以前已完成、失败或仍运行的任务。`d` 可直接输入历史 workflow 的完整目录，`0/b` 返回，`q` 退出面板。
 
+选择任务后进入结果中心，首页只放状态与五个二级页：1 分割结果、2 诊断决策、3 诊断评估、4 训练与数据、5 文件与来源。各页默认简洁，`d/s` 详细/简洁，`n/p` 翻页，`r` 刷新，`b/0` 返回上一级，`q` 退出面板且后台继续。
+
 结果页读取既有 JSON 清单，不安装环境、不选择显卡、不改原文件或最近任务指针，不重新训练/预测/评估。旧版只有逐病例 Dice 时，按已保存的数值汇总各结构均值，忽略不适用的空值；没有评估结果时明确提示，而不是把完成训练显示为评估通过。
 
-- 显示任务名、记录状态、完成步骤及结果目录。
+- 首页显示任务名、记录状态、完成步骤；结果目录与来源移入文件页。
 - 标明菜单功能、实际缓存/真值、模型和预测清单；读到数据清单时显示原始来源目录及缓存数量。缓存总数、划分计划数和本次实际评估数分别说明，不固定假定为 97 例。
 - 分割显示整体与逐折七结构 Dice、有效病例分母、病例名单及逐病例指标；OOF 与三折集成分开说明。整体按病例平均，不对各折均值等权平均；分母缺失或明细不全时标为未记录。Dice 是重叠度，不是诊断准确率。
 - 训练显示单次划分或三折概况，预测只显示产物；短测/预检和合成数据明确标注。决策模块列逐疾病训练可用性、每例实际树路径/规则证据，以及逐疾病混淆计数、准确率、覆盖率、弃判和未知真值。详见 [结果说明](result-details.md)。
 - 缺少文件、损坏清单、仅完成 GPU 计算时都有提示；完整性哈希不在查询中重新计算。归档备份目录不当成当前结果。
-- 页末直接给出结果摘要、训练明细和详细日志的可复制命令，路径中的空格和引号按 Bash 转义。
+- 文件页的详细视图提供结果摘要、训练明细和详细日志的可复制命令，路径中的空格和引号按 Bash 转义。病例清单、完整路径与树路径按需查看，不在默认简洁页展开。
 
 也可直接查询（使用系统 `python3` 即可）：
 
 ```bash
 python3 start_server.py --query results --job-dir /原任务_workflow
-# 只看测试结果
-python3 start_server.py --query results --job-dir /原任务_workflow --step test
+# 分割简洁摘要；其他分区为 decisions / diagnosis-evaluation / training / files
+python3 start_server.py --query results --job-dir /原任务_workflow --result-section segmentation
+# 只看测试步骤的详细结果
+python3 start_server.py --query results --job-dir /原任务_workflow --step test --result-detail detailed
 # 观察仍在运行的任务；Ctrl+C 只退出查看
 python3 start_server.py --query results --job-dir /原任务_workflow --follow
 ```

@@ -213,6 +213,14 @@ def make_parser():
     )
     parser.add_argument("--job-dir", help="查询指定历史 workflow 目录；默认最近任务")
     parser.add_argument(
+        "--result-section",
+        choices=("all", "segmentation", "decisions", "diagnosis-evaluation", "training", "files"),
+        help="结果分区：默认 all；仅配合 --query results",
+    )
+    parser.add_argument(
+        "--result-detail", choices=("summary", "detailed"), help="结果级别：默认 summary 简洁；detailed 详细"
+    )
+    parser.add_argument(
         "--step", default="auto", help="查询步骤名称，如 train/smoke/preflight；launcher 为总日志"
     )
     parser.add_argument(
@@ -301,6 +309,8 @@ def main(argv=None):
             raise ValueError("--query 是只读查询，不能同时指定启动、续跑、停止或 --status")
         if not 1 <= args.lines <= 1000:
             raise ValueError("--lines 需要在 1—1000 之间")
+        if (args.result_section or args.result_detail) and args.query != "results":
+            raise ValueError("--result-section/--result-detail 需要配合 --query results")
         if not args.query and (args.job_dir or args.follow or args.step != "auto" or args.model != "all"):
             raise ValueError("--job-dir/--follow/--step/--model 需要配合 --query")
         if args.worker:

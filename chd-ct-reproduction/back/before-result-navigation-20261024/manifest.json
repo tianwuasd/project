@@ -1,0 +1,21 @@
+{
+  "source": "D:\\projects\\project\\chd-ct-reproduction",
+  "head": "769c5001ae2bb2d3fb3e7cadedf4f30a49a82f8d",
+  "files": {
+    ".gitattributes": "55fa6c96755ce697280c0d5decbee89ed7b7e64496bdb85ecd1d81f463764199",
+    "AGENTS.md": "057e7d14edb9df2f58e94ef0f4338acb64fc2b2667cda62bfb54a84255267ad5",
+    "README.md": "1e4fef0dec21961da20244e0c5289d2d9d9f2f0cbfbc51185943b7c030fccc8e",
+    "docs/server-start.md": "af230f9353a171eb4f9eb5526ee4d864e309795b961d6dd8c41796b257bd62da",
+    "docs/result-details.md": "1de191423e316a06395242e23b894d6a34626ef17908402f5492928799bbcee8",
+    "pyproject.toml": "8d5fd42d3fb3177eb50e29c1a532b98c911f0b277b98246cf0feb2ebd8802e61",
+    "src/chd_ct/__init__.py": "bb4cbfab2b64c92e69d5d8cb1eca927289d7b423f422d29bf05d748c8662f094",
+    "src/chd_ct/server/panel.py": "256c89980c304a76a80c61e1fd5b37a066dc0cf89e6884e6095e498604e400a4",
+    "src/chd_ct/server/inspection.py": "cb6dda6066d98ee1eaaa861c4351e2a89629254c37c7841058e6f53f738c55cd",
+    "src/chd_ct/server/launcher.py": "f0108f54ee3f205fb7b05b9107f9ba9eec4fa703b5fd786ff2c5e864df779738",
+    "tests/test_result_viewer.py": "32c5e16fc41f9b2c05bce21112c00001b8c8aaa4ed80fce91a7fb3f47a8f7024",
+    ".github/workflows/chd-ct-server.yml": "596d596c1b2b8a853e22ae2109bcec23de498b5e479da05bab12432fb01186aa"
+  },
+  "source_overrides": {
+    ".github/workflows/chd-ct-server.yml": "D:\\projects\\project\\.github\\workflows\\chd-ct-server.yml"
+  }
+}

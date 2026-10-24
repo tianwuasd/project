@@ -55,6 +55,8 @@ def test_old_single_split_results_cli_without_site_packages_is_readonly(complete
         str(launcher.ROOT / "start_server.py"),
         "--query",
         "results",
+        "--result-detail",
+        "detailed",
         "--job-dir",
         str(job),
     ]
@@ -124,7 +126,8 @@ def test_result_browser_selects_old_task_even_after_runtime_change(completed, mo
     assert job not in inspection.history(runtime, root)  # Resume rules stay strict.
     monkeypatch.setattr(jobs, "acquire_lock", lambda *a: pytest.fail("acquired training lock"))
     monkeypatch.setattr(launcher, "query_gpus", lambda: pytest.fail("queried GPU"))
-    monkeypatch.setattr("builtins.input", lambda _: "2")
+    answers = iter(["2", "1", "b", "b"])
+    monkeypatch.setattr("builtins.input", lambda _: next(answers))
     panel.results_menu(runtime, root)
     assert "0.7500" in capsys.readouterr().out
     assert before == snapshot(root.parent)
@@ -137,7 +140,9 @@ def test_panel_result_action_remains_available_while_running(completed, monkeypa
     answers = iter(["o", "", "0"])
     monkeypatch.setattr("builtins.input", lambda _: next(answers))
     seen = []
-    monkeypatch.setattr(results, "show_results", lambda path: seen.append(path))
+    from chd_ct.server import result_menu
+
+    monkeypatch.setattr(result_menu, "browse_results", lambda path: seen.append(path))
     assert panel.run(args, dict(runtime=str(runtime), results=str(root))) is False
     assert seen == [job]
 
@@ -148,7 +153,7 @@ def test_manual_directory_old_plan_and_moved_output(completed, monkeypatch, caps
     plan = results.read(job / "plan.json")
     plan["steps"][0]["output"] = "/old/location/steps/06_test"
     save(job / "plan.json", plan)
-    answers = iter(["d", str(job)])
+    answers = iter(["d", str(job), "1", "b", "b"])
     monkeypatch.setattr("builtins.input", lambda _: next(answers))
     panel.results_menu(runtime, root)
     assert "0.7500" in capsys.readouterr().out
@@ -633,6 +638,8 @@ def test_boolean_rule_evidence_and_diagnosis_cli_need_no_ml(completed):
             str(job),
             "--step",
             "diagnose",
+            "--result-detail",
+            "detailed",
         ],
         capture_output=True,
         encoding="utf-8",

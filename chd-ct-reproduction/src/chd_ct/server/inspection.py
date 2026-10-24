@@ -26,9 +26,11 @@ def latest(runtime):
 
 def name(job):
     state, plan = load(job / "job_state.json"), load(job / "plan.json")
-    return (state.get("name") if isinstance(state, dict) else None) or (
-        plan.get("name") if isinstance(plan, dict) else None
-    ) or job.name
+    return (
+        (state.get("name") if isinstance(state, dict) else None)
+        or (plan.get("name") if isinstance(plan, dict) else None)
+        or job.name
+    )
 
 
 def job_active(job):
@@ -317,14 +319,19 @@ def query(args, profile):
     runtime = Path(args.runtime or profile["runtime"]).expanduser().resolve()
     job = Path(args.job_dir).expanduser().resolve() if args.job_dir else latest(runtime)
     if args.query == "results":
-        from .results import show_results
+        from .result_views import show_results
 
         if job is None:
             print("没有任务记录；用 --job-dir 指定历史 workflow 目录，或在面板 o 中选择。")
             return 0
         try:
             while True:
-                show_results(job, args.step)
+                show_results(
+                    job,
+                    args.step,
+                    getattr(args, "result_section", None) or "all",
+                    getattr(args, "result_detail", None) or "summary",
+                )
                 if not args.follow:
                     return 0
                 time.sleep(3)

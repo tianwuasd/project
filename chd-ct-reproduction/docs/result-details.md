@@ -1,13 +1,32 @@
 # 查看分割与决策的详细结果
 
-适用版本：0.19.0。打开服务器面板，按 `o` 选择原任务即可；旧任务不必重跑，原报告和最近任务指针不变。命令入口：
+适用版本：0.20.0。打开服务器面板，按 `o` 选择原任务进入结果中心；旧任务不必重跑，原报告和最近任务指针不变。
+
+## 结果中心与二级页
+
+首页只显示任务状态与下面五个入口。每页默认简洁；`d` 详细、`s` 简洁、`n/p` 前后翻页、`r` 刷新、`b/0` 返回上一级、`q` 退出整个面板。正文每页最多 20 行，长行按终端宽度折行。Ctrl+C 退出当前查看层，不停止后台任务。
+
+| 编号 | 二级页 | 简洁 | 详细 |
+|---|---|---|---|
+| 1 | 分割结果 | 集合/用途、病例数、整体和各折前景 Dice | 七结构分数、有效分母、病例名单和逐例指标 |
+| 2 | 诊断决策 | 按疾病统计已保存的阳性候选/阴性/证据不足数量 | 每例实际树路径、阈值、叶节点及规则证据 |
+| 3 | 诊断评估 | 方法、集合、准确率、覆盖率与分母 | 各疾病混淆计数和全部指标 |
+| 4 | 训练与数据 | 准备/训练状态及可读的数量摘要 | 训练记录、每病可训练性和缓存信息 |
+| 5 | 文件与来源 | 主要结果文件位置 | 输入任务、数据/模型/预测来源、上传位置及查询命令 |
+
+简洁页仍标明软件短测/合成数据、未知用途、未完成和缺失情况。决策数量不是诊断准确率；诊断准确率需同时看覆盖率。没有该部分的任务显示无步骤记录。翻页不重新读磁盘，主动刷新重新读取。
+
+命令行不进入交互菜单，默认简洁；可用以下入口：
 
 ```bash
 python3 start_server.py --query results --job-dir /原任务_workflow
-python3 start_server.py --query results --job-dir /原任务_workflow --step test
-python3 start_server.py --query results --job-dir /原任务_workflow --step evaluate
-python3 start_server.py --query results --job-dir /原任务_workflow --step diagnose
-python3 start_server.py --query results --job-dir /原任务_workflow --step diagnosis-evaluate
+python3 start_server.py --query results --job-dir /原任务_workflow --result-section segmentation
+python3 start_server.py --query results --job-dir /原任务_workflow --result-section decisions --result-detail detailed
+python3 start_server.py --query results --job-dir /原任务_workflow --result-section diagnosis-evaluation
+python3 start_server.py --query results --job-dir /原任务_workflow --result-section training
+python3 start_server.py --query results --job-dir /原任务_workflow --result-section files --result-detail detailed
+# 显式查看原全量内容；仍可叠加 --step test / evaluate / diagnose 等筛选
+python3 start_server.py --query results --job-dir /原任务_workflow --result-detail detailed
 ```
 
 ## 先看结果来自哪一步
@@ -27,7 +46,7 @@ python3 start_server.py --query results --job-dir /原任务_workflow --step dia
 
 ## 分割页如何读
 
-结果按“来源 → 整体汇总 → 每折结构分数 → 病例明细”显示：
+简洁页显示核心分数；详细页展开结构与病例，完整来源集中在“文件与来源”。原有指标口径保持：
 
 - 来源包括历史参数中的缓存/真值、模型和预测清单；可读时显示缓存记录数量与原始影像来源目录。缓存包含多少病例，不代表本报告评估了多少病例。
 - `cv` 表示开发集的留出折评估。`out_of_fold` 表示每例使用它对应的留出测试折模型；具体以保存的划分记录为准。`threefold_ensemble` 是一次集成结果，不是三个独立折分数。`train/val/test` 是原记录的集合名，不自动证明患者隔离或外部验证。
