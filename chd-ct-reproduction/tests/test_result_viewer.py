@@ -276,3 +276,414 @@ def test_bad_neighbor_and_history_index_dont_hide_good_results(completed):
     assert job in results.result_history(runtime, root)
     save(runtime / "job-history.json", [None, 42, {}, str(job)])
     assert job in results.result_history(runtime, root)
+
+
+def detailed_case(case, fold, mean, **dice):
+    return dict(
+        case_id=case,
+        inference_protocol="out_of_fold",
+        fold_indices=[fold],
+        mean_foreground_dice=mean,
+        dice=dice,
+    )
+
+
+def test_fold_details_use_saved_case_metrics_and_valid_denominators(completed, capsys):
+    _, root, job, step = completed
+    save(
+        step / "test/evaluation/evaluation.json",
+        dict(
+            status="passed",
+            split="cv",
+            cases_evaluated=3,
+            protocols=["out_of_fold"],
+            cases=[
+                detailed_case("case_a", 0, 0.8, LV=0.8, MYO=None),
+                detailed_case("case_b", 0, 0.5, LV=0.6, MYO=0.4),
+                detailed_case("case_c", 1, 0.2, LV=0.2, MYO=0.2),
+            ],
+            folds={
+                "fold_0": dict(
+                    cases_evaluated=2, mean_case_foreground_dice=0.65, dice_by_class=dict(LV=0.7, MYO=0.4)
+                )
+            },
+        ),
+    )
+    before = snapshot(root.parent)
+    results.show_results(job)
+    out = capsys.readouterr().out
+    first = out.split("fold_0：2 例", 1)[1].split("fold_1：", 1)[0]
+    assert "左心室 (LV)： 0.7000" in first and "有效病例 2/2" in first
+    assert "心肌 (MYO)： 0.4000" in first and "有效病例 1/2" in first
+    assert "case_a" in first and "case_b" in first and "case_c" not in first
+    assert "fold_2：未记录" in out
+    assert "0.5000（50.00%）" in out  # Per-case average; not equal weighting of fold averages.
+    assert before == snapshot(root.parent)
+
+
+def test_ensemble_is_not_reported_as_three_heldout_folds(completed, capsys):
+    _, _, job, step = completed
+    save(
+        step / "test/evaluation/evaluation.json",
+        dict(
+            status="passed",
+            split="test",
+            cases_evaluated=1,
+            protocols=["threefold_ensemble"],
+            cases=[
+                dict(
+                    case_id="new_case",
+                    inference_protocol="threefold_ensemble",
+                    fold_indices=[0, 1, 2],
+                    mean_foreground_dice=0.8,
+                    dice=dict(LV=0.8),
+                )
+            ],
+        ),
+    )
+    results.show_results(job)
+    out = capsys.readouterr().out
+    assert "集成模型的结果，不是三个独立测试折的分数" in out
+    assert "fold_0：" not in out and "new_case" in out
+
+
+def test_missing_fold_detail_never_invents_cases_or_denominators(completed, capsys):
+    _, _, job, step = completed
+    save(
+        step / "test/evaluation/evaluation.json",
+        dict(
+            status="passed",
+            split="cv",
+            protocols=["out_of_fold"],
+            folds={
+                "fold_0": dict(cases_evaluated=2, mean_case_foreground_dice=0.8, dice_by_class=dict(LV=0.9))
+            },
+        ),
+    )
+    results.show_results(job)
+    out = capsys.readouterr().out
+    assert "病例名单：未记录" in out and "有效病例 未记录" in out
+    assert "97" not in out and "33/" not in out
+    assert "fold_1：未记录" in out and "fold_2：未记录" in out
+
+
+def test_result_identity_and_prediction_only_scope(completed, capsys):
+    _, _, job, _ = completed
+    output = job / "steps/02_predict"
+    source = job / "prepared"
+    save(
+        job / "plan.json",
+        dict(
+            steps=[
+                dict(
+                    name="predict",
+                    output=str(output),
+                    arguments=dict(prepared=str(source), models="/models/original/models.json"),
+                )
+            ]
+        ),
+    )
+    save(
+        output / "predict/prediction-report.json",
+        dict(
+            status="passed",
+            model_mode="train",
+            split=None,
+            cases=[dict(case_id="case_x", inference_protocol="out_of_fold", fold_indices=[1])],
+        ),
+    )
+    results.show_results(job, "predict")
+    out = capsys.readouterr().out
+    assert "菜单 6" in out and "独立预测" in out and "不计算 Dice" in out
+    assert str(source) in out and "/models/original/models.json" in out
+    assert "全部病例" in out and "case_x" in out
+
+
+def test_synthetic_demo_cannot_be_presented_as_real_cohort(completed, capsys):
+    _, _, job, _ = completed
+    output = job / "steps/08_demo"
+    save(
+        output / "demo/evaluation/evaluation.json",
+        dict(status="passed", split="test", cases_evaluated=1, mean_case_foreground_dice=0.9),
+    )
+    save(output / "demo/predictions/prediction-report.json", dict(model_mode="smoke", cases=[]))
+    results.show_results(job, "demo")
+    out = capsys.readouterr().out
+    assert "菜单 13" in out and "合成数据" in out
+    assert "0.9000" in out and "不代表真实 CT 分割精度" in out
+
+
+def test_corrupt_fold_metadata_remains_readable(completed, capsys):
+    _, _, job, step = completed
+    save(
+        step / "test/evaluation/evaluation.json",
+        dict(
+            status="failed",
+            split=["cv"],
+            protocols=[{}, "out_of_fold"],
+            cases=[
+                dict(
+                    case_id="bad\x1b[31m",
+                    inference_protocol=["out_of_fold"],
+                    fold_indices={},
+                    mean_foreground_dice=True,
+                    dice=dict(LV=True),
+                ),
+                detailed_case("case_ok", 0, 0.6, LV=0.6),
+            ],
+            folds={"fold_0": [], "fold_1": dict(cases_evaluated=2, dice_by_class=dict(LV=float("nan")))},
+        ),
+    )
+    results.show_results(job)
+    out = capsys.readouterr().out
+    assert "尚未完整通过" in out and "case_ok" in out
+    assert "nan" not in out and "\x1b" not in out
+
+
+def test_decisions_display_actual_paths_missing_evidence_and_leaf(completed, capsys):
+    _, root, job, _ = completed
+    output = job / "steps/11_diagnose"
+    save(
+        output / "diagnose/diagnosis.json",
+        dict(
+            status="passed",
+            split="test",
+            method="both",
+            segmentation_mode="train",
+            classifier_blank_policy="negative",
+            cases=[
+                dict(
+                    case_id="case_a",
+                    patient_id="patient_a",
+                    split="test",
+                    rule_evidence_source=None,
+                    classifier={
+                        "VSD": dict(
+                            status="positive",
+                            probability=0.75,
+                            path=[
+                                dict(
+                                    feature="fraction_LV",
+                                    observed=0.41,
+                                    used_value=0.41000001,
+                                    operator=">",
+                                    threshold=0.2,
+                                )
+                            ],
+                            leaf=dict(id=3, samples=8, positive=6),
+                        ),
+                        "ASD": dict(
+                            status="indeterminate",
+                            reason="missing_required_feature",
+                            path=[dict(feature="contact_LA_RA", observed=None, threshold=0.5)],
+                        ),
+                    },
+                    rules={
+                        "VSD": dict(status="indeterminate", reason="missing_evidence", missing=["comm_LV_RV"])
+                    },
+                )
+            ],
+        ),
+    )
+    before = snapshot(root.parent)
+    results.show_results(job, "diagnose")
+    out = capsys.readouterr().out
+    assert "菜单 11" in out and "case_a" in out and "VSD：阳性候选" in out
+    assert "fraction_LV" in out and "0.4100" in out and "> 0.2000" in out
+    assert "6/8" in out and "75.00%" in out and "未经临床风险校准" in out
+    assert "ASD：证据不足" in out and "comm_LV_RV" in out
+    assert "空白按阴性" in out and before == snapshot(root.parent)
+
+
+def test_diagnosis_metrics_include_per_disease_denominators(completed, capsys):
+    _, _, job, _ = completed
+    output = job / "steps/12_diagnosis-evaluate"
+    metrics = dict(
+        known=5,
+        unknown_truth=1,
+        decided=3,
+        abstained=2,
+        tp=1,
+        tn=1,
+        fp=1,
+        fn=0,
+        accuracy=2 / 3,
+        coverage=0.6,
+        sensitivity=1.0,
+        specificity=0.5,
+        precision=0.5,
+        f1=2 / 3,
+        auroc=None,
+        correct_fraction_all_known=0.4,
+    )
+    save(
+        output / "diagnosis-evaluate/diagnosis-metrics.json",
+        dict(
+            status="passed",
+            split="test",
+            cases_evaluated=6,
+            classifier_micro=metrics,
+            classifier={"VSD": metrics},
+            rules={},
+            blank_policy="negative",
+            assumed_negative_cells=4,
+            segmentation_mode="smoke",
+            software_only=True,
+        ),
+    )
+    results.show_results(job, "diagnosis-evaluate")
+    out = capsys.readouterr().out
+    assert "VSD" in out and "已知真值 5" in out and "已判定 3" in out and "弃判 2" in out
+    assert "TP/TN/FP/FN：1/1/1/0" in out and "全部已知真值中的正确比例" in out
+    assert "60.00%" in out and "仅用于软件验证" in out
+    assert "空白按阴性" in out and "4" in out
+
+
+def test_decision_training_displays_untrainable_diseases(completed, capsys):
+    _, _, job, _ = completed
+    output = job / "steps/10_diagnosis-train"
+    save(
+        output / "diagnosis-train/trainability.json",
+        dict(
+            status="passed",
+            trained_diseases=1,
+            training_cases=8,
+            validation_cases=2,
+            test_cases_used=0,
+            blank_policy="negative",
+            diseases={
+                "VSD": dict(status="trained", positive=4, negative=4, unknown=0, max_depth=2),
+                "ASD": dict(
+                    status="not_trainable",
+                    positive=1,
+                    negative=7,
+                    unknown=0,
+                    reason="训练集至少需要 2 个阳性和 2 个阴性",
+                ),
+            },
+        ),
+    )
+    results.show_results(job, "diagnosis-train")
+    out = capsys.readouterr().out
+    assert "VSD" in out and "深度 2" in out and "ASD" in out and "不能训练" in out
+    assert "至少需要 2 个阳性" in out and "训练/验证病例：8/2" in out
+
+
+def test_external_prediction_is_not_replaced_by_same_named_local_step(completed, capsys):
+    _, _, job, _ = completed
+    external = job.parent / "external_workflow/steps/06_predict/predict"
+    local = job / "steps/06_predict/predict"
+    save(external / "prediction-report.json", dict(model_mode="smoke"))
+    save(local / "prediction-report.json", dict(model_mode="train"))
+    output = job / "steps/07_evaluate"
+    save(output / "evaluate/evaluation.json", dict(status="passed", cases_evaluated=1))
+    save(
+        job / "plan.json",
+        dict(
+            steps=[
+                dict(name="predict", output=str(local.parent)),
+                dict(name="evaluate", output=str(output), arguments=dict(predictions=str(external))),
+            ]
+        ),
+    )
+    results.show_results(job, "evaluate")
+    out = capsys.readouterr().out
+    assert "不能当作正式实验结果" in out and str(external) in out
+    assert "模型来源模式：正式训练" not in out
+
+
+def test_boolean_rule_evidence_and_diagnosis_cli_need_no_ml(completed):
+    _, root, job, _ = completed
+    output = job / "steps/11_diagnose"
+    save(
+        output / "diagnose/diagnosis.json",
+        dict(
+            status="passed",
+            method="rules",
+            cases=[
+                dict(
+                    case_id="case_bool",
+                    rules={
+                        "VSD": dict(
+                            status="positive",
+                            evidence=[
+                                dict(
+                                    feature="conn_LV_RV",
+                                    observed=True,
+                                    operator="eq",
+                                    threshold=True,
+                                    satisfied=True,
+                                )
+                            ],
+                        )
+                    },
+                )
+            ],
+        ),
+    )
+    before = snapshot(root.parent)
+    response = subprocess.run(
+        [
+            sys.executable,
+            "-S",
+            str(launcher.ROOT / "start_server.py"),
+            "--query",
+            "results",
+            "--job-dir",
+            str(job),
+            "--step",
+            "diagnose",
+        ],
+        capture_output=True,
+        encoding="utf-8",
+        timeout=15,
+    )
+    assert response.returncode == 0, response.stderr
+    assert "观测 1（是）" in response.stdout and "= 1（是）" in response.stdout
+    assert before == snapshot(root.parent)
+
+
+def test_partial_case_details_do_not_claim_complete_denominator(completed, capsys):
+    _, _, job, step = completed
+    save(
+        step / "test/evaluation/evaluation.json",
+        dict(
+            status="passed",
+            cases_evaluated=3,
+            protocols=["out_of_fold"],
+            cases=[detailed_case("one_saved", 0, 0.6, LV=0.6)],
+            folds={
+                "fold_0": dict(cases_evaluated=3, mean_case_foreground_dice=0.8, dice_by_class=dict(LV=0.8))
+            },
+        ),
+    )
+    results.show_results(job)
+    out = capsys.readouterr().out
+    assert "已保存明细 1 例，与登记总数不一致" in out
+    assert "有效病例 未记录" in out and "有效病例 1/3" not in out
+
+
+@pytest.mark.parametrize(
+    "cases",
+    [
+        [dict(mean_foreground_dice=1.0, dice=dict(LV=1.0))],
+        [dict(mean_foreground_dice=1.0, dice=dict(LV=1.0)), dict(dice={})],
+        [
+            dict(mean_foreground_dice=1.0, dice=dict(LV=1.0)),
+            dict(mean_foreground_dice=True, dice=dict(LV=True)),
+        ],
+    ],
+)
+def test_partial_or_invalid_saved_values_cannot_fill_whole_summary(cases):
+    from chd_ct.server.result_metrics import summary
+
+    value, _ = summary(dict(cases_evaluated=2), cases, results.LABELS)
+    assert "mean_case_foreground_dice" not in value and "LV" not in value["dice_by_class"]
+
+
+def test_partial_cache_metadata_does_not_claim_zero_cases_or_available_truth(tmp_path, capsys):
+    save(tmp_path / "dataset.json", dict(discovered=8))
+    results.cache_details(str(tmp_path))
+    out = capsys.readouterr().out
+    assert "保留 未记录" in out and "排除记录 未记录" in out
+    assert "无法确认真值可用性" in out

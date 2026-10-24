@@ -1,0 +1,14 @@
+{
+  "source": "D:\\projects\\project\\chd-ct-reproduction",
+  "files": {
+    "src/chd_ct/server/results.py": "7e3990bd2502e39739431082b3056a3e8bda9a4d929620c8b0160f92bdb308e7",
+    "tests/test_result_viewer.py": "6c29af57ceac84637952e418af75edee0f371f8f56f1efc3b3696f2f31a78d4f",
+    "pyproject.toml": "5a83f7984abc25b0672a7c942cab1b4d52b6e137e9dca7ae0adaaa62574e9e17",
+    "src/chd_ct/__init__.py": "f6c2911e4f669a9d96b3fcdb44ec4b0259198511db420f17f42bef94d1f7cc5d",
+    "README.md": "2bf19c76d0a3caa3e3f180184c3320d0e976dcf1df5876810bcfae8678b69aeb",
+    "docs/server-start.md": "bdf5c7539ea8cf1041067d9a3b1d9a54fb316adf82efaaad90a45748787da427",
+    "AGENTS.md": "225f20a0dcf8e5b58a9d53443ee402f3349413a46d78e2467ff7d336cf1e0a2f",
+    ".gitattributes": "8e70a1bca8dcb5f889b6857aef0b70b59f8ee5601d7ff52cd84c14112834f4f5"
+  },
+  "head": "dee6b893c32160d5238f01027375ae9fe9345304"
+}

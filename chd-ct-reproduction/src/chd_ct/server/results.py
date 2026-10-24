@@ -1,12 +1,11 @@
 """Human-readable existing results, using only the standard library and read-only I/O."""
 
-import json
-import math
 import shlex
-import unicodedata
 from pathlib import Path
 
 from . import inspection
+from .result_io import count, mapping, named, number, read, rows, text
+from .result_metrics import denominator, fold_details, fold_index, summary
 
 LABELS = {
     "LV": "左心室",
@@ -35,10 +34,16 @@ STEPS = {
     "smoke": "软件短测",
     "preflight": "训练预检",
     "train": "正式训练",
-    "test": "测试",
-    "predict": "预测",
-    "evaluate": "分割评估",
-    "diagnosis-evaluate": "诊断评估",
+    "test": "菜单 5 · 测试集预测和评估",
+    "predict": "菜单 6 · 独立预测（不计算 Dice）",
+    "evaluate": "菜单 7 · 独立分割评估（读取已有预测）",
+    "diagnosis-labels": "菜单 8 · 导入诊断标签",
+    "diagnosis-features": "菜单 9 · 提取诊断特征",
+    "diagnosis-train": "菜单 10 · 训练诊断树",
+    "diagnose": "菜单 11 · 诊断与解释",
+    "diagnosis-evaluate": "菜单 12 · 诊断评估",
+    "demo": "菜单 13 · 合成分割测试",
+    "diagnosis-demo": "菜单 14 · 合成诊断测试",
 }
 PROTOCOLS = {
     "out_of_fold": "三折独立测试（OOF）",
@@ -47,39 +52,41 @@ PROTOCOLS = {
 }
 
 
-def text(value):
-    """Keep persisted names/errors from injecting terminal control sequences."""
-    return "".join(c if not unicodedata.category(c).startswith("C") else " " for c in str(value))
+SPLITS = {
+    "cv": "开发集的留出折病例（交叉验证）",
+    "train": "原记录 train 集合",
+    "val": "原记录 val 集合",
+    "test": "原记录 test 集合",
+    "all": "全部病例",
+}
 
 
-def read(path, warn=False, kind=dict):
-    try:
-        with Path(path).open("rb") as stream:
-            raw = stream.read(16 * 1024 * 1024 + 1)
-        if len(raw) > 16 * 1024 * 1024:
-            raise ValueError("结果清单超过 16 MiB，请直接查看原文件")
-        value = json.loads(raw.decode("utf-8-sig"))
-        if not isinstance(value, kind):
-            raise ValueError("结果清单格式不正确")
-        return value
-    except (OSError, ValueError) as error:
-        if warn:
-            print(f"  无法读取 {text(path)}：{text(error)}")
-        return kind()
+def case_list(cases):
+    ids = [text(r["case_id"]) for r in cases if isinstance(r.get("case_id"), str)]
+    print(f"  病例名单：{'、'.join(ids) if ids else '未记录'}")
+    if ids and len(ids) != len(cases):
+        print("  部分病例编号未记录，名单不完整。")
 
 
-def mapping(value):
-    return value if isinstance(value, dict) else {}
-
-
-def rows(value):
-    return [r for r in value if isinstance(r, dict)] if isinstance(value, list) else []
-
-
-def number(value, percent=False):
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-        return "—（未记录/不适用）"
-    return f"{value:.4f}" + (f"（{value * 100:.2f}%）" if percent else "")
+def scope(report, prediction_only=False):
+    split = report.get("split")
+    description = (
+        "全部病例（此预测清单范围）"
+        if prediction_only and "split" in report and split is None
+        else named(split, SPLITS)
+    )
+    print("  数据范围：" + description)
+    protocols = report.get("protocols")
+    if not isinstance(protocols, list):
+        protocols = [r.get("inference_protocol") for r in rows(report.get("cases"))]
+    protocols = sorted({p for p in protocols if isinstance(p, str)})
+    print("  推理方式：" + ("、".join(named(p, PROTOCOLS) for p in protocols) or "未记录"))
+    if "out_of_fold" in protocols:
+        print("  OOF：按记录，每例使用其留出测试折模型；分折不是同一批病例跑三次。")
+    if "threefold_ensemble" in protocols:
+        print("  集成模型的结果，不是三个独立测试折的分数；不能据此拆成三折指标。")
+    if split in ("train", "val"):
+        print("  集合名不等于独立测试；是否留出以预测协议及原始划分记录为准。")
 
 
 def state(value):
@@ -177,31 +184,132 @@ def commands(job, steps):
             print("  暂无可读取的日志文件。")
 
 
-def evaluation_mode(job, item):
+def step_arguments(item):
+    return {**read(item["output"] / "server-settings.json"), **mapping(item.get("arguments"))}
+
+
+def cache_details(value):
+    if not isinstance(value, str) or not value:
+        return
+    directory = Path(value).expanduser()
+    data = read(directory / "dataset.json")
+    if not data:
+        print("  数据清单不可读：无法确认队列数量与真值可用性。")
+        return
+    print("  数据清单：" + text(directory / "dataset.json"))
+    retained, excluded = data.get("cases"), data.get("excluded")
+    print(
+        f"  缓存记录：发现 {count(data.get('discovered'))} 例，"
+        f"保留 {count(len(retained) if isinstance(retained, list) else None)} 例；"
+        f"排除记录 {count(len(excluded) if isinstance(excluded, list) else None)} 条。"
+    )
+    prediction_only = data.get("for_prediction")
+    print(
+        "  真值用途："
+        + (
+            "无标签预测缓存，不能计算 Dice。"
+            if prediction_only is True
+            else "按带标签缓存处理；本次查询不读取标签影像。"
+            if prediction_only is False
+            else "未记录，无法确认真值可用性。"
+        )
+    )
+    sources = read(directory / "preprocess-contract.json").get("sources")
+    if isinstance(sources, list):
+        roots = sorted(
+            {
+                str(Path(r[1]).parent)
+                for r in sources
+                if isinstance(r, list) and len(r) > 1 and isinstance(r[1], str)
+            }
+        )
+        print("  原始影像来源目录（记录值）：" + ("；".join(text(p) for p in roots) or "未记录"))
+    print("  缓存总数不等于本次评估数；具体名单以本报告为准。")
+
+
+def prediction_source(job, item):
     output = item["output"]
     if item["name"] == "test":
-        path = output / "test/predictions/prediction-report.json"
-    else:
-        settings = read(output / "server-settings.json")
-        source = mapping(item.get("arguments")).get("predictions") or settings.get("predictions")
-        path = None
-        if isinstance(source, str) and source:
-            folder = Path(source).expanduser()
-            path = folder / "prediction-report.json"
-            # A copied workflow may retain its old absolute input path in the plan.
-            if "steps" in folder.parts:
-                relative = folder.parts[folder.parts.index("steps") :]
-                local = job.joinpath(*relative) / "prediction-report.json"
+        return output / "test/predictions/prediction-report.json"
+    if item["name"] == "predict":
+        return output / "predict/prediction-report.json"
+    if item["name"] == "demo":
+        return output / "demo/predictions/prediction-report.json"
+    source = step_arguments(item).get("predictions")
+    if not isinstance(source, str) or not source:
+        return None
+    folder = Path(source).expanduser()
+    if not folder.is_absolute():
+        folder = job / folder
+    # Remap only sources owned by this workflow, not another task's same-named step.
+    for producer in rows(read(job / "plan.json").get("steps")):
+        raw, kind = producer.get("output"), producer.get("name")
+        if isinstance(raw, str) and kind in {"test", "predict"}:
+            suffix = "test/predictions" if kind == "test" else "predict"
+            if Path(raw) / suffix == folder:
+                local = job / "steps" / Path(raw).name / suffix / "prediction-report.json"
                 if local.is_file():
-                    path = local
+                    return local
+    return folder / "prediction-report.json"
+
+
+def evaluation_mode(job, item):
+    path = prediction_source(job, item)
     report = read(path) if path else {}
     mode = report.get("model_mode", report.get("mode"))
-    if report.get("software_only") or mode in {"smoke", "preflight"}:
+    if report.get("software_only") or mode in ("smoke", "preflight"):
         print("  模型来源：短测/预检，仅用于软件验证；以下分数不能当作正式实验结果。")
     elif mode == "train":
         print("  模型来源模式：正式训练（train）。")
     else:
         print("  模型用途未记录或来源清单不可读，无法确认是否为短测结果。")
+    args = step_arguments(item)
+    if item["name"] == "evaluate" and path:
+        for producer in steps_for(job):
+            if producer["name"] in {"test", "predict"} and prediction_source(job, producer) == path:
+                args = {**step_arguments(producer), **args}
+                break
+    for key, label in (("prepared", "数据/真值缓存"), ("models", "分割模型来源")):
+        print(f"  {label}：{text(args.get(key) or '未记录')}")
+    cache_details(args.get("prepared"))
+    print("  预测来源清单：" + text(path or "未记录"))
+    if report.get("models_sha256"):
+        print("  模型清单摘要（历史记录，未重新核验）：" + text(report["models_sha256"]))
+    plan = mapping(report.get("split_plan"))
+    if plan:
+        print(
+            f"  划分来源：上述预测清单 split_plan；身份策略 {text(plan.get('id_policy', '未记录'))}；"
+            f"开发范围 {text(plan.get('development_scope', '未记录'))}"
+        )
+        for fold in rows(plan.get("folds")):
+            cases = mapping(fold.get("cases"))
+            values = [
+                str(len(cases[p])) if isinstance(cases.get(p), list) else "未记录"
+                for p in ("train", "val", "test")
+            ]
+            print(f"  划分记录 fold_{text(fold.get('index', '?'))}：训练/验证/测试 {'/'.join(values)} 例")
+        print("  实际评估范围以下方报告为准；未重新验证划分或患者身份。")
+
+
+def metric_table(saved, cases):
+    for code, label in LABELS.items():
+        print(
+            f"  {label} ({code})： {number(mapping(saved.get('dice_by_class')).get(code))}"
+            f" | 有效病例 {denominator(cases, code, saved.get('cases_evaluated'))}"
+        )
+
+
+def case_metrics(cases):
+    case_list(cases)
+    if not cases:
+        return
+    print("  逐病例已保存指标：病例 | 前景均值 | " + " | ".join(LABELS))
+    for case in cases:
+        values = [number(mapping(case.get("dice")).get(code)) for code in LABELS]
+        print(
+            f"    {text(case.get('case_id', '未记录'))} | {number(case.get('mean_foreground_dice'))} | "
+            + " | ".join(values)
+        )
 
 
 def evaluation(path):
@@ -214,33 +322,39 @@ def evaluation(path):
     )
     if report.get("status") not in {"passed", "complete"}:
         print("  此评估尚未完整通过，以下仅为已有记录。")
-    protocols = report.get("protocols", [])
-    if isinstance(protocols, list) and protocols:
-        print("  推理方式：" + "、".join(PROTOCOLS.get(p, text(p)) for p in protocols if isinstance(p, str)))
-    print("  平均前景 Dice：" + number(report.get("mean_case_foreground_dice"), percent=True))
+    scope(report)
+    cases = rows(report.get("cases"))
+    overall, derived = summary(report, cases, LABELS)
+    print("  整体汇总（本评估报告范围）")
+    print("  平均前景 Dice：" + number(overall.get("mean_case_foreground_dice"), percent=True))
     print("  Dice 为分割重叠度，越接近 1 越好；这是按病例平均的前景指标，不是诊断准确率。")
-    print("  结构                 Dice")
-    by_class = mapping(report.get("dice_by_class"))
-    if not by_class and rows(report.get("cases")):
-        # Old releases stored case Dice without a class-level summary.
-        for code in LABELS:
-            values = [mapping(r.get("dice")).get(code) for r in rows(report["cases"])]
-            values = [
-                v
-                for v in values
-                if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
-            ]
-            by_class[code] = sum(values) / len(values) if values else None
-        print("  （旧版清单：按已保存的逐病例 Dice 汇总，不重新评估影像）")
-    for code, label in LABELS.items():
-        print(f"  {label} ({code})： {number(by_class.get(code))}")
-    print("  — 表示未记录或不适用；真值和预测都没有该结构时不计入其平均值。")
-    for name, fold in mapping(report.get("folds")).items():
-        if isinstance(fold, dict):
-            print(
-                f"  {text(name)}：{text(fold.get('cases_evaluated', '?'))} 例；"
-                f"平均前景 Dice {number(fold.get('mean_case_foreground_dice'))}"
-            )
+    print("  汇总口径：先取每例前景均值，再对有效病例平均；不对各折均值等权平均。")
+    if derived:
+        print("  （旧版清单：缺失汇总字段按已保存的逐病例数值补算，不重新评估影像）")
+    metric_table(overall, cases)
+    print("  — 表示未记录/不适用，不能据此认定结构不存在；当前算法双方都缺失时为 null。")
+    print("  有效病例分母仅在明细完整且该字段均已记录时显示；ignore=255 不参与当前 Dice。")
+    details = fold_details(report, LABELS)
+    if details:
+        print("\n  每折分割明细（保留原折摘要；逐病例仅按明确的 OOF 记录归属）")
+    for name, fold, members, recovered in details:
+        if "cases_evaluated" not in fold and "mean_case_foreground_dice" not in fold and not members:
+            print(f"  {name}：未记录，不能据此认定该折未运行。")
+            continue
+        print(
+            f"\n  {name}：{count(fold.get('cases_evaluated'))} 例；"
+            f"平均前景 Dice {number(fold.get('mean_case_foreground_dice'))}"
+        )
+        if recovered:
+            print("  缺失汇总由本折已保存的逐病例数值补算。")
+        if members and len(members) != fold.get("cases_evaluated"):
+            print(f"  注意：已保存明细 {len(members)} 例，与登记总数不一致；明细不代表完整结果。")
+        metric_table(fold, members)
+        case_metrics(members)
+    other = [r for r in cases if fold_index(r) is None] if details else cases
+    if other or not details:
+        print("\n  未按 OOF 折归属的病例（单次划分/集成/归属未记录，以逐例协议为准）")
+        case_metrics(other)
     if report.get("space") == "prepared_grid":
         print("  评估网格：预处理网格。")
     if report.get("error"):
@@ -254,6 +368,9 @@ def prediction(path):
         return
     cases = rows(report.get("cases"))
     print(f"  预测记录：{state(report.get('status'))} | 清单记录已保存 {len(cases)} 例")
+    scope(report, prediction_only=True)
+    print("  此部分只列预测产物，不计算 Dice；分割评分见测试/独立评估。")
+    case_list(cases)
     print("  预测目录：" + text(path.parent))
     print("  预测清单：" + text(path))
     missing = 0
@@ -267,7 +384,7 @@ def prediction(path):
         print(f"  注意：清单中 {missing} 例的最终预测文件目前不可访问。")
     if report.get("status") == "pending_cpu":
         print("  中间计算已结束，最终影像仍需 CPU 后处理；不能当作最终预测完成。")
-    if report.get("software_only") or report.get("model_mode", report.get("mode")) in {"smoke", "preflight"}:
+    if report.get("software_only") or report.get("model_mode", report.get("mode")) in ("smoke", "preflight"):
         print("  此记录来自短测/预检，仅用于软件验证。")
 
 
@@ -307,24 +424,23 @@ def training(output, name):
 
 
 def diagnosis(path):
-    report = read(path, warn=True)
-    if not report:
-        return
-    print(
-        f"  诊断评估：{state(report.get('status'))} | 集合：{text(report.get('split', '未记录'))}"
-        f" | 病例：{text(report.get('cases_evaluated', '未记录'))}"
-    )
-    for key, label in (("classifier_micro", "分类器"), ("rules_micro", "规则")):
-        metrics = mapping(report.get(key))
-        print(
-            f"  {label}：准确率 {number(metrics.get('accuracy'), True)}；"
-            f"覆盖率 {number(metrics.get('coverage'), True)}；"
-            f"F1 {number(metrics.get('f1'))}"
-        )
-    print("  准确率仅统计已作出判断且真值已知的患者-疾病对；覆盖率反映弃权情况。")
-    if report.get("software_only"):
-        print("  此记录仅用于软件验证。")
-    print("  诊断评估文件：" + text(path))
+    from .result_decisions import show_metrics
+
+    show_metrics(path)
+
+
+def diagnosis_sources(item):
+    args = step_arguments(item)
+    for key, label in (
+        ("features", "分割特征来源"),
+        ("classifier", "决策树来源"),
+        ("diagnosis_labels", "诊断真值来源"),
+        ("diagnoses", "诊断判断来源"),
+        ("evidence", "人工证据输入"),
+    ):
+        if args.get(key):
+            print(f"  {label}：{text(args[key])}")
+    print("  来源按历史任务记录展示，未重新核验文件摘要。")
 
 
 def show_results(job, step="auto"):
@@ -375,17 +491,40 @@ def show_results(job, step="auto"):
             if name == "test" and (output / "test/predictions/prediction-report.json").is_file():
                 prediction(output / "test/predictions/prediction-report.json")
         elif name == "predict":
+            evaluation_mode(job, item)
             path = output / "predict/prediction-report.json"
             if path.is_file():
                 prediction(path)
             else:
                 print("  尚无最终预测清单；请查看该步骤日志。")
+        elif name == "demo":
+            print("  数据类型：程序生成的合成数据；不代表真实 CT 分割精度。")
+            evaluation_mode(job, item)
+            path = output / "demo/evaluation/evaluation.json"
+            if path.is_file():
+                evaluation(path)
+            else:
+                print("  尚无合成分割评估清单。")
         elif name == "diagnosis-evaluate":
+            diagnosis_sources(item)
             path = output / "diagnosis-evaluate/diagnosis-metrics.json"
             if path.is_file():
                 diagnosis(path)
             else:
                 print("  尚无诊断评估文件。")
+        elif name in {"diagnosis-train", "diagnose", "diagnosis-demo"}:
+            from .result_decisions import show_decisions, show_training
+
+            diagnosis_sources(item)
+            if name == "diagnosis-train":
+                show_training(output / "diagnosis-train/trainability.json")
+            elif name == "diagnose":
+                show_decisions(output / "diagnose/diagnosis.json")
+            else:
+                print("  数据类型：合成数据，仅验证诊断软件流程，不代表真实诊断性能。")
+                show_training(output / "diagnosis-demo/training/trainability.json")
+                show_decisions(output / "diagnosis-demo/prediction/diagnosis.json")
+                diagnosis(output / "diagnosis-demo/evaluation/diagnosis-metrics.json")
         else:
             print("  输出目录：" + text(output))
         if item.get("status") in {"failed", "interrupted"}:
