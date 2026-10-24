@@ -221,7 +221,7 @@ class AutomaticTests(unittest.TestCase):
         self.assertIn('resource_request', spec)
         np.testing.assert_allclose(spec['config']['target_spacing'], [.6, .6, .25])
         self.assertEqual(spec['config']['target_spacing'], first['selected']['target_spacing'])
-        panel = self.panel(['r', 'y', 'q'])
+        panel = self.panel(['r', '1', 'y', 'q'])
         panel.run()
         finished = self.wait(output)
         self.assertEqual(finished['worker']['reused'], 2, finished)

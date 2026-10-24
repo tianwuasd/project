@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 from . import mirrors
+from . import defaults
 from .state import now, write
 from .updater import CODE_ROOT, command, managed_release
 
@@ -57,8 +58,8 @@ def install(destination, runtime, emit=print):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description='AAOCA 预处理环境安装：有序镜像，首个成功即停止')
-    parser.add_argument('--env', required=True, help='尚不存在的新环境目录')
-    parser.add_argument('--runtime', default=os.environ.get('AAOCA_SERVER_RUNTIME', '~/.local/state/aaoca-server'),
+    parser.add_argument('--env', default=str(defaults.environment_default()), help='尚不存在的新环境目录，默认原服务器 venv')
+    parser.add_argument('--runtime', default=defaults.runtime_default(),
                         help='读取此面板的镜像配置；不存在时使用默认顺序')
     args = parser.parse_args(argv)
     try:

@@ -11,11 +11,13 @@ import time
 import uuid
 
 from .state import Registry, dispatch_lock, job_status, now, read, validate_paths, write
+from . import defaults
 
 
-DEFAULTS = {'input': '', 'results': '', 'manifest': '', 'scratch': '', 'spacing': 'auto',
+DEFAULTS = {'input': defaults.INPUT, 'results': defaults.RESULTS, 'manifest': '', 'scratch': '', 'spacing': 'auto',
             'cpu_limit': None, 'memory_budget_gib': None, 'workers': None,
-            'compute_threads': None, 'read_workers': None, 'max_case_gib': None}
+            'compute_threads': None, 'read_workers': None, 'max_case_gib': None,
+            'cache_mode': 'reuse', 'cache_output': ''}
 RESOURCE_FIELDS = ('cpu_limit', 'memory_budget_gib', 'workers', 'compute_threads', 'read_workers', 'max_case_gib')
 STATES = {'not_submitted': '未提交', 'submitted': '已提交', 'checking': '检查中', 'running': '运行中',
           'completed': '已完成', 'completed_with_errors': '部分失败', 'stopped': '已停止',
@@ -32,8 +34,12 @@ class Exit(Exception):
 
 def parse_setting(key, value):
     value = value.strip()
-    if key in {'input', 'results', 'manifest', 'scratch'}:
+    if key in {'input', 'results', 'manifest', 'scratch', 'cache_output'}:
         return str(Path(value).expanduser().resolve()) if value else ''
+    if key == 'cache_mode':
+        if value not in {'reuse', 'new'}:
+            raise ValueError('缓存方式须为 reuse（尝试沿用）或 new（新建）')
+        return value
     if key == 'spacing':
         if value.lower() == 'auto':
             return 'auto'
@@ -73,9 +79,9 @@ class Panel:
 
     def prompt(self, message):
         answer = self.ask(message).strip()
-        if answer.lower() in {'q', '0'}:
+        if answer.lower() in {'q', 'quit', 'exit', '退出'}:
             raise Exit()
-        if answer.lower() == 'b':
+        if answer.lower() in {'b', 'back', '返回'}:
             raise Back()
         return answer
 
@@ -120,21 +126,30 @@ class Panel:
         except KeyboardInterrupt:
             self.emit('已返回面板，后台任务继续运行。')
 
-    def history(self):
+    def choose(self):
         entries = self.registry.entries()
         if not entries:
-            self.emit('暂无历史任务'); return
+            raise ValueError('暂无历史任务')
         for i, entry in enumerate(entries, 1):
             state = job_status(entry['output'])['state']
-            self.emit(f"{i}. {entry['name']} | {STATES.get(state, state)} | {entry['created_at']}")
-        answer = self.prompt('选择任务编号，b 返回：')
+            self.emit(f"{i}. {entry['name']} | {STATES.get(state, state)} | {entry.get('created_at', '旧记录')}\n   {entry['output']}")
+        answer = self.prompt('选择任务编号，回车保留当前选择，b 返回：')
         if not answer:
-            return
+            return self.current()
         index = int(answer) - 1
         if not 0 <= index < len(entries):
             raise ValueError('编号不在列表中')
-        self.selected = entries[index]
+        return entries[index]
+
+    def history(self):
+        self.selected = self.choose()
         self.show_status()
+
+    def results(self):
+        self.selected = self.choose()
+        self.show_status()
+        self.emit('结果目录：' + self.current()['output'])
+        self.emit('完整结果可从独立粗分割面板选择；本面板不会启动分割。')
 
     def logs(self, follow=False):
         status = job_status(self.current()['output'])
@@ -174,13 +189,15 @@ class Panel:
         self.emit('资源在后台启动时复核；间距随任务固定。当前负载只作短时估算。')
         return config, spacing, resources, planned
 
-    def configure(self, new_name=None):
-        draft = dict(self.settings)
+    def configure(self, new_name=None, initial=None, force_new=False):
+        draft = dict(self.settings if initial is None else initial)
         fields = [('input', 'HU NIfTI 输入目录'), ('results', '结果根目录'), ('spacing', '目标间距 mm'),
                   ('cpu_limit', 'CPU 总预算'), ('memory_budget_gib', '内存预算 GiB'),
                   ('manifest', '输入清单（可留空）'), ('scratch', '临时根目录（空=结果内临时区）'),
                   ('workers', '病例并发'), ('compute_threads', '每病例计算线程'),
-                  ('read_workers', '读取并发'), ('max_case_gib', '单病例内存上限 GiB')]
+                  ('read_workers', '读取并发'), ('max_case_gib', '单病例内存上限 GiB'),
+                  ('cache_mode', '缓存方式 reuse=尝试沿用 / new=新建'),
+                  ('cache_output', '历史缓存目录（空=最近任务）')]
         while True:
             self.emit('\n预处理配置' + (f' — {new_name}' if new_name else ''))
             for index, (key, label) in enumerate(fields, 1):
@@ -202,18 +219,28 @@ class Panel:
                         return
                 elif action.isdigit() and 1 <= int(action) <= len(fields):
                     key, label = fields[int(action)-1]
+                    if force_new and key in {'cache_mode', 'cache_output'}:
+                        raise ValueError('主动重跑固定新建独立结果，不沿用已有缓存')
                     answer = self.prompt(label + '（auto 为自动；b 返回）：')
                     draft[key] = parse_setting(key, answer)
                 elif action:
                     self.emit('请选择菜单中的操作。')
-            except Back:
-                continue
             except (ValueError, RuntimeError, OSError, ImportError) as exc:
                 self.emit('未完成：' + str(exc))
 
     def launch(self, name, settings):
         self.registry.ensure_idle()
         config, spacing, resources, planned = self.show_plan(settings)
+        candidate = None
+        if settings.get('cache_mode', 'reuse') == 'reuse':
+            if settings.get('cache_output'):
+                candidate = str(Path(settings['cache_output']).expanduser().resolve())
+            elif self.registry.entries():
+                candidate = self.registry.entries()[0]['output']
+        if candidate:
+            self.emit('尝试沿用缓存：' + candidate + '；核验通过则沿用原任务，否则说明原因后新建。')
+        else:
+            self.emit('缓存方式：新建独立目录（无历史记录或已选择 new）。')
         task_id = datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:8]
         output = Path(settings['results']) / task_id
         self.emit(f'将启动：{name}\n输出目录：{output}')
@@ -226,8 +253,31 @@ class Panel:
             self.registry.ensure_idle()
             from .updater import CODE_ROOT, ensure_current
             ensure_current(self.registry.root)
+            cache_receipt = {'requested_name': name, 'candidate': candidate, 'created_at': now()}
+            if candidate:
+                from .cache import CacheMismatch, inspect_cache
+                try:
+                    decision = inspect_cache(candidate, settings, config, self.emit)
+                except CacheMismatch as exc:
+                    cache_receipt.update(action='new', reason=str(exc))
+                    self.emit(f'不能沿用：{exc}\n旧缓存保留；本次自动新建：{output}')
+                else:
+                    original = next((row for row in self.registry.entries() if row['output'] == decision['output']), None)
+                    if original is None:
+                        raise ValueError('缓存未登记在本 runtime；请使用原任务面板查看/续跑')
+                    self.selected = original
+                    cache_receipt.update(decision)
+                    write(self.registry.root / 'last-cache-selection.json', cache_receipt)
+                    if decision['action'] == 'resume':
+                        from .updater import resume_saved
+                        resume_saved(original)
+                        self.emit('已接续原任务：' + original['name'] + '\n实际输出：' + original['output'])
+                    else:
+                        self.emit('完整缓存已核验，沿用原任务：' + original['name'] + '\n实际输出：' + original['output'])
+                    return True
             entry = {'id': task_id, 'name': name, 'output': str(output), 'created_at': now(),
-                     'code_root': str(CODE_ROOT), 'python': sys.executable}
+                     'code_root': str(CODE_ROOT), 'python': sys.executable,
+                     'cache_selection': dict(cache_receipt, action='new', output=str(output))}
             # Persist history BEFORE spawning, so a terminal crash cannot orphan
             # a successfully submitted worker from this registry.
             self.registry.register(entry)
@@ -238,6 +288,7 @@ class Panel:
             result = jobs.start(settings['input'], output, config, settings['manifest'] or None,
                                 scratch, spacing, resource_request={k: settings[k] for k in RESOURCE_FIELDS})
             write(Path(result['runtime']) / 'preview.json', {'resources': resources, 'spacing': spacing})
+            write(self.registry.root / 'last-cache-selection.json', entry['cache_selection'])
         self.emit('已提交后台预处理。退出面板或断开终端后继续运行；用 p 看实时进度条、s 查进度、l 看日志。')
         return True
 
@@ -253,6 +304,7 @@ class Panel:
         self.configure(name)
 
     def resume(self):
+        self.selected = self.choose()
         entry = self.current()
         self.registry.ensure_idle()
         self.emit(f"续跑：{entry['name']}\n输出：{entry['output']}\n沿用冻结的输入和间距，自动资源重新估算。")
@@ -266,6 +318,25 @@ class Panel:
             entry = next((item for item in self.registry.entries() if item['output'] == entry['output']), entry)
             resume_saved(entry)
         self.emit('已提交续跑。')
+
+    def rerun(self):
+        original = self.choose()
+        status = job_status(original['output'])
+        if status['alive'] is not False or status['state'] != 'completed':
+            raise ValueError('主动重跑只接受已完成且无活动进程的任务；中断任务请用 r 续跑')
+        runtime = Path(original['output']).with_name(Path(original['output']).name + '.runtime')
+        spec = read(runtime / 'job.json')
+        if not isinstance(spec, dict):
+            raise ValueError('缺少冻结任务记录，不能推断原始输入')
+        draft = dict(self.settings, input=spec['input'], spacing=spec['config']['target_spacing'],
+                     manifest=str(runtime / 'inputs.json'), cache_mode='new', cache_output='')
+        if draft['spacing'] is None:
+            raise ValueError('旧任务为原分辨率模式，请通过 n 明确配置新任务')
+        self.emit('主动重跑保留原输入清单和间距，使用当前实现并生成新目录；旧结果保持不变。')
+        name = self.prompt('新任务名称，回车沿用原名称：') or original['name']
+        if not 1 <= len(name) <= 80 or any(ord(c) < 32 for c in name):
+            raise ValueError('任务名称须为 1–80 字，不含控制字符')
+        self.configure(new_name=name, initial=draft, force_new=True)
 
     def stop(self):
         entry = self.current()
@@ -319,15 +390,18 @@ class Panel:
                 if self.selected:
                     state = job_status(self.selected['output'])['state']
                     self.emit(f"\n当前任务：{self.selected['name']} | {STATES.get(state, state)}")
+                    self.emit('目录：' + self.selected['output'])
                 else:
                     self.emit('\n当前任务：暂无')
-                self.emit('n 新建任务  c 预处理配置  s 进度  p 实时进度条  l 日志  f 实时日志\nh 历史任务  o 结果位置  r 续跑  x 停止  e 环境\nu 更新程序  m 镜像配置  q/0 退出')
+                self.emit('n 新建/沿用缓存  c 预处理配置  s 进度  p 实时进度条  l 日志  f 实时日志\nh 历史任务  o 查看结果  r 续跑  k 已完成任务重跑  x 停止  e 环境\nu 更新程序  m 镜像配置  q/0 退出')
                 action = self.prompt('操作 [s]：').lower() or 's'
+                if action == '0':
+                    raise Exit()
                 actions = {'n': self.new, 'c': self.configure, 's': self.show_status, 'l': self.logs,
                            'f': lambda: self.logs(True), 'h': self.history, 'r': self.resume,
                            'x': self.stop, 'e': self.environment, 'u': self.update, 'm': self.mirrors,
                            'p': self.watch_progress,
-                           'o': lambda: self.emit('结果目录：' + self.current()['output'])}
+                           'o': self.results, 'k': self.rerun}
                 if action in actions:
                     actions[action]()
                 else:
@@ -343,7 +417,7 @@ class Panel:
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description='AAOCA 中文服务器工作台（当前开放预处理）')
-    parser.add_argument('--runtime', default=os.environ.get('AAOCA_SERVER_RUNTIME', '~/.local/state/aaoca-server'), help='面板配置与任务历史目录')
+    parser.add_argument('--runtime', default=defaults.runtime_default(), help='面板配置与任务历史目录（默认原服务器目录，兼容已有旧历史）')
     parser.add_argument('--input', help='已转换且保留 HU 的 NIfTI 根目录')
     parser.add_argument('--results', help='独立预处理结果根目录')
     parser.add_argument('--checkout', help='更新用的 Git 项目目录；安装后的 aaoca-server 可显式指定')
@@ -359,6 +433,15 @@ def main(argv=None):
         release = managed_release(runtime)
         if release is not None and release != CODE_ROOT:
             os.execv(sys.executable, [sys.executable, str(release / 'start_aaoca_server.py'),
+                                     *(sys.argv[1:] if argv is None else argv)])
+        # Old root shell launchers may still select the system Python after an
+        # isolated update. Interactive sessions find the original server venv.
+        preferred = defaults.environment_default() / 'bin/python'
+        if (not (args.status or args.logs or args.watch or args.update)
+                and sys.prefix == sys.base_prefix and not os.environ.get('AAOCA_PREPROCESS_PYTHON')
+                and preferred.is_file()
+                and os.path.abspath(sys.executable) != os.path.abspath(preferred)):
+            os.execv(str(preferred), [str(preferred), str(CODE_ROOT / 'start_aaoca_server.py'),
                                      *(sys.argv[1:] if argv is None else argv)])
         overrides = {key: parse_setting(key, getattr(args, key)) for key in ('input', 'results') if getattr(args, key)}
         panel = Panel(args.runtime, overrides)

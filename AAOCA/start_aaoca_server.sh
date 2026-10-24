@@ -5,6 +5,8 @@ PYTHON="${AAOCA_PREPROCESS_PYTHON:-}"
 if [[ -z "$PYTHON" ]]; then
     if [[ -x "$ROOT/.venv-preprocess/bin/python" ]]; then
         PYTHON="$ROOT/.venv-preprocess/bin/python"
+    elif [[ -x "${AAOCA_PREPROCESS_ENV:-/data5/zhougaowei/zhangruichen_workspace/aaoca_runtime/venv}/bin/python" ]]; then
+        PYTHON="${AAOCA_PREPROCESS_ENV:-/data5/zhougaowei/zhangruichen_workspace/aaoca_runtime/venv}/bin/python"
     else
         PYTHON=python3
     fi

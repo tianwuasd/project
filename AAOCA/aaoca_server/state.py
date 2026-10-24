@@ -94,7 +94,10 @@ class Registry:
         self.root = Path(root).expanduser().resolve()
 
     def entries(self):
-        return read(self.root / 'history.json', [])
+        rows = read(self.root / 'history.json', [])
+        if not isinstance(rows, list) or any(not isinstance(row, dict) or not row.get('output') for row in rows):
+            raise ValueError('历史索引损坏，请保留 history.json 供核查')
+        return [dict(row, name=row.get('name') or Path(row['output']).name) for row in rows]
 
     def ensure_idle(self):
         for entry in self.entries():

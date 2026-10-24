@@ -27,7 +27,7 @@ from .service_state import (
 
 DEFAULTS = {'manifest': '', 'results': '', 'mode': 'cpu', 'devices': [], 'gpu_count': 1,
             'min_gpu_gib': 8, 'cpu_limit': None, 'memory_gib': None, 'workers': None,
-            'threads': None, 'io_workers': None, 'preprocess_output': ''}
+            'threads': None, 'io_workers': None, 'preprocess_output': '/data_nas/zhangruichen/aaoca_preprocessed'}
 
 
 def digest(path):
@@ -72,21 +72,27 @@ def validate_settings(settings):
 
 
 class Workbench:
-    def __init__(self, workspace):
+    def __init__(self, workspace, overrides=None):
         self.root = Path(workspace).expanduser().resolve()
         if self.root.is_relative_to(CODE_ROOT) or (CODE_ROOT.is_relative_to(self.root) and not managed_release(self.root)):
             raise ValueError('运行目录必须与源码分开')
         self.children = []
+        self.overrides = overrides or {}
 
     @property
     def settings(self):
-        return {**DEFAULTS, 'results': str(self.root / 'results'), **read_json(self.root / 'seg-settings.json', {})}
+        settings = {**DEFAULTS, 'results': str(self.root / 'results'),
+                    **read_json(self.root / 'seg-settings.json', {}), **self.overrides}
+        if not settings['preprocess_output']:
+            settings['preprocess_output'] = DEFAULTS['preprocess_output']
+        return settings
 
     def save(self, settings):
         validate_settings(settings)
         with file_lock(self.root / 'control.lock'):
             self.idle()
             write_json(self.root / 'seg-settings.json', settings)
+            self.overrides = {}  # Later edits in the same session take effect.
 
     def entries(self):
         entries = []

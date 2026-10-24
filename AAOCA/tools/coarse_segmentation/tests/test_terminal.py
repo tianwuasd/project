@@ -71,6 +71,22 @@ class TerminalTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse((self.base / 'absent').exists())
 
+    def test_preprocessed_default_and_cli_override_keep_saved_results(self):
+        self.assertEqual(self.work.settings['preprocess_output'], '/data_nas/zhangruichen/aaoca_preprocessed')
+        self.work.save(dict(self.work.settings, preprocess_output='/saved/preprocessed', results=str(self.base / 'saved-results')))
+        other = Workbench(self.work.root, overrides={'preprocess_output': '/explicit/preprocessed'})
+        self.assertEqual(other.settings['preprocess_output'], '/explicit/preprocessed')
+        self.assertEqual(other.settings['results'], str(self.base / 'saved-results'))
+        other.save(dict(other.settings, preprocess_output='/edited/preprocessed'))
+        self.assertEqual(other.settings['preprocess_output'], '/edited/preprocessed')
+        entry = CODE_ROOT.parents[1] / 'start_segmentation.py'
+        missing = self.base / 'missing-runtime'
+        result = subprocess.run([sys.executable, '-S', str(entry), '--runtime', str(missing),
+                                 '--preprocessed', str(self.base / 'inputs'), '--results', str(self.base / 'labels'),
+                                 '--query', 'history'], capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(missing.exists())
+
     def test_cancel_form_and_zero_gpu_not_exit(self):
         panel = Panel(self.work.root, ask=Mock(side_effect=['0', 'b', 'q']), emit=lambda _: None)
         self.assertEqual(panel.prompt(''), '0')

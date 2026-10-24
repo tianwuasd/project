@@ -21,8 +21,8 @@ class Exit(Exception):
 
 
 class Panel:
-    def __init__(self, workspace, ask=input, emit=print):
-        self.work = Workbench(workspace)
+    def __init__(self, workspace, ask=input, emit=print, overrides=None):
+        self.work = Workbench(workspace, overrides)
         self.ask, self.emit = ask, emit
         entries = self.work.entries()
         self.selected = Path(entries[0]['job']) if entries else None
@@ -287,9 +287,13 @@ def main(argv=None):
     parser.add_argument('--query', choices=['status', 'history', 'logs', 'gpu', 'setup'])
     parser.add_argument('--job', help='只读查询的历史任务 UUID')
     parser.add_argument('--profile', help='导入之前的私有服务器配置，不打印许可')
+    parser.add_argument('--preprocessed', help='本次默认选择的已完成预处理任务或根目录；不启动预处理')
+    parser.add_argument('--results', help='本次分割结果根目录；省略则沿用已保存配置')
     args = parser.parse_args(argv)
     try:
-        panel = Panel(args.runtime)
+        overrides = {key: str(Path(value).expanduser().resolve()) for key, value in
+                     [('preprocess_output', args.preprocessed), ('results', args.results)] if value}
+        panel = Panel(args.runtime, overrides=overrides)
         if args.profile:
             from .managed import ManagedController
             from .server import import_profile

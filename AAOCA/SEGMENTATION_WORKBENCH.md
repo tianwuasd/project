@@ -3,10 +3,21 @@
 版本 0.3.0。在 **AAOCA 项目目录**启动，入口独立于原始资料整理和预处理；新任务默认选择已完成的 AAOCA 预处理结果：
 
 ```bash
-bash start_segmentation.sh --runtime /srv/private/aaoca-seg-terminal
+bash start_segmentation.sh
 ```
 
 系统 Python 3.11–3.13 即可打开面板；推理依赖由面板安装到此 runtime 的 `venv/`。不需要激活预处理环境。退出面板、关闭 VS Code 或断开 SSH，已提交的任务继续运行。服务器重启或管理员终止进程后，需要重新进入面板续跑。
+
+2026-10-24：默认预处理结果根目录已在实际代码中设为 `/data_nas/zhangruichen/aaoca_preprocessed`。已有 `seg-settings.json` 的路径优先，未配置或旧配置为空时使用该默认值；分割结果根目录保持已有配置。默认runtime仍为 `~/.local/state/aaoca-seg-terminal`（`AAOCA_SEG_RUNTIME`或`--runtime`可覆盖），没有迁移旧任务或合并两个面板。
+
+在原服务器代码目录中，新的显式入口也可直接接上预处理：
+
+```bash
+cd /data5/zhougaowei/zhangruichen_workspace/aaoca_code/project/AAOCA
+bash start_segmentation.sh --preprocessed /data_nas/zhangruichen/aaoca_preprocessed
+```
+
+`--preprocessed`只设定本次默认来源，仍在`n`中选择具体已完成任务；`--results`可明确指定本次独立分割结果根目录。参数优先于已保存配置，配置页`w`后保存整页；仅打开/查询不会写配置。原来的 `--runtime` 和带参数命令保持兼容，不调用预处理入口。
 
 ## 首次操作
 
