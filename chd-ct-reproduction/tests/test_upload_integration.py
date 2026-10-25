@@ -43,7 +43,7 @@ def publication(tmp_path, monkeypatch):
     def upload(*args):
         assert locked
         calls.append("publish")
-        return "https://github.com/tianwuasd/project/releases/tag/result-test"
+        return "https://github.com/tianwuasd/project/tree/chd-artifacts/result-test"
 
     monkeypatch.setitem(
         sys.modules,
@@ -79,7 +79,7 @@ def test_confirmed_retry_publishes_package_without_repacking(publication, capsys
     assert calls == ["preview", "publish"]
     assert (job / "uploads/package.json").is_file()
     results.show_results(job)
-    assert "https://github.com/tianwuasd/project/releases/tag/result-test" in capsys.readouterr().out
+    assert "https://github.com/tianwuasd/project/tree/chd-artifacts/result-test" in capsys.readouterr().out
 
 
 def test_declined_preview_and_active_target_never_publish(publication, monkeypatch):
@@ -102,6 +102,9 @@ def test_declined_preview_and_active_target_never_publish(publication, monkeypat
         ["--upload-job", "latest", "--query", "results"],
         ["--upload-job", "latest", "--resume-job"],
         ["--upload-package", "pack", "--stop"],
+        ["--push-code", "--stop"],
+        ["--push-code", "--configure-network"],
+        ["--push-code", "--rerun-job", "latest"],
     ],
 )
 def test_upload_cli_rejects_mixed_actions(argv):

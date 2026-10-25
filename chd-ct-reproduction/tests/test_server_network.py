@@ -1,4 +1,4 @@
-"""Explicit network routes stay inside Git/gh children and retain authentication boundaries."""
+"""Explicit network routes stay inside Git/LFS children and retain authentication boundaries."""
 
 import importlib
 import importlib.util
@@ -7,7 +7,6 @@ import os
 import shlex
 import subprocess
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 import test_server_update as update_tests
@@ -86,25 +85,34 @@ def test_private_https_never_uses_mirrors(tmp_path):
     assert network.routes(settings) == (updater.UPSTREAM,)
 
 
-def test_upload_gh_gets_scoped_proxy_but_retains_official_api_auth(tmp_path, monkeypatch):
+def test_upload_ssh_gets_scoped_proxy_key_and_no_api_token(tmp_path, monkeypatch):
+    from chd_ct.server import ssh_upload
+
     network = module()
+    key = tmp_path / "test-key"
+    key.write_text("SYNTHETIC KEY")
     settings = network.save(tmp_path, proxy="http://127.0.0.1:17891", git_transport="github-ssh",
-                            ssh_key="/unused/key")
+                            ssh_key=str(key))
     captured = {}
     monkeypatch.setenv("GH_TOKEN", "synthetic-test-token")
-    monkeypatch.setattr(upload.shutil, "which", lambda name: "mock-gh")
+    monkeypatch.setattr(ssh_upload.shutil, "which", lambda name: "mock-" + name)
 
-    def run(command, **kwargs):
-        captured.update(command=command, **kwargs)
-        return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+    class Child:
+        returncode = 0
 
-    monkeypatch.setattr(upload.subprocess, "run", run)
+        def __init__(self, command, **kwargs):
+            captured.update(command=command, **kwargs)
+
+        def communicate(self, **kwargs):
+            return "ok", ""
+
+    monkeypatch.setattr(ssh_upload.subprocess, "Popen", Child)
     with network.use(settings):
-        assert upload._gh("auth", "status", "--hostname", "github.com") == "ok"
+        assert ssh_upload.git(tmp_path, "status").stdout == "ok"
     assert captured["env"]["HTTPS_PROXY"] == settings["proxy"]
-    assert captured["env"]["GH_TOKEN"] == "synthetic-test-token"
-    assert captured["env"]["GH_HOST"] == "github.com"
-    assert "GIT_SSH_COMMAND" not in captured["env"]
+    assert "GH_TOKEN" not in captured["env"]
+    assert str(key) in captured["env"]["GIT_SSH_COMMAND"]
+    assert captured["env"]["GIT_CONFIG_GLOBAL"] == os.devnull
 
 
 def test_network_cli_can_configure_and_show_without_ml_or_starting_jobs(tmp_path):

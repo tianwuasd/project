@@ -45,7 +45,7 @@ def run_upload(args, profile, interactive):
         print("上传/失败后重试命令：" + command)
         confirmed = bool(args.yes_upload)
         if not confirmed and interactive:
-            confirmed = ask("确认将以上日志、配置、指标及权重发布到 GitHub Release？[y/N]：").lower() == "y"
+            confirmed = ask("确认通过 SSH + Git LFS 上传以上日志、配置、指标及权重？[y/N]：").lower() == "y"
         if not confirmed:
             print("已准备上传包，尚未发送。需要上传时执行上方命令。")
             return 0

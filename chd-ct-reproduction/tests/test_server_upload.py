@@ -7,7 +7,6 @@ import os
 import subprocess
 import tarfile
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -81,92 +80,6 @@ def test_demo_models_and_stage_reports_are_included(workflow):
         "blood2d.environment.json", "blood2d.result.json", "test/test-report.json",
     ):
         assert any(name.endswith(suffix) for name in names)
-
-
-class FakeGh:
-    def __init__(self):
-        self.release = None
-        self.assets = {}
-        self.calls = []
-        self.uploads = []
-        self.fail_upload_once = None
-        self.corrupt = False
-        self.with_digest = True
-        self.create_then_fail = False
-        self.patch_then_fail = False
-
-    def run(self, args, **kwargs):
-        self.calls.append((args, kwargs))
-        assert args[0] == "mock-gh"
-        assert kwargs["timeout"] > 0
-        assert kwargs["env"]["GH_HOST"] == "github.com"
-        assert kwargs["env"]["GH_REPO"] == "tianwuasd/project"
-        assert kwargs.get("shell", False) is False
-        assert "gh-proxy" not in " ".join(args)
-        assert "GH_DEBUG" not in kwargs["env"]
-        command = args[1:]
-        if command[:2] == ["auth", "status"]:
-            assert command == ["auth", "status", "--hostname", "github.com"]
-            result = ""
-        elif command[0] == "api":
-            assert command[1:3] == ["--hostname", "github.com"]
-            endpoint = command[3]
-            assert endpoint.startswith("repos/tianwuasd/project/")
-            if "--method" in command:
-                assert command[command.index("--method") + 1] == "PATCH"
-                assert command[command.index("-f") + 1] == "make_latest=false"
-                assert self.assets and all(a["state"] == "uploaded" for a in self.assets.values())
-                self.release["draft"] = False
-                if self.patch_then_fail:
-                    self.patch_then_fail = False
-                    return SimpleNamespace(returncode=1, stdout="", stderr="network lost")
-                result = self.release
-            elif "/assets?" in endpoint:
-                result = list(self.assets.values())
-            else:
-                result = [self.release] if self.release else []
-        elif command[:2] == ["release", "create"]:
-            assert self.release is None
-            assert command[command.index("--repo") + 1] == "github.com/tianwuasd/project"
-            assert "--draft" in command
-            assert "--latest=false" in command
-            self.release = {
-                "id": 123, "tag_name": command[2], "draft": True,
-                "body": command[command.index("--notes") + 1],
-            }
-            if self.create_then_fail:
-                self.create_then_fail = False
-                return SimpleNamespace(returncode=1, stdout="", stderr="network lost")
-            result = ""
-        elif command[:2] == ["release", "upload"]:
-            assert self.release["draft"]
-            assert command[command.index("--repo") + 1] == "github.com/tianwuasd/project"
-            path = Path(command[3])
-            self.uploads.append(path.name)
-            data = path.read_bytes()
-            if self.fail_upload_once == path.name:
-                self.fail_upload_once = None
-                self.assets[path.name] = {"name": path.name, "size": 0, "state": "starter"}
-                return SimpleNamespace(returncode=1, stdout="", stderr="do not expose secret")
-            self.assets[path.name] = {
-                "name": path.name, "size": len(data) + int(self.corrupt), "state": "uploaded",
-                "digest": "sha256:" + hashlib.sha256(data).hexdigest() if self.with_digest else None,
-            }
-            result = ""
-        else:
-            raise AssertionError(command)
-        return SimpleNamespace(returncode=0, stdout=json.dumps(result) if not isinstance(result, str) else result,
-                               stderr="")
-
-
-def fake_gh(monkeypatch):
-    fake = FakeGh()
-    monkeypatch.setattr(upload.shutil, "which", lambda executable: "mock-gh")
-    monkeypatch.setattr(upload.subprocess, "run", fake.run)
-    monkeypatch.setenv("GH_HOST", "untrusted.example")
-    monkeypatch.setenv("GH_REPO", "someone/else")
-    monkeypatch.setenv("GH_DEBUG", "api")
-    return fake
 
 
 def test_collect_only_authorized_layout_and_referenced_models(workflow, tmp_path):
@@ -316,102 +229,6 @@ def test_mutation_during_stream_never_creates_uploadable_manifest(workflow, monk
     assert len(packages) == 1
     assert not (packages[0] / "manifest.json").exists()
     assert (packages[0] / "preparation-failed.txt").is_file()
-
-
-def test_changed_staged_part_rejected_before_any_network(workflow, monkeypatch):
-    package = upload.prepare_upload(*workflow)
-    part = package / manifest(package)["assets"][0]["name"]
-    data = part.read_bytes()
-    part.write_bytes(b"x" + data[1:])
-    fake = fake_gh(monkeypatch)
-    with pytest.raises(ValueError, match="校验失败"):
-        upload.upload_package(package)
-    assert not fake.calls
-
-
-@pytest.mark.parametrize("digest", [True, False])
-def test_upload_verify_publish_receipt_and_idempotent_retry(workflow, monkeypatch, digest):
-    package = upload.prepare_upload(*workflow)
-    fake = fake_gh(monkeypatch)
-    fake.with_digest = digest
-    url = upload.upload_package(package)
-    assert url.startswith("https://github.com/tianwuasd/project/releases/tag/chd-artifacts-")
-    assert not fake.release["draft"]
-    assert upload._json(package / "receipt.json")["url"] == url
-    assert not (workflow[0] / "uploads").exists()
-    uploaded = list(fake.uploads)
-    assert upload.upload_package(package) == url
-    assert fake.uploads == uploaded
-    assert sum(args[1:3] == ["release", "create"] for args, _ in fake.calls) == 1
-
-
-def test_partial_failure_keeps_draft_and_resumes_only_missing_assets(workflow, monkeypatch):
-    monkeypatch.setattr(upload, "CHUNK_BYTES", 6144)
-    package = upload.prepare_upload(*workflow)
-    fake = fake_gh(monkeypatch)
-    fake.fail_upload_once = manifest(package)["assets"][1]["name"]
-    with pytest.raises(ValueError, match="操作失败"):
-        upload.upload_package(package)
-    assert fake.release["draft"] and not (package / "receipt.json").exists()
-    first = manifest(package)["assets"][0]["name"]
-    assert fake.uploads.count(first) == 1
-    upload.upload_package(package)
-    assert fake.uploads.count(first) == 1
-    assert not fake.release["draft"]
-
-
-@pytest.mark.parametrize("stage", ["create_then_fail", "patch_then_fail"])
-def test_uncertain_remote_success_reuses_same_release(workflow, monkeypatch, stage):
-    package = upload.prepare_upload(*workflow)
-    fake = fake_gh(monkeypatch)
-    setattr(fake, stage, True)
-    with pytest.raises(ValueError):
-        upload.upload_package(package)
-    upload.upload_package(package)
-    assert sum(args[1:3] == ["release", "create"] for args, _ in fake.calls) == 1
-    assert not fake.release["draft"]
-
-
-def test_corrupt_remote_asset_never_publishes(workflow, monkeypatch):
-    package = upload.prepare_upload(*workflow)
-    fake = fake_gh(monkeypatch)
-    fake.corrupt = True
-    with pytest.raises(ValueError, match="校验未通过"):
-        upload.upload_package(package)
-    assert fake.release["draft"] and not (package / "receipt.json").exists()
-    fake.corrupt = False
-    upload.upload_package(package)
-    assert not fake.release["draft"]
-
-
-def test_unowned_release_never_modified(workflow, monkeypatch):
-    package = upload.prepare_upload(*workflow)
-    fake = fake_gh(monkeypatch)
-    fake.release = {"id": 456, "tag_name": manifest(package)["release_tag"], "draft": True, "body": "unrelated"}
-    with pytest.raises(ValueError, match="不属于"):
-        upload.upload_package(package)
-    assert not fake.uploads and fake.release["draft"]
-
-
-def test_missing_auth_and_timeout_errors_do_not_leak_stderr(workflow, monkeypatch):
-    package = upload.prepare_upload(*workflow)
-    monkeypatch.setattr(upload.shutil, "which", lambda executable: None)
-    with pytest.raises(ValueError, match="安装"):
-        upload.upload_package(package)
-    monkeypatch.setattr(upload.shutil, "which", lambda executable: "mock-gh")
-    monkeypatch.setattr(upload.subprocess, "run", lambda *args, **kwargs: SimpleNamespace(
-        returncode=1, stdout="", stderr="Authorization: Bearer private-token"))
-    with pytest.raises(ValueError, match="gh auth login") as error:
-        upload.upload_package(package)
-    assert "private-token" not in str(error.value)
-
-    def timeout(*args, **kwargs):
-        raise subprocess.TimeoutExpired(args[0], kwargs["timeout"], stderr="private-token")
-
-    monkeypatch.setattr(upload.subprocess, "run", timeout)
-    with pytest.raises(ValueError, match="超时") as error:
-        upload.upload_package(package)
-    assert "private-token" not in str(error.value)
 
 
 def test_part_asset_count_is_bounded(tmp_path, monkeypatch):

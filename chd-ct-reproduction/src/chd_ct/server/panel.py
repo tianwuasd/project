@@ -113,7 +113,7 @@ def run(args, profile):
         print(
             "o 查看结果（选择项目/任务）  h 历史任务与日志  u 更新程序  0/q 退出面板（后台任务继续）"
         )
-        print("v 上传日志、配置、指标和模型权重（GitHub Release）")
+        print("v 上传日志、配置、指标和模型权重（SSH + Git LFS）  w 上传已提交的 CT 代码")
         print("c GitHub 网络设置（代理、私有仓库线路）")
         print(
             "x 中断当前任务（保留检查点）"
@@ -159,6 +159,12 @@ def run(args, profile):
                     sharing_args.upload_package = None
                     sharing_args.yes_upload = False
                     run_upload(sharing_args, profile, True)
+            elif action == "w":
+                from .code_sync import run as push_code
+
+                code_args = copy.deepcopy(args)
+                code_args.yes_upload = False
+                push_code(code_args, profile, True)
             elif action == "x":
                 if not active:
                     print("没有正在运行的任务。")

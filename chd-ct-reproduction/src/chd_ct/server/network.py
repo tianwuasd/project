@@ -124,12 +124,13 @@ def routes(settings):
 
 
 def show(settings):
-    print("GitHub 网络设置（仅用于代码更新与结果上传）")
+    print("GitHub 网络设置（仅用于代码更新、代码上传与结果上传）")
     print("代理：" + (settings["proxy"] or "未显式设置，沿用进程网络环境"))
     print("代码更新线路：" + settings["git_transport"])
     if settings["git_transport"] == "github-ssh":
         print("SSH 密钥路径：" + settings["ssh_key"] + "；目标 ssh.github.com:443")
-    print("结果上传：官方 HTTPS API；需要单独 gh 登录，SSH 密钥不替代 API 认证")
+    print("上传：github-ssh 使用同一 SSH 密钥；产物使用 Git LFS，无需 gh 或 API token")
+    print("Git LFS 数据经 HTTPS 传输，认证由 SSH 密钥取得；使用本次子进程代理。")
     if settings["git_transport"] == "public-mirrors":
         print("公开镜像模式不支持私有仓库；私有仓库请选择 github-ssh 或 github-https")
     print("保存设置不等于连接验证；不修改系统代理、训练环境或正在运行的任务。")

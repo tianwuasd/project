@@ -1,8 +1,8 @@
-"""Snapshot finished CHD artifacts and upload them with authenticated GitHub CLI.
+"""Snapshot finished CHD artifacts for publication through SSH Git and Git LFS.
 
 Only standard-library dependencies are used. The caller must hold the workflow's
 runtime lock throughout preparation/upload and obtain consent after the preview.
-No public Git download mirror, Git credential helper, or training import is used.
+No public Git download mirror, gh login, API token, or training import is used.
 """
 
 import hashlib
@@ -10,7 +10,6 @@ import json
 import re
 import shutil
 import stat
-import subprocess
 import tarfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -305,7 +304,7 @@ class _SplitWriter:
         while view:
             if self.stream is None:
                 if len(self.assets) >= MAX_ASSETS - 1:
-                    raise ValueError("上传分卷超过 GitHub 每个 Release 的 1000 个附件限制")
+                    raise ValueError("上传分卷超过本工具的 1000 个文件上限")
                 self.stream = (self.directory / f"artifacts.tar.part{len(self.assets) + 1:04d}").open("xb")
                 self.size, self.digest = 0, hashlib.sha256()
             take = min(len(view), self.limit - self.size)
@@ -449,99 +448,19 @@ def _validate_package(package):
 def show_preview(package: Path) -> None:
     package, manifest, assets = _validate_package(package)
     print(f"\n待上传任务：{_display(manifest['name'])}")
-    print(f"官方目标：https://github.com/{REPOSITORY}/releases")
+    print(f"官方目标：https://github.com/{REPOSITORY}/tree/chd-artifacts/{manifest['package_id']}")
+    print("认证：zmic网络设置中的SSH密钥；分卷用Git LFS（需要Git LFS与可用额度，无需gh）。")
     print("将上传日志、配置、指标、最佳和末次模型权重；不包含原始影像、缓存或环境目录。")
     for row in manifest["files"]:
         print(f"  {_display(row['archive_path'])}  {row['size']} 字节")
-    print(f"合计 {len(manifest['files'])} 个文件；{len(assets)} 个附件；"
+    print(f"合计 {len(manifest['files'])} 个文件；{len(assets)} 个上传文件；"
           f"{sum(a['size'] for a in assets) / 1024**3:.3f} GiB")
     print("完整清单与 SHA256：" + _display(package / "manifest.json"))
     print("失败后保留此上传包，可选择同一个包重试；开始上传前请核对清单。")
 
 
-def _gh(*arguments, timeout=COMMAND_TIMEOUT):
-    """Never interpolate shell text, expose stderr tokens, or use a mirror host."""
-    executable = shutil.which("gh")
-    if not executable:
-        raise ValueError("未安装 GitHub CLI (gh)；请先安装 gh，再执行 gh auth login --hostname github.com")
-    from . import network
-
-    env = network.child_env()
-    env.update(GH_HOST=HOST, GH_REPO=REPOSITORY, GH_PROMPT_DISABLED="1", GH_PAGER="cat")
-    for key in ("GH_DEBUG", "DEBUG", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"):
-        env.pop(key, None)
-    try:
-        result = subprocess.run(
-            [executable, *arguments], capture_output=True, text=True, encoding="utf-8",
-            errors="replace", timeout=timeout, env=env, check=False,
-        )
-    except subprocess.TimeoutExpired as error:
-        raise ValueError("GitHub 操作超时；上传包已保留，请使用同一个包重试") from error
-    except OSError as error:
-        raise ValueError("无法启动 GitHub CLI；请检查 gh 安装后重试") from error
-    if result.returncode:
-        if arguments[:2] == ("auth", "status"):
-            raise ValueError("GitHub 登录不可用；请执行 gh auth login --hostname github.com 后重试")
-        raise ValueError("GitHub 操作失败；请检查官方 github.com 连接、登录和仓库写权限，再重试同一个包")
-    return result.stdout
-
-
-def _api(endpoint, *arguments, method=None):
-    args = ["api", "--hostname", HOST, endpoint]
-    if method:
-        args += ["--method", method]
-    raw = _gh(*args, *arguments)
-    try:
-        return json.loads(raw)
-    except ValueError as error:
-        raise ValueError("GitHub 返回了无效 JSON；保留上传包并重试") from error
-
-
-def _release(tag):
-    # Listing avoids conflating an unauthenticated/network error with a missing tag.
-    page = 1
-    while page <= 100:
-        rows = _api(f"repos/{REPOSITORY}/releases?per_page=100&page={page}")
-        if not isinstance(rows, list):
-            raise ValueError("GitHub Release 列表格式无效")
-        for release in rows:
-            if release.get("tag_name") == tag:
-                return release
-        if len(rows) < 100:
-            return None
-        page += 1
-    raise ValueError("Release 历史超过查询上限；请通过官方 GitHub 确认同名发布后重试")
-
-
-def _remote_assets(release_id):
-    assets = []
-    for page in range(1, 12):
-        rows = _api(f"repos/{REPOSITORY}/releases/{release_id}/assets?per_page=100&page={page}")
-        if not isinstance(rows, list):
-            raise ValueError("GitHub 附件列表格式无效")
-        assets.extend(rows)
-        if len(rows) < 100:
-            break
-    return assets
-
-
-def _matches(remote, local):
-    digest = remote.get("digest")
-    return (
-        remote.get("size") == local["size"] and remote.get("state") == "uploaded"
-        and (digest is None or digest == "sha256:" + local["sha256"])
-    )
-
-
-def _verify_assets(remote, expected):
-    by_name = {row.get("name"): row for row in remote}
-    return len(by_name) == len(remote) and set(by_name) == {a["name"] for a in expected} and all(
-        _matches(by_name[a["name"]], a) for a in expected
-    )
-
-
 def upload_package(package: Path) -> str:
-    """Upload/resume one package, verify every asset, then publish its draft."""
+    """Publish/retry the same package using its runtime SSH configuration."""
     package, manifest, assets = _validate_package(package)
     from . import network
 
@@ -552,65 +471,6 @@ def upload_package(package: Path) -> str:
 
 
 def _publish(package, manifest, assets):
-    _finished(Path(manifest["job_directory"]), Path(manifest["runtime"]))
-    _gh("auth", "status", "--hostname", HOST)
-    tag = manifest["release_tag"]
-    marker = "CHD upload package: " + manifest["package_id"]
-    release = _release(tag)
-    if release is None:
-        print("正在创建 GitHub 草稿发布……", flush=True)
-        _gh(
-            "release", "create", tag, "--repo", HOST + "/" + REPOSITORY,
-            "--target", "main", "--draft", "--latest=false",
-            "--title", "CHD artifacts " + manifest["package_id"],
-            "--notes", marker + "\n\nSee manifest.json for file sizes and SHA256. "
-            "Concatenate artifacts.tar.part* in name order to restore artifacts.tar, then extract it.",
-        )
-        release = _release(tag)
-        if release is None:
-            raise ValueError("无法确认草稿是否已创建；请保留同一个上传包重试")
-    release_id = release.get("id")
-    if (
-        type(release_id) is not int or release_id <= 0
-        or marker not in (release.get("body") or "").splitlines()
-        or release.get("tag_name") != tag
-    ):
-        raise ValueError("同名 GitHub Release 不属于此上传包，停止上传")
-    remote = _remote_assets(release_id)
-    if not release.get("draft") and not _verify_assets(remote, assets):
-        raise ValueError("已公开的同名 Release 附件不一致；不会覆盖，请核查原发布")
-    if release.get("draft"):
-        by_name = {row.get("name"): row for row in remote}
-        expected = {a["name"] for a in assets}
-        if len(by_name) != len(remote) or set(by_name) - expected:
-            raise ValueError("草稿包含不属于此上传包的附件，停止上传")
-        for index, asset in enumerate(assets, 1):
-            old = by_name.get(asset["name"])
-            if old and _matches(old, asset):
-                print(f"已校验并复用附件 {index}/{len(assets)}：{asset['name']}", flush=True)
-                continue
-            # Only replace this package's incomplete/corrupt asset on its own draft.
-            print(f"正在上传附件 {index}/{len(assets)}：{asset['name']} ({asset['size']} 字节)", flush=True)
-            _gh(
-                "release", "upload", tag, str(package / asset["name"]),
-                "--repo", HOST + "/" + REPOSITORY, "--clobber", timeout=UPLOAD_TIMEOUT,
-            )
-        if not _verify_assets(_remote_assets(release_id), assets):
-            raise ValueError("GitHub 附件大小或 SHA256 校验未通过；草稿已保留，请重试同一个包")
-        _api(
-            f"repos/{REPOSITORY}/releases/{release_id}", "-F", "draft=false",
-            "-f", "make_latest=false", method="PATCH",
-        )
-    verified = _release(tag)
-    if (
-        not verified or verified.get("id") != release_id or verified.get("draft")
-        or marker not in (verified.get("body") or "").splitlines()
-        or not _verify_assets(_remote_assets(release_id), assets)
-    ):
-        raise ValueError("尚未确认公开发布成功；请保留同一个上传包重试")
-    url = f"https://{HOST}/{REPOSITORY}/releases/tag/{tag}"
-    _write_json(package / "receipt.json", {
-        "schema_version": 1, "package_id": manifest["package_id"], "repository": REPOSITORY,
-        "release_tag": tag, "release_id": release_id, "url": url, "verified_at": _now(), "assets": assets,
-    })
-    return url
+    from .ssh_upload import publish
+
+    return publish(package, manifest, assets)

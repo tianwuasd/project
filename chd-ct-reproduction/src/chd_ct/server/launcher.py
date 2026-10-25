@@ -260,7 +260,8 @@ def make_parser():
         "--upload-job", nargs="?", const="latest", help="准备任务日志、配置、指标和权重上传包"
     )
     publication.add_argument("--upload-package", help="上传或重试已准备的包目录")
-    parser.add_argument("--yes-upload", action="store_true", help="确认发布所选上传包至 GitHub Release")
+    publication.add_argument("--push-code", action="store_true", help="预览并上传已提交的 CT 代码（SSH）")
+    parser.add_argument("--yes-upload", action="store_true", help="确认上传预览的代码提交或产物包")
     parser.add_argument("--stop", action="store_true", help="请求中断最近任务，保留已提交的缓存和检查点")
     parser.add_argument("--worker", help=argparse.SUPPRESS)
     parser.add_argument("--lock-fd", type=int, help=argparse.SUPPRESS)
@@ -277,7 +278,7 @@ def main(argv=None):
             raise ValueError("网络设置参数需要配合 --configure-network")
         if networking and any((args.task, args.tasks, args.resume_job, args.rerun_job, args.input_job,
                                args.query, args.status, args.stop, args.worker, args.upload_job,
-                               args.upload_package, args.yes_upload, args.name, args.reset_settings,
+                               args.upload_package, args.push_code, args.yes_upload, args.name, args.reset_settings,
                                args.preprocess_cache, args.append_tasks, args.resume_check, args.rerun_tasks)):
             raise ValueError("网络设置/查看不能与任务启动、查询、停止或上传混用")
 
@@ -288,16 +289,16 @@ def main(argv=None):
         if args.input_job and args.resume_job:
             raise ValueError("续跑保留原输入任务，不能更换")
         if (args.input_job or args.rerun_job) and (
-            args.query or args.status or args.stop or args.worker or args.upload_job or args.upload_package
+            args.query or args.status or args.stop or args.worker or args.upload_job or args.upload_package or args.push_code
         ):
             raise ValueError("输入任务/重跑参数不能与查询、停止、worker 或上传混用")
         if args.append_tasks and not args.resume_job:
             raise ValueError("--append-tasks 需要配合 --resume-job")
         if args.resume_check and not args.resume_job:
             raise ValueError("--resume-check 需要配合 --resume-job")
-        publishing = args.upload_job or args.upload_package
+        publishing = args.upload_job or args.upload_package or args.push_code
         if args.yes_upload and not publishing:
-            raise ValueError("--yes-upload 需要配合 --upload-job 或 --upload-package")
+            raise ValueError("--yes-upload 需要配合 --upload-job、--upload-package 或 --push-code")
         if publishing and (
             args.task
             or args.tasks
@@ -341,6 +342,10 @@ def main(argv=None):
             network.show(network.load(runtime))
             return 0
         if publishing:
+            if args.push_code:
+                from .code_sync import run
+
+                return run(args, profile, sys.stdin.isatty() and not args.non_interactive)
             from .sharing import run_upload
 
             return run_upload(args, profile, sys.stdin.isatty() and not args.non_interactive)

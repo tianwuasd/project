@@ -1,6 +1,6 @@
-# 追加后续步骤与上传结果（网络适配 0.21.0）
+# 追加后续步骤与上传结果（SSH + Git LFS 0.22.0）
 
-网络配置及旧版首次升级见 [代理与私有仓库](github-network.md)。`c` 保存原 runtime 的网络设置，`u` 使用选定的 Git 通道，`v` 单独使用官方 gh API 认证。旧包重试读取原 runtime 新设置，不必重新打包。
+网络配置及旧版首次升级见 [代理与私有仓库](github-network.md)。`c` 保存原 runtime 的网络设置，`u` 使用选定的 Git 通道，`w` 上传代码，`v` 使用同一 SSH 密钥认证并通过 Git LFS 上传产物。旧包重试读取原 runtime 新设置，不必重新打包。
 
 先更新代码并重新打开 `bash start_server.sh`。旧 workflow 不必搬迁或重跑；面板 `o` 继续读取已有结果，`r` 可给同一个任务补上后续步骤。
 
@@ -24,7 +24,7 @@ bash start_server.sh --resume-job /完整路径/原任务_workflow --append-task
 
 ## 上传日志和模型权重
 
-面板选 `v` → 选择完成的任务 → 查看文件清单和总大小 → 确认发布。上传目的地是同一仓库 [tianwuasd/project 的 Releases](https://github.com/tianwuasd/project/releases)，与程序代码分开保存。
+面板选 `v` → 选择完成的任务 → 查看文件清单和总大小 → 确认发布。上传目的地是同一仓库 [tianwuasd/project](https://github.com/tianwuasd/project) 的独立 `chd-artifacts/<package_id>` 分支，与 main 的程序代码分开保存。
 
 包括运行日志、训练配置/超参数、指标、模型清单，以及训练好的最佳权重和最后检查点。明确引用的外部模型目录也会收集。原始影像、缓存、预测体积、原始诊断表、环境和凭据不在上传范围内；以实际预览清单为准。
 
@@ -46,10 +46,32 @@ bash start_server.sh --upload-package /实际runtime/uploads/实际包目录 --y
 bash start_server.sh --upload-job /完整路径/原任务_workflow --yes-upload --non-interactive
 ```
 
-服务器需已安装并登录 GitHub CLI，账号拥有该仓库发布权限。认证未完成时，按照工具提示执行 `gh auth login --hostname github.com`。上传使用官方 GitHub 认证通道和服务器网络配置；公共 GitHub 下载镜像不支持安全的认证写入，不把令牌交给镜像。
+服务器需要 Git、Git LFS，以及 `c` 中配置的 `github-ssh` 写密钥；无需 gh 登录。认证只访问官方地址，不把凭据交给公共下载镜像。配置方法见 [网络设置](github-network.md)。
 
-上传包在原 runtime 的 `uploads/` 下，准备时会读取全部获准权重并计算哈希，需要磁盘空间与时间。分块附件支持大模型；下载后按包内说明合并解包。发布前保持 draft，失败后保留包和相同 release tag；使用打印的重试命令继续，勿重新打包产生另一个发布。
+上传过程：
 
-成功后面板 `o` 显示发布链接。上传回执位于 workflow 根目录 `uploads/`，不写入旧步骤输出，因此不会破坏其恢复校验。工作区保持干净，后续 `u` 不受大模型文件影响。
+1. 完成且无存活进程的任务持锁制作稳定快照；完整读取获准文件、计算 SHA256，流式生成最大 1 GiB 的 tar 分卷。清单包含来源路径，日志/配置内容按文件原样保存，请审阅实际预览。
+2. 预览确认后，在包目录建立独立 Git 工作目录。提交只含清单、说明、LFS 属性及分卷指针；实际分卷放 LFS 对象存储。额外需要约一份包大小的本地 LFS 缓存空间。
+3. 先上传 LFS 对象，再复核包和提交，最后推送独立产物分支。失败或超时不创建新包：原命令重试同一提交；已存在且不同的同名远端分支会被拒绝，不覆盖、不强推。
+4. 远端 ref 与本地已核验提交一致后写成功回执。该检查证明 LFS 命令成功且指针/清单提交已推送；不等于又从 GitHub 完整下载所有大文件验证。
 
-GitHub 限制依据：[Release 附件规则](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases)、[gh release upload](https://cli.github.com/manual/gh_release_upload)。真实服务器网络、认证与上传吞吐需要在服务器验证；本地测试使用合成文件和模拟服务，不发送真实实验数据。
+包和清单位于原 `<runtime>/uploads/<package_id>/`。`git-publication/` 是该包的独立 Git/LFS 暂存目录，保留它供重试。旧包不重打包；旧 `release_tag` 保留兼容，旧 Release 不会被修改。
+
+成功后面板 `o` 显示产物分支链接；workflow 根目录 `uploads/` 保存回执，不改旧步骤输出。代码工作区保持干净，`u` 不会检出产物分支。`w` 只上传代码到 main，不用于上传权重。
+
+下载时，使用同一 SSH 认证与代理设置，选择回执中的实际分支，并关闭克隆时自动展开，随后显式获取 LFS 文件：
+
+```bash
+GIT_LFS_SKIP_SMUDGE=1 git clone --single-branch --branch 'chd-artifacts/实际包ID' \
+  ssh://git@ssh.github.com:443/tianwuasd/project.git /新的产物下载目录
+cd /新的产物下载目录
+git lfs pull
+```
+
+上述手动 Git 命令需在当前终端显式配置 `GIT_SSH_COMMAND` 和 HTTP 代理；面板设置不会修改终端全局环境。按照 `manifest.json` 对每个分卷核对 size/SHA256，按编号合并 `artifacts.tar.part*` 后，在新的空目录解包；保留原任务，不覆盖旧输出。不要将产物分支合并到 main。
+
+单卷 1 GiB 低于 GitHub 常见套餐的 LFS 单文件上限，但存储、下载带宽和账单限制仍适用；额度错误时保留包并停止，不自动购买或修改额度。[GitHub LFS 说明](https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-git-large-file-storage)
+
+本地测试使用真实的临时 Git/LFS 仓库和合成文件，验证上传、克隆及字节恢复；没有上传真实模型或患者数据。Linux 进程回收、zmic44 权限/网络/额度与真实吞吐需服务器验收。
+
+2026-10-25 的 Windows / Python 3.12 验证：相关工程回归 143 项通过、1 项因符号链接权限跳过；另 1 项完整模型入口测试因未安装 torch/scipy/skimage/networkx/sklearn 未通过，不能算全套通过。最后代码上传目录保护与 CLI 集成复核 18 项通过。Ruff 通过；未在目标 Linux 执行，未重复触发此前因 GitHub 账户计费/额度限制未启动的 CI。

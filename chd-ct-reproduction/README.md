@@ -1,6 +1,6 @@
 # ImageCHD：多阶段分割与独立可解释诊断
 
-0.21.0：新增 `c GitHub 网络设置`，`u` 支持经本机代理使用官方 SSH/HTTPS 更新私有仓库，`v` 使用独立的官方 GitHub API 认证上传。配置仅作用于 Git/gh 子进程。旧版首次升级、部署密钥与上传登录的区别见 [代理与私有仓库](docs/github-network.md)。
+0.22.0：`c` 配置服务器代理与 SSH 密钥，`u` 更新代码，`w` 预览并上传已提交的 CT 代码，`v` 使用同一 SSH 密钥及 Git LFS 上传日志、指标和权重。无需 gh 或 API token；产物进入独立分支，不进入 main。旧版首次升级与操作见 [代理与私有仓库](docs/github-network.md)。
 
 0.20.0：`o` 选择任务后进入简洁的结果中心，按分割、决策、诊断评估、训练与数据、文件与来源五个二级页查看。各页默认简洁，`d/s` 切换详细/简洁，`n/p` 翻页，`b` 返回上一级。命令行结果查询也默认简洁，显式选择详细可保留原全量输出。见 [结果面板](docs/result-details.md)。
 
@@ -124,4 +124,4 @@ chd-ct-reproduction/
 python3 start_server.py --query results --job-dir /原来的/任务_workflow
 ```
 
-0.15.0 支持为已完成 workflow 追加未执行步骤（面板 `r` / `--append-tasks`），成功步骤校验后锁定复用，后续结果仍在面板 `o` 中显示。更新器首条有效线路成功即停止。新增面板 `v` / `--upload-job`，将日志、配置、指标及 best/last 模型权重打包为 GitHub Release 附件；先预览再发布，失败可重试。详见 [追加与上传](docs/results-publishing.md)。
+0.15.0 支持为已完成 workflow 追加未执行步骤（面板 `r` / `--append-tasks`），成功步骤校验后锁定复用，后续结果仍在面板 `o` 中显示。更新器首条有效线路成功即停止。新增面板 `v` / `--upload-job`，将日志、配置、指标及 best/last 模型权重打包上传；0.22.0 改用 SSH + Git LFS 独立产物分支，先预览再发布，失败重试原包。详见 [追加与上传](docs/results-publishing.md)。
