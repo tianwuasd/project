@@ -64,7 +64,8 @@ def main():
     from project_trainers import BaselineNNUNet
     from smoke_train import state_hash
     from nnunetv2.training.logging.nnunet_logger import MetaLogger
-    torch.set_num_threads(2)
+    from task_resources import torch_threads
+    torch_threads(torch)
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
@@ -89,6 +90,10 @@ def main():
             raise FileExistsError("实验已存在，请选择‘断点继续’或新的工作区")
     elif out.exists():
         raise FileExistsError("发现无状态记录的已有实验目录，不自动覆盖")
+    from preflight_gate import before_training
+    effective_cpu=before_training(ROOT,args.fold,args.method,(previous or {}).get('effective_cpu'))
+    from task_resources import apply_training_cpu
+    cpu_limiter=apply_training_cpu(effective_cpu,torch)  # Hold through training lifetime.
     checkpoint, restarted_from = None, None
     if previous:
         try:
@@ -99,6 +104,7 @@ def main():
             previous = None
     out.mkdir(parents=True, exist_ok=True)
     report = previous or {"signature": signature, "split": split, "history": [], "formal_training": True}
+    report['effective_cpu']=effective_cpu
     if restarted_from:
         report['restarted_from_archive'] = restarted_from
     report["status"] = "running"
@@ -119,6 +125,9 @@ def main():
         report["planned_epochs"] = trainer.num_epochs
         if checkpoint:
             trainer.load_checkpoint(str(checkpoint))
+            report['rng_state_restored']=trainer.rng_state_restored
+            report['resume_scope']='epoch checkpoint weights/optimizer/global RNG; serial loader; numerical bitwise identity not claimed'
+        report['history'][-1]['first_epoch']=trainer.current_epoch
         write_json(record, report)
         # 只执行训练和来源开发集验证；这里不调用目标中心推理或选模。
         if trainer.current_epoch < trainer.num_epochs:

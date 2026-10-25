@@ -121,6 +121,7 @@ class UpdateTests(unittest.TestCase):
                 if args==('rev-parse','--show-toplevel'):result.stdout=str(repository)
                 elif args[:2]==('config','--get'):result.stdout=updater.UPSTREAM
                 elif args==('rev-parse','HEAD'):result.stdout='old'
+                elif args[:2]==('ls-remote','--get-url'):result.stdout=args[2]
                 elif args[0]=='ls-remote':raise subprocess.TimeoutExpired(args,12)
                 elif args[0]=='fetch' and args[2] in [updater.UPSTREAM]:
                     routes.append(args[2])
@@ -144,6 +145,7 @@ class UpdateTests(unittest.TestCase):
                 elif args[:2]==('config','--get'):result.stdout=updater.UPSTREAM
                 elif args==('rev-parse','HEAD'):result.stdout='old'
                 elif args[0]=='archive':result.stdout=b'backup'
+                elif args[:2]==('ls-remote','--get-url'):result.stdout=args[2]
                 elif args[0]=='ls-remote' or (args[0]=='fetch' and args[2] in [updater.UPSTREAM]):raise subprocess.TimeoutExpired(args,12)
                 return result
             with patch.object(updater,'git',side_effect=fake_git),self.assertRaises(ValueError):updater.update(runtime)

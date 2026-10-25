@@ -56,4 +56,25 @@ class BaselineNNUNet(nnUNetTrainer):
         temporary = str(filename) + ".tmp"
         super().save_checkpoint(temporary)
         if self.local_rank == 0 and not self.disable_checkpointing:
+            from checkpoint_rng import capture
+            checkpoint=torch.load(temporary,map_location='cpu',weights_only=False)
+            checkpoint['vista_rng_state']=capture()
+            torch.save(checkpoint,temporary)
             os.replace(temporary, filename)
+
+    def load_checkpoint(self, filename_or_checkpoint):
+        checkpoint=torch.load(filename_or_checkpoint,map_location='cpu',weights_only=False) if isinstance(filename_or_checkpoint,(str,Path)) else filename_or_checkpoint
+        super().load_checkpoint(checkpoint)
+        self._vista_resume_rng=checkpoint.get('vista_rng_state')
+        self.rng_state_restored=bool(self._vista_resume_rng)
+        if self._vista_resume_rng:
+            from checkpoint_rng import restore
+            restore(self._vista_resume_rng)
+
+    def on_train_start(self):
+        super().on_train_start()
+        # Initialization/loading pools may consume random draws after load_checkpoint.
+        if getattr(self,'_vista_resume_rng',None):
+            from checkpoint_rng import restore
+            restore(self._vista_resume_rng)
+            self._vista_resume_rng=None

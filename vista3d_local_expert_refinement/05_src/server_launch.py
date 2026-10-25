@@ -35,7 +35,8 @@ def runtime_check(work, gpu_memory):
         raise RuntimeError(f"依赖版本不符：{actual}；请使用 start_server.sh 建立的独立环境")
     if not torch.cuda.is_available():
         raise RuntimeError("PyTorch 无法使用 CUDA。请检查 NVIDIA 驱动与 CUDA_VISIBLE_DEVICES；不自动退回 CPU")
-    torch.set_num_threads(2)
+    from task_resources import torch_threads
+    torch_threads(torch)
     free, total = torch.cuda.mem_get_info()
     if free / 2**30 < gpu_memory + 0.5:
         raise RuntimeError(f"可用显存只有 {free/2**30:.1f} GiB，无法使用 {gpu_memory:g} GiB 的规划预算；请选择空闲 GPU 或新工作区中的较低预算")

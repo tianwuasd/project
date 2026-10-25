@@ -1,5 +1,7 @@
 """服务器可继续的数据准备，逐病例保存完成标记，保留已完成预处理。"""
 import argparse
+import os
+import sys
 import importlib.metadata
 from pathlib import Path
 import shutil
@@ -44,7 +46,8 @@ def prepare(fold, gpu_memory):
     from nnunetv2.experiment_planning.dataset_fingerprint.fingerprint_extractor import DatasetFingerprintExtractor
     from nnunetv2.experiment_planning.experiment_planners.default_experiment_planner import ExperimentPlanner
     from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
-    torch.set_num_threads(2)
+    from task_resources import torch_threads
+    torch_threads(torch)
     split = load_json(ROOT / "04_data/manifests/splits_v1.json")["folds"][fold]
     phase_started = time.perf_counter()
     progress_path = ROOT / f'00_admin/preparation_progress/{fold}.json'
@@ -120,6 +123,25 @@ def prepare(fold, gpu_memory):
     plan_hash = digest(plans_path)
     done_dir = completion_directory(prep, cache, split["train"] + split["val"], plan_hash)
     total = len(split['train'])+len(split['val'])
+    from task_resources import case_budget
+    budget=case_budget(ROOT,[raw/'imagesTr'/f'{i}_0000.nii.gz' for i in split['train']+split['val']],list(reversed(config.spacing)))
+    if budget['workers']>1:
+        from cpu_case_queue import run
+        commands=[];finished=[]
+        for case_id in split['train']+split['val']:
+            done=done_dir/f'{case_id}.complete.json'
+            valid=done.exists() and load_json(done).get('plan_sha256')==plan_hash and all((cache/f'{case_id}{s}').exists() for s in ['.b2nd','_seg.b2nd','.pkl'])
+            if valid:finished.append(case_id)
+            else:commands.append((case_id,[sys.executable,'-B',str(Path(__file__).resolve()),fold,'--gpu-memory',str(gpu_memory),'--case',case_id]))
+        def completed(case_id):
+            finished.append(case_id);progress('逐病例预处理',completed=len(finished),total=total)
+            print(f'{fold} 预处理 {len(finished)}/{total}：{case_id}',flush=True)
+        progress('逐病例预处理',completed=len(finished),total=total)
+        run(commands,budget['workers'],ROOT/f'00_admin/preparation_logs/{fold}',completed)
+        for case_id in split['train']+split['val']:shutil.copyfile(raw/'labelsTr'/f'{case_id}.nii.gz',gt/f'{case_id}.nii.gz')
+        write_json(complete,dict(status='passed',seconds=time.perf_counter()-started,source_train=len(split['train']),source_val=len(split['val']),target_used=False,gpu_memory_target_gb=gpu_memory,plan_sha256=plan_hash))
+        progress('已完成',completed=total,total=total)
+        return
     for i, case_id in enumerate(split["train"] + split["val"], 1):
         done = done_dir / f"{case_id}.complete.json"
         files_ok = all((cache / f"{case_id}{s}").exists() for s in [".b2nd", "_seg.b2nd", ".pkl"])
@@ -139,5 +161,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("fold", choices=list(FOLDS))
     parser.add_argument("--gpu-memory", type=float, default=5)
+    parser.add_argument('--case',help=argparse.SUPPRESS)
     args = parser.parse_args()
-    prepare(args.fold, args.gpu_memory)
+    if args.case:
+        configure_paths()
+        import torch
+        from task_resources import torch_threads
+        torch_threads(torch)
+        from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
+        split=load_json(ROOT/'04_data/manifests/splits_v1.json')['folds'][args.fold]
+        if args.case not in split['train']+split['val']:raise ValueError('病例不在冻结来源范围')
+        name=f'Dataset{split["dataset_id"]:03d}_{args.fold}'
+        prep=ROOT/'04_data/derived/nnUNet_preprocessed'/name;raw=ROOT/'04_data/derived/nnUNet_raw'/name
+        manager=PlansManager(load_json(prep/'WholeheartBaselinePlans.json'));config=manager.get_configuration('3d_fullres')
+        config.preprocessor_class(verbose=False).run_case_save(str(prep/config.data_identifier/args.case),[str(raw/'imagesTr'/f'{args.case}_0000.nii.gz')],str(raw/'labelsTr'/f'{args.case}.nii.gz'),manager,config,load_json(raw/'dataset.json'))
+        write_json(prep/'server_case_completion'/config.data_identifier/f'{args.case}.complete.json',{'plan_sha256':digest(prep/'WholeheartBaselinePlans.json')})
+    else:prepare(args.fold, args.gpu_memory)

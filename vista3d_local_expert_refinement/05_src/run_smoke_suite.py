@@ -37,7 +37,12 @@ def main():
                     record.update(status="passed" if result.returncode == 0 else "failed", exit_code=result.returncode)
                 except subprocess.TimeoutExpired:
                     record.update(status="timeout", exit_code=None)
+                except BaseException as error:
+                    record.update(status='interrupted' if isinstance(error,KeyboardInterrupt) else 'failed',error=str(error),seconds=time.perf_counter()-started,ended=time.strftime('%F %T'))
+                    save_json(suite/'suite.json',records)
+                    raise
             record["seconds"] = time.perf_counter()-started
+            record['ended']=time.strftime('%F %T')
             save_json(suite / "suite.json", records)
             print(f"END {fold} {method}: {record['status']}", flush=True)
             if record["status"] != "passed":

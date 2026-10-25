@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 from model_catalog import MODELS, FOLDS, SCOPES, parse_models, parse_folds
 from server_data import read_json
@@ -13,7 +14,7 @@ import task_runtime as jobs
 from task_queries import query, follow, result_lines, read_optional, log_sources
 from task_progress import STATES
 
-PANEL_VERSION = '0.2.0'
+PANEL_VERSION = '0.3.0'
 
 
 class Back(Exception):
@@ -63,6 +64,11 @@ def resolve_gpus(value):
     tokens = str(value).replace('，', ',').replace(',', ' ').split()
     if not tokens:
         raise ValueError('请明确填写获准GPU，不能默认使用全部显卡')
+    if tokens == ['auto']:
+        result = [r['uuid'] for r in rows if r['uuid'] in visible]
+        if not result:
+            raise ValueError('获准可见范围内没有 GPU；请检查调度分配和 CUDA_VISIBLE_DEVICES')
+        return result
     result = []
     for token in tokens:
         matched = [r['uuid'] for r in rows if token in [r['index'], r['uuid']] and r['uuid'] in visible]
@@ -72,17 +78,38 @@ def resolve_gpus(value):
     return result
 
 
+def show_gpu_choices():
+    from evaluation_gpu import query as gpu_query, allowed_ids
+    rows=[]
+    processes=gpu_query('gpu_uuid,pid','compute-apps')
+    for index,uuid,name,free,util in gpu_query('index,uuid,name,memory.free,utilization.gpu'):
+        rows.append(dict(index=index,uuid=uuid,name=name,free=free,util=util))
+    visible=allowed_ids(rows,{'allowed_gpus':None})
+    print('\n当前显卡状态（空闲不代表已预约；执行前再次检查）：')
+    print('编号 / 型号 / 空闲显存MiB / 利用率 / 计算进程PID / 本次分配可见范围')
+    for row in rows:
+        pids=','.join(p[1] for p in processes if p[0]==row['uuid']) or '无'
+        print(f"{row['index']} / {row['name']} / {row['free']} / {row['util']}% / {pids} / " + ('范围内' if row['uuid'] in visible else '范围外'))
+    print('auto 表示授权当前分配可见范围为候选；不会超过并发上限，不抢占外部进程。')
+
+
 def new_config(args, saved, interactive=True):
-    from runtime_setup import DEFAULT_PATHS
+    import server_profile
+    profile=server_profile.load(getattr(args,'profile',None))
     def value(argument, key, default, label):
         if argument is not None:
             return argument
         suggestion = saved.get(key, default)
         return ask(label, suggestion) if interactive else suggestion
-    runtime = str(Path(args.runtime or saved.get('runtime', DEFAULT_PATHS['base'])).expanduser().resolve())
+    runtime = str(Path(args.runtime or saved.get('runtime') or profile['runtime']).expanduser().resolve())
     if interactive:
-        print('\n新建任务：按步骤填写；每页 b 返回面板，q 退出；GPU 编号 0 和步骤 0 保持原意。\n[1/3] 选择步骤与历史输入')
-    tasks = jobs.parse_tasks(value(args.tasks, 'tasks', 'environment,prepare,smoke', '步骤：0环境 1预处理 2短测 3训练 4预测评估 5已有评价汇总；可多选'))
+        print('\n新建任务：命名 → 步骤 → 路径 → 输入 → 步骤配置 → 冻结预览。每页 b 返回、q 退出。')
+    name=value(args.name,'name','wholeheart nnU-Net','任务显示名称')
+    tasks = jobs.parse_tasks(value(args.tasks, 'tasks', 'environment,prepare,smoke', '步骤：0环境与CPU软件检查 1预处理 2完整尺寸预检 3训练 4预测评估 5已有评价汇总；可多选'))
+    results=value(args.results,'results',profile['results'],'结果根目录（每次自动生成独立子目录）')
+    data=args.data or (ask('原始 Wholeheart 数据目录',saved.get('data') or profile['data']) if interactive and tasks!=['environment'] else saved.get('data') or profile['data'])
+    if interactive:
+        server_profile.show(profile,dict(runtime=runtime,results=results,data=data))
     source = args.input_job
     if source is None and interactive and tasks != ['environment']:
         source = choose_job(runtime, allow_none=True)
@@ -97,35 +124,38 @@ def new_config(args, saved, interactive=True):
             old = read_optional(Path(source) / '00_admin/server_config.json')
             if old:
                 source_config = {'data': old['data_root'], 'gpu_memory': old['gpu_memory_gb']}
-    default_data = (source_config or {}).get('data', saved.get('data', DEFAULT_PATHS['data']))
-    methods = parse_models(args.models)
-    folds = parse_folds(args.folds or args.scope or 'ct-first')
+    if source_config and args.data is None:
+        if interactive and str(source_config.get('data',data)) != str(data):
+            print('所选历史输入的冻结原始数据：'+str(source_config.get('data')))
+        data=source_config.get('data',data)
+    methods = parse_models(args.models or (source_config or {}).get('methods'))
+    folds = parse_folds(args.folds or args.scope or (source_config or {}).get('folds') or 'ct-first')
     gpus, count = [], 0
     if jobs.GPU_TASKS.intersection(tasks):
         if interactive:
-            print('\n[2/3] 计算范围与获准资源（CPU 前置完成后才等待显卡）')
+            print('\n计算范围与获准资源（CPU 前置完成后才等待显卡）')
         print('\n模型可多选：' + '；'.join(f'{i} {v["label"]}' for i,v in enumerate(MODELS.values(), 1)))
         if interactive and args.models is None:
             methods = parse_models(ask('模型编号或名称，逗号分隔；all全部', ','.join(saved.get('methods', list(MODELS)))))
         if interactive and args.folds is None and args.scope is None:
             folds = parse_folds(ask('范围：ct-first / all，或逗号分隔方向', 'ct-first'))
-        print(query('gpu', runtime))
-        selection = args.gpus if args.gpus is not None else ask('填写本次获准的候选GPU编号/UUID；繁忙时后台等待') if interactive else None
-        if selection is None:
-            raise ValueError('非交互GPU任务必须提供 --gpus')
+        if interactive:
+            show_gpu_choices()
+        raw_count=value(args.gpu_count,'gpu_count',profile['gpu_count'],'最多同时使用几张 GPU（1—5；不足时少卡运行，无卡时等待）')
+        if isinstance(raw_count,bool) or str(raw_count).strip() not in {'1','2','3','4','5'}:
+            raise ValueError('显卡并发上限需为1至5的整数')
+        count=int(raw_count)
+        selection=value(args.gpus,'gpu_candidates',profile['gpu_candidates'],'允许使用的候选 GPU 编号/UUID，逗号分隔，或 auto（卡数可少于/多于上限）')
         gpus = resolve_gpus(selection)
-        count = int(args.gpu_count or (ask('最多并行使用几张GPU', len(gpus)) if interactive else len(gpus)))
     elif interactive:
-        print('\n[2/3] 本次仅 CPU 步骤，无需设置 GPU。')
-    if interactive:
-        print('\n[3/3] 名称、数据与输出目录；提交前还可取消。')
+        print('\n本次仅 CPU 步骤，无需设置 GPU。')
     config = dict(runtime=runtime,
-                  results=value(args.results, 'results', DEFAULT_PATHS['work'], '结果根目录（每次自动生成独立子目录）'),
-                  data=args.data or (ask('原始数据目录', default_data) if interactive and tasks != ['environment'] else default_data),
-                  name=value(args.name, 'name', 'wholeheart nnU-Net', '任务显示名称'), tasks=tasks,
+                  results=results, data=data,name=name,tasks=tasks,profile=profile['name'],conda=profile.get('conda',''),
                   methods=methods, folds=folds, gpus=gpus, gpu_count=count,
                   gpu_memory=float(args.gpu_memory or (source_config or {}).get('gpu_memory', saved.get('gpu_memory', 5))),
                   input_job=source, preprocess_cache=args.preprocess_cache or 'reuse')
+    if gpus:
+        config['gpu_candidates']=selection
     if interactive and args.gpu_memory is None and any(t in tasks for t in ['prepare','smoke','train']):
         config['gpu_memory'] = float(ask('网络规划显存预算GiB（已有输入需保持一致）', config['gpu_memory']))
     if source and 'prepare' in tasks and interactive and args.preprocess_cache is None:
@@ -252,12 +282,16 @@ def result_menu(job):
 
 
 def panel(args, runtime, saved):
+    import server_profile
+    profile=server_profile.load(getattr(args,'profile',None))
     while True:
         active = any(jobs.active_processes(row['directory']) for row in jobs.history(runtime))
         print(f'\nVISTA3D / nnU-Net 服务器任务面板 v{PANEL_VERSION}\n运行目录：' + runtime + '\n' + query('status', runtime))
+        server_profile.show(profile,dict(runtime=runtime,results=args.results or saved.get('results') or profile['results'],data=args.data or saved.get('data') or profile['data']))
         print('\ns 任务概览  t 持续进度  g 显卡(1秒刷新)  m 模型 epoch/loss\nl 选择详细日志  p 本任务/我的进程  h 历史任务  o 查看结果')
         print('x 中断指定任务（保留完整检查点）' if active else 'n 新建任务  e 独立环境准备  r 续跑/追加  k 完成任务独立重跑')
-        print('u 更新程序  0/q 退出面板（后台任务继续）；普通输入页 b 返回、q 退出。')
+        print('u 更新程序  c GitHub网络设置  w 上传已提交代码  v 上传日志/指标/权重（SSH+Git LFS）')
+        print('0/q 退出面板（后台任务继续）；普通输入页 b 返回、q 退出。')
         try:
             action = ask('选择；回车只看状态', 's')
             if action == '0':
@@ -285,6 +319,18 @@ def panel(args, runtime, saved):
                     print(query(kind, runtime))
             elif action == 'e':
                 environment_menu(args, runtime, saved)
+            elif action == 'c':
+                from panel_publication.network import configure_interactive
+                configure_interactive(runtime,profile.get('network'))
+            elif action == 'w':
+                from panel_publication.code_sync import run as push_code
+                selected=copy.copy(args);selected.yes_upload=False
+                push_code(selected,profile,True)
+            elif action == 'v':
+                from panel_publication.sharing import run_upload
+                selected=copy.copy(args)
+                selected.upload_job=choose_job(runtime);selected.upload_package=None;selected.yes_upload=False
+                run_upload(selected,profile,True)
             elif action == 'o':
                 result_menu(choose_job(runtime))
             elif action == 'n':
@@ -309,6 +355,7 @@ def panel(args, runtime, saved):
                     raise ValueError('主动重跑只接受已完成任务；中断任务请续跑')
                 config = dict(old, input_job=str(job), tasks=jobs.parse_tasks(ask('重跑步骤', ','.join(old['tasks']))),
                               name=ask('新任务名称', old['name']+' 重跑'), preprocess_cache='new')
+                config['preprocess_cache']='new' if 'prepare' in config['tasks'] else 'reuse'
                 if ask('独立重跑并保留原结果？输入 RUN', '') == 'RUN':
                     jobs.submit(config, args.foreground)
             elif action == 'x':
@@ -318,6 +365,20 @@ def panel(args, runtime, saved):
                     jobs.stop(job)
             elif action == 'u':
                 from task_update import update
+                if active:
+                    targets=[r for r in jobs.history(runtime) if jobs.active_processes(r['directory'])]
+                    if len(targets)!=1:
+                        raise ValueError('存在多个活动任务记录，请先用x逐一确认停止目标')
+                    target=targets[0]['directory']
+                    print(query('status',runtime,target))
+                    if ask('中断上方任务、保留检查点并等待退出后更新？[y/N]','n').lower()!='y':
+                        continue
+                    jobs.stop(target)
+                    deadline=time.monotonic()+60
+                    while jobs.active_processes(target) and time.monotonic()<deadline:
+                        time.sleep(1)
+                    if jobs.active_processes(target):
+                        raise ValueError('子进程60秒内仍未退出；已停止更新，锁和检查点保留')
                 if ask('检查并切换本项目版本（不自动恢复任务），输入 UPDATE', '') == 'UPDATE':
                     update(runtime)
                     print('更新操作结束。重新打开面板载入选定版本。')
@@ -338,6 +399,7 @@ def make_parser():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('data_root', nargs='?')
     p.add_argument('--runtime', '--base-dir', dest='runtime')
+    p.add_argument('--profile',choices=['zmic44','generic'],help='Linux默认zmic44已记录路径；原runtime与CLI优先')
     p.add_argument('--results', '--work-dir', dest='results')
     p.add_argument('--data-dir', dest='data')
     p.add_argument('--name')
@@ -366,6 +428,15 @@ def make_parser():
     p.add_argument('--rerun-job')
     p.add_argument('--stop', action='store_true')
     p.add_argument('--update', action='store_true')
+    p.add_argument('--configure-network',action='store_true')
+    p.add_argument('--show-network',action='store_true')
+    p.add_argument('--github-proxy')
+    p.add_argument('--github-transport',choices=['github-ssh','github-https'])
+    p.add_argument('--github-ssh-key')
+    p.add_argument('--push-code',action='store_true',help='预览/上传已提交的本项目代码到main')
+    p.add_argument('--upload-job',help='预览/上传已完成任务的日志、配置、指标和权重')
+    p.add_argument('--upload-package',help='按原不可变包重试SSH+LFS发布')
+    p.add_argument('--yes-upload',action='store_true',help='明确确认当前预览范围的上传')
     p.add_argument('--mode', choices=['check','smoke','train','resume','experiment','evaluate','status'])
     p.add_argument('--server-defaults', action='store_true')
     p.add_argument('--loaded-release', action='store_true', help=argparse.SUPPRESS)
@@ -375,8 +446,12 @@ def make_parser():
 def main(argv=None):
     args = make_parser().parse_args(argv)
     from runtime_setup import DEFAULT_PATHS, SETTINGS
+    import server_profile
+    profile=server_profile.load(args.profile)
     legacy = read_optional(SETTINGS) or {}
-    runtime = args.runtime or (None if args.server_defaults else legacy.get('base')) or DEFAULT_PATHS['base']
+    old_runtime=Path(DEFAULT_PATHS['base'])
+    compatible_default=str(old_runtime) if any((old_runtime/p).exists() for p in ['settings.json','last-job.json','release.json']) else profile['runtime']
+    runtime = args.runtime or (None if args.server_defaults else legacy.get('base')) or compatible_default
     runtime = str(Path(runtime).expanduser().resolve())
     args.runtime, args.data = runtime, args.data or args.data_root
     if not args.loaded_release:
@@ -385,6 +460,21 @@ def main(argv=None):
         if entry:
             return subprocess.call([sys.executable, '-B', str(entry), *(sys.argv[1:] if argv is None else argv), '--loaded-release'])
     saved = read_optional(Path(runtime) / 'settings.json') or {}
+    if args.configure_network or args.show_network:
+        from panel_publication import network
+        if args.show_network:
+            network.show(network.load(runtime));return 0
+        if any(v is not None for v in [args.github_proxy,args.github_transport,args.github_ssh_key]):
+            network.show(network.save(runtime,proxy=args.github_proxy,git_transport=args.github_transport,ssh_key=args.github_ssh_key))
+        else:
+            network.configure_interactive(runtime,profile.get('network'))
+        return 0
+    if args.push_code:
+        from panel_publication.code_sync import run
+        return run(args,profile,not args.non_interactive)
+    if args.upload_job or args.upload_package:
+        from panel_publication.sharing import run_upload
+        return run_upload(args,profile,not args.non_interactive)
     if args.status or args.mode == 'status':
         args.query = 'status'
     if args.query:
@@ -417,6 +507,7 @@ def main(argv=None):
             raise ValueError('只能主动重跑已完成任务')
         config = dict(old, input_job=args.rerun_job, tasks=jobs.parse_tasks(args.tasks or old['tasks']),
                       name=args.name or old['name']+' 重跑', preprocess_cache='new')
+        config['preprocess_cache']='new' if 'prepare' in config['tasks'] else 'reuse'
         return jobs.submit(config, args.foreground)
     if args.mode:
         args.tasks = {'check':'environment', 'smoke':'environment,prepare,smoke',

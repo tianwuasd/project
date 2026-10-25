@@ -11,7 +11,6 @@ from unittest.mock import patch, Mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / '05_src'))
 import evaluation_gpu as gpu
 import evaluation_parallel as queue
-import evaluation as ev
 from server_data import read_json, write_json
 
 
@@ -49,7 +48,7 @@ class GPUSelectionTests(unittest.TestCase):
     def test_invalid_config_rejected(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / 'config.json'
-            write_json(path, dict(self.settings, max_gpus=4))
+            write_json(path, dict(self.settings, max_gpus=6))
             with patch.object(gpu, 'CONFIG', path), self.assertRaises(ValueError):
                 gpu.load_settings()
 
@@ -68,7 +67,7 @@ class ParallelQueueTests(unittest.TestCase):
                  patch.object(queue.subprocess, 'Popen', side_effect=stop_signal), \
                  patch.object(queue, 'stop_owned_process') as stop, patch('evaluation_summary.summarize') as summary:
                 with self.assertRaises(InterruptedError):
-                    queue.run_queue([dict(fold='ct_holdA', method='B0')], 'sha', gpu.load_settings(), work)
+                    queue.run_phase([dict(fold='ct_holdA', method='B0',index=0,case_id='Case1',status='pending')], 'sha', gpu.load_settings(), work)
                 stop.assert_called_once_with(proc)
                 summary.assert_not_called()
                 self.assertEqual(signal.getsignal(signal.SIGTERM), previous)
@@ -93,19 +92,19 @@ class ParallelQueueTests(unittest.TestCase):
                 return self.rc
         def idle(settings, candidates=None):
             return [f'GPU-{i}' for i in range(5)] if candidates is None else list(candidates)
-        models = [dict(fold=f'fold{i}', method='B0') for i in range(10)]
+        models = [dict(fold=f'fold{i}', method='B0',index=i,case_id='Case1',status='pending') for i in range(10)]
         with patch.object(queue, 'idle_gpus', side_effect=idle), patch.object(queue.subprocess, 'Popen', Process), \
              patch.object(queue.time, 'sleep'), patch.object(queue.time, 'monotonic', side_effect=range(10000)), \
              patch.object(queue, 'stop_owned_process') as stop, patch('evaluation_summary.summarize') as summarize:
             if failure:
                 with self.assertRaises(RuntimeError):
-                    queue.run_queue(models, 'sha', gpu.load_settings(), work)
+                    queue.run_phase(models, 'sha', gpu.load_settings(), work)
                 summarize.assert_not_called()
                 self.assertTrue(stop.called)
                 self.assertEqual(len(processes), 3)  # 失败后不再启动下一批。
             else:
-                queue.run_queue(models, 'sha', gpu.load_settings(), work)
-                summarize.assert_called_once_with(work)
+                queue.run_phase(models, 'sha', gpu.load_settings(), work)
+                summarize.assert_not_called()
                 self.assertEqual(len(processes), 10)
             self.assertLessEqual(max(peak), 3)
             self.assertEqual(set(masks), {'GPU-0', 'GPU-1', 'GPU-2'})
@@ -133,11 +132,13 @@ class ParallelQueueTests(unittest.TestCase):
                  patch.object(queue.subprocess, 'Popen', return_value=proc) as start, \
                  patch.object(queue.time, 'sleep'), patch.object(queue.time, 'monotonic', side_effect=range(10000)), \
                  patch('evaluation_summary.summarize'):
-                queue.run_queue([dict(fold='ct_holdA', method='B0')], 'sha', gpu.load_settings(), work)
+                queue.run_phase([dict(fold='ct_holdA', method='B0',index=0,case_id='Case1',status='pending')], 'sha', gpu.load_settings(), work)
                 self.assertEqual(idle.call_count, 2)
                 self.assertEqual(start.call_args.kwargs['env']['CUDA_VISIBLE_DEVICES'], 'GPU-1')
 
     def test_old_project_compatibility_file_is_not_accepted(self):
+        try:import evaluation as ev
+        except ModuleNotFoundError:self.skipTest('requires imaging dependencies; no model execution')
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             old, new = {'old.py': 'aaa'}, {'old.py': 'bbb', 'new.py': 'ccc'}

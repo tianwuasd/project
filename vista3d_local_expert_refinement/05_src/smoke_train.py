@@ -30,16 +30,20 @@ def main():
     parser.add_argument("method", choices=["B0"])
     parser.add_argument("--steps", type=int, default=12)
     parser.add_argument("--predict", action="store_true")
+    parser.add_argument('--report-file',help='受管预检的独立报告路径，必须位于本工作区')
     args = parser.parse_args()
     if not 3 <= args.steps <= 50:
         parser.error("短测限 3..50 步；不得把正式训练隐藏在短测中")
+    if args.report_file and not Path(args.report_file).resolve().is_relative_to(ROOT.resolve()):
+        parser.error('预检报告超出工作区')
     configure_paths()
     os.environ["nnUNet_n_proc_DA"] = "0"
     import torch
     import nibabel as nib
     from project_trainers import BaselineNNUNet
     from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
-    torch.set_num_threads(2)
+    from task_resources import torch_threads
+    torch_threads(torch)
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
@@ -50,7 +54,7 @@ def main():
     data = Path(os.environ["nnUNet_preprocessed"]) / name
     plans = load_json(data / "WholeheartBaselinePlans.json")
     dataset_json = load_json(data / "dataset.json")
-    run_id = f"smoke_{args.fold}_{args.method}_seed0_{time.strftime('%Y%m%d_%H%M%S')}"
+    run_id = f"smoke_{args.fold}_{args.method}_seed0_{time.time_ns()}"
     out = ROOT / "07_experiments" / run_id
     out.mkdir(parents=True, exist_ok=False)
     os.environ["nnUNet_results"] = str(out / "native_results")
@@ -113,6 +117,7 @@ def main():
         assert state_hash(restored.network) == trained_hash, "恢复权重不一致"
         report["checkpoint_weights_equal"] = True
         report["optimizer_state_restored"] = bool(restored.optimizer.state)
+        report['global_rng_restored']=restored.rng_state_restored
         assert report["optimizer_state_restored"]
         resumed_step = restored.train_step(batch)
         assert np.isfinite(resumed_step["loss"]).all(), "恢复后的训练步骤失败"
@@ -142,13 +147,17 @@ def main():
             assert nib.load(pred_path).header.get_xyzt_units() == original.header.get_xyzt_units()
             report["prediction"] = {"source_val_case": case_id, "seconds": time.perf_counter()-tick, "original_grid_restored": True, "path": str(pred_path), "not_a_performance_result": True}
         report["status"] = "passed"
-    except Exception:
-        report["status"] = "failed"
+    except BaseException as error:
+        report["status"] = 'interrupted' if isinstance(error,KeyboardInterrupt) else 'failed'
         report["error"] = traceback.format_exc()
         raise
     finally:
         report["total_seconds"] = time.perf_counter()-started
         save_json(out / "run.json", report)
+        if args.report_file:
+            target=Path(args.report_file).resolve()
+            if not target.is_relative_to(ROOT.resolve()):raise ValueError('预检报告超出工作区')
+            save_json(target,report)
         print(f"REPORT: {out / 'run.json'}", flush=True)
 
 

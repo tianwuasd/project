@@ -112,6 +112,8 @@ def execute(job, lock_fd):
                WHOLE_HEART_GPU_LIMIT=str(plan.get('gpu_count', 1)), WHOLE_HEART_GPU_MEMORY=str(plan.get('gpu_memory', 5)))
     # Retain inherited allocation; only individual compute children narrow CUDA.
     env['WHOLE_HEART_EVAL_VISIBLE_DEVICES'] = env.get('CUDA_VISIBLE_DEVICES', '__UNRESTRICTED__')
+    if plan.get('conda') and Path(plan['conda']).is_file():
+        env['CONDA_EXE']=plan['conda']
     state = read_json(job / 'state.json')
     state.pop('ended', None)
     state.pop('error', None)
@@ -137,6 +139,11 @@ def execute(job, lock_fd):
         python = Path(env['WHOLE_HEART_ENV_PREFIX']) / 'bin/python'
         # Installation is an actual dependency, not a GPU gate.
         run_child(['bash', str(code / 'bootstrap_server.sh'), '--install-only'], env)
+        from task_resources import configure
+        budget=configure(job,plan,env)
+        print('CPU共享预算：'+json.dumps(budget,ensure_ascii=False),flush=True)
+        # CPU-only software smoke is separate from actual-size CUDA preflight.
+        run_child([str(python),'-B',str(code/'05_src/software_smoke.py'),str(job/'software-smoke.json')],env)
         for step in plan['tasks']:
             current = state['steps'][step]
             if current['status'] == 'completed':
@@ -158,6 +165,7 @@ def execute(job, lock_fd):
                 # Binding must happen before environment files make a new workspace nonempty.
                 from server_data import bind_workspace
                 bind_workspace(code, work, plan['data'], plan.get('gpu_memory', 5))
+                write_json(work/'00_admin/resource-plan.json',budget)
                 from model_catalog import save_selection
                 save_selection(work, plan['folds'], plan['methods'])
                 record_environment(python, conda, work, env)

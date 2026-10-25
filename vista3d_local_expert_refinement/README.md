@@ -53,4 +53,6 @@ AGENTS.md                后续助手的读取顺序与项目工作约定
 
 在这个目录继续工作时，先读 `AGENTS.md` 和 `.codex/HANDOFF.md`。按 [服务器面板](docs/SERVER_PANEL.md) 先完成 B0 真实数据短测和训练；保留数据边界，之后推进互补性与点击收益实验。
 
+面板v0.3的GPU/路径、c/u/w/v及子任务内部执行逐项对应见 [CT完整母版严格验收](docs/CT_STRICT_AUDIT.md)。
+
 GitHub 同步目标是既有仓库 [tianwuasd/project](https://github.com/tianwuasd/project) 的 [vista3d_local_expert_refinement](https://github.com/tianwuasd/project/tree/main/vista3d_local_expert_refinement) 子目录，包含本项目完整研究归档。同步范围与授权见 [.codex/GITHUB_SYNC.md](.codex/GITHUB_SYNC.md)。本地原项目仍保留，尚未注册 Codex 侧边栏项目。学术 Agent 软件与运行环境的现有位置、研究快照恢复方式见 [.codex/ENVIRONMENT.md](.codex/ENVIRONMENT.md)。

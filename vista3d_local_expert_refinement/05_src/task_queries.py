@@ -43,6 +43,26 @@ def tail(path, size=24000):
 
 def model_lines(work):
     lines = []
+    selection=read_optional(work/'00_admin/model_selection.json') or {}
+    queue=read_optional(work/'00_admin/gpu_queue.json') or {}
+    queued={(r['fold'],r['method']):r for r in queue.get('jobs',[])}
+    keys=set(queued)|{(f,m) for f in selection.get('folds',[]) for m in selection.get('methods',[])}
+    if keys:
+        lines.append('模型 / 状态 / epoch / train loss / val loss / 学习率 / GPU UUID')
+        for fold,method in sorted(keys):
+            base=work/f'07_experiments/formal/{fold}_{method}_seed0'
+            run=read_optional(base/'run.json') or {};record=queued.get((fold,method),{})
+            status=run.get('status') or record.get('status') or '尚未开始'
+            if status=='pending':status='等待GPU/前序调度'
+            log=tail(base/'training.log',48000)
+            def last(pattern):
+                values=re.findall(pattern,log,re.I)
+                return values[-1] if values else '—'
+            epoch=last(r'\bEpoch\s+(\d+)\b')
+            train=last(r'train[_ ]loss\s*[:=]?\s*(-?[0-9.eE+]+)')
+            val=last(r'val[_ ]loss\s*[:=]?\s*(-?[0-9.eE+]+)')
+            lr=last(r'(?:Current learning rate|learning rate|\blr)\s*[:=]\s*([0-9.eE+-]+)')
+            lines.append(f'{fold}/{method} / {status} / {epoch}/{run.get("planned_epochs","—")} / {train} / {val} / {lr} / {record.get("gpu_uuid","—")}')
     for path in sorted((work / '07_experiments/formal').glob('*/run.json')):
         value = read_optional(path)
         if not value:
@@ -63,7 +83,23 @@ def model_lines(work):
                     completed = epoch + 1
                     seconds.append(duration)
         planned = value.get('planned_epochs')
-        if seconds and isinstance(planned, int) and value.get('status') != 'completed':
+        # A resumed attempt must first complete its own timed epoch. Old logs still
+        # display as history but cannot supply a fresh ETA.
+        attempt=value.get('history',[])
+        if len(attempt)>1:
+            boundary=attempt[-1].get('started','')
+            fresh=[];epoch=None;completed=None
+            for line in logs:
+                stamp=re.match(r'(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)',line)
+                if not stamp or stamp.group(1)<boundary:continue
+                match=re.search(r'\bEpoch\s+(\d+)\b',line,re.I)
+                if match:epoch=int(match.group(1))
+                timing=re.search(r'Epoch time:\s*([0-9.]+)\s*s',line,re.I)
+                if timing and epoch is not None:
+                    duration=float(timing.group(1))
+                    if math.isfinite(duration) and duration>0:fresh.append(duration);completed=epoch+1
+            seconds=fresh
+        if seconds and isinstance(planned, int) and value.get('status') == 'running':
             recent = seconds[-10:]
             remaining = max(0, planned-completed)*sum(recent)/len(recent)/60
             lines.append(f'  已提交轮次日志：{completed}/{planned}；按最近轮次估算剩余训练计算约{remaining:.1f}分钟（不含排队/预测）。')
@@ -77,19 +113,33 @@ def prediction_lines(work):
     if not frozen:
         return []
     lines = ['预测进度（最后保存的完整病例记录）：']
+    queue=read_optional(work/'08_results/evaluation/status.json') or {}
+    if queue.get('phase'):
+        phase='GPU逐病例推理' if queue['phase']=='gpu' else 'CPU原网格恢复/压缩/指标（GPU已释放）'
+        jobs=queue.get('jobs',[]);done=sum(r.get('status')=='completed' for r in jobs)
+        active=[r for r in jobs if r.get('status')=='running']
+        lines.append(f'当前阶段：{phase}；队列 {done}/{len(jobs)}；活动病例 {len(active)}；状态 {queue.get("status","未知")}')
+        samples=[r['seconds'] for r in jobs if r.get('status')=='completed' and isinstance(r.get('seconds'),(int,float)) and r['seconds']>0]
+        if samples and active and queue.get('status') in {'running','cpu_tail'}:
+            remaining=(len(jobs)-done)*sum(samples)/len(samples)/len(active)/60
+            lines.append(f'  按本轮实际耗时估算本阶段剩余约 {remaining:.1f} 分钟（不含未知资源等待及后续阶段）')
+        elif done<len(jobs):lines.append('  无本轮完成样本或仍在等待，暂不能估算剩余时间。')
     for model in frozen.get('models', []):
         folder = work / '08_results/evaluation' / f"{model['fold']}_{model['method']}"
-        completed, seconds = 0, []
+        completed, seconds, gpu_done = 0, [], 0
         for case in model.get('targets', []):
             record = read_optional(folder / (case+'.json'))
+            middle=read_optional(folder/'intermediate'/(case+'.json'))
+            if middle and middle.get('status')=='completed':gpu_done+=1
             if record and record.get('status') == 'completed':
                 completed += 1
                 duration = record.get('seconds')
                 if isinstance(duration, (int,float)) and not isinstance(duration,bool) and math.isfinite(duration) and duration > 0:
                     seconds.append(duration)
         total = len(model.get('targets', []))
-        estimate = f'；按已完成病例估算尚需{(total-completed)*sum(seconds)/len(seconds)/60:.1f}分钟计算（不含排队）' if seconds and completed < total else ''
+        estimate = ''  # ETA above uses only the current phase's worker completions.
         lines.append(f"  {model['fold']}/{model['method']}：{completed}/{total}{estimate}")
+        if gpu_done:lines.append(f'    已提交GPU中间结果：{gpu_done}/{total}；完成病例计数仍以CPU输出为准。')
     return lines
 
 
@@ -147,6 +197,9 @@ def log_sources(job):
     candidates += [('model:'+p.parent.name, '模型 / '+p.parent.name, p) for p in sorted((work/'07_experiments/formal').glob('*/training.log'))]
     for area, name in [('07_experiments/queue_logs','训练队列'), ('08_results/evaluation/queue_logs','预测队列')]:
         candidates += [(area+':'+p.stem, name+' / '+p.stem, p) for p in sorted((work/area).glob('*.log'))[-20:]]
+    for area,name in [('00_admin/preflight','正式尺寸预检'),('00_admin/preparation_logs','预处理病例'),('09_reports','短测套件')]:
+        candidates += [(area+':'+str(p.relative_to(work/area)),name+' / '+str(p.relative_to(work/area)),p) for p in sorted((work/area).rglob('*.log'))]
+    candidates += [('smoke:'+str(p.relative_to(work/'07_experiments')),'完整尺寸短测 / '+p.parent.name+' / '+p.name,p) for root in sorted((work/'07_experiments').glob('smoke_*')) for p in root.glob('*.log')]
     return [(key, label, p) for key,label,p in candidates if p.is_file()]
 
 

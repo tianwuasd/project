@@ -1,0 +1,17 @@
+{
+  "name": "zmic44",
+  "path_source": "Existing private server note; dataset is a historical confirmed path, VISTA runtime/results are separate configured defaults, not a new live probe.",
+  "workspace": "/data5/zhougaowei/zhangruichen_workspace",
+  "runtime": "/data5/zhougaowei/zhangruichen_workspace/vista3d_runtime",
+  "results": "/data_nas/zhangruichen/vista3d_results",
+  "data": "/data_nas/zhangruichen/baidu_import/Wholeheart_Train_Dataset",
+  "conda": "/data5/zhougaowei/zhangruichen_workspace/project1_runtime/tools/miniforge3/bin/conda",
+  "network": {
+    "schema_version": 1,
+    "proxy": "http://127.0.0.1:17891",
+    "git_transport": "github-ssh",
+    "ssh_key": "~/.ssh/project_readonly_ed25519"
+  },
+  "gpu_count": 1,
+  "gpu_candidates": "auto"
+}

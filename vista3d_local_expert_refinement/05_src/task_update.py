@@ -13,11 +13,19 @@ from task_runtime import CODE, runtime_lock
 
 UPSTREAM = 'https://github.com/tianwuasd/project.git'
 SUBDIR = 'vista3d_local_expert_refinement'
-ORIGINS = [UPSTREAM, 'git@github.com:tianwuasd/project.git']
+ORIGINS = [UPSTREAM, 'git@github.com:tianwuasd/project.git', 'ssh://git@ssh.github.com:443/tianwuasd/project.git',
+           'https://gh-proxy.com/https://github.com/tianwuasd/project.git',
+           'https://gitclone.com/github.com/tianwuasd/project.git']
 
 
 def git(root, *args, timeout=20, check=True, binary=False):
+    from panel_publication import network
+    settings=network.current()
     command = ['git', '-c', 'http.lowSpeedLimit=1', '-c', 'http.lowSpeedTime=10']
+    command += ['-c','http.followRedirects=false','-c','http.sslVerify=true']
+    if settings['proxy']:
+        for key in ['http.proxy','http.https://github.com.proxy','http.https://github.com/tianwuasd/project.git.proxy']:
+            command += ['-c',key+'='+settings['proxy']]
     command += ['-C', str(root), *args]
     process, cancelled, handlers = None, [False], {}
     def interrupt(*_):
@@ -27,8 +35,10 @@ def git(root, *args, timeout=20, check=True, binary=False):
     try:
         for sig in [signal.SIGINT, signal.SIGTERM]:
             handlers[sig] = signal.signal(sig, interrupt)
+        env=network.child_env(ssh=settings['git_transport']=='github-ssh')
+        env.update(GIT_TERMINAL_PROMPT='0',GCM_INTERACTIVE='never')
         process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                   env=dict(os.environ, GIT_TERMINAL_PROMPT='0', GCM_INTERACTIVE='never'),
+                                   env=env,
                                    start_new_session=os.name == 'posix')
         if cancelled[0]:
             raise KeyboardInterrupt
@@ -97,6 +107,13 @@ def extract_project(data, destination):
 
 
 def update(runtime):
+    from panel_publication import network
+    with network.use(network.load(runtime)):
+        return _update(runtime)
+
+
+def _update(runtime):
+    from panel_publication import network
     runtime = Path(runtime).resolve()
     with runtime_lock(runtime):
         previous = read_json(runtime / 'release.json') if (runtime / 'release.json').exists() else None
@@ -107,6 +124,12 @@ def update(runtime):
         if git(repository, 'status', '--porcelain', '--', SUBDIR).stdout:
             raise ValueError('本项目代码存在本地修改，先保留并处理后再更新；未自动stash或覆盖')
         current = previous['commit'] if previous else git(repository, 'rev-parse', 'HEAD').stdout
+        selected_route=network.routes(network.current())[0]
+        # Do not allow global/local insteadOf rules to redirect credentials.
+        resolved=git(repository,'ls-remote','--get-url',selected_route).stdout
+        if resolved!=selected_route:
+            raise ValueError('Git URL重写改变了官方地址；未发送认证信息，请先核对配置')
+        origin=selected_route
         cache = runtime / 'update_cache.git'
         if not cache.exists():
             cache.mkdir()

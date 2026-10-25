@@ -15,7 +15,7 @@ CONFIG = Path(__file__).resolve().parents[1] / '06_configs/evaluation_gpu.json'
 
 def load_settings():
     settings = json.loads(CONFIG.read_text(encoding='utf-8'))
-    bounds = {'max_gpus': (1, 3), 'min_free_mib': (1024, 1048576),
+    bounds = {'max_gpus': (1, 5), 'min_free_mib': (1024, 1048576),
               'max_utilization_percent': (0, 10), 'idle_samples': (2, 10),
               'sample_interval_seconds': (1, 30), 'retry_seconds': (1, 60)}
     for key, (low, high) in bounds.items():
@@ -30,7 +30,7 @@ def load_settings():
         raise ValueError('allowed_gpus 应为编号/完整UUID字符串列表，或 null')
     if os.environ.get('WHOLE_HEART_MANAGED') == '1':
         settings['allowed_gpus'] = json.loads(os.environ['WHOLE_HEART_GPU_UUIDS'])
-        settings['max_gpus'] = min(settings['max_gpus'], int(os.environ['WHOLE_HEART_GPU_LIMIT']))
+        settings['max_gpus'] = int(os.environ['WHOLE_HEART_GPU_LIMIT'])
         settings['min_free_mib'] = max(settings['min_free_mib'], (float(os.environ.get('WHOLE_HEART_GPU_MEMORY', 5))+.5)*1024)
     return settings
 

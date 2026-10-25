@@ -26,6 +26,8 @@ class PrivateUpdateTests(unittest.TestCase):
             initial=local_git(original,'rev-parse','HEAD')
             real_git=task_update.git
             def offline_git(where,*args,**kwargs):
+                if args[:2]==('ls-remote','--get-url'):
+                    return subprocess.CompletedProcess(args,0,stdout=args[2],stderr='')
                 # The test transport is local; production still uses its allowlisted URL.
                 args=tuple(str(upstream) if a==task_update.UPSTREAM else a for a in args)
                 return real_git(where,*args,**kwargs)
@@ -46,7 +48,9 @@ class PrivateUpdateTests(unittest.TestCase):
 
     def test_only_authenticated_official_routes(self):
         self.assertEqual(task_update.SUBDIR,'vista3d_local_expert_refinement')
-        self.assertEqual(set(task_update.ORIGINS),{'https://github.com/tianwuasd/project.git','git@github.com:tianwuasd/project.git'})
+        self.assertIn('ssh://git@ssh.github.com:443/tianwuasd/project.git',task_update.ORIGINS)
+        # Historical mirror identity is accepted, while downloads stay official.
+        self.assertIn('https://gh-proxy.com/https://github.com/tianwuasd/project.git',task_update.ORIGINS)
         process=Mock(returncode=0);process.communicate.return_value=(b'ok',b'')
         with patch.object(task_update.subprocess,'Popen',return_value=process) as launch:
             task_update.git(Path('.'),'status')

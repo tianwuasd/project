@@ -53,6 +53,15 @@ def step_lines(job, plan, work, state):
     lines = [f'步骤完成：{done}/{len(steps)}（按步骤数，非总计算量）；本次运行耗时：{duration(state.get("started"), state.get("ended"))}']
     if state.get('current_step') == 'input':
         lines.append('当前前置：校验并复制所选历史输入/缓存；大文件复制期间尚无计算百分比。')
+    budget=optional(Path(job)/'resource-plan.json')
+    if budget:
+        lines.append(f'本轮CPU共享预算：有效核数 {budget.get("cpu_slots")}，并行上限 {budget.get("parallel_workers")}，每worker线程 {budget.get("threads_per_worker")}；CPU尾部 {budget.get("cpu_tail_workers")} 进程。')
+    software=optional(Path(job)/'software-smoke.json')
+    if software:lines.append('小尺寸CPU软件检查：'+software.get('status','未知')+'；不代表正式尺寸GPU预检通过。')
+    if state.get('current_step') in {'smoke','train'}:
+        for path in sorted((work/'00_admin/preflight').glob('*.state.json')):
+            item=optional(path)
+            lines.append(f'正式尺寸预检 {item.get("fold")}/{item.get("method")}：{item.get("status")}；GPU {item.get("gpu")}；日志 {item.get("log")}')
     if state.get('current_step') == 'prepare':
         for fold in plan.get('folds', []):
             value = optional(work / f'00_admin/preparation_progress/{fold}.json')

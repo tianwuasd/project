@@ -55,7 +55,7 @@ if [[ ! -f "$ENV_PREFIX/.baseline_ready" ]] || [[ "$(cat "$ENV_PREFIX/.baseline_
   progress pytorch "安装固定 PyTorch / CUDA 运行库；下载明细见总日志，不需要现在分配显卡。"
   "$CONDA_BIN" run --no-capture-output --prefix "$ENV_PREFIX" python -m pip install torch==2.8.0+cu128 torchvision==0.23.0+cu128 --index-url https://download.pytorch.org/whl/cu128
   progress nnunet "安装 nnU-Net 2.8.1 及训练约束依赖。"
-  "$CONDA_BIN" run --no-capture-output --prefix "$ENV_PREFIX" python -m pip install nnunetv2==2.8.1 --index-url https://pypi.org/simple -c "$SCRIPT_DIR/06_configs/training_constraints.txt"
+  "$CONDA_BIN" run --no-capture-output --prefix "$ENV_PREFIX" python -m pip install nnunetv2==2.8.1 threadpoolctl==3.6.0 --index-url https://pypi.org/simple -c "$SCRIPT_DIR/06_configs/training_constraints.txt"
 fi
 progress verify "核验固定依赖版本及 pip 依赖一致性；CPU 检查不申请 GPU。"
 "$CONDA_BIN" run --no-capture-output --prefix "$ENV_PREFIX" python -c "import importlib.metadata as m; expected={'torch':'2.8.0+cu128','torchvision':'0.23.0+cu128','nnunetv2':'2.8.1'}; actual={k:m.version(k) for k in expected}; assert actual==expected, ('依赖版本不符',actual)"

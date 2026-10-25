@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import shutil
+import time
 from contextlib import contextmanager
 from server_data import digest, read_json, write_json
 
@@ -32,6 +33,7 @@ def source_lock(source):
 def inspect_input(config):
     from task_runtime import active_processes, load_plan
     source = Path(config['input_job']).expanduser().resolve()
+    evidence={}
     if (source / 'plan.json').is_file():
         plan = load_plan(source)
         if Path(plan['runtime']).resolve() != Path(config['runtime']).resolve():
@@ -39,6 +41,13 @@ def inspect_input(config):
         if active_processes(source):
             raise ValueError('历史输入仍在运行，不能复用')
         work = Path(plan['workspace'])
+        for name in ['plan.json','state.json','code_manifest.json']:
+            evidence[name]=digest(source/name)
+        for file in sorted((source/'receipts').glob('*.json')):
+            evidence[str(file.relative_to(source))]=digest(file)
+        for relative,sha in read_json(source/'code_manifest.json').items():
+            if digest(Path(plan['code'])/relative)!=sha:
+                raise ValueError('来源任务冻结源码不符：'+relative)
     else:
         work = source
     meta = work / '00_admin/server_config.json'
@@ -86,7 +95,17 @@ def inspect_input(config):
                 for relative in ['run.json', 'fold_0/checkpoint_best.pth', 'fold_0/checkpoint_final.pth']:
                     path = folder / relative
                     fingerprints[str(path.relative_to(work))] = digest(path)
-    return dict(directory=str(source), workspace=str(work), files=fingerprints,
+    if 'summarize' in config['tasks'] and 'predict' not in config['tasks']:
+        frozen=work/'08_results/evaluation/frozen_models.json'
+        fingerprints[str(frozen.relative_to(work))]=digest(frozen)
+        for fold in config['folds']:
+            for method in config['methods']:
+                folder=work/f'08_results/evaluation/{fold}_{method}'
+                for case in splits[fold]['target']:
+                    path=folder/f'{case}.json'
+                    if read_json(path).get('status')!='completed':raise ValueError('来源评价未完成：'+str(path))
+                    fingerprints[str(path.relative_to(work))]=digest(path)
+    return dict(directory=str(source), workspace=str(work), files=fingerprints,evidence=evidence,
                 verification='来源清单/计划/所选权重完整SHA256；缓存大文件存在检查，执行时保留原预处理校验')
 
 
@@ -104,6 +123,9 @@ def _copy_input_locked(plan):
     work, src = Path(plan['workspace']), Path(source['workspace'])
     if (work / '00_admin/input_receipt.json').exists():
         return  # Resume uses its own committed copy, not the evolving source task.
+    for relative,sha in source.get('evidence',{}).items():
+        if digest(Path(source['directory'])/relative)!=sha:
+            raise ValueError('来源任务证据在选择后发生变化：'+relative)
     for relative, sha in source['files'].items():
         if digest(src / relative) != sha:
             raise ValueError('历史输入在选择后发生变化：' + relative)
@@ -112,6 +134,10 @@ def _copy_input_locked(plan):
         work.rename(archive)
         print('未提交的输入复制保留于：' + str(archive), flush=True)
     work.mkdir(parents=True, exist_ok=True)
+    for relative in source.get('evidence',{}):
+        dest=work/'00_admin/input_evidence'/relative
+        dest.parent.mkdir(parents=True,exist_ok=True)
+        shutil.copy2(Path(source['directory'])/relative,dest)
     # Independent copies intentionally favour correctness across NAS/filesystems.
     # No symlinks/hardlinks: downstream recovery must never alter source bytes.
     for relative in ['04_data/manifests', '06_configs']:
@@ -143,7 +169,7 @@ def _copy_input_locked(plan):
     write_json(work / '00_admin/input_receipt.json', source)
 
 
-def verify_resume(job, level):
+def verify_resume(job, level, pending=None):
     if level not in {'simple', 'full', 'none'}:
         raise ValueError('检查等级应为simple/full/none')
     job = Path(job)
@@ -152,12 +178,23 @@ def verify_resume(job, level):
     for relative, sha in read_json(job / 'code_manifest.json').items():
         if digest(Path(plan['code']) / relative) != sha:
             raise ValueError('任务源码快照发生变化：' + relative)
-    if level == 'none':
-        return
     receipts = sorted((job / 'receipts').glob('*.json'))
-    for receipt in receipts:
-        files = read_json(receipt).get('files', {})
-        for index, (raw, info) in enumerate(files.items(), 1):
+    state=read_json(job/'state.json') if (job/'state.json').exists() else {'steps':{}}
+    pending=pending if pending is not None else [t for t,s in state['steps'].items() if s['status']!='completed']
+    deps={'environment':[],'prepare':[],'smoke':['prepare'],'train':['prepare'],
+          'predict':['prepare','train'],'summarize':['predict']}
+    direct={d for task in pending for d in deps.get(task,[])}
+    if level=='simple':receipts=[r for r in receipts if r.stem in direct]
+    if level=='none':receipts=[]
+    report=dict(level=level,pending=pending,scope=[r.stem for r in receipts],
+                missing_receipts=sorted(direct-{r.stem for r in receipts}) if level!='none' else [],
+                checked_files=0,hashed_bytes=0,large_file_rule='size+mtime' if level=='simple' else level,
+                code_manifest='full_sha256',status='running')
+    files=[(r.stem,raw,info) for r in receipts for raw,info in read_json(r).get('files',{}).items()]
+    total=sum(i['size'] for _,_,i in files if level=='full' or i['size']<=1024*1024)
+    started=last=time.monotonic()
+    try:
+      for stem,raw,info in files:
             path = Path(raw)
             stat = path.stat()
             if stat.st_size != info['size']:
@@ -165,10 +202,22 @@ def verify_resume(job, level):
             if level == 'full' or info['size'] <= 1024*1024:
                 if digest(path) != info['sha256']:
                     raise ValueError('历史产物摘要不符：' + str(path))
+                report['hashed_bytes']+=info['size']
             elif stat.st_mtime_ns != info['mtime_ns']:
                 raise ValueError('历史大文件修改时间发生变化：' + str(path))
-            if index % 25 == 0:
-                print(f'检查 {receipt.stem}: {index}/{len(files)}，{level}', flush=True)
+            report['checked_files']+=1
+            if time.monotonic()-last>=2 or report['checked_files']==len(files):
+                elapsed=max(.001,time.monotonic()-started);speed=report['hashed_bytes']/elapsed
+                eta=f'{(total-report["hashed_bytes"])/speed:.1f}s' if speed else '未知'
+                print(f'检查 {stem}: {report["checked_files"]}/{len(files)}；已读取 {report["hashed_bytes"]}/{total} bytes；{speed/1024**2:.1f} MiB/s；剩余约 {eta}；{level}',flush=True)
+                last=time.monotonic()
+      report['status']='passed'
+    except BaseException as error:
+      report.update(status='failed',error=str(error));raise
+    finally:
+      report['seconds']=time.monotonic()-started
+      write_json(job/'resume-check.json',report)
+    if report['missing_receipts']:print('旧任务缺少以下产物凭证，未宣称已验证：'+','.join(report['missing_receipts']),flush=True)
 
 
 def receipt(job, step):

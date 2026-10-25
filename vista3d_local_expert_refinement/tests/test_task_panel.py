@@ -97,7 +97,7 @@ class PanelTests(unittest.TestCase):
             write_json(work/'08_results/evaluation/ct_holdG_B0/Case1.json',dict(status='completed',seconds=60))
             write_json(work/'08_results/evaluation/ct_holdG_B0/Case2.json',dict(status='failed',seconds=1))
             text='\n'.join(queries.prediction_lines(work))
-            self.assertIn('1/2',text);self.assertIn('1.0分钟',text)
+            self.assertIn('1/2',text);self.assertNotIn('分钟',text) # Old case timings are not a fresh ETA.
 
 
 class JobTests(unittest.TestCase):

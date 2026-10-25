@@ -1,7 +1,4 @@
-"""最终评价自动使用最多三张空闲卡；一张卡一个模型，全部成功后才汇总。
-
-只有协调进程写队列状态；子进程只写自己的模型目录。预测和指标沿用 evaluation.py。
-"""
+"""Elastic per-case GPU queue, then bounded CPU restore/metrics after GPU exit."""
 import argparse
 from collections import deque
 import json
@@ -27,17 +24,14 @@ def verify_environment(work):
         raise ValueError('当前 Python 依赖与训练环境记录不符，停止评价；没有覆盖旧记录')
 
 
-def run_queue(models, sha, settings, work):
-    records = [dict(fold=m['fold'], method=m['method'], index=i, status='pending')
-               for i, m in enumerate(models)]
-    if len({(r['fold'], r['method']) for r in records}) != len(records):
-        raise ValueError('模型任务重复')
+def run_phase(records, sha, settings, work, phase='gpu'):
+    records=[dict(r) for r in records]
     path = work / '08_results/evaluation/status.json'
     logdir = work / '08_results/evaluation/queue_logs'
     logdir.mkdir(parents=True, exist_ok=True)
-    state = dict(status='selecting_gpus', started=time.strftime('%F %T'),
-                 frozen_sha256=sha, settings=settings, jobs=records)
-    pending, active, chosen = deque(records), {}, None
+    state = dict(status='selecting_gpus' if phase=='gpu' else 'cpu_tail', started=time.strftime('%F %T'),
+                 phase=phase,frozen_sha256=sha, settings=settings, jobs=records)
+    pending, active = deque(r for r in records if r['status']!='completed'), {}
     terminating = [False]
     previous = signal.getsignal(signal.SIGTERM)
     signal.signal(signal.SIGTERM, lambda *_: terminating.__setitem__(0, True))
@@ -53,29 +47,27 @@ def run_queue(models, sha, settings, work):
                     continue
                 stream.close()
                 record.update(status='completed' if rc == 0 else 'failed', exit_code=rc)
+                record['seconds']=max(0,time.monotonic()-record['started_monotonic'])
                 del active[gpu]
                 print(f"评价 {record['fold']}/{record['method']}: {record['status']}，日志 {record['log']}", flush=True)
                 if rc:
                     raise RuntimeError(f"评价失败：{record['log']}；停止队列，已完成病例保留")
             if pending and len(active) < settings['max_gpus']:
-                candidates = None if chosen is None else [g for g in chosen if g not in active]
-                available = idle_gpus(settings, candidates) if candidates is None or candidates else []
-                if chosen is None and available:
-                    chosen = available[:settings['max_gpus']]
-                    available = chosen
-                    state['gpu_uuids'] = chosen
-                    print(f'评价自动选择 {len(chosen)} 张GPU：{chosen}', flush=True)
+                available = ([f'CPU-{i}' for i in range(settings['max_gpus'])] if phase=='cpu'
+                             else idle_gpus(settings))
+                available=[g for g in available if g not in active][:settings['max_gpus']-len(active)]
                 for gpu in available:
                     if not pending or terminating[0]:
                         break
                     record = pending.popleft()
                     env = os.environ.copy()
                     env['WHOLE_HEART_WORKSPACE'] = str(work)
-                    env['CUDA_VISIBLE_DEVICES'] = gpu
+                    env['CUDA_VISIBLE_DEVICES'] = gpu if phase=='gpu' else ''
                     env.pop('WHOLE_HEART_GPU_UUIDS', None)
                     for key in ['OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'NUMEXPR_NUM_THREADS']:
-                        env[key] = '2'
-                    logfile = logdir / f"{stamp}_{record['fold']}_{record['method']}.log"
+                        env[key] = env.get('WHOLE_HEART_CPU_THREADS','1') if phase=='gpu' else '1'
+                    if phase=='cpu':env['WHOLE_HEART_CPU_THREADS']='1'
+                    logfile = logdir / f"{stamp}_{phase}_{record['fold']}_{record['method']}_{record.get('case_id','all')}.log"
                     stream = logfile.open('w', encoding='utf-8')
                     try:
                         extra = {}
@@ -84,19 +76,21 @@ def run_queue(models, sha, settings, work):
                             extra = child_options()
                         process = subprocess.Popen(
                             [sys.executable, '-u', '-B', str(Path(__file__).resolve()),
-                             '--worker', str(record['index']), '--frozen-sha', sha],
+                             '--worker', str(record['index']), '--frozen-sha', sha,
+                             '--case',record['case_id'],'--phase',phase],
                             cwd=CODE, env=env, stdin=subprocess.DEVNULL, stdout=stream,
                             stderr=subprocess.STDOUT, start_new_session=True, **extra)
                         if extra:
                             from task_worker import register_child
-                            register_child(process, 'predict')
+                            register_child(process, 'predict_'+phase)
                     except BaseException:
                         stream.close()
                         raise
                     active[gpu] = process, stream, record
                     record.update(status='running', gpu_uuid=gpu, pid=process.pid, log=str(logfile))
-                    print(f"开始评价 {record['fold']}/{record['method']}，GPU={gpu}，日志：{logfile}", flush=True)
-                state['status'] = 'running' if active else 'waiting_for_idle_gpu'
+                    record['started_monotonic']=time.monotonic()
+                    print(f"开始评价 {record['fold']}/{record['method']}/{record['case_id']}，{gpu}，日志：{logfile}", flush=True)
+                state['status'] = ('running' if phase=='gpu' else 'cpu_tail') if active else 'waiting_for_idle_gpu'
                 if not available and not active:
                     print(f"没有空闲GPU，{settings['retry_seconds']}秒后重查。", flush=True)
             write_json(path, state)
@@ -106,10 +100,6 @@ def run_queue(models, sha, settings, work):
                 deadline = time.monotonic() + wait
                 while not terminating[0] and time.monotonic() < deadline:
                     time.sleep(min(1, max(0, deadline-time.monotonic())))
-        state['status'] = 'summarizing'
-        write_json(path, state)
-        from evaluation_summary import summarize
-        summarize(work)
         state['status'] = 'completed'
     except BaseException as error:
         state.update(status='failed', error=str(error))
@@ -126,12 +116,36 @@ def run_queue(models, sha, settings, work):
         signal.signal(signal.SIGTERM, previous)
 
 
+def run_queue(models,sha,settings,work):
+    from evaluation_contract import cached
+    if len({(m['fold'],m['method']) for m in models})!=len(models):raise ValueError('模型任务重复')
+    records=[dict(fold=m['fold'],method=m['method'],index=i,case_id=c,status='pending')
+             for i,m in enumerate(models) for c in m['targets']]
+    for r in records:
+        if cached(work,models[r['index']],r['case_id'],sha,'gpu'):r['status']='completed'
+    run_phase(records,sha,settings,work,'gpu')
+    print('所有GPU病例进程已退出；开始CPU原网格恢复、压缩、LCC与Dice/HD95。',flush=True)
+    for r in records:
+        r['status']='completed' if cached(work,models[r['index']],r['case_id'],sha,'cpu') else 'pending'
+    workers=max(1,int(os.environ.get('WHOLE_HEART_CPU_TAIL_WORKERS','1')))
+    if os.environ.get('WHOLE_HEART_MANAGED')=='1':
+        from task_resources import case_budget
+        cases=read_json(work/'04_data/manifests/case_inventory.json')['cases'];targets={r['case_id'] for r in records}
+        workers=case_budget(work,[c['image'] for c in cases if c['case_id'] in targets])['workers']
+    cpu_settings=dict(settings,max_gpus=workers)
+    run_phase(records,sha,cpu_settings,work,'cpu')
+    from evaluation_summary import summarize
+    summarize(work)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--worker', type=int)
     parser.add_argument('--frozen-sha')
+    parser.add_argument('--case')
+    parser.add_argument('--phase',choices=['gpu','cpu'],default='gpu')
     args = parser.parse_args()
-    from evaluation import ROOT, configure_paths, freeze_models, evaluate_model
+    from evaluation import ROOT, configure_paths, freeze_models
     configure_paths()
     os.environ['nnUNet_n_proc_DA'] = '0'
     if args.worker is not None:
@@ -141,9 +155,12 @@ def main():
         model = read_json(frozen)['models'][args.worker]
         if digest(model['checkpoint']) != model['checkpoint_sha256']:
             raise ValueError('模型权重发生变化')
+        if args.case not in model['targets']:raise ValueError('病例不在冻结目标范围内')
         import torch
-        torch.set_num_threads(2)
-        evaluate_model(model, args.frozen_sha)
+        from task_resources import torch_threads
+        torch_threads(torch)
+        from evaluation_phases import infer,finish
+        (infer if args.phase=='gpu' else finish)(ROOT,model,args.case,args.frozen_sha)
         return
     from filelock import FileLock
     # 标准入口已经持有 .run.lock；此锁另外防止两个评价协调进程同时写结果。

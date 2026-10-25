@@ -64,7 +64,7 @@ def run_training_queue(tasks, gpus, work, resume=True):
     used_gpus = set()
     managed = os.environ.get('WHOLE_HEART_MANAGED') == '1'
     limit = int(os.environ.get('WHOLE_HEART_GPU_LIMIT', len(gpus)))
-    if not 1 <= limit <= len(gpus):
+    if not 1 <= limit <= 5:
         raise ValueError('GPU并发上限无效')
     state = dict(status='running', gpu_uuids=gpus, jobs=records)
     state_path = work / '00_admin/gpu_queue.json'
@@ -112,7 +112,7 @@ def run_training_queue(tasks, gpus, work, resume=True):
                         env['CUDA_VISIBLE_DEVICES'] = gpu
                         env.pop('WHOLE_HEART_GPU_UUIDS', None)
                         for key in ['OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'NUMEXPR_NUM_THREADS']:
-                            env[key] = '2'
+                            env[key] = env.get('WHOLE_HEART_CPU_THREADS','1')
                         log = log_dir / f"{stamp}_{record['fold']}_{record['method']}.log"
                         stream = log.open('w', encoding='utf-8')
                         command = [sys.executable, '-u', '-B', '-X', 'utf8', str(CODE / '05_src/server_train.py'),

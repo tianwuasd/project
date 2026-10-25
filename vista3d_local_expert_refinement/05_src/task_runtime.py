@@ -20,7 +20,7 @@ from model_catalog import parse_models, parse_folds
 from server_data import digest, read_json, write_json
 
 CODE = Path(__file__).resolve().parents[1]
-TASKS = {'environment': '环境准备', 'prepare': '数据预处理', 'smoke': '所选模型短测',
+TASKS = {'environment': '环境准备与CPU软件检查', 'prepare': '数据预处理', 'smoke': '所选模型完整尺寸预检',
          'train': '模型训练', 'predict': '模型预测与逐例评估', 'summarize': '已有评价汇总'}
 GPU_TASKS = {'smoke', 'train', 'predict'}
 
@@ -195,8 +195,12 @@ def validate_request(config):
         raise ValueError('单独预测需要提供已训练的输入任务')
     if 'summarize' in c['tasks'] and 'predict' not in c['tasks'] and not c.get('input_job'):
         raise ValueError('单独汇总需要提供已预测的输入任务')
+    if 'summarize' in c['tasks'] and 'predict' not in c['tasks'] and any(t in c['tasks'] for t in ['prepare','train']):
+        raise ValueError('重算预处理或训练后汇总必须同时选择预测，不能混用旧评价')
+    if 'prepare' in c['tasks'] and 'predict' in c['tasks'] and 'train' not in c['tasks']:
+        raise ValueError('重算预处理后预测必须同时选择训练，不能搭配旧模型')
     if GPU_TASKS.intersection(c['tasks']):
-        if not c.get('gpus') or not 1 <= int(c.get('gpu_count', 0)) <= len(c['gpus']) or len(c['gpus']) != len(set(c['gpus'])):
+        if not c.get('gpus') or isinstance(c.get('gpu_count'),bool) or not 1 <= int(c.get('gpu_count',0)) <= 5 or len(c['gpus']) != len(set(c['gpus'])):
             raise ValueError('GPU任务需明确候选GPU和有效并发上限')
     return c
 
@@ -303,7 +307,7 @@ def append_tasks(job, tasks, foreground=False, check='simple'):
     added = [t for t in parse_tasks(tasks) if t not in plan['tasks']]
     if not added:
         raise ValueError('没有缺失步骤；已经完成的步骤请使用独立重跑')
-    if GPU_TASKS.intersection(added) and (not plan.get('gpus') or not 1 <= plan.get('gpu_count', 0) <= len(plan['gpus'])):
+    if GPU_TASKS.intersection(added) and (not plan.get('gpus') or not 1 <= plan.get('gpu_count', 0) <= 5):
         raise ValueError('原任务没有获准GPU范围；请新建任务、选择此历史输入并明确GPU，不能直接追加计算')
     order = list(TASKS)
     if min(map(order.index, added)) <= max(map(order.index, plan['tasks'])):
@@ -312,7 +316,7 @@ def append_tasks(job, tasks, foreground=False, check='simple'):
         if active_processes(job):
             raise ValueError('任务仍在运行')
         from task_inputs import verify_resume
-        verify_resume(job, check)
+        verify_resume(job, check, pending=added)
         job = Path(job)
         state = read_json(job / 'state.json')
         if state['status'] != 'completed':

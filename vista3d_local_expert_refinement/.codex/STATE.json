@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-25T15:06:43.142184+00:00",
+  "updated_at": "2026-10-25T16:18:50.122131+00:00",
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
@@ -178,5 +178,20 @@
     "patient_training_started": false,
     "independent_review": "one installation-stage finding fixed and verified",
     "published_code_commit": "c4a21bbf7f29a815eba957e06b587225d8f41079"
+  },
+  "panel_strict_ct_update": {
+    "version": "0.3.0",
+    "updated_at": "2026-10-25T16:18:50.122131+00:00",
+    "validation": "docs/STRICT_VALIDATION.json",
+    "matrix": "docs/CT_STRICT_AUDIT.md",
+    "local_tests": {
+      "total": 80,
+      "passed": 75,
+      "skipped": 5
+    },
+    "server_deployed": false,
+    "real_gpu_validated": false,
+    "publishing": "ready after validation",
+    "patient_training_started": false
   }
 }

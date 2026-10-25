@@ -2,18 +2,17 @@
 import csv
 import math
 from pathlib import Path
-import numpy as np
 from server_data import digest, read_json, write_json
 
 
 def defined_mean(values):
     values = [v for v in values if v is not None]
-    return float(np.mean(values)) if values else None
+    return float(sum(values)/len(values)) if values else None
 
 
 def distance_summary(values):
     defined = [float(v) for v in values if v is not None]
-    value = float(np.mean(defined)) if defined else None
+    value = float(sum(defined)/len(defined)) if defined else None
     return dict(mean='inf' if value is not None and math.isinf(value) else value,
                 defined=len(defined), undefined=len(values)-len(defined),
                 infinite=sum(math.isinf(v) for v in defined))

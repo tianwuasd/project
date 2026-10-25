@@ -14,13 +14,13 @@ cd vista3d_local_expert_refinement
 bash start_server.sh
 ```
 
-新建任务时填写名字和真实数据目录。默认运行环境位于 `~/.local/share/vista3d_baseline_runtime`，结果位于 `~/vista3d_baseline_results/时间戳_随机编号/`；二者以及原始数据目录必须相互独立。未设定任何旧用户服务器绝对路径。没有复制数据到 GitHub。
+v0.3.0的完整实现与验证边界见 [严格验收表](CT_STRICT_AUDIT.md)。Linux默认载入zmic44配置：数据预填 `/data_nas/zhangruichen/baidu_import/Wholeheart_Train_Dataset`，新runtime约定 `/data5/zhougaowei/zhangruichen_workspace/vista3d_runtime`，新结果根目录约定 `/data_nas/zhangruichen/vista3d_results`。数据/Conda程序路径来自历史服务器记录；Vista新目录未现场确认。原runtime、旧设置和显式CLI路径优先，不自动迁移旧任务。其他主机可用 `--profile generic` 选择HOME默认目录。
 
 | 操作 | 行为 |
 |---|---|
 | n 新建 | 名称、步骤、数据、输出、B0、留出方向、规划预算、获准 GPU |
 | r 续跑／追加 | 使用原始源码快照和冻结设置；恢复未完成步骤或追加后续步骤 |
-| k 独立重跑 | 新目录、新缓存，保留原任务结果 |
+| k 独立重跑 | 新任务目录；重算预处理才新缓存，否则复制合法历史输入；保留原结果 |
 | h / o | 历史／结果；摘要、病例与七结构、训练、文件，支持简洁/详细和分页 |
 | e | 独立环境准备/核验；无需数据或 GPU；不会覆盖计算任务偏好 |
 | s / t | 单次任务概览 / 每5秒持续查看安装、步骤、病例与模型进度 |
@@ -30,6 +30,9 @@ bash start_server.sh
 | g | 每秒显示一次显卡；Ctrl+C 返回，不影响后台任务 |
 | x | 只向指定任务身份匹配的进程发停止信号，不按显卡杀其他人进程 |
 | u | 从认证 GitHub 原站获取本项目，备份并选择独立发布目录 |
+| c | 原runtime网络设置；zmic建议SSH443、17891代理及已有部署密钥 |
+| w | 预览并上传已提交的本项目代码到main，不自动提交/强推 |
+| v | 预览完成任务的配置/日志/指标/权重，同SSH+Git LFS发布独立产物分支 |
 | b / q / 0 | 子菜单返回／退出；退出面板不停止后台任务 |
 
 v0.2.0 按 CT 母版重整了查询导航和环境过程。`h` 可选任一历史任务进入它自己的概览/模型/日志/进程/结果子菜单，不改变最近任务。运行中隐藏新建/续跑入口并解释原因；`x` 仍需选定具体任务和确认停止。输入页提示 `b/q`，新建完成后用中文预览名称、目录、顺序及获准 GPU，再输入 RUN。
@@ -112,8 +115,16 @@ bash start_server.sh
 
 如果原来用过 `--runtime /某目录`，两条命令都加相同 `--runtime /某目录`，否则会进入另一个默认运行空间。活动任务会阻止更新；从面板选明确目标停止并等实际退出后再更新。受管更新只切换本项目的独立发布目录，不需要直接在共享 monorepo 执行 pull。服务器代理与 Windows 本机代理是两台机器的设置，本项目继承服务器现有网络与 GitHub 认证，不替用户写 7897。
 
-CT 母版适配及未纳入的产物上传/跨阶段持卡等边界见 [设计对照表](superpowers/specs/2026-10-25-panel-template-design.md)，本轮测试证据见 [面板验证](PANEL_TEMPLATE_VALIDATION.md)。
+当前完整适配与证据以 [v0.3严格验收表](CT_STRICT_AUDIT.md) 为准；v0.2设计仅作历史记录，产物上传已纳入。跨步骤显存holder未新增，实际计算退出即释放GPU，不承诺独占预约。
 
 GPU 监控只是实时探测，不是集群资源预约。必须遵守已有调度分配；程序与 `CUDA_VISIBLE_DEVICES`／SLURM 范围取交集，繁忙时等待，不抢占外部进程。显存等待阈值至少 6000 MiB，并随规划预算提高；OOM 时保留日志和检查点，不自动改 batch size 后混入原实验。
 
 结果目录含 `plan.json`、`state.json`、`code/`、`logs/`、`receipts/`、`workspace/`。正式模型在 `workspace/07_experiments/formal/`，预测在 `workspace/08_results/predictions/`，最终 CSV/报告在 `workspace/09_reports/final_evaluation/`。
+
+## v0.3网络、代码与产物发布
+
+先用 `c` 在原runtime保存服务器网络：线路 `github-ssh`、代理 `http://127.0.0.1:17891`、密钥 `~/.ssh/project_readonly_ed25519`（路径来自历史记录，不读取或打印密钥内容）。保存不是连接/写权限验证。u/w/v统一使用此配置；首次主机指纹需按服务器既有记录核实，程序不关闭严格校验。
+
+`w` 只上传工作区干净、已提交且仅修改Vista代码的提交，预览后确认。编辑后需要先在Git提交；面板不自动commit或强推。`v` 选择已完成任务，预览日志/配置/报告/权重清单，再上传到独立 `vista3d-artifacts` 分支；排除原始影像、缓存、预测NIfTI与失败归档。需要Git LFS、部署密钥写权限及对应额度，无需gh/PAT。失败保留包，按面板打印的原包命令重试。
+
+GPU完整尺寸预检会在实际分配的卡上比较最多3个CPU线程候选并冻结有效设置；续训保留原参数。环境内的小CPU检查不代表真实尺寸已通过。预测保存逐病例GPU中间产物，全部GPU进程退出后进行CPU原网格恢复、压缩、LCC和指标；CPU尾部恢复可复用已校验GPU结果。
