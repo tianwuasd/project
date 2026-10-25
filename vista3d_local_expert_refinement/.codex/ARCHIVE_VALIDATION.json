@@ -1,13 +1,13 @@
 {
-  "checked_at": "2026-10-25T06:20:54.900369+00:00",
+  "checked_at": "2026-10-25T07:11:09.686697+00:00",
   "status": "passed",
   "copied_file_checks": 130,
   "mentioned_papers": 42,
   "unique_pdf_papers": 17,
   "existing_notes": 18,
   "valid_json_files": 63,
-  "checked_markdown_files": 31,
-  "checked_project_links": 83,
+  "checked_markdown_files": 32,
+  "checked_project_links": 91,
   "sqlite_integrity": "ok",
   "app_records": 61,
   "app_job_status_counts": {

@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-25",
+  "scope": "initial_plan_only",
+  "plan_path": "docs\\wholeheart_initial_plan_2026-10-25.md",
+  "plan_sha256": "40092631f9c0b9600551c89223db4e7287b552c6f01b5eb25c00e96c5ec5741f",
+  "source_check_before_current_plan_edits": {
+    "source_commit": "25fae29f78f40d1e8ac95f3cd5e3d38b060ce87b",
+    "remote_blob_count": 173,
+    "matching_files": 160,
+    "missing_files": [],
+    "locally_changed_files_preserved": [
+      ".codex/ARCHIVE_VALIDATION.json",
+      ".codex/DECISIONS.md",
+      ".codex/ENVIRONMENT.md",
+      ".codex/HANDOFF.md",
+      ".codex/NEXT_STEPS.md",
+      ".codex/RESUME_PROMPT.md",
+      ".codex/STATE.json",
+      "AGENTS.md",
+      "README.md",
+      "docs/conversation_context.md",
+      "docs/research_framework.md",
+      "experiments/PLAN.md",
+      "experiments/data_requirements.json"
+    ],
+    "normalization": "raw git blob SHA1 or CRLF to LF for text",
+    "local_project": "D:\\code_project\\vista3d_local_expert_refinement"
+  },
+  "data_files_present": {
+    "image_records": 106,
+    "label_records": 106,
+    "missing": 0,
+    "voxel_arrays_reread": false
+  },
+  "budget_arithmetic_verified": true,
+  "historical_archive_files_hash_checked": 153,
+  "historical_archive_files_changed": 0,
+  "review": "no material questions for initial plan; implementation preconditions remain",
+  "model_experiments_executed": false
+}

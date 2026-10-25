@@ -1,24 +1,33 @@
 {
-  "schema_version": 1,
-  "updated_at": "2026-10-25T06:20:53.811353+00:00",
+  "schema_version": 2,
+  "updated_at": "2026-10-25",
   "timezone": "Asia/Shanghai",
-  "project_root": "D:\\projects\\vista3d_local_expert_refinement",
-  "title": "全局老师与局部学生：VISTA3D 选择性点击修正",
-  "phase": "literature_and_framework_ready_model_experiments_not_started",
+  "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
+  "title": "局部专家协同的 VISTA3D 选择性分割修正",
+  "phase": "nnunet_baseline_implemented_software_validated",
   "confirmed": {
     "same_source_material": true,
     "source_labeled_ct": true,
     "source_unlabeled_ct": true,
     "target_ct_use": "prediction",
-    "student_role": "local_specialization_and_test_time_advice",
-    "teacher_role": "global_segmentation_and_selective_refinement",
-    "final_output": "teacher_mask_after_accepted_student_clicks"
+    "final_output": "primary_mask_after_accepted_expert_clicks",
+    "expert_role": "local_specialization_and_test_time_advice",
+    "primary_role": "global_segmentation_and_selective_refinement",
+    "dataset_for_next_plan": "wholeheart",
+    "current_turn_scope": "implement_nnunet_baseline_and_skill_panel_upload_github"
   },
   "proposed_not_user_fixed": {
-    "student_count": 2,
     "first_stage_clicks": 1,
     "test_time_parameter_updates": false,
-    "gate": "predicted_executor_specific_net_utility"
+    "gate": "predicted_executor_specific_net_utility",
+    "expanded_expert_count": 2,
+    "initial_mechanism_expert_count": 1,
+    "terminology": {
+      "primary": "主体分割模型",
+      "expert": "局部专家",
+      "selector": "修正采纳模块",
+      "refiner": "交互修正器"
+    }
   },
   "model_experiments_executed": false,
   "patient_data_copied": false,
@@ -44,15 +53,15 @@
     "partial_by_model_review": 2
   },
   "gaps": [
-    "label_names_and_ids",
-    "patient_counts_and_splits",
-    "source_center_count",
-    "teacher_checkpoint_and_click_interface",
-    "gpu_resources",
-    "external_labeled_evaluation",
+    "patient_identity_mapping_not_available",
+    "primary_checkpoint_and_seven_class_adaptation",
+    "current_mask_click_interface_and_multiclass_merge",
+    "pretraining_dataset_overlap",
+    "gpu_resources_and_actual_cost",
+    "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Recover existing data documentation, then evaluate student complementarity and oracle analysis of executable click utility.",
+  "next_action": "On the Linux server run process lifecycle verification, then explicitly select data and authorized GPUs for environment/prepare/smoke. Real patient training has not started.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -69,7 +78,7 @@
   "github_sync": {
     "authorized_by_user": true,
     "repository": "tianwuasd/project",
-    "repository_visibility": "public",
+    "repository_visibility": "private_verified_2026-10-25",
     "branch": "main",
     "path": "vista3d_local_expert_refinement",
     "url": "https://github.com/tianwuasd/project/tree/main/vista3d_local_expert_refinement",
@@ -83,5 +92,68 @@
       "historical discussion",
       "Codex handoff including local paths"
     ]
+  },
+  "source_project_root": "D:\\projects\\vista3d_local_expert_refinement",
+  "assessment": {
+    "date": "2026-10-25",
+    "path": "docs/assessment-2026-10-25.md",
+    "status": "design_assessment_completed_no_model_experiments",
+    "terminology_change_authorized": true,
+    "specific_terms_chosen_by": "assistant",
+    "new_recommendation": "one expert first; expand only after complementarity and executable click utility",
+    "agent_rerun": false,
+    "full_novelty_search_completed": false,
+    "source_commit": "25fae29f78f40d1e8ac95f3cd5e3d38b060ce87b",
+    "local_changes_pushed": false
+  },
+  "wholeheart_plan": {
+    "date": "2026-10-25",
+    "path": "docs/wholeheart_initial_plan_2026-10-25.md",
+    "status": "assistant_proposal_pending_user_review",
+    "data_summary": "106 records present; 58 CT and 43 MRI eligible under existing quarantine policy; patient uniqueness unresolved",
+    "first_fold_proposed": "A+B to G",
+    "label_budget_total_proposed": 16,
+    "fit_selector_cal_proposed": [
+      8,
+      4,
+      4
+    ],
+    "unlabeled_fit_proposed": 22,
+    "model_experiments_executed": false,
+    "images_copied": false,
+    "target_label_voxels_read": false,
+    "remote_source_commit_checked": "25fae29f78f40d1e8ac95f3cd5e3d38b060ce87b",
+    "remote_files": 173,
+    "missing_remote_files_locally": 0,
+    "local_changes_preserved": true,
+    "design_review": {
+      "status": "no_material_unresolved_questions_for_initial_plan",
+      "scope": [
+        "label_budget_and_split",
+        "leakage_controls",
+        "selector_small_sample_limits",
+        "seven_class_click_interface_preconditions",
+        "multiclass_merge_and_baselines"
+      ],
+      "implementation_conditions_remain_pending": true
+    }
+  },
+  "baseline": {
+    "method": "nnUNet v2.8.1 B0",
+    "fold": "ct_holdG",
+    "fit": 8,
+    "cal": 4,
+    "reserved_selector": 4,
+    "unused_U": 22,
+    "epochs": 250,
+    "seed": 0,
+    "implementation": "05_src",
+    "panel": "start_server.sh",
+    "validation": "docs/BASELINE_VALIDATION.md",
+    "real_patient_training": false,
+    "cpu_synthetic_pipeline_passed": true,
+    "linux_process_test": "skipped_on_windows",
+    "github_publication": "Remote main commit history is the publication authority; see .codex/GITHUB_SYNC.md.",
+    "independent_code_review": "One important updater cache-recovery finding fixed with RED-to-GREEN regression; no remaining material findings."
   }
 }

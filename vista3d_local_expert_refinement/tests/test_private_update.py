@@ -1,0 +1,57 @@
+from pathlib import Path
+import sys
+import subprocess
+import tempfile
+import unittest
+from unittest.mock import patch, Mock
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'05_src'))
+import task_update
+
+class PrivateUpdateTests(unittest.TestCase):
+    def test_two_updates_recover_evicted_cache_with_checkout_unchanged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); upstream=root/'upstream'; upstream.mkdir()
+            def local_git(where,*args):
+                return subprocess.check_output(['git','-C',str(where),*args],stderr=subprocess.STDOUT).decode().strip()
+            local_git(upstream,'init','-b','main')
+            local_git(upstream,'config','user.name','Synthetic Test')
+            local_git(upstream,'config','user.email','synthetic@example.invalid')
+            project=upstream/task_update.SUBDIR
+            for relative in ['05_src/task_panel.py','05_src/task_worker.py','bootstrap_server.sh']:
+                file=project/relative;file.parent.mkdir(parents=True,exist_ok=True);file.write_text('# v1\n')
+            local_git(upstream,'add','.');local_git(upstream,'commit','-m','initial')
+            original=root/'original'
+            local_git(root,'clone','--local',str(upstream),str(original))
+            local_git(original,'remote','set-url','origin',task_update.UPSTREAM)
+            initial=local_git(original,'rev-parse','HEAD')
+            real_git=task_update.git
+            def offline_git(where,*args,**kwargs):
+                # The test transport is local; production still uses its allowlisted URL.
+                args=tuple(str(upstream) if a==task_update.UPSTREAM else a for a in args)
+                return real_git(where,*args,**kwargs)
+            runtime=root/'runtime'
+            with patch.object(task_update,'CODE',original/task_update.SUBDIR),patch.object(task_update,'git',side_effect=offline_git):
+                for version in [2,3]:
+                    if version == 3:
+                        cache=(runtime/'update_cache.git').resolve()
+                        assert cache.is_relative_to(root.resolve()) and cache.name=='update_cache.git'
+                        evicted=(runtime/'evicted_cache.git').resolve()
+                        assert evicted.is_relative_to(root.resolve())
+                        cache.rename(evicted)
+                    (project/'05_src/task_panel.py').write_text(f'# v{version}\n')
+                    local_git(upstream,'add','.');local_git(upstream,'commit','-m',f'version {version}')
+                    task_update.update(runtime)
+                    self.assertEqual(task_update.selected_entry(runtime).read_text(),f'# v{version}\n')
+                    self.assertEqual(local_git(original,'rev-parse','HEAD'),initial)
+
+    def test_only_authenticated_official_routes(self):
+        self.assertEqual(task_update.SUBDIR,'vista3d_local_expert_refinement')
+        self.assertEqual(set(task_update.ORIGINS),{'https://github.com/tianwuasd/project.git','git@github.com:tianwuasd/project.git'})
+        process=Mock(returncode=0);process.communicate.return_value=(b'ok',b'')
+        with patch.object(task_update.subprocess,'Popen',return_value=process) as launch:
+            task_update.git(Path('.'),'status')
+        command=launch.call_args.args[0]
+        self.assertNotIn('credential.helper=',command)
+        self.assertNotIn('http.extraHeader=',command)
+
+if __name__=='__main__':unittest.main()

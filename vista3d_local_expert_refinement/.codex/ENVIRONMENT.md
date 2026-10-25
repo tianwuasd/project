@@ -1,6 +1,10 @@
 # 环境、工具与恢复
 
-## 本项目
+## 当前机器接续（2026-10-25）
+
+本机工作目录为 `D:/code_project/vista3d_local_expert_refinement`，从 GitHub main 提交 `25fae29f78f40d1e8ac95f3cd5e3d38b060ce87b` 下载。下面的 D:/projects/ 和 Lenovo Python 路径为来源机器的运行留痕；本轮未恢复其运行环境，也未重新调用 Academic Agent。阅读固定快照不依赖这些旧路径。
+
+## 原始归档环境
 
 - 根目录：`D:/projects/vista3d_local_expert_refinement`。
 - 本轮只归档文档、论文和研究工具输出；没有患者 CT、模型权重或训练环境。

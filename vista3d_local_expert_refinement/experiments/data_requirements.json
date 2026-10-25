@@ -1,19 +1,106 @@
 {
-  "status": "not_yet_audited",
+  "status": "wholeheart_manifest_and_file_presence_audited_plan_proposed",
   "source_labeled_ct_available": true,
   "source_unlabeled_ct_available": true,
   "target_unlabeled_ct_available": true,
-  "target_use_confirmed_by_user": "prediction",
+  "target_use_confirmed_by_user": "prediction; proposed held-out G evaluation after method freeze",
   "source_labeled_patients": null,
   "source_unlabeled_patients": null,
-  "source_centers": null,
-  "target_centers": null,
+  "source_centers": [
+    "A",
+    "B"
+  ],
+  "target_centers": [
+    "G"
+  ],
   "target_patients": null,
-  "labels_and_id_map": null,
+  "labels_and_id_map": {
+    "background": {
+      "raw": 0,
+      "train": 0
+    },
+    "Myo": {
+      "raw": 205,
+      "train": 1
+    },
+    "LA": {
+      "raw": 420,
+      "train": 2
+    },
+    "LV": {
+      "raw": 500,
+      "train": 3
+    },
+    "RA": {
+      "raw": 550,
+      "train": 4
+    },
+    "RV": {
+      "raw": 600,
+      "train": 5
+    },
+    "AO": {
+      "raw": 820,
+      "train": 6
+    },
+    "PA": {
+      "raw": 850,
+      "train": 7
+    }
+  },
   "patient_split_manifest": null,
-  "external_labeled_evaluation_available": null,
-  "teacher_checkpoint": null,
-  "student_specialties": null,
+  "external_labeled_evaluation_available": true,
   "gpu_resources": null,
-  "note": "Availability comes from conversation, not a filesystem data audit. Do not insert patient identifiers here."
+  "note": "Aggregate research metadata only. Counts are scan records, not verified unique patients. Wholeheart unlabeled source is simulated by hiding labels; no additional unlabeled cohort was verified. Held-out G is within the released training dataset, not a new independent external cohort.",
+  "primary_checkpoint": null,
+  "expert_specialties": null,
+  "dataset": "CARE-Whole Heart",
+  "audit": {
+    "date": "2026-10-25",
+    "mode": "existing_full_audit_and_manifest_review_plus_current_path_existence",
+    "raw_data_root": "D:/code_project/whole_heart/Wholeheart_Train_Dataset",
+    "inventory": "D:/code_project/whole_heart/project1/04_data/manifests/case_inventory.json",
+    "base_splits": "D:/code_project/whole_heart/project1/04_data/manifests/splits_v1.json",
+    "records_total": 106,
+    "image_paths_missing": 0,
+    "label_paths_missing": 0,
+    "eligible_ct_records": 58,
+    "eligible_mri_records": 43,
+    "eligible_groups": {
+      "A": 20,
+      "B": 18,
+      "G": 20,
+      "CD": 19,
+      "E": 24
+    },
+    "quarantined_records": 5,
+    "raw_voxels_reread": false,
+    "patient_independence_verified": false,
+    "prior_geometry_audit_date": "2026-09-18",
+    "label_number_mapping_is_not_vista_prompt_mapping": true
+  },
+  "proposal_not_approved": {
+    "plan": "docs/wholeheart_initial_plan_2026-10-25.md",
+    "first_fold": "ct_holdG",
+    "source_records": 38,
+    "target_records": 20,
+    "source_label_budget_total": 16,
+    "labeled_fit_records": 8,
+    "unlabeled_fit_records": 22,
+    "selector_fit_records": 4,
+    "calibration_records": 4,
+    "source_unlabeled_mode": "masked_existing_labels",
+    "checkpoint_family": "VISTA3D/NV-Segment-CT interactive; exact version and seven-class adaptation pending",
+    "expert_specialties": [
+      "Myo",
+      "LV"
+    ],
+    "expert_count": 1,
+    "max_candidates_per_case": 8,
+    "max_executed_clicks_per_case": 1,
+    "target_parameters_frozen": true,
+    "actual_split_created": false,
+    "evaluation_type": "held-out center within released training data",
+    "pretraining_overlap": "not_verified"
+  }
 }

@@ -1,0 +1,19 @@
+{
+  "project_id": "vista3d_wholeheart_nnunet_v1",
+  "description": "Protocol summary; execution values are enforced in cohort.py and project_trainers.py, not a tunable override.",
+  "default_fold": "ct_holdG",
+  "methods": ["B0"],
+  "source_fit": 8,
+  "source_cal": 4,
+  "reserved_selector": 4,
+  "default_unlabeled_unused": 22,
+  "epochs": 250,
+  "iterations_per_epoch": 250,
+  "validation_iterations_per_epoch": 50,
+  "nnunet": "2.8.1",
+  "configuration": "3d_fullres",
+  "planner_gpu_memory_gb_default": 5,
+  "seed": 0,
+  "split_seed": 20260919,
+  "evaluation": "source-best checkpoint; original-grid per-class Dice and HD95; raw output primary"
+}
