@@ -103,26 +103,34 @@ def execute(job, lock_fd):
     plan = load_plan(job)
     job, work, code = Path(job), Path(plan['workspace']), Path(plan['code'])
     os.environ.update(WHOLE_HEART_JOB=str(job), WHOLE_HEART_LOCK_FD=str(lock_fd), WHOLE_HEART_MANAGED='1')
-    from runtime_setup import environment, ensure_conda
+    from runtime_setup import environment, ensure_conda, report_progress
     from task_inputs import copy_input, receipt
     env = environment(Path(plan['runtime']))
     env.update(WHOLE_HEART_JOB=str(job), WHOLE_HEART_LOCK_FD=str(lock_fd), WHOLE_HEART_MANAGED='1',
+               WHOLE_HEART_CONTROL_PYTHON=sys.executable,
                WHOLE_HEART_WORKSPACE=str(work), WHOLE_HEART_GPU_UUIDS=json.dumps(plan.get('gpus', [])),
                WHOLE_HEART_GPU_LIMIT=str(plan.get('gpu_count', 1)), WHOLE_HEART_GPU_MEMORY=str(plan.get('gpu_memory', 5)))
     # Retain inherited allocation; only individual compute children narrow CUDA.
     env['WHOLE_HEART_EVAL_VISIBLE_DEVICES'] = env.get('CUDA_VISIBLE_DEVICES', '__UNRESTRICTED__')
     state = read_json(job / 'state.json')
-    state.update(status='running', pid=os.getpid(), identity=identity(os.getpid()), started=now())
+    state.pop('ended', None)
+    state.pop('error', None)
+    state.update(status='running', current_step='installation', pid=os.getpid(), identity=identity(os.getpid()), started=now())
     write_json(job / 'state.json', state)
     def interrupt(*_):
         raise KeyboardInterrupt('收到停止请求')
     old = signal.signal(signal.SIGTERM, interrupt)
     try:
         if plan.get('source') and not (work / '00_admin/input_receipt.json').exists():
+            state.update(current_step='input')
+            write_json(job / 'state.json', state)
             # Validate current raw inputs before any cache fallback or copying.
             from server_data import resolve_cases
             resolve_cases(plan['data'], read_json(Path(plan['source']['workspace']) / '04_data/manifests/case_inventory.json')['cases'])
             copy_input(plan)
+        state.update(current_step='installation')
+        write_json(job / 'state.json', state)
+        report_progress(env, 'starting', '准备独立计算环境；CPU 前置不等待 GPU。')
         conda = ensure_conda(Path(plan['runtime']), env)
         env['CONDA_EXE'] = str(conda)
         env['WHOLE_HEART_CONDA_EXE'] = str(conda)
@@ -134,6 +142,8 @@ def execute(job, lock_fd):
             if current['status'] == 'completed':
                 print('复用已完成步骤：' + step, flush=True)
                 continue
+            current.pop('ended', None)
+            current.pop('error', None)
             current.update(status='running', started=now())
             state.update(current_step=step)
             write_json(job / 'state.json', state)
@@ -142,6 +152,8 @@ def execute(job, lock_fd):
             current['log'] = str(logfile)
             if step == 'environment':
                 current['log'] = str(job / 'launcher.log')
+            write_json(job / 'state.json', state)
+            print(f'开始步骤：{step}；日志：{current["log"]}', flush=True)
             if step != 'environment':
                 # Binding must happen before environment files make a new workspace nonempty.
                 from server_data import bind_workspace
@@ -153,7 +165,11 @@ def execute(job, lock_fd):
                 step_env = dict(env)
                 if step == 'smoke':
                     os.environ.update({k: v for k, v in env.items() if k.startswith('WHOLE_HEART_')})
+                    state.update(status='waiting_gpu')
+                    write_json(job / 'state.json', state)
                     step_env['CUDA_VISIBLE_DEVICES'] = wait_gpu(plan)
+                    state.update(status='running')
+                    write_json(job / 'state.json', state)
                     step_env['WHOLE_HEART_GPU_UUIDS'] = json.dumps([step_env['CUDA_VISIBLE_DEVICES']])
                 command = [str(python), '-u', '-B', str(code / '05_src/server_launch.py'), plan['data'],
                            '--work-dir', str(work), '--mode', mode, '--folds', ','.join(plan['folds']),
@@ -163,13 +179,16 @@ def execute(job, lock_fd):
                     run_child(command, step_env, cwd=code, output=stream)
             receipt(job, step)
             current.update(status='completed', ended=now())
+            print(f'完成步骤：{step}；产物与核验记录已保存。', flush=True)
             write_json(job / 'state.json', state)
         state.update(status='completed', ended=now())
     except BaseException as error:
         state.update(status='interrupted' if isinstance(error, KeyboardInterrupt) else 'failed', error=str(error), ended=now())
         step = state.get('current_step')
-        if step and state['steps'][step]['status'] != 'completed':
-            state['steps'][step].update(status=state['status'], error=str(error))
+        if step == 'installation':
+            report_progress(env, None, '环境准备未完成；请在总日志查看错误后续跑。', status=state['status'], error=str(error))
+        if step in state['steps'] and state['steps'][step]['status'] != 'completed':
+            state['steps'][step].update(status=state['status'], error=str(error), ended=state['ended'])
         raise
     finally:
         write_json(job / 'state.json', state)

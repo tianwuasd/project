@@ -61,5 +61,20 @@ class WorkerTests(unittest.TestCase):
             self.assertEqual(state['steps']['predict']['status'],'pending')
             self.assertFalse(any('evaluate' in c for c in calls))
 
+    def test_environment_failure_is_recorded_before_any_compute_step(self):
+        with tempfile.TemporaryDirectory() as temp,ExitStack() as stack:
+            job,plan=self.fixture(Path(temp))
+            stack.enter_context(patch.dict(os.environ,{},clear=True))
+            stack.enter_context(patch('runtime_setup.environment',return_value={'WHOLE_HEART_ENV_PREFIX':str(Path(temp)/'env')}))
+            stack.enter_context(patch('runtime_setup.ensure_conda',side_effect=RuntimeError('download unavailable')))
+            child=stack.enter_context(patch.object(worker,'run_child'))
+            with self.assertRaisesRegex(RuntimeError,'download unavailable'):
+                worker.execute(job,9)
+            state=read_json(job/'state.json')
+            self.assertEqual(state['status'],'failed')
+            self.assertTrue(all(v['status']=='pending' for v in state['steps'].values()))
+            self.assertEqual(read_json(job/'environment.json')['status'],'failed')
+            child.assert_not_called()
+
 
 if __name__=='__main__':unittest.main()

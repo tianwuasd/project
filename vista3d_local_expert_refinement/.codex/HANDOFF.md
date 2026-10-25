@@ -1,5 +1,13 @@
 # 接手说明
 
+## CT 母版面板接续（2026-10-25）
+
+用户要求按 server-engineering 的 CT 母版完善面板、环境安装与完整过程展示，完成后推送 GitHub 并交付服务器更新命令。本轮面板为 v0.2.0：环境入口 e、持续进度 t、分层日志 l、历史任务子菜单、身份核验进程树 p；安装子阶段和下载字节落盘，失败保留真实子阶段。独立环境设置不覆盖计算偏好。
+
+实现和操作见 docs/SERVER_PANEL.md；模板逐项对应见 docs/superpowers/specs/2026-10-25-panel-template-design.md；验证范围见 docs/PANEL_TEMPLATE_VALIDATION.md。Windows Python3.11回归46项（42通过、4项Linux专属跳过），Bash语法通过；Linux CI另核对发布记录。独立审查所报安装失败阶段问题已修复并复核。没有连接目标服务器、安装真实服务器环境或启动患者训练。B0协议不变，旧任务继续使用原快照；新版worker的进度字段用于新建/独立重跑。
+
+服务器进入本项目原检出目录，沿用原runtime执行 `bash start_server.sh --update`，再 `bash start_server.sh`；若有自定义runtime，两条命令都加同一 `--runtime`。当前任务的后续工作是核实服务器部署、环境与获准GPU短测，不把本地测试写成真实服务器成果。
+
 最后整理：2026-10-25。项目：`D:/code_project/vista3d_local_expert_refinement`。
 
 ## 当前实施：nnU-Net baseline（2026-10-25）

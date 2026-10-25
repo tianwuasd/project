@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Linux/Ubuntu 一键入口；路径全部加引号，可包含空格。不要用 sudo 运行。
 set -Eeuo pipefail
-trap 'printf "\n启动失败（第 %s 行）。请查看上方错误；没有自动重试或删除数据。\n" "$LINENO" >&2' ERR
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+CONTROL_PYTHON="${WHOLE_HEART_CONTROL_PYTHON:-python3}"
+progress() { "$CONTROL_PYTHON" -B -X utf8 "$SCRIPT_DIR/05_src/runtime_setup.py" "$@"; }
+trap 'progress "" "环境安装失败（第 $LINENO 行），请查看任务总日志。" --status failed || true' ERR
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   cat <<'HELP'
@@ -26,7 +28,7 @@ if [[ ! -x "$CONDA_BIN" ]]; then
   done
 fi
 [[ -x "$CONDA_BIN" ]] || { echo "找不到 Conda。请先安装 Miniconda，或设置 CONDA_EXE=/实际路径/bin/conda。" >&2; exit 2; }
-ENV_PREFIX="${WHOLE_HEART_ENV_PREFIX:-$SCRIPT_DIR/.server_env}"
+ENV_PREFIX="${WHOLE_HEART_ENV_PREFIX:-$HOME/.local/share/vista3d_baseline_runtime/envs/vista_baseline_py311}"
 
 # 防止两次启动同时修改环境；训练阶段由 Python 工作区锁保护。
 command -v flock >/dev/null || { echo "缺少 flock，请安装 util-linux。" >&2; exit 2; }
@@ -34,17 +36,33 @@ mkdir -p "$(dirname -- "$ENV_PREFIX")"
 exec 9>"${ENV_PREFIX}.setup.lock"
 flock -n 9 || { echo "正在安装环境，请等待安装结束。" >&2; exit 2; }
 
+CREATED=0
 if [[ ! -x "$ENV_PREFIX/bin/python" ]]; then
-  echo "首次启动：创建独立 Conda 环境，下载依赖可能需要一些时间。"
+  if [[ -d "$ENV_PREFIX" ]]; then
+    echo "环境目录不完整：$ENV_PREFIX；已保留现场，请核查或在面板选择新的 runtime。" >&2
+    exit 2
+  fi
+  progress python_env "创建独立 Python 3.11 环境；此阶段可能等待依赖解析和下载。"
   "$CONDA_BIN" env create --prefix "$ENV_PREFIX" --file "$SCRIPT_DIR/06_configs/environment_server.yml" --yes
+  CREATED=1
 fi
-if [[ ! -f "$ENV_PREFIX/.baseline_ready" ]]; then
-  echo "安装固定的 GPU 训练依赖（不会改动其他环境）。"
+FINGERPRINT="$( { cat "$SCRIPT_DIR/06_configs/environment_server.yml" "$SCRIPT_DIR/06_configs/training_constraints.txt"; printf '%s' 'torch2.8.0+cu128 torchvision0.23.0+cu128 nnunetv2=2.8.1'; } | sha256sum | cut -d' ' -f1)"
+if [[ ! -f "$ENV_PREFIX/.baseline_ready" ]] || [[ "$(cat "$ENV_PREFIX/.baseline_ready")" != "$FINGERPRINT" ]]; then
+  if [[ "$CREATED" == 0 ]]; then
+    progress python_env "依赖配置或旧凭证已变化；更新本项目独立 Conda 环境。"
+    "$CONDA_BIN" env update --prefix "$ENV_PREFIX" --file "$SCRIPT_DIR/06_configs/environment_server.yml"
+  fi
+  progress pytorch "安装固定 PyTorch / CUDA 运行库；下载明细见总日志，不需要现在分配显卡。"
   "$CONDA_BIN" run --no-capture-output --prefix "$ENV_PREFIX" python -m pip install torch==2.8.0+cu128 torchvision==0.23.0+cu128 --index-url https://download.pytorch.org/whl/cu128
+  progress nnunet "安装 nnU-Net 2.8.1 及训练约束依赖。"
   "$CONDA_BIN" run --no-capture-output --prefix "$ENV_PREFIX" python -m pip install nnunetv2==2.8.1 --index-url https://pypi.org/simple -c "$SCRIPT_DIR/06_configs/training_constraints.txt"
-  "$CONDA_BIN" run --no-capture-output --prefix "$ENV_PREFIX" python -m pip check
-  touch "$ENV_PREFIX/.baseline_ready"
 fi
+progress verify "核验固定依赖版本及 pip 依赖一致性；CPU 检查不申请 GPU。"
+"$CONDA_BIN" run --no-capture-output --prefix "$ENV_PREFIX" python -c "import importlib.metadata as m; expected={'torch':'2.8.0+cu128','torchvision':'0.23.0+cu128','nnunetv2':'2.8.1'}; actual={k:m.version(k) for k in expected}; assert actual==expected, ('依赖版本不符',actual)"
+"$CONDA_BIN" run --no-capture-output --prefix "$ENV_PREFIX" python -m pip check
+printf '%s\n' "$FINGERPRINT" > "$ENV_PREFIX/.baseline_ready.pending"
+mv -- "$ENV_PREFIX/.baseline_ready.pending" "$ENV_PREFIX/.baseline_ready"
+progress complete "独立训练环境安装与依赖检查通过；尚未申请 GPU。" --status completed
 flock -u 9
 exec 9>&-
 export WHOLE_HEART_CONDA_EXE="$CONDA_BIN"

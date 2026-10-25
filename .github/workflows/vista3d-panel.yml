@@ -1,0 +1,39 @@
+name: VISTA3D panel and Linux lifecycle
+
+on:
+  push:
+    paths:
+      - 'vista3d_local_expert_refinement/**'
+      - '.github/workflows/vista3d-panel.yml'
+  pull_request:
+    paths:
+      - 'vista3d_local_expert_refinement/**'
+      - '.github/workflows/vista3d-panel.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  panel:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vista3d_local_expert_refinement
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: vista3d_local_expert_refinement
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Read-only entry without site packages
+        run: |
+          python -B -S 05_src/task_panel.py --runtime "$RUNNER_TEMP/vista-absent" --query status
+          test ! -e "$RUNNER_TEMP/vista-absent"
+      - name: Shell syntax
+        run: |
+          bash -n start_server.sh
+          bash -n bootstrap_server.sh
+      - name: Control-plane, installer and actual Linux process tests
+        run: python -B -X utf8 tests/run_panel_suite.py

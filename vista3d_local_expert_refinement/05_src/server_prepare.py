@@ -46,6 +46,12 @@ def prepare(fold, gpu_memory):
     from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
     torch.set_num_threads(2)
     split = load_json(ROOT / "04_data/manifests/splits_v1.json")["folds"][fold]
+    phase_started = time.perf_counter()
+    progress_path = ROOT / f'00_admin/preparation_progress/{fold}.json'
+    def progress(phase, **fields):
+        write_json(progress_path, dict(fold=fold, phase=phase, updated=time.time(),
+                   elapsed_seconds=time.perf_counter()-phase_started, **fields))
+    progress('核对来源与缓存', completed=0, total=len(split['train'])+len(split['val']))
     cases = load_json(ROOT / "04_data/manifests/case_inventory.json")["cases"]
     from server_data import freeze_source_labels
     source_labels = freeze_source_labels(ROOT, fold)
@@ -76,14 +82,17 @@ def prepare(fold, gpu_memory):
         completion_directory(prep, cache, split["train"] + split["val"], digest(prep / "WholeheartBaselinePlans.json"))
         if all((cache / f"{i}{suffix}").is_file() for i in split["train"]+split["val"] for suffix in [".b2nd", "_seg.b2nd", ".pkl"]):
             write_json(marker, signature)
+            progress('已完成：复用兼容预处理', completed=len(split['train'])+len(split['val']), total=len(split['train'])+len(split['val']))
             print(f"{fold} 已准备完成，复用同一份来源数据。", flush=True)
             return
     started = time.perf_counter()
+    progress('导出来源病例（不读取目标标签）')
     export_fold(ROOT, fold, split, cases, resume=raw.exists())
     write_json(marker, signature)
     fingerprint = prep / "dataset_fingerprint.json"
     provenance = prep / "fingerprint_provenance.json"
     if not fingerprint.exists() or not provenance.exists():
+        progress('计算 fit 病例数据指纹')
         extractor = DatasetFingerprintExtractor(split["dataset_id"], num_processes=1, verbose=False)
         extractor.dataset = {i: extractor.dataset[i] for i in split["train"]}
         extractor.dataset_json = dict(extractor.dataset_json, numTraining=len(split["train"]))
@@ -94,6 +103,7 @@ def prepare(fold, gpu_memory):
         raise ValueError("来源指纹验证失败")
     plans_path = prep / "WholeheartBaselinePlans.json"
     if not plans_path.exists():
+        progress('生成 nnU-Net 网络规划（CPU）')
         planner = ExperimentPlanner(split["dataset_id"], gpu_memory_target_in_gb=gpu_memory, plans_name="WholeheartBaselinePlans")
         planner.dataset = {i: planner.dataset[i] for i in split["train"]}
         planner.dataset_json = dict(planner.dataset_json, numTraining=len(split["train"]))
@@ -109,16 +119,20 @@ def prepare(fold, gpu_memory):
     dataset_json = load_json(raw / "dataset.json")
     plan_hash = digest(plans_path)
     done_dir = completion_directory(prep, cache, split["train"] + split["val"], plan_hash)
+    total = len(split['train'])+len(split['val'])
     for i, case_id in enumerate(split["train"] + split["val"], 1):
         done = done_dir / f"{case_id}.complete.json"
         files_ok = all((cache / f"{case_id}{s}").exists() for s in [".b2nd", "_seg.b2nd", ".pkl"])
+        progress('逐病例预处理', completed=i-1, total=total, active_case=case_id)
         if not (done.exists() and files_ok and load_json(done).get("plan_sha256") == plan_hash):
             # 使用官方逐病例接口，避免官方整批入口先删除已有缓存目录。
             processor.run_case_save(str(cache / case_id), [str(raw / "imagesTr" / f"{case_id}_0000.nii.gz")], str(raw / "labelsTr" / f"{case_id}.nii.gz"), manager, config, dataset_json)
             write_json(done, {"plan_sha256": plan_hash})
         shutil.copyfile(raw / "labelsTr" / f"{case_id}.nii.gz", gt / f"{case_id}.nii.gz")
+        progress('逐病例预处理', completed=i, total=total)
         print(f"{fold} 预处理 {i}/{len(split['train'])+len(split['val'])}：{case_id}", flush=True)
     write_json(complete, {"status": "passed", "seconds": time.perf_counter()-started, "source_train": len(split["train"]), "source_val": len(split["val"]), "target_used": False, "gpu_memory_target_gb": gpu_memory, "plan_sha256": plan_hash})
+    progress('已完成', completed=total, total=total)
 
 
 if __name__ == "__main__":

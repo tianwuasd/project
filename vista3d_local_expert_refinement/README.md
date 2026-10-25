@@ -6,6 +6,7 @@
 
 - [工程与方法说明](docs/NNUNET_BASELINE.md)：预处理、训练、测试、重要公式、模块和数据边界。
 - [服务器面板与命令](docs/SERVER_PANEL.md)：运行 `bash start_server.sh`，命名任务、短测、训练、续跑、查询和更新。
+- [面板 v0.2.0 验证](docs/PANEL_TEMPLATE_VALIDATION.md)：CT 母版适配、环境安装子阶段、持续进度、选择日志和任务进程树。
 - [验证记录](docs/BASELINE_VALIDATION.md)：已测范围与尚需服务器验证的部分。
 - [wholeheart 初步研究方案](docs/wholeheart_initial_plan_2026-10-25.md)：后续专家／采纳／交互目标的来源；其中“只出计划”是历史阶段。
 
@@ -13,7 +14,7 @@
 
 来源中心有少量标注 CT 和额外未标注 CT。主体分割模型与局部专家使用相同的当前来源病例池，分别学习整体分割与局部专长。预测时，局部专家持续提出建议，修正采纳模块选择预计有益的三维正负点击，交互修正器执行并更新主体掩膜。最终输出为修正后的主体分割。
 
-本机工作目录：`D:/code_project/vista3d_local_expert_refinement`。角色命名与评估见 [项目评估](docs/assessment-2026-10-25.md)。历史对话与固定研究快照保留原称呼。
+本机工作目录：`D:/projects/vista3d_local_expert_refinement`。角色命名与评估见 [项目评估](docs/assessment-2026-10-25.md)。历史对话与固定研究快照保留原称呼。
 
 ## 从这里阅读
 

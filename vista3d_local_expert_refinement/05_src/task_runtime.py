@@ -263,7 +263,8 @@ def submit(config, foreground=False):
             old = []
         write_json(runtime / 'history.json', {'jobs': list(dict.fromkeys([*old, str(job)]))})
         write_json(runtime / 'last-job.json', {'directory': str(job)})
-        write_json(runtime / 'settings.json', config)
+        if config['tasks'] != ['environment']:
+            write_json(runtime / 'settings.json', config)
         return launch(job, lock, foreground)
 
 

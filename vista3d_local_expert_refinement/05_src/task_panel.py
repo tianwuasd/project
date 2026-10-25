@@ -1,5 +1,6 @@
 """Whole-heart task panel: stdlib control plane; compute starts only on submission."""
 import argparse
+import copy
 import json
 import os
 from pathlib import Path
@@ -9,7 +10,10 @@ import sys
 from model_catalog import MODELS, FOLDS, SCOPES, parse_models, parse_folds
 from server_data import read_json
 import task_runtime as jobs
-from task_queries import query, follow, result_lines, read_optional
+from task_queries import query, follow, result_lines, read_optional, log_sources
+from task_progress import STATES
+
+PANEL_VERSION = '0.2.0'
 
 
 class Back(Exception):
@@ -34,8 +38,11 @@ def ask(label, default=None):
 
 def choose_job(runtime, allow_none=False):
     records = jobs.history(runtime)
+    if allow_none:
+        records = [r for r in records if (Path(r.get('workspace', r['directory']))/'04_data/manifests/case_inventory.json').is_file()]
+        print('这里只列出已有数据清单的输入任务；仅安装环境的任务无需选作缓存。')
     for i, row in enumerate(records, 1):
-        print(f"{i}. {jobs.clean(row['name'])} [{row['status']}] {row['directory']}")
+        print(f"{i}. {jobs.clean(row['name'])} [{STATES.get(row['status'], row['status'])}] {row['directory']}")
     text = '选择历史编号；d手工填写旧任务/工作区'
     if allow_none:
         text += '；0不使用历史输入'
@@ -73,6 +80,8 @@ def new_config(args, saved, interactive=True):
         suggestion = saved.get(key, default)
         return ask(label, suggestion) if interactive else suggestion
     runtime = str(Path(args.runtime or saved.get('runtime', DEFAULT_PATHS['base'])).expanduser().resolve())
+    if interactive:
+        print('\n新建任务：按步骤填写；每页 b 返回面板，q 退出；GPU 编号 0 和步骤 0 保持原意。\n[1/3] 选择步骤与历史输入')
     tasks = jobs.parse_tasks(value(args.tasks, 'tasks', 'environment,prepare,smoke', '步骤：0环境 1预处理 2短测 3训练 4预测评估 5已有评价汇总；可多选'))
     source = args.input_job
     if source is None and interactive and tasks != ['environment']:
@@ -93,6 +102,8 @@ def new_config(args, saved, interactive=True):
     folds = parse_folds(args.folds or args.scope or 'ct-first')
     gpus, count = [], 0
     if jobs.GPU_TASKS.intersection(tasks):
+        if interactive:
+            print('\n[2/3] 计算范围与获准资源（CPU 前置完成后才等待显卡）')
         print('\n模型可多选：' + '；'.join(f'{i} {v["label"]}' for i,v in enumerate(MODELS.values(), 1)))
         if interactive and args.models is None:
             methods = parse_models(ask('模型编号或名称，逗号分隔；all全部', ','.join(saved.get('methods', list(MODELS)))))
@@ -104,6 +115,10 @@ def new_config(args, saved, interactive=True):
             raise ValueError('非交互GPU任务必须提供 --gpus')
         gpus = resolve_gpus(selection)
         count = int(args.gpu_count or (ask('最多并行使用几张GPU', len(gpus)) if interactive else len(gpus)))
+    elif interactive:
+        print('\n[2/3] 本次仅 CPU 步骤，无需设置 GPU。')
+    if interactive:
+        print('\n[3/3] 名称、数据与输出目录；提交前还可取消。')
     config = dict(runtime=runtime,
                   results=value(args.results, 'results', DEFAULT_PATHS['work'], '结果根目录（每次自动生成独立子目录）'),
                   data=args.data or (ask('原始数据目录', default_data) if interactive and tasks != ['environment'] else default_data),
@@ -119,6 +134,87 @@ def new_config(args, saved, interactive=True):
             raise ValueError('缓存选择无效')
         config['preprocess_cache'] = 'reuse' if choice == '1' else 'new'
     return jobs.validate_request(config)
+
+
+def preview_config(config):
+    print('\n提交预览\n任务名称：' + jobs.clean(config['name']))
+    print('执行顺序：' + ' → '.join(['独立环境检查', *(jobs.TASKS[t] for t in config['tasks'] if t != 'environment')]))
+    print('运行环境：' + config['runtime'] + '\n结果根目录：' + config['results'] + '（自动新建唯一目录）')
+    if config['tasks'] != ['environment']:
+        print('原始数据：' + config['data'])
+        print('模型：' + ', '.join(config['methods']) + '；方向：' + ', '.join(config['folds']))
+    if config.get('gpus'):
+        print('获准 GPU：' + ', '.join(config['gpus']) + f"；并发上限：{config['gpu_count']}；规划显存：{config['gpu_memory']} GiB")
+    else:
+        print('本次仅 CPU 步骤；不会申请显卡。')
+    print('提交后在后台执行；退出面板或日志查看不会停止任务。')
+
+
+def view_menu(kind, runtime, job=None, **kwargs):
+    mode = ask('1 单次查看  2 持续刷新（Ctrl+C 返回）  b 返回', '1')
+    if mode == '1':
+        print(query(kind, runtime, job, **kwargs))
+    elif mode == '2':
+        follow(kind, runtime, job, **kwargs)
+    else:
+        print('请输入 1 或 2。')
+
+
+def log_menu(runtime, job=None):
+    target = job or jobs.latest(runtime)
+    if not target:
+        print('尚无任务日志。先新建环境或计算任务。'); return
+    while True:
+        sources = log_sources(target)
+        print('\n日志中心：' + str(target) + '\n总日志包含环境安装；模型日志包含实际 epoch/loss。')
+        for index, (_,label,path) in enumerate(sources):
+            print(f'{index}. {label}\n   {path}')
+        print('a 全部日志（动态发现新模型）  b 返回  q 退出')
+        try:
+            choice = ask('选择日志编号', '0' if sources else 'a')
+            if choice == 'a':
+                key = 'all'
+            elif str(choice).isdigit() and 0 <= int(choice) < len(sources):
+                key = sources[int(choice)][0]
+            else:
+                print('日志编号无效，请重选。'); continue
+            view_menu('logs', runtime, target, log_source=key)
+        except (Back, KeyboardInterrupt):
+            return
+
+
+def job_menu(runtime, job):
+    while True:
+        print('\n历史任务：' + str(job) + '\ns 概览  m 模型  l 日志  p 进程  o 结果  b/0 返回  q 退出')
+        try:
+            action = ask('选择', 's')
+            if action == '0': return
+            if action == 'l': log_menu(runtime, job)
+            elif action == 'o': result_menu(job)
+            elif action in {'s','m','p'}:
+                view_menu({'s':'status','m':'models','p':'processes'}[action], runtime, job)
+            else: print('请选择显示的操作。')
+        except (Back, KeyboardInterrupt):
+            return
+
+
+def environment_menu(args, runtime, saved):
+    print('\n独立计算环境\n目录：' + str(Path(runtime)/'envs/vista_baseline_py311'))
+    print('固定 Python 3.11 / PyTorch 2.8.0+cu128 / nnU-Net 2.8.1。\n复用可用 Conda 或校验后安装独立 Miniforge；不修改其它环境。\n不需要数据路径或 GPU，提交后可在 s/t 看安装阶段，在 l 看下载与依赖明细。')
+    try:
+        action = ask('1 提交环境准备/核验  2 查看最近任务安装日志  b 返回', 'b')
+        if action == '2':
+            log_menu(runtime); return
+        if action != '1':
+            print('请选择 1 或 2。'); return
+        selected = copy.copy(args)
+        selected.tasks, selected.name, selected.input_job = 'environment', args.name or '独立环境准备', None
+        config = new_config(selected, saved)
+        preview_config(config)
+        if ask('输入 RUN 提交环境准备，其它输入取消', '') == 'RUN':
+            jobs.submit(config, args.foreground)
+    except (Back, KeyboardInterrupt):
+        return
 
 
 def result_menu(job):
@@ -157,23 +253,43 @@ def result_menu(job):
 
 def panel(args, runtime, saved):
     while True:
-        print('\nWhole-heart 服务器任务面板\n运行目录：' + runtime + '\n' + query('status', runtime))
-        print('n 新建  r 续跑/追加  k 独立重跑  h 历史  o 结果\ns 状态  g 显卡(1秒刷新)  m 模型  l 日志  p 我的进程\nx 中断指定任务  u 更新程序  0/q 退出（后台继续）')
+        active = any(jobs.active_processes(row['directory']) for row in jobs.history(runtime))
+        print(f'\nVISTA3D / nnU-Net 服务器任务面板 v{PANEL_VERSION}\n运行目录：' + runtime + '\n' + query('status', runtime))
+        print('\ns 任务概览  t 持续进度  g 显卡(1秒刷新)  m 模型 epoch/loss\nl 选择详细日志  p 本任务/我的进程  h 历史任务  o 查看结果')
+        print('x 中断指定任务（保留完整检查点）' if active else 'n 新建任务  e 独立环境准备  r 续跑/追加  k 完成任务独立重跑')
+        print('u 更新程序  0/q 退出面板（后台任务继续）；普通输入页 b 返回、q 退出。')
         try:
             action = ask('选择；回车只看状态', 's')
             if action == '0':
                 return 0
-            if action in {'s','g','m','l','p','h'}:
-                kind = {'s':'status','g':'gpu','m':'models','l':'logs','p':'processes','h':'history'}[action]
+            if active and action in {'n','e','r','k'}:
+                print('此运行目录仍有活动任务。先查看进程或明确中断并等它退出，再提交任务。'); continue
+            if action in {'s','g','m','l','p','h','t'}:
+                kind = {'s':'status','g':'gpu','m':'models','l':'logs','p':'processes','h':'history','t':'status'}[action]
                 if action == 'g':
                     follow(kind, runtime)
+                elif action == 't':
+                    follow(kind, runtime)
+                elif action == 'l':
+                    log_menu(runtime)
+                elif action == 'h':
+                    job_menu(runtime, choose_job(runtime))
+                elif action == 'm':
+                    view_menu(kind, runtime)
+                elif action == 'p':
+                    scope = ask('1 本任务进程树  2 本用户全部进程  b 返回', '1')
+                    if scope not in {'1','2'}:
+                        print('请输入 1 或 2。'); continue
+                    view_menu(kind, runtime, process_scope='task' if scope == '1' else 'all')
                 else:
                     print(query(kind, runtime))
+            elif action == 'e':
+                environment_menu(args, runtime, saved)
             elif action == 'o':
                 result_menu(choose_job(runtime))
             elif action == 'n':
                 config = new_config(args, saved)
-                print(json.dumps({k:v for k,v in config.items() if k != 'gpus'}, ensure_ascii=False, indent=2))
+                preview_config(config)
                 if ask('提交以上任务？输入 RUN；其它输入返回', '') == 'RUN':
                     jobs.submit(config, args.foreground)
                     saved = config
@@ -240,6 +356,8 @@ def make_parser():
     p.add_argument('--status', action='store_true')
     p.add_argument('--follow', action='store_true')
     p.add_argument('--job', help='指定命名任务或旧工作区，只读查询不会改变最近任务')
+    p.add_argument('--log-source', default='all', help='all全部 / 0总日志 / step:train / model:模型目录名')
+    p.add_argument('--process-scope', choices=['task','all'], default='task', help='本任务进程树或本用户全部进程')
     p.add_argument('--result-section', choices=['summary','cases','training','files'], default='summary')
     p.add_argument('--result-detail', choices=['summary','detailed'], default='summary')
     p.add_argument('--resume-job', nargs='?', const='latest')
@@ -270,7 +388,8 @@ def main(argv=None):
     if args.status or args.mode == 'status':
         args.query = 'status'
     if args.query:
-        kwargs = dict(section=args.result_section, detailed=args.result_detail == 'detailed')
+        kwargs = dict(section=args.result_section, detailed=args.result_detail == 'detailed',
+                      log_source=args.log_source, process_scope=args.process_scope)
         if args.follow:
             follow(args.query, runtime, args.job, **kwargs)
         else:

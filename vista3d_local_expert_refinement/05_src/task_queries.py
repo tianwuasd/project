@@ -8,8 +8,10 @@ import re
 import math
 import subprocess
 import time
+from datetime import datetime
 from server_data import read_json
 from task_runtime import active_processes, clean, history, latest
+from task_progress import STATES, step_lines, process_lines
 
 STRUCTURES = {'Myo': '心肌', 'LA': '左房', 'LV': '左室', 'RA': '右房', 'RV': '右室', 'AO': '主动脉', 'PA': '肺动脉'}
 
@@ -137,7 +139,42 @@ def result_lines(job, section='summary', detailed=False):
     return lines
 
 
-def query(kind, runtime, job=None, section='summary', detailed=False):
+def log_sources(job):
+    job = Path(job)
+    _, work, _ = context(job)
+    candidates = [('0', '总日志 / 环境安装与调度', job/'launcher.log')]
+    candidates += [('step:'+p.stem, '步骤 / '+p.stem, p) for p in sorted((job/'logs').glob('*.log'))]
+    candidates += [('model:'+p.parent.name, '模型 / '+p.parent.name, p) for p in sorted((work/'07_experiments/formal').glob('*/training.log'))]
+    for area, name in [('07_experiments/queue_logs','训练队列'), ('08_results/evaluation/queue_logs','预测队列')]:
+        candidates += [(area+':'+p.stem, name+' / '+p.stem, p) for p in sorted((work/area).glob('*.log'))[-20:]]
+    return [(key, label, p) for key,label,p in candidates if p.is_file()]
+
+
+class LogCursor:
+    """Tail on first discovery; bounded incremental reads; handle rotation/truncation."""
+    def __init__(self):
+        self.positions = {}
+
+    def read(self, path, limit=12000):
+        try:
+            with Path(path).open('rb') as stream:
+                stat = os.fstat(stream.fileno())
+                token = (stat.st_dev, stat.st_ino)
+                old = self.positions.get(str(path))
+                offset = old[1] if old and old[0] == token and stat.st_size >= old[1] else max(0,stat.st_size-limit)
+                if old and stat.st_size == old[1] and stat.st_mtime_ns != old[2]:
+                    offset = max(0,stat.st_size-limit)
+                # On a burst, retain only a bounded tail instead of loading an entire file.
+                skipped = stat.st_size-offset > limit
+                stream.seek(max(offset,stat.st_size-limit))
+                data = stream.read(limit)
+                self.positions[str(path)] = (token, stream.tell(), stat.st_mtime_ns)
+                return ('[新增日志过多，仅显示最近部分]\n' if skipped else '') + data.decode('utf-8', errors='replace')
+        except OSError:
+            return ''
+
+
+def query(kind, runtime, job=None, section='summary', detailed=False, log_source='all', process_scope='task'):
     if kind == 'history':
         entries = history(runtime)
         return '\n'.join(f"{i}. {clean(x['name'])} [{x['status']}] {x['directory']}" for i,x in enumerate(entries,1)) or '暂无命名任务。可用 --job 指定旧工作区只读查看。'
@@ -146,10 +183,10 @@ def query(kind, runtime, job=None, section='summary', detailed=False):
             return subprocess.check_output(['nvidia-smi'], text=True, timeout=15)
         except (OSError, subprocess.SubprocessError) as error:
             return f'显卡查询不可用：{error}'
-    if kind == 'processes':
+    if kind == 'processes' and process_scope == 'all':
         if os.name != 'posix':
             return '进程查询仅在Linux服务器提供。'
-        return subprocess.check_output(['ps', '-u', str(os.getuid()), '-o', 'pid,ppid,stat,etime,args'], text=True, timeout=15)
+        return subprocess.check_output(['ps', '-u', str(os.getuid()), '-o', 'pid,ppid,stat,etime,pcpu,pmem,args'], text=True, timeout=15)
     job = Path(job) if job else latest(runtime)
     if not job:
         return '尚无任务；新建前不会安装环境或使用显卡。'
@@ -158,33 +195,56 @@ def query(kind, runtime, job=None, section='summary', detailed=False):
         return '\n'.join(result_lines(job, section, detailed))
     if kind == 'models':
         return '\n'.join(model_lines(work) + prediction_lines(work))
+    if kind == 'processes':
+        return '\n'.join(process_lines(job))
     if kind == 'logs':
-        candidates = [job / 'launcher.log', *sorted((job / 'logs').glob('*.log')),
-                      *sorted((work / '07_experiments/formal').glob('*/training.log')),
-                      *sorted((work / '08_results/evaluation/queue_logs').glob('*.log'))[-5:]]
-        return '\n\n'.join(f'{p}\n{tail(p, 10000)}' for p in candidates if p.exists()) or '暂无日志。'
+        candidates = [(key,label,p) for key,label,p in log_sources(job) if log_source in {'all',key}]
+        return '\n\n'.join(f'{label}：{p}\n{tail(p, 10000)}' for _,label,p in candidates) or '所选日志尚未生成；可返回总日志查看安装与当前阶段。'
     lines = [f"任务：{clean(plan.get('name', job.name))}", f'目录：{job}', f'工作区：{work}']
     if state:
         status = state.get('status', '未知')
         living = active_processes(job)
         if living:
-            status = '运行中（含活动子进程）'
+            status = '运行中（含活动子进程）' if status not in {'stopping','waiting_gpu'} else STATES[status]
         elif status in {'running','queued','stopping','waiting_gpu'}:
             status = '记录未结束，但未发现身份匹配进程；可能已中断'
         lines.append('状态：' + status)
-        lines.extend(f"{name}：{value.get('status', '未知')} {value.get('error', '')}" for name,value in state.get('steps',{}).items())
+        lines += step_lines(job, plan, work, state)
     for path in [work / '00_admin/gpu_queue.json', work / '08_results/evaluation/status.json']:
         value = read_optional(path)
         if value:
-            lines.append(f"{path.name}（最后落盘记录）：{value.get('status', '未知')}")
+            queue_status = value.get('status', '未知')
+            expected_step = 'train' if path.name == 'gpu_queue.json' else 'predict'
+            try:
+                step_started = datetime.fromisoformat(state['steps'][expected_step]['started']).timestamp()
+                current_queue = state.get('current_step') == expected_step and path.stat().st_mtime >= step_started
+            except (KeyError, ValueError, TypeError, OSError):
+                current_queue = False
+            label = '当前阶段最后落盘记录' if current_queue else '历史阶段记录，非本轮实时进度'
+            lines.append(f"{path.name}（{label}）：{STATES.get(queue_status, queue_status)}")
             lines.extend(f"  {v['fold']}/{v['method']}：{v.get('status', '未知')} {v.get('gpu_uuid','')}" for v in value.get('jobs', []))
+    if state.get('current_step') == 'train':
+        lines += model_lines(work)
     return '\n'.join(lines + prediction_lines(work))
 
 
 def follow(kind, runtime, job=None, **kwargs):
+    cursor, last_summary = LogCursor(), 0
     try:
         while True:
-            print(query(kind, runtime, job, **kwargs), flush=True)
+            if kind == 'logs':
+                current = Path(job) if job else latest(runtime)
+                if time.monotonic()-last_summary >= 10:
+                    print(query('status', runtime, current), flush=True)
+                    last_summary = time.monotonic()
+                if current:
+                    for key,label,path in log_sources(current):
+                        if kwargs.get('log_source','all') in {'all',key}:
+                            text = cursor.read(path)
+                            if text:
+                                print(f'\n[{label}] {path}\n{text}', flush=True)
+            else:
+                print(query(kind, runtime, job, **kwargs), flush=True)
             print('Ctrl+C 返回查看入口；后台任务继续。', flush=True)
             time.sleep(1 if kind == 'gpu' else 5)
     except KeyboardInterrupt:
