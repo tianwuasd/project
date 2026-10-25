@@ -111,9 +111,10 @@ def run(args, profile):
             print("尚无任务记录。")
         print("s 任务进度  g 显卡状态（1秒刷新）  m 模型 epoch/loss  l 详细日志  p 我的进程")
         print(
-            "o 查看结果（选择项目/任务）  h 历史任务与日志  u 更新程序（多镜像）  0/q 退出面板（后台任务继续）"
+            "o 查看结果（选择项目/任务）  h 历史任务与日志  u 更新程序  0/q 退出面板（后台任务继续）"
         )
         print("v 上传日志、配置、指标和模型权重（GitHub Release）")
+        print("c GitHub 网络设置（代理、私有仓库线路）")
         print(
             "x 中断当前任务（保留检查点）"
             if active
@@ -144,6 +145,10 @@ def run(args, profile):
                     logs(selected)
             elif action == "o":
                 results_menu(runtime, results)
+            elif action == "c":
+                from .network import configure_interactive
+
+                configure_interactive(runtime)
             elif action == "v":
                 from .sharing import run_upload
 

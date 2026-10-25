@@ -1,4 +1,4 @@
-"""Bounded public Git mirror fallback; update only an idle, clean main checkout."""
+"""Bounded official/private or public-mirror updates of an idle, clean checkout."""
 
 import os
 import re
@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
-from . import inspection, jobs
+from . import inspection, jobs, network
 from .launcher import ROOT, write_json
 
 UPSTREAM = "https://github.com/tianwuasd/project.git"
@@ -26,11 +26,12 @@ ORIGIN_URLS = (
     *MIRRORS,
     "https://gh-proxy.com/" + UPSTREAM,
     "git@github.com:tianwuasd/project.git",
+    network.SSH_UPSTREAM,
 )
 
 
 def git(root, *arguments, timeout=20, check=True):
-    """No shell, no credential forwarding; reap this command's helpers on cancellation."""
+    """Scope credentials to the selected route and reap helpers on cancellation."""
     command = [
         "git",
         "-c",
@@ -52,7 +53,22 @@ def git(root, *arguments, timeout=20, check=True):
     for url in {UPSTREAM, *MIRRORS}:
         if url.startswith("https://"):
             command[1:1] = ["-c", f"credential.{url}.helper=", "-c", f"http.{url}.extraHeader="]
-    env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GCM_INTERACTIVE="never")
+    settings = network.current()
+    authenticated = settings["git_transport"] != "public-mirrors"
+    if authenticated:
+        # Auth is permitted only for the explicit official route. Local Git's
+        # credential helpers remain usable; mirrors never enter this branch.
+        command = ["git", "-c", "core.askPass=", "-c", "http.followRedirects=false",
+                   "-c", "http." + UPSTREAM + ".followRedirects=false",
+                   "-c", "http.lowSpeedLimit=1", "-c", "http.lowSpeedTime=15",
+                   "-C", str(root), *arguments]
+    if settings["proxy"]:
+        command[1:1] = ["-c", "http.proxy=" + settings["proxy"]]
+        for url in {UPSTREAM, *network.routes(settings)}:
+            if url.startswith("https://"):
+                command[1:1] = ["-c", "http." + url + ".proxy=" + settings["proxy"]]
+    env = network.child_env(ssh=network.SSH_UPSTREAM in arguments)
+    env.update(GIT_TERMINAL_PROMPT="0", GCM_INTERACTIVE="never")
     process, cancelled = None, False
     handlers = {}
 
@@ -80,6 +96,8 @@ def git(root, *arguments, timeout=20, check=True):
         out, err = process.communicate(timeout=timeout)
         result = subprocess.CompletedProcess(command, process.returncode, out, err)
         if check and result.returncode:
+            if authenticated:
+                raise ValueError("Git 操作失败；请检查官方线路、代理、主机指纹及仓库认证，不会回退公共镜像")
             raise ValueError("Git 操作失败：" + (err or out).strip()[-1800:])
         return result
     except BaseException:
@@ -150,6 +168,13 @@ def ancestor(root, older, newer):
 
 
 def update(repo, runtime):
+    settings = network.load(runtime)
+    network.show(settings)
+    with network.use(settings):
+        return _update(repo, runtime, settings)
+
+
+def _update(repo, runtime, settings):
     root, before = Path(repo["root"]), repo["head"]
     if runtime.resolve() == root or root in runtime.resolve().parents:
         raise ValueError("更新备份目录必须位于代码仓库之外，请使用独立 runtime。")
@@ -158,14 +183,21 @@ def update(repo, runtime):
         raise ValueError("更新前仓库状态已改变，请重新进入更新。")
     directory = runtime / "updates" / (datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid4().hex[:8])
     directory.mkdir(parents=True)
-    report = dict(before=before, upstream=UPSTREAM, attempts=[], status="checking")
+    routes = network.routes(settings)
+    official = routes[0] if settings["git_transport"] != "public-mirrors" else UPSTREAM
+    report = dict(before=before, upstream=official, attempts=[], status="checking",
+                  network={"proxy": settings["proxy"], "git_transport": settings["git_transport"]})
     report_file = directory / "update.json"
     refs = []
     try:
+        if settings["git_transport"] != "public-mirrors":
+            resolved = git(root, "ls-remote", "--get-url", official).stdout.strip()
+            if resolved != official:
+                raise ValueError("Git URL 重写改变了官方地址；请检查 insteadOf 配置，不会发送认证或访问镜像")
         expected = None
         print("检查 GitHub main 的版本（最多 12 秒）……", flush=True)
         try:
-            output = git(root, "ls-remote", UPSTREAM, "refs/heads/main", timeout=12).stdout
+            output = git(root, "ls-remote", official, "refs/heads/main", timeout=12).stdout
             match = re.fullmatch(r"([0-9a-f]{40,64})\s+refs/heads/main\s*", output)
             if not match:
                 raise ValueError("上游没有返回有效 main 提交")
@@ -173,14 +205,11 @@ def update(repo, runtime):
             report["upstream_head"] = expected
         except (OSError, ValueError, subprocess.SubprocessError) as error:
             report["upstream_error"] = str(error)
-            print(
-                "GitHub 版本查询不可用，将采用首个校验通过的线路；无法保证镜像已同步最新版本。",
-                flush=True,
-            )
+            print("GitHub 版本查询不可用，将尝试配置的下载线路；最新状态仍需核验。", flush=True)
         selected = before
         reachable = False
-        for index, url in enumerate(MIRRORS, 1):
-            print(f"更新线路 {index}/{len(MIRRORS)}：{url}（最多 45 秒）", flush=True)
+        for index, url in enumerate(routes, 1):
+            print(f"更新线路 {index}/{len(routes)}：{url}（最多 45 秒）", flush=True)
             ref = "refs/chd-update/" + uuid4().hex
             refs.append(ref)
             attempt = dict(url=url)
@@ -203,6 +232,9 @@ def update(repo, runtime):
                 if not ancestor(root, before, head):
                     raise ValueError("线路版本较旧或与本地分支分叉，继续切换")
                 selected, reachable = head, True
+                if settings["git_transport"] != "public-mirrors" and expected is None:
+                    expected = head
+                    report["upstream_head"] = head
                 attempt["status"] = "verified"
                 # Equal HEAD is valid too; later routes cannot replace this candidate.
                 break

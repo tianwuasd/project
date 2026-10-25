@@ -196,6 +196,12 @@ def make_parser():
         "--reset-settings", action="store_true", help="忽略上次选择，重新采用服务器配置默认值"
     )
     parser.add_argument("--runtime")
+    networking = parser.add_mutually_exclusive_group()
+    networking.add_argument("--configure-network", action="store_true", help="仅保存本 runtime 的 GitHub 网络设置")
+    networking.add_argument("--show-network", action="store_true", help="只读查看 GitHub 网络设置")
+    parser.add_argument("--github-proxy", help="本机 HTTP 代理地址；none 清除显式设置")
+    parser.add_argument("--github-transport", choices=("public-mirrors", "github-https", "github-ssh"))
+    parser.add_argument("--github-ssh-key", help="官方 SSH 更新使用的密钥文件路径，不是私钥内容")
     parser.add_argument("--results")
     parser.add_argument("--name", help="本次新任务的显示名称；重名也使用独立目录，续跑保留原名称")
     parser.add_argument("--input-job", help="新建任务复用指定 workflow 的预处理结果；none 不复用并新建预处理")
@@ -266,6 +272,15 @@ def main(argv=None):
     try:
         from . import jobs
 
+        networking = args.configure_network or args.show_network
+        if (args.github_proxy is not None or args.github_transport or args.github_ssh_key is not None) and not args.configure_network:
+            raise ValueError("网络设置参数需要配合 --configure-network")
+        if networking and any((args.task, args.tasks, args.resume_job, args.rerun_job, args.input_job,
+                               args.query, args.status, args.stop, args.worker, args.upload_job,
+                               args.upload_package, args.yes_upload, args.name, args.reset_settings,
+                               args.preprocess_cache, args.append_tasks, args.resume_check, args.rerun_tasks)):
+            raise ValueError("网络设置/查看不能与任务启动、查询、停止或上传混用")
+
         if args.rerun_tasks and not args.rerun_job:
             raise ValueError("--rerun-tasks 需要配合 --rerun-job")
         if args.rerun_job and (args.resume_job or args.input_job or args.task or args.tasks):
@@ -316,6 +331,15 @@ def main(argv=None):
         if args.worker:
             return jobs.worker(Path(args.worker), args.lock_fd)
         profile = json.loads(Path(args.server_config).read_text(encoding="utf-8"))
+        if networking:
+            from . import network
+
+            runtime = personal_path(args.runtime or profile["runtime"])
+            if args.configure_network:
+                network.save(runtime, proxy="" if args.github_proxy == "none" else args.github_proxy,
+                             git_transport=args.github_transport, ssh_key=args.github_ssh_key)
+            network.show(network.load(runtime))
+            return 0
         if publishing:
             from .sharing import run_upload
 

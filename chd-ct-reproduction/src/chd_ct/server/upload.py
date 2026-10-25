@@ -7,7 +7,6 @@ No public Git download mirror, Git credential helper, or training import is used
 
 import hashlib
 import json
-import os
 import re
 import shutil
 import stat
@@ -465,7 +464,10 @@ def _gh(*arguments, timeout=COMMAND_TIMEOUT):
     executable = shutil.which("gh")
     if not executable:
         raise ValueError("未安装 GitHub CLI (gh)；请先安装 gh，再执行 gh auth login --hostname github.com")
-    env = dict(os.environ, GH_HOST=HOST, GH_REPO=REPOSITORY, GH_PROMPT_DISABLED="1", GH_PAGER="cat")
+    from . import network
+
+    env = network.child_env()
+    env.update(GH_HOST=HOST, GH_REPO=REPOSITORY, GH_PROMPT_DISABLED="1", GH_PAGER="cat")
     for key in ("GH_DEBUG", "DEBUG", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"):
         env.pop(key, None)
     try:
@@ -541,6 +543,15 @@ def _verify_assets(remote, expected):
 def upload_package(package: Path) -> str:
     """Upload/resume one package, verify every asset, then publish its draft."""
     package, manifest, assets = _validate_package(package)
+    from . import network
+
+    settings = network.load(Path(manifest["runtime"]))
+    network.show(settings)
+    with network.use(settings):
+        return _publish(package, manifest, assets)
+
+
+def _publish(package, manifest, assets):
     _finished(Path(manifest["job_directory"]), Path(manifest["runtime"]))
     _gh("auth", "status", "--hostname", HOST)
     tag = manifest["release_tag"]

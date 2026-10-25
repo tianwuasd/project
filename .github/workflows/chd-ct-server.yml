@@ -39,3 +39,5 @@ jobs:
           tests/test_server_posix.py tests/test_extension_posix.py tests/test_workflow_extension.py
           tests/test_resume_modes.py tests/test_result_viewer.py tests/test_result_navigation.py tests/test_cache_selection.py
           tests/test_resume_verification.py tests/test_verification_posix.py
+          tests/test_server_network.py tests/test_server_update.py tests/test_server_upload.py
+          tests/test_server_update_posix.py
