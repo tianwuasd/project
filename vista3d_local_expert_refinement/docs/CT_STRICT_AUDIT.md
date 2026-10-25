@@ -58,4 +58,4 @@ CHD专属疾病诊断/LSTM/五阶段模型不适用当前B0。GPU随实际计算
 
 机器可读结果见 `STRICT_VALIDATION.json`。独立只读审查已复核线程池、排队模型展示、I/O约束三项修复，未发现已确认的P0/P1阻断错误。
 
-当前Windows环境跳过Linux专用进程测试和需要影像依赖的测试。真实nnU-Net API集成、真实GPU尺寸/峰值、服务器安装、实际代码/产物上传仍需服务器验收。此前GitHub Actions因账户计费/额度问题未启动步骤；发布后另核对新run，平台未启动不算测试通过。
+当前Windows环境跳过Linux专用进程测试和需要影像依赖的测试。真实nnU-Net API集成、真实GPU尺寸/峰值、服务器安装、实际代码/产物上传仍需服务器验收。本次[GitHub Actions](https://github.com/tianwuasd/project/actions/runs/40211433316)仍因账户计费/支出上限在启动前失败，执行步骤为0；平台未启动不算测试通过。代码已发布并核验main提交 `de307c6e98355c5e077a65947ed29412662df221`。

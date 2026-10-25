@@ -94,3 +94,5 @@ GitHub代码发布完成。Linux CI https://github.com/tianwuasd/project/actions
 用户要求对GPU、新建路径、面板上传和子任务内部方法逐项严格核对，已建立目标并完成v0.3.0实现。以 docs/CT_STRICT_AUDIT.md 和 docs/STRICT_VALIDATION.json 为当前证据，取代v0.2排除c/w/v的范围。GPU按上限→auto候选池、动态少卡；预填zmic44有来源路径；c/u/w/v沿用CT发布核心。正式尺寸预检绑定实际GPU并有界选CPU线程，续训冻结参数；预测按病例GPU中间提交后统一CPU恢复/指标；保留B0串行增强、8fit/4cal、250epochs及评价协议。
 
 本机80项回归中75通过、5跳过；真实CPU小张量检查、RNG/线程池限制、Bash语法及无site-packages查询通过。独立只读审查的3项发现已修复。Linux进程、真实nnU-Net/GPU、服务器部署及实际LFS权限仍待目标环境，不是已完成真实实验。直接升级见 docs/SERVER_GIT_UPDATE.md；旧任务快照不改写。患者训练未启动。
+
+代码已发布并核验GitHub main：`de307c6e98355c5e077a65947ed29412662df221`。本次Linux CI 40211433316仍在启动前因账户计费/支出限制失败，步骤为0；Linux验收未通过也未实际运行。服务器和真实GPU验证保持待执行。

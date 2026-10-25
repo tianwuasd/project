@@ -71,7 +71,12 @@
   "real_gpu_validation": "pending authorized server execution",
   "github_lfs_write_validation": "pending server",
   "linux_ci": {
-    "status": "previous run blocked before steps by billing; current publication pending check",
-    "previous_url": "https://github.com/tianwuasd/project/actions/runs/40205509176"
-  }
+    "status": "not_started_platform_billing_limit",
+    "url": "https://github.com/tianwuasd/project/actions/runs/40211433316",
+    "job_id": 121223298748,
+    "steps_executed": 0,
+    "code_commit": "de307c6e98355c5e077a65947ed29412662df221",
+    "reason": "GitHub account payment or spending limit; not a test execution failure"
+  },
+  "published_code_commit": "de307c6e98355c5e077a65947ed29412662df221"
 }
