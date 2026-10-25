@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-10-25T05:46:38.738884+00:00",
+  "snapshot": [
+    214,
+    52,
+    24,
+    "20b0f62633b254d5680d31767135940733fb8d37301216f2b59c034f7fac329f"
+  ],
+  "synthetic_demo": false,
+  "works": 61,
+  "included": 12,
+  "document_levels": {
+    "full_text": 12,
+    "abstract_only": 0,
+    "needs_ocr": 0,
+    "metadata_only": 49
+  },
+  "supported_claims": 193,
+  "withheld_claims": 2,
+  "reading_cards": 12,
+  "known_retracted": 0,
+  "budget": {
+    "attempts": {
+      "spent": 24,
+      "uncertain": 2
+    },
+    "consumed_or_reserved_calls": 26,
+    "monetary_cost": null,
+    "cost_status": "unknown"
+  },
+  "human_accuracy_evaluation": "not_performed",
+  "source_recall_evaluation": "not_performed",
+  "review_scope": "Full bounded available document per model review; see review event scope",
+  "failed_or_pending_jobs": []
+}

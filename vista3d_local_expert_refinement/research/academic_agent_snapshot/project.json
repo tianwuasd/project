@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "title": "同源训练的全局老师与局部学生：跨领域近邻与点击纠错框架",
+  "question": "在少量来源中心标注和来源中心未标注CT上训练全局老师与局部专长学生，在目标中心预测时让老师选择学生建议并通过3D点击改善老师最终掩膜。寻找跨领域先例、可迁移方法、负面证据和可证伪的训练方案。",
+  "sources": [
+    "openalex",
+    "semantic_scholar",
+    "arxiv"
+  ],
+  "queries": [
+    "Draft and Refine with Visual Experts",
+    "SegAgent",
+    "learning to defer multiple experts",
+    "generalist specialist collaborative refinement segmentation",
+    "DeferredSeg"
+  ],
+  "max_candidates": 100,
+  "max_documents": 14,
+  "max_model_calls": 32,
+  "model_workers": 2,
+  "backend": "codex",
+  "model": null,
+  "proxy_url": "http://127.0.0.1:7897",
+  "timeout_seconds": 300,
+  "max_input_chars": 450000
+}

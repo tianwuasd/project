@@ -1,0 +1,641 @@
+[
+  {
+    "id": "L1_VISTA3D",
+    "title": "VISTA3D - A Unified Segmentation Foundation Model For 3D Medical Imaging",
+    "group": "本地文献",
+    "pdf": "literature/papers/L1_VISTA3D/paper.pdf",
+    "notes": [
+      "literature/papers/L1_VISTA3D/批注.md",
+      "literature/papers/L1_VISTA3D/精读.md"
+    ],
+    "source_path": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\VISTA3D - A Unified Segmentation Foundation Model For 3D Medical Imaging\\VISTA3D - A Unified Segmentation Foundation Model For 3D Medical Imaging.pdf",
+    "sha256": "1e0f43ccc657591e28a40022f7c2cb14c94d31719a12ec78c572d9a0fa06a3a5",
+    "reading_scope": "Academic Agent 全文阅读及独立会话复核；另保留原精读/批注",
+    "app_fulltext_reviewed": true,
+    "work_id": "work_669c3001a51d42b8",
+    "urls": [],
+    "metadata_status": "本地书目名称原样保留"
+  },
+  {
+    "id": "L2_REDNet",
+    "title": "REDNet - Reliable Evidential Discounting Network for Multi-Modality Medical Image Segmentation",
+    "group": "本地文献",
+    "pdf": "literature/papers/L2_REDNet/paper.pdf",
+    "notes": [
+      "literature/papers/L2_REDNet/批注.md",
+      "literature/papers/L2_REDNet/精读.md"
+    ],
+    "source_path": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\REDNet - Reliable Evidential Discounting Network for Multi-Modality Medical Image Segmentation\\REDNet - Reliable Evidential Discounting Network for Multi-Modality Medical Image Segmentation.pdf",
+    "sha256": "e10baea62dc75658bd74f16be67db1f211e7937e09b6ea69e3d2a2ea5ae383b8",
+    "reading_scope": "Academic Agent 全文阅读及独立会话复核；另保留原精读/批注",
+    "app_fulltext_reviewed": true,
+    "work_id": "work_e8706d7715e44ae8",
+    "urls": [],
+    "metadata_status": "本地书目名称原样保留"
+  },
+  {
+    "id": "L3_Deep_Closing",
+    "title": "Deep Closing - Enhancing Topological Connectivity in Medical Tubular Segmentation",
+    "group": "本地文献",
+    "pdf": "literature/papers/L3_Deep_Closing/paper.pdf",
+    "notes": [
+      "literature/papers/L3_Deep_Closing/批注.md",
+      "literature/papers/L3_Deep_Closing/精读.md"
+    ],
+    "source_path": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Deep Closing - Enhancing Topological Connectivity in Medical Tubular Segmentation\\Deep Closing - Enhancing Topological Connectivity in Medical Tubular Segmentation.pdf",
+    "sha256": "f65fdb948610505882b7e57269769d94fcf28ef1a957124627477cb509bd978c",
+    "reading_scope": "本轮文本层定向阅读 PDF pages 1-2；另保留既有笔记，未计入本轮 12 篇全文",
+    "app_fulltext_reviewed": false,
+    "work_id": null,
+    "urls": [],
+    "metadata_status": "本地书目名称原样保留"
+  },
+  {
+    "id": "L4_Learned_Iterative_CHD",
+    "title": "Learned iterative segmentation of highly variable anatomy from limited data - Applications to whole heart segmentation for congenital heart disease",
+    "group": "本地文献",
+    "pdf": "literature/papers/L4_Learned_Iterative_CHD/paper.pdf",
+    "notes": [
+      "literature/papers/L4_Learned_Iterative_CHD/批注.md",
+      "literature/papers/L4_Learned_Iterative_CHD/精读.md"
+    ],
+    "source_path": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Learned iterative segmentation of highly variable anatomy from limited data - Applications to whole heart segmentation for congenital heart disease\\Learned iterative segmentation of highly variable anatomy from limited data - Applications to whole heart segmentation for congenital heart disease.pdf",
+    "sha256": "81e2ddda7ce08f885cd60b0050179e7dd115972a3d5d6dfaa16f0614633fb4e3",
+    "reading_scope": "Academic Agent 全文阅读及独立会话复核；另保留原精读/批注",
+    "app_fulltext_reviewed": true,
+    "work_id": "work_035a8553e2314bc2",
+    "urls": [],
+    "metadata_status": "本地书目名称原样保留"
+  },
+  {
+    "id": "L5_Structure_Self_Supervision",
+    "title": "Structure-aware Semantic Discrepancy and Consistency for 3D Medical Image Self-supervised Learning",
+    "group": "本地文献",
+    "pdf": "literature/papers/L5_Structure_Self_Supervision/paper.pdf",
+    "notes": [
+      "literature/papers/L5_Structure_Self_Supervision/批注.md",
+      "literature/papers/L5_Structure_Self_Supervision/精读.md"
+    ],
+    "source_path": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Structure-aware Semantic Discrepancy and Consistency for 3D Medical Image Self-supervised Learning\\Structure-aware Semantic Discrepancy and Consistency for 3D Medical Image Self-supervised Learning.pdf",
+    "sha256": "c36fc42c5a0c381732290154094291cf7d9d597b0c1682878d87ad47cdc44268",
+    "reading_scope": "本轮文本层定向阅读 PDF pages 1-2；另保留既有笔记，未计入本轮 12 篇全文",
+    "app_fulltext_reviewed": false,
+    "work_id": null,
+    "urls": [],
+    "metadata_status": "本地书目名称原样保留"
+  },
+  {
+    "id": "L6_Variational_UDA_Cardiac",
+    "title": "Unsupervised Domain Adaptation with Variational Approximation for Cardiac Segmentation",
+    "group": "本地文献",
+    "pdf": "literature/papers/L6_Variational_UDA_Cardiac/paper.pdf",
+    "notes": [
+      "literature/papers/L6_Variational_UDA_Cardiac/批注.md",
+      "literature/papers/L6_Variational_UDA_Cardiac/精读.md"
+    ],
+    "source_path": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Unsupervised Domain Adaptation with Variational Approximation for Cardiac Segmentation\\Unsupervised Domain Adaptation with Variational Approximation for Cardiac Segmentation.pdf",
+    "sha256": "31964bc406d8e817ddecf936ffc2e1ce5c2916dd7efcb359ca0fa55d5bbbf379",
+    "reading_scope": "本轮文本层定向阅读 PDF pages 1；另保留既有笔记，未计入本轮 12 篇全文",
+    "app_fulltext_reviewed": false,
+    "work_id": null,
+    "urls": [],
+    "metadata_status": "本地书目名称原样保留"
+  },
+  {
+    "id": "L7_SDF4CHD",
+    "title": "SDF4CHD - Generative modeling of cardiac anatomies with congenital heart defects",
+    "group": "本地文献",
+    "pdf": "literature/papers/L7_SDF4CHD/paper.pdf",
+    "notes": [
+      "literature/papers/L7_SDF4CHD/批注.md",
+      "literature/papers/L7_SDF4CHD/精读.md"
+    ],
+    "source_path": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\SDF4CHD - Generative modeling of cardiac anatomies with congenital heart defects\\SDF4CHD - Generative modeling of cardiac anatomies with congenital heart defects.pdf",
+    "sha256": "01f34e8183b05c87fd30c9c858b9db39d4d99bee563511550e27cc4f852ac859",
+    "reading_scope": "Academic Agent 全文阅读及独立会话复核；另保留原精读/批注",
+    "app_fulltext_reviewed": true,
+    "work_id": "work_a3a141cb15434c22",
+    "urls": [],
+    "metadata_status": "本地书目名称原样保留"
+  },
+  {
+    "id": "L8_NETracer",
+    "title": "NETracer - A Topology-Aware Iterative Tracing Approach for Tubular Structure Extraction",
+    "group": "本地文献",
+    "pdf": "literature/papers/L8_NETracer/paper.pdf",
+    "notes": [
+      "literature/papers/L8_NETracer/批注.md",
+      "literature/papers/L8_NETracer/精读.md"
+    ],
+    "source_path": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\NETracer - A Topology-Aware Iterative Tracing Approach for Tubular Structure Extraction\\NETracer - A Topology-Aware Iterative Tracing Approach for Tubular Structure Extraction.pdf",
+    "sha256": "4f7dfacdabf74c28d467090602a098ffd95e72eab5518086c491ceb6ccc3215e",
+    "reading_scope": "本轮原文PDF第1页；详细方法只参考已有精读笔记；另保留既有笔记，未计入本轮 12 篇全文",
+    "app_fulltext_reviewed": false,
+    "work_id": null,
+    "urls": [],
+    "metadata_status": "本地书目名称原样保留"
+  },
+  {
+    "id": "L9_Hierarchical_CMR",
+    "title": "Hierarchical Semantic Concept Modeling for Myocardial Pathology Segmentation in CMR",
+    "group": "本地文献",
+    "pdf": "literature/papers/L9_Hierarchical_CMR/paper.pdf",
+    "notes": [
+      "literature/papers/L9_Hierarchical_CMR/批注.md",
+      "literature/papers/L9_Hierarchical_CMR/精读.md"
+    ],
+    "source_path": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Hierarchical Semantic Concept Modeling for Myocardial Pathology Segmentation in CMR\\Hierarchical Semantic Concept Modeling for Myocardial Pathology Segmentation in CMR.pdf",
+    "sha256": "4a43f4fccaf65938b354e95711e546312fb920c40a9c1129f27ee58aeb71face",
+    "reading_scope": "本轮原文PDF第1页；详细方法只参考已有精读笔记；另保留既有笔记，未计入本轮 12 篇全文",
+    "app_fulltext_reviewed": false,
+    "work_id": null,
+    "urls": [],
+    "metadata_status": "本地书目名称原样保留"
+  },
+  {
+    "id": "R01_DnR",
+    "title": "Draft and Refine with Visual Experts",
+    "group": "本轮在线全文",
+    "pdf": "literature/papers/R01_DnR/paper.pdf",
+    "notes": [],
+    "sha256": "d91360c4ceebb55bc0696d59d7999e604d7b955301f3b9f222a8854a20618691",
+    "reading_scope": "Academic Agent 全文阅读及独立会话复核；主会话另核对关键方法段",
+    "app_fulltext_reviewed": true,
+    "work_id": "work_1e05e2b0eb6c452c",
+    "urls": [
+      "https://arxiv.org/html/2511.11005v3",
+      "https://arxiv.org/pdf/2511.11005v3"
+    ],
+    "relevance": "视觉专家意见转成提示，支持先预测再修正；视觉利用度是代理指标。",
+    "doi": "10.48550/arxiv.2511.11005",
+    "arxiv_id": "2511.11005v3",
+    "metadata_status": "题录年份可能为预印本年份，引用时核对具体版本"
+  },
+  {
+    "id": "R02_SegAgent",
+    "title": "SegAgent: Exploring Pixel Understanding Capabilities in MLLMs by Imitating Human Annotator Trajectories",
+    "group": "本轮在线全文",
+    "pdf": "literature/papers/R02_SegAgent/paper.pdf",
+    "notes": [],
+    "sha256": "d185c3ccb130ff91535630d33d01cdfa0b4c8c543f67b1eefb361b228b1d9927",
+    "reading_scope": "Academic Agent 全文阅读及独立会话复核；主会话另核对关键方法段",
+    "app_fulltext_reviewed": true,
+    "work_id": "work_aa6dce0ed7f14b25",
+    "urls": [
+      "https://arxiv.org/html/2503.08625v1",
+      "https://arxiv.org/pdf/2503.08625v1"
+    ],
+    "relevance": "学习点击轨迹及执行后评价；第一版采纳头需要明确不修改选项。",
+    "doi": null,
+    "arxiv_id": "2503.08625v1",
+    "metadata_status": "题录年份可能为预印本年份，引用时核对具体版本"
+  },
+  {
+    "id": "R03_Two_Stage_L2D",
+    "title": "Two-Stage Learning to Defer with Multiple Experts",
+    "group": "本轮在线全文",
+    "pdf": "literature/papers/R03_Two_Stage_L2D/paper.pdf",
+    "notes": [],
+    "sha256": "86a347b0144aea4dc8faf5c1e25681a4eaee237705341ecf41408c8885f81cd4",
+    "reading_scope": "Academic Agent 全文阅读及独立会话复核；主会话另核对关键方法段",
+    "app_fulltext_reviewed": true,
+    "work_id": "work_5d1c00a2b3764ef3",
+    "urls": [
+      "https://papers.neurips.cc/paper_files/paper/2023/hash/0b17d256cf1fe1cc084922a8c6b565b7-Abstract-Conference.html",
+      "https://papers.neurips.cc/paper_files/paper/2023/file/0b17d256cf1fe1cc084922a8c6b565b7-Paper-Conference.pdf"
+    ],
+    "relevance": "先预测器后选择器；分类理论不是三维点击或跨中心保证。",
+    "doi": "10.52202/075280-0159",
+    "arxiv_id": null,
+    "metadata_status": "题录年份可能为预印本年份，引用时核对具体版本"
+  },
+  {
+    "id": "R04_CGS",
+    "title": "Balancing Multi-Target Semi-Supervised Medical Image Segmentation with Collaborative Generalist and Specialists",
+    "group": "本轮在线全文",
+    "pdf": "literature/papers/R04_CGS/paper.pdf",
+    "notes": [],
+    "sha256": "158b4ef253a1a66e113d1dffcf84014aef6a2ac99aff6d0a51a4b4984409c697",
+    "reading_scope": "Academic Agent 全文阅读及独立会话复核；主会话另核对关键方法段",
+    "app_fulltext_reviewed": true,
+    "work_id": "work_6572d29cec464414",
+    "urls": [
+      "https://arxiv.org/html/2504.00862v1",
+      "https://arxiv.org/pdf/2504.00862v1"
+    ],
+    "relevance": "同源标注与未标注资料训练通才/专长分支；原作测试可丢弃专长分支。",
+    "doi": null,
+    "arxiv_id": "2504.00862v1",
+    "metadata_status": "题录年份可能为预印本年份，引用时核对具体版本"
+  },
+  {
+    "id": "R05_DeferredSeg",
+    "title": "DeferredSeg: A multi-expert deferral framework for medical image segmentation",
+    "group": "本轮在线全文",
+    "pdf": "literature/papers/R05_DeferredSeg/paper.pdf",
+    "notes": [],
+    "sha256": "aaf49740f21c4eb50cd9ccb6bdb856b870fa5d35e041b561ad19ce718afe6727",
+    "reading_scope": "Academic Agent 全文阅读及独立会话复核；主会话另核对关键方法段",
+    "app_fulltext_reviewed": true,
+    "work_id": "work_750f4a75835240a3",
+    "urls": [
+      "https://arxiv.org/html/2604.12411v2",
+      "https://arxiv.org/pdf/2604.12411v2"
+    ],
+    "relevance": "像素级专家路由融合；实验专家信息条件与训练的学生不同。",
+    "doi": "10.1016/j.patcog.2026.114811",
+    "arxiv_id": "2604.12411v2",
+    "metadata_status": "题录年份可能为预印本年份，引用时核对具体版本"
+  },
+  {
+    "id": "R06_NeuroRefiner",
+    "title": "NeuroRefiner: Morphology-Aware Multi-agent Refinement for 3D Fluorescence Microscopy Neuron Segmentation",
+    "group": "本轮在线全文",
+    "pdf": "literature/papers/R06_NeuroRefiner/paper.pdf",
+    "notes": [],
+    "sha256": "e447474541bb266fe5270d55c634d1f13f4a31c41499cb84e11663e540d87fde",
+    "reading_scope": "Academic Agent 全文阅读及独立会话复核；主会话另核对关键方法段",
+    "app_fulltext_reviewed": true,
+    "work_id": "work_864fba4def554ce3",
+    "urls": [
+      "https://arxiv.org/html/2608.09636v1",
+      "https://arxiv.org/pdf/2608.09636v1"
+    ],
+    "relevance": "已有全局检查/局部修正/验证循环；神经元拓扑不可直接迁移到先心病。",
+    "doi": "10.1007/978-3-032-37098-3_33",
+    "arxiv_id": null,
+    "metadata_status": "题录年份可能为预印本年份，引用时核对具体版本"
+  },
+  {
+    "id": "R07_U_CFR",
+    "title": "U-CFR: Uncertainty-Guided Cascade Forward Refinement for Interactive Segmentation",
+    "group": "本轮在线全文",
+    "pdf": "literature/papers/R07_U_CFR/paper.pdf",
+    "notes": [],
+    "sha256": "8f1b3c8f831bc852abe63d6605dbfc6b7081a3d071704b7d04ec86340d47118b",
+    "reading_scope": "Academic Agent 全文阅读及独立会话复核；主会话另核对关键方法段",
+    "app_fulltext_reviewed": true,
+    "work_id": "work_dc3db188901f4579",
+    "urls": [
+      "https://arxiv.org/html/2607.20705v1",
+      "https://arxiv.org/pdf/2607.20705v1"
+    ],
+    "relevance": "不确定性与边界驱动自动伪点击；便宜而必要的对照。",
+    "doi": null,
+    "arxiv_id": null,
+    "metadata_status": "题录年份可能为预印本年份，引用时核对具体版本"
+  },
+  {
+    "id": "R08_Generalist_Specialist_RL",
+    "title": "Improving Policy Optimization with Generalist-Specialist Learning",
+    "group": "本轮在线全文",
+    "pdf": "literature/papers/R08_Generalist_Specialist_RL/paper.pdf",
+    "notes": [],
+    "sha256": "b78db77ab8f8261bb4fa69d4a382491d7b411ab4f9b7a61b47042fe8bed78370",
+    "reading_scope": "Academic Agent 全文阅读及独立会话复核；主会话另核对关键方法段",
+    "app_fulltext_reviewed": true,
+    "work_id": "work_b8b1ef49ee17445d",
+    "urls": [
+      "https://arxiv.org/abs/2206.12984",
+      "https://arxiv.org/pdf/2206.12984v1"
+    ],
+    "relevance": "强化学习中专长反馈通才；原作主要在训练阶段协作。",
+    "doi": null,
+    "arxiv_id": "2206.12984v1",
+    "metadata_status": "题录年份可能为预印本年份，引用时核对具体版本"
+  },
+  {
+    "id": "H03",
+    "title": "Learning to Defer to Multiple Experts: Consistent Surrogate Losses, Confidence Calibration, and Conformal Ensembles",
+    "group": "历史跨领域近邻",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://proceedings.mlr.press/v206/verma23a.html"
+    ],
+    "reading_scope": "parent metadata/abstract; subtask PDF §2–4；历史核查范围，本次归档未重新阅读",
+    "relevance": "专家选择训练依据；分类理论非跨域分割保证",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "沿用历史记录，未重新联网核验"
+  },
+  {
+    "id": "H04",
+    "title": "LLM-Blender: Ensembling Large Language Models with Pairwise Ranking and Generative Fusion",
+    "group": "历史跨领域近邻",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://aclanthology.org/2023.acl-long.792/"
+    ],
+    "reading_scope": "PDF §2.3, §3 and §4 related method passages；历史核查范围，本次归档未重新阅读",
+    "relevance": "评价候选后生成新结果",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "沿用历史记录，未重新联网核验"
+  },
+  {
+    "id": "H05",
+    "title": "Mixture-of-Agents Enhances Large Language Model Capabilities",
+    "group": "历史跨领域近邻",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://proceedings.iclr.cc/paper_files/paper/2025/file/5434be94e82c54327bb9dcaf7fca52b6-Paper-Conference.pdf"
+    ],
+    "reading_scope": "§2.1–2.3; subtask additionally §3.3；历史核查范围，本次归档未重新阅读",
+    "relevance": "proposer和aggregator角色",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "沿用历史记录，未重新联网核验"
+  },
+  {
+    "id": "H06",
+    "title": "DExperts: Decoding-Time Controlled Text Generation with Experts and Anti-Experts",
+    "group": "历史跨领域近邻",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://aclanthology.org/2021.acl-long.522/"
+    ],
+    "reading_scope": "parent metadata/abstract; subtask PDF §2.1–2.2 equations2–5；历史核查范围，本次归档未重新阅读",
+    "relevance": "小专家推理时引导基础模型；概率融合",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "沿用历史记录，未重新联网核验"
+  },
+  {
+    "id": "H07",
+    "title": "Adaptive Mixtures of Local Experts",
+    "group": "历史跨领域近邻",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://ieeexplore.ieee.org/document/6797059"
+    ],
+    "reading_scope": "abstract and indexed introduction; image-only PDF not OCRed；历史核查范围，本次归档未重新阅读",
+    "relevance": "基础类比",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "沿用历史记录，未重新联网核验"
+  },
+  {
+    "id": "H08",
+    "title": "Fast Inference from Transformers via Speculative Decoding",
+    "group": "历史跨领域近邻",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://proceedings.mlr.press/v202/leviathan23a.html"
+    ],
+    "reading_scope": "abstract/introduction；历史核查范围，本次归档未重新阅读",
+    "relevance": "提议验证类比；不迁移分布保持保证",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "沿用历史记录，未重新联网核验"
+  },
+  {
+    "id": "H09",
+    "title": "Large Language Models Cannot Self-Correct Reasoning Yet",
+    "group": "历史跨领域近邻",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://proceedings.iclr.cc/paper_files/paper/2024/hash/8b4add8b0aa8749d80a34ca5d941c355-Abstract-Conference.html"
+    ],
+    "reading_scope": "abstract only；历史核查范围，本次归档未重新阅读",
+    "relevance": "反面证据；不能外推医学不可能纠错",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "沿用历史记录，未重新联网核验"
+  },
+  {
+    "id": "H10",
+    "title": "Training Language Models to Self-Correct via Reinforcement Learning",
+    "group": "历史跨领域近邻",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://proceedings.iclr.cc/paper_files/paper/2025/hash/871ac99fdc5282d0301934d23945ebaa-Abstract-Conference.html",
+      "https://arxiv.org/html/2409.12917v1"
+    ],
+    "reading_scope": "§3 reward/reference setup; §4–5 relevant statements；历史核查范围，本次归档未重新阅读",
+    "relevance": "纠错训练分布及多轮目标；自生成轨迹不等于无正确性监督",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "沿用历史记录，未重新联网核验"
+  },
+  {
+    "id": "S01",
+    "title": "DualClickMed / Rethinking RoI Strategy in Interactive 3D Segmentation for Medical Images",
+    "group": "补充与历史提及",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://link.springer.com/chapter/10.1007/978-3-032-23496-4_12"
+    ],
+    "reading_scope": "历史出版社摘要及公开原文片段；未收齐全文",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "只保留已有记录，不补写未核实作者/年份/细节"
+  },
+  {
+    "id": "S02",
+    "title": "SAM-REF",
+    "group": "补充与历史提及",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://arxiv.org/html/2408.11535v4"
+    ],
+    "reading_scope": "历史核对方法 3.2–3.5；未归档全文 PDF",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "只保留已有记录，不补写未核实作者/年份/细节"
+  },
+  {
+    "id": "S03",
+    "title": "SAT3D / Segment any tumour",
+    "group": "补充与历史提及",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://www.nature.com/articles/s41467-026-76531-2"
+    ],
+    "reading_scope": "历史出版社/索引摘要和方法片段；完整页面访问受限",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "只保留已有记录，不补写未核实作者/年份/细节"
+  },
+  {
+    "id": "S04",
+    "title": "MedSAM-Agent",
+    "group": "补充与历史提及",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://arxiv.org/html/2602.03320v1"
+    ],
+    "reading_scope": "历史子任务核对方法 3.1–3.2 及奖励；未归档全文 PDF",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "只保留已有记录，不补写未核实作者/年份/细节"
+  },
+  {
+    "id": "S05",
+    "title": "SemiSAM+",
+    "group": "补充与历史提及",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://arxiv.org/html/2502.20749v1"
+    ],
+    "reading_scope": "历史原文 3.4–3.5、4.4；训练学生背景，非最终部署角色",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "只保留已有记录，不补写未核实作者/年份/细节"
+  },
+  {
+    "id": "S06",
+    "title": "PseudoClick",
+    "group": "补充与历史提及",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://www.ecva.net/papers/eccv_2022/papers_ECCV/html/2903_ECCV_2022_paper.php"
+    ],
+    "reading_scope": "会议摘要及原文索引方法片段；不计入本轮 12 篇全文",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "只保留已有记录，不补写未核实作者/年份/细节"
+  },
+  {
+    "id": "S07",
+    "title": "CT-PromptSAM: Collaborative Prompting With Hybrid CNN–Transformer for Remote Sensing Semantic Segmentation",
+    "group": "补充与历史提及",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://github.com/WangXin81/CT-PromptSAM/"
+    ],
+    "reading_scope": "摘要和作者仓库；未取得全文，优先补核近邻",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "只保留已有记录，不补写未核实作者/年份/细节"
+  },
+  {
+    "id": "S08",
+    "title": "From Few-Shot Segmentation to Clinician-in-the-Loop Medical Image Analysis",
+    "group": "补充与历史提及",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://arxiv.org/abs/2609.10001"
+    ],
+    "reading_scope": "摘要/观点性背景，不构成实验验证",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "只保留已有记录，不补写未核实作者/年份/细节"
+  },
+  {
+    "id": "S09",
+    "title": "When More Experts Hurt: Underfitting in Multi-Expert Learning to Defer",
+    "group": "补充与历史提及",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://arxiv.org/abs/2602.17144v1"
+    ],
+    "reading_scope": "题录与摘要背景；未阅读全文",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "只保留已有记录，不补写未核实作者/年份/细节"
+  },
+  {
+    "id": "C05",
+    "title": "Evidence modeling for reliability learning and interpretable decision-making under multi-modality medical image segmentation",
+    "group": "补充与历史提及",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://doi.org/10.1016/j.compmedimag.2024.102422"
+    ],
+    "reading_scope": "历史 Consensus 输出中引用摘要；未独立全文复核",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "只保留已有记录，不补写未核实作者/年份/细节"
+  },
+  {
+    "id": "C06",
+    "title": "Evidence fusion with contextual discounting for multi-modality medical image segmentation",
+    "group": "补充与历史提及",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://arxiv.org/abs/2206.11739"
+    ],
+    "reading_scope": "历史 Consensus 输出中引用摘要；未独立全文复核",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "只保留已有记录，不补写未核实作者/年份/细节"
+  },
+  {
+    "id": "C07",
+    "title": "ProMISe: Prompt-Driven 3D Medical Image Segmentation Using Pretrained Image Foundation Models",
+    "group": "补充与历史提及",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://doi.org/10.1109/ISBI56570.2024.10635207"
+    ],
+    "reading_scope": "历史 Consensus 输出中引用摘要；未独立全文复核",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "只保留已有记录，不补写未核实作者/年份/细节"
+  },
+  {
+    "id": "C08",
+    "title": "Few-Shot Adaptation of Training-Free Foundation Model for 3D Medical Image Segmentation",
+    "group": "补充与历史提及",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://arxiv.org/abs/2501.09138"
+    ],
+    "reading_scope": "历史 Consensus 输出中引用摘要/引言；未独立全文复核",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "只保留已有记录，不补写未核实作者/年份/细节"
+  },
+  {
+    "id": "C09",
+    "title": "ENSAM: an efficient foundation model for interactive segmentation of 3D medical images",
+    "group": "补充与历史提及",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://doi.org/10.1007/978-3-032-23496-4_2"
+    ],
+    "reading_scope": "历史 Consensus 输出中引用摘要/正文；未独立全文复核",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "只保留已有记录，不补写未核实作者/年份/细节"
+  },
+  {
+    "id": "C10",
+    "title": "Iterative Segmentation from Limited Training Data: Applications to Congenital Heart Disease",
+    "group": "补充与历史提及",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://doi.org/10.1007/978-3-030-00889-5_38"
+    ],
+    "reading_scope": "历史 Consensus 输出中引用摘要；不要与较新的 Learned iterative CHD 全文混同",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "只保留已有记录，不补写未核实作者/年份/细节"
+  },
+  {
+    "id": "C11",
+    "title": "Adaptability of Vision Foundation Models for 3D Medical Image Segmentation",
+    "group": "补充与历史提及",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://doi.org/10.1109/OJSP.2025.3650437"
+    ],
+    "reading_scope": "历史 Consensus 输出中引用摘要/正文；未独立全文复核",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "只保留已有记录，不补写未核实作者/年份/细节"
+  },
+  {
+    "id": "C12",
+    "title": "HVSMR-2.0: A 3D cardiovascular MR dataset for whole-heart segmentation in congenital heart disease",
+    "group": "补充与历史提及",
+    "pdf": null,
+    "notes": [],
+    "urls": [
+      "https://doi.org/10.1038/s41597-024-03469-9"
+    ],
+    "reading_scope": "历史 Consensus 输出中引用正文；未独立全文复核",
+    "app_fulltext_reviewed": false,
+    "metadata_status": "只保留已有记录，不补写未核实作者/年份/细节"
+  }
+]

@@ -1,0 +1,1076 @@
+                                                                   Medical Image Analysis 80 (2022) 102469
+
+
+
+                                                              Contents lists available at ScienceDirect
+
+
+                                                              Medical Image Analysis
+                                                        journal homepage: www.elsevier.com/locate/media
+
+
+
+
+Learned iterative segmentation of highly variable anatomy from
+limited data: Applications to whole heart segmentation for congenital
+heart disease
+Danielle F. Pace a,b,∗, Adrian V. Dalca a,b, Tom Brosch c, Tal Geva d,e, Andrew J. Powell d,e,
+Jürgen Weese c, Mehdi H. Moghari d,e, Polina Golland a
+a
+  Computer Science and Artiﬁcial Intelligence Laboratory, Massachusetts Institute of Technology, Cambridge, MA, USA
+b
+  A.A. Martinos Center for Biomedical Imaging, Massachusetts General Hospital, Harvard Medical School, Boston, MA, USA
+c
+  Philips Research Laboratories, Hamburg, Germany
+d
+  Department of Cardiology, Boston Children’s Hospital, Boston, MA, USA
+e
+  Department of Pediatrics, Harvard Medical School, Boston, MA, USA
+
+
+
+
+a r t i c l e            i n f o                         a b s t r a c t
+
+Article history:                                         Training deep learning models that segment an image in one step typically requires a large collection
+Received 9 July 2021                                     of manually annotated images that captures the anatomical variability in a cohort. This poses challenges
+Revised 26 April 2022
+                                                         when anatomical variability is extreme but training data is limited, as when segmenting cardiac struc-
+Accepted 29 April 2022
+                                                         tures in patients with congenital heart disease (CHD). In this paper, we propose an iterative segmentation
+Available online 13 May 2022
+                                                         model and show that it can be accurately learned from a small dataset. Implemented as a recurrent neu-
+Keywords:                                                ral network, the model evolves a segmentation over multiple steps, from a single user click until reach-
+Recurrent Neural Network                                 ing an automatically determined stopping point. We develop a novel loss function that evaluates the
+Whole heart segmentation                                 entire sequence of output segmentations, and use it to learn model parameters. Segmentations evolve
+Congenital heart disease                                 predictably according to growth dynamics encapsulated by training data, which consists of images, par-
+Interactive segmentation                                 tially completed segmentations, and the recommended next step. The user can easily reﬁne the ﬁnal
+                                                         segmentation by examining those that are earlier or later in the output sequence. Using a dataset of 3D
+                                                         cardiac MR scans from patients with a wide range of CHD types, we show that our iterative model offers
+                                                         better generalization to patients with the most severe heart malformations.
+                                                                                                                          © 2022 Elsevier B.V. All rights reserved.
+
+
+
+
+1. Introduction                                                                           must understand each patient’s unique heart anatomy, evaluat-
+                                                                                          ing the size and location of defects and determining their rela-
+    Congenital heart disease (CHD) includes all heart defects exist-                      tionships with other cardiac structures. MR is an attractive pre-
+ing at birth, encompassing a wide array of potential cardiac malfor-                      operative modality (Ntsinjana et al., 2011; Arafati et al., 2019)
+mations and topological changes (Frescura et al., 2010). The heart                        as it produces high quality images and, unlike CT imaging, does
+of each CHD patient is unique, with different combinations of orig-                       not require ionizing radiation, which is particularly important for
+inal heart defects, new atypical connections and implants from                            children.
+prior surgeries, and shape changes from long-term cardiac remod-                              However, cardiac MR suffers from (1) low signal-to-noise ra-
+eling (Pandya et al., 2016). Fig. 1 illustrates the wide variability of                   tio and spatial resolution (Zhuang et al., 2019), (2) no contrast at
+heart anatomy in CHD. Strong anatomical priors are hard to en-                            many of the valves, thin walls and “holes in the heart” that sep-
+force, and relating information across subjects with dramatically                         arate neighboring cardiac chambers and great vessels, and (3) ar-
+different heart conﬁgurations or simulating realistic images is dif-                      tifacts, especially those surrounding implanted stents. Fig. 2 illus-
+ﬁcult.                                                                                    trates these challenges.
+    Treating severe CHD requires multiple surgeries throughout in-                            There is great interest in patient-speciﬁc 3D heart surface mod-
+fancy, childhood and adult life. For surgical planning, clinicians                        els for surgical planning for CHD, whether rendered on a screen
+                                                                                          or 3D-printed. Using 3D heart surface models promises to yield
+                                                                                          a greater appreciation of the true locations and sizes of intrac-
+    ∗
+        Corresponding author.                                                             ardiac structures, aid decision making and consensus, and even
+        E-mail address: dfpace@mgh.harvard.edu (D.F. Pace).                               lead doctors to alter original surgical plans made based on images
+
+
+https://doi.org/10.1016/j.media.2022.102469
+1361-8415/© 2022 Elsevier B.V. All rights reserved.
+D.F. Pace, A.V. Dalca, T. Brosch et al.                                                                                                 Medical Image Analysis 80 (2022) 102469
+
+
+
+
+Fig. 1. Example 3D heart surface models of congenital heart disease, which manifests as size and shape changes in the chambers or vessels; abnormal connections, e.g., DORV
+(double outlet right ventricle), TGA (transposition of the great arteries), VSD (ventricular septal defect), ASD (atrial septal defect) and Fontan surgery; duplicated structures,
+e.g., bilateral SVC; missing structures, e.g., single ventricle; and/or abnormal structure locations, e.g., dextrocardia, mesocardia, inverted ventricles and left IVC/SVC.
+
+
+
+
+                                                                                              CHD subtypes, and remain recognized as very diﬃcult to seg-
+                                                                                              ment (Zhuang et al., 2019). For CHD patients, segmentation of MR
+                                                                                              images has largely been limited to labeling the blood pool and
+                                                                                              myocardium (Wolterink et al., 2017; Yu et al., 2017; Dou et al.,
+                                                                                              2017; Pace et al., 2015). Segmenting each chamber and great ves-
+                                                                                              sel as separate labels offers several advantages: it facilitates au-
+                                                                                              tomatic computation of quantitative metrics of cardiac function
+                                                                                              that for CHD patients are typically based on manual annotations,
+                                                                                              such as chamber volumes, ejection fraction and aortic dimensions
+Fig. 2. Example scans illustrating challenges of cardiac MR segmentation for CHD              (Seraphim et al., 2020; Petersen et al., 2019), it yields a more vi-
+that go beyond anatomical variability. These include noise (green arrow), no con-
+                                                                                              sually intuitive surface model, and the shape variability of each
+trast at the boundaries of adjacent structures (gold arrows), different structures that
+locally appear very similar (red arrows), and dark inhomogeneity artifacts from pre-          anatomical structure is reduced compared to that of the entire car-
+viously implanted stents (blue arrow).                                                        diac blood pool. Previously demonstrated methods to segment in-
+                                                                                              dividual heart structures for CHD either operated on CT images (Xu
+                                                                                              et al., 2019; Liu et al., 2020b), or only segmented the ventricles in
+(Lau and Sun, 2018; Valverde et al., 2017a; Bhatla et al., 2017;                              speciﬁc CHD subtypes (Zhang et al., 2010; Mansi et al., 2011).
+Garekar et al., 2016; Riesenkampff et al., 2009). However, manual                                 Example interactive segmentation methods include in-
+segmentation requires many hours per image. The lack of accurate                              telligent scissors (Mortensen and Barrett, 1998), graph cuts
+whole heart segmentation methods for CHD patients currently pre-                              (Boykov and Jolly, 2001), random walks (Grady, 2006), GrowCut
+cludes widespread adoption of 3D heart surface models for surgical                            (Vezhnevets and Konouchine, 2005), GraphCut (Rother et al., 2004)
+planning (Lau and Sun, 2018; Byrne et al., 2016).                                             and GeoS (Criminisi et al., 2008). These methods are not ideal for
+    To support surgical planning in CHD patients, we focus on                                 whole heart segmentation because the homogeneous blood pool
+whole heart segmentation for CHD patients, which requires out-                                must be partitioned into its component cardiac chambers and
+lining the left ventricle (LV), right ventricle (RV), left atrium (LA,                        great vessels, which are not separated by strong edges or have
+including the pulmonary veins), right atrium (RA), aorta (AO), pul-                           distinctive intensity distributions. However, interactive segmen-
+monary artery (PA), superior vena cava (SVC) and inferior vena                                tation methods based on deep learning can learn more complex
+cava (IVC) (Zhuang, 2013; Zhuang et al., 2019; Peng et al., 2016).                            features and reduce user interaction. For example, user clicks or
+We do not focus on segmenting the myocardium. The input to our                                scribbles can be transformed into binary, Euclidean distance or
+methods is a 3D cardiac MR scan that captures the heart at a single                           geodesic distance maps, and concatenated as additional input
+point in the cardiac cycle (and not a time-series of images), plus a                          channels in a segmentation network (Xu et al., 2016; Sakinis et al.,
+single user click per structure. We propose to support image seg-                             2019; Wang et al., 2019; Amrehn et al., 2017), or used to update
+mentation via a deep learning model that progressively evolves the                            a network’s weights to better segment a test image (Wang et al.,
+segmentation of each structure. Our approach also opens up user                               2018). Many of these methods focus on back-and-forth interaction
+opportunities to interact and adjust.                                                         with a user to iteratively reﬁne a segmentation. In contrast, we
+                                                                                              aim to estimate a high-quality segmentation from more limited
+1.1. Prior work                                                                               user interaction, namely one click per structure plus an optional
+                                                                                              step of choosing amongst a sequence of candidate segmentations.
+    Most whole heart segmentation methods have been devel-                                        State-of-the-art segmentation methods train a feedforward CNN
+oped for patients with relatively normal anatomy, including de-                               to segment an image in one step (Long et al., 2015; Ronneberger
+formable models (Ecabert et al., 2008; 2011; Peters et al., 2010;                             et al., 2015; Dalca et al., 2018). An alternative is to iteratively seg-
+Zheng et al., 2008) and atlas-based segmentation (Zhuang et al.,                              ment an image over multiple steps, at each step conditioning on
+2010; Zhuang and Shen, 2016). More recent convolutional neu-                                  a previous partial solution to make progress towards the ﬁnal an-
+ral network (CNN) investigations include two-step network cas-                                swer. This is reminiscent of traditional active contours, level sets,
+cades, multi-planar CNNs, deep supervision, and/or integration of                             hidden Markov models and particle ﬁlters (Sonka et al., 2008;
+statistical shape priors (Payer et al., 2017; Yang et al., 2018; Wang                         Dalca et al., 2011). More recently, deep learning approaches that
+and Smedby, 2017). The public Multi-Modality Whole Heart Seg-                                 use iterative segmentation include network cascades (Wachinger
+mentation (MM-WHS) dataset does include CHD images, but these                                 et al., 2018; Payer et al., 2017; Valverde et al., 2017b; Havaei et al.,
+are relatively few (16/120 images), cover a limited number of                                 2017), instance segmentation using an internal memory or atten-
+
+                                                                                          2
+D.F. Pace, A.V. Dalca, T. Brosch et al.                                                                                            Medical Image Analysis 80 (2022) 102469
+
+
+
+
+Fig. 3. Results of our iterative segmentation model that evolves segmentations in a predictable way that is deﬁned via training data. Visualizations show 3D surface models
+in the context of a representative image slice. The variable t refers to the time step of the iterative segmentation model’s output segmentations.
+
+
+tion mechanism (Ren and Zemel, 2017; Romera-Paredes and Torr,                           mum likelihood loss function factors into a sum over time steps,
+2016; Lessmann et al., 2019), and, most relevant to this paper, re-                     eliminating the need to back-propagate through time and mak-
+current neural networks (RNNs).                                                         ing training easier than e.g., LSTMs (Shi et al., 2015). We show
+    RNNs are popular for modeling sequential data. They imple-                          that this proposed loss can be optimized using a dataset of images
+ment the repeated application of a recursive function, using the                        alongside input-output pairs of partially completed segmentations.
+same learned parameters at each iteration. At each step, the                            We construct these pairs on-the-ﬂy during training from complete
+network inputs include information from the previous step via                           ground truth segmentations.
+recurrent connections, which can link analogous hidden layers                               Due to the challenges of our task, we optionally enable users to
+of consecutive iterations or directly connect outputs to hidden                         interact with the system to intuitively ﬁne-tune the segmentation.
+units (Goodfellow et al., 2016). Notably, previously proposed RNNs                      After the user clicks once to place a seed, the result from our seg-
+for image segmentation produce unpredictable growth patterns,                           mentation with automatic stopping will be shown. The user will
+whether they progressively reﬁne an initially coarse segmentation                       have the option to either accept the segmentation, or look for a
+of the entire object (Pinheiro and Collobert, 2014; McIntosh et al.,                    better segmentation result by looking backwards in the output se-
+2018), model level sets (Le et al., 2018a; 2018b; Chakravarty and                       quence or asking for more iterations. Our experiments indicate that
+Sivaswamy, 2019) or sequentially segment small areas pulled from                        this minimal amount of additional user interaction may yield large
+an internal list of potential regions of interest (Januszewski et al.,                  performance improvements. Compared to previous RNN segmenta-
+2018).                                                                                  tion methods, we anticipate that a user using our model can more
+                                                                                        easily interact with and edit the segmentation. A user can more
+1.2. Approach and contributions                                                         easily ﬁnd a high quality result because the output sequence con-
+                                                                                        tains diverse yet automatically-sorted solutions. It is also more ef-
+    In this paper, we demonstrate a novel segmentation strategy,                        ﬁcient to monitor progress, because the region in which growth is
+initialized by a single click per structure, which also enables addi-                   expected is spatially limited, which is especially important for 3D
+tional intuitive user interaction that is valuable in our challenging                   images. Finally, if interactive editing of intermediate segmentations
+application. Our major contributions are enumerated within the                          via foreground or background clicks or scribbles were to be incor-
+text below.                                                                             porated in future (Wang et al., 2019; 2018; Xu et al., 2016; Sakinis
+    1. To the best of our knowledge, our work provides the ﬁrst whole                   et al., 2019), our RNN can be restarted at any point (since it does
+heart segmentation to individually label each cardiac chamber and                       not rely on a memory) and the user can anticipate which areas
+great vessel in cardiac MR for patients with congenital heart disease.                  require input and which would be corrected in subsequent time
+    2. We develop an iterative segmentation model (and RNN im-                          steps (since it grows segmentations with a predictable pattern).
+plementation) that is trained to evolve a segmentation over multi-                          4. Using a dataset of 3D cardiac MR scans from patients with a
+ple steps, until reaching a stopping point that can be automatically                    wide range of CHD types, we show that existing state-of-the-art seg-
+determined or deﬁned by a user. See Fig. 3. Vessel segmentations                        mentation methods fail to handle the extraordinary anatomical vari-
+are trained to grow along centerlines and chamber segmentations                         ability of CHD, and demonstrate that our iterative model offers bet-
+grow outwards towards the boundary. The model can be trained to                         ter generalization to patients with the most severe heart malforma-
+follow any desired evolution pattern that is implicitly represented                     tions. In particular, we show advantages when learning from small
+by training data. The algorithm operates directly on the 3D image                       datasets, in which speciﬁc anatomical conﬁgurations are often rep-
+grid, unlike approaches that learn to progressively trace a contour                     resented by a single sample and hence can be present during in-
+(Mo et al., 2018; Zhang et al., 2018), perform slice-by-slice analysis                  ference but not during training. These advantages may go beyond
+(Zheng et al., 2018; Poudel et al., 2017) or propagate information                      our particular clinical application, as access to limited training data
+from 2D image patches (Pace et al., 2015).                                              is a very common setting in practice, and eﬃcient interactive seg-
+    3. To encourage the output segmentations to grow in a predi-                        mentation is valuable for direct use or in the process of generating
+cable way, we develop a novel loss function that evaluates the en-                      larger training datasets.
+tire sequence of output segmentations, adopting a learning frame-                           This paper expands our preliminary work on segmenting the
+work known as teacher forcing (Williams and Zipser, 1989; Good-                         AO and LV (Pace et al., 2018), arguably the easiest cardiac struc-
+fellow et al., 2016). This approach differs from evaluating the                         tures to segment. Here, we extend the method to whole heart seg-
+ﬁnal segmentation alone or encouraging every segmentation in                            mentation, improve the data augmentation, training and inference
+the sequence to match the complete ground truth segmentation                            strategies, and provide detailed derivations. We present extensive
+(Pinheiro and Collobert, 2014; McIntosh et al., 2018). The maxi-                        evaluation of the binary segmentation model and demonstrate its
+
+                                                                                    3
+D.F. Pace, A.V. Dalca, T. Brosch et al.                                                                                                           Medical Image Analysis 80 (2022) 102469
+
+
+                                                                                                 We model the segmentation yt and stopping indicator st as condi-
+                                                                                                 tionally independent given the latent representation ht :
+
+                                                                                                 p(yt , st |x, yt−1 , st−1 = 0 ) = p(yt |ht ) · p(st |ht ).                           (6)
+                                                                                                 This conditional independence assumption is justiﬁed because de-
+                                                                                                 ciding whether yt is the ﬁnal segmentation is equivalent to de-
+                                                                                                 ciding whether yt−1 is one step from completion, due to the pre-
+                                                                                                 dictable segmentation evolution. Hence, yt is not informative for
+Fig. 4. Probabilistic model: given image x, we assume that pairs of segmentations                inferences about the stopping indicator st given ht that captures
+and stopping indicators {yt , st } follow a ﬁrst order Markov chain. Shaded nodes in-            all necessary information about the image x and previous segmen-
+dicate observed variables.                                                                       tation yt−1 .
+                                                                                                     Finally, we model h(x, yt−1 ), p(yt |ht ) and p(st |ht ) as stationary
+                                                                                                 functions, i.e., they do not depend on the time step t.
+extension to multiclass iterative segmentation. Finally, we perform
+a more comprehensive validation in a signiﬁcantly expanded pa-                                   2.3. Learning
+tient cohort.
+                                                                                                     We use manually segmented images to learn the parame-
+2. Iterative segmentation model                                                                  ters θ ∗ = argminθ L(θ ) of a model for the transition probability
+                                                                                                 p(yt , st |x, yt−1 , st−1 = 0; θ ). We use θ = {θh , θy , θs } to denote the
+  Given image x :  → R and initial segmentation seed y0 :                                       parameters of the learned functions h(x, yt−1 ; θh ), p(yt |ht ; θy ) and
+ → { 0, . . . , L − 1 }, we seek a segmentation label map y :                                   p(st |ht ; θs ), respectively.
+ → { 0, . . . , L − 1 } that parcellates the image into L label                                     First we consider a training dataset D containing im-
+maps. In practice, the initial segmentation y0 is created by cen-                                ages {x} and variable-length ground truth sequences of seg-
+tering a small sphere around a seed point placed by the user for                                 mentations {y0 , . . . , yT (x )−1 , yT (x ) } and stopping indicators
+each anatomical structure.                                                                       {s0 , . . . , sT (x)−1 , sT (x) } = {0, . . . , 0, 1}, such that the ﬁnal seg-
+                                                                                                 mentation is the sole complete segmentation. The segmen-
+2.1. Probabilistic model
+                                                                                                 tation sequences capture the desired segmentation evolution
+                                                                                                 dynamics.
+    We model the segmentation label map y as the ﬁnal element
+                                                                                                     Adopting the teacher forcing approach (Williams and Zipser,
+in a sequence of segmentations y0 , . . . , yT that captures a growing
+                                                                                                 1989; Goodfellow et al., 2016), we develop a novel loss function
+and evolving portion of the anatomy of interest, where yt :  →
+                                                                                                 that seeks the parameter values which minimize the expected neg-
+{0, . . . , L − 1} for time steps t = 0, . . . , T . To capture the variable                     ative log-likelihood over the sequences of segmentations and stop-
+length of the segmentation sequence, we introduce a sequence of
+                                                                                                 ping indicators, conditioned on the image and the initial condi-
+stopping indicators s0 , . . . , sT , where st ∈ {0, 1} and st = 1 indicates
+                                                                                                 tions:
+that the segmentations should ﬁnish evolving at yt . Hence, in prac-
+tice s0 = 0.                                                                                     L(θ ) = ED − log p(y1 , . . . , yT (x ) , s1 , . . . , sT (x ) |x, y0 , s0 ; θ ) ,
+    Given an image x, we assume that pairs of segmentations and
+stopping indicators {yt , st } follow a ﬁrst order Markov chain, as                                               T (x )
+                                                                                                                  
+shown in Fig. 4:                                                                                        = ED               − log p(yt , st |x, yt−1 , st−1 ; θ ) ,                    (7)
+                                                                                                                  t=1
+p(yt , st |x, y0 , . . . , yt−1 , s0 , . . . , st−1 ) = p(yt , st |x, yt−1 , st−1 ),   (1)
+for t = 1, . . . , T , leading to the recursion
+                                                                                                                ⎡
+                                                                                                                  T (x )
+p(yt , st |x, y0 , s0 )                                                                                         ⎢                                           
+                                                                                                       = ED ⎣            − log p yt |h(x, yt−1 ; θh ); θy
+ =             p(yt , st |x, yt−1 , st−1 ) · p(yt−1 , st−1 |x, y0 , s0 ),              (2)                          t=1                                   
+                                                                                                                            segmentation loss
+     yt−1 st−1
+                     transition probability         recursive deﬁnition                                                                                     ⎤
+for t = 1, . . . , T , where p(y0 , s0 |x, y0 , s0 ) = 1.                                                                                                 ⎥
+                                                                                                                           − log p st |h(x, yt−1 ; θh ); θs ⎦.                        (8)
+2.2. Transition probability model
+                                                                                                                                                        
+                                                                                                                                  stopping indicator loss
+
+    To complete the recursion in Eq. (2), the transition probabil-                                  In Eq.    (7), teacher forcing leads to a sum over decou-
+ity p(yt , st |x, yt−1 , st−1 ) must be deﬁned. We consider st−1 = 1 and                         pled time steps, due to the Markov property in Eq. (1). This
+st−1 = 0 separately.                                                                             greatly simpliﬁes training, by eliminating the need for back-
+    When st−1 = 1, the segmentation yt−1 is the ﬁnal segmenta-                                   propagation through time. Eq. (8) is an expectation over a seg-
+tion. The transition model ensures the segmentation remains un-                                  mentation loss and a stopping indicator loss. The segmentation
+changed:                                                                                         yt and stopping indicator st are predicted jointly, and both of
+                                                                                                 their losses inﬂuence the parameters used to compute the la-
+p(yt , st |x, yt−1 , st−1 = 1 ) = 1[yt = yt−1 ] · 1[st = 1],                           (3)
+                                                                                               tent representation ht = h(x, yt−1 ; θh ). This multi-task approach of-
+where 1 · denotes the indicator function.                                                        ten improves learning, and requires fewer parameters compared
+  When st−1 = 0, the segmentation’s evolution is not yet ﬁnished.                                to training two separate networks (Caruana, 1997; Liu et al.,
+We introduce a deterministic latent representation                                               2020a).
+ht = h(x, yt−1 )                                                                       (4)          Since the loss is a sum over decoupled time steps, training data
+                                                                                                 of entire predeﬁned output sequences is unnecessary. The loss can
+that captures all necessary information from the given image x and
+                                                                                                 be equivalently minimized using a simpliﬁed dataset D  consisting
+previous segmentation yt−1 to make inferences about yt and st :
+                                                                                                 of tuples {x, yin , yout , s}, where segmentations yin and yout corre-
+p(yt , st |x, yt−1 , st−1 = 0 ) = p(yt , st |ht ).                                     (5)       spond to consecutive time steps and s denotes whether yout is a
+
+                                                                                             4
+D.F. Pace, A.V. Dalca, T. Brosch et al.                                                                                                          Medical Image Analysis 80 (2022) 102469
+
+
+complete segmentation:
+               ⎡                                                                        ⎤
+               ⎢                                                                    ⎥
+L(θ ) = ED ⎢− log p yout |h(x, yin ; θh ); θy − log p s|h(x, yin ; θh ); θs ⎥.
+               ⎣                                                                ⎦
+                        segmentation loss                 stopping indicator loss
+                                                                                        (9)
+
+These input-output pairs can be generated on-the-ﬂy during train-
+ing (more details are provided in Section 3.2).
+   In the rest of this section, we make typical modeling
+choices to deﬁne the segmentation and stopping indicator
+losses.
+                                                                                                  Fig. 5. Our RNN jointly evolves the segmentation and predicts the stopping indica-
+                                                                                                  tor. The main block is a trained U-Net modiﬁed to model p(yt , st |x, yt−1 , st−1 = 0; θ ),
+2.3.1. Segmentation loss                                                                          where the ﬁnal bank of C = 24 features forms the latent representation ht =
+    We assume that the label of each voxel in the segmentation yout                               h (x, yt−1 ; θh ). This particular example visualizes the model for binary segmentation.
+is conditionally independent of all other voxels given h(x, yin ). Pre-
+dicted segmentations can therefore be represented as probability                                   ∗ :
+                                                                                                  st−1
+maps, at each voxel storing the parameters of a categorical distri-
+bution over L labels. Let yout be a one-hot ground truth segmenta-                                p(yt , st |x, y0 , s0 ; θ )
+tion and yˆ out be a predicted segmentation probability map, i.e., we                                
+                                                                                                   =            p(yt , st |x, yt−1 , st−1 ; θ ) · p(yt−1 , st−1 |x, y0 , s0 ; θ )
+use yˆ out as a shorthand for p(yout |h(x, yin ; θh ); θy ). The segmenta-
+                                                                                                      yt−1 st−1
+tion loss in Eq. (9) is a voxel-wise categorical cross-entropy loss
+with spatially varying weights ωyout ,l (v ):                                                      ≈ p(yt , st |x, yt−1
+                                                                                                                    ∗      ∗
+                                                                                                                        , st−1 ; θ ),
+                                                                                                         ∗
+                                                                                                  where yt−1    ∗
+                                                                                                             , st−1 = argmax p(yt−1 , st−1 |x, y0 , s0 ; θ ).                          (12)
+                        L−1
+                                                                                                                          yt−1 ,st−1
+Lseg yout , yˆ out =               −ωyout ,l (v ) · yout,l (v ) · log yˆ out,l (v ),              Eq. (12) is a mode approximation of Eq. (2). It is accurate
+                         v∈ l=0                                                                                    ∗ , s∗ |x, y , s ; θ ) ≈ 1, i.e., when the distribution
+                                                                                                  whenever p(yt−1          t−1       0 0
+         ωyout ,l (v ) = ωl + ωyout (v ).                                              (10)       p(yt−1 , st−1 |x, y0 , s0 ; θ ) ≈ δ (yt−1 − yt−1
+                                                                                                                                               ∗ ) · δ (s
+                                                                                                                                                         t−1 − st−1 ), where δ is
+                                                                                                                                                                ∗
+
+                                                                                                  the Dirac delta function, as the non-maximal members of the sum
+We use spatially varying weights with two goals in mind. The
+                                                                                                  in Eq. (2) are negligible compared with the maximal one.
+ﬁrst term addresses class rebalancing, where each weight ωl =                                                  ∗
+                                                                                                    When st−1      = 1, Eqs. (3) and (12) yield the approximation
+(1/ fl )/ l  (1/ fl  ) is a normalized inverse label frequency in the                                                                          
+training data’s target segmentations. The second goal is to en-                                   p(yt , st |x, y0 , s0 ; θ ) ≈ 1 yt = yt−1
+                                                                                                                                        ∗
+                                                                                                                                            · 1(st = 1 ).                              (13)
+courage segmentations to “snap” to image boundaries, by more
+                                                                                                  We adopt the maximum a posteriori (MAP) approach and continue
+strongly penalizing errors near ground truth segmentation bor-
+                                                                                                  the recursion until p(st∗ = 1|x, y0 , s0 ; θ ) > 0.5, at which point the
+ders, hence the dependence on the ground truth segmenta-
+                                                                                                  segmentation yt∗ is deemed the ﬁnal segmentation and iterative
+tion yout (Ronneberger et al., 2015; Roy et al., 2017). We intro-
+                                                                                                  segmentation stops. While here we use the MAP criterion for stop-
+duce a weight map ωyout :  → {0, ω0 } that contains a constant
+                                                                                                  ping, one could also choose a different threshold of the posterior
+boundary weight ω0 > 0 for voxels located within d0 voxels of
+                                                                                                  probability of the stopping indicator based on domain knowledge
+any boundary in the ground truth segmentation yout , and zero
+                                                                                                  or empirical results. A user can override this automatic stopping
+otherwise.
+                                                                                                  prediction by choosing an earlier segmentation or asking for more
+                                                                                                  iterations.
+2.3.2. Stopping indicator loss
+    The distribution of the stopping indicator s is Bernoulli. The                                3. Recurrent neural network
+stopping indicator loss in Eq. (9) is a binary cross-entropy loss,
+which we again weight for class rebalancing. Let s be a ground                                        Our RNN implements the recursion
+truth binary stopping indicator and sˆ be a predicted stopping prob-                              ht = h(x, yt−1
+                                                                                                             ∗
+                                                                                                                 ; θh ) ,
+ability, i.e., we use sˆ as a shorthand for p(s|h(x, yin ; θh ); θs ). We
+                                                                                                  yt∗ = argmax p(yt |ht ; θy ),
+have                                                                                                         yt
+
+Lstop (s, sˆ) = −(1 − ωs ) · s log sˆ − ωs · (1 − s ) log(1 − sˆ),                     (11)                           ( |
+                                                                                                  st∗ = argmax p st ht ; s     θ ),                                                    (14)
+                                                                                                           st
+
+where the class rebalancing weight ωs is the estimated pro-                                       until st∗ = 1, at which point yt∗ is the ﬁnal solution.
+portion of training instances in which the stopping indicator
+equals 1.                                                                                         3.1. RNN architecture
+
+                                                                                                      Our RNN is depicted in Fig. 5. It is constructed by joining copies
+2.4. Inference                                                                                    of a 3D U-Net architecture (Ronneberger et al., 2015) that we mod-
+                                                                                                  ify to model p(yt , st |x, yt−1 , st−1 = 0; θ ). The U-Net has L + 1 input
+    Since the recursion in Eq. (2) is computationally intractable                                 channels for the image to be segmented and a binary mask for
+due to the summation over all possible segmentations yt−1 , we                                    each of the anatomical labels in the input segmentation yt−1      ∗    (in-
+follow the widely accepted practice of using point estimates                                      cluding the background). There are two outputs: the output seg-
+(Iglesias et al., 2013) to infer yt and st directly from the most likely                          mentation yt∗ , which becomes the input segmentation in the next
+previous binary segmentation yt−1    ∗  and binary stopping indicator                             time step via a recurrent connection, and the stopping indicator st∗ .
+
+                                                                                              5
+D.F. Pace, A.V. Dalca, T. Brosch et al.                                                                                               Medical Image Analysis 80 (2022) 102469
+
+
+
+
+                                                                                           Fig. 7. Data augmentation creates corrupted inputs yin and uncorrupted outputs yout
+                                                                                           so the trained RNN is robust to errors in its intermediate results.
+
+
+
+                                                                                           the aortic seed could have been placed at the aortic valve, and seg-
+Fig. 6. Input and output partial segmentations and binary stopping indicators              mentations grown away from the heart. However, the descending
+(yin , yout , s ) are generated on-the-ﬂy during training from ground truth complete       aorta is more salient, so we grow segmentations in the opposite di-
+segmentations y and seeds y0 .                                                             rection, towards the aortic valve. For all but the PA, segmentations
+                                                                                           must grow towards one of the inter-structure boundaries that sep-
+                                                                                           arate the global blood pool. The lack of contrast at these borders
+    Recall that in the U-Net architecture, a ﬁnal bank of learned
+                                                                                           provides a challenging test case for automatic stopping.
+feature maps is used to produce the output segmentation proba-
+bility map. In our RNN, these learned feature maps form the latent
+                             ∗ ; θ ). Note that the size of h equals
+                                                                                           3.3. Data augmentation
+representation ht = h(x, yt−1      h                         t
+the dimensions of image x multiplied by the number of channels
+                                                                                               We apply random aﬃne and nonlinear transformations, left-
+C (i.e., this is not a bottleneck layer).
+                                                                                           right and anterior-posterior ﬂips (relevant due to dextrocardia and
+                                                                                           other cardiac malpositions in CHD), constant intensity shifts and
+3.2. Training data generation                                                              additive Gaussian noise.
+                                                                                               Cardiac MR has inhomogeneity artifacts around implanted
+    The training data D  = {x, yin , yout , s} should capture the                         stents and a heterogeneous background due to inconsistent sur-
+application-dependent segmentation evolution pattern that the                              rounding vasculature. We perform additional data augmentation
+RNN should learn to produce. There are many ways in which this                             for the AO and PA by adding random dark regions inside the ves-
+training data can be generated. In our case, every training im-                            sels and random dark or bright regions next to them.
+age has a ground truth complete segmentation y and an example                                  Finally, if our modiﬁed U-Net is trained using error-free input
+seed y0 for each anatomical label. We consider binary segmenta-                            segmentations yin , then it may not operate well when perform-
+tion in this section, and discuss extensions to multiclass segmen-                         ing inference on its own imperfect outputs at test time. We ad-
+tation in Section 3.4. During each epoch, we automatically generate                        dress this by corrupting each label of yin using random nonrigid
+one sample from D  for each training image (Fig. 6) using a differ-                       deformations and also add random foreground blobs that vary in
+ent mechanism for great vessels and cardiac chambers.                                      number, location and size (Fig. 7). The output segmentation yout re-
+    We train models for great vessel segmentation that grow along                          mains unchanged. During training, the network must learn to cor-
+their centerline at a constant rate. Before training, we precom-                           rect errors in its input while simultaneously growing the segmen-
+pute a distance map that can be randomly thresholded to sam-                               tation appropriately. Hence, the trained model will be more robust
+ple the partial segmentations used for training. We use fast march-                        when it operates recursively.
+ing (Sethian, 1996) to create a geodesic distance map that is zero
+in the background (and hence embeds the ground truth complete                              3.4. Multiclass learned iterative segmentation
+segmentation), and for each foreground voxel stores the distance of
+the shortest path to the seed point that remains within the ground                             Although we primarily focus on binary segmentation, we also
+truth segmentation. During training, we threshold at a distance d1                         demonstrate the application of our framework to multiclass itera-
+chosen uniformly at random to form yin , and then at d2 = d1 + ds                          tive segmentation (i.e., L > 2). Multiclass segmentation enjoys the
+to form yout , where ds is the desired step size. Note that this pre-                      beneﬁts of multi-task learning, requires training only one model
+computed distance map relies on the ground truth segmentation                              that segments multiple anatomical structures, and eliminates the
+and therefore is unavailable during inference.                                             need to subsequently resolve conﬂicts between overlapping bi-
+    Chamber segmentations are trained to dilate outward at a con-                          nary segmentations. Moreover, an iterative model that learns to si-
+stant rate. During training, we ﬁrst randomly perturb the seed                             multaneously grow multiple segmentations might better learn the
+point by moving y0 within the chamber’s center region, and then                            spatial relationships between them. For the most part, the train-
+generate two concentric spheres centered on it: the radius d1 of                           ing data generation for multiclass iterative segmentation can be
+the smaller sphere is chosen uniformly at random, and the larger                           achieved by separately processing the data for each anatomical la-
+radius is d2 = d1 + ds . Both spheres are intersected with y to form                       bel as described above for binary segmentation, with a few addi-
+(yin , yout ).                                                                             tional considerations. In our implementation, each multiclass yin
+    Finally, the ground truth binary stopping indicator s is com-                          contains input partial segmentations of each structure that are
+puted by comparing yout with y.                                                            approximately the same (random) percentage complete. We con-
+    The seed points to be clicked by the user1 were chosen to max-                         tinue to use a single binary stopping indicator s. During data aug-
+imize the potential for automatic detection in future. For example,                        mentation, corrupting the segmentation of a structure in yin often
+                                                                                           changes the segmentations of neighboring structures, so we avoid
+ 1
+   LV, RV, LA, RA: center region; AO: bottom of descending aorta; PA: bottom of            biasing the degree to which each anatomical label is distorted by
+main PA trunk; SVC: superior end; IVC: center of hepatic segment.                          corrupting the foreground channels of yin in a random order and
+
+                                                                                       6
+D.F. Pace, A.V. Dalca, T. Brosch et al.                                                                                            Medical Image Analysis 80 (2022) 102469
+
+
+making a structure’s label map immutable after it has been cor-
+rupted.
+
+
+4. Evaluation
+
+   We evaluated our iterative segmentation model for the task of
+whole heart segmentation in patients with CHD, comparing to sev-
+eral automatic and interactive learning-based methods that directly
+segment an image in one step.
+                                                                                            Fig. 8. Size and composition of the 20–HVSMR and 48–HVSMR+ training datasets.
+
+4.1. Data
+                                                                                            4.2. Experimental setup
+    The ﬁrst 20 cardiac MR scans come from our group’s public
+HVSMR challenge dataset (http://segchd.csail.mit.edu, (Pace et al.,
+                                                                                                We compared seven segmentation approaches, including ﬁve
+2015)). We retrospectively retrieved 40 additional images from the
+                                                                                            interactive and two fully-automatic methods. All of the interac-
+clinical archive for this study, thus creating a larger dataset of 60
+                                                                                            tive methods generate a full segmentation from a single user click
+images with manual segmentations of the LV, RV, LA, RA, AO, PA,
+                                                                                            per structure (i.e., there is no iterative back-and-forth with a user).
+SVC and IVC. This is a unique dataset acquired during clinical prac-
+                                                                                            (1) Iter–A is our iterative binary segmentation with automatic
+tice, and reﬂects the substantial manual labeling effort required for
+                                                                                            stopping. (2) Iter–U uses the same trained model as Iter–A but
+whole heart segmentation in CHD.
+                                                                                            simulates a user who chooses the stopping point (by keeping the
+    All images were acquired at Boston Children’s Hospital on a
+                                                                                            best segmentation from the ﬁrst 40 iterations), included to eval-
+1.5T scanner (Philips Achieva) using ECG and respiratory naviga-
+                                                                                            uate how a slight increase in user interaction may improve seg-
+tor gating, the vast majority using a free-breathing SSFP pulse se-
+                                                                                            mentation accuracy. (3) Iter–A–All is our multiclass iterative seg-
+quence (TR∼3.4-4.7 ms, TE∼1.7-2.4 ms, α ∼60-90◦ ) (Moghari et al.,
+                                                                                            mentation with automatic stopping, and (4) Iter–U–All is our mul-
+2017). A few images were acquired using alternate MR protocols;
+                                                                                            ticlass iterative segmentation with simulated user stopping (by
+image appearance differences are relatively minor. Gadolinium-
+                                                                                            keeping the segmentation from the ﬁrst 40 iterations that has the
+based contrast agent (Ablavar or Gadovist) was used in some pa-
+                                                                                            best mean accuracy over all eight cardiac structures). (5) U–Net–
+tients at the discretion of clinicians. The image resolution averaged
+                                                                                            All is a U-Net for fully-automatic multiclass segmentation of all
+0.9 × 0.9 × 0.85mm. All images were cropped around the heart and
+                                                                                            8 structures, included as a state-of-the-art reference. (6) U–Net is
+resized to 126 × 180 × 144. Intensity normalization was performed
+                                                                                            a U-Net for fully-automatic binary segmentation of each anatom-
+using estimates of the blood pool and lung intensity that were
+                                                                                            ical structure, included as a benchmark for binary segmentation.
+automatically derived from intensity histograms within predeter-
+                                                                                            (7) U–Net+S is a U-Net for interactive binary segmentation which
+mined image bounding boxes (see Supplementary Material). Sub-
+                                                                                            also inputs a Euclidean distance map to the user seed, included
+ject age ranged from <1 to 55 years old.
+                                                                                            to evaluate the value of input seed points. We emphasize that U–
+    Ground truth segmentation required many hours per image.
+                                                                                            Net+S is an interactive method as it relies on a distance map to
+The original HVSMR dataset included segmentations of the blood
+                                                                                            a user-speciﬁed seed, and is nearly identical to prior state-of-the-
+pool and myocardium only. Trained raters manually divided each
+                                                                                            art methods when generating an entire segmentation from a single
+blood pool surface model using 3D Slicer (Fedorov et al., 2012)
+                                                                                            user click (Xu et al., 2016; Sakinis et al., 2019). We also note that
+by ﬁtting local separating planes at the interfaces between struc-
+                                                                                            although the training data for the multiclass iterative segmentation
+tures. The 40 new images were segmented by combining manual
+                                                                                            models Iter–A/U–All is generated on-the-ﬂy for each anatomical
+contours of the interfaces between different heart structures made
+                                                                                            label separately, these are true multiclass models that input L + 1
+using a valve annotation module (Scanlan et al., 2018; Nguyen
+                                                                                            input channels and produce L output channels in a single forward
+et al., 2019) with segmentations from a 3D U-Net trained using the
+                                                                                            pass for each iteration.
+HVSMR dataset, and performing extensive manual cleanup to ﬁx
+                                                                                                In total, we trained 26 models (1 U–Net–All model, 1 Iter–A–
+errors and avoid bias towards the network’s output. All segmenta-
+                                                                                            All model, plus 8 structures × 3 models for Iter–A, U–Net and U–
+tions were validated by hospital experts when the correct segmen-
+                                                                                            Net+S. Note Iter–U uses the trained model from Iter–A and Iter–
+tation was ambiguous. For each cardiac structure, a simulated user
+                                                                                            U–All uses the trained model from Iter–A–All). All models used
+click was created using morphological and center-of-mass calcula-
+                                                                                            the same data augmentation procedures for image transformations,
+tions.
+                                                                                            intensity adjustments and MR artifact simulation. User interaction
+    Under the advice of a cardiologist, all images were categorized
+                                                                                            was simulated in our experiments, including the clicks to place the
+as mild, moderate or severe, according to each heart’s anatomical
+                                                                                            seed points required by U–Net+S, Iter–A/U and Iter–A/U–All and
+malformations (not clinical prognosis)2 Note that even moderate
+                                                                                            the user stopping required by Iter–U and Iter–U–All. In particu-
+cases have signiﬁcant defects. Most subjects have a unique combi-
+                                                                                            lar, U–Net+S used the same procedures as Iter–A/U to simulate in-
+nation of heart defects (45% of moderate subjects and 89% of se-
+                                                                                            put seeds, after which the Euclidean distance map is computed.
+vere subjects).
+                                                                                            For more details on network architectures, training data genera-
+                                                                                            tion, data augmentation and learning procedures, including chosen
+  2
+                                                                                            parameters, please see the Supplementary Material.
+    Mild: Roughly normal anatomy, prior CHD surgery with restoration of normal
+anatomy, and/or a mildly or moderately dilated chamber or vessel, Moderate: Sep-                We evaluated the impact of training dataset size as follows (see
+tal defect (VSD, ASD), abnormal connectivity (DORV, D-Loop TGA), bilateral SVC,             Fig. 8). First, we trained 20–HVSMR models on the original HVSMR
+severely dilated chamber/vessel, and/or connective tissue disorder causing tortuous         scans, and tested on the 40 new images. These experiments evalu-
+vessels, Severe: Heart malpositions or situs inversus (dextrocardia, mesocardia, in-        ate generalization from a very small dataset, which is biased to-
+verted ventricles or atria, left/central IVC or SVC), L-loop TGA, common atrium, sin-
+gle ventricle, and/or major prior reconstructive surgery resulting in highly abnormal
+                                                                                            wards more normal anatomy, to more severe cases. Second, we
+anatomy (atrial switch, Rastelli, Glenn, Fontan). Note: A dilated chamber or vessel         trained 48–HVSMR+ models using the 20 HVSMR images and 28
+was counted only if it was the sole diagnosis.                                              new images, and tested on 12 new images. These 12 images repre-
+
+                                                                                        7
+D.F. Pace, A.V. Dalca, T. Brosch et al.                                                                                                    Medical Image Analysis 80 (2022) 102469
+
+
+ Table 1
+ Overall Dice scores for held-out test images. For mild / moderate subjects, all methods have comparable performance. For severe subjects, our binary iterative segmentation
+ is superior, and our multiclass iterative segmentation is superior to the baselines when the training dataset is small and imbalanced (20–HVSMR). Dice scores are averaged
+ over all 8 cardiac structures and shown as mean ± standard deviation. Where shown, p-values indicate statistically signiﬁcant differences between the given iterative
+ method and U–Net+S (∗ p) or U–Net–All (∗∗ p) in a paired t-test with a threshold of 0.05. Table S1 of the Supplementary Material gives results for each cardiac structure in
+ detail.
+
+                                          Mild / Moderate Subjects                                                             Severe Subjects
+
+                                    20-HVSMR                         48-HVSMR+                        20-HVSMR                                            48-HVSMR+
+
+   U-Net-All             87.7±14.6                                   90.7±7.5         64.6±31.9                                                  84.9±18.0
+   U-Net                 87.3±9.5                                    90.5±5.3         55.8±36.1                                                  75.6±28.0
+   U-Net+S               85.4±17.3                                   89.7±7.7         68.2±27.8                                                  82.0±19.7
+                                                                                                          ∗
+   Iter-A                88.1±7.7                                    90.4±4.3         79.0±17.2               p < 10−11 , ∗∗ p < 10−12           85.1±15.6
+   Iter-U                91.1±4.1               ∗
+                                                    p < 10−2         92.6±3.0         85.3±12.8           ∗
+                                                                                                              p < 10−22 , ∗ ∗ p < 10−22          88.2±14.0           ∗
+                                                                                                                                                                         p < 10−2
+                                                                                                          ∗          −7   ∗∗        −9
+   Iter-A-All            85.6±14.3                                   88.2±9.0         77.3±22.6               p < 10 , p < 10                    85.2±17.8
+                                                                                                          ∗
+   Iter-U-All            87.4±13.6                                   90.3±7.3         78.9±22.0               p < 10−10 , ∗∗ p < 10−11           86.8±18.1
+
+
+
+sent 20% of the total dataset size and also focus on generalization                       mild/moderate subjects. Despite the small dataset sizes, good gen-
+to severe subjects, but include one mild and one moderate subject                         eralization is possible with or without user interaction since these
+as sanity checks. These experiments assess an algorithm’s accuracy                        hearts exhibit low variability and are well represented in both
+when a larger and more balanced dataset is available for training,                        datasets.
+although we note that the dataset of 48 images is still small. All                            Severe Subjects: Extreme cardiac malformations make segment-
+training was done using 4-fold cross validation, where each fold                          ing severe subjects a much more challenging task. First, the user
+had an approximately equal number of mild, moderate and severe                            seed provides a signal for object localization that proved very
+cases. An ensemble of the resulting four networks yielded the ﬁnal                        useful since CHD often involves abnormal positioning of cardiac
+prediction on the test images.                                                            structures in the body, and U–Net+S outperformed U–Net for both
+    We implemented our method using Keras (Chollet et al., 2015)                          training datasets.
+with a Tensorﬂow backend (Abadi et al., 2015). Optimization was                               Binary iterative segmentation had the highest accuracy. Note
+done using Adam (Kingma and Ba, 2015), with a learning rate of                            that Iter–A requires the same level of user input as U–Net+S, but
+10−4 and a batch size of 1, for 20 0 0 epochs. Inference was fast                         had a better mean segmentation accuracy. The multiclass segmen-
+enough for our iterative segmentation method to be used inter-                            tation baseline (U–Net–All) did show some advantages compared
+actively. For binary iterative segmentation, each iteration required                      to binary segmentation, but nevertheless had lower mean accuracy
+0.65±0.15 seconds on an NVIDIA TITAN X GPU and the mean time                              than Iter–A and Iter–U. In addition, Iter–A and Iter–U had smaller
+required to segment one structure ranged from 2 to 18 seconds,                            Dice score variances and suffered from fewer catastrophic failures
+leading to a total inference time of approximately 1 minute for                           compared to the baselines. In cases where Iter–A does not identify
+whole heart segmentation. For binary iterative segmentation, we                           the ideal stopping point, we have evidence that iterative segmenta-
+expect users to interact with the algorithm as each structure is                          tion may be improved by a small additional amount of user inter-
+segmented sequentially.                                                                   action to choose the ﬁnal segmentation (Iter–U). Including this in-
+                                                                                          teraction brought the mean Dice score in severe subjects to greater
+4.3. Evaluation metrics                                                                   than 85, within ∼6 Dice points of the mean performance in mild
+                                                                                          and moderate subjects. As expected, accuracy improved with more
+    We employ the Dice score to quantify the volume overlap be-                           training data, but the accuracy of binary iterative segmentation
+tween the ground truth and predicted segmentations.                                       was less sensitive to the training dataset size than the three di-
+    All segmentations were post-processed to keep the island con-                         rect segmentation methods (U–Net–All, U–Net and U–Net+S). The
+taining the user seed if the given method inputs a seed and the                           beneﬁts of iterative segmentation were especially pronounced in
+segmentation contained it, or the largest connected component                             the smaller 20–HVSMR dataset, in which paired t-tests with a
+otherwise. For the iterative segmentation methods, this is done af-                       threshold of 0.05 showed statistically signiﬁcant differences be-
+ter every step of inference. Vessel segmentations that are slightly                       tween Iter–U and U–Net+S for all 8 cardiac structures, and be-
+too long or too short are no less clinically useful (Zhuang et al.,                       tween Iter–A and U–Net+S for all structures except the AO and
+2019). Hence, we included “optional zones” for the AO, PA, SVC, IVC                       SVC. Similarly, there were statistically signiﬁcant differences be-
+and pulmonary veins, which speciﬁed both a minimum required                               tween Iter–U and U–Net–All for all structures except the AO, and
+vessel length and a permitted continuation. Optional areas were                           between Iter–A and U–Net–All for the LV, LA, RA, SVC and IVC. For
+subtracted from both the ground truth and algorithm segmenta-                             both training datasets, the PA was the most diﬃcult structure to
+tions before computing the Dice score, so that only the required                          segment, as corroborated by the results from a recent whole heart
+regions were compared.                                                                    segmentation challenge (Zhuang et al., 2019). For 20–HVSMR, the
+                                                                                          RV, RA and SVC were also relatively diﬃcult to segment.
+4.4. Segmentation accuracy                                                                    Multiclass iterative segmentation shows similar trends. Most
+                                                                                          importantly, for the 20–HVSMR dataset both Iter–A–All and Iter–
+   Table 1 and Fig. 9 report segmentation accuracy on held-out                            U–All showed statistically signiﬁcant improvements over all three
+test images. Our proposed binary iterative segmentation with user                         baseline algorithms, including the multiclass U–Net–All. However,
+stopping (Iter–U) consistently had the highest accuracy.                                  for multiclass iterative segmentation simulated user stopping did
+   Mild and Moderate Subjects: We combine results from mild and                           not improve the results as much as it did for binary iterative seg-
+moderate subjects because they were very similar: Welch’s t-tests                         mentation. Regarding individual cardiac structures, paired t-tests
+for independent samples with a threshold of 0.05 showed no sig-                           with a threshold of 0.05 showed signiﬁcantly signiﬁcant differ-
+niﬁcant differences between the overall Dice scores on mild ver-                          ences between Iter–U–All and U–Net+S for all structures except
+sus moderate test images for any combination of segmentation al-                          the AO and IVC, and between Iter–A–All and U–Net+S for the LV,
+gorithm and training dataset. All seven models performed well in                          RV, LA, PA and SVC. Similarly, there were statistically signiﬁcant
+
+                                                                                      8
+D.F. Pace, A.V. Dalca, T. Brosch et al.                                                                                         Medical Image Analysis 80 (2022) 102469
+
+
+
+
+Fig. 9. Overall and structure-speciﬁc Dice scores for held-out test images. For mild / moderate subjects, all methods have comparable performance. For severe subjects,
+our binary iterative segmentation is superior, and our multiclass iterative segmentation is superior to the baselines when the training dataset is small and imbalanced
+(20–HVSMR).
+
+
+
+differences between Iter–U–All and U–Net–All for the LV, RV, LA,                      monary veins that were missing or excessively long, while RA seg-
+RA and SVC, and between Iter–A–All and U–Net–All for the LV,                          mentations were sometimes mis-segmented at the IVC boundary.
+RV, LA and SVC. We again found that accuracy improved when us-                        The AO surface models were highly accurate, but could be too
+ing the larger 48–HVSMR+ dataset. Here, the overall Dice scores of                    bumpy near dark inhomogeneity artifacts. The main failure case for
+Iter–A–All and Iter–U–All were similar to or better than those of                     the PA was a segmentation that could not grow through a narrow
+the three baselines, although no statistically signiﬁcant improve-                    main PA (MPA) trunk for patients with a PA band, PA stenosis, or
+ments were found. For multiclass iterative segmentation, the PA                       whose images had artifacts in the MPA region. The left or right PA
+was again diﬃcult to segment for both training datasets. For 20–                      branch sometimes grew past the maximum length speciﬁed by the
+HVSMR, the RA and IVC had the lowest accuracy.                                        “optional zones”. Finally, slight differences compared to the ground
+    Finally, we compare multiclass to binary iterative segmenta-                      truth could be found at the interface between the SVC/IVC and the
+tion. Although the binary iterative segmentation methods most of-                     RA, or between the SVC/IVC and the attached PA for patients with
+ten have a higher mean Dice score than their corresponding mul-                       prior Glenn or Fontan surgeries.
+ticlass iterative segmentation methods, the difference is typically
+not statistically signiﬁcant in paired t-tests with a threshold of                    4.6. User interaction: automatic versus user stopping
+0.05. The exception is between Iter–U and Iter–U–All for models
+trained with the smaller 20–HVSMR dataset in both mild / mod-                             Some examples in which Iter–U outperformed Iter–A are
+erate and severe subjects. In severe subjects, for the 20–HVSMR                       shown in Fig. 11. Recall that in our proposed setup, the Iter–A re-
+dataset, Iter–U–All was signiﬁcantly better than Iter–U for the RV                    sult is initially shown, and the user can accept it or look forwards
+but signiﬁcantly worse for the LA, AO, SVC and IVC, and Iter–A–All                    or backwards in the output sequence for a better result. The er-
+was signiﬁcantly better than Iter–A for the RV and AO but signiﬁ-                     ror in the number of iterations predicted via automatic stopping
+cantly worse for the LA and IVC. For the 48–HVSMR+ dataset, Iter–                     directly causes the decrease in accuracy for Iter–A compared to
+U–All showed statistically signiﬁcant advantages for the LV and AO,                   Iter–U, as well as the number of additional clicks required of the
+and Iter–A–All showed statistically signiﬁcant advantages for the                     user. However, Fig. 12 shows that this number was typically small
+AO. No signiﬁcant disadvantages were found for severe subjects                        and often zero, i.e., a user would not have to search far, if at all,
+in 48–HVSMR+ between corresponding binary and multiclass al-                          from the automatically proposed solution.
+gorithms.
+    In the remaining evaluations, we focus on the performance of                      4.7. Do the iterative models learn the desired trajectories?
+Iter–U using the 48–HVSMR+ training dataset, since it had the best
+accuracy.                                                                                 Our iterative segmentation algorithm is trained to produce se-
+                                                                                      quences of output segmentations that follow a prescribed growth
+4.5. Example segmentations and failure cases                                          pattern. To evaluate this evolution, for each cardiac structure in the
+                                                                                      test images we compared each intermediate segmentation in the
+   Example Iter–U segmentations are shown in Fig. 10. The bot-                        predicted output sequence y∗1 , . . . , yt∗ , . . . (for all t up to and includ-
+tom rows illustrate some failure cases.In the LV, RV, LA and RA,                      ing the stopping point chosen by the simulated user in Iter–U) to
+the Iter–U segmentation sometimes grew through a septal defect                        those in the ground truth sequence that begins with the same ini-
+or an adjoining valve, with a coincident under-segmentation of the                    tial segmentation y0 and grows according to the desired step size
+basal and apical ventricles, the main LA chamber or the pulmonary                     (as described in Section 3.2). Results are shown in Fig. 13. High
+veins. Chamber segmentations could also be under-segmented near                       Dice scores (approximately 80) over all subjects indicates good cor-
+septal defects. LA segmentations sometimes suffered from pul-                         respondences between the generated and ideal output sequences.
+
+                                                                                  9
+D.F. Pace, A.V. Dalca, T. Brosch et al.                                                                                             Medical Image Analysis 80 (2022) 102469
+
+
+
+
+Fig. 10. Inspection of representative Iter–U segmentations of severe subjects predominantly shows good overlap (gray), with some examples of under-segmentation (blue)
+and over-segmentation (orange). Results are from test subjects after training using 48–HVSMR+. Subjects were chosen for visualization according to the Dice score at the
+95th, 75th, 50th, 25th and 5th percentiles.
+
+
+
+
+                                                                                        Fig. 12. The automatically detected number of iterations (used by Iter–A) was typ-
+Fig. 11. Examples from severe subjects for which our iterative segmentation al-
+                                                                                        ically close to the ideal number of iterations (used by Iter–U). Results are from all
+lowed the simulated user to choose a better segmentation than that predicted by
+                                                                                        12 test subjects after training using 48–HVSMR+. The mean error for each structure
+automatic stopping. The user can select an earlier segmentation if the automatic
+                                                                                        is shown at the top of the graph.
+segmentation is too large, or ask for more iterations if is under-segmented.
+
+
+
+This adds further support for the accuracy of the learned iterative                     mean Dice score for the cardiac chambers by 1.4, 1.6, 2.2 and 2.7
+process, in addition to the improved accuracy of the ﬁnal output                        points for Iter–U, respectively, and by 1.5, 2.2, 3.2 and 4.2 points
+segmentations.                                                                          for Iter–A. RA segmentation was the most sensitive. For Iter–U,
+                                                                                        Welch’s t-tests for independent samples with a threshold of 0.05
+                                                                                        showed no signiﬁcant differences between the results for moving
+4.8. Impact of input seed location
+                                                                                        vs. center seed point locations for any cardiac chamber or moving
+                                                                                        seed region size. For Iter–A, the only signiﬁcant differences were
+    We used cardiac chamber segmentation to evaluate the robust-
+                                                                                        for the RV’s 50% region and the RA’s 25%, 30%, 40% and 50% re-
+ness of Iter–U and Iter–A to the location of the input seed. For
+                                                                                        gions.
+each test image, we varied the ideal “center” seed point loca-
+tion (derived from morphological and center-of-mass calculations
+as described above), sampling 20 “moving” seed points uniformly                         4.9. Impact of congenital heart defects
+at random within a spherical region whose radius was set to 25%,
+30%, 40% and 50% of the maximum possible distance to the ground                             A detailed examination of the impact of different heart defects,
+truth boundary. Note that 25% is the same amount of perturbation                        prior surgeries and MR artifacts on segmentation accuracy is given
+as was used when randomly varying the seed point location dur-                          by Fig. 15. The PA was the most diﬃcult structure to segment in
+ing training. Results are shown in Fig. 14. Varying the input seed                      the presence of cardiac malformations. Counterintuitively, segmen-
+location within the 25%, 30%, 40% and 50% regions decreased the                         tation accuracy increased in the LA for severe subjects compared to
+
+                                                                                   10
+D.F. Pace, A.V. Dalca, T. Brosch et al.                                                                                              Medical Image Analysis 80 (2022) 102469
+
+
+
+
+Fig. 13. The distribution of Dice scores between predicted and ground truth inter-
+mediate segmentations in Iter–U’s output sequences show high overlap. Results are
+from all 12 test subjects after training using 48–HVSMR+. The mean Dice score for
+each group of subjects is shown at the top of the graph.
+
+
+
+
+                                                                                          Fig. 15. Comparing the mean Dice score for patients with heart defects, prior surg-
+                                                                                          eries and MR artifacts to that of normal subjects shows that these conditions var-
+                                                                                          iously impact the accuracy of Iter–U. Green squares indicate higher accuracy than
+                                                                                          in normal subjects, pink squares indicate lower accuracy. The darkest pink inten-
+                                                                                          sity is set to -20% of the overall Dice score in normal subjects. The left vertical
+                                                                                          line indicates mild (green), moderate (yellow), severe (red) and coincident (black)
+                                                                                          abnormalities. Boxes indicate which structures are expected to be affected by each
+                                                                                          cardiac abnormality, but additional structures may be impacted if other conditions
+                                                                                          co-occur with the given abnormality. On the right, gray and black horizontal bars
+                                                                                          indicate prevalence in the 48–HVSMR+ cross validation and test splits, respectively.
+                                                                                          Results are from all 12 test subjects after training using 48–HVSMR+.
+Fig. 14. Perturbing the input seed had a minor impact on segmentation accuracy
+for Iter–U for all cardiac chambers and for Iter–A for all cardiac chambers except
+the RA. Results are from all 12 test subjects after training using 48–HVSMR+.                 Iterative segmentation with simulated user stopping consis-
+                                                                                          tently had the best overall segmentation accuracy in our experi-
+                                                                                          ments. Moreover, iterative segmentation with automatic stopping
+normal subjects. Segmentation accuracy in the SVC and IVC were
+                                                                                          outperformed all of the direct segmentation methods for subjects
+the least impacted by heart defects, while the LV, RV, RA and AO
+                                                                                          with severe cardiac malformations. All algorithms were highly ac-
+were moderately impacted. These results indicate where more data
+                                                                                          curate for patients with mild or moderate heart defects. This is be-
+or specialized data augmentation schemes might be helpful in fu-
+                                                                                          cause they make up a large proportion of both training datasets
+ture, e.g., to address diﬃculties in segmenting the PA (under var-
+                                                                                          while exhibiting lower anatomical variability. However, the direct
+ious conditions) and subjects with L-Loop TGA or prior arterial
+                                                                                          segmentation methods broke down in severe subjects, especially
+switch.
+                                                                                          when the training dataset was very small and imbalanced (20–
+                                                                                          HVSMR). The much improved performance of Iter–A/U and Iter–
+4.10. Additional ablation studies
+                                                                                          A/U–All in this situation is impressive since only 4 severe subjects
+                                                                                          were available for training. Iterative segmentation was less sen-
+   The results of additional ablation studies examining the impact
+                                                                                          sitive to dataset size, produced output segmentations whose pre-
+of (1) the step size ds , (2) the new data augmentation step com-
+                                                                                          dictability enables simpler user interaction, coped well with vari-
+pared to (Pace et al., 2018), and (3) segmentation post-processing
+                                                                                          ability in the input seed location, and binary iterative segmentation
+can be found in the Supplementary Material.
+                                                                                          computed a whole heart segmentation in less than one minute
+                                                                                          with just a few seconds per structure.
+5. Discussion
+                                                                                              We envision that our iterative segmentation RNN can be used
+                                                                                          within a complete solution to interactive segmentation as follows:
+    We show that it is possible to learn a whole heart segmentation
+model for cardiac MR images from patients with congenital heart                           1. The user places one seed click per structure.
+disease, despite limited labeled data and high anatomical variabil-                       2. Run Iter–A, which produces a segmentation with automatic
+ity. The proposed iterative segmentation method provides a new                               stopping.
+approach for very diﬃcult segmentation problems in which some                             3. In rare cases of signiﬁcant Iter–A failures (e.g., a PA doesn’t
+user interaction remains necessary, for example when creating new                            grow through a stent or MR artifact region): the user can go
+labeled datasets.                                                                            back in the output segmentation sequence to identify the ﬁrst
+
+                                                                                     11
+D.F. Pace, A.V. Dalca, T. Brosch et al.                                                                          Medical Image Analysis 80 (2022) 102469
+
+
+   point of failure and ﬁx it (e.g., draw the PA through the dif-            sometimes outperformed by U–Net–All in mild / moderate sub-
+   ﬁcult region) using existing interactive segmentation methods             jects. This may indicate that there exists a good stopping point
+   (Wang et al., 2018; 2019; Xu et al., 2016; Sakinis et al., 2019)          for each structure in the sequences of binary segmentations for
+   or manual editing. Our iterative segmentation RNN can then be             the simulated user to select, but that the multiclass output se-
+   easily restarted to continue growing the segmentation, since at           quences may not necessarily have a segmentation that simultane-
+   each step it requires only an image and a partially completed             ously contains the best segmentation for each structure. Develop-
+   segmentation (without relying on a memory).                               ing variants that further extend the multiclass iterative segmen-
+4. If the Iter–A result is not ideal, the user can look a few steps          tation method to predict a separate stopping point for each car-
+   forward or backward in the segmentation, yielding the Iter–U              diac structure is hence a promising area for future research. All
+   result.                                                                   procedures and parameters for training data generation, data aug-
+5. Finally, as for any algorithmic segmentation, the user can make           mentation, and learning were tuned for binary iterative segmenta-
+   any ﬁnal required edits using existing interactive segmentation           tion and then subsequently applied to multiclass iterative segmen-
+   methods (Wang et al., 2018; 2019; Xu et al., 2016; Sakinis et al.,        tation, and might be further optimized for the multiclass setting.
+   2019).                                                                    That said, from a user interaction perspective is possible that seg-
+                                                                             menting each structure sequentially may be simpler than interact-
+    In this way, user effort is minimized because s/he knows what            ing with a multiclass segmentation. Incorporating additional input
+the segmentation should look like as it progresses, and can make             channels, for example containing geodesic distance maps to fore-
+minimal corrections at intermediate phases if needed. In addition,           ground and background user annotations (Wang et al., 2019), may
+the user does not have to look at the entire image to monitor                further improve accuracy for U–Net+S, Iter–A/U and Iter–A/U–All.
+progress, since updates are limited in spatial extent, which is es-          A variable step size for iterative segmentation could be tuned by
+pecially important for 3D images.                                            the user as an additional input parameter or automatically adapted
+    Our results corroborate previous studies in which direct seg-            by the network itself, which could reduce the required number of
+mentation was outperformed by iterative approaches (Pinheiro and             steps for easy cases. An empirical study that evaluates different
+Collobert, 2014; McIntosh et al., 2018; Le et al., 2018a; 2018b;             RNN architectures is an interesting direction for future research.
+Chakravarty and Sivaswamy, 2019; Januszewski et al., 2018). Con-             Finally, a user study would be informative to quantify any differ-
+ventional feedforward neural networks perform inference at each              ences in segmentation accuracy between actual users versus the
+voxel independently. In contrast, iterative segmentation models can          user simulation used in our experiments. A user study could also
+learn both local structure and long-range dependencies in the out-           investigate our hypothesis that interaction with the sequence of
+put domain (Havaei et al., 2017; Pinheiro and Collobert, 2014),              predictably evolving segmentations output by our iterative model
+since inference at each pixel is informed by label estimates from            is faster and more intuitive than interactive segmentation meth-
+its surroundings, perhaps more effectively propagating information           ods that require substantial back-and-forth with the user over the
+from distant landmarks. Binary iterative segmentation can learn              entire 3D volume.
+spatial correlations between subparts of a single anatomical struc-              In addition to enabling 3D visualization of cardiac anatomy for
+ture, while multiclass iterative segmentation can learn correlations         surgical planning, automated whole heart segmentation could also
+between them. Iterative segmentation also implicitly expands the             be used to compute important functional indices that are cur-
+model’s ﬁeld of view without increasing its complexity. Finally,             rently derived from manual segmentations in CHD patients. Ap-
+we observed that our iterative segmentation model successfully               plied to 3D+time imaging in future, fast and accurate segmenta-
+learned to slowly expand a single connected component connected              tion would also enable research into dynamic heart surface mod-
+to the user seed, leading to simple post-processing, while the di-           els for surgical planning and into simulating post-surgical hemo-
+rect segmentation methods produced multiple islands inside and               dynamics, assessing joint atrio-ventricular function, and quantify-
+outside the anatomical structure of interest. In particular, the dis-        ing vessel wall stiffness, perhaps via patient-speciﬁc models that
+tance map used by U–Net+S encodes the same user click as Iter–               incorporate biophysical properties (Weese et al., 2013; Suinesiapu-
+A/U, but may be less informative at intermediate distances from              tra et al., 2016) or information from 4D ﬂow MRI and computa-
+the seed point for compact structures that vary in size (e.g., LV,           tional ﬂuid dynamics (Lawley et al., 2018). Finally, once patient-
+RV, LA, RA, IVC), or when distinguishing between long vessels that           speciﬁc anatomy and function can be captured and summarized,
+lie in close proximity (e.g., AO vs. PA).                                    it may be possible to learn outcome prediction models from data
+    Our iterative segmentation method could be applied to any                to forecast the consequences of competing surgical approaches
+number of growth dynamics, as long as appropriate input-output               in CHD.
+segmentation pairs can be generated for training. For example, our
+method could be used to generalize spatial propagation RNNs pre-
+viously proposed to segment the cardiac ventricles slice-by-slice            6. Conclusions
+from base to apex (Zheng et al., 2018; Poudel et al., 2017). For the
+four cardiac chambers, a possible alternative is to train the net-               We propose a learned iterative segmentation model, imple-
+work to grow segmentations according to a distance map com-                  mented as a recurrent neural network, that inputs a single user
+puted from the ground truth segmentation boundary, which may                 click and evolves a segmentation over multiple steps. We develop
+perform better than spherical growth for elongated structures like           a novel loss function and use it to learn the model’s parameters so
+the RV.                                                                      that the growth pattern of its output segmentations corresponds
+    We acknowledge a few limitations of this study and ideas for             to that deﬁned by training data. The ﬁnal output segmentation can
+future research. Additional investigations into automatic stopping           be inferred automatically, or can be easily adjusted by the user. We
+could close the gap between Iter–A/Iter–A–All and Iter–U/Iter–U–             use our iterative model to demonstrate the ﬁrst whole heart seg-
+All. Our experiments show that some structures remain diﬃcult                mentation in cardiac MR for patients with congenital heart disease,
+to segment, including the PA in general and the LV, RV, RA and               and use this challenging application to show our model’s superior-
+IVC for certain pathologies. In our experiments, the multiclass it-          ity over conventional feedforward neural networks when anatomi-
+erative segmentation models generally performed worse than the               cal variability is wide and training datasets are small. The resulting
+binary models, and did not realize as large an advantage from sim-           method enables patient-speciﬁc 3D heart surface models for surgi-
+ulated user stopping versus automatic stopping. They were also               cal planning for CHD.
+
+                                                                        12
+D.F. Pace, A.V. Dalca, T. Brosch et al.                                                                                                                Medical Image Analysis 80 (2022) 102469
+
+
+Declaration of Competing Interest                                                                      Fedorov, A., Beichel, R., Kalpathy-Cramer, J., Finet, J., Fillion-Robin, J.-C., Pujol, S.,
+                                                                                                            Bauer, C., Jennings, D., Fennessy, F., Sonka, M., Buatti, J., Aylward, S., Miller, J.V.,
+                                                                                                            Pieper, S., Kikinis, R., 2012. 3D Slicer as an image computing platform for the
+    The authors declare that they have no known competing ﬁnan-                                             quantitative imaging network. Magn. Reson. Imaging 30 (9), 1323–1341.
+cial interests or personal relationships that could have appeared to                                   Frescura, C., Büchel, E.V., Ho, S.Y., Thiene, G., 2010. Anatomical and Pathophysiolog-
+inﬂuence the work reported in this paper.                                                                   ical Classiﬁcation of Congenital Heart Disease. In: Saremi, F., Achenbach, S., Ar-
+                                                                                                            bustini, E., Narula, J. (Eds.), Revisiting Cardiac Anatomy: A Computed-Tomogra-
+                                                                                                            phy-Based Atlas and Reference. Blackwell Publishing, Chichester, UK, pp. 40–75.
+Acknowledgments                                                                                        Garekar, S., Bharati, A., Chokhandre, M., Mali, S., Trivedi, B., Changela, V.P.,
+                                                                                                            Solanki, N., Gaikwad, S., Agarwal, V., 2016. Clinical application and multidisci-
+                                                                                                            plinary assessment of three dimensional printing in double outlet right ven-
+    This project was supported by NIH NIBIB NAC P41EB015902,                                                tricle with remote ventricular septal defect. World J. Pediatr. Congenital Heart
+NIH NHLBI 1R01HL149807-01, NIH 1R56AG064027, NIH                                                            Surg. 7 (3), 344–350.
+                                                                                                       Goodfellow, I., Bengio, Y., Courville, A., 2016. Deep learning. MIT Press, Cambridge,
+1R01AG064027, Philips Inc., NSERC CGS-D, Wistron Corporation,                                               MA, USA.
+the Boston Children’s Hospital Translational Research Program and                                      Grady, L., 2006. Random walks for image segmentation. IEEE Trans. Pattern Anal.
+Oﬃce of Faculty Development, Harvard Catalyst, the Charles H.                                               Mach. Intell. 28 (11), 1768–1783.
+                                                                                                       Havaei, M., Davy, A., Warde-Farley, D., Biard, A., Courville, A., Bengio, Y., Pal, C.,
+Hood Foundation and the American Heart Association. We would
+                                                                                                            Jodoin, P.-M., Larochelle, H., 2017. Brain tumor segmentation with deep neural
+also like to thank Alireza Akhondi-Asl, Hannah Contreras, Bruce                                             networks. Med. Image Anal. 35, 18–31.
+Fischl, Patricia Gao, Shruti Ghelani, Sunil Ghelani, Christian Herz,                                   Iglesias, J.E., Sabuncu, M.R., Leemput, K.V., 2013. Improved inference in bayesian
+Matthew Jolley, Andras Lasso, Imon Rahaman and Yue Zhang.                                                   segmentation using monte carlo sampling: application to hippocampal subﬁeld
+                                                                                                            volumetry. Med. Image Anal. 17 (7), 766–778.
+                                                                                                       Januszewski, M., Kornfeld, J., Li, P., Pope, A., Blakely, T., Lindsey, L., Maitin-Shepard, J.,
+                                                                                                            Tyka, M., Denk, W., Jain, V., 2018. High-precision automated reconstruction of
+Supplementary material
+                                                                                                            neurons with ﬂood-ﬁlling networks. Nat. Methods 15 (8), 605–610.
+                                                                                                       Kingma, D.P., Ba, J., 2015. Adam: A method for stochastic optimization. In: Interna-
+   Supplementary material associated with this article can be                                               tional Conference for Learning Representations (ICLR).
+found, in the online version, at doi:10.1016/j.media.2022.102469.                                      Lau, I., Sun, Z., 2018. Three-dimensional printing in congenital heart disease: a sys-
+                                                                                                            tematic review. J. Med. Radiat. Sci. 65 (3), 226–236.
+                                                                                                       Lawley, C.M., Broadhouse, K.M., Callaghan, F.M., Winlaw, D.S., Figtree, G.A.,
+References                                                                                                  Grieve, S.M., 2018. 4D Flow magnetic resonance imaging: role in pediatric con-
+                                                                                                            genital heart disease. Asian Cardiovasc. Thoracic Annals 26 (1), 28–37.
+Abadi, M., Agarwal, A., Barham, P., Brevdo, E., Chen, Z., Citro, C., Corrado, G. S.,                   Le, T.H.N., Gummadi, R., Savvides, M., 2018. Deep recurrent level set for segmenting
+    Davis, A., Dean, J., Devin, M., Ghemawat, S., Goodfellow, I., Harp, A., Irving,                         brain tumors. In: Medical Image Computing and Computer-Assisted Intervention
+    G., Isard, M., Jia, Y., Jozefowicz, R., Kaiser, L., Kudlur, M., Levenberg, J., Mané,                    (MICCAI). In: Lecture Notes in Computer Science, Vol. 11072, pp. 646–653.
+    D., Monga, R., Moore, S., Murray, D., Olah, C., Schuster, M., Shlens, J., Steiner,                 Le, T.H.N., Quach, K.G., Luu, K., Duong, C.N., Savvides, M., 2018. Reformulating level
+    B., Sutskever, I., Talwar, K., Tucker, P., Vanhoucke, V., Vasudevan, V., Viégas,                        sets as deep recurrent neural network approach to semantic segmentation. IEEE
+    F., Vinyals, O., Warden, P., Wattenberg, M., Wicke, M., Yu, Y., Zheng, X., 2015.                        Trans. Image Process. 27 (5), 2393–2407.
+    TensorFlow: Large-scale machine learning on heterogeneous systems. Software                        Lessmann, N., van Ginneken, B., de Jong, P.A., Išgum, I., 2019. Iterative fully convolu-
+    available from tensorﬂow.org.                                                                           tional neural networks for automatic vertebra segmentation and identiﬁcation.
+Amrehn, M., Gaube, S., Unberath, M., Schebesch, F., Horz, T., Strumia, M., Steidl, S.,                      Med. Image Anal. 53, 142–155.
+    Kowarschik, M., Maier, A., 2017. UI-Net: interactive artiﬁcial neural networks for                 Liu, M., Li, F., Yan, H., Wang, K., Ma, Y., Shen, L., Xu, M., 2020. A multi-model
+    iterative image segmentation based on a user model. In: Eurographics Work-                              deep convolutional neural network for automatic hippocampus segmentation
+    shop on Visual Computing for Biology and Medicine (EG VCBM), pp. 143–147.                               and classiﬁcation in alzheimer’s disease. NeuroImage 208, 116459.
+Arafati, A., Hu, P., Finn, J.P., Rickers, C., Cheng, A.L., Jafarkhani, H., Kheradvar, A., 2019.        Liu, T., Tian, Y., Zhao, S., Huang, X., 2020. Graph Reasoning and Shape Constrains for
+    Artiﬁcial intelligence in pediatric and adult congenital cardiac MRI: an unmet                          Cardiac Segmentation in Congenital Heart Defect. In: Medical Image Computing
+    clinical need. Cardiovasc. Diagn. Ther. 9 (Suppl 2), S310–S325.                                         and Computer-Assisted Intervention (MICCAI). In: Lecture Notes in Computer
+Bhatla, P., Tretter, J.T., Ludomirsky, A., Argilla, M., Latson, L.A., Chakravarti, S.,                      Science, Vol. 12264, pp. 607–616.
+    Barker, P.C., Yoo, S.-J., McElhinney, D.B., Wake, N., Mosca, R.S., 2017. Utility and               Long, J., Shelhamer, E., Darrell, T., 2015. Fully convolutional networks for semantic
+    scope of rapid prototyping in patients with complex muscular ventricular sep-                           segmentation. In: IEEE Conference on Computer Vision and Pattern Recognition
+    tal defects or double-outlet right ventricle: does it alter management decisions?                       (CVPR), pp. 3431–3440.
+    Pediatr. Cardiol. 38 (1), 103–114.                                                                 Mansi, T., Voigt, I., Leonardi, B., Pennec, X., Durrleman, S., Sermesant, M.,
+Boykov, Y., Jolly, M., 2001. Interactive graph cuts for optimal boundary and region                         Delingette, H., Taylor, A., Boudjemline, Y., Pongiglione, G., Ayache, N., 2011. A
+    segmentation of objects in N-D images. In: IEEE International Conference on                             statistical model for quantiﬁcation and prediction of cardiac remodelling: appli-
+    Computer Vision (ICCV), Vol. 1, pp. 105–112.                                                            cation to tetralogy of Fallot. IEEE Trans. Med. Imaging 30 (9), 1605–1616.
+Byrne, N., Velasco Forte, M., Tandon, A., Valverde, I., Hussain, T., 2016. A systematic                McIntosh, L., Maheswaranathan, N., Sussillo, D., Shlens, J., 2018. Recurrent segmen-
+    review of image segmentation methodology, used in the additive manufacture                              tation for variable computational budgets. In: IEEE/CVF Conference on Computer
+    of patient-speciﬁc 3D printed models of the cardiovascular system. JRSM Car-                            Vision and Pattern Recognition Workshops (CVPRW), pp. 1729–172909.
+    diovasc. Dis. 5. 2048004016645467.                                                                 Mo, Y., Liu, F., McIlwraith, D., Yang, G., Zhang, J., He, T., Guo, Y., 2018. The Deep
+Caruana, R., 1997. Multitask learning. Mach. Learn. 28, 41–75.                                              Poincaré map: a Novel Approach for Left Ventricle Segmentation. In: Medi-
+Chakravarty, A., Sivaswamy, J., 2019. RACE-Net: a recurrent neural network for                              cal Image Computing and Computer-Assisted Intervention (MICCAI). In: Lecture
+    biomedical image segmentation. IEEE J. Biomed. Health Inform. 23 (3),                                   Notes in Computer Science, Vol. 11073, pp. 561–568.
+    1151–1162.                                                                                         Moghari, M.H., Geva, T., Powell, A.J., 2017. Prospective heart tracking for whole-heart
+Chollet, F., et al., 2015. Keras. https://keras.io.                                                         magnetic resonance angiography. Magn. Reson. Med. 77 (2), 759–765.
+Criminisi, A., Sharp, T., Blake, A., 2008. GeoS: Geodesic image segmentation. In: Eu-                  Mortensen, E.N., Barrett, W.A., 1998. Interactive segmentation with intelligent scis-
+    ropean Conference on Computer Vision (ECCV). In: Lecture Notes in Computer                              sors. Graph. Models Image Process. 60 (5), 349–384.
+    Science, Vol. 5302, pp. 99–112.                                                                    Nguyen, A.V., Lasso, A., Nam, H.H., Faerber, J., Aly, A.H., Pouch, A.M., Scanlan, A.B.,
+Dalca, A., Danagoulian, G., Kikinis, R., Schmidt, E., Golland, P., 2011. Segmentation of                    McGowan, F.X., Mercer-Rosa, L., Cohen, M.S., Simpson, J., Fichtinger, G., Jol-
+    nerve bundles and ganglia in spine MRI using particle ﬁlters. In: Medical Image                         ley, M.A., 2019. Dynamic three-dimensional geometry of the tricuspid valve an-
+    Computing and Computer-Assisted Intervention (MICCAI). In: Lecture Notes in                             nulus in hypoplastic left heart syndrome with a Fontan circulation. J. Am. Soc.
+    Computer Science, Vol. 6893, pp. 537–545.                                                               Echocardiograph. 32 (5), 655–666.
+Dalca, A.V., Guttag, J., Sabuncu, M.R., 2018. Anatomical priors in convolutional net-                  Ntsinjana, H.N., Hughes, M.L., Taylor, A.M., 2011. The role of cardiovascular magnetic
+    works for unsupervised biomedical segmentation. In: IEEE Conference on Com-                             resonance in pediatric congenital heart disease. J. Cardiovasc. Magn. Resonance
+    puter Vision and Pattern Recognition (CVPR), pp. 9290–9299.                                             13, 51.
+Dou, Q., Yu, L., Chen, H., Jin, Y., Yang, X., Qin, J., Heng, P.-A., 2017. 3D Deeply super-             Pace, D., Dalca, A., Geva, T., Powell, A., Moghari, M., Golland, P., 2015. Interac-
+    vised network for automated segmentation of volumetric medical images. Med.                             tive Whole-Heart Segmentation in Congenital Heart Disease. In: Medical Image
+    Image Anal. 41, 40–54.                                                                                  Computing and Computer-Assisted Intervention (MICCAI). In: Lecture Notes in
+Ecabert, O., Peters, J., Schramm, H., Lorenz, C., von Berg, J., Walker, M.J., Vembar, M.,                   Computer Science, Vol. 9351, pp. 80–88.
+    Olszewski, M.E., Subramanyan, K., Lavi, G., Weese, J., 2008. Automatic mod-                        Pace, D.F., Dalca, A.V., Brosch, T., Geva, T., Powell, A.J., Weese, J., Moghari, M.H., Gol-
+    el-based segmentation of the heart in CT images. IEEE Trans. Med. Imaging 27                            land, P., 2018. Iterative Segmentation from Limited Training Data: Applications
+    (9), 1189–1201.                                                                                         to Congenital Heart Disease. In: Deep Learning in Medical Image Analysis and
+Ecabert, O., Peters, J., Walker, M.J., Ivanc, T., Lorenz, C., Berg, J.v., Lessick, J., Vem-                 Multimodal Learning for Clinical Decision Support (DLMIA). In: Lecture Notes in
+    bar, M., Weese, J., 2011. Segmentation of the heart and great vessels in CT                             Computer Science, Vol. 11045, pp. 334–342.
+    images using a model-based adaptation framework. Med. Image Anal. 15 (6),                          Pandya, B., Cullen, S., Walker, F., 2016. Congenital heart disease in adults. BMJ 354,
+    863–876.                                                                                                i3905.
+
+
+                                                                                                  13
+D.F. Pace, A.V. Dalca, T. Brosch et al.                                                                                                             Medical Image Analysis 80 (2022) 102469
+
+
+Payer, C., Stern, D., Bischof, H., Urschler, M., 2017. Multi-label Whole Heart Segmen-               Vezhnevets, V., Konouchine, V., 2005. ”GrowCut” - Interactive Multi-label N-D Image
+    tation Using CNNs and Anatomical Label Conﬁgurations. In: Statistical Atlases                        Segmentation by Cellular Automata. In: International Conference on Computer
+    and Computational Models of the Heart (STACOM). In: Lecture Notes in Com-                            Graphics and Vision (GraphiCon), pp. 150–156.
+    puter Science, Vol. 10663, pp. 190–198.                                                          Wachinger, C., Reuter, M., Klein, T., 2018. DeepNAT: deep convolutional neural net-
+Peng, P., Lekadir, K., Gooya, A., Shao, L., Petersen, S.E., Frangi, A.F., 2016. A review                 work for segmenting neuroanatomy. NeuroImage 170, 434–445.
+    of heart chamber segmentation for structural and functional analysis using car-                  Wang, C., Smedby, O., 2017. Automatic Whole Heart Segmentation Using Deep
+    diac magnetic resonance imaging. Magn. Reson. Mater. Phys., Biol. Med. 29 (2),                       Learning and Shape Context. In: Statistical Atlases and Computational Mod-
+    155–195.                                                                                             els of the Heart (STACOM). In: Lecture Notes in Computer Science, Vol. 10663,
+Peters, J., Ecabert, O., Meyer, C., Kneser, R., Weese, J., 2010. Optimizing boundary                     pp. 242–249.
+    detection via simulated search with applications to multi-modal heart segmen-                    Wang, G., Li, W., Zuluaga, M.A., Pratt, R., Patel, P.A., Aertsen, M., Doel, T., David, A.L.,
+    tation. Med. Image Anal. 14 (1), 70–84.                                                              Deprest, J., Ourselin, S., Vercauteren, T., 2018. Interactive medical image seg-
+Petersen, S.E., Khanji, M.Y., Plein, S., Lancellotti, P., Bucciarelli-Ducci, C., 2019. Euro-             mentation using deep learning with image-speciﬁc ﬁne tuning. IEEE Trans. Med.
+    pean association of cardiovascular imaging expert consensus paper: a compre-                         Imaging 37 (7), 1562–1573.
+    hensive review of cardiovascular magnetic resonance normal values of cardiac                     Wang, G., Zuluaga, M.A., Li, W., Pratt, R., Patel, P.A., Aertsen, M., Doel, T., David, A.L.,
+    chamber size and aortic root in adults and recommendations for grading sever-                        Deprest, J., Ourselin, S., Vercauteren, T., 2019. Deepigeos: a deep interactive
+    ity. Eur. Heart J. 20 (12), 1321–1331.                                                               geodesic framework for medical image segmentation. IEEE Trans. Pattern Anal.
+Pinheiro, P., Collobert, R., 2014. Recurrent Convolutional Neural Networks for Scene                     Mach. Intell. 41 (7), 1559–1572.
+    Labeling. In: International Conference on Machine Learning. In: Proceedings of                   Weese, J., Groth, A., Nickisch, H., Barschdorf, H., Weber, F.M., Velut, J., Cas-
+    Machine Learning Research, Vol. 32, pp. 82–90.                                                       tro, M., Toumoulin, C., Coatrieux, J.L., Craene, M.D., Piella, G., Tobón-Gomez, C.,
+Poudel, R.P.K., Lamata, P., Montana, G., 2017. Recurrent fully convolutional neural                      Frangi, A.F., Barber, D.C., Valverde, I., Shi, Y., Staicu, C., Brown, A., Beerbaum, P.,
+    networks for multi-slice MRI cardiac segmentation. In: Reconstruction, Segmen-                       Hose, D.R., 2013. Generating anatomical models of the heart and the aorta from
+    tation, and Analysis of Medical Images (RAMBO). In: Lecture Notes in Computer                        medical images for personalized physiological simulations. Med. Biol. Eng. Com-
+    Science, Vol. 10129, pp. 83–94.                                                                      put. 51 (11), 1209–1219.
+Ren, M., Zemel, R., 2017. End-to-end instance segmentation with recurrent atten-                     Williams, R., Zipser, D., 1989. A learning algorithm for continually running fully re-
+    tion. In: IEEE Conference on Computer Vision and Pattern Recognition (CVPR),                         current neural networks. Neural Comput. 1 (2), 270–280.
+    pp. 6656–6664.                                                                                   Wolterink, J., Leiner, T., Viergever, M., Išgum, I., 2017. Dilated Convolutional Neu-
+Riesenkampff, E., Rietdorf, U., Wolf, I., Schnackenburg, B., Ewert, P., Huebler, M.,                     ral Networks for Cardiovascular MR Segmentation in Congenital Heart Disease.
+    Alexi-Meskishvili, V., Anderson, R.H., Engel, N., Meinzer, H.-P., Hetzer, R.,                        In: Reconstruction, Segmentation, and Analysis of Medical Images (HVSMR). In:
+    Berger, F., Kuehne, T., 2009. The practical clinical value of three-dimensional                      Lecture Notes in Computer Science, Vol. 10129, pp. 95–102.
+    models of complex congenitally malformed hearts. J. Thorac. Cardiovasc. Surg.                    Xu, N., Price, B., Cohen, S., Yang, J., Huang, T.S., 2016. Deep interactive object selec-
+    138 (3), 571–580.                                                                                    tion. In: IEEE Conference on Computer Vision and Pattern Recognition (CVPR),
+Romera-Paredes, B., Torr, P.H.S., 2016. Recurrent instance segmentation. In: Euro-                       pp. 373–381.
+    pean Conference on Computer Vision (ECCV). In: Lecture Notes in Computer                         Xu, X., Wang, T., Shi, Y., Yuan, H., Jia, Q., Huang, M., Zhuang, J., 2019. Whole Heart
+    Science, Vol. 9910, pp. 312–329.                                                                     and Great Vessel Segmentation in Congenital Heart Disease Using Deep Neural
+Ronneberger, O., Fischer, P., Brox, T., 2015. U-Net: Convolutional Networks for                          Networks and Graph Matching. In: Medical Image Computing and Computer-As-
+    Biomedical Image Segmentation. In: Medical Image Computing and Comput-                               sisted Intervention (MICCAI). In: Lecture Notes in Computer Science, Vol. 11765,
+    er-Assisted Intervention (MICCAI). In: Lecture Notes in Computer Science, Vol.                       pp. 477–485.
+    9351, pp. 234–241.                                                                               Yang, X., Bian, C., Yu, L., Ni, D., Heng, P.-A., 2018. Hybrid loss guided convolu-
+Rother, C., Kolmogorov, V., Blake, A., 2004. “GrabCut”: interactive foreground extrac-                   tional networks for whole heart parsing. In: Statistical Atlases and Computa-
+    tion using iterated graph cuts. ACM Trans. Graph. 23 (3), 309–314.                                   tional Models of the Heart (STACOM). In: Lecture Notes in Computer Science,
+Roy, A.G., Conjeti, S., Sheet, D., Katouzian, A., Navab, N., Wachinger, C., 2017. Er-                    Vol. 10663, pp. 215–223.
+    ror Corrective Boosting for Learning Fully Convolutional Networks with Limited                   Yu, L., Cheng, J.-Z., Dou, Q., Yang, X., Chen, H., Qin, J., Heng, P.-A., 2017. Automatic 3D
+    Data. In: Medical Image Computing and Computer-Assisted Intervention (MIC-                           Cardiovascular MR Segmentation with Densely-Connected Volumetric ConvNets.
+    CAI). In: Lecture Notes in Computer Science, Vol. 10435, pp. 231–239.                                In: Medical Image Computing and Computer-Assisted Intervention (MICCAI). In:
+Sakinis, T., Milletari, F., Roth, H., Korﬁatis, P., Kostandy, P.M., Philbrick, K., Akkus, Z.,            Lecture Notes in Computer Science, Vol. 10434, pp. 287–295.
+    Xu, Z., Xu, D., Erickson, B.J., 2019. Interactive segmentation of medical images                 Zhang, H., Wahle, A., Johnson, R., Scholz, T., Sonka, M., 2010. 4-D Cardiac MR image
+    through fully convolutional neural networks. arXiv preprint arXiv: 1903.08205.                       analysis: left and right ventricular morphology and function. IEEE Trans. Med.
+Scanlan, A.B., Nguyen, A.V., Ilina, A., Lasso, A., Cripe, L., Jegatheeswaran, A., Sil-                   Imaging 29 (2), 350–364.
+    vestro, E., McGowan, F.X., Mascio, C.E., Fuller, S., Spray, T.L., Cohen, M.S.,                   Zhang, P., Wang, F., Zheng, Y., 2018. Deep Reinforcement Learning for Vessel Center-
+    Fichtinger, G., Jolley, M.A., 2018. Comparison of 3D echocardiogram-derived 3D                       line Tracing in Multi-Modality 3D Volumes. In: Medical Image Computing and
+    printed valve models to molded models for simulated repair of pediatric atri-                        Computer-Assisted Intervention (MICCAI). In: Lecture Notes in Computer Sci-
+    oventricular valves. Pediatr. Cardiol. 39 (3), 538–547.                                              ence, Vol. 11073, pp. 755–763.
+Seraphim, A., Knott, K.D., Augusto, J., Bhuva, A.N., Manisty, C., Moon, J.C., 2020.                  Zheng, Q., Delingette, H., Duchateau, N., Ayache, N., 2018. 3-D consistent and robust
+    Quantitative cardiac MRI. J. Magn. Reson. Imaging 51 (3), 693–711.                                   segmentation of cardiac images by deep learning with spatial propagation. IEEE
+Sethian, J.A., 1996. A fast marching level set method for monotonically advancing                        Trans. Med. Imaging 37 (9), 2137–2148.
+    fronts. Proc. Natl. Acad. Sci. 93 (4), 1591–1595.                                                Zheng, Y., Barbu, A., Georgescu, B., Scheuering, M., Comaniciu, D., 2008. Four-cham-
+Shi, X., Chen, Z., Wang, H., Yeung, D.-Y., Wong, W.-k., Woo, W.-c., 2015. Convolu-                       ber heart modeling and automatic segmentation for 3-D cardiac CT volumes
+    tional LSTM network: a machine learning approach for precipitation nowcast-                          using marginal space learning and steerable features. IEEE Trans. Med. Imaging
+    ing. In: Neural Information Processing Systems (NIPS), pp. 802–810.                                  27 (11), 1668–1681.
+Sonka, M., Hlavac, V., Boyle, R., 2008. Image processing, analysis and machine vision.               Zhuang, X., 2013. Challenges and methodologies of fully automatic whole heart seg-
+    Cengage Learning, Stamford, CT, USA.                                                                 mentation: a review. J. Healthc. Eng. 4 (3), 371–408.
+Suinesiaputra, A., McCulloch, A.D., Nash, M.P., Pontre, B., Young, A.A., 2016. Cardiac               Zhuang, X., Li, L., Payer, C., Štern, D., Urschler, M., Heinrich, M.P., Oster, J., Wang, C.,
+    image modelling: breadth and depth in heart disease. Med. Image Anal. 33,                            Smedby, Ö., Bian, C., Yang, X., Heng, P.-A., Mortazi, A., Bagci, U., Yang, G., Sun, C.,
+    38–43.                                                                                               Galisot, G., Ramel, J.-Y., Brouard, T., Tong, Q., Si, W., Liao, X., Zeng, G., Shi, Z.,
+Valverde, I., Gomez-Ciriza, G., Hussain, T., Suarez-Mejias, C., Velasco-Forte, M.N.,                     Zheng, G., Wang, C., MacGillivray, T., Newby, D., Rhode, K., Ourselin, S., Mohi-
+    Byrne, N., Ordoñez, A., Gonzalez-Calle, A., Anderson, D., Hazekamp, M.G.,                            addin, R., Keegan, J., Firmin, D., Yang, G., 2019. Evaluation of algorithms for mul-
+    Roest, A.A.W., Rivas-Gonzalez, J., Uribe, S., El-Rassi, I., Simpson, J.,                             ti-modality whole heart segmentation: an open-access grand challenge. Med.
+    Miller, O., Ruiz, E., Zabala, I., Mendez, A., Manso, B., Gallego, P., Prada, F.,                     Image Anal. 58, 101537.
+    Cantinotti, M., Ait-Ali, L., Merino, C., Parry, A., Poirier, N., Greil, G., Razavi, R.,          Zhuang, X., Rhode, K., Razavi, R., Hawkes, D., Ourselin, S., 2010. A registration-based
+    Gomez-Cia, T., Hosseinpour, A.-R., 2017. Three-dimensional printed mod-                              propagation framework for automatic whole heart segmentation of cardiac MRI.
+    els for surgical planning of complex congenital heart defects: an in-                                IEEE Trans. Med. Imaging 29 (9), 1612–1625.
+    ternational multicentre study. Eur. J. Cardio-Thoracic Surg. 52 (6), 1139–                       Zhuang, X., Shen, J., 2016. Multi-scale patch and multi-modality atlases for whole
+    1148.                                                                                                heart segmentation of MRI. Med. Image Anal. 31, 77–87.
+Valverde, S., Cabezas, M., Roura, E., González-Villà, S., Pareto, D., Vilanova, J.C.,
+    Ramió-Torrentà, L., Rovira, À., Oliver, A., Lladó, X., 2017. Improving automated
+    multiple sclerosis lesion segmentation with a cascaded 3D convolutional neural
+    network approach. NeuroImage 155, 159–168.
+
+
+
+
+                                                                                                14
+

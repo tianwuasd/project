@@ -1,0 +1,64 @@
+# 证据缺口与待办
+
+这些是当前材料的缺口，不构成领域创新性结论。
+
+- Draft and Refine with Visual Experts：出版状态仍未知
+- Dynamic Mixture-of-Experts for Visual Autoregressive Model：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- Visual Boosting Techniques for Spatiotemporal Dense Pixel Visualizations：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- Siamese High-Level Feature Refine Network for Visual Object Tracking：补充可读全文；完成筛选并记录理由；生成当前文档阅读卡
+- VIANA: Visual Interactive Annotation of Argumentation：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- A Literature Review Comparing Experts’ and Non-Experts’ Visual Processing of Graphs during Problem-Solving and Learning：补充可读全文；完成筛选并记录理由；生成当前文档阅读卡
+- Chaos in DNA inversions \(Draft paper\)：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- Refining posthuman aesthetic pedagogy for teacher education through multidisciplinary expert consultation：补充可读全文；完成筛选并记录理由；生成当前文档阅读卡
+- Lexara-RF: Reference-Free Metrics for Evaluating Conversational Visual Analytics Agents：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- Refining a taxonomy for guideline implementation: results of an exercise in abstract classification：补充可读全文；完成筛选并记录理由；生成当前文档阅读卡
+- ExpertFlow: Efficient Mixture-of-Experts Inference via Predictive Expert Caching and Token Scheduling：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- Almost an Expert：补充可读全文；完成筛选并记录理由；生成当前文档阅读卡
+- Zoom-Refine: Boosting High-Resolution Multimodal Understanding via Localized Zoom and Self-Refinement：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- Refining Child Pornography Law：补充可读全文；完成筛选并记录理由；生成当前文档阅读卡
+- Bigraphical Refinement：补充可读全文；完成筛选并记录理由；生成当前文档阅读卡
+- SegAgent: Exploring Pixel Understanding Capabilities in MLLMs by Imitating Human Annotator Trajectories：补充可读全文；完成筛选并记录理由；生成当前文档阅读卡
+- SegAgent: Exploring Pixel Understanding Capabilities in MLLMs by Imitating Human Annotator Trajectories：出版状态仍未知
+- Les services publics economiques entre experts, praticiens et gouvernants dans le premier XX^e siecle: d'une configuration historique a l'autre：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- Summarizing Scientific Articles: Experiments with Relevance and Rhetorical Status：补充可读全文；完成筛选并记录理由；生成当前文档阅读卡
+- DRAgent: Discriminative Reasoning Agent for Referring Expression Segmentation：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- Evolving, Not Training: Zero-Shot Reasoning Segmentation via Evolutionary Prompting：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- Affordance2Action: Task-Conditioned Scene-level Affordance Grounding for Real-Time Manipulation：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- FeVOS: Foresight Expression Video Object Segmentation：补充可读全文；完成筛选并记录理由；生成当前文档阅读卡
+- ALTo: Adaptive-Length Tokenizer for Autoregressive Mask Generation：补充可读全文；完成筛选并记录理由；生成当前文档阅读卡
+- Principled Approaches for Learning to Defer with Multiple Experts：补充可读全文；完成筛选并记录理由；生成当前文档阅读卡
+- One-Stage Top-$k$ Learning-to-Defer: Score-Based Surrogates with Theoretical Guarantees：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- Principled Approaches for Learning to Defer with Multiple Experts：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- Learning to Defer to Multiple Experts: Consistent Surrogate Losses, Confidence Calibration, and Conformal Ensembles：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- When More Experts Hurt: Underfitting in Multi-Expert Learning to Defer：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- Cost-Sensitive Learning to Defer to Multiple Experts with Workload Constraints：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- Active Learning in Incomplete Label Multiple Instance Multiple Label Learning：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- No Need for Learning to Defer? A Training Free Deferral Framework to Multiple Experts through Conformal Prediction：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- Mastering Multiple-Expert Routing: Realizable $H$-Consistency and Strong Guarantees for Learning to Defer：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- Learning to Defer with Limited Expert Predictions：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- How can humans leverage machine learning? From Medical Data Wrangling to Learning to Defer to Multiple Experts：补充可读全文；完成筛选并记录理由；生成当前文档阅读卡
+- Consistent Estimators for Learning to Defer to an Expert：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- To Defer or Not to Defer? Online Learning with LLMs and Congested Experts：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- CT-PromptSAM: Collaborative Prompting With Hybrid CNN–Transformer for Remote Sensing Semantic Segmentation：补充可读全文；完成筛选并记录理由；生成当前文档阅读卡
+- Balancing Multi-Target Semi-Supervised Medical Image Segmentation with Collaborative Generalist and Specialists：出版状态仍未知
+- SemiSAM-O1: Pushing the Boundary of Annotation-Efficient Medical Image Segmentation with Generalist Knowledge Fusion：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- GSCo: Towards Generalizable AI in Medicine via Generalist-Specialist Collaboration：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- EoS-FM: Can an Ensemble of Specialist Models Act as a Generalist Feature Extractor?：补充可读全文；完成筛选并记录理由；生成当前文档阅读卡
+- An Open Natural Language Processing Development Framework for EHR-based Clinical Research: A case demonstration using the National COVID Cohort Collaborative \(N3C\)：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- TAGS: A Test-Time Generalist–Specialist Framework with Retrieval-Augmented Reasoning and Verification：补充可读全文；完成筛选并记录理由；生成当前文档阅读卡
+- On-Device Collaborative Language Modeling via a Mixture of Generalists and Specialists：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- U-CFR: Uncertainty-Guided Cascade Forward Refinement for Interactive Segmentation：出版状态仍未知
+- 3D Kidneys and Kidney Tumor Semantic Segmentation using Boundary-Aware Networks：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- BRIGHT: A Collaborative Generalist-Specialist Foundation Model for Breast Pathology：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- SC-CoSF: Self-Correcting Collaborative and Co-Training for Image Fusion and Semantic Segmentation：补充可读全文；完成筛选并记录理由；生成当前文档阅读卡
+- Improving Policy Optimization with Generalist-Specialist Learning：出版状态仍未知
+- Generalist Open-World Temporal Perception：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- GSL-PCD: Improving Generalist-Specialist Learning with Point Cloud Feature-based Task Partitioning：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- VISTA3D - A Unified Segmentation Foundation Model For 3D Medical Imaging：出版状态仍未知
+- REDNet - Reliable Evidential Discounting Network for Multi-Modality Medical Image Segmentation：出版状态仍未知
+- Learned iterative segmentation of highly variable anatomy from limited data - Applications to whole heart segmentation for congenital heart disease：出版状态仍未知
+- DeferredSeg:A Multi-Expert Deferral Framework for Medical Image Segmentation：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- From Few-Shot Segmentation to Clinician-in-the-Loop Medical Image Analysis：补充可读全文；完成筛选并记录理由；出版状态仍未知；生成当前文档阅读卡
+- SDF4CHD - Generative modeling of cardiac anatomies with congenital heart defects：出版状态仍未知
+
+未纳入正文的陈述：2。原因见 quality.json 和 evidence-ledger.json。

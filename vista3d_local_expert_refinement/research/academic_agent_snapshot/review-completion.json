@@ -1,0 +1,1950 @@
+{
+  "results": [
+    {
+      "work_id": "work_669c3001a51d42b8",
+      "status": "ok",
+      "verdicts": [
+        {
+          "schema_version": 1,
+          "claim_id": "claim_ead15b4acb63fcd33b28da3d06046649",
+          "verdict": "supported",
+          "rationale": "The introduction states these annotation and engineering burdens and motivates zero-shot capability for rare pathologies and animal data, alongside human correction.",
+          "evidence_ids": [
+            "ev_7abcc58f5479d9854745e852",
+            "ev_f673c39efae44bfb3fccbdb4"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_a6eb998423f9327d2be21408d5b75f1b",
+          "verdict": "supported",
+          "rationale": "Figure 1 describes all three workflows, 127 supported classes, 3D point prompts, and two branches sharing an encoder.",
+          "evidence_ids": [
+            "ev_d0a444e3c1665ed931de8d5b"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_9ef8961dbcce582815cda453666f1f91",
+          "verdict": "supported",
+          "rationale": "The architecture and overview explicitly specify the backbone, patch size, inference method, class-index binary output, and positive/negative 3D click inputs.",
+          "evidence_ids": [
+            "ev_42b1587f0d110edccab90427",
+            "ev_a6d4e0f9f7c110cbeadf55e0",
+            "ev_be03b4a69996f461196d63c1"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_7692a158c6549c75de98867c5f455c18",
+          "verdict": "supported",
+          "rationale": "The paper describes independent branch outputs and click-containing connected-component refinement intended to avoid unexpected modifications.",
+          "evidence_ids": [
+            "ev_e48e371374b873b9a25d8fb2",
+            "ev_e7432595d4bb94f08dbef5ee"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_7fd36cd17422e9b0d6f609feb43734f9",
+          "verdict": "supported",
+          "rationale": "The data section gives the stated volume count, sources, per-source split, generated labels and supervoxels, and post-processing removal.",
+          "evidence_ids": [
+            "ev_cece72e3c8156ebf6163681a",
+            "ev_e7432595d4bb94f08dbef5ee"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_23a8a17778dbee73a1697fefecce1e6e",
+          "verdict": "supported",
+          "rationale": "Algorithm 2 specifies ViT-H, summed features from three anatomical views, and the stated SLIC parameters; the accompanying text explains interactive-branch knowledge transfer.",
+          "evidence_ids": [
+            "ev_2ebe6904acde42e3f4621e02",
+            "ev_f5a612daacfd6e48d7c1edd9"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_18b4c5d12043f32b7d645c4e43f74904",
+          "verdict": "supported",
+          "rationale": "The four stages and their oversampling, frozen-encoder, and MAISI augmentation details match the training recipe.",
+          "evidence_ids": [
+            "ev_0adce17f3722cb52357e2803",
+            "ev_2ebe6904acde42e3f4621e02",
+            "ev_818fc2a99b358e40300ad6f8"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_92014ad5643f82196be0564d122d0ed7",
+          "verdict": "supported",
+          "rationale": "All five averages match Table 1, which lists 14 datasets.",
+          "evidence_ids": [
+            "ev_13347963e3c464ecf99c5af3",
+            "ev_b8c5a394b480d13996212dd1"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_83179729237520adfb56a04a4a46e495",
+          "verdict": "supported",
+          "rationale": "The evaluation explicitly defines one click per sliding-window patch, its local 128-cubic-voxel effect, and sampling from prediction-error regions.",
+          "evidence_ids": [
+            "ev_6b4df8e285d05a174518ba7e"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_d6732c09fb30c004d80093ad9eb4a4b8",
+          "verdict": "supported",
+          "rationale": "Table 1 explicitly flags this bias and preserves uncertainty about training/test overlap.",
+          "evidence_ids": [
+            "ev_b8c5a394b480d13996212dd1"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_0a21c05b7d740c15ab93c16d9531abf2",
+          "verdict": "supported",
+          "rationale": "The zero-shot section lists these four external datasets with exactly the stated counts, mouse resolution, and organ count.",
+          "evidence_ids": [
+            "ev_33f34993e04e383d9d431ac7",
+            "ev_91db90c1f3eddc9915f9d782"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_1b78422c5ca95d80fee8a6f5933ee2f2",
+          "verdict": "supported",
+          "rationale": "The authors report superior accuracy and annotation efficiency and describe the supervoxel ablation as demonstrating its importance. The supplied Figure 5 text contains axis descriptions but no numerical curves.",
+          "evidence_ids": [
+            "ev_13347963e3c464ecf99c5af3",
+            "ev_91db90c1f3eddc9915f9d782"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_596c6aa0fe226478bf6f09de5c2b7d63",
+          "verdict": "supported",
+          "rationale": "Table 2 confirms both timings and all stated hardware, resampling, class-count, and optimization conditions.",
+          "evidence_ids": [
+            "ev_33f34993e04e383d9d431ac7"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_e764f012164c6a5e14c998dbe490e5b5",
+          "verdict": "supported",
+          "rationale": "The one-case scores and 100-case WORD tie match Table 3; the accompanying text identifies held-out test evaluation.",
+          "evidence_ids": [
+            "ev_13cbe13e632bf0dcf21a00b3",
+            "ev_91db90c1f3eddc9915f9d782"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_2da704822a1f516da213cbe1d121f15c",
+          "verdict": "supported",
+          "rationale": "The conclusion explicitly identifies modality expansion, improved zero-shot experiences, and clinical-partner validation and integration as future work.",
+          "evidence_ids": [
+            "ev_03692352e187cb4f620f0baa",
+            "ev_5711344a9ec9d691eb99f65f"
+          ]
+        }
+      ]
+    },
+    {
+      "work_id": "work_1e05e2b0eb6c452c",
+      "status": "ok",
+      "verdicts": [
+        {
+          "schema_version": 1,
+          "claim_id": "claim_4f724344d0b29ddf874bb9aaebee0387",
+          "verdict": "supported",
+          "rationale": "The related-work discussion explicitly describes heuristic or text-based expert selection and missing quantitative invocation criteria.",
+          "evidence_ids": [
+            "ev_68df7c4167d28160176535af"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_90e1e97d94e55ccacc5be05113b384df",
+          "verdict": "supported",
+          "rationale": "Section 3.1 specifies concrete visual queries, CLIP-based grounding, and averaging of query-specific spatial maps.",
+          "evidence_ids": [
+            "ev_734fdbdabec54593802000bb"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_cb71bac6614831182eb4d98867a8e917",
+          "verdict": "supported",
+          "rationale": "Equations 3–5 combine relevant-region semantic deviation and irrelevant-region stability, weighted using entropy and contrast.",
+          "evidence_ids": [
+            "ev_2ea2ef49b4c9a1fba8368134",
+            "ev_79b7ff8e9fe1e3625ab981ce",
+            "ev_a67cb53428694000ba66227b"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_b8f902e54f2a207b12ec4a8e925d0252",
+          "verdict": "supported",
+          "rationale": "Section 3.3 explicitly describes rendering these structured outputs onto images and re-querying through the existing vision encoder.",
+          "evidence_ids": [
+            "ev_d5f0d3fe3637da5ca349a94d"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_9152ad6486014a9ca99b717c5a55df13",
+          "verdict": "supported",
+          "rationale": "The method reuses original masks, selects the greatest positive utilization gain, and skips refinement when none improves the baseline.",
+          "evidence_ids": [
+            "ev_2788b02c6c7574d8ff2a68d5"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_66109cbb9782c15de17d5192103877f9",
+          "verdict": "partial",
+          "rationale": "The models, experts, mask count, and Top-k/Bottom-k settings are correct, but the claim omits adaptive adjustment of masking ratios in Hybrid mode, which the comprehensive experiments use.",
+          "evidence_ids": [
+            "ev_f4d28440ede98fb801b24733"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_a0c1e55c68f1644628628ce934f89c30",
+          "verdict": "supported",
+          "rationale": "Table 1 identifies 16 benchmarks, and Section 4.1 specifies the five categories, subsets, GRAY rendering, and Hybrid masking.",
+          "evidence_ids": [
+            "ev_847c81aa978d961c58765a5c",
+            "ev_f4d28440ede98fb801b24733"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_eb9a63c9c20422a0290a78539572635f",
+          "verdict": "supported",
+          "rationale": "Section 4.2 names all four datasets, highlight rendering, the evaluator, and the four response categories.",
+          "evidence_ids": [
+            "ev_02d1c1c97655225621a7117e",
+            "ev_ccf2853d91048560958232a8"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_fb56af1255aadb175013d7c34b41f663",
+          "verdict": "supported",
+          "rationale": "Both numerical changes and their directions match the IDEFICS row in Table 1.",
+          "evidence_ids": [
+            "ev_21545cf94cf2d20ce8d107b8"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_a73b013b2b9c8dc33ac708fbb8edc35c",
+          "verdict": "supported",
+          "rationale": "The captioning discussion explicitly reports the Flickr decrease from 57.3 to 55.9.",
+          "evidence_ids": [
+            "ev_2ede6b7ae44d3a8511618cdb"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_acbec9bcce55ed1a3d8a65c1fbb41cb7",
+          "verdict": "supported",
+          "rationale": "The Qwen2.5-VL COCO Caption hallucination entry reports 48.24/26.13, with values defined as category percentages.",
+          "evidence_ids": [
+            "ev_fe24f169695d7146cce654dc"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_e866eb57d62e39bc6168a97c663a051c",
+          "verdict": "supported",
+          "rationale": "Table 3 identifies PaliGemma and reports all three stated comparisons, including the 70.39% average cost reduction.",
+          "evidence_ids": [
+            "ev_fe24f169695d7146cce654dc"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_642efd9da80aa33f77f542e10fce65be",
+          "verdict": "supported",
+          "rationale": "The introduction and discussion explicitly acknowledge tuning requirements, utilization variability, and heuristic masking sensitivity.",
+          "evidence_ids": [
+            "ev_4142779f17fa0fa326fb1b58",
+            "ev_a863872ff157a9bdc91c9bda"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_f8f61f1b86fd88e7ba8f6b70ee5669d8",
+          "verdict": "supported",
+          "rationale": "The paper explicitly characterizes DnR as reinforcing access to existing knowledge and unable to recover unknown facts.",
+          "evidence_ids": [
+            "ev_15535ab06f0a218f2e46af76"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_1e2894410a0acade089cf96101632e56",
+          "verdict": "supported",
+          "rationale": "The cited passages establish the utilization criterion, rendering integration without retraining, and an approximate learned replacement for exhaustive selection.",
+          "evidence_ids": [
+            "ev_19eafa9caf7c2ae632cde690",
+            "ev_88ef732fb76f3bc6c1d466c3",
+            "ev_a863872ff157a9bdc91c9bda"
+          ]
+        }
+      ]
+    },
+    {
+      "work_id": "work_aa6dce0ed7f14b25",
+      "status": "ok",
+      "verdicts": [
+        {
+          "schema_version": 1,
+          "claim_id": "claim_0a17c63f1d4b3ebbb8f51b7afda7c09d",
+          "verdict": "supported",
+          "rationale": "The introduction explicitly identifies pixel-level limitations and inadequate assessment by VQA and visual grounding.",
+          "evidence_ids": [
+            "ev_7fcac78f0a4aa92986dae68e"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_00efd3af44fd1aa3db3b0d97fd7eb22f",
+          "verdict": "supported",
+          "rationale": "HLMAT is explicitly formulated as a multi-step MDP using textual coordinates without specialized architectures or implicit tokens.",
+          "evidence_ids": [
+            "ev_7dbfe37bbc1fdfe1801f7367"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_c474d454691350c6aa73500806a06c38",
+          "verdict": "supported",
+          "rationale": "The framework describes the composite visual input, task and target prompt, textual action output, and segmentation update using action history.",
+          "evidence_ids": [
+            "ev_4b80da477964a5650edc9b4c",
+            "ev_8aeae7130e7a44ec562010e3"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_f126966541f27397ee62cd1d88bc47f8",
+          "verdict": "supported",
+          "rationale": "The trajectory generator uses mask error regions and explicitly applies all three stated filtering and stopping rules.",
+          "evidence_ids": [
+            "ev_ca90af6f87f795a99e7a3a40",
+            "ev_e90d180ae5771c95fbda449b"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_fead9af886a5410fe7f0e2ef273c07c7",
+          "verdict": "supported",
+          "rationale": "StaR+ explicitly retains reward-increasing actions, corrects decreasing actions with Fsim, and merges trajectories for fine-tuning.",
+          "evidence_ids": [
+            "ev_050dfdcb8f542a89c6f78c2e"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_d1ba20f567e2e1aa4abd90cf207ddedc",
+          "verdict": "supported",
+          "rationale": "The PRM description and Algorithm 2 specify current-state mIoU prediction, candidate sampling and scoring, and selection of the best mask across steps.",
+          "evidence_ids": [
+            "ev_a5a6f1f2d15251dd456a83a9",
+            "ev_d5b9d5b55bba4585496cf018"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_5137323fb078587d0d890fc48e616d3a",
+          "verdict": "supported",
+          "rationale": "The dataset descriptions confirm the RES components, HRES provenance and subsets, and all stated DIS5K counts.",
+          "evidence_ids": [
+            "ev_7d55354dfbd98844c1e9c992",
+            "ev_94239693c8a03702c5b02cac"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_5afaf5ec4da6922969e66b50f3ba3c86",
+          "verdict": "supported",
+          "rationale": "The evaluation protocol explicitly gives cIoU and the stated T and K settings for both datasets.",
+          "evidence_ids": [
+            "ev_2e468725ef84e27accf6992d"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_34ff41a6ca5dde8027af926f9b5ed555",
+          "verdict": "supported",
+          "rationale": "All four scores and their dataset splits match Table 1.",
+          "evidence_ids": [
+            "ev_e82ee2055511ec08c8cccf07"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_c721ac454ceb1638414b01da8f19da21",
+          "verdict": "supported",
+          "rationale": "Section 5.4 reports the single-round StaR+ scores and the stated PRM and additional search improvements with the same comparators.",
+          "evidence_ids": [
+            "ev_af59762e939ebb467e0f23ca"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_54a0b0c1b0476b082c0e359220d0d56b",
+          "verdict": "supported",
+          "rationale": "Both models' four annotation-filtering metrics match Table 3 exactly.",
+          "evidence_ids": [
+            "ev_1675f7c93153b65e588502c4"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_58fff044a29965c4026579a11013bfbd",
+          "verdict": "supported",
+          "rationale": "The limitations section identifies both failure modes and explicitly attributes the main bottleneck to fine-grained pixel localization.",
+          "evidence_ids": [
+            "ev_54a381b62ecc4597ce0345b4"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_6a9f61c93bf4a44ca133ba7f816717b4",
+          "verdict": "supported",
+          "rationale": "The paper states that limited trajectory diversity constrains robustness and generalization, and that noisy masks cause erroneous actions near trajectory endpoints.",
+          "evidence_ids": [
+            "ev_468ca2597ea988ff97ff05b2",
+            "ev_ca90af6f87f795a99e7a3a40"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_e7a5ffaf30a3341c2a7fd2b6348b4f7a",
+          "verdict": "supported",
+          "rationale": "The search discussion names BFS and MCTS as more complex alternatives and leaves their exploration to future work because of the computation–performance trade-off.",
+          "evidence_ids": [
+            "ev_1d774a5ae20aa5af075a2c5d",
+            "ev_d5b9d5b55bba4585496cf018"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_33d5248df2cd54cd3cf0f2a50b8c5e3b",
+          "verdict": "supported",
+          "rationale": "The contribution list explicitly presents HLMAT, automatically trained SegAgent, and HRES for complex vision-centered multi-step research.",
+          "evidence_ids": [
+            "ev_9e126dfccfdf7973a23bdddd"
+          ]
+        }
+      ]
+    },
+    {
+      "work_id": "work_b8b1ef49ee17445d",
+      "status": "ok",
+      "verdicts": [
+        {
+          "schema_version": 1,
+          "claim_id": "claim_cc2098ccb80b9a321963644d2c325dd2",
+          "verdict": "supported",
+          "rationale": "The paper describes inefficient learning across many variations and suboptimal performance plateaus.",
+          "evidence_ids": [
+            "ev_ad704acc19c856c400e94e2e",
+            "ev_c9897dc006f4374fca4c744a"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_72783b68d58a60d6ee6e5b26a199a71d",
+          "verdict": "supported",
+          "rationale": "Algorithm 1 specifies these steps, with specialist training conditional on the plateaued generalist remaining suboptimal.",
+          "evidence_ids": [
+            "ev_d3ddbbc2f6b0a8ccea2e3026"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_bed2ddfe92dd0948e2bc823d9dfb4d08",
+          "verdict": "supported",
+          "rationale": "The stated algorithm combinations and online environment sampling are explicitly described.",
+          "evidence_ids": [
+            "ev_309ae504f55108ddc6570b87",
+            "ev_a5aa56e14db79b0e5851b8f8"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_906e5227f1a2eb4b8409bcfdeb800f52",
+          "verdict": "supported",
+          "rationale": "The main Procgen evaluation selects seven challenging environments; Table 1 specifies 1024 training levels, 1000 unseen levels, and five-run means with standard deviations.",
+          "evidence_ids": [
+            "ev_309ae504f55108ddc6570b87",
+            "ev_e3764f504c1a9d35a5ff3f5a",
+            "ev_e41959f9ef6d4ce04d37a4d1"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_b6a45c85e7962a46b39ca23c69318884",
+          "verdict": "supported",
+          "rationale": "The benchmark description explicitly states V2, the respective skill counts, and evaluation only on training environments.",
+          "evidence_ids": [
+            "ev_e3764f504c1a9d35a5ff3f5a"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_c85a6f2171b40ae9f70de12c2990da8b",
+          "verdict": "supported",
+          "rationale": "All four BigFish values match Table 1, whose caption specifies raw episode rewards and five-run means with standard deviations.",
+          "evidence_ids": [
+            "ev_309ae504f55108ddc6570b87",
+            "ev_a05dcc49215a19d83c2d6da6"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_d34fe37d6a4d319fbd2b90d4a21f7269",
+          "verdict": "supported",
+          "rationale": "The MT-10 and MT-50 percentages and five-run averaging match Table 2; the full context identifies the metric as success rate.",
+          "evidence_ids": [
+            "ev_309ae504f55108ddc6570b87",
+            "ev_5e225a674cc76ac751b6468f"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_b6c714a93c16599c98100030c787759e",
+          "verdict": "supported",
+          "rationale": "The timing ablation explicitly reports worse sample complexity before plateau and inefficient, ineffective learning from scratch.",
+          "evidence_ids": [
+            "ev_05f3af2f5c490c6eae385115"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_01bbc314251aa32528f3f236bbb23a54",
+          "verdict": "supported",
+          "rationale": "All training and test returns match Table 3.",
+          "evidence_ids": [
+            "ev_67503e1ef9a162cfc5b0f79a"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_8fedbdaf0b151a36a4e069cc5085c209",
+          "verdict": "supported",
+          "rationale": "The paper limits ManiSkill testing to PushChair because of simulation and rendering costs, reports 30 steps per second, and uses eight chairs.",
+          "evidence_ids": [
+            "ev_48b5ae36db41368c105eb0c9"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_6242dff2366988517238293d055311e6",
+          "verdict": "supported",
+          "rationale": "The text explicitly requires tuning and describes the stated efficiency costs and potential fine-tuning difficulty.",
+          "evidence_ids": [
+            "ev_31ff59cac0606136c36fc6aa",
+            "ev_67503e1ef9a162cfc5b0f79a"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_06665a95209a7663f2af41a60c50710a",
+          "verdict": "supported",
+          "rationale": "The authors explicitly say they skip DnC because its quadratic complexity makes their comparison computationally intractable.",
+          "evidence_ids": [
+            "ev_ab68da109d1651d59bf5de1a"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_1992b4942bfd08e46058a2d51d7f78c4",
+          "verdict": "supported",
+          "rationale": "The paper defines GSL as the stated meta-algorithm and explicitly identifies specialist-training timing as a key contribution.",
+          "evidence_ids": [
+            "ev_baf7ea490f2740a3cfac4c69",
+            "ev_bc9e0f7f1c6a3d8aa24adc97"
+          ]
+        }
+      ]
+    },
+    {
+      "work_id": "work_e8706d7715e44ae8",
+      "status": "ok",
+      "verdicts": [
+        {
+          "schema_version": 1,
+          "claim_id": "claim_f2b1020c3ab93c6a3514c4f13d6267d8",
+          "verdict": "supported",
+          "rationale": "The introduction explicitly describes degradation from imperfect modalities, failures to detect or adapt to imperfections, and difficulties under substantial train–test discrepancies.",
+          "evidence_ids": [
+            "ev_9f11b1f325573c57d24f81b6"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_10875d77ca6f6cc880b31fa4a68a6bba",
+          "verdict": "supported",
+          "rationale": "The methodology specifies volumetric processing, separate modality extractors, ICEM/CDAM assessment, pixel-level discounting, and DS fusion.",
+          "evidence_ids": [
+            "ev_a9a9390531f391c2541f9a3e",
+            "ev_b8f0be9b27964ef596323260"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_8adcaf8524b546c5b0caf96ed31e0362",
+          "verdict": "supported",
+          "rationale": "Equations (5)–(7) describe evidence SVD, the minimum L1 distance divided by class count against stored training spectra, and convolutional combination.",
+          "evidence_ids": [
+            "ev_293a5211674ddc0f02cc5c77",
+            "ev_56f5ceb5bf39928f04915e36"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_7f719c5ff2fd39a5003bb2999319ebde",
+          "verdict": "supported",
+          "rationale": "Equations (9)–(11) and their explanation establish differential evidence, concatenation and convolutions, and lower weights with greater discrepancies.",
+          "evidence_ids": [
+            "ev_0adbdda80c725fbc6042b73d",
+            "ev_8a3f0ac9cf8864f209200380",
+            "ev_fece48f1a33611bf1c7d813a"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_df94e5029721914fbafb45106c51af3e",
+          "verdict": "supported",
+          "rationale": "The module combines both information sources with α and β set to 1, then merges discounted opinions through Reduced Dempster’s Combination Rule.",
+          "evidence_ids": [
+            "ev_3ab530c6dfcfbb8ba153eb61",
+            "ev_5217e4910db03f7f2120effe"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_6c8d3b750964153c0bf384eb21bf5848",
+          "verdict": "supported",
+          "rationale": "The dataset description supplies all four modalities, 1251 scans, and the stated training, validation, and testing counts.",
+          "evidence_ids": [
+            "ev_9bf378bc6cff5581822a3624",
+            "ev_b961e1894536a4b5e0f604c8"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_1335d432ffbddcb0a5bd306f98308fac",
+          "verdict": "supported",
+          "rationale": "The patient count, diagnoses, three phases, annotation targets, and Elastix registration reference phase all match.",
+          "evidence_ids": [
+            "ev_9bf378bc6cff5581822a3624"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_b0fcdb659e358bc6a087bf9acabcd8e3",
+          "verdict": "supported",
+          "rationale": "The implementation details explicitly report the stated training schedule, crop size, sliding-window overlap, and evaluation metrics.",
+          "evidence_ids": [
+            "ev_5e7b7cc5dbdaee432b2d9b07"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_d29db3a3fa6d4cd6d0e3e76b6174eb44",
+          "verdict": "supported",
+          "rationale": "The comparison protocol and qualified performance statements accurately reflect the reported text.",
+          "evidence_ids": [
+            "ev_3178400c310350b736541f7f"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_fe9a0541cc7cab838c4e4220eab55a7c",
+          "verdict": "supported",
+          "rationale": "Figure 2 lists the exact σ values and both datasets; its accompanying discussion reports highest Dice and lowest HD95 under noisy conditions.",
+          "evidence_ids": [
+            "ev_a53b45d0c04a3adad69a78a4"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_f4dfb790b38bc683855b722ac932c4d0",
+          "verdict": "supported",
+          "rationale": "The text explicitly reports both corruption settings, eight comparison models, and superiority across standard BraTS metrics.",
+          "evidence_ids": [
+            "ev_90f02ad2c09d9bf123d4117b"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_3431a4bc49d6f2425fa9063cd3e8cc86",
+          "verdict": "supported",
+          "rationale": "The ablation discussion gives the stated N-T1Gd Model3 scores and baseline scores in the same ET, TC, WT order.",
+          "evidence_ids": [
+            "ev_2c01c38963727a0f567d80ad",
+            "ev_627f9d3030bc92ec12a85ea4"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_bdd1dcab0cc99b6154f3b12899c261cd",
+          "verdict": "supported",
+          "rationale": "The reported Model4 scores and comparison with Models1–3 match, including the explicit N-T1Gd exception.",
+          "evidence_ids": [
+            "ev_80522cc9e9280bc39d3ab103"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_c5b623f96d0e2cc6933974b1e9ebc86d",
+          "verdict": "supported",
+          "rationale": "The clinical analysis explicitly identifies both scanners, distribution shifts, degraded segmentation quality, and retained anatomical consistency.",
+          "evidence_ids": [
+            "ev_7b7d8f08e9051a221499e021"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_866d4d5a9f197b00452600fd680069b3",
+          "verdict": "supported",
+          "rationale": "The discussion explicitly acknowledges this limitation even when discount factors approach 1.",
+          "evidence_ids": [
+            "ev_fd611988bcb7f714bc563b1d"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_b42d5b4618697bb3df31b59f0d566ca2",
+          "verdict": "supported",
+          "rationale": "The contribution statements describe all three modules, dynamic pixel-level modality calibration, both datasets, and both comparator categories.",
+          "evidence_ids": [
+            "ev_a4ad9c0b3d6627f5baf01d89"
+          ]
+        }
+      ]
+    },
+    {
+      "work_id": "work_035a8553e2314bc2",
+      "status": "ok",
+      "verdicts": [
+        {
+          "schema_version": 1,
+          "claim_id": "claim_02b7fb2d0fa08ca8f3964e5a12a986ee",
+          "verdict": "supported",
+          "rationale": "The abstract and introduction identify all listed anatomical, data, and MR imaging challenges.",
+          "evidence_ids": [
+            "ev_0912e215a3f00194456bb922",
+            "ev_f3749a082723dee8ecbae06a"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_04319f58ce6cc59dec3262c930f0e3dc",
+          "verdict": "supported",
+          "rationale": "The task description specifies all eight structures, pulmonary-vein inclusion, single-phase input, one click per structure, and the stated exclusions.",
+          "evidence_ids": [
+            "ev_20d0f408ef59408b3236aadf"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_e969435660f2340dea9efd837a39695b",
+          "verdict": "supported",
+          "rationale": "The architecture predicts segmentation and stopping jointly, recurs through the segmentation output, and permits overriding stopping.",
+          "evidence_ids": [
+            "ev_a3c2bd68ce63175435d03ae0"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_4d708cd0b157cbbd629cc61e2e09a9db",
+          "verdict": "supported",
+          "rationale": "The loss derivation explicitly decouples time steps and removes backpropagation through time; training pairs are generated from complete annotations on the fly.",
+          "evidence_ids": [
+            "ev_6aaf261a29fc95efbad3fa06",
+            "ev_fca92bd44623370062bf401b"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_f5f9197cc019dbd92bb85ec8976d9f7f",
+          "verdict": "supported",
+          "rationale": "The training-data and augmentation descriptions specify these growth targets and input corruptions while preserving output targets.",
+          "evidence_ids": [
+            "ev_1406053f15f0edbe2cf6ce14",
+            "ev_59e1ce0dc6b2503979079696",
+            "ev_dce5a7458bbbb9dca75bcc00"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_ec6ff1899a17a2dc9941448282dcd2de",
+          "verdict": "supported",
+          "rationale": "The data section confirms the sample counts, eight labels, acquisition institution, scanner model, and field strength.",
+          "evidence_ids": [
+            "ev_95e59bfbd2f76597e5ae295f"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_446c20dbaa46d91dfa2ba668f0320a4f",
+          "verdict": "supported",
+          "rationale": "The reported ages, mean resolution, resized dimensions, and anatomical basis of severity categories match exactly.",
+          "evidence_ids": [
+            "ev_383ff5709e13506c413f2e52",
+            "ev_6f4feb67c90fe6f453ac35cf"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_2f3d729650dace72a10f8f57e0cc1ffd",
+          "verdict": "supported",
+          "rationale": "The experimental setup reports both train/test splits, four-fold training validation, and ensemble test predictions.",
+          "evidence_ids": [
+            "ev_1028a99a3a9972082e1c5a5e",
+            "ev_3ab9b90fa9aeb2680cbb57e7",
+            "ev_8f87ac8e68ddeadd4fc012ec"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_d94537bbb106ce6e0eb275b3e11cedd0",
+          "verdict": "supported",
+          "rationale": "Interaction was simulated, with the stated best-of-40 selection rules for binary and multiclass models.",
+          "evidence_ids": [
+            "ev_1028a99a3a9972082e1c5a5e",
+            "ev_161d9a0150fe3325f056a73c",
+            "ev_3ea094b3134e56dcc15ec1aa"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_922764a5dc06433edb9ffb5a8602d91f",
+          "verdict": "supported",
+          "rationale": "All severe-subject 20–HVSMR Dice values and comparison p-values match Table 1.",
+          "evidence_ids": [
+            "ev_3ab9b90fa9aeb2680cbb57e7",
+            "ev_b76df7f900839d3d1a08f2cd"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_f62236f36219afda00a8f13f0b5b0ee1",
+          "verdict": "supported",
+          "rationale": "All severe-subject 48–HVSMR+ Dice values and the Iter–U versus U–Net+S significance threshold match Table 1.",
+          "evidence_ids": [
+            "ev_3ab9b90fa9aeb2680cbb57e7",
+            "ev_b76df7f900839d3d1a08f2cd"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_d3663622dbdaf8c0543608f89bb4f986",
+          "verdict": "partial",
+          "rationale": "Good mild/moderate performance is supported, but the multiclass significance findings concern severe subjects. Omitting that population restriction overgeneralizes the results.",
+          "evidence_ids": [
+            "ev_359a3c37019bc185bcf06a56",
+            "ev_7600a6d300e0051166f117e2",
+            "ev_d15b532e59ea7338b1b381ef"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_a1737ecabcd3a7552201379385a0ab78",
+          "verdict": "supported",
+          "rationale": "The inference-time report gives precisely these timings and GPU hardware.",
+          "evidence_ids": [
+            "ev_86dfd590543ed0c4d693657b"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_6a6adfe55bfbf980d0b97fc3795e14dd",
+          "verdict": "supported",
+          "rationale": "Optional vessel zones were removed from both segmentations before Dice calculation, leaving required regions for comparison.",
+          "evidence_ids": [
+            "ev_7600a6d300e0051166f117e2",
+            "ev_86dfd590543ed0c4d693657b"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_8e501e1892c18f150a876de5f33c38f3",
+          "verdict": "supported",
+          "rationale": "The failure analysis and limitations describe all listed failure modes and pathology-dependent difficulties.",
+          "evidence_ids": [
+            "ev_2565aca0bbee79e931d02dfa",
+            "ev_97ec38b059f84954aca4ff13"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_7e803bab7b1e577da5274f5df38de1d8",
+          "verdict": "supported",
+          "rationale": "The discussion reports these multiclass limitations, presents the stopping-point explanation tentatively, and notes inherited binary tuning.",
+          "evidence_ids": [
+            "ev_2565aca0bbee79e931d02dfa",
+            "ev_ef4142c372c4b249f496a8c8"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_ab97ee1e6157858c8a27075f5d2e960e",
+          "verdict": "supported",
+          "rationale": "The authors explicitly propose a future actual-user study to evaluate accuracy and their interaction-speed and intuitiveness hypothesis.",
+          "evidence_ids": [
+            "ev_af60aa1becfed13468542610",
+            "ev_ef4142c372c4b249f496a8c8"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_34ee92d0f45940016a468c7c433dad35",
+          "verdict": "supported",
+          "rationale": "This accurately attributes the authors’ qualified novelty claim and preserves its modality, population, and labeling scope.",
+          "evidence_ids": [
+            "ev_2bb9b1cb338e7f93a68e282b"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_e8e07adc8291d6e168ec3f6b72c46053",
+          "verdict": "supported",
+          "rationale": "The contributions describe prescribed evolution, teacher-forcing sequence loss, automatic stopping, and optional candidate selection.",
+          "evidence_ids": [
+            "ev_1e42d2f7f85657338ef4c018",
+            "ev_2bb9b1cb338e7f93a68e282b",
+            "ev_fca92bd44623370062bf401b"
+          ]
+        }
+      ]
+    },
+    {
+      "work_id": "work_750f4a75835240a3",
+      "status": "ok",
+      "verdicts": [
+        {
+          "schema_version": 1,
+          "claim_id": "claim_abda0cbf13406d1b184c33ec6e29eb9c",
+          "verdict": "supported",
+          "rationale": "The document explicitly contrasts predominantly instance-level L2D with spatially varying segmentation uncertainty in these regions.",
+          "evidence_ids": [
+            "ev_fb0d61a7a7c7a881ea2c1e5b"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_936e402162191b5aea0a63327723c70b",
+          "verdict": "supported",
+          "rationale": "Section 4.2.1 specifies J+1 additional routing channels and unchanged segmentation output channels.",
+          "evidence_ids": [
+            "ev_4a7114cc7ab798a623c1a56d"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_356a9773e059f667b21159e3585fabb5",
+          "verdict": "supported",
+          "rationale": "The four described terms match the stated DC loss interpretation, including thresholded routing supervision and soft-probability BCE.",
+          "evidence_ids": [
+            "ev_4b64f38b0995b34258c342a4"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_e0edd82803a5441a6872b3a9c9222151",
+          "verdict": "supported",
+          "rationale": "Equations 8–10 define batch-average soft expert allocations, bound-violation penalties, and the combined multi-expert objective.",
+          "evidence_ids": [
+            "ev_3f67c57af8cc016a40bbdcbf"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_b4f72f96263f5c0a92edc0058fa438fb",
+          "verdict": "supported",
+          "rationale": "Equations 11–12 specify argmax routing and fusion using the thresholded model output or selected expert prediction.",
+          "evidence_ids": [
+            "ev_3a6f1cb8eb8615abccda4c09",
+            "ev_540c2cddf9c91ae880f52164"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_98ea2fbfff9ac0fbcf6c08b7fc9cba8d",
+          "verdict": "supported",
+          "rationale": "The predictor receives joint SC supervision and is explicitly restricted to visualization at inference.",
+          "evidence_ids": [
+            "ev_1f2a3641998b100cbc978983"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_3447d492b730483ec07bf2368c2bd939",
+          "verdict": "supported",
+          "rationale": "The dataset groups, offline annotation setting, and three metrics are explicitly listed.",
+          "evidence_ids": [
+            "ev_ac7f6914676a81a3876508c5"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_bb215d32fd889132e0c74988637c239b",
+          "verdict": "supported",
+          "rationale": "The expert-source description identifies these masks as correction proxies and excludes them from routing inputs and selection.",
+          "evidence_ids": [
+            "ev_3277af82a0c4a13298ab2eb7",
+            "ev_fb67c77f09275e9d9184bd14"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_bb874a95c59f9b539ca1ad817b645811",
+          "verdict": "supported",
+          "rationale": "All three FG/BG/BD profiles match Table 2 for comparative experiments.",
+          "evidence_ids": [
+            "ev_9192097bb19f87b69945485c"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_d1ff75d54ba5ad2f6aad14c30228e9eb",
+          "verdict": "supported",
+          "rationale": "The reference-construction description explicitly distinguishes disjoint QUBIQ annotations from shared Chaksu and CURVAS pools.",
+          "evidence_ids": [
+            "ev_5d9a1bb3436c81228fca0852"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_db3714f38a7ec2431c4c952a5f993b07",
+          "verdict": "supported",
+          "rationale": "The baseline protocol explicitly matches both expert source and dataset-specific one-expert intervention budget.",
+          "evidence_ids": [
+            "ev_028c4b034fb4e7fa9a28c4c9"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_f77eb863c77077f892ea6c49fe55301b",
+          "verdict": "supported",
+          "rationale": "All four PROMISE12 DSC means and standard deviations match Table D.10.",
+          "evidence_ids": [
+            "ev_d92c80d33d9218452fd4c377"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_6a699af9b2cdf15516447ead48dac6cd",
+          "verdict": "supported",
+          "rationale": "The deferred and model-retained percentages match the PROMISE12 row of Table 5.",
+          "evidence_ids": [
+            "ev_cce7e8e1462c854f5127d4e3"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_b4b1a1b4e2cee9965191e14608e8cfd0",
+          "verdict": "supported",
+          "rationale": "Table 4 reports exactly these brain-growth DSC values in the clinician-annotation evaluation.",
+          "evidence_ids": [
+            "ev_696d3a4947114a7503668d33"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_7058339408f9b2d7fb04dc943f52ea32",
+          "verdict": "supported",
+          "rationale": "The QUBIQ prostate row confirms all DSC and Sensitivity values and the stated directions of change.",
+          "evidence_ids": [
+            "ev_301c138c2f726903f2749ae2",
+            "ev_696d3a4947114a7503668d33"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_71a36c34568d9395f4c67b7bfddf195e",
+          "verdict": "supported",
+          "rationale": "The testing protocol specifies one-sided paired Wilcoxon tests; Table 7 confirms all comparison counts.",
+          "evidence_ids": [
+            "ev_78d154815ad18aad2300dc4c",
+            "ev_d2257091cfd6a118c537dd88"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_3633c767b34013144e4487d5c52249a8",
+          "verdict": "supported",
+          "rationale": "Appendix H explicitly identifies these two non-significant configurations.",
+          "evidence_ids": [
+            "ev_68448704556a74a4a4984e02",
+            "ev_8ae5c8bcc331258888807ab1"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_508d8307a66efbc9e0483c0b990e1c97",
+          "verdict": "supported",
+          "rationale": "All four three-expert System DSC means and standard deviations match Table 8; the full context identifies PROMISE12 as the ablation dataset.",
+          "evidence_ids": [
+            "ev_d2257091cfd6a118c537dd88"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_459e43b608da7a9709d1030b11cecfb0",
+          "verdict": "supported",
+          "rationale": "The document reports nonmonotonic expert-count effects and explicitly ties benefits to complementarity and task.",
+          "evidence_ids": [
+            "ev_6da0f8d1ffe0e2d71fedb829",
+            "ev_fa6a9fb4c04af74625d8696c"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_94abb84ae78c65275b001f0ff6570058",
+          "verdict": "supported",
+          "rationale": "The limitations explicitly state dependence on prior expert annotations, offline evaluation, and the need for prospective studies.",
+          "evidence_ids": [
+            "ev_010c975d9b832298a35913c2"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_448a887c0708b032a6ecf5cfc6c849f8",
+          "verdict": "supported",
+          "rationale": "Appendix A describes the Streamlit workflow and explicitly leaves all listed human-efficiency outcomes for prospective evaluation.",
+          "evidence_ids": [
+            "ev_4f8cad3598c5597885133f37"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_a054c9ce6d2e4b0493c382ea4417fe14",
+          "verdict": "supported",
+          "rationale": "The contribution statements cover pixel-wise deferral, both losses, multi-expert load balancing, and MedSAM/CENet instantiations.",
+          "evidence_ids": [
+            "ev_081f5659c894c1d4ab71e1e1",
+            "ev_de15bd845d160fa8fbcbc2c4"
+          ]
+        }
+      ]
+    },
+    {
+      "work_id": "work_a3a141cb15434c22",
+      "status": "ok",
+      "verdicts": [
+        {
+          "schema_version": 1,
+          "claim_id": "claim_599a9d572d229d7c08601afda8a29afc",
+          "verdict": "supported",
+          "rationale": "The introduction explicitly identifies rare CHD cohorts and normal-topology assumptions of prior generative methods as these challenges.",
+          "evidence_ids": [
+            "ev_9bc45964f001705008da9241",
+            "ev_a9da8206185605d565e3be4f"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_bcf2215df4f1a2a4185a66c96ae215ac",
+          "verdict": "supported",
+          "rationale": "The pipeline includes diagnosis-conditioned implicit type representations, shape deformation, and correction of additional patient-specific topology variations.",
+          "evidence_ids": [
+            "ev_46b98c3024aa55be0d75f321",
+            "ev_85c702a343b7fdc1c50699ab"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_4e3f6cf95980d509186e49c11eea9d53",
+          "verdict": "supported",
+          "rationale": "The methods specify NODE-based invertible deformation and a 4×4×4×27 spatial shape-code grid.",
+          "evidence_ids": [
+            "ev_35aabb921bfa6504acf0dde3"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_832784e3f96208365171db5125509aee",
+          "verdict": "supported",
+          "rationale": "The implementation explicitly trains with occupancy targets and extracts boundaries at the 0.5-level set.",
+          "evidence_ids": [
+            "ev_11cbe3fdd8494f689e9944b5"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_563d8bd09c9e6445c476940654ef204d",
+          "verdict": "supported",
+          "rationale": "The dataset description confirms CT images, diagnoses, seven-structure segmentations, expert-supervised processing, and the stated patient splits.",
+          "evidence_ids": [
+            "ev_64378ab50821c47a5ba1270b",
+            "ev_f56b267e1c8381b7a6defdd0"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_57209670bef7b40cab34ade5339f2f89",
+          "verdict": "supported",
+          "rationale": "These are the six CHD types listed for the main dataset experiments; a separate experiment additionally introduces one single-ventricle example.",
+          "evidence_ids": [
+            "ev_f56b267e1c8381b7a6defdd0"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_9ca7dace0fb5a47057669552fae69267",
+          "verdict": "supported",
+          "rationale": "The assessment was blinded to generation diagnoses, used 50 random cases per method, and reported exactly these mismatch counts and predominant confusion.",
+          "evidence_ids": [
+            "ev_84ee4319a5364ee140ac9943",
+            "ev_bcbd0d39482b1e1d7457e281"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_b0472f4bfacf8920c8a163753862e9e1",
+          "verdict": "supported",
+          "rationale": "The evaluation defines plausibility as maximum training-set Dice and reports higher means across 30 generated anatomies per type.",
+          "evidence_ids": [
+            "ev_eb139e29dee79caf1c7152ba"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_f5239625c7243996725b2dc8046e2ae0",
+          "verdict": "supported",
+          "rationale": "Table 4 reports all four whole-heart reconstruction values exactly as stated.",
+          "evidence_ids": [
+            "ev_63414c4e3d43bc39a11be278",
+            "ev_84389058b399b8ab8b752658"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_6e8d4a931e32b45c29d00b38466f8285",
+          "verdict": "supported",
+          "rationale": "The experiment specifies 67 real and 420 synthetic images; Table 7 confirms both Dice changes and their significance markers.",
+          "evidence_ids": [
+            "ev_468c6f16ed86a8dbdeef6fda",
+            "ev_b29f658f0c7b807897ae56aa"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_d9e8e6dff94c12167295195bd89cc7ea",
+          "verdict": "supported",
+          "rationale": "The reported 3D UNet median VSD diameter and area percentage errors match the claim exactly.",
+          "evidence_ids": [
+            "ev_85fd761a46d0e5563ebb19dd"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_04cd50911e3dd064533e288ad1a36bfc",
+          "verdict": "supported",
+          "rationale": "The local-defect analysis attributes the missed apical VSD to subaortic-only templates and states that correction also failed.",
+          "evidence_ids": [
+            "ev_e68512c7b73bda2d4b82ee1c"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_84390b61ba7d6dcc87316cd1b1dc5aff",
+          "verdict": "supported",
+          "rationale": "The limitations explicitly describe the shared Gaussian prior as simplifying and acknowledge type-dependent distributions and limited samples.",
+          "evidence_ids": [
+            "ev_e88ad8c1b19a00be4c379f44"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_51c10988f3cf229ac8bbefe6663ba792",
+          "verdict": "supported",
+          "rationale": "Increasing latent spatial resolution improved unseen reconstruction but caused non-physiological synthetic shapes.",
+          "evidence_ids": [
+            "ev_3707576fddc6a7ae1b5e019f"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_99732cb1a06cfe06a84b4b37a4e8745a",
+          "verdict": "supported",
+          "rationale": "The discussion explicitly distinguishes reduced intersection artifacts from the absence of a positive-Jacobian guarantee.",
+          "evidence_ids": [
+            "ev_e9ba442b3d854d3ec3ff61aa"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_60a8b49401240082f7a32ffce198362f",
+          "verdict": "supported",
+          "rationale": "The limitations report small-branch reconstruction difficulties for all methods and limited exploration of vessel-connection generation.",
+          "evidence_ids": [
+            "ev_44a6228d05888ee4fba56c64",
+            "ev_8505ca9805b8e541c6c34c6b"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_b1b6c06442c2549eeaf82c6ae6d25967",
+          "verdict": "supported",
+          "rationale": "The stated contributions combine smooth implicit representations with diffeomorphic deformation and demonstrate both application classes.",
+          "evidence_ids": [
+            "ev_21ef63af3042c61e19c20a9b",
+            "ev_9e9ccc31a264d6c4f682f15a"
+          ]
+        }
+      ]
+    },
+    {
+      "work_id": "work_5d1c00a2b3764ef3",
+      "status": "ok",
+      "verdicts": [
+        {
+          "schema_version": 1,
+          "claim_id": "claim_257786b81c9006c7aca4198d5ba09897",
+          "verdict": "supported",
+          "rationale": "The introduction identifies an existing predictor and potentially prohibitive joint retraining lasting weeks or months as the practical motivation.",
+          "evidence_ids": [
+            "ev_318ac6549718bb129161cdd3"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_1055a738ada697a952e9080f8dbda0c0",
+          "verdict": "supported",
+          "rationale": "The predictor is trained first using a classification surrogate; the second stage learns deferral with the predictor-derived score fixed.",
+          "evidence_ids": [
+            "ev_c9ab2dde9d92462f8d7f5cba",
+            "ev_efc83543eec8733cadcc2b87",
+            "ev_f535e28a5c5a4f9a2a84bf90"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_76b0b28083c28ca3aea1ec5393f381ac",
+          "verdict": "supported",
+          "rationale": "Equation (3) weights the predictor option by its correctness indicator and expert options by complementary deferral costs.",
+          "evidence_ids": [
+            "ev_f535e28a5c5a4f9a2a84bf90"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_ae8415130621affd0fda6861d0520fd0",
+          "verdict": "supported",
+          "rationale": "The experiments section names both datasets and precisely these predictor, deferral and expert architectures.",
+          "evidence_ids": [
+            "ev_262ea7303102a13a7968638b",
+            "ev_c84ec09e7b4ea91ea21ace03"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_203fff1173fd635415e05cfe3cd2a23e",
+          "verdict": "supported",
+          "rationale": "The reported training setup matches the losses, optimizer, batch size, weight decay, dataset-specific epochs and absence of augmentation.",
+          "evidence_ids": [
+            "ev_262ea7303102a13a7968638b"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_bf010ec3b5fd520f30c82c9293b4cf47",
+          "verdict": "supported",
+          "rationale": "The contributions explicitly describe both surrogate families and their H-consistency bounds implying Bayes-consistency.",
+          "evidence_ids": [
+            "ev_3bfe366ac40512e19b60306a"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_1bb6d0dd9cc7ab8633339237a01259e9",
+          "verdict": "supported",
+          "rationale": "Theorems 1 and 6 impose the respective stage-specific consistency-bound assumptions and retain minimizability gaps in the deferral bounds.",
+          "evidence_ids": [
+            "ev_1b2de2a6584ef6fc69f85b06",
+            "ev_210bb8fa32aa88009bd77fb6",
+            "ev_f285c656acfcc7a9121ad0f5",
+            "ev_f438ae4fd8fb05f7dc4c847c"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_a7cdd88504732bb8a913763f9f4463a8",
+          "verdict": "supported",
+          "rationale": "Theorems 5 and 7 state zero expected deferral loss for the specified minimizers under logistic losses, constant costs, scaling closure and realizability.",
+          "evidence_ids": [
+            "ev_cc680f0e06020d529a0329a7",
+            "ev_fe67fc42913253429034a241"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_13135079784b6a93a5546e7397c0a534",
+          "verdict": "supported",
+          "rationale": "The fixed-score multiclass result is identified as a contribution, and Theorem 3 assumes symmetry and completeness of the underlying class.",
+          "evidence_ids": [
+            "ev_0beaaea90ab257b1a96e5679",
+            "ev_4035e35041abc846c01f0000"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_f58f3b63266abc631df37e0d386b7558",
+          "verdict": "supported",
+          "rationale": "All six values and the three-run mean and standard deviation reporting match Table 4; the methods identify its first two rows as lacking base costs.",
+          "evidence_ids": [
+            "ev_262ea7303102a13a7968638b",
+            "ev_e7ca1a26a36352fb7a73c7cb"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_0abfbf28cf76971687111d0c28820cca",
+          "verdict": "supported",
+          "rationale": "All six values and uncertainty summaries match Table 4; the methods identify its last two rows as using base costs.",
+          "evidence_ids": [
+            "ev_262ea7303102a13a7968638b",
+            "ev_e7ca1a26a36352fb7a73c7cb"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_96502dc3b21c8b1b1f595666a16c2157",
+          "verdict": "supported",
+          "rationale": "The authors explicitly report being unaware of established baselines within this setting.",
+          "evidence_ids": [
+            "ev_a1380b25017ad89c123d7f44"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_3d43aacab90ca89408e9bab2d0cee52a",
+          "verdict": "supported",
+          "rationale": "The limitation paragraph states that costs are typically determined through cross-validation and reserves principled selection for future research.",
+          "evidence_ids": [
+            "ev_e97fad690ac4c117f87a7e60"
+          ]
+        }
+      ]
+    },
+    {
+      "work_id": "work_6572d29cec464414",
+      "status": "ok",
+      "verdicts": [
+        {
+          "schema_version": 1,
+          "claim_id": "claim_41f56349d20ff41185a680589ec70e48",
+          "verdict": "supported",
+          "rationale": "Accurately states the scale-imbalance problem and preserves the source's qualified causal language.",
+          "evidence_ids": [
+            "ev_8aa809e36a36c25197be4d5c"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_fb68ba7901d06baff3348b6f7cc36fa6",
+          "verdict": "supported",
+          "rationale": "The framework and three-category specialist label definition match the methods.",
+          "evidence_ids": [
+            "ev_133bdc1b559c15291cc6485e",
+            "ev_a56978023a84fb4de16de8cd"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_91292fa112e51678829d818d56577cfc",
+          "verdict": "supported",
+          "rationale": "The teacher uses EMA updates, and both segmentation losses use H, defined as cross-entropy plus Dice.",
+          "evidence_ids": [
+            "ev_5f4ea9e0e5d12f221d4930ab",
+            "ev_7fa2e43a7d912370bfd7316d"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_cd869fc0dad090db4557c94a58551fa4",
+          "verdict": "supported",
+          "rationale": "Equation 11 exchanges branch pseudo-labels, and Equation 12 masks joint optimization to consensus regions.",
+          "evidence_ids": [
+            "ev_857369d8d50c4465622cd09c"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_5c3a4ad1a1c1d06c25e91c49c6af09ff",
+          "verdict": "supported",
+          "rationale": "Both stated agreement patterns are precisely the IHED acceptance conditions described.",
+          "evidence_ids": [
+            "ev_c288b09bdc346e4b7b6fd002"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_a9634cc1982df3edfcc72422124b9c96",
+          "verdict": "supported",
+          "rationale": "Patient counts, target counts, dataset splits, and input dimensions match the dataset descriptions.",
+          "evidence_ids": [
+            "ev_4607c22698f2fe975053c51b",
+            "ev_64a53da69e89deb158de317e"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_dc5b04a70b655032ed264475a2dfe434",
+          "verdict": "supported",
+          "rationale": "The testing description explicitly reports three seeds across three datasets and means with standard deviations.",
+          "evidence_ids": [
+            "ev_e38ecea0ac925653f8827691"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_050023a870c1366b004d8ae12a48f9a3",
+          "verdict": "supported",
+          "rationale": "All DSC values, uncertainties, labeled counts, and ratios match Table I.",
+          "evidence_ids": [
+            "ev_086bc48fe01a33c40228b24d"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_3e7a80f654a7776e7905eb0f5a7f5e30",
+          "verdict": "supported",
+          "rationale": "All reported CGS and FixMatch DSC values and labeled settings match Table II.",
+          "evidence_ids": [
+            "ev_ee7bc629e785a1f393373208"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_09213006d4d2501926d21e6e0e3ab01e",
+          "verdict": "supported",
+          "rationale": "Table III confirms the average metrics and both organ-specific regressions relative to FixMatch.",
+          "evidence_ids": [
+            "ev_d7b12f522b145bff1f4e28d2"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_23b7086859138f89e53a512d89d60bdd",
+          "verdict": "supported",
+          "rationale": "Table I reports these values, and lower 95HD is better.",
+          "evidence_ids": [
+            "ev_086bc48fe01a33c40228b24d"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_a8dcd132fb96d98ca6c9b88dd2f803b0",
+          "verdict": "supported",
+          "rationale": "The experimental setup and memory endpoints match Table X and its accompanying description.",
+          "evidence_ids": [
+            "ev_d7f88ad0e17b0bd32c33fc78"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_93e8a0bd7f247dd00ab8d923226c9581",
+          "verdict": "supported",
+          "rationale": "Accurately attributes the authors' stated dependency and limits the ablation restriction to removing the specialist foundation.",
+          "evidence_ids": [
+            "ev_20c96eab6f68dc9d5621ed92"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_de53bf8872aae8f67100d41ecc21360e",
+          "verdict": "supported",
+          "rationale": "The future-work statement and the CGS resampling improvement are explicitly reported.",
+          "evidence_ids": [
+            "ev_161ef218bac27709f7bb2fd5",
+            "ev_9871388095b2b11ec516f275"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_692842d6418bab7340167ed3185958ab",
+          "verdict": "supported",
+          "rationale": "The stated contributions and removal of specialist heads at inference match the paper's descriptions.",
+          "evidence_ids": [
+            "ev_64a53da69e89deb158de317e",
+            "ev_867063645d3106089853bdf0"
+          ]
+        }
+      ]
+    },
+    {
+      "work_id": "work_dc3db188901f4579",
+      "status": "ok",
+      "verdicts": [
+        {
+          "schema_version": 1,
+          "claim_id": "claim_67f1046145e522815064840053aa10b1",
+          "verdict": "supported",
+          "rationale": "The introduction identifies fine details, small objects, intricate boundaries and uniformly applied refinement as the targeted problems.",
+          "evidence_ids": [
+            "ev_6f63a458bee2ece085b7a9cd",
+            "ev_e08a8633b6436b2a1b155ec3"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_b03cbeeef4d2025ae2be729190a3bdd8",
+          "verdict": "supported",
+          "rationale": "The architecture description specifies MAE-pretrained plain ViT, FPN, two click disk-map channels and the previous mask, with prompt embeddings added to image embeddings.",
+          "evidence_ids": [
+            "ev_e935e4b874cabc24d8013162"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_21ddd5330ba7b8e6fc00a082b487c6c5",
+          "verdict": "supported",
+          "rationale": "The methods explicitly describe mask-derived edge supervision using differential operators and a weighted combination of normalized focal and Dice losses.",
+          "evidence_ids": [
+            "ev_4867bd5181dd0d1dc24befdd",
+            "ev_c78daeac7664b7bcfb16509f"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_661d79345d66bccaa920699241606c00",
+          "verdict": "supported",
+          "rationale": "Equations 4–6 define exactly this uncertainty formula and its product with the normalized Sobel contour-gradient magnitude.",
+          "evidence_ids": [
+            "ev_58a76a775ab9a983490e7ca3",
+            "ev_93f1532dbc0206767f92b62c"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_26a792c324aa9c8bbaf21f63fb507f13",
+          "verdict": "supported",
+          "rationale": "The pseudo-click procedure specifies the maximum-uncertainty candidate, inclusive skip interval, strict positive and negative thresholds, and feedback of accepted clicks.",
+          "evidence_ids": [
+            "ev_3f3a0200758a5b7f0d61552b",
+            "ev_58a76a775ab9a983490e7ca3"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_70927a5ebeb2a5dd4c3c875c53aa386c",
+          "verdict": "supported",
+          "rationale": "The setup lists all named evaluation datasets and reports the stated SBD training and test image counts.",
+          "evidence_ids": [
+            "ev_13de5fd89f1e6dffe877ae36"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_8f51d824603848d731a8bf45b0c4c354",
+          "verdict": "supported",
+          "rationale": "The out-of-domain evaluation explicitly names these medical and SEM datasets and states SBD-only training without target-domain fine-tuning.",
+          "evidence_ids": [
+            "ev_8062531f238f90af764cf9bc"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_1999dce50acdcddb89e7403c7dbda704",
+          "verdict": "supported",
+          "rationale": "The edge-head ablation reports all three NoC@90 reductions exactly as claimed.",
+          "evidence_ids": [
+            "ev_32f7e726071809ea757e1dd8"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_cba1fa1631bbf5830afbd2c361c54e69",
+          "verdict": "supported",
+          "rationale": "The reported COCO_MVal first-click mIoU and NSDS values match the claim.",
+          "evidence_ids": [
+            "ev_420ae82d8eb7d3c889da1aa8"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_e2ffba7b7342f08528ab103e69cb1901",
+          "verdict": "supported",
+          "rationale": "Table 2 compares one-step refinement variants and gives the three stated NoC@90 pairs.",
+          "evidence_ids": [
+            "ev_e65e70bdd19e6b8521b3a0ef"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_c31f22889dffd1572bcd9cd4041d022c",
+          "verdict": "supported",
+          "rationale": "The Berkeley comparison reports these values and relative reductions; the percentages agree with the rounded numbers.",
+          "evidence_ids": [
+            "ev_02779b600bb8c5126c542269"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_e78e285d993b69eb316197e4626812a5",
+          "verdict": "supported",
+          "rationale": "The OAIZIB discussion reports all three metric pairs against SimpleClick exactly as stated.",
+          "evidence_ids": [
+            "ev_8062531f238f90af764cf9bc"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_26c36bfd854b8183a0c5ab43e557eca1",
+          "verdict": "supported",
+          "rationale": "Table 4 gives the stated SEM-Precipitate NoC@85 and NSDS values for the model and SimpleClick.",
+          "evidence_ids": [
+            "ev_be50fdb0447d2c70c672134e"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_3f7c12e422ebf3058cbb935ffa94409c",
+          "verdict": "supported",
+          "rationale": "Table 2 shows lower U-CFR mIoU@10 on all three datasets, with exactly the claimed values.",
+          "evidence_ids": [
+            "ev_e65e70bdd19e6b8521b3a0ef"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_652c1ec74d02a6265e253144a45111d6",
+          "verdict": "supported",
+          "rationale": "The methods explicitly characterize the edge head as a training regularizer and acknowledge potential connectivity benefits from topology-aware losses.",
+          "evidence_ids": [
+            "ev_4867bd5181dd0d1dc24befdd",
+            "ev_c78daeac7664b7bcfb16509f"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_19be5410599d0cbda4655d59ed5965d7",
+          "verdict": "supported",
+          "rationale": "The conclusion identifies these two contributions and states that inference-time pseudo-click refinement requires no additional user input.",
+          "evidence_ids": [
+            "ev_146f616ede5204f8dc5155ee",
+            "ev_f8182f44a1746d2412d97d43"
+          ]
+        }
+      ]
+    },
+    {
+      "work_id": "work_864fba4def554ce3",
+      "status": "ok",
+      "verdicts": [
+        {
+          "schema_version": 1,
+          "claim_id": "claim_b92ea458b5277700f337e4275ac55236",
+          "verdict": "supported",
+          "rationale": "The introduction explicitly links sparsity, filamentous morphology, noise, and limited sliding-window receptive fields to segmentation difficulty and fragmentation.",
+          "evidence_ids": [
+            "ev_6511a606fb17b1ba89781dc9"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_db409fc8cc41b9bc2c5cba000457e703",
+          "verdict": "supported",
+          "rationale": "The workflow specifies global inspection, regional instructions, tool editing, validation, and both stated termination conditions.",
+          "evidence_ids": [
+            "ev_66bac5a1c5515d0d4aaf1ad4",
+            "ev_ddeecb67e2ea5b84f49d122d"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_56cda9f870cb7406020c85ad6a7adf87",
+          "verdict": "supported",
+          "rationale": "Equation 2 uses global and local mask projections and Betti numbers; the text defines these as 3D connected-component counts and assigns FP/FN labels.",
+          "evidence_ids": [
+            "ev_6d6fa1c8b6871e0cdab84db8"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_b5be9e9cc24c33afa5ea98176da06cfd",
+          "verdict": "supported",
+          "rationale": "The advisor jointly analyzes orthogonal image/mask projections and specifies location and operation in each instruction.",
+          "evidence_ids": [
+            "ev_ce17b2813fda76afd794fc75"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_e376a5eca89b16e1a5145f11de1577ae",
+          "verdict": "supported",
+          "rationale": "The main method explicitly describes both checks, instruction regeneration, and human escalation. The claim appropriately limits its attribution to that description; the supplementary prompt also permits unchanged topology.",
+          "evidence_ids": [
+            "ev_cfc1138ca153b06aea3b053e"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_0fab1943fb43cc4cb9e5f2b06028177d",
+          "verdict": "supported",
+          "rationale": "The architecture description specifies concatenated image/mask encoding, frozen text encoding, deepest-feature cross-attention, and mask decoding.",
+          "evidence_ids": [
+            "ev_b36fafeadedc252d16ea85c1",
+            "ev_e803a5d85ffa26e9bd953cbd"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_4d67d683a67fd9fb4049090eecb43728",
+          "verdict": "supported",
+          "rationale": "The training description distinguishes synthetic perturbations with derived instructions from real prediction errors with Qwen3-VL instructions.",
+          "evidence_ids": [
+            "ev_7f6b8e2598c8f68863de063f",
+            "ev_bc8951167e8eee81dcc543e1"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_1afe89a6ff4faa3edc1e8f92fe74bcb9",
+          "verdict": "supported",
+          "rationale": "The dataset description confirms the benchmarks, prior splits, BigNeuron diversity, and all stated CWMBS counts, dimensions, and resolution.",
+          "evidence_ids": [
+            "ev_00ebe63c442a9ec637016570",
+            "ev_7f6b8e2598c8f68863de063f"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_f45696c0f2e067b628b11c1dfb915a7d",
+          "verdict": "supported",
+          "rationale": "The dataset description gives the stated imaging modality, larval age, volume dimensions, and physical resolution.",
+          "evidence_ids": [
+            "ev_7f6b8e2598c8f68863de063f",
+            "ev_b69dbd8e2cbeb706581a07c1"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_f38787e56950f5a77daafede182cdf22",
+          "verdict": "supported",
+          "rationale": "The second-stage details explicitly list the five networks, selection metrics, 5,310 volumes, and their dimensions.",
+          "evidence_ids": [
+            "ev_70ddd39113f52ec5a71a5545"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_945e55ec3b1c033402cdb55a2fc56b9f",
+          "verdict": "supported",
+          "rationale": "The experimental details state all four configurations exactly as claimed.",
+          "evidence_ids": [
+            "ev_b69dbd8e2cbeb706581a07c1",
+            "ev_c9eff9e9a48d19bb35e2bb49"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_480e4cb97a85514046b4767d963ff6b9",
+          "verdict": "supported",
+          "rationale": "Table 2 confirms the three F1 values; their differences are 13.19 and 3.02 percentage points. The accompanying text confirms initialization.",
+          "evidence_ids": [
+            "ev_00ebe63c442a9ec637016570",
+            "ev_58b5bb17544d7c446ca5958c",
+            "ev_e57e89c27283311639d49804"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_6380b8eb0bedfd77df0735b7ede72ebf",
+          "verdict": "supported",
+          "rationale": "All six numerical values match Table 2, and the text identifies 3D U-Net outputs as initialization.",
+          "evidence_ids": [
+            "ev_00ebe63c442a9ec637016570",
+            "ev_e57e89c27283311639d49804"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_09ea9b15a536f441cd0677f078f26ec0",
+          "verdict": "supported",
+          "rationale": "Table 1 confirms both baseline F1 values and all four refinement results under the corresponding initialization and subset.",
+          "evidence_ids": [
+            "ev_70ddd39113f52ec5a71a5545",
+            "ev_a4764e1eb47bacf9fcb251fb"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_e2766091015dccdaea78269b49d219e3",
+          "verdict": "supported",
+          "rationale": "Table 3 supplies the stated F1 values, and the ablation description identifies the no-agent condition as indiscriminate refinement of all blocks.",
+          "evidence_ids": [
+            "ev_bcc8eb25366fe99c72a7b15f",
+            "ev_ffb0953ebab66abd33f5294e"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_511bde4bc161672d49ae91d2161ae0d7",
+          "verdict": "supported",
+          "rationale": "The ablation reports exactly these rejection-rate and F1 changes for real-defect training from scratch versus the two-stage strategy.",
+          "evidence_ids": [
+            "ev_d082e7277f3537c866ce4a9e",
+            "ev_e43bc1d0edd163a90ca42284"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_688af1efd840b66e391cf7d5fdf8999d",
+          "verdict": "supported",
+          "rationale": "The limitations describe depth loss in dense regions, and the inspector ablation discusses interference from overlapping neurons.",
+          "evidence_ids": [
+            "ev_b48eabbb609a788b37a08624",
+            "ev_d082e7277f3537c866ce4a9e"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_076d25bc58a8c73920e81e4f9e9050bb",
+          "verdict": "supported",
+          "rationale": "The contributions explicitly make this novelty claim and introduce the editing tool and two-stage training; the wording correctly attributes novelty to the authors.",
+          "evidence_ids": [
+            "ev_e983fdedc095873b3c0a2f92"
+          ]
+        },
+        {
+          "schema_version": 1,
+          "claim_id": "claim_5164c58738d816b5708fc72cb6fdbfe3",
+          "verdict": "supported",
+          "rationale": "The conclusion states refinement without agent training, while the method states diagnostic decisions and instructions are auditable.",
+          "evidence_ids": [
+            "ev_d082e7277f3537c866ce4a9e",
+            "ev_ddeecb67e2ea5b84f49d122d"
+          ]
+        }
+      ]
+    }
+  ],
+  "budget": {
+    "attempts": {
+      "spent": 24,
+      "uncertain": 2
+    },
+    "consumed_or_reserved_calls": 26,
+    "monetary_cost": null,
+    "cost_status": "unknown"
+  }
+}

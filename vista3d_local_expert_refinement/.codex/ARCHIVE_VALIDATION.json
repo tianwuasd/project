@@ -1,0 +1,20 @@
+{
+  "checked_at": "2026-10-25T06:20:54.900369+00:00",
+  "status": "passed",
+  "copied_file_checks": 130,
+  "mentioned_papers": 42,
+  "unique_pdf_papers": 17,
+  "existing_notes": 18,
+  "valid_json_files": 63,
+  "checked_markdown_files": 31,
+  "checked_project_links": 83,
+  "sqlite_integrity": "ok",
+  "app_records": 61,
+  "app_job_status_counts": {
+    "succeeded": 24
+  },
+  "export_version": "v-2026-10-25T054638-996790-0000-0128989e",
+  "app_quality_fulltext": 12,
+  "errors": [],
+  "limits": "Offline integrity and navigation checks only; no new literature evaluation or segmentation experiment. Historical originals retain original links and statements."
+}

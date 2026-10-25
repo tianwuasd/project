@@ -1,0 +1,626 @@
+[
+  {
+    "work_id": "work_1e05e2b0eb6c452c",
+    "title": "Draft and Refine with Visual Experts",
+    "pages": 11,
+    "chars": 56946,
+    "sha256": "d91360c4ceebb55bc0696d59d7999e604d7b955301f3b9f222a8854a20618691",
+    "document_id": "doc_165c29e833e03cfd92ae53d9",
+    "source_path": "artifacts/d91360c4ceebb55bc0696d59d7999e604d7b955301f3b9f222a8854a20618691.pdf",
+    "card_claims": 15,
+    "targeted_hits": [
+      {
+        "page": 5,
+        "pattern": "skips further",
+        "text": "ert increasesU q(x)beyondU baseq , the system\nconcludes that the draft already captures sufficient visual\ngrounding and skips further refinement, where(·) + ensures\nthat only positive improvements over the baseline are con-\nsidered.\n3.4. Learned Expert Selection\nRunning allKexperts for Eq. (7) is computationally ex-\npensive. To makeDnRpractical, a lightweightselectornet-\nworkS θ(j|s)is trained to predict the optimal expertj ∗ as\ndefined in Eq. (7) directly from the states.\nThe s"
+      }
+    ]
+  },
+  {
+    "work_id": "work_aa6dce0ed7f14b25",
+    "title": "SegAgent: Exploring Pixel Understanding Capabilities in MLLMs by Imitating Human Annotator Trajectories",
+    "pages": 18,
+    "chars": 74338,
+    "sha256": "d185c3ccb130ff91535630d33d01cdfa0b4c8c543f67b1eefb361b228b1d9927",
+    "document_id": "doc_d8186e2c40a9d4300de919e5",
+    "source_path": "artifacts/d185c3ccb130ff91535630d33d01cdfa0b4c8c543f67b1eefb361b228b1d9927.pdf",
+    "card_claims": 15,
+    "targeted_hits": [
+      {
+        "page": 3,
+        "pattern": "discount",
+        "text": "ates a better match be-\ntween Mt and Mtarget.\nSince we are focused solely on the quality of the final\nmask, we omit the discount factor γ in our setup. Given\nthat the action space can be fully represented by text, and\nthe state space can be fully represented by images, a com-\npetent MLLM should be able to perform this task as ef-\nfectively as a human annotator. Our objective is to train a\npolicy πθ(at|st, I, P) for the MLLM that, given an imageI\nand a text promptP , outputs"
+      },
+      {
+        "page": 14,
+        "pattern": "validation",
+        "text": "ld, we can effec-\ntively filter out low-quality masks.\nTo evaluate this ability, we constructed a test set based\non the validation set of RefCOCO. Specifically, we gener-\nated masks of varying quality by randomly sampling posi-\n14"
+      }
+    ]
+  },
+  {
+    "work_id": "work_5d1c00a2b3764ef3",
+    "title": "Two-Stage Learning to Defer with Multiple Experts",
+    "pages": 29,
+    "chars": 101828,
+    "sha256": "86a347b0144aea4dc8faf5c1e25681a4eaee237705341ecf41408c8885f81cd4",
+    "document_id": "doc_a640fa1df871842d55c3510c",
+    "source_path": "artifacts/86a347b0144aea4dc8faf5c1e25681a4eaee237705341ecf41408c8885f81cd4.pdf",
+    "card_claims": 13,
+    "targeted_hits": [
+      {
+        "page": 1,
+        "pattern": "two-stage",
+        "text": "Two-Stage Learning to Defer with Multiple Experts\nAnqi Mao\nCourant Institute\nNew York, NY 10012\naqmao@cims.nyu.edu\nChristopher Mohri\nStanford University\nStanford, CA 94305\nxmohri@stanford.edu\nMehryar Mohri\nGoogle Research & CIMS\nNew York, NY 10011\nmohri@google.com\nYutao Zhong\nCourant Institute\nNew York, NY 10012\nyutao@cims.nyu.edu\nAbstract\nWe study a two-st"
+      },
+      {
+        "page": 2,
+        "pattern": "two-stage",
+        "text": "age learning to\ndefer with multiple experts that beneﬁt from strong H-consistency bounds.\nOur contributions. We study a two-stage scenario for learning to defer with multiple experts that is\ncrucial in practice for many applications. In this scenario, a predictor is derived in a ﬁrst stage by\ntraining with a common loss function such as cross-entropy. In the second stage, a deferral function\nis learned to assign the most suitable expert to each input. We design a new family "
+      },
+      {
+        "page": 4,
+        "pattern": "two-stage",
+        "text": "acketright.alt3α/bracketright.alt3,α ∈ (0, 1).\nMean absolute error loss 𝓁mae(h,x,y )= 1− eh(x,y)\n∑y′∈Y∪{0}eh(x,y′ ) .\n3 Two-stage H-consistent surrogate loss\nIn this section, we consider an importanttwo-stage scenario for learning to defer with multiple experts.\nThis is a critical scenario in practice for many applications where a predictor is already available, as\na result of training with a loss function𝓁 supported by H-consistency bounds, such as the logistic\nloss (ﬁrst s"
+      },
+      {
+        "page": 5,
+        "pattern": "two-stage",
+        "text": "one, and it allows for multiple deferral\noptions, as opposed to only one rejection option.\n3.2 H-consistency bounds for two-stage surrogate losses\nIn this section, we provide strong guarantees for two-stage surrogate losses, provided that the ﬁrst-\nstage loss function𝓁1 admits an Hp-consistency bound, and the second-stage surrogate𝓁2 admits an\nHd-consistency bound.\nTheorem 1 (H-consistency bounds for score-based two-stage surrogates). Assume that𝓁1 admits\nan Hp-consistency b"
+      },
+      {
+        "page": 6,
+        "pattern": "two-stage",
+        "text": "cj /uni23A4/uni23A5/uni23A5/uni23A5/uni23A5/uni23A6\n1\n2\n.\nIn particular, the bound implies the Bayes-consistency of the two-stage surrogate loss when𝓁1 =𝓁2 =\n𝓁log. Similarly, for other choices of𝓁1 and𝓁2 deﬁned in Table 1, the two-stage surrogate loss beneﬁts\nfrom an H-consistency bound and is also Bayes-consistent.\n3.3 H-consistency bounds for standard surrogate loss functions\nIn this section, we seek to derive H-consistency bounds for common surrogate losses deﬁned in\nTabl"
+      },
+      {
+        "page": 7,
+        "pattern": "two-stage",
+        "text": "tline⇒ ELdef(hn)− E∗Ldef(H) n→+∞/leftrightline/leftrightline/leftrightline→0.\nIn the following result, we show that our two-stage surrogate losses are realizable H-consistent.\nCombined with their Bayes-consistency properties, which have already been established in Section 3.2,\nwe effectively ﬁnd surrogate losses that are both Bayes-consistent and realizable consistent in the\nmulti-expert setting, including the single-expert setting as a special case. For simplicity, here, we"
+      },
+      {
+        "page": 8,
+        "pattern": "two-stage",
+        "text": " function L.\nLet𝓁1 be a surrogate loss for standard multi-class classiﬁcation with n classes. We consider the\nfollowing two-stage scenario: in the ﬁrst stage, a predictorh is learned using the surrogate loss𝓁1;\nin the second stage,r is learned using a surrogate loss Lh that depends on the prediction functionh\nlearned in the ﬁrst stage.\nTo anyr ∈ R, we associate a hypothesisr deﬁned over (ne+ 1) classes {0, 1,...,n e} byr(x, 0)= 0,\nthat is zero scoring function, andr(x,j)=−rj"
+      },
+      {
+        "page": 9,
+        "pattern": "two-stage",
+        "text": "9B/uni239D1+ ne/summation.dispj=1cj/uni239E/uni23A0Γ2/parenleft.alt4 ϵ2∑nej=1cj/parenright.alt4.\nNext, we show that our two-stage surrogate losses are realizable (H, R)-consistent. We say that\nthe distribution is (H, R)-realizable, if there exists a zero error solution (h∗,r∗) ∈ H× R with\nELdef(h∗,r∗)= 0.\nTheorem 7 (Realizable (H, R)-consistency for predictor-rejector two-stage surrogates ). As-\nsume that H and R is closed under scaling andcj(x,y)=βj,∀(x,y)∈ X× Y. Let𝓁1 and𝓁"
+      },
+      {
+        "page": 10,
+        "pattern": "validation",
+        "text": "ur study is that the cost function used within the deferral loss is not ﬁxed, and\nis typically determined through cross-validation in practice. There exists potential to introduce a\nprincipled method for selecting the cost function, which we have reserved for future research.\n6 Conclusion\nWe introduced a novel family of surrogate loss functions and algorithms for a crucial two-stage\nlearning to defer approach with multiple experts. We proved that these surrogate losses are su"
+      },
+      {
+        "page": 10,
+        "pattern": "two-stage",
+        "text": "nd 50 epochs for CIFAR-10 with the default learning rate.\nNo data augmentation was used in our experiments. We used our two-stage surrogate loss (3) with\nthe logistic loss𝓁=𝓁log to train the deferral model ResNet-4, with a pre-learned predictor ResNet-4\ntrained using logistic loss. A check mark indicates the presence of a base cost in the cost function,\nwhereas a cross mark signiﬁes its absence. We ﬁrst set the cost function to be 1hj(x)≠y without a\nbase cost. Next, for the "
+      },
+      {
+        "page": 15,
+        "pattern": "two-stage",
+        "text": "Contents of Appendix\nA Related work 16\nB Examples of two-stage score-based surrogate losses 17\nC Examples of two-stage predictor-rejector surrogate losses 18\nD Proof of H-consistency bounds for score-based two-stage surrogate losses (Theorem 1) 19\nE Proof of H-consistency bounds for standard surrogate loss functions (Theorem 3) 21\nE.1 Multinomial logistic loss . . . . . . . . . . . . . . . . . . . . . . . . ."
+      },
+      {
+        "page": 17,
+        "pattern": "two-stage",
+        "text": "efer with multiple\nexperts but has not achieved realizable H-consistency even in a single-expert setting.\nB Examples of two-stage score-based surrogate losses\nExample:𝓁2 =𝓁exp. For𝓁2(hd,x,y )=𝓁exp(hd,x,y )= ∑y′≠yehd(x,y′)−hd(x,y), by (3), we have\nLhp(hd,x,y )\n= 1hp(x)=y𝓁2(hd,x, 0)+\nne\n/summation.disp\nj=1\n¯cj(x,y)𝓁2(hd,x,j )\n= 1hp(x)=y /summation.disp\ny′≠0\nehd(x,y′)−hd(x,0)+ ne/summation.disp\nj=1\n¯cj(x,y) /summation.disp\ny′≠j\nehd(x,y′)−hd(x,j)\n= 1hp(x)=y\nne\n/summation.disp\ni="
+      }
+    ]
+  },
+  {
+    "work_id": "work_6572d29cec464414",
+    "title": "Balancing Multi-Target Semi-Supervised Medical Image Segmentation with Collaborative Generalist and Specialists",
+    "pages": 13,
+    "chars": 70871,
+    "sha256": "158b4ef253a1a66e113d1dffcf84014aef6a2ac99aff6d0a51a4b4984409c697",
+    "document_id": "doc_fa9b959a24eeb86debc04b6c",
+    "source_path": "artifacts/158b4ef253a1a66e113d1dffcf84014aef6a2ac99aff6d0a51a4b4984409c697.pdf",
+    "card_claims": 15,
+    "targeted_hits": [
+      {
+        "page": 1,
+        "pattern": "specialist",
+        "text": "1\nBalancing Multi-Target Semi-Supervised Medical\nImage Segmentation with Collaborative Generalist\nand Specialists\nYou Wang, Zekun Li, Lei Qi, Qian Yu, Yinghuan Shi, Yang Gao\nAbstract—Despite the promising performance achieved by\ncurrent semi-supervised models in segmenting individual medical\ntargets, many of these models suffer a notable decrease in\nperformance when tasked with the simultaneous segmentation\nof multiple targets. A vital factor could be attrib"
+      },
+      {
+        "page": 2,
+        "pattern": "discarded",
+        "text": "ta-\ntion capabilities are mutually reinforced and tend to converge.\nTo ensure parameter efficiency, the specialists are discarded in\ninference, maintaining the same parameter size as conventional\nmethods, e.g., UNet [19].\nMoreover, in order to further exploit the relationships among\nall the segmentation heads of the specialists, we introduce\nan Inter-Head Error Detection (IHED) module. We observe\nthat, for any two specialized segmentation heads, a pixel in\nthe target class s"
+      },
+      {
+        "page": 2,
+        "pattern": "specialist",
+        "text": "tation for each individual target. To achieve\nthis goal, we propose to Collaboratively train with both a\nGeneralist and Specialists, termed as CGS.\nIn pursuit of this goal, we introduce a collaborative training\nstrategy comprising a generalist and several specialists. Specif-\nically, the generalist is equipped with a segmentation head\nto perform the segmentation of multiple targets. Meanwhile,\nthe specialists consist of multiple class-specific segmentation\nheads. To prevent s"
+      },
+      {
+        "page": 3,
+        "pattern": "specialist",
+        "text": "3\n• We propose a novel collaborative training framework that\ninvolves a generalist and several specialists to achieve a\nmore balanced training, without adding additional param-\neters during inference.\n• Building upon the specialists, we propose the Inter-Head\nError Detection (IHED) module to enhance the quality of\npseudo-labels from the unlabeled data.\n• Additionally, we incorporate bidirectional the consistency\nloss and consensus-based consistency lo"
+      },
+      {
+        "page": 4,
+        "pattern": "specialist",
+        "text": "ter-Head \nError Detection\n𝑀𝑑\nCase1\nCase2\nExponential \nMoving Average\nTeacher\nStudent\nGeneralist\nHead0\nHead1\nHead3\nHead2\nSpecialists\nPerform conventional segmentation\nTarget Class1\nTarget Class2\nTarget Class3\nEnsemble\nFig. 3. The pipeline of our proposed CGS (illustrated using ACDC as an example). The framework comprises the generalist as the general branch and\nthe specialists as the multi-head specialized branch. Building upon this, the cross-branch consistency losses are com"
+      },
+      {
+        "page": 5,
+        "pattern": "specialist",
+        "text": "5\nC. Specialists as Multi-Head Specialized Branch\nIn order to mitigate the scale imbalance issue in SSMIS,\nwe are exploring the insight of assigning a specialized seg-\nmentation head for each class. Unlike conventional Binary\nSegmentation Heads (BSH), which solely focus on the binary\nsegmentation task (target class and background), we are ex-\nploring the design o"
+      },
+      {
+        "page": 7,
+        "pattern": "discarded",
+        "text": "losely aligns with that of the general\nbranch (see Section IV-D). Consequently, specialized seg-\nmentation heads can be discarded in inference. Therefore, the\nproposed method does not incur additional memory and time\ncosts during inference.\nIV. E XPERIMENT\nIn this section, we conduct experiments to compare our\nmethod with existing approaches, showcasing its effectiveness.\nFurthermore, we perform ablation studies and further analysis\nto assess the contribution of each individ"
+      },
+      {
+        "page": 7,
+        "pattern": "validation",
+        "text": "]. For each image, we resize it to 224 × 224\nbefore feeding it into the network. The data set is divided into\ntraining, validation, and test sets with a ratio of 7:1:2.\nSegTHOR dataset [17]. Segmentation of THoracic Organs\n(SegTHOR) addresses the problem of Organs at Risk (OAR)\nsegmentation in CT images. The goal of the SegTHOR chal-\nlenge is to automatically segment four OAR targets: heart,\naorta, trachea, and esophagus. The dataset is partitioned into\ntraining, validation, "
+      }
+    ]
+  },
+  {
+    "work_id": "work_dc3db188901f4579",
+    "title": "U-CFR: Uncertainty-Guided Cascade Forward Refinement for Interactive Segmentation",
+    "pages": 12,
+    "chars": 43888,
+    "sha256": "8f1b3c8f831bc852abe63d6605dbfc6b7081a3d071704b7d04ec86340d47118b",
+    "document_id": "doc_3628754cfa67f573f6b520b8",
+    "source_path": "artifacts/8f1b3c8f831bc852abe63d6605dbfc6b7081a3d071704b7d04ec86340d47118b.pdf",
+    "card_claims": 16,
+    "targeted_hits": [
+      {
+        "page": 1,
+        "pattern": "pseudo-click",
+        "text": "hat fuses segmentation uncertainty, contour gradients,\nand explicit edge predictions to guide the placement of internal pseudo-clicks. These self-generated\nclicks target the most ambiguous boundary regions, providing strong corrective signals without\nadditional manual input. To support this process, we design a dual-head network with a shared encoder-\ndecoder backbone: a segmentation head ensures region consistency, while an edge head sharpens\nboundary alignment. In inference, "
+      },
+      {
+        "page": 1,
+        "pattern": "specialist",
+        "text": "al. [2023], which\nhave demonstrated impressive zero-shot generalization capabilities across a vast range of domains and specialist models\nLiu et al. [2023], Chen et al. [2022], Sun et al. [2024], Sofiiuk et al. [2021], explicitly optimized for the segmentation\ntask, continue to provide state-of-the-art performance in resource-constrained environments. This paper focuses on the\nlatter paradigm. Despite these significant advancements, a persistent and formidable challenge remai"
+      },
+      {
+        "page": 2,
+        "pattern": "pseudo-click",
+        "text": " refinement goal.Second, our uncertainty map fuses predictive\nuncertainty with explicit contour gradients, allowing our pseudo-clicks to target ambiguous boundaries, rather than just\nambiguous regions. By integrating these components, the proposed framework transforms the refinement process from\na passive, uniform operation into an active, intelligent self-correction loop. We demonstrate that this approach achieves\ncompetitive results and significantly reduces the number of use"
+      },
+      {
+        "page": 3,
+        "pattern": "pseudo-click",
+        "text": "tional trainable modules. A particularly innovative direction within model-integrated\nrefinement is click imitation or \"pseudo-click\" generation. Pioneered by Lui et. al and presented in PseudoClick Liu\net al. [2022], this approach enables the segmentation network itself during training to propose the next corrective\nclick by identifying error regions in its own output. These automatically generated clicks serve as a proxy for human\ninteraction, allowing the model to correct it"
+      },
+      {
+        "page": 4,
+        "pattern": "pseudo-click",
+        "text": "tainty Guided CFR. This is a novel, inference-time iterative process to feed back the segmentation results and\ngenerate pseudo-clicks. It takes the initial predictions from the segmentation head (Pseg) to calculate a guidance map.\nThis map then dynamically modulates the features within an iterative refinement loop to produce the final segmentation\nmask.\n3.2 Edge Detection Head (EDH) as Auxiliary Supervision\nThe EDH is designed to inculcate the shared ViT backbone with an explic"
+      },
+      {
+        "page": 5,
+        "pattern": "pseudo-click",
+        "text": " regions that are both on a predicted boundary and where the model’s\nsegmentation confidence is low.\nUncertainty-Guided Pseudo-Click Generation.U-CFR operates in an iterative loop for a fixed number of steps after\neach user interaction. In each step, the coordinates (i⋆, j⋆) of the pixel with the maximum value in the boundary-aware\nuncertainty map (argmax Ubd) is identified as the candidate pseudo-click location. To assign a label to a potential\npseudo-click, we adopt a selecti"
+      },
+      {
+        "page": 7,
+        "pattern": "pseudo-click",
+        "text": "e points on COCO MVal (89.93% vs. 89.39%) and a\nsimilar gain on SBD. This indicates that our active, uncertainty-guided pseudo-clicks provide a more effective corrective\nsignal. While the CFR baseline eventually achieves comparable accuracy after 10 clicks, U-CFR yields a high-quality\nresult sooner, directly contributing to a reduction in user annotation effort.\n4.4 Quantitative Comparison with State-of-the-Art\nTo validate the effectiveness of our proposed method, we conduct a "
+      },
+      {
+        "page": 10,
+        "pattern": "pseudo-click",
+        "text": ".\ndevelopment of the U-CFR framework, an efficient inference-time strategy that uses uncertainty to automatically place\npseudo-clicks and correct segmentation errors without additional user input. The experimental results demonstrated\nthat the EDH-enhanced base model consistently outperforms strong baselines, showing marked improvements in\nclick efficiency (NoC), initial mask quality (mIoU@1), and boundary accuracy (NSDS). This proves particularly\nbeneficial in out-of-domain sc"
+      }
+    ]
+  },
+  {
+    "work_id": "work_864fba4def554ce3",
+    "title": "NeuroRefiner: Morphology-Aware Multi-agent Refinement for 3D Fluorescence Microscopy Neuron Segmentation",
+    "pages": 21,
+    "chars": 60137,
+    "sha256": "e447474541bb266fe5270d55c634d1f13f4a31c41499cb84e11663e540d87fde",
+    "document_id": "doc_74d94da70bc6c9179401aa79",
+    "source_path": "artifacts/e447474541bb266fe5270d55c634d1f13f4a31c41499cb84e11663e540d87fde.pdf",
+    "card_claims": 19,
+    "targeted_hits": [
+      {
+        "page": 2,
+        "pattern": "validator",
+        "text": " patch\nImperfect \nmask\nSegmentation \nnetwork\nGlobal receptive field\n Modify the incorrect resultInterpretability\nChange Validator\nAssess refinement \nquality\nvs\nand\nand\nFig.1:(a) Mainstream neuron segmentation paradigms. Sliding window-based meth-\nods fail to preserve holistic neuronal morphology. Moreover, a single forward pass can-\nnotrectifysegmentationerrorsandlacksinterpretability.(b)OverviewofNeuroRefiner.\nBy combining global topological observation with local fine-grai"
+      },
+      {
+        "page": 3,
+        "pattern": "two-stage",
+        "text": "ecialized\nsegmentation models, we design TopoRefineNet, a dedicated segmentation\nediting tool, together with a tailored two-stage training strategy that aligns\nmodel behavior with structural refinement instructions.\n–Experiments on three benchmarks demonstrate that our method outper-\nformsexistingneuronsegmentationandsegmentationrefinementapproaches.\n2 Related Work\nNeuron Segmentation.Recent advancements have prioritized the design of\nspecializedarchitecturestoextractmulti-s"
+      },
+      {
+        "page": 5,
+        "pattern": "connected component",
+        "text": "on the revised suggestions\nStep 4: Compare the results to \ndetermine whether to accept .\n𝓑fix ：{1:’FP’, 5:’FN’, …  }\n𝐼5\nConnected components: [8,4,3,5,7,3]\nMerge\nMerge\n𝒕5: Connect the neurons \nlocated in the middle upper \nposterior region\n𝐼1 𝑀1xy 𝑀1yz\nStep n : The result is \ncomplete and can be output.\nRefinement Advisor\n𝒕1: Remove the isolated noise \nlocated in the left upper front \n…, from the overall image, … \nbreak in the middle…. Rechecking \nthe id 5, … have a false \nnegative, … "
+      },
+      {
+        "page": 5,
+        "pattern": "validator",
+        "text": "Block 5\nTopoRefineNet\n𝑀5refined𝑀5, 𝐼5\n… after refinement has \nless irrelevant structure \nand should be accepted.\nChange Validator\nInstruction adherence\nTopological improvement\n… result removed the noise \naccording to the instruction …\n… after refinement has \nbetter continuity and \nshould be accepted.\nChange Validator\nInstruction adherence\nTopological improvement\n… result removed the \nnoise according to the \ninstruction\nRefinement Advisor\nText\nEncoder\nFig.2:Collaborative Neur"
+      },
+      {
+        "page": 5,
+        "pattern": "validation",
+        "text": " sub-region. These instructions guide TopoRefineNet to produce re-\nfined sub-region masks, denoted as{Mrefinedi }. As a validation mechanism, the\nChange Validator acccepts only those refinements that yield an improvement\nover the original segmentation, as\nM (t+1) =Merge \u0010M (t), \bMrefinedi |Validator(M refinedi ) =True\t\u0011 . (1)\nAs illustrated in Fig. 2, the process terminates when the Global Inspector\ndetermines that the neuronal morphology is complete or upon reachingTmax\niter"
+      },
+      {
+        "page": 6,
+        "pattern": "connected component",
+        "text": "he 0th-\norder Betti number is computed to quantify topological irregularities asβ0(bi) =\nCC(M i), whereCC(·)denotes the connected component counting function in\nthe corresponding 3D region. An elevatedβ 0 value, which indicates a greater\nnumber of isolated fragments within a sub-block, suggests a higher likelihood of\ntopological errors. Based on this topological metric and the mask, the inspection\npolicyπ ins identifies abnormal regions and categorizes their error types:\nBfix, τi =π i"
+      },
+      {
+        "page": 7,
+        "pattern": "validator",
+        "text": "natural language as an intermediary, thereby fully unleashing\nthe agent’s reasoning and expressive capabilities.\nChange Validatorensures the reliability of iterative refinement by evaluating\nthe output of TopoRefineNet and preventing erroneous edits from being merged.\nSpecifically, it compares the initial maskMi against the refined resultMrefinedi ,\nconditioned on the instructionti and the error typeτi to assess whether the edit\nis beneficial to morphology. This evaluation i"
+      },
+      {
+        "page": 8,
+        "pattern": "two-stage",
+        "text": "by\ntheir respective encoders, fused via cross-attention, and decoded to generate the cor-\nrected mask. (b) The proposed two-stage training paradigm. The first stage is trained\non synthetic defects, while the second stage utilizes real masks with defects.\nF′vL =CrossAttn(F vL,F t) =softmax\n\u0012 WqFvL(WkFt)⊤√dk \u0013 WvFt, (5)\nwhereW q,W k,W v are learnable projection matrices anddk denotes the feature\ndimension.Thismechanismdynamicallyrecalibratesvisualfeaturesbyattending\nto regions"
+      },
+      {
+        "page": 10,
+        "pattern": "connected component",
+        "text": " [54],\nand SwinUNETR [11]—on a subset of the training set, followed by inference\non the complete training set. Based on connected component and F1 scores, we\nselected a total of 5,310 volumes of 128×128×64 voxels exhibiting significant\nsegmentation errors for training.\n4.2 Quantitative Results\nWe comprehensively evaluated NeuroRefiner against a diverse set of state-of-\nthe-art (SOTA) methods for fluorescence microscopy neuron segmentation. The\nbaselines include 3D U-Net [7], SwinUNETR"
+      },
+      {
+        "page": 12,
+        "pattern": "validator",
+        "text": "yieldssuperiorperformance.\nTable 3:Ablation Study on Agents in NeuroRefiner.\nGlobal\nInspector\nRefinement\nAdvisor\nChange\nValidator\nZBFWB CWMBS\nSSD F1 (%) SSD F1 (%)\n34.52 76.39 30.23 79.96\n✓ 32.05 77.29 28.47 80.34\n✓ ✓ 25.24 83.47 18.93 87.14\n✓ ✓ 30.69 81.43 24.53 83.12\n✓ ✓ ✓ 23.66 86.13 16.65 88.83\nFig.4depictsaneuronwithlong-rangeprojectionsfromtheZBFWBdataset,\nwhere irrelevant tissue signals significantly obscure the target structure. All\nsingle-pass segmentation methods y"
+      },
+      {
+        "page": 13,
+        "pattern": "connected component",
+        "text": "the 0-th Betti num-\nber β0 as an auxiliary topological indicator effectively directs attention toward\nregions with high connected component counts. This configuration achieved the\nbest performance across multiple datasets."
+      },
+      {
+        "page": 14,
+        "pattern": "validator",
+        "text": "cts from scratch as a comparison. This single-stage variant\nexhibited a 23.57% increase in the rejection rate of Change Validator, alongside\nF1 score degradations of 1.17% and 1.89% in ZBFWB and CWMBS, respec-\ntively. The decline confirms the necessity of our training strategy.\n5 Conclusion\nIn this paper, we present NeuroRefiner, the first LLM-based multi-agent system\nfor neuron segmentation refinement. By coordinating morphology-aware global\ninspection, language-guided edit"
+      }
+    ]
+  },
+  {
+    "work_id": "work_b8b1ef49ee17445d",
+    "title": "Improving Policy Optimization with Generalist-Specialist Learning",
+    "pages": 16,
+    "chars": 66706,
+    "sha256": "b78db77ab8f8261bb4fa69d4a382491d7b411ab4f9b7a61b47042fe8bed78370",
+    "document_id": "doc_c038e863ea0192aea65a5d2f",
+    "source_path": "artifacts/b78db77ab8f8261bb4fa69d4a382491d7b411ab4f9b7a61b47042fe8bed78370.pdf",
+    "card_claims": 13,
+    "targeted_hits": [
+      {
+        "page": 1,
+        "pattern": "specialist",
+        "text": "Improving Policy Optimization with Generalist-Specialist Learning\nZhiwei Jia 1 Xuanlin Li 1 Zhan Ling 1 Shuang Liu 1 Yiran Wu1 Hao Su 1\nAbstract\nGeneralization in deep reinforcement learning\nover unseen environment variations usually re-\nquires policy learning over a large set of diverse\ntraining variations. We empirically observe that\nan agent trained on many variations (a general-\nist) tends to learn "
+      },
+      {
+        "page": 2,
+        "pattern": "specialist",
+        "text": "Improving Policy Optimization with Generalist-Specialist Learning\nbut crucial for later stages (i.e., “catastrophic ignorance” in\nSec. 4). This poses a signiﬁcant challenge and results in\nperformance plateaus. Meanwhile, if we only consider a\nsmall subset of environment variations and train a specialist\non it, then due to the low state variance, the specialist can\noften master these variations, achievin"
+      },
+      {
+        "page": 3,
+        "pattern": "discount",
+        "text": "nd action space,T (s′|s,a ) is the state transition probabil-\nity,R(s,a ) is the reward function, and γ ∈ [0, 1) is the\ndiscount factor. In reinforcement learning, we aim to train\na policyπ(a|s) that maximizes the expected accumulated\nreturn given byJ(π) = E(st,at)∼ρπ [∑t=0γtr(st,at)].\nA Block Contextual Markov Decision Process (BC-\nMDP) (Zhang et al., 2020; Du et al., 2019; Sodhani et al.,\n2021a) augments an MDP with context information, which\ncan be deﬁned as (C,A,M (c),γ"
+      },
+      {
+        "page": 3,
+        "pattern": "specialist",
+        "text": "Improving Policy Optimization with Generalist-Specialist Learning\nimproving task (context) encoding representations from en-\nvironment dynamics or reward signal (Bram et al., 2019;\nSodhani et al., 2021b). Another stream focuses on studying\nand alleviating negative gradient interference from different\ntasks (Schaul et al., 2019; Yu et al., 2020a; Kurin et al.,\n2022). Different from these approaches, our "
+      },
+      {
+        "page": 4,
+        "pattern": "specialist",
+        "text": "Improving Policy Optimization with Generalist-Specialist Learning\n(a) Illustrative environment\n (b) Procgen\n (c) Meta-World\n (d) ManiSkill\nFigure 3. (a) An illustrative environment that consists of a long corridor and a “brush”-like maze, where the agent starts from the left\nand needs to reach one of the ﬁve targets (stars in the ﬁgure) speciﬁed by a goal context. (b) Sample environments in Procgen, a 2"
+      },
+      {
+        "page": 5,
+        "pattern": "specialist",
+        "text": "Improving Policy Optimization with Generalist-Specialist Learning\nThe default choice in the literature (Teh et al., 2017; Ghosh\net al., 2017) starts specialist training from the very beginning\nand periodically distills the specialists into the generalist.\nHowever, as in Fig. 7, we observe that training the special-\nists before the generalist’s performance plateaus does not\ntake full advantage of general"
+      },
+      {
+        "page": 6,
+        "pattern": "specialist",
+        "text": "Improving Policy Optimization with Generalist-Specialist Learning\nLCLIPρ (θ) =−E(s,a)∼ρ\n[\nmin\n(\nπθ(a|s)\nπθold (a|s)A(s,a),clip(rt(θ),1−ϵ,1+ϵ)A(s,a)\n)]\nL1ρ(θ) =−E(s,a)∼ρ[πθ(a|s)]\nLDAPG +PPO (θ) =LCLIPρπ (θ) +ω· ˆA·L 1ρD (θ)\nWe ﬁnd that a smoothed loss L1(·) here signiﬁcantly im-\nproves training stability for some tasks, compared to the\ncross entropy (style) loss used in the original DAPG paper.\nWe setω ="
+      },
+      {
+        "page": 7,
+        "pattern": "specialist",
+        "text": "Improving Policy Optimization with Generalist-Specialist Learning\n0 20 40 60 80 100\n10\n15\n20\n25\n30\n35 BigFish (Procgen)\nGeneralist\nGeneralist-cont'd\nSpecialists\nMerged\n0 20 40 60 80 100\n4\n6\n8\n10\n12\n14 BossFight (Procgen)\n0 20 40 60 80 100\n0\n2\n4\n6\n8\n10\n12\n14\n16\nChaser (Procgen)\n0 20 40 60 80 100\n6\n8\n10\n12\n14\n16\n18\nDodgeball (Procgen)\n0 20 40 60 80 100\n22\n24\n26\n28\n30\n32\n34 FruitBot (Procgen)\n0 20 40 60 80"
+      },
+      {
+        "page": 8,
+        "pattern": "specialist",
+        "text": "Improving Policy Optimization with Generalist-Specialist Learning\nalso corroborate those in Fig. 2 of our illustrative example.\nWe compare the ﬁnal average performance of GSL with\nPPO/PPG baselines on (1) the 1024 training levels and also\n(2) the 1000 hold-out test levels of Procgen. We observe\nthat our framework not only improves over the baseline\non the training environment variations, but also on uns"
+      },
+      {
+        "page": 9,
+        "pattern": "specialist",
+        "text": "Improving Policy Optimization with Generalist-Specialist Learning\nFigure 8. Training returns of PPO on BigFish with 256 levels and\nperformance histograms over the withheld levels at four generalist\ncheckpoints during training. Policy learning on BigFish achieves\ngood progress in a large portion of levels but slow to no improve-\nments on the remaining.\nreaches a performance plateau. Fig. 9 provides a qua"
+      },
+      {
+        "page": 10,
+        "pattern": "specialist",
+        "text": "Improving Policy Optimization with Generalist-Specialist Learning\nReferences\nBram, T., Brunner, G., Richter, O., and Wattenhofer, R.\nAttentive multi-task deep reinforcement learning. arXiv\npreprint arXiv:1907.02874, 2019.\nChen, T., Xu, J., and Agrawal, P. A system for general\nin-hand object re-orientation. In Conference on Robot\nLearning, pp. 297–307. PMLR, 2022.\nCobbe, K., Hesse, C., Hilton, J., and Sc"
+      },
+      {
+        "page": 11,
+        "pattern": "specialist",
+        "text": "Improving Policy Optimization with Generalist-Specialist Learning\nRaileanu, R., Goldstein, M., Yarats, D., Kostrikov, I., and\nFergus, R. Automatic data augmentation for general-\nization in deep reinforcement learning. arXiv preprint\narXiv:2006.12862, 2020.\nRajeswaran, A., Kumar, V ., Gupta, A., Vezzani, G., Schul-\nman, J., Todorov, E., and Levine, S. Learning complex\ndexterous manipulation with deep rei"
+      }
+    ]
+  },
+  {
+    "work_id": "work_669c3001a51d42b8",
+    "title": "VISTA3D - A Unified Segmentation Foundation Model For 3D Medical Imaging",
+    "pages": 11,
+    "chars": 51677,
+    "sha256": "1e0f43ccc657591e28a40022f7c2cb14c94d31719a12ec78c572d9a0fa06a3a5",
+    "document_id": "doc_f2ae2239a302703043a71464",
+    "source_path": "artifacts/1e0f43ccc657591e28a40022f7c2cb14c94d31719a12ec78c572d9a0fa06a3a5.pdf",
+    "card_claims": 15,
+    "targeted_hits": [
+      {
+        "page": 4,
+        "pattern": "connected component",
+        "text": " idea\nfrom FocalClick and proposed the following merging algo-\nrithm Alg. 1. The core idea is to add or remove only the\nconnected component regions that contain the point clicks\nto avoid unexpected modification.\n3.3. Data\nWe curated a collection of 11454 CT volumetric images ob-\ntained from in-house and publicly available data sources [3,\n4, 12, 16, 20, 23, 25, 31, 32, 46–50, 52, 53, 56] with a\nwide range of acquisition protocols and subject conditions.\nAmong these, five of them are w"
+      },
+      {
+        "page": 4,
+        "pattern": "validation",
+        "text": "th from those datasets as manual labels or par-\ntial labels . Each data source is randomly split into 64%\ntraining, 16% validation, and 20% test sets. We generated\npseudo-labels of 117 classes using TotalSegmentator [12]\nand supervoxels using SAM for every scan. The unreliable\npseudo-labels are removed by post-processing.\n20866\n"
+      },
+      {
+        "page": 5,
+        "pattern": "connected component",
+        "text": " negative clicks P ip and P jn, au-\ntomatic and interactive output Ma and Mp\nEnsure: size(Ma) = size(Mp)\nDenote “get 3D connected components” as CC (·).\n{M nadd}N ← CC ((Mp − Ma) > 0) ▷ N added\nconnected components\n{M krm}K ← CC ((Ma − Mp) > 0) ▷ K removed\nconnected components\nif ∃\ni=1,··· ,I\nP ip ∈ M a then M nadd = M nadd ∪ CC (M p)\nend if ▷ If positive points in Ma, add Mp into addition\ncandidates.\nMf inalrm, Mf inaladd ← {}, {}\nfor n = 1 to N do\nif ∃\ni=1,··· ,I\nP ip ∈ M nadd then "
+      }
+    ]
+  },
+  {
+    "work_id": "work_e8706d7715e44ae8",
+    "title": "REDNet - Reliable Evidential Discounting Network for Multi-Modality Medical Image Segmentation",
+    "pages": 12,
+    "chars": 58247,
+    "sha256": "e10baea62dc75658bd74f16be67db1f211e7937e09b6ea69e3d2a2ea5ae383b8",
+    "document_id": "doc_a7db2305ee83861d8943cfa0",
+    "source_path": "artifacts/e10baea62dc75658bd74f16be67db1f211e7937e09b6ea69e3d2a2ea5ae383b8.pdf",
+    "card_claims": 16,
+    "targeted_hits": [
+      {
+        "page": 1,
+        "pattern": "discount",
+        "text": "16 IEEE TRANSACTIONS ON MEDICAL IMAGING, VOL. 45, NO. 1, JANUARY 2026\nREDNet: Reliable Evidential Discounting\nNetwork for Multi-Modality Medical\nImage Segmentation\nShichen Sun\n , Member, IEEE, Yufei Chen\n , Xiaodong Yue\n , Chao Ma, and Xiahai Zhuang\nAbstract— In the field of computer-aided diagnosis, par-\nticularly for tumor diseases, segmentation is a prerequisite\nand primary step. Multi-modality images become essential\nfor achieving accurate segmenta"
+      },
+      {
+        "page": 2,
+        "pattern": "discount",
+        "text": "resent in medical\nimaging data. The main contributions of this study are as\nfollows:\n• We propose a reliable evidential discounting network\n(REDNet). This framework is designed to dynamically\ncalibrate the influence of each modality by assessing their\nreal-time quality and reducing the impact of imperfection.\n• We present three modules: ICEM identifying consis-\ntency between test and training data, CDAM evaluating\ndata discrepancy across modalities and DFM fusing\nmulti-moda"
+      },
+      {
+        "page": 3,
+        "pattern": "discount",
+        "text": "Consistency Evaluation Module (ICEM) and Cross-modality Difference\nAggregation Module (CDAM) for quality detection. The Discounting Fusion Module (DFM) processes the multi-modality evidence by applying\ndiscounting strategies to fuse the data.\nTABLE I\nDEFINITION OF SYMBOLS USED IN THIS PAPER\nA. Evidential-Based Uncertainty Estimation\nBased on Dempster-Shafer Evidence Theory (DST) [30],\na framework for Subjective Logic (SL) [13] is developed\nthat specifically correlates belie"
+      },
+      {
+        "page": 4,
+        "pattern": "discount",
+        "text": "α is a learnable parameter, di n can adjust the impact\nof modalities based on the imperfection situation: the high di n\ndiscount the modality’s contribution to fusion, Conversely, low\ndivergence retains the modality’s influence, as di n approaches\none. This ensures feature fusion is finely tuned to the quality\nof the data.\nIn summary, this module refines modality-specific informa-\ntion at the pixel level and dynamically enhances features by\nincorporating the diversity θ, pe"
+      },
+      {
+        "page": 5,
+        "pattern": "discount",
+        "text": "specific modality\nrelationships. A large discrepancy between modalities i and\nj increases ψ, reducing dc. To apply more discounts in the\nfusion process. Small discrepancies make the dc closer to 1,\nresulting in fewer discounts. In this way, it gives priority to\nthose features that are more reliable in multimodal analysis,\nwhile reducing the impact of imperfection.\nD. Discounting Fusion Module\nIn our framework, evidence is dynamically adjusted based\non the quality of the mod"
+      },
+      {
+        "page": 6,
+        "pattern": "validation",
+        "text": "ncing tumor core (NCR/NET -label1).\nFollowing [33], we divided the 1251 scans into 834, 208 and\n209 scans for training, validation and testing, respectively.\nUsing the same pre-processing operation as in [33]. The\nin-house dataset from Changhai Hospital includes 139 patients\ndiagnosed with either SCN (Serous Cystic Neoplasm) or MCN\n(Mucinous Cystic Neoplasm). All volumes contain arterial\nphases (AP), portal venous phases (VP), and delayed phases\n(DP). Experienced radiologists"
+      },
+      {
+        "page": 7,
+        "pattern": "validation",
+        "text": "accurate representation.\nFurthermore, while Gaussian noise is a widely adopted syn-\nthetic benchmark for methodological validation, we have also\nevaluated our method on two common imperfections in MRI:\nRayleigh noise and intensity non-uniformity (INU). Rayleigh\nNoise: Noise in MRI images follows a Rayleigh distribution,\nparticularly in low signal-to-noise ratio (SNR) regions [44].\nTo simulate this realistic condition, we introduced Rayleigh\nnoise into the BraTS dataset. Inten"
+      },
+      {
+        "page": 8,
+        "pattern": "discount",
+        "text": "weights of bad modalities\nduring multi-modal fusion, while enhancing the contribution\nof good modalities. This adaptive discounting mechanism\nensures that the model automatically identifies and down-\nweights unreliable modalities caused by clinical imperfections\n(e.g., motion artifacts or scanner variations), while prioritizing\nhigh-quality imaging information. The inclusion of test data\nfrom uCT 960+ and iCT 256 scanners explicitly evaluates\nour method’s robustness to real"
+      },
+      {
+        "page": 9,
+        "pattern": "discount",
+        "text": "segmentation, while those farther from the average\n(Rows 3-6) yield poorer results.\nTABLE IV\nABLATION STUDIES ON T RUST DISCOUNTING FUSION (F), I NTRA -M ODALITY CONSISTENCY EVALUATION MODULE (I) AND CROSS -M ODALITY\nDIFFERENCE AGGREGATION MODULE (C). T EST WERE CONDUCTED BETWEEN EACH BASELINE MODEL AND O UR MODEL ON F OUR\nDIFFERENT IMPERFECTION CONDITIONS ( “N-” I S USED TO DENOTE THE PRESENCE OF IMPERFECTION IN THE SPECIFIED MODALITIES )\nfor clearer evaluation of the impa"
+      },
+      {
+        "page": 10,
+        "pattern": "discount",
+        "text": "AIR modal-\nity and others, derived from Eq. (9), while (k) displays the outcome from\nEq. (11), indicating the extent of discounting applied by the CDAM.\nIn CDAM, we acquire information disparity between the\ncurrent modality and other modalities and harnessing it by\nneural network learning. This can discern areas of conflict\nwhen exposed to noise, thus offering discounts. Fig 6 presents\nthe scenario where imperfection with σ = 3.5 is introduced\ninto the FLAIR images. The fir"
+      },
+      {
+        "page": 10,
+        "pattern": "discarded",
+        "text": "ts a depiction\nof the pre-discount state, while the second row illustrates the\nstate post-discounting. In the initial undiscarded condition,\nwe observe that the system predicts no results due to data\nAuthorized licensed use limited to: TONGJI UNIVERSITY. Downloaded on August 14,2026 at 07:31:30 UTC from IEEE Xplore.  Restrictions apply. "
+      },
+      {
+        "page": 11,
+        "pattern": "discount",
+        "text": "The figure presents the impact of imperfection-induced dis-\ncounting on FLAIR modality. Subfigures (a) and (b) show pre-discount\npredicted probability and uncertainty. Subfigures (d) and (e) illus-\ntrate post-discount probability and uncertainty, respectively. Subfigure\n(c) shows the segmentation labels.\ncorruption. However, because the damage is extensive, the\nuncertainty is quite low, which could potentially impair the\nfusion process. The second row reveals the situation "
+      }
+    ]
+  },
+  {
+    "work_id": "work_035a8553e2314bc2",
+    "title": "Learned iterative segmentation of highly variable anatomy from limited data - Applications to whole heart segmentation for congenital heart disease",
+    "pages": 14,
+    "chars": 92026,
+    "sha256": "81e2ddda7ce08f885cd60b0050179e7dd115972a3d5d6dfaa16f0614633fb4e3",
+    "document_id": "doc_a3ae9432211ef4069f9ba3f0",
+    "source_path": "artifacts/81e2ddda7ce08f885cd60b0050179e7dd115972a3d5d6dfaa16f0614633fb4e3.pdf",
+    "card_claims": 19,
+    "targeted_hits": [
+      {
+        "page": 4,
+        "pattern": "stopping indicator",
+        "text": "mage Analysis 80 (2022) 102469 \nFig. 4. Probabilistic model: given image x , we assume that pairs of segmentations \nand stopping indicators { y t , s t } follow a ﬁrst order Markov chain. Shaded nodes in- \ndicate observed variables. \nextension to multiclass iterative segmentation. Finally, we perform \na more comprehensive validation in a signiﬁcantly expanded pa- \ntient cohort. \n2. Iterative segmentation model \nGiven image x : /Omega1 → R and initial segmentation seed y 0 : \n/Omega1 "
+      },
+      {
+        "page": 4,
+        "pattern": "validation",
+        "text": " \ndicate observed variables. \nextension to multiclass iterative segmentation. Finally, we perform \na more comprehensive validation in a signiﬁcantly expanded pa- \ntient cohort. \n2. Iterative segmentation model \nGiven image x : /Omega1 → R and initial segmentation seed y 0 : \n/Omega1 → { 0 , . . . , L −1 } , we seek a segmentation label map y : \n/Omega1 → { 0 , . . . , L −1 } that parcellates the image into L label \nmaps. In practice, the initial segmentation y 0 is created by"
+      },
+      {
+        "page": 5,
+        "pattern": "stopping indicator",
+        "text": "oss \n−log p \n(\ns | h (x , y in ; θh ) ; θs \n)\n/bracehtipupleft /bracehtipdownright/bracehtipdownleft /bracehtipupright \nstopping indicator loss \n⎤ \n⎥ \n⎥ \n⎦ . \n(9) \nThese input-output pairs can be generated on-the-ﬂy during train- \ning (more details are provided in Section 3.2 ). \nIn the rest of this section, we make typical modeling \nchoices to deﬁne the segmentation and stopping indicator \nlosses. \n2.3.1. Segmentation loss \nWe assume that the label of each voxel in the segmentation "
+      },
+      {
+        "page": 6,
+        "pattern": "stopping indicator",
+        "text": "ca, T. Brosch et al. Medical Image Analysis 80 (2022) 102469 \nFig. 6. Input and output partial segmentations and binary stopping indicators \n( y in , y out , s ) are generated on-the-ﬂy during training from ground truth complete \nsegmentations y and seeds y 0 . \nRecall that in the U-Net architecture, a ﬁnal bank of learned \nfeature maps is used to produce the output segmentation proba- \nbility map. In our RNN, these learned feature maps form the latent \nrepresentation h t = h (x , y "
+      },
+      {
+        "page": 8,
+        "pattern": "connected component",
+        "text": "island con- \ntaining the user seed if the given method inputs a seed and the \nsegmentation contained it, or the largest connected component \notherwise. For the iterative segmentation methods, this is done af- \nter every step of inference. Vessel segmentations that are slightly \ntoo long or too short are no less clinically useful ( Zhuang et al., \n2019 ). Hence, we included “optional zones” for the AO, PA, SVC, IVC \nand pulmonary veins, which speciﬁed both a minimum required \nvessel le"
+      },
+      {
+        "page": 8,
+        "pattern": "validation",
+        "text": "for training, \nalthough we note that the dataset of 48 images is still small. All \ntraining was done using 4-fold cross validation, where each fold \nhad an approximately equal number of mild, moderate and severe \ncases. An ensemble of the resulting four networks yielded the ﬁnal \nprediction on the test images. \nWe implemented our method using Keras ( Chollet et al., 2015 ) \nwith a Tensorﬂow backend ( Abadi et al., 2015 ). Optimization was \ndone using Adam ( Kingma and Ba, 201"
+      },
+      {
+        "page": 11,
+        "pattern": "validation",
+        "text": "ur with the given abnormality. On the right, gray and black horizontal bars \nindicate prevalence in the 48–HVSMR+ cross validation and test splits, respectively. \nResults are from all 12 test subjects after training using 48–HVSMR+ . \nIterative segmentation with simulated user stopping consis- \ntently had the best overall segmentation accuracy in our experi- \nments. Moreover, iterative segmentation with automatic stopping \noutperformed all of the direct segmentation methods f"
+      },
+      {
+        "page": 12,
+        "pattern": "connected component",
+        "text": "complexity. Finally, \nwe observed that our iterative segmentation model successfully \nlearned to slowly expand a single connected component connected \nto the user seed, leading to simple post-processing, while the di- \nrect segmentation methods produced multiple islands inside and \noutside the anatomical structure of interest. In particular, the dis- \ntance map used by U–Net+S encodes the same user click as Iter–\nA/U , but may be less informative at intermediate distances from \nthe se"
+      }
+    ]
+  },
+  {
+    "work_id": "work_750f4a75835240a3",
+    "title": "DeferredSeg: A multi-expert deferral framework for medical image segmentation",
+    "pages": 50,
+    "chars": 95539,
+    "sha256": "aaf49740f21c4eb50cd9ccb6bdb856b870fa5d35e041b561ad19ce718afe6727",
+    "document_id": "doc_3e100deb0df450ee9d65bf41",
+    "source_path": "artifacts/aaf49740f21c4eb50cd9ccb6bdb856b870fa5d35e041b561ad19ce718afe6727.pdf",
+    "card_claims": 22,
+    "targeted_hits": [
+      {
+        "page": 10,
+        "pattern": "two-stage",
+        "text": "a consistent and calibrated surrogate was developed in [34], and a two-stage approach\nwith a matching consistent loss was proposed in [35].\nL2D has also been extended beyond classification, including regression with ex-\npert deferral [36], sequential healthcare decision-making [37] and semi-supervised\nlearning with sparse expert availability [38]. These studies demonstrate the generality\nof L2D for Human–AI collaboration a"
+      },
+      {
+        "page": 24,
+        "pattern": "validation",
+        "text": "tions improve overlap and sensitivity by selectively routing\ndifficult boundary pixels. Additional leave-one-center-out validation on PROMISE12\nfurther confirms thatDeferredSeg, particularly with three experts, improves overlap-\nbased performance under center shifts with limited expert deferral (Appendix Ap-\npendix F). LiTS contains large homogeneous liver regions together with small, low-\ncontrast tumors;DeferredSegimproves both tasks, with particularly clear gains for\ntumor"
+      },
+      {
+        "page": 36,
+        "pattern": "two-stage",
+        "text": "losses, confidence calibration, and conformal ensembles, in:\nAISTATS, 2023.\n[35] A. Mao, C. Mohri, M. Mohri, Y . Zhong, Two-stage learning to defer with multi-\nple experts, NeurIPS (2023).\n[36] A. Mao, M. Mohri, Y . Zhong, Regression with multi-expert deferral, ICML\n(2024).\n[37] J. Strong, Q. Men, A. Noble, Towards human-ai collaboration in healthcare:\nGuided deferral systems with large language models, in: ICML, 2024.\n34"
+      },
+      {
+        "page": 37,
+        "pattern": "validation",
+        "text": "sensee, T. Wald, C. Ulrich, M. Baumgartner, S. Roy, K. Maier-Hein, P. F.\nJaeger, nnu-net revisited: A call for rigorous validation in 3d medical image\nsegmentation, in: MICCAI, 2024.\n[46] A. Bozorgpour, S. G. Kolahi, R. Azad, I. Hacihaliloglu, D. Merhof, Cenet: Con-\ntext enhancement network for medical image segmentation, MICCAI (2025).\n35"
+      },
+      {
+        "page": 40,
+        "pattern": "validation",
+        "text": "des\nstandard deviations as well as the System, Expert, and Model branch results ofDeferredSeg.\nAppendix F. Cross-center Validation on PROMISE12\nTo evaluate the robustness ofDeferredSegunder center shift, we conduct leave-\none-center-out cross-center validation on the 50 labeled PROMISE12 training cases.\n38"
+      },
+      {
+        "page": 42,
+        "pattern": "validation",
+        "text": "Table F.12: Leave-one-center-out cross-center validation on PROMISE12. Values are reported as percent-\nages. MedSAM Zero-shot denotes direct inference using the original MedSAM checkpoint. MedSAM-FT\ndenotes supervised fine-tuning on the training centers. The best result for each metric is highlighted in bold.\nHeld-out site Cases MedSAM Zero-shot MedSAM-FT Ours-1E Ours-3E\nDSC Jaccard Sens. DSC Jaccard Se"
+      }
+    ]
+  },
+  {
+    "work_id": "work_a3a141cb15434c22",
+    "title": "SDF4CHD - Generative modeling of cardiac anatomies with congenital heart defects",
+    "pages": 23,
+    "chars": 128268,
+    "sha256": "01f34e8183b05c87fd30c9c858b9db39d4d99bee563511550e27cc4f852ac859",
+    "document_id": "doc_9305e394275645706ffe08d3",
+    "source_path": "artifacts/01f34e8183b05c87fd30c9c858b9db39d4d99bee563511550e27cc4f852ac859.pdf",
+    "card_claims": 17,
+    "targeted_hits": [
+      {
+        "page": 1,
+        "pattern": "topological variations",
+        "text": "ohorts; however, prior approaches were largely designed for normal anatomies and cannot\nreadily capture the significant topological variations seen in CHD patients. Therefore, we propose a type-\nand shape-disentangled generative approach suitable to capture the wide spectrum of cardiac anatomies\nobserved in different CHD types and synthesize differently shaped cardiac anatomies that preserve the\nunique topology for specific CHD types. Our DL approach represents generic whole heart anatom"
+      },
+      {
+        "page": 2,
+        "pattern": "topological variations",
+        "text": " distri-\nbution had been sufficiently covered in the training dataset. However,\nCHDs encompass a broad spectrum of rare topological variations among\ndifferent defect types, making it practically impossible to assemble\na comprehensive training cohort from clinical imaging data alone.\nTo address this challenge, it is essential to incorporate prior human\nknowledge of CHD anatomical abnormalities associated with each type\nand the relationships between different types into the modeling proces"
+      },
+      {
+        "page": 2,
+        "pattern": "validation",
+        "text": "cal and treatment plans to in-\ndividual patients, ultimately leading to improved outcomes. However,\nthe development and validation of personalized modeling paradigms\nhave mostly been carried out on small patient cohorts, and larger\npatient cohorts are necessary to validate their clinical advantages.\nFurthermore, data-driven approaches, such as deep learning methods\nfor segmentation, diagnosis, and shape quantification, are essential to\nimprove the efficiency of personalized m"
+      },
+      {
+        "page": 3,
+        "pattern": "topological variations",
+        "text": "shape primitives,\nwhereas CHD cardiac anatomies involve both abnormal configurations\nof multiple cardiac structures and topological variations within a single\nstructure. The modeled topological anomalies should also correspond"
+      },
+      {
+        "page": 4,
+        "pattern": "topological variations",
+        "text": "e that changes the shape of the type-specific geometries. Additionally, we used a correction module that captures minor topological variations of patient-specific anatomical\nfeatures that are not described by their CHD types.\nto meaningful disease states. Our method was thus designed to model\nthe intricate topological variations in multi-structural geometries seen\nin realistic CHDs. We use CHD diagnosis as an input vector of true\nor false values corresponding to whether a patient had the"
+      },
+      {
+        "page": 5,
+        "pattern": "topological variations",
+        "text": " dif-\nferent in branches of aortic arches, pulmonary veins, and arteries). The\ncorrection module intends to model these topological variations that\nare not due to CHDs. We thus use an additional MLP ( ) to output a\ncorrection vector 𝐜 ∈ R7 at each point 𝐩𝑆 in the shape space, to model\nthe anatomical correction for each of the seven cardiac structures:\n𝐜𝑗 = (𝐩, 𝐳𝑗𝐶 ). (11)\nSimilar to the deformation module, we use positional-aware shape\nencoding by sampling the correction code from a la"
+      },
+      {
+        "page": 7,
+        "pattern": "validation",
+        "text": "mage Analysis 97 (2024) 103293\n7\nF. Kong et al.\nTable 1\nNumbers of patients and cases of CHDs included in the training, validation, and testing\nsplits.\nASD VSD DORV PuA ToF TGA Normal Total\nTraining 26 40 3 12 8 2 13 67\nValidation 2 6 1 1 2 1 1 8\nTesting 18 23 3 7 3 5 4 34\nwith specific CHD abnormalities. During generation, we randomly sam-\nple a shape code 𝐙𝑆 from the prior Gaussian distribution  (𝟎,𝜎 2𝐼)\nand specify the desired type code 𝐭𝑐ℎ𝑑. The type network  will then\n"
+      },
+      {
+        "page": 12,
+        "pattern": "topological variations",
+        "text": "e anatomies of blood\nvessels possess significant variations even within the same CHD types.\nAddressing these additional topological variations presented a chal-\nlenge for the deformation network, necessitating the use of correction\nfields. Our method, with correction, achieved a similar shape recon-\nstruction performance compared to CDeepSDF and DeepSDF. Without\ncorrection, our method achieved a similar reconstruction performance\nwith NDF, which also represented shapes by deforming an im"
+      },
+      {
+        "page": 15,
+        "pattern": "connected component",
+        "text": "d in Fig. 18 . However,\nsuch artifacts can be easily corrected by a post-processing step where\nwe only kept the largest connected component of a cardiac structure.\nWe did not observe any notable effects of Lipschitz regularization and\ninitialization when interpolating among different CHD type-specific\ntemplates."
+      },
+      {
+        "page": 17,
+        "pattern": "connected component",
+        "text": "earned template, and the bottom row shows the corresponding\ntemplate after post-processing (i.e. extracting the largest connected components).\nshows example deformed meshes of specific CHDs for simulations. The\ngenerated meshes within a CHD type also have semantic correspon-\ndence, as indicated by the texture map that is created based on global\nvertex IDs, and which shares the same connectivity as the type-specific\ntemplate mesh.\n5. Discussion\nCHDs are uncommon conditions that can sig"
+      },
+      {
+        "page": 17,
+        "pattern": "topological variations",
+        "text": " representation, generation, and reconstruction\nof cardiac anatomies for a range of complex CHDs.\nOur method introduces topological variations in the representation\nof cardiac anatomies, an important and previously unaddressed con-\nsideration for modeling CHD. Previous studies have largely focused\non cardiac diseases such as hypertrophic cardiomyopathy ( Biffi et al. ,\n2019), myocardial infarction (Beetz et al., 2022), and dilated cardiomy-\nopathy (Gómez et al. , 2021), where the topolog"
+      },
+      {
+        "page": 18,
+        "pattern": "topological variations",
+        "text": "ly viewed\nas categorical, it is important to acknowledge that CHD anatomies\nencompass a wide and continuous spectrum of topological variations\nacross different defect types originating from abnormal fetal heart de-\nvelopment. A Lipschitz-regularized SDF can effectively capture gradual\nand smooth changes in anatomical abnormalities. We have shown that\nwhen linearly interpolating the input CHD-type vector, our method\ncan accurately represent the anatomical changes that align with in-\nterme"
+      }
+    ]
+  }
+]

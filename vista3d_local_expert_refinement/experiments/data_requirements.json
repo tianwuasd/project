@@ -1,0 +1,19 @@
+{
+  "status": "not_yet_audited",
+  "source_labeled_ct_available": true,
+  "source_unlabeled_ct_available": true,
+  "target_unlabeled_ct_available": true,
+  "target_use_confirmed_by_user": "prediction",
+  "source_labeled_patients": null,
+  "source_unlabeled_patients": null,
+  "source_centers": null,
+  "target_centers": null,
+  "target_patients": null,
+  "labels_and_id_map": null,
+  "patient_split_manifest": null,
+  "external_labeled_evaluation_available": null,
+  "teacher_checkpoint": null,
+  "student_specialties": null,
+  "gpu_resources": null,
+  "note": "Availability comes from conversation, not a filesystem data audit. Do not insert patient identifiers here."
+}

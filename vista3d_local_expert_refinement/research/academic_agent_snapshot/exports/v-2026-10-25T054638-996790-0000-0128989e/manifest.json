@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "snapshot": [
+    214,
+    52,
+    24,
+    "20b0f62633b254d5680d31767135940733fb8d37301216f2b59c034f7fac329f"
+  ],
+  "files": {
+    "review.md": "9809de30c7ddfe96e6734c6e1feb2e43d974397e7908a7b901e8a3c5464fc49d",
+    "reading-cards.md": "1f91d250a06622da4ff44dea84000b28b4cf274be2eef53c53628569dcd15cdd",
+    "comparison.md": "63933590a323ac3dcae120c28e1b9334b90073d1b796f4d15fe6d6a540d827c1",
+    "comparison.csv": "892861c4f8d19aa0ecea2b01589156a2e4cd0ecbbddc85f652187c524fd4ebb8",
+    "gaps.md": "3870bf0cec64521daa6552a90260d46c7837cfe6b42a32b7c7fe7f688d71f5ac",
+    "outline.md": "114c400f86c8b50f93d8b0f5789614a7effa08b02057c95422ef2e0f1b446462",
+    "references.bib": "b29cb85529038c358d5d8360212e31ddcd792c86cf796c65dba7135bf56be90c",
+    "library.csv": "09bc7de9cab2f87cda901d62c60bd851768b71304ef231578002f13c556d048a",
+    "library.json": "dce252544822b0342897eed69cbe145d77f80b567ce158dc24d73886dc1f7995",
+    "quality.json": "c15d72b006051b79267a9c9e7920b75c18b301fc24eb9ef2aef3a154dbd55c90",
+    "evidence-ledger.json": "eff85c5e363d031c3b1944280583d0ebccbe4438bc4b482501bab0d7848a05a9",
+    "query-log.json": "c64cf51396fbcd4272cd8961353d7fcbea0dcafee64011b4ba717224e001d0c0"
+  }
+}

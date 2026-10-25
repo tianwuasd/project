@@ -1,0 +1,1413 @@
+                                                                      Medical Image Analysis 97 (2024) 103293
+
+
+                                                                     Contents lists available at ScienceDirect
+
+
+                                                                     Medical Image Analysis
+                                                            journal homepage: www.elsevier.com/locate/media
+
+
+
+
+SDF4CHD: Generative modeling of cardiac anatomies with congenital heart
+defects✩
+Fanwei Kong a,b,c , Sascha Stocker d,e , Perry S. Choi f , Michael Ma f , Daniel B. Ennis c,d ,
+Alison L. Marsden a,b,c,f ,∗
+a
+    Institute for Computational and Mathematical Engineering, Stanford University, Stanford, CA, USA
+b Department of Pediatrics, Stanford University, Stanford, CA, USA
+c Cardiovascular Institute, Stanford University, Stanford, CA, USA
+d
+  Department of Radiology, Stanford University, Stanford, CA, USA
+e
+  Institute for Biomedical Engineering, ETH Zurich and University Zurich, Zurich, Switzerland
+f
+  Department of Cardiothoracic Surgery, Stanford University, Stanford, CA, USA
+
+
+
+ARTICLE                  INFO                               ABSTRACT
+
+Keywords:                                                   Congenital heart disease (CHD) encompasses a spectrum of cardiovascular structural abnormalities, often
+Congenital cardiac defects                                  requiring customized treatment plans for individual patients. Computational modeling and analysis of these
+Generative shape modeling                                   unique cardiac anatomies can improve diagnosis and treatment planning and may ultimately lead to improved
+Implicit neural representations
+                                                            outcomes. Deep learning (DL) methods have demonstrated the potential to enable efficient treatment planning
+                                                            by automating cardiac segmentation and mesh construction for patients with normal cardiac anatomies.
+                                                            However, CHDs are often rare, making it challenging to acquire sufficiently large patient cohorts for training
+                                                            such DL models. Generative modeling of cardiac anatomies has the potential to fill this gap via the generation
+                                                            of virtual cohorts; however, prior approaches were largely designed for normal anatomies and cannot
+                                                            readily capture the significant topological variations seen in CHD patients. Therefore, we propose a type-
+                                                            and shape-disentangled generative approach suitable to capture the wide spectrum of cardiac anatomies
+                                                            observed in different CHD types and synthesize differently shaped cardiac anatomies that preserve the
+                                                            unique topology for specific CHD types. Our DL approach represents generic whole heart anatomies with
+                                                            CHD type-specific abnormalities implicitly using signed distance fields (SDF) based on CHD type diagnosis.
+                                                            To capture the shape-specific variations, we then learn invertible deformations to morph the learned CHD
+                                                            type-specific anatomies and reconstruct patient-specific shapes. After training with a dataset containing the
+                                                            cardiac anatomies of 67 patients spanning 6 CHD types and 14 combinations of CHD types, our method
+                                                            successfully captures divergent anatomical variations across different types and the meaningful intermediate
+                                                            CHD states across the spectrum of related CHD diagnoses. Additionally, our method demonstrates superior
+                                                            performance in CHD anatomy generation in terms of CHD-type correctness and shape plausibility. It also
+                                                            exhibits comparable generalization performance when reconstructing unseen cardiac anatomies. Moreover, our
+                                                            approach shows potential in augmenting image-segmentation pairs for rarer CHD types to significantly enhance
+                                                            cardiac segmentation accuracy for CHDs. Furthermore, it enables the generation of CHD cardiac meshes for
+                                                            computational simulation, facilitating a systematic examination of the impact of CHDs on cardiac functions.
+
+
+
+1. Introduction                                                                                  et al., 2014; Micheletti, 2018). These anatomical abnormalities can dra-
+                                                                                                 matically disrupt patients’ cardiac function and circulation (Micheletti,
+    Congenital heart defects (CHDs) are the most common birth defects                            2018). For instance, ventricular septal defects result in abnormal shunt-
+affecting 1 in 100 babies and are among the top causes of infant mortal-                         ing of blood flow between the left and the right ventricles, causing
+ity worldwide (Alison et al., 2020). CHDs are structural abnormalities                           mixing of oxygenated and de-oxygenated blood; d-transposition of the
+of the heart or great vessels occurring during fetal development and                             great arteries involves a reversal of the aorta and pulmonary artery con-
+span a wide array of anatomical characteristics (Liu et al., 2019; Marelli                       nections (i.e., arterioventricular discordance), causing de-oxygenated
+
+
+
+    ✩ Code is available at https://github.com/fkong7/SDF4CHD.
+    ∗ Corresponding author at: 318 Campus Dr, Clark Center E100b, Stanford, CA, USA.
+       E-mail addresses: fwkong@stanford.edu (F. Kong), amarsden@stanford.edu (A.L. Marsden).
+
+https://doi.org/10.1016/j.media.2024.103293
+Received 8 November 2023; Received in revised form 7 May 2024; Accepted 30 July 2024
+Available online 8 August 2024
+1361-8415/© 2024 Elsevier B.V. All rights are reserved, including those for text and data mining, AI training, and similar technologies.
+F. Kong et al.                                                                                                           Medical Image Analysis 97 (2024) 103293
+
+
+blood to be pumped to the body and oxygenated blood to be circulated              cardiac anatomies, allowing us to create synthetic cardiac anatomies
+back to the lungs; and pulmonary atresia describes a missing pulmonary            tailored to specific CHD types and conditions. Our key insight is to
+outflow tract from the right ventricle, limiting blood flow to the lungs          learn disentangled type and shape representations of CHD hearts. In
+for oxygenation. CHDs form a spectrum of related diagnoses, shaped                essence, we represent the CHD type-specific heart anatomies and the
+by variations in the timing, nature, and severity of developmental                corresponding abnormalities implicitly using a smooth signed distance
+abnormalities during fetal heart development. CHD defects can appear              function (SDF) learned by Lipschitz-regularized neural networks. This
+in isolation or in combination, resulting in unique and complex cardiac           function takes in a CHD diagnosis vector as input and outputs a signed
+malformations across the spectrum. Approximately 25% of children                  distance field where we can extract its 0-level set to represent the cor-
+born with severe CHD will require heart surgery or other interventions            responding topologies of complex cardiac anatomies. Learning smooth
+to survive into adulthood (Oster et al., 2013). Given the uniqueness of           SDFs is well-suited for modeling spectra of related CHDs. Although
+CHD patients, personalized treatment planning is essential to address             CHDs are typically diagnosed discretely, they form a continuous range
+their specific needs.                                                             of structural abnormalities tied to their developmental origins. Cardiac
+    Personalized modeling of the heart, which encompasses techniques              structural changes transition among various CHD types. For instance,
+such as 3D printing (Hermsen et al., 2020), shape analysis (Govil                 Tetralogy of Fallot (TOF), Double Outlet Right Ventricle (DORV), and
+et al., 2023b), and computational simulations (Marsden and Feinstein,             Transposition of the Great Arteries (TGA) share a connection through
+2015) holds potential for tailoring surgical and treatment plans to in-           the distribution of conus arteriosus around the aortic and pulmonary
+dividual patients, ultimately leading to improved outcomes. However,              outflow tracts. Moreover, while DORVs are often categorized into
+the development and validation of personalized modeling paradigms                 different sub-types, these classifications are associated with other types
+have mostly been carried out on small patient cohorts, and larger                 of congenital cardiac malformations (Bell-Cheddar et al., 2023). This
+patient cohorts are necessary to validate their clinical advantages.              characteristic of CHDs can be effectively captured by a learned SDF
+Furthermore, data-driven approaches, such as deep learning methods                parameterized by CHD diagnosis information. This enables interpo-
+for segmentation, diagnosis, and shape quantification, are essential to           lation of cardiac structure topologies based on input CHD diagnosis
+improve the efficiency of personalized modeling, ensuring it can be               vectors, producing meaningful intermediate representations that are
+completed within a reasonable clinical timeframe. Data-driven methods             developmentally reasonable, yet may not appear in a sparse dataset.
+hinge on the availability of large and diverse datasets for training mod-         We then learn diffeomorphic deformations to morph the anatomies to
+els. However, CHDs, particularly the more complex types (e.g. double              capture shape-specific anatomical variations in patient cardiac models
+outlet right ventricle and hypoplastic left heart syndrome), are rare             while preserving the structural anomalies associated with CHDs. Con-
+conditions. This rarity makes it extremely challenging to acquire suffi-          sequently, following training on a limited CHD dataset, our approach
+ciently large patient cohorts (Xu et al., 2020; Fonseca et al., 2011; Govil       can generate a spectrum of CHD anatomies (types and shapes) that
+et al., 2023b) for validation of new surgical procedures in clinical trials       realistically reflects varying degrees of disease severity and anatomy,
+and the development of data-driven approaches for automated image-                but which are only represented sparsely in the training dataset. Our
+based computational modeling. Consequently, current developments of               key contributions are the following:
+surgical treatments for complex CHDs are usually conducted on a very
+small patient cohort, and there is a lack of consensus among healthcare              1. We introduce a cardiac shape representation approach to model
+practitioners regarding the best approaches (Jenkins et al., 2002).                     the spectrum of CHD. Our innovative method disentangles CHD
+Generative modeling of cardiac anatomies capturing the spectrum of                      type and shape using smooth SDFs in conjunction with dif-
+patient variation can generate virtual cohorts that facilitate in silico                feomorphic deformations. This disentanglement allows us to
+clinical trials (Dou et al., 2023; Niederer et al., 2020) to evaluate new               independently model variations in cardiac topology and shape.
+surgical approaches. Namely, generating synthetic CHD models with                    2. By disentangling type and shape representations, our method
+bespoke abnormalities can significantly expand the available virtual                    enables CHD-type-controlled synthesis of cardiac anatomies and
+cohort, enabling systematic development and validation of image pro-                    can be used for generating virtual cohorts for rarer CHD types.
+cessing methods, computational modeling approaches, and treatment                       We demonstrate the applications of our methods by generating
+strategies for any particular type-specific and shape-specific CHD.                     both image-segmentation pairs and meshes for computational
+    While deep learning (DL) has shown potential in cardiac shape-                      simulations.
+specific generation (Dou et al., 2023; Beetz et al., 2022; Qiao et al.,              3. From a highly heterogeneous CHD dataset, our method can au-
+2024; Yuan et al., 2023), prior approaches primarily focused on mod-                    tomatically learn spatially-aligned implicit anatomical templates
+eling cardiac structures with normal topology and cannot generalize to                  for different types of CHD and represent anatomical abnormal-
+CHDs with topologically unusual cardiac structure such as atrial and                    ities for both the common and the rare types. It can seamlessly
+ventricular septal defects, hypoplastic ventricles, outflow tract atresia,              interpolate between binary CHD states and accurately model a
+and transposition of the great arteries. Furthermore, prior generative                  spectrum of anatomical changes.
+models of cardiac shapes often assumed that the cardiac anatomy distri-              4. We will openly share our trained CHD whole-heart anatomy
+bution had been sufficiently covered in the training dataset. However,                  generator and the associated virtual cohorts representing various
+CHDs encompass a broad spectrum of rare topological variations among                    CHD conditions to benefit research in the medical imaging and
+different defect types, making it practically impossible to assemble                    cardiac computational modeling communities.
+a comprehensive training cohort from clinical imaging data alone.
+To address this challenge, it is essential to incorporate prior human                 This study substantially extends our prior work (Kong and Marsden,
+knowledge of CHD anatomical abnormalities associated with each type               2023). First, we have introduced improvements to the methods, such
+and the relationships between different types into the modeling process.          as alternatively training the type and shape networks and adding a
+This integration of domain expertise is crucial for enhancing the capac-          Lipschitz regularization loss, to stabilize and accelerate the convergence
+ity of these models to accurately represent the diversity of CHD-related          of our learned CHD-type representations. We extended our preliminary
+cardiac anomalies.                                                                analysis to demonstrate the potential of our method to realistically
+    We propose a novel solution, which we term SDF4CHD, to tackle                 capture changes in cardiac structural abnormalities representing spec-
+the complex task of representing whole-heart cardiac anatomies for a              tra of CHDs. We also included additional baselines, such as training
+wide range of CHD types, whether they occur in isolation, in combina-             conditional DeepSDF and training a single network for each CHD type,
+tion, or along a spectrum of disease severity or developmental origin.            to further demonstrate the advantages of our method in CHD-type
+Namely, our approach enables type-controlled generative modeling of               controlled reconstruction and synthesis of cardiac anatomies. We have
+
+                                                                              2
+F. Kong et al.                                                                                                            Medical Image Analysis 97 (2024) 103293
+
+
+implemented a generative and adversarial (GAN) neural network model              and the need for pulmonary valve replacements. Similarly, the use of a
+to generate realistic-looking CT images and demonstrate our potential            single ToF mesh template in these studies limits the extension of these
+application in generating image-segmentation pairs of CHD anatomies              methods to other CHD types. In contrast, our approach is designed
+that can effectively facilitate training neural network models for image         to represent a wide range of CHD topologies using a single neural
+segmentation. We have also demonstrated other potential applications             function, thus enabling shape analysis for all CHD types. Loke et al.
+of systematically exploring the effect of CHDs on cardiac function by            (2017) and Ryan et al. (2018) reported the beneficial impact of using
+using our CHD-type controlled mesh for computational simulations.                3D-printed congenital heart disease models on the learning experiences
+Lastly, we have also extensively investigated multiple design choices            of clinical residents. However, the 3D-printed anatomies were derived
+to showcase their effects on our results.                                        from manually segmenting patient image data, which relies on the
+                                                                                 availability of patient data and significant user intervention, especially
+2. Related works                                                                 for rare CHD cases. Our method aims to model an augmented range of
+                                                                                 CHD anatomies by interpolating between various CHD topologies and
+2.1. Generative models for cardiac anatomies                                     incorporating shape variations from the training data, resulting in a
+                                                                                 more diverse set of CHD cardiac anatomies for clinical education. Pace
+    Cardiac statistical shape analysis aims to understand how changes            et al. (2022) proposed a promising iterative segmentation model to
+in cardiac anatomy relate to diseases, and to enhance disease diag-              efficiently segment cardiac anatomies with a wide range of CHDs from
+nosis, risk assessment, and treatment strategies. In earlier research on         patient image data. However, this method is not fully automated and
+statistical shape models, principal component analysis was commonly              requires a few user inputs. Our generative model of CHD anatomies has
+used to identify the primary modes of shape variation within a training          the potential to augment the available CHD datasets to facilitate the
+dataset of cardiac anatomies (Suinesiaputra et al., 2018; Rodero et al.,         training of fully automated deep learning methods for medical image
+2021; Attar et al., 2019). However, recent advances in deep learning             segmentations for CHDs.
+have led to a shift towards employing more expressive variational
+auto-encoders (VAEs) to model shape variations effectively. For ex-              2.3. Deep implicit template using SDFs
+ample, Qiao et al. (2024) proposed a conditional generative model
+to capture the four-dimensional spatiotemporal anatomy of the biven-                 An SDF implicitly represents shapes using its zero-level set. DeepSDF
+tricular heart conditioned on non-imaging clinical factors. Biffi et al.         introduced an auto-decoder method to approximate a continuous SDF
+(2019) combined VAE and a classification neural network to model the             to model shapes with arbitrary topology (Park et al., 2019a). A few
+shape variations of the left ventricle among both healthy individuals            studies have since explored this approach for modeling shapes of
+and patients with hypertrophic cardiomyopathy. Beetz et al. (2022)               cells (Wiesner et al., 2022), and livers (Raju et al., 2021). However,
+proposed a mesh VAE to model left ventricle shapes among patients                prior methods did not differentiate between type (topology) and shape
+with acute myocardial infarction, and leveraged the latent space of the          changes, which can pose challenges when attempting to generate
+VAE for predicting major adverse cardiac events. Generative models               anatomies specific to particular CHDs. In contrast, our study focuses
+have also been applied to cardiac image data, enabling the synthesis of          on creating disentangled representations that separate the spectrum
+new cardiac cine magnetic resonance (MR) images (Duchateau et al.,               of CHD into type-specific and shape-specific dimensions. Our disen-
+2018) and MR images depicting specific pathological conditions (Ther-            tangled representation is important for clinical applications, such as
+mos et al., 2021). Additionally, Campello et al. (2022) proposed an              generating type-specific generation of synthetic datasets for rare CHD
+age-conditioned generative adversarial network to generate MR images             types by varying shapes of the heart while keeping the type fixed, and
+of aging hearts. However, the above studies were all limited to cases            visualizing treatment scenarios and transition from diseased to healthy
+in which the heart was topologically normal. Namely, all pathologi-              states for individual patients by varying the CHD types while keeping
+cal cases they considered could be modeled by morphing a healthy                 the patient-specific shape fixed.
+heart template. As a result, these approaches may not readily extend                 A few studies have proposed to separately model topology and
+to CHD patients, whose cardiac anatomy can vary significantly from               shape-specific variations by learning implicit templates that model the
+normal topology (e.g. atrophied chambers, holes, or vascular switches).          topology (e.g. type) and another network to deform (e.g. shape) the
+Furthermore, prior studies mostly focused on the ventricles, yet CHDs            learned template (Yang et al., 2022; Sun et al., 2022; Hui et al.,
+encompass anomalies in the atrium and great vessels as well.                     2022; Deng et al., 2020). Particularly, Yang et al. (2022) proposed
+                                                                                 to learn implicit organ templates and deform a selected template to
+2.2. Patient image-based anatomical modeling for CHDs                            represent organ shapes. Sun et al. (2022) proposed to reconstruct
+                                                                                 meshes of organ anatomies by deforming the meshes extracted from a
+    To the best of our knowledge, no prior study has attempted to                learned implicit template using Neural Ordinary Differential Equations
+automatically model changes in cardiac anatomy across a spectrum of              (NODEs), thereby preventing non-manifold artifacts, including folded
+CHDs. Nevertheless, a few studies have concentrated on constructing              faces and self-intersections. However, these approaches either focused
+CHD anatomical models from images for segmentation (Pace et al.,                 on a single template (Sun et al., 2022) or necessitated training distinct
+2022), computational simulations (Tikenogullari et al., 2023; Vieira             networks for different object categories to handle substantial topologi-
+et al., 2015), shape analysis (Mauger et al., 2021; Govil et al., 2023b),        cal changes (Deng et al., 2020; Zheng et al., 2020; Yang et al., 2022).
+and 3D printing (Xu et al., 2019; Loke et al., 2017; Ryan et al., 2018)          Consequently, the above methods are not readily adaptable to the com-
+for specific CHD types. For instance, Govil et al. (2023a) and Tang et al.       plexity of CHD anatomies with their diverse and varying topological
+(2022) developed mesh templates for specific congenital heart defects,           configurations. Furthermore, these methods are not designed to model
+namely tetralogy of Fallot (ToF) and hypoplastic left heart syndrome             the intermediate topological changes along a spectrum of related CHD
+(HLHS), respectively. These templates were employed to reconstruct               diagnoses. Hui et al. (2022) suggested a method for learning topology-
+patient-specific cardiac meshes from images through template defor-              aware neural templates that are constructed with a set of learned
+mation. However, the templates were manually constructed for each                convex shapes to capture topological changes. However, this method
+specific CHD type and thus may not easily extend to accommodate the              only considered general objects (e.g. chairs, tables, airplanes) that
+multitude of existing CHD types and combinations. Mauger et al. (2021)           can be described by arbitrary composition of basic shape primitives,
+and Govil et al. (2023b) utilized principal component analysis (PCA)             whereas CHD cardiac anatomies involve both abnormal configurations
+to analyze biventricular shapes in ToF cases, identifying associations           of multiple cardiac structures and topological variations within a single
+between shape features and factors such as pulmonary regurgitation               structure. The modeled topological anomalies should also correspond
+
+                                                                             3
+F. Kong et al.                                                                                                                            Medical Image Analysis 97 (2024) 103293
+
+
+
+
+Fig. 1. Overview of SDF4CHD. It consists of a type representation module that leverages CHD-type information to predict type-specific cardiac geometries, and a deformation
+module that changes the shape of the type-specific geometries. Additionally, we used a correction module that captures minor topological variations of patient-specific anatomical
+features that are not described by their CHD types.
+
+
+to meaningful disease states. Our method was thus designed to model                         structure indexed as 𝑖 ∈ 1, … , 𝑛, if we let 𝐷𝑖 represent its domain, 𝜕𝐷𝑖
+the intricate topological variations in multi-structural geometries seen                    represent its boundary, 𝐷̄ 𝑖 represent the closure of 𝐷𝑖 , 𝐷𝑖′ represent the
+in realistic CHDs. We use CHD diagnosis as an input vector of true                          complement of 𝐷̄ 𝑖 , and 𝑑 denote the distance function from 𝐩 to 𝜕𝐷,
+or false values corresponding to whether a patient had the specific                         we can express the SDF as follows:
+CHD defects that we chose to include in this study. The inclusion of                                        {
+                                                                                                              𝑑(𝐩, 𝜕𝐷𝑖 ),    if 𝐩 ∈ 𝐷̄ 𝑖
+diagnostic information allows us to reconstruct cardiac geometries that                     𝑠𝑖 = 𝑆𝐷𝐹 (𝐩)𝑖 =                                                          (1)
+represent the unique cardiac abnormalities associated with each CHD                                           −𝑑(𝐩, 𝜕𝐷𝑖 ), if 𝐩 ∈ 𝐷𝑖′ , 𝑖 ∈ 1, … , 7.
+type.                                                                                          The representation of cardiac anatomies is determined by the zero-
+                                                                                            level set, 𝑆𝐷𝐹 (⋅) = 𝟎.
+3. Methods
+                                                                                            3.1.2. Learning type-specific CHD geometries
+   Fig. 1 shows our proposed pipeline, SDF4CHD, for CHD type and
+                                                                                                In general, the topology of cardiac structures depends on the specific
+shape disentanglement. It consists of a type representation module
+                                                                                            combination of CHD types. We therefore assume that the topology of
+that leverages CHD-type information to predict type-specific cardiac
+                                                                                            cardiac structures is the same for patients with the same CHD type
+geometries, a deformation module that changes the shape of the type-
+                                                                                            combinations yet could differ for patients with different CHD type
+specific geometries, and a correction module that captures additional
+                                                                                            combinations. We are thus motivated to parameterize the SDF with an
+topological variations of patient-specific anatomical features.
+                                                                                            additional input, denoted as 𝐳𝑇 , which controls the zero-level set of
+                                                                                            this SDF to represent different topologies. In our context, 𝐳𝑇 represents
+3.1. Type representation module
+                                                                                            the types of CHDs. This allows the SDF to produce different structural
+                                                                                            abnormalities corresponding to different types of CHDs. Specifically, we
+    We modeled the topology changes among and within a total of
+                                                                                            can express it as follows:
+seven cardiac structures including the myocardium (Myo), blood pools                                             {
+of the right atrium (RA), left atrium (LA), right ventricle (RV) left                                              𝑑(𝐩, 𝜕𝐷𝑖 (𝐳𝑇 )),  if 𝐩 ∈ 𝐷̄ 𝑖 (𝐳𝑇 )
+                                                                                            𝑠𝑖 = 𝑆𝐷𝐹 (𝐩, 𝐳𝑇 )𝑖 =                                        𝑖 ∈ 1, … , 7. (2)
+ventricle (LV), major branches of aorta (Ao), and pulmonary arteries                                               −𝑑(𝐩, 𝜕𝐷𝑖 (𝐳𝑇 )), if 𝐩 ∈ 𝐷𝑖 (𝐳𝑇 )′ ,
+(PA). We note that pulmonary veins were included in the LA segmen-
+tation and the superior and interior vena cava were included in the RA                         Herein, we approximated the above SDFs using a Multilayer Percep-
+segmentation.                                                                               tron (MLP), 𝑑𝑒𝑐 , following Park et al. (2019a). Namely,
+
+                                                                                            𝐬 = 𝑑𝑒𝑐 (𝐩, 𝐳𝑇 ).                                                                (3)
+3.1.1. Implicit representations for cardiac anatomies
+    Implicit representations use SDFs to represent 3D geometries of                            Since the ReLU activation functions commonly used in MLPs are
+arbitrary topology. An SDF maps a point 𝐩 ∈ R3 to a scalar value 𝑠 ∈ R,                     biased towards low-frequency features, we used Fourier positional
+indicating the distance from 𝐩 to the surfaces of cardiac structures,                       encoding to augment the point coordinates 𝐩 before using them as
+with the sign denoting whether 𝐩 is inside or outside the geometry.                         inputs (Tancik et al., 2020). The final input to 𝑑𝑒𝑐 is the product
+However, considering that a heart comprises multiple structures, we opt                     between the point coordinates after the positional encoding and the
+for modeling a signed distance vector field denoted as 𝐬 = 𝑆𝐷𝐹 (𝐩). In                      CHD-type latent code 𝐳𝑇 .
+this context, 𝐬 is a vector that represents the signed distances from the                      To obtain the CHD-type latent code 𝐳𝑇 from the diagnostic infor-
+domain boundaries of each cardiac structure. Specifically, for a cardiac                    mation, we first use another MLP (𝑒𝑛𝑐 ) to encode the CHD diagnostic
+
+                                                                                        4
+F. Kong et al.                                                                                                                               Medical Image Analysis 97 (2024) 103293
+
+
+information:                                                                         from the type space to the shape space will not generate intersecting
+                                                                                     mesh surfaces. This ODE can be integrated to progressively map point
+𝐳𝑇 = 𝑒𝑛𝑐 (𝐭𝑐ℎ𝑑 )                                                         (4)
+                                                                                     locations from the shape space to the type space. Therefore, based on
+where the input diagnostic information 𝐭𝑐ℎ𝑑 is a vector containing true              Eq. (7), the diffeomorphic deformation conditioned on the deformation
+or false values, corresponding to whether the patient modeled had the                code is given by,
+CHD-types found in the training dataset. The CHD-type representation                                                                     𝑇
+module can thus be expressed as,                                                     𝐩𝑇 = (𝐩, 𝐳𝑆𝑗 ) = 𝜙(𝐩, 𝐳𝑆𝑗 , 𝑇 ) = 𝐩𝑗𝑆 +                𝐯(𝜙(𝐩, 𝐳𝑆𝑗 , 𝐳𝑆𝑗 , 𝑡), 𝑡)𝑑𝑡.         (9)
+                                                                                                                                    ∫0
+      (      )        (     (    ))
+𝐬 =  𝐩, 𝐭𝑐ℎ𝑑 = 𝑑𝑒𝑐 𝐩, 𝑒𝑛𝑐 𝐭𝑐ℎ𝑑 .                                 (5)                 By the existence and uniqueness properties of ODEs, the NODE nets
+    The dimension of 𝐭𝑐ℎ𝑑 is the number of CHD-types modeled. Both                   are invertible. Therefore, we can readily obtain the inverse deformation
+𝑒𝑛𝑐 and 𝑑𝑒𝑐 consist of six fully connected layers (512 neurons per                 by integrating the ODE backward in time:
+layer) with leaky ReLU activation functions (𝛼 = 0.02). The dimension                                                                        𝑇
+of type code 𝐳𝑇 for each point is 32.                                                𝐩𝑗𝑆 = −(𝐩, 𝐳𝑆𝑗 ) = 𝜓(𝐩, 𝐳𝑆𝑗 , 𝑇 ) = 𝐩𝑇 +                   −𝐯(𝜙(𝐩, 𝐳𝑆𝑗 , 𝐳𝑆𝑗 , 𝑡), 𝑡)𝑑𝑡,   (10)
+                                                                                                                                     ∫0
+
+3.2. Diffeomorphic shape representation module                                       where 𝜓 ∶ R3 × [0, 𝑇 ] → R3 is the inverse of the diffeomorphic flow 𝜙.
+                                                                                     We used the forward Euler method to solve the ODE in Eqs. (9) and
+3.2.1. Coupling with CHD type representations                                        (10), with a fixed step size of 0.2 over a time interval of 𝑡 ∈ [0, 1].
+    Modeling the shape changes while preserving the cardiac anatomies
+and topologies specific to CHD types can enable the controlled gener-                3.3. Correction module
+ation of cardiac shapes for desired CHD types. To preserve the cardiac
+anatomies learned by the type-specific network, we coupled the type                      CHD cardiac geometries are primarily described by deformations
+representation module with a conditional shape deformation module                    from CHD type-specific templates. However, additional topological
+. If we represent a patient-specific anatomy as 𝑋 𝑗 , where 𝑗 ∈ 1, … , 𝑁            variations may exist among patients with the same CHD type (e.g. dif-
+is the index of this anatomy in the training dataset, a shape code 𝐙𝑗𝑆               ferent in branches of aortic arches, pulmonary veins, and arteries). The
+controls how  deforms the type-specific anatomies to match with                     correction module intends to model these topological variations that
+this patient-specific anatomy 𝑋 𝑗 . Furthermore, we adopted the idea                 are not due to CHDs. We thus use an additional MLP () to output a
+of position-aware shape encoding (Chen et al., 2021) where the latent                correction vector 𝐜 ∈ R7 at each point 𝐩𝑆 in the shape space, to model
+shape code for shape 𝑋 𝑗 is a latent grid 𝐙𝑗𝑆 . Therefore, we have,                  the anatomical correction for each of the seven cardiac structures:
+       ( (       )     )
+𝐬𝑗 =   𝐩, 𝐳𝑆𝑗 , 𝐭𝑐ℎ𝑑 .                                              (6)            𝐜𝑗 = (𝐩, 𝐳𝐶𝑗 ).                                                                            (11)
+
+We linearly interpolated (i.e. 𝐿𝑒𝑟𝑝) the latent grid at specified points                 Similar to the deformation module, we use positional-aware shape
+to obtain the point-specific shape code, thus 𝐳𝑆𝑗 = 𝐿𝑒𝑟𝑝(𝐩, 𝐙𝑗𝑆 ), where             encoding by sampling the correction code from a latent grid 𝐙𝑗𝐶 ∈
+𝐿𝑒𝑟𝑝(⋅, ⋅) denotes the linear interpolation function. Our spatial latent             R4×4×4×27 , using trilinear interpolation 𝐳𝐶𝑗 = 𝐿𝑒𝑟𝑝(𝐩, 𝐙𝑗𝐶 ). This correction
+code 𝐙𝑗𝑆 ∈ R4×4×4×27 had a spatial dimension of four and a latent                    describes the minor variations of cardiac anatomies at the point loca-
+dimension of 27. We also used Fourier positional encoding (Tancik                    tions that cannot be modeled by simply deforming type-specific cardiac
+et al., 2020) to augment the point coordinates and multiply them with                shapes. Therefore, the final SDF prediction 𝐬𝑗𝑓 , for a point 𝐩𝑗𝑆 in the
+𝐳𝑆𝑗 .                                                                                shape space of patient anatomy 𝑋 𝑗 is,
+                                                                                             ( (         )      )
+3.2.2. Diffeomorphic flow                                                            𝐬𝑗𝑓 =   𝐩𝑗𝑆 , 𝐳𝑆𝑗 , 𝐭𝑐ℎ𝑑 + (𝐩𝑗𝑆 , 𝐳𝐶𝑗 ), where, 𝐳𝐶𝑗 = 𝐿𝑒𝑟𝑝(𝐩, 𝐙𝑗𝐶 ),
+    We leveraged the neural ordinary differential equation (NODE)
+approach (Chen et al., 2018; Hui et al., 2022; Sun et al., 2022) to                                                                                        𝐳𝑆𝑗 = 𝐿𝑒𝑟𝑝(𝐩, 𝐙𝑗𝑆 ). (12)
+learn an invertible deformation between the learned type-specific ge-                   The correction network contains six fully connected layers with 512
+ometries (type space) and patient-specific cardiac geometries (shape                 neurons per layer, connected with leaky ReLU activation function (𝛼 =
+space). Namely, the diffeomorphic flow of patient anatomy 𝑋 𝑗 , namely               0.02). Similar to the type and the shape representation modules, we also
+𝜙(𝐩, 𝐳𝑆𝑗 , 𝑡) ∶ R3 ×R27 ×R → R3 , is the solution to the initial value problem       used Fourier positional encoding (Tancik et al., 2020) to augment the
+of an ODE and describes the trajectory of points moving from their                   point coordinates and multiplied them with 𝐳𝐶 .
+locations 𝐩𝑆 ∈ R3 on the signed distance field of patient anatomy 𝑋 𝑗 at
+𝑡 = 0 to their corresponding locations 𝐩𝑇 ∈ R3 on the signed distance
+                                                                                     3.4. Optimization
+field of the CHD type-specific template at 𝑡 = 𝑇 , so that
+𝜕𝜙(𝐩, 𝐳𝑆𝑗 , 𝑡)                                                                           Leveraging the ground truth anatomies obtained from expert an-
+                 = 𝐯(𝜙(𝐩, 𝐳𝑆𝑗 , 𝑡), 𝐳𝑆𝑗 , 𝑡) s.t.   𝜙(𝐩, 𝐳𝑆𝑗 , 0) = 𝐩𝑗𝑆
+     𝜕𝑡                                                                              notations and the corresponding diagnosis information, we can jointly
+                   and 𝜙(𝐩, 𝐳𝑆𝑗 , 𝑇 ) = 𝐩𝑇 ,                              (7)        learn the generic CHD type representations and the posterior probabil-
+                                                                                     ity distribution of the shape and correction codes that best represent the
+where 𝑣(⋅, ⋅, ⋅) is a smooth function defining a velocity vector at time             patient-specific anatomies. Assuming a prior distribution of the shape
+𝑡 over its domain. The unique solution of Eq. (7) exists if 𝐯(⋅, ⋅, ⋅) is            codes, we can then sample a shape code from this prior distribution to
+Lipschitz continuous. Namely, there exists a Lipschitz constant 𝐿 ∈ R+
+                                                                                     construct synthetic cardiac anatomies for a specific CHD type beyond
+such that, for any 𝐱, 𝐲 ∈ R3 ,
+                                                                                     those included in the training dataset. We followed the DeepSDF auto-
+‖𝐯(𝐱) − 𝐯(𝐲)‖𝑝 ≤ 𝐿‖𝐱 − 𝐲‖𝑝 ,                                              (8)        decoder approach described by Park et al. (2019a), where we jointly
+                                                                                     optimized the network parameters, the shape, and the correction codes
+where ‖ ⋅ ‖𝑝 is the 𝑝−norm for 𝑝 ≥ 1. Our deformation module                         to maximize the joint log posterior over all training shapes. Namely,
+approximates 𝐯(⋅, ⋅, ⋅) using six fully connected layers with leaky ReLU             given a training dataset of CHD patient anatomies {𝑋 𝑗 }𝑁    , we optimize
+                                                                                                                                              𝑗=1
+activation functions (𝛼 = 0.02), and is thus differentiable and Lip-                 the network and latent codes over a set of point coordinates and their
+schitz continuous. We refer the readers to Ma et al. (2022) for the                  ground truth signed distance values so that:
+proof. Therefore, the trajectories of different points will, in theory,
+not intersect with each other. This ensures that flowing mesh points                 𝑋 𝑗 = {(𝐩𝑗𝑆 , 𝐬𝑗𝑔𝑡 ) ∶ 𝐬𝑗𝑔𝑡 = 𝑆𝐷𝐹 𝑗 (𝐩𝑗𝑆 )}.                                                (13)
+
+                                                                                 5
+F. Kong et al.                                                                                                                                 Medical Image Analysis 97 (2024) 103293
+
+
+
+
+Fig. 2. Example ground truth whole heart anatomies for various CHD types. For each example on the top row, a view of the whole heart and two views of the myocardium were
+shown. For each example on the bottom row, views of the whole heart, the atria, and the myocardial were shown. The atria were cut in the middle with the half transparent to
+visualize any the ASDs. The topological features, tricuspid opening (TO), mitral opening (MO), aortic opening (AO), and pulmonary opening (PO), of the myocardium were labeled
+in white boxes. The defects, VSDs and ASDs, were labeled in red boxes.
+
+
+   If we assume that the deformation needed to model patient-specific                          2022) on 𝑑𝑒𝑐 by penalizing the upper bound of its Lipschitz constant.
+                                                                                                                                              ∏
+geometries and the need for additional corrections are independent                             The regularization loss is 𝑙𝑖𝑝 = 𝐿              𝑘 𝑆𝑜𝑓 𝑡𝑃 𝑙𝑢𝑠(𝑙𝑘 ), where 𝑙𝑘 = ‖𝑊𝑘 ‖𝑝
+events, based on the Bayes’ Theorem, the posterior probability of shape                        is the norm of the weight matrix 𝑊𝑘 at layer 𝑘, and 𝑆𝑜𝑓 𝑡𝑃 𝑙𝑢𝑠(𝑙𝑘 ) =
+and correction codes given the training data pairs can be expressed as:                        𝑙𝑛(1+𝑒𝑙𝑘 ) to ensure positive Lipschitz bounds. We normalized the weight
+                                                                                               matrix 𝑊𝑘 with 𝑙𝑘 , and added 𝑙𝑖𝑝 to the objective function to bound
+                         𝑝(𝐙𝑗𝑆 , 𝐙𝑗𝐶 )𝑝𝜃 (𝑋 𝑗 |𝐙𝑗𝑆 , 𝐙𝑗𝐶 )                                     the Lipschitz constant of 𝑑𝑒𝑐 , namely,
+𝑝𝜃 (𝐙𝑗𝑆 , 𝐙𝑗𝐶 |𝑋 𝑗 ) =
+                                     𝑝(𝑋 𝑗 )                                                                        ∑𝑁 (
+                                                                                                                                                                  1
+                   ∝ 𝑝(𝐙𝑗𝑆 , 𝐙𝑗𝐶 )𝑝𝜃 (𝑋 𝑗 |𝐙𝑗𝑆 , 𝐙𝑗𝐶 )                              (14)            argmin               𝑔𝑒𝑜 (𝐬𝑗𝑓 , 𝐬𝑗𝑔𝑡 ) + 𝑔𝑒𝑜 (𝐬𝑗 , 𝐬𝑗𝑔𝑡 ) +     ‖𝐙𝑆 ‖𝐹
+                                                                                                                                                                  𝜎 2
+                                         ∏                                                         𝑗 𝑁       𝑗 𝑁
+                                                                                               𝜃,{𝐙𝑆 }𝑗=1 ,{𝐙𝐶 }𝑗=1 𝑗=1
+                   = 𝑝(𝐙𝑗𝑆 )𝑝(𝐙𝑗𝐶 )                𝑝𝜃 (𝐬𝑗𝑓 |𝐙𝑗𝑆 , 𝐙𝑗𝐶 ; 𝐩𝑗𝑆 ).                                                                             )
+                                                                                                                              1
+                                       𝑗 𝑗
+                                     (𝐩𝑆 ,𝐬𝑓 )∈𝑋 𝑗                                                                       +        ‖𝐙𝐶 ‖𝐹 + 𝜆𝑙𝑖𝑝 𝑙𝑖𝑝 .                          (17)
+                                                                                                                             𝜎 2
+     We assumed the prior distribution over the shape codes and the
+                                                                                                    We note that the shape representation module requires learned CHD
+correction codes to be zero-mean multivariate-Gaussian distributions,
+                                                                                               type-specific implicit templates to reconstruct shapes in the dataset.
+ (0, 𝜎 2 𝐼). The likelihood 𝑝𝜃 (𝐬𝑗𝑓 |𝐙𝑗𝑆 , 𝐙𝑗𝐶 , 𝑋 𝑗 ) is assumed to be
+                                                                                               However, during the early stages of training, the type representation
+                                (                                       )
+𝑝𝜃 (𝐬𝑗𝑓 |𝐙𝑗𝑆 , 𝐙𝑗𝐶 , 𝑋 𝑗 ) = exp −𝑔𝑒𝑜 (𝐬𝑗𝑓 , 𝐬𝑗𝑔𝑡 ) − 𝑔𝑒𝑜 (𝐬𝑗 , 𝐬𝑗𝑔𝑡 ) , (15)                module has yet to learn accurate representations of CHD type-specific
+                                                                                               anatomies. Consequently, it is unable to provide reliable initial tem-
+where 𝑔𝑒𝑜 is the loss function responsible for the accuracy of the                            plates for the shape representation module to deform. Therefore, we
+predicted signed distance values both after the shape deformation                              initialize the type representation module by pre-training it to recon-
+module and after the correction module. In practice, we found that                             struct healthy cardiac anatomy regardless of the input diagnosis vector
+training with occupancy values (i.e. 0 if the signed distance value is                         𝐭𝑐ℎ𝑑 for 500 iterations of gradient descent updates. Furthermore, at the
+negative and 1 if otherwise) at points randomly sampled near shape                             start of training, jointly optimizing the type and the shape represen-
+boundaries resulted in faster convergence than training with signed                            tation modules may interfere with the training of both. Therefore, we
+distance values. Please see Appendix B for point sampling details. This                        alternatively train and freeze the type representation module and other
+agreed with the finding of occupancy fields being easier to learn than                         parts of the networks every five epochs for the first 1000 epochs and
+signed distance fields, as reported in Ouasfi and Boukhayma (2024).                            jointly optimize all network parameters for the remaining 1000 epochs.
+The trained network output continuous fields where shape boundaries                                 During inference, we fix the optimized network parameters 𝜃 and
+were represented by the 0.5-level set rather than the 0-level set in clas-                     estimate the shape and the correction codes, 𝐙𝑆 , 𝐙𝐶 , via Maximum-a-
+sic signed distance fields. We used the L2 norm as the reconstruction                          Posterior:
+loss function, namely, 𝑔𝑒𝑜 (𝐬𝑗𝑓 , 𝐬𝑗𝑔𝑡 ) = ‖𝐬𝑗𝑓 − 𝐬𝑗𝑔𝑡 ‖22 , and 𝑔𝑒𝑜 (𝐬𝑗 , 𝐬𝑗𝑔𝑡 ) =                              ∑ (
+                                                                                               𝐙̂𝑆 , 𝐙̂𝐶 = argmin        𝑔𝑒𝑜 (𝐬𝑗𝑓 , 𝐬𝑗𝑔𝑡 ) + 𝑔𝑒𝑜 (𝐬𝑗 , 𝐬𝑗𝑔𝑡 )
+‖𝐬𝑗 − 𝐬𝑗𝑔𝑡 ‖22 . Therefore, during training, we first sample points near the                               𝐙𝑆 ,𝐙𝐶         𝑗
+                                                                                                                    (𝐩𝑗 ,𝐬𝑔𝑡 )
+surfaces of the heart. At these points, we optimize both the network                                                                   )
+parameters 𝜃, the individual shape codes {𝐙𝑗𝑆 }𝑁        , and correction codes                                1           1
+                                                    𝑗=1                                                   +      ‖𝐙𝑆 ‖𝐹 +    ‖𝐙𝐶 ‖𝐹        .                                    (18)
+{𝐙𝑗𝐶 }𝑁
+      𝑗=1
+          to maximize the joint 𝑙𝑜𝑔 posterior in Eq. (14). The objective                                      𝜎2          𝜎2
+function is as follows,                                                                           To reconstruct unseen shapes, we initialized the shape and cor-
+               ∑(  𝑁
+                                                            1          1
+                                                                               )               rection codes, 𝐙𝑆 , 𝐙𝐶 , for each unseen shape with random numbers
+    argmin         𝑔𝑒𝑜 (𝐬𝑗𝑓 , 𝐬𝑗𝑔𝑡 ) + 𝑔𝑒𝑜 (𝐬𝑗 , 𝐬𝑗𝑔𝑡 ) + 2 ‖𝐙𝑆 ‖𝐹 + 2 ‖𝐙𝐶 ‖𝐹 .   (16)       sampled from Gaussian distribution,  (0, 0.01), and optimized the
+    𝑗      𝑗
+𝜃,{𝐙 }𝑁 ,{𝐙 }𝑁 𝑗=1                                         𝜎          𝜎
+   𝑆 𝑗=1   𝐶 𝑗=1                                                                               shape and correction codes for 200 iterations using the Adam op-
+   To further encourage smooth latent spaces learned by the type                               timizer (Kingma and Ba, 2014) with a learning rate of 0.01. Our
+representation module, we applied Lipschitz regularization (Liu et al.,                        generative model enables the generation of synthetic cardiac anatomies
+
+                                                                                           6
+F. Kong et al.                                                                                                                         Medical Image Analysis 97 (2024) 103293
+
+Table 1                                                                                       on the point coordinates concatenated with the CHD-type and CHD-
+Numbers of patients and cases of CHDs included in the training, validation, and testing
+                                                                                              shape latent codes. We also compared with Neural Diffeomorphic Flow
+splits.
+                                                                                              (NDF) (Sun et al., 2022), a prior approach that applied implicit tem-
+                 ASD    VSD      DORV      PuA     ToF      TGA     Normal      Total
+                                                                                              plates to medical applications but only considered a single implicit
+ Training        26     40       3         12      8        2       13          67
+                                                                                              template with consistent topology. We compared our SDF4CHD method
+ Validation      2      6        1         1       2        1       1           8
+ Testing         18     23       3         7       3        5       4           34
+                                                                                              with this approach to verify the necessity of allowing topological
+                                                                                              variations in modeling CHD anatomies. Furthermore, we conducted
+                                                                                              a comparison between our SDF4CHD, which utilizes a shared model
+                                                                                              to represent all CHD types, and a baseline approach using separate
+with specific CHD abnormalities. During generation, we randomly sam-                          networks for each CHD type. This comparison aimed to validate the
+ple a shape code 𝐙𝑆 from the prior Gaussian distribution  (𝟎, 𝜎 2 𝐼)                         advantages of using a shared representation across CHD types. The
+and specify the desired type code 𝐭𝑐ℎ𝑑 . The type network  will then                         baseline approach involved training a network using data exclusively
+produce the corresponding type-specific template anatomy and the                              from each CHD type to learn and deform a single template tailored
+shape network  will then deform this type-specific template anatomy                          specifically for that CHD type. In all these baselines, the latent codes
+to generate new cardiac shapes.                                                               were obtained in the same manner as our method, ensuring a fair
+                                                                                              comparison. Namely, the same dimension, regularization, and trilin-
+4. Experiments and results                                                                    ear sampling method were applied for all baselines. We also used
+                                                                                              the same point sampling method during both training and testing
+4.1. Datasets                                                                                 to construct the signed distance field predictions for all methods.
+                                                                                              Please see Supplementary Materials for further implementation details
+    In our study, we considered several CHD types that cause abnormal                         of baselines.
+anatomical configurations of the heart chambers and great vessels:
+ventricular septal defects (VSD), atrial septal defects (ASD), Tetralogy                      4.3. Results of representing CHD types
+of Fallot (ToF), d-transposition of the great arteries (TGA), double
+outlet right ventricle (DORV), and pulmonary atresia (PuA). VSDs were                         4.3.1. Learning the generic cardiac anatomies for various CHDs
+defined as isolated defects of the ventricular septum, without further                            We first examined the learned type-specific anatomical templates.
+subcategorization. ToF was defined as the classic constellation of four                       As shown in Fig. 3, our method successfully learned type-specific ge-
+associated defects: anterior maligned VSD, right ventricular outflow                          ometries that represent the typical abnormalities associated with each
+tract obstruction, right ventricular hypertrophy, and overriding aorta.                       CHD type. For instance, it learned to represent a hole in the interven-
+TGA was defined as arterio-ventricular discordance in the absence                             tricular septum for VSD, the discontinuation of the pulmonary artery in
+of atrioventricular discordance and lack of a subpulmonary conus.                             PuA, the transposition of the aorta and pulmonary artery positions in
+DORV was defined as any defect with the presence of a VSD and both                            TGA, the presence of VSD and both subpulmonary and subaortic conus
+subpulmonary and subaortic conus. PuA was defined as discontinuity of                         in DORV, and the existence of VSD, overriding aorta, right ventricular
+the pulmonary artery, regardless of other lesions present. The training                       hypertrophy, and stenosis in the pulmonary outflow tract for ToF. We
+and testing data comes from the public ‘‘imageCHD’’ dataset (Xu et al.,                       note that our method captured both the topological differences in CHD
+2020)1 that includes 110 CT images, the corresponding diagnosis (CHD                          anatomies and the characteristic shape abnormalities specific to each
+type) and ground truth segmentations of seven cardiac structures. Since                       CHD type when compared to healthy anatomy. For example, features
+the ‘‘imageCHD’’ dataset was initially designed for classification, the                       such as right ventricle hypertrophy and a narrowed pulmonary outflow
+provided ground truth segmentations were extremely noisy, posing a                            tract represent shape abnormalities rather than changes in topology.
+significant challenge in accurately differentiating the true defects from                     Therefore, the learned implicit type templates encompassed both the
+noise. Therefore, we manually processed the segmentations under the                           topology and shape abnormalities unique to each CHD type.
+supervision of a radiology expert to remove noise and improve consis-
+tency with diagnostic information (Please see Supplementary Materials                         4.3.2. Modeling the intermediate CHD states
+Fig. A.1 for a visual comparison). Table 1 shows the total number of                              During our training process, we used a vector to represent CHD
+patients we included for training, validation, and testing data splits,                       diagnosis information, indicating whether a patient had specific CHD
+along with the number of CHD cases included in each data split. The                           types through binary values. However, CHDs form a spectrum of related
+ground truth segmentations referred to hereafter are the ground truths                        diagnoses shaped by variations in the timing, nature, and severity of
+after our manual processing (see Fig. 2).                                                     developmental abnormalities during fetal heart development. We show
+                                                                                              that our learned type latent space has demonstrated the ability to
+4.2. Baselines                                                                                encompass intermediate states between different CHD types, effectively
+                                                                                              representing a spectrum of CHDs.
+    The key insights of our SDF4CHD approach include: (1) disentan-                               For instance, CHD conditions of DORV, ToF, and d-TGA all fall
+gling the CHD-type and CHD-shape representation, and (2) leveraging                           under the category of conotruncal defects. These defects can be thought
+the CHD diagnostic information and neural SDFs to represent topo-                             of as existing along a spectrum of conal septum distribution. In simpler
+logical variations across CHD types. We then verify the advantages                            terms, DORV, characterized by the presence of both a subaortic and
+of our approach by comparing it with existing methods discussed in                            subpulmonic conus, can be seen as occupying a position between
+Section 2.3. First, we adapted DeepSDF (Park et al., 2019a), an auto-                         two endpoints: ToF (where there is a subpulmonary conus and no
+decoder approach to represent single-category objects, to represent                           subaortic conus) and d-TGA (where there is a subaortic conus and no
+multiple cardiac structures by predicting a signed distance vector field.                     subpulmonic conus). The variation in conal distribution is responsible
+Then, to verify the advantage of using a disentangled representation                          for the differences in the rotational positions of the great arteries
+between CHD-type and CHD-shape, we implemented a conditional                                  across these three defects. Indeed, it is this spectrum of conal septum
+DeepSDF (CDeepSDF) that directly predicts the SDF point values based                          distribution that makes these diagnoses (ToF, DORV, and d-TGA) an
+                                                                                              ideal template for testing our method’s capability to represent interme-
+                                                                                              diate states along a spectrum. Fig. 4 (top) illustrates the intermediate
+  1
+    Dataset link: https://www.kaggle.com/datasets/xiaoweixumedicalai/imag                     CHD anatomies from a ToF diagnosis to a DORV diagnosis, and from
+echd                                                                                          the DORV diagnosis to a dTGA diagnosis, showing rotating positions
+
+                                                                                          7
+F. Kong et al.                                                                                                                          Medical Image Analysis 97 (2024) 103293
+
+
+
+
+Fig. 3. Cardiac geometries extracted from the learned type-specific SDFs for different CHDs. For each example on the top row, a view of the whole heart and two views of the
+myocardium were shown. Similarly, types on the top row were shown a view of the whole heart and two views of the myocardium, whereas types on the bottom row were shown
+views of the whole heart, the atria, and the myocardium. The atria were cut in the middle with the half transparent to visualize any the ASDs. Arrows highlight the learned
+structural defects for the corresponding CHDs.
+
+
+
+
+Fig. 4. Interpolated cardiac anatomies between ToF and TGA (with VSD) to illustrate that our learned latent space can cover a spectrum of CHD diseases. Top: interpolating the
+diagnosis vectors from ToF to DORV and from DORV to TGA. Bottom: interpolating the diagnosis vectors directly from ToF to TGA. The red circles highlight the structural changes
+in response to CHD-type changes. The topological features, tricuspid opening (TO), mitral opening (MO), aortic opening (AO), and pulmonary opening (PO), of the myocardium
+were labeled in white boxes. VSDs, were labeled in red boxes. Animations of this figure can be found in the supporting material and on our GitHub repository.
+
+
+of the aorta and pulmonary arteries. We note that our method did                           symptoms, which can range from mild to severe, is linked to the extent
+not require the intermediate diagnosis DORV vector to represent this                       of blood flow obstruction originating from the right ventricle to the
+spectrum. Namely, interpolating directly between a ToF diagnosis vec-                      lungs. Pulmonary atresia with VSD is often classified as a severe form
+tor and a TGA diagnosis vector can represent a similar transition in                       of ToF, characterized by the complete constriction of the pulmonary
+cardiac anatomies. This shows that our method can readily repre-                           outflow tract. Fig. 5 (top) illustrates the intermediate CHD anatomies
+sent meaningful intermediate states that correspond to intermediate                        from normal to a ToF diagnosis and from the ToF diagnosis to a PuA
+diagnosis.                                                                                 (with VSD) diagnosis. Along this spectrum, our method captured the
+   Similarly, our method can also encompass intermediate states along                      forming of a large VSD, increasingly overriding aorta, thickening of RV
+a spectrum of disease severity. For instance, the symptoms of ToF can                      myocardium, and the gradual narrowing and ultimate detachment of
+vary significantly from one individual to another. The severity of these                   the pulmonary artery from the right ventricle.
+
+
+                                                                                       8
+F. Kong et al.                                                                                                                             Medical Image Analysis 97 (2024) 103293
+
+
+
+
+Fig. 5. Interpolated cardiac anatomies between normal, ToF (with VSD) and PuA (with VSD) to illustrate that our learned latent space can continuously describe different severities
+of CHD disease. The red circles highlight the structural changes in response to CHD-type changes. The topological features, tricuspid opening (TO), mitral opening (MO), aortic
+opening (AO), and pulmonary opening (PO), of the myocardium were labeled in white boxes. VSDs, were labeled in red boxes. Animations of this figure can be found in the
+supporting material and on our GitHub repository.
+
+
+
+
+Fig. 6. Left: The example of a patient with single ventricle physiology newly included in the training dataset. This patient exhibited hypoplastic left heart syndrome (HLHS),
+characterized by a rudimentary left ventricle with a hypoplastic aortic arch, resulting in the dominant right ventricle as the sole functioning chamber. Right: The learned CHD
+spectrum encompasses normal LV, hypoplastic LV, and single ventricle (rudimentary LV with a single functioning RV).
+
+
+4.3.3. Modeling a new CHD spectrum from a single example                                     trained on the following combinations, Normal, ASD, VSD, VSD+DORV,
+    Some CHD types are rare conditions and it is thus difficult to acquire                   VSD+ToF, ASD+VSD+ToF, ASD+VSD+PuA, VSD+PuA, VSD+TGA,
+many patient data to train machine learning models. Similarly, the                           VSD+DORV+TGA, and ASD+TGA, we evaluated the type representa-
+‘‘ImageCHD’’ dataset also did not include important but rare CHD                             tion module with a new type combination of ASD+VSD+TGA. Fig. 7
+types such as single ventricle diseases or hypoplastic left heart or right                   demonstrated that the CHD type representation module successfully
+heart syndrome. As demonstrated in the previous section, our method                          learned the ASD, VSD, and TGA abnormalities of this new combination.
+can model spectra of related CHD diagnoses without training data                             This shows that our method has the potential to represent unique CHD
+of intermediate diagnosis. Now, we further demonstrate the ability                           type combinations not present in the training data.
+of our method to model a new spectrum of CHD conditions with
+limited training data. Namely, we acquired the cardiac anatomies of
+only one single ventricle (SV) patient, included this patient during                         4.4. Results of disentangled representation of CHD types and shapes for
+training, and appended the new diagnosis of SV to the input diagnosis                        CHD type-controlled generation.
+vector 𝑡𝑐ℎ𝑑 . This patient was diagnosed with hypoplastic left heart
+syndrome (HLHS), characterized by a rudimentary left ventricle with                              A major advantage of disentangling the learned shape and type
+a hypoplastic aortic arch, resulting in the dominant right ventricle                         representations is that we can then manipulate the learned shape and
+as the sole functioning chamber. As demonstrated in Fig. 6, with                             type independently. Fig. 8 shows the results of linearly interpolating
+only one training example of SV, our method effectively captured the                         the shape latent space or type diagnosis code between a patient with
+abnormalities of SV within the learned type space. It represented a new                      normal heart chambers and a ToF patient. When fixing the shape
+spectrum of CHD, encompassing normal anatomy, borderline hypoplas-                           latent code and interpolating type code from normal to ToF, the VSD,
+tic left heart syndrome (HLHS), and severe HLHS leading to single                            overriding aorta, RV hypertrophy, and pulmonary valve stenosis (PS)
+ventricle physiology. The learned spectrum included changes in LV size                       featured in ToF gradually appear, whereas the overall shape of the
+from normal to borderline to hypoplastic and to rudimentary LV, as                           heart remains roughly fixed. When fixing the type latent code and
+well as the progressive narrowing of the ascending aortic arch. This                         interpolating the shape code, our reconstruction preserved the type-
+experiment demonstrated the capability of our method to interpolate                          specific anatomies while only deforming the shape. In contrast, the
+related input-type diagnoses, even with just a single training example.                      baseline method, conditional DeepSDF, lacked the ability to separately
+                                                                                             manipulate learned type and shape anatomies. Specifically, during
+4.3.4. Modeling an unseen combination of CHD types                                           shape interpolation with a fixed type latent code, the topology of the
+   By using a shared neural network to represent cardiac anatomies                           resulting anatomies underwent alterations. Likewise, when interpolat-
+with different CHD combinations, we also observed the potential of                           ing the type code while maintaining a fixed shape code, the resulting
+our trained network to represent new combinations of CHD types                               anatomical structures did not accurately reflect the expected topology
+beyond those included in the training dataset. When the network was                          changes from ToF to normal anatomies.
+
+                                                                                         9
+F. Kong et al.                                                                                                                         Medical Image Analysis 97 (2024) 103293
+
+
+
+
+Fig. 7. Cardiac geometries extracted from the learned type-specific SDFs for two existing combinations (ASD+TGA and VSD+TGA) included in the training dataset, and for a new
+combination (ASD+VSD+TGA) not included in the training dataset.
+
+
+
+
+Fig. 8. Reconstruction results when interpolating the CHD type diagnosis or shape code. The top panels compare the anatomical changes achieved by our approach and conditional
+DeepSDF when keeping the CHD type code fixed and interpolating the shape codes from a normal patient to a ToF patient. In the bottom panels, we compare the anatomical
+changes when keeping the shape codes fixed and interpolating the CHD type codes from normal to ToF. The red boxes highlight that our method produced the expected anatomical
+changes from normal to ToF, whereas the green boxes highlight the incorrect type changes produced by conditional DeepSDF when the type code was fixed. Animations of this
+figure can be found in the supporting material and on our GitHub repository.
+
+
+
+4.4.1. Quality of CHD-type controlled generation                                          manually examined the anatomies of 50 synthesized CHD cases for each
+   We can thus apply our method to generate synthetic anatomies for                       method. While blind to the input CHD types used for generation, we
+rare CHD types, augmenting the amount of available training data for                      diagnosed each synthetic anatomy using the available CHD types in
+these specific CHDs. For example, PuA with VSD is a rare condition                        this study. We then compared these diagnoses with the actual input
+with an incidence of 7 per 100,000 live births (Naimi et al., 2021). Both                 diagnoses used during generation to quantitatively evaluate whether
+acquiring sufficient data for this CHD type and manually segmenting                       the synthetic anatomies are clinically acceptable representations of the
+these data would be challenging. To generate new anatomies with this                      corresponding input CHD types. Each of the 50 cases was generated
+specific CHD type, we fixed the input type diagnosis vector and varied                    by selecting a random type combination and a random shape code.
+the input shape code to the learned PuA (with VSD) type template.                         Table 2 illustrates the number of discrepancies between the actual
+Namely, the shape code was obtained by randomly sampling from the                         input diagnoses used to generate the CHD anatomies and the human
+Gaussian prior distribution. We applied the same treatments to the                        diagnoses based on the generated CHD anatomies. Among the 50 cases,
+conditional DeepSDF for comparison. The left panel of Fig. 9 shows that                   our method effectively generated CHD anatomies that aligned with
+the example cardiac anatomies generated by our method successfully                        human diagnoses, with only 3 exceptions. The majority of the dis-
+preserve the correct cardiac anatomy of PuA (with VSD), whereas the                       crepancies occured when distinguishing between DORV and ToF, two
+right panel shows that the anatomies generated by the conditional                         closely related diagnoses that can be challenging to differentiate even
+DeepSDF failed to preserve the topology.                                                  clinically. Conversely, CDeepSDF synthesized CHD anatomies failed to
+                                                                                          match their human diagnoses in 48 out of 50 cases.
+   We further quantified that the generated CHD anatomies indeed
+contain the specific CHDs the models were asked to produce. We
+
+                                                                                     10
+F. Kong et al.                                                                                                                          Medical Image Analysis 97 (2024) 103293
+
+
+
+
+Fig. 9. Our approach (left) readily enables type-controlled generation for pulmonary atresia with VSD (PuA+VSD). In contrast, conditional DeepSDF struggled to learn the correct
+cardiac topology when conditioned on the CHD diagnosis. The red boxes highlight that our method produced the expected anatomical changes, whereas the green boxes highlight
+the numerous topological errors made by conditional DeepSDF.
+
+
+
+
+Fig. 10. Z-score distributions of the anatomical features (PA diameter and RV myocardium mass) between normal and diseased cohorts synthesized by SDF4CHD. The top left panel
+shows where the PA diameters and RV mass measurements were taken for all synthetic CHD anatomies. The rest of the panels are histograms comparing the Z-score distribution
+of PA diameters between synthesized Normal and ToF anatomies, as well as RV mass between synthesized Normal, ToF, DORV, TGA and PuA cohorts. Each synthesized cohort
+contained 100 cases.
+
+
+
+Table 2                                                                                      cases (Sinha et al., 2019). Furthermore, we compared the RV my-
+Number of incorrect structural abnormalities presented in 50 generated CHD anatomies,
+                                                                                             ocardium mass between virtual cohorts of normal hearts and diseased
+each generated with randomly selected type combinations and a random shape code.
+                                                                                             hearts including ToF, PuA, TGA, and DORV with large VSDs. These
+                 ASD VSD DORV PuA ToF TGA Total # of              Total # of
+                                          incorrect types         patients with
+                                                                                             CHD types are often characterized by right ventricle overloading, re-
+                                                                  incorrect types            sulting in RV hypertrophy (Davlouros et al., 2006; Lu et al., 2014).
+ SDF4CHD 0           0    3     0    1    0     4                 3
+                                                                                             As shown in Fig. 10, our method successfully captured the positive
+ CDeepSDF 22         26   11    19   12   17    107               48                         Z-scores for all these CHD types.
+                                                                                                 However, in addition to ensuring the structural accuracy of the gen-
+                                                                                             erated anatomies, it is essential to assess their plausibility. To quantify
+                                                                                             shape plausibility, we adopted evaluation methods from Kalaie et al.
+   We further utilized clinically meaningful metrics to verify that our
+                                                                                             (2023), comparing the generated shapes to the closest-matched samples
+synthesized virtual cohorts of CHD anatomies successfully captured
+                                                                                             in the training set. Specifically, for each generated anatomy, we com-
+meaningful anatomical abnormalities seen in multiple CHD types in-
+                                                                                             puted the Dice similarity score between it and each training anatomy.
+cluded in this study. We measured the Z-scores of the pulmonary
+                                                                                             The plausibility score for a synthesized anatomy is determined as
+outflow tract diameter, which is often used clinically to evaluate the
+                                                                                             the maximum Dice similarity score among the training data. Table 3
+adequacy of pulmonary arteries in pediatric patients with ToF. We
+                                                                                             compares the plausibility scores between SDF4CHD and using a single
+generated virtual cohorts of 100 normal hearts and 100 ToF hearts by
+                                                                                             network for each CHD type (Single Type), averaged over 30 generated
+randomly sampling the shape space while keeping the corresponding
+                                                                                             anatomies for each CHD type. SDF4CHD consistently demonstrated
+type input vector fixed. As shown in Fig. 10, our method successfully
+                                                                                             higher plausibility scores for all CHD types. Indeed, training a separate
+captured the negative Z-scores for ToF cases compared with normal
+                                                                                             network for each CHD type using the ‘‘ImageCHD’’ dataset means that
+
+                                                                                        11
+F. Kong et al.                                                                                                                                   Medical Image Analysis 97 (2024) 103293
+
+                     Table 3
+                     We compared the shape plausibility of SDF4CHD, which models all CHDs concurrently, with Single Type, which models one CHD type at a
+                     time. The plausibility score is the averaged Dice similarity score of the closest matching training data to the generated anatomies. A higher Dice
+                     score corresponds to better plausibility. For each CHD type, 30 anatomies were generated and evaluated. ‘*’ indicates statistical significance
+                     based on a two-way independent samples t-test.
+                                            ASD                   VSD                   DORV                 PuA                   ToF                   TGA
+                      SDF4CHD               59.0 ± 2.7*           58.0 ± 3.5*           55.6 ± 4.3           58.5 ± 2.0*           58.5 ± 2.3            53.8 ± 3.0*
+                      Single Type           57.3 ± 3.3            52.9 ± 4.3            47.4 ± 5.0           55.1 ± 3.6            57.2 ± 3.5            50.4 ± 4.2
+
+
+                 Table 4
+                 Dice scores for whole heart (WH) and individual cardiac structures in reconstructed geometries compared to different baselines for unseen cases. (*
+                 denotes significant differences in mean values when compared with ‘‘SDF4CHD’’; ! denotes significant differences in mean values when compared with
+                 ‘‘SDF4CHD+Corr’’; we assume p-Values< 0.0125 = 0.05∕4, based on a two-sided paired T-test after Bonferroni correction for four comparisons.)
+                                      WH               LV               RV             LA               RA                 Myo            Ao                PA
+                  SDF4CHD             86.3 ± 2.7       91.4 ± 2.7       88.3 ± 8.0     82.6 ± 5.3       88.8 ± 4.0         88.9 ± 5.5     76.3 ± 12.8       72.1 ± 16.0
+                  SDF4CHD+Corr        88.8 ± 2.0*      91.4 ± 2.7       88.3 ± 7.9     85.5 ± 4.7*      91.9 ± 2.1*        90.0 ± 3.8*    83.0 ± 8.6*       76.7 ± 14.3*
+                  NDF                 87.4 ± 2.5*!     91.6 ± 1.8       88.8 ± 6.7     84.1 ± 6.0*!     89.9 ± 3.1!        90.1 ± 4.5*    77.7 ± 12.5!      73.6 ± 15.1!
+                  CDeepSDF            88.8 ± 2.7*      92.0 ± 2.1       90.5 ± 4.3     85.2 ± 6.2*      91.3 ± 2.8*        90.4 ± 4.0*    84.3 ± 7.7*       71.9 ± 19.5!
+                  DeepSDF             88.8 ± 2.7*      91.9 ± 2.1       90.6 ± 4.2     85.1 ± 6.1*      91.6 ± 2.5*        90.5 ± 3.9*    83.6 ± 7.7*       72.2 ± 18.3!
+
+
+                     Table 5
+                     Comparison of dice scores for whole heart (WH) and individual cardiac structures in reconstructed geometries between our method (SDF4CHD)
+                     and training a single network for each CHD type (ST). The dice scores are evaluated separately for patients who have specific CHD type among
+                     the test dataset. (* denotes significant differences in mean values when compared with ‘‘SDF4CHD’’ for each type.)
+                                            ASD                   VSD                   DORV                  PuA                   ToF                   TGA
+                      SDF4CHD               87.0 ± 2.3            86.8 ± 2.3            86.5 ± 1.3            86.3 ± 1.9            87.8 ± 3.1            86.0 ± 2.4
+                      Single Type           86.8 ± 2.4            87.5 ± 3.0            83.1 ± 1.8            86.1 ± 2.1            86.5 ± 3.1            85.8 ± 4.0
+
+
+
+each network will have access to fewer data, potentially leading to                                  We observed that increasing the dimension of the latent shape code
+a less robust learned shape representation. In contrast, SDF4CHD can                             when reconstructing unseen shapes effectively improved the recon-
+leverage the entirety of the training dataset to learn shape variations                          struction accuracy for all methods. Table 6 presents the Dice scores
+shared across all training data, ultimately generating higher-quality                            for various methods when reconstructing unseen shapes, following the
+shapes.                                                                                          increase in latent code dimensions from 4×4×4×27 to 8×8×8×27. This
+                                                                                                 increase in spatial dimensionality expanded the shape representation
+4.4.2. Quality of CHD shape reconstruction                                                       capacity since the input shape code was tri-linearly sampled at spatial
+    After examining the learned CHD type representation, we evalu-                               point locations to predict deformations (for our SDF4CHD method and
+ated the ability of our method to reconstruct previously unseen CHD                              NDF) or signed distance field values (for CDeepSDF and DeepSDF). In
+anatomies in the testing dataset. To reconstruct unseen shapes, we                               fact, when using an 8 × 8 × 8 × 27 shape code size during inference,
+utilized Maximum-a-Posterior (MAP) estimations of the shape code                                 our method and others achieved higher average Dice scores on unseen
+𝑍𝑠 . Namely, for all methods, the unseen shapes were obtained by                                 shapes compared to using a 4 × 4 × 4 × 27 shape code size on training
+optimizing the shape code (and the correction code for our method) to                            shapes. However, we found that a high-resolution shape code resulted
+minimize the objection function described by Eq. (18) while freezing                             in non-physiological distortions when generating synthetic shapes, and
+the parameters of the trained network. Table 4 compares the Dice                                 we thus chose a dimension of 4 × 4 × 4 × 27 in other experiments. Please
+scores for cardiac anatomies reconstructed for unseen shapes in the                              see Section 4.6 for a detailed discussion.
+testing dataset among different methods. Adding correction signifi-                                  In addition to demonstrating similar accuracy compared to previ-
+cantly improved the accuracy of shape representation for our method,                             ous approaches, our method offers a distinct advantage in producing
+especially for the pulmonary artery, aorta, and atria, which included                            cardiac anatomies that align with CHD diagnoses, as illustrated in
+the pulmonary veins and vena cavae. Indeed, the anatomies of blood                               Fig. 11, which compares example reconstruction results for unseen
+vessels possess significant variations even within the same CHD types.                           cases. The limitation of the NDF approach lies in its inability to handle
+Addressing these additional topological variations presented a chal-                             topological changes due to its reliance on a single implicit template.
+lenge for the deformation network, necessitating the use of correction                           Given that a majority of its training cases feature VSDs, the implicit
+fields. Our method, with correction, achieved a similar shape recon-                             template learned by NDF consistently includes a VSD, rendering it un-
+struction performance compared to CDeepSDF and DeepSDF. Without                                  suitable for reconstructing cardiac anatomies without VSDs. DeepSDF
+correction, our method achieved a similar reconstruction performance                             and CDeepSDF, can both model arbitrary topologies, but sometimes
+with NDF, which also represented shapes by deforming an implicit                                 produce inconsistent topology. For example, these methods incorrectly
+template. We have also evaluated the ability of our method to repre-                             predicted a pulmonary outflow tract in PuA where the pulmonary
+sent existing CHD anatomies in the training dataset. We drew similar                             artery was supposed to disconnect from the right ventricle. They also
+conclusions when comparing our method with the baselines, although                               did not correctly reconstruct smaller VSDs. In contrast, our method,
+CDeepSDF achieved slightly better training accuracy. These evaluations                           by deforming a learned CHD type-specific implicit template that cor-
+can be found in our appendix.                                                                    responded to the disease diagnosis, consistently reconstructed CHD
+    We also conducted a comparison of the reconstruction Dice scores                             anatomies that matched the diagnosis. Our use of a correction network
+for each CHD type included in the testing dataset (first row of Table 5).                        was able to correct inaccuracies, mostly in the reconstruction of blood
+We found comparable reconstruction accuracies across different CHD                               vessels. However, we observed that it sometimes removed half of the
+types. Additionally, we compared the reconstruction accuracy of our                              aorta if the deformation network failed to capture the correct location
+SDF4CHD model with models trained for individual CHD types. While                                of the aorta.
+our method demonstrated slightly better mean reconstruction Dice                                     We further compared the ability of our SDF4CHD method and the
+scores for most CHD types, these differences were not significant.                               baseline methods to reconstruct local VSDs. VSDs were identified in
+
+                                                                                            12
+F. Kong et al.                                                                                                                               Medical Image Analysis 97 (2024) 103293
+
+                 Table 6
+                 Dice scores for whole heart (WH) and individual cardiac structures in reconstructed geometries compared to different baselines for unseen cases when
+                 increasing the latent shape code dimension from 4 × 4 × 4 × 27 to 8 × 8 × 8 × 27. (* denotes significant differences in mean values when compared with
+                 ‘‘SDF4CHD’’; ! denotes significant differences in mean values when compared with ‘‘SDF4CHD+Corr’’; we assume p-Values< 0.0125 = 0.05∕4, based on a
+                 two-sided paired T-test after Bonferroni Correction for 4 comparisons.)
+                                     WH               LV              RV              LA               RA              Myo              Ao              PA
+                  SDF4CHD            92.9 ± 1.3       95.5 ± 0.8      94.1 ± 3.2      90.4 ± 3.9       95.1 ± 1.2      93.9 ± 2.2       88.1 ± 7.0      81.6 ± 15.0
+                  SDF4CHD+Corr       94.2 ± 1.0*      95.5 ± 0.8      94.3 ± 2.3      92.7 ± 3.2*      96.5 ± 0.8*     94.3 ± 1.9*      91.2 ± 5.0*     85.5 ± 12.3*
+                  NDF                93.1 ± 1.5!      95.6 ± 1.0      94.5 ± 2.4      91.1 ± 3.8*!     95.4 ± 1.4!     94.1 ± 2.0*!     87.6 ± 8.0!     82.2 ± 16.6!
+                  CDeepSDF           93.1 ± 1.2!      95.2 ± 0.8*!    94.4 ± 1.3      90.6 ± 4.0!      95.4 ± 1.0!     93.5 ± 2.0*!     91.5 ± 2.1*     82.1 ± 13.6!
+                  DeepSDF            93.0 ± 1.1!      95.1 ± 0.9*!    91.4 ± 17.0     90.5 ± 3.8!      95.5 ± 0.8*!    93.4 ± 2.1*!     91.5 ± 2.1*     82.9 ± 12.1!
+
+
+
+
+Fig. 11. Example reconstruction results for unseen cases. The first and the second columns show the whole heart (WH) and myocardium (Myo) reconstruction, respectively. The
+red boxes highlight that the expected anatomical changes due to CHDs, whereas the green boxes indicate topological errors produced by NDF, Conditional DeepSDF, and DeepSDF.
+The orange boxes highlight that NDF sometimes failed to reconstruct accurate VSD sizes and geometries.
+
+
+the reconstructed cardiac anatomies as regions where the RV blood                               to match the correct location for the unseen anatomy. Fig. 12 (right)
+pool connected with the LV blood pool. To achieve this, we converted                            presents three example cases, including one with a large VSD, another
+the predicted signed distance fields into segmentations and identified                          with a small VSD, and a case with two VSDs. In the case of the large
+regions where the RV blood pool segmentation could be expanded to                               VSD, all methods successfully produced reconstructions that included
+match the LV blood pool segmentation, and vice versa. Fig. 12 (left)                            the VSD. However, when dealing with the small VSD, both CDeepSDF
+presents a comparison of the Dice scores for VSDs in a total of 20                              and DeepSDF failed to detect this defect. We note that accurately recon-
+reconstructed cardiac anatomies with a VSD diagnosis from the unseen                            structing small VSDs when training on global cardiac anatomies poses
+test dataset. Our method, with or without corrections, effectively re-                          a considerable challenge. Our method, leveraging diagnosis priors and
+constructed anatomies with VSDs. In contrast, CDeepSDF and DeepSDF                              CHD type-specific templates, demonstrated more robust performance in
+failed to reconstruct any VSDs in four and six cases, respectively. Since                       capturing these local defects. Nevertheless, our learned VSD template
+NDF deformed a learned implicit template with a VSD, its reconstructed                          anatomies only contained a subaortic VSD, which led to our method’s
+cardiac anatomies all contained a VSD. The zero Dice score for NDF                              failure in reconstructing the apical VSD in the case with both VSDs
+resulted from its inability to accurately deform the VSD in the template                        present. Notably, the correction network did not capture the apical
+
+
+                                                                                           13
+F. Kong et al.                                                                                                                            Medical Image Analysis 97 (2024) 103293
+
+
+
+
+Fig. 12. Left: Box plots showing percentage area and diameter errors for VSDs (n=20) in the test dataset. The colored circles show the percentage errors of all data points. Black
+arrows highlight missed VSD reconstructions (100% error). Right: example VSD reconstructions from different methods. The red regions represent the locations of VSDs where the
+RV blood pool and the LV blood pool meet.
+
+
+
+
+Fig. 13. Example synthetic CT image and segmentation pairs. The top row displays the synthetic data when simulating a CHD-type change from the disease state of PuA and
+VSD to a healthy state. The bottom row displays the synthetic data for a CHD-shape change, that is, deforming a patient-specific geometry to the shape of a healthy patient while
+preserving the CHD type (PuA and VSD). The red arrows highlight the gradual shrinking of VSD from disease to a healthy state, whereas the blue arrows highlight the preservation
+of VSD during shape changes.
+
+
+VSD, and the baseline methods also failed in this regard. This specific                         To verify the effectiveness of our synthetic image-segmentation
+defect was only present in this single test case, while all training shapes                 pairs in improving the segmentation of CHD anatomies from image
+featured subaortic VSDs, causing all trained methods to struggle with                       data, we trained a 3D UNet and a 2D UNet using both real and syn-
+this out-of-distribution defect.                                                            thetic data. The real dataset comprised 67 images, while the synthetic
+                                                                                            data consisted of 420 images (30 per type combination for 14 unique
+                                                                                            combinations included in the dataset). Table 7 presents a comparison
+4.5. Example applications
+                                                                                            of the Dice scores for the whole heart and individual cardiac structures
+                                                                                            evaluated on the test dataset between a 3D/2D UNet trained with both
+4.5.1. Dataset generations for image segmentation                                           real and synthetic data and a 3D/2D UNet trained solely with real
+    Our method can be applied to generate a spectrum of CHD datasets                        data. We observed significant accuracy improvements in all cardiac
+for segmentation and computational simulations. For example, we can                         structures for 2D UNet and in the majority of the cardiac structures
+employ a conditional Generative Adversarial Network (cGAN) (Mirza                           for 3D UNet when training with synthetic data. We note that 3D UNets
+and Osindero, 2014) to synthesize paired CT images from the generated                       generally demonstrated better segmentation accuracy than 2D UNets.
+anatomies. The synthesized images match with the segmentations cre-                         Additionally, we compared the accuracy of VSD reconstruction between
+ated from our generative anatomies, and can thus expand our dataset                         the two differently trained 3D UNets. As illustrated in Fig. 14, the UNet
+on underrepresented and uncommon CHD types. Such an expanded                                segmented VSDs more accurately when trained with synthetic data,
+dataset can be used for training a neural network to improve CHD                            exhibiting lower median VSD area and diameter percentage errors.
+segmentation performance. Fig. 13 illustrates the synthesized image-                        Specifically, the median diameter percentage error reduced from 54%
+segmentation pairs representing intermediate states between ToF and                         to 38%, and the median area percentage error reduced from 72% to
+PuA for patient-specific anatomies. It also showcases deformations                          59%.
+between two patient-specific shapes, with the CHD type held con-
+stant. Specifically, we followed the implementation of Amirrajab et al.
+(2023), which leverages specially designed normalization, known as                          4.5.2. Systematic investigation of CHD pathophysiology using SDF4CHD
+Spatially Adaptive DEnormalisation (SPADE) (Park et al., 2019). Using                       and computational simulations
+this approach, we successfully preserved tissue boundaries described                           Previously, our understanding of CHD pathophysiology, specifically
+in the input conditional segmentation and synthesized stacks of 2D CT                       the impact of CHDs on patients’ cardiac functions, has relied heavily
+images with an appearance similar to a reference CT image.                                  on statistical data from existing patient populations. However, patients
+
+                                                                                       14
+F. Kong et al.                                                                                                                             Medical Image Analysis 97 (2024) 103293
+
+                 Table 7
+                 Comparison of Dice scores for whole heart (WH) and individual cardiac structures evaluated on the test dataset between a 3D UNet trained with real
+                 images from the training dataset and a 3D UNet trained with additional synthetic data generated by SDF4CHD. The bold font highlights the better Dice
+                 score comparing training without and with synthetic data. * denotes significant differences in the mean values based on a two-sided paired T-test.
+                                        WH             LV             RV               LA             RA              Myo            Ao               PA
+                  3D UNet Real          84.7 ± 6.0     85.3 ± 8.0     81.1 ± 10.3      84.0 ± 10.1    87.3 ± 8.3      86.1 ± 5.8     82.1 ± 11.9      70.8 ± 17.0
+                  3D UNet Real+Syn      86.3 ± 5.3*    88.2 ± 5.1*    81.8 ± 11.1      86.6 ± 7.6*    88.8 ± 7.9*     87.1 ± 5.3*    83.8 ± 11.7      73.3 ± 18.8
+                  2D UNet Real          82.1 ± 7.1     84.2 ± 5.7     78.0 ± 12.3      82.0 ± 9.5     86.0 ± 8.5      83.9 ± 7.2     76.3 ± 16.5      64.5 ± 21.2
+                  2D UNet Real+Syn      84.0 ± 6.3*    86.1 ± 7.5*    80.1 ± 11.1*     83.3 ± 9.7*    87.5 ± 6.8*     85.1 ± 7.0*    81.4 ± 12.9*     66.8 ± 20.6*
+
+
+
+                                                                                              shunting reduced. Furthermore, the simulation also captured the in-
+                                                                                              creasing trend of RV pressure overload and flow acceleration due to
+                                                                                              the progressive narrowing of the pulmonary outflow tract.
+
+                                                                                              4.6. Analysis of design choices
+
+                                                                                                 We conducted ablation analyses to understand the effects of design
+                                                                                              choices on our model’s performance. The following two subsections
+                                                                                              describe the effects of several choices on the CHD-type-specific and
+                                                                                              shape-specific representations of cardiac anatomies, respectively.
+
+Fig. 14. Box plots showing the percentage diameter and area errors for VSDs                   4.6.1. Effects of design choices on type-specific representations
+segmented from CT images in the test dataset. The boxes compare the VSD segmentation              Alternatively training the type and shape network helped our method
+accuracy between 3D UNets trained solely with real data (Real) and with real and
+                                                                                              learn the CHD type representations faster and more robustly. While
+synthetic data combined (Real+Syn).
+                                                                                              joint training was able to correctly learn the CHD type-specific anato-
+                                                                                              mies for ToF, PuA, VSD, and normal cases, it failed to correctly
+                                                                                              represent the position changes between the aorta and the pulmonary
+may exhibit unique characteristics across various CHD spectra, present-                       arteries for DORV and TGA, as demonstrated in Fig. 16 (left). Fur-
+ing complex combinations of multiple CHD types, diverse heart shapes,                         thermore, alternative training was able to learn the large VSD and the
+and factors such as age, gender, and coexisting medical conditions.                           discontinued pulmonary artery in PuA before Epoch 200, whereas joint
+These confounding factors can significantly complicate our comprehen-                         training took longer to capture these anatomical abnormalities.
+sion of CHD pathophysiology when relying solely on clinical patient                               We demonstrated that our SDF4CHD model can effectively represent
+CHD cohorts.                                                                                  meaningful intermediate CHD anatomies across the spectrum of related
+    In contrast, using SDF4CHD, we can separately parameterize cardiac                        CHD diagnoses. During our analysis, we identified two design choices
+anatomies to model anatomical changes in CHD types and shapes.                                that may influence the learned CHD spectrum representations. The
+This enables precise control over the generation process, allowing                            first involves the availability of training data for certain CHD types.
+us to produce anatomies at specified points along the CHD spec-                               Despite our model’s ability to represent DORV-like CHD anatomies by
+tra. By combining SDF4CHD with computational simulations, we can                              accepting an interpolated CHD diagnosis between ToF and TGA, we
+conduct physics-based simulations of cardiac function, including elec-                        observed that this behavior was impacted by the inclusion of DORV
+tromechanical and fluid dynamics models, specific to the generated                            patients in the training dataset. Specifically, as shown in Fig. 17, when
+CHD cardiac anatomies. This approach facilitates a comprehensive                              DORV patients were excluded, the type network learned a different
+exploration of cardiac function resulting from specific CHDs, while                           spectrum, no longer capturing the same DORV-like shape. Our method
+effectively isolating the effects of other confounding variables.                             demonstrated the potential to represent CHD spectra with limited data,
+    For example, we performed computational fluid dynamics (CFD)                              as evidenced by our experiment of learning the spectrum of LV size
+simulations to simulate the ejection phase of the ventricles within                           changes by including only one single ventricle example. However, we
+CHD anatomies characterized by a progressive increase in VSD size                             believe the inclusion of more CHD types and their intermediate states
+and pulmonary stenosis severity. The meshes used in simulations were                          in the training set would enhance the network’s ability to learn more
+automatically created from CHD anatomies that interpolate between                             accurate representations of CHD spectra.
+Normal and pulmonary atresia with a VSD diagnosis while keeping the                               Furthermore, we found the type encoder to be useful in learning
+shape code fixed. Please refer to Appendix C for details on moving-                           the correct intermediate topology changes (e.g., rotation of the relative
+domain mesh generations and CFD simulations. Briefly, we applied the                          positions of the aorta and the pulmonary artery from ToF to TGA).
+Arbitrary Lagrangian-Eulerian (ALE) formulation of the incompressible                         Fig. 17 demonstrated that when the type encoder was removed, the
+Navier–Stokes equations with a stabilized FE finite-element Galerkin                          network failed to learn the correct rotational changes between the aorta
+method implemented in the open-source software solver svFSI (Zhu                              and pulmonary positions. We suspect that the non-linearity introduced
+et al., 2022) to simulate the intraventricular flow and account for the                       by the type encoder helps capture the more complicated anatomical
+moving boundary.                                                                              changes among CHD types.
+    Fig. 15 illustrates the impact of concurrently increasing the size                            Furthermore, we observed that applying Lipschitz regularization to
+of ventricular septal defects (VSDs) and reducing the diameter of the                         the type network and initializing the type network by pre-training it to
+pulmonary outflow tract on the pressure and velocity fields within the                        reconstruct healthy cardiac anatomy, regardless of the input diagnosis
+ventricles during cardiac contraction. By solely varying CHD types,                           vector, can reduce the presence of noisy isolated islands in the learned
+the simulated outcomes depict the influence of CHD types on cardiac                           CHD type-specific anatomies, as demonstrated in Fig. 18. However,
+functions, effectively isolating the contribution of patient-specific shape                   such artifacts can be easily corrected by a post-processing step where
+variations. The simulated pressure field revealed a pressure difference                       we only kept the largest connected component of a cardiac structure.
+between LV and RV when the VSD was smaller, resulting in flow                                 We did not observe any notable effects of Lipschitz regularization and
+shunting between the two ventricles through the VSD. As the VSD                               initialization when interpolating among different CHD type-specific
+size increased, the RV and LV pressure balanced out, and the flow                             templates.
+
+                                                                                         15
+F. Kong et al.                                                                                                                          Medical Image Analysis 97 (2024) 103293
+
+
+
+
+Fig. 15. Simulated pressure field (right) and velocity streamlines (left) for CHD anatomies with increasing severity of VSD and pulmonary stenosis (PS) using CFD. The top and
+bottom rows show two different views of the simulation results.
+
+
+
+
+Fig. 16. The resulting learned CHD type-specific templates obtained from joint training and from alternative training the shape and type networks, respectively. Left: The final
+templates for DORV and TGA. Right: The templates for DORV and PuA after various epochs during training. Orange arrows highlight CHD abnormalities that were better captured
+by using alternative training.
+
+
+
+4.6.2. Effect of design choices on shape-specific representations                          Therefore, we chose a latent dimension of four for our shape codes to
+                                                                                           achieve a balance between reconstruction and generation performance.
+    We observed that the spatial resolution (i.e. dimension) of latent                         We then verified our choice of using NODE to deform the type
+shape codes significantly affects the reconstruction accuracy (Fig. 19).                   template by naturally learning an invertible flow field without ex-
+Specifically, higher-dimensional or spatially-resolved shape codes ex-                     plicitly incorporating diffeomorphic constraints. Fig. 21 compares our
+hibit greater precision in reconstructing previously unseen geometries.                    currently adopted approach with a traditional approach of directly
+This is because, when we perform linear interpolation on cubical shape                     predicting displacements on mesh vertices, as adopted in Kong and
+codes, a higher spatial resolution results in more distinct values among                   Shadden (2022). Since the networks were trained by transforming
+the shape latent vectors at closely located points. Consequently, this                     from shape to type space, learning an invertible flow enabled our
+encourages the deformation network  to capture finer details. We no-                      method to readily invert the deformation and deform a mesh created
+ticed that the spatial resolution of the latent shape code during training                 in the type space to the shape space. This enabled our approach
+had minimal impact on reconstruction accuracy. Specifically, training                      to generate patient-specific meshes for computational simulations by
+with a low-resolution shape code of 23 produced similar reconstruction                     deforming a template mesh created from the type-specific SDF. Fur-
+accuracy as training with a high-resolution shape code of 83 when both                     thermore, deformation under an invertible flow prevents intersections
+trained models were tested with the same resolution of shape code (83 ).                   of point trajectories, thereby preventing inverted mesh elements. We
+However, a high-resolution shape code would require a larger dataset                       used TetGen (Si, 2015) to detect surface intersections on synthetic
+to effectively learn a latent space exclusively comprising physiological                   whole-heart meshes, each of which contained about 20 K mesh vertices.
+shapes. Notably, when generating synthetic cardiac anatomies, an 83                        Table 8 shows that predicting the displacements produced surface self-
+high-resolution shape code resulted in non-physiological distortions.                      intersections, whereas using NODE produced 0 intersections. Fig. 20
+
+                                                                                      16
+F. Kong et al.                                                                                                                               Medical Image Analysis 97 (2024) 103293
+
+
+
+
+Fig. 17. A comparison of the ToF to TGA spectra learned by SDF4CHD when (1) trained with the original dataset containing DORV patients, (2) when trained without DORV
+patients, and (3) when trained with the original dataset but with the type encoder 𝑒𝑛𝑐 removed and 𝑡𝑐ℎ𝑑 input directly into the type decoder 𝑑𝑒𝑐 . Both the DORV patients used
+during training and 𝑒𝑛𝑐 contributed to correctly representing the ToF-DORV-TGA spectrum.
+
+
+
+
+                   Table 8
+                   Percentage of intersected mesh elements for synthetic meshes. The meshes were generated by deforming CHD type-specific template meshes,
+                   either using predicted invertible flow fields (NODE) or using directly predicted displacements (Displacement) on mesh vertices.
+                                          LV                  RV                  LA                  RA             Myo            Ao               PA
+                     NODE                 0.0 ± 0.0           0.0 ± 0.0           0.0 ± 0.0           0.0 ± 0.0      0.0 ± 0.0      0.0 ± 0.0        0.0 ± 0.0
+                     Displacement         0.22 ± 0.37         0.28 ± 0.37         0.2 ± 0.24          0.18 ± 0.23    0.16 ± 0.24    0.47 ± 0.59      0.26 ± 0.23
+
+
+
+                                                                                                      and computational simulations, hold promise in improving CHD pa-
+                                                                                                      tient care. Nonetheless, due to the rarity of CHDs, there exists a
+                                                                                                      significant challenge in assembling adequate patient cohorts and as-
+                                                                                                      sociated ground truth data to fully harness the potential and validate
+                                                                                                      these techniques. Generative DL methods can model the distribution
+                                                                                                      of cardiac anatomies from a training dataset. They can thus create
+                                                                                                      an unlimited number of synthetic anatomies by drawing from the
+                                                                                                      learned distribution. However, prior generative DL methods are only
+                                                                                                      suitable for normal cardiac anatomies and cannot model the diverse
+                                                                                                      anatomical abnormalities seen in CHDs. We thus develop a novel gen-
+                                                                                                      erative DL approach that represents CHD cardiac anatomies in a CHD-
+                                                                                                      type and CHD-shape disentangled manner. Leveraging readily available
+                                                                                                      CHD diagnosis information, our approach uses an SDF-based type-
+                                                                                                      representation module to model the corresponding type-specific cardiac
+                                                                                                      abnormalities and uses deformation and correction modules to repre-
+Fig. 18. A comparison among the resulting CHD type-specific templates learned from
+training the type network with Lipschitz regularization (𝜆𝑙𝑖𝑝 = 1𝑒−8 , 𝜆𝑙𝑖𝑝 = 1𝑒−10 ), without        sent patient-specific variations of cardiac shapes. Our method uniquely
+Lipschitz regularization, without Lipschitz regularization or type initialization. The top            enables type-controlled representation, generation, and reconstruction
+row shows the original learned template, and the bottom row shows the corresponding                   of cardiac anatomies for a range of complex CHDs.
+template after post-processing (i.e. extracting the largest connected components).
+                                                                                                          Our method introduces topological variations in the representation
+                                                                                                      of cardiac anatomies, an important and previously unaddressed con-
+                                                                                                      sideration for modeling CHD. Previous studies have largely focused
+shows example deformed meshes of specific CHDs for simulations. The                                   on cardiac diseases such as hypertrophic cardiomyopathy (Biffi et al.,
+generated meshes within a CHD type also have semantic correspon-                                      2019), myocardial infarction (Beetz et al., 2022), and dilated cardiomy-
+dence, as indicated by the texture map that is created based on global                                opathy (Gómez et al., 2021), where the topology and arrangement of
+vertex IDs, and which shares the same connectivity as the type-specific                               cardiac structures typically remain conventional, with abnormalities
+template mesh.                                                                                        primarily confined to changes in shape. Furthermore, our CHD-type
+                                                                                                      and CHD-shape disentangled representation uniquely supports CHD
+                                                                                                      type-controlled generation of cardiac anatomies for downstream ap-
+5. Discussion
+                                                                                                      plications, such as image segmentation and computational simulations
+                                                                                                      tailored to specific CHD cases. Our method achieves this using a single
+    CHDs are uncommon conditions that can significantly impact a                                      trained network, by automatically learning SDFs to represents generic
+patient’s cardiac function, often necessitating specialized expertise for                             anatomical templates corresponding to different CHDs. In contrast,
+diagnosis, treatment planning, and surgical interventions. Computer-                                  previous methodologies, such as NDF (Sun et al., 2022) and HeartDe-
+assisted methods, such as 3D printing, visualization, image analysis,                                 formNet (Kong and Shadden, 2022), assume a single topology, which
+
+                                                                                                 17
+F. Kong et al.                                                                                                                             Medical Image Analysis 97 (2024) 103293
+
+
+
+
+Fig. 19. Left: Effect of latent shape code dimension on cardiac shape reconstruction. The top panel shows box plots of whole heart Dice scores evaluated on the test set when
+testing with latent shape code of various dimensions for a model trained on a latent shape code dimension of 43 , and when testing with the same latent shape code dimension
+of 83 after being trained with latent shape codes of various dimensions. The bottom left panel shows a qualitative comparison between reconstructing shapes using shape code
+dimensions of 83 and 43 (with or without the correction module), respectively. Black arrows highlight areas where the correction network improved reconstruction accuracy. Orange
+arrows highlight areas where the shape module produced more accurate deformation using a shape code dimension of 83 than 43 . Right: Effect of latent shape code dimension
+on cardiac shape generation where random shape codes of different dimensions (23 , 43 , 83 ) were sampled from Gaussian prior distributions of  (0, 0.012 𝐼) to generate synthetic
+cardiac anatomies.
+
+
+
+
+Fig. 20. Cardiac meshes generated by deforming a DORV-type-specific mesh template. Textures were mapped based on mesh vertex IDs showing semantic correspondence among
+generated meshes.
+
+
+
+
+may require separate dataset training or manual design of distinct                           encompass a wide and continuous spectrum of topological variations
+mesh templates for different CHDs, respectively. By deforming the                            across different defect types originating from abnormal fetal heart de-
+learned generic templates, our method also exhibited advantages in                           velopment. A Lipschitz-regularized SDF can effectively capture gradual
+reconstructing patient cardiac anatomies with improved consistency                           and smooth changes in anatomical abnormalities. We have shown that
+with the CHD diagnosis.                                                                      when linearly interpolating the input CHD-type vector, our method
+    We demonstrate the effectiveness of implicit SDF-based anatomy                           can accurately represent the anatomical changes that align with in-
+representation in modeling CHD hearts. Specifically, it empowers us                          termediate diagnoses. The ability to handle potential CHD topological
+to model the diverse topologies and arrangements of cardiac structures                       variations, even with limited training data, is valuable in addressing
+in CHDs while representing intermediate CHD states beyond the scope                          the challenge of acquiring diverse CHD types for training data due to
+of binary diagnoses. Although CHD diagnoses are typically viewed                             their extreme rarity.
+as categorical, it is important to acknowledge that CHD anatomies
+
+                                                                                        18
+F. Kong et al.                                                                                                                         Medical Image Analysis 97 (2024) 103293
+
+
+                                                                                                dimensions, respectively. While our current demonstration focuses on
+                                                                                                only optimizing the shape codes to reconstruct unseen geometries,
+                                                                                                we note that the type code can also be optimized in conjunction
+                                                                                                with the shape codes to place each patient along the spectrum of
+                                                                                                CHDs. In the future, the learned type and shape codes can be used
+                                                                                                for morphological analysis of CHD hearts by correlating them with
+                                                                                                patients’ cardiac function and surgical outcomes. Such analysis can
+                                                                                                identify anatomical biomarkers that can inform cardiac function and
+                                                                                                surgical outcomes for CHD patients (Farrar et al., 2016; Govil et al.,
+                                                                                                2023b; Tang et al., 2022; Mauger et al., 2021). Notably, compared
+                                                                                                with preceding studies that intertwine the CHD spectrum with shape
+                                                                                                variations when identifying biomarkers, our method potentially al-
+                                                                                                lows separate consideration of the CHD spectrum and patient-specific
+                                                                                                shape variations. Our approach thus has the potential to enhance the
+                                                                                                interpretability of CHD morphological analysis.
+                                                                                                     We generated the whole heart cardiac meshes by extracting the
+Fig. 21. Comparison between predicting an invertible flow field (bottom) and pre-
+dicting displacements directly (top) to deform shapes. From left to right shows the             zero-level-set surface mesh of the learned generic type-specific SDF and
+patient-specific meshes extracted from the signed-distance field at the shape space, the        deforming the mesh differently using shape codes randomly sampled
+CHD type-specific meshes obtained by deforming the patient-specific mesh to the type            from a Gaussian prior distribution. However, since the deformation
+space, and the reconstructed patient-specific meshes obtained by deforming the CHD              network acts on any points in the space, one can also readily de-
+type-specific mesh back to the shape space. The zoomed-in panels highlight that by
+                                                                                                form a different mesh adapted from the zero-level-set surface mesh
+using a NODE, we prevented the mesh intersections resulting from directly predicting
+the displacements.                                                                              for various computational applications. For example, one could edit
+                                                                                                the template mesh to create simulation-ready mesh templates so that
+                                                                                                following deformation, the resulting meshes can readily be used for
+                                                                                                computational simulations of electrophysiology, active contraction, and
+    We note that our method captures both the topological abnormality
+                                                                                                fluid dynamics within the heart. Compared with our prior approach
+and the shape abnormality in its type representation module. For
+                                                                                                that deforms a template mesh by directly predicting displacements,
+example, our type representation for ToF captured the thickening of
+                                                                                                we demonstrated that using a NODE approach to deform a mesh in
+the right ventricular myocardium and the narrowing of the pulmonary
+                                                                                                a diffeomorphic manner can effectively reduce mesh artifacts such as
+outflow tract. Here, the shape variations captured in the type repre-
+                                                                                                surface intersections. However, the predicted diffeomorphic mapping
+sentation module are responsible for characteristic shape features of
+                                                                                                does not guarantee that the deformed mesh elements will have strictly
+the particular disease types, whereas the shape variations captured
+                                                                                                positive Jacobian values, since the learned diffeomorphism can contain
+in the shape latent codes and the deformation network are (assumed
+                                                                                                sinks, making the points nearby converge to the same location. Indeed,
+to be) independent of diseases. Our ability to capture both the CHD-
+                                                                                                Narayanan et al. has reported that deformations applied by NODE can
+shape and the CHD-type abnormalities for specific cardiac diseases
+                                                                                                still lead to self-intersections for meshes of thin-wall structures, such
+originates from, perhaps counterintuitively, the CHD-type and CHD-
+                                                                                                as vessel and atrium walls. Although we did not observe this issue for
+shape disentangled design. Namely, our deformation network morphs
+                                                                                                cardiac structures modeled in this study, our method can be readily
+the generic CHD-type templates to match the cardiac anatomies for
+                                                                                                adapted to include the regularization loss developed by Narayanan
+different diseases in the training dataset. Since the prior distribution
+                                                                                                et al. (2024) to further applications on those thin-wall structures.
+of the shape codes is assumed to follow the Gaussian distribution
+                                                                                                Such regularization penalizes vanishing volumes during training and
+independent of CHD types, the deformation network is biased towards
+                                                                                                test-time optimization, thus preventing sinks and the resulting mesh
+only modeling the patient-specific shape variations that are not due
+                                                                                                self-intersections.
+to CHDs. Therefore, our CHD-type representation module is forced to
+capture the typical shape and type abnormalities for each disease type
+                                                                                                5.1. Limitations
+in the training dataset.
+    An immediate advantage of the CHD-type and shape disentangled                                    We assumed that the shape codes follow the same Gaussian prior
+design is that the represented generic CHD-type anatomies for dif-                              distribution for all CHD types. This is a simplifying assumption con-
+ferent CHD types are aligned in space, and the differences in their                             sidering the limited training dataset that we currently have. Indeed,
+anatomies are primarily attributed to the corresponding abnormalities                           although the CHD type-representation module can capture typical CHD-
+for the different CHDs. Therefore, by applying the same patient-specific                        related shape abnormalities, the patient-specific shape distributions
+shape code and changing the type code, we can readily visualize the                             of cardiac anatomies may still differ for different CHD types. For
+anatomical changes corresponding to various degrees of defects in                               example, the pulmonary arteries of patients with PuA pose a much
+the same patient-specific cardiac geometries. This could also benefit                           wider range of variations compared with normal patients in terms of
+clinical education, since the current education is mostly based on                              the numbers, locations, and orientations of major branches. However,
+visualizations of 3D patient-specific geometries, confounding the CHD                           it is challenging to fully capture such variations in shape distributions
+type-specific variations with the patient-specific shape variations. Fur-                       using only a few training samples for each CHD type. Nevertheless,
+thermore, our type encoding module can potentially represent anatomy                            if a larger dataset for CHD patients such as Xu et al. (2023) can be
+changes before and after surgical repairs, for example, the insertion of                        made available, our method can easily be adapted to learn CHD type-
+intracardiac patches to close VSD or septate the heart in DORV (Backer                          conditioned shape distributions. Namely, Biffi et al. (2019) learned the
+and Mavroudis, 2003), and the arterial switch operation to swap the                             shape latent distribution differences between HCM and healthy cases
+pulmonary artery and aorta positions in TGA (Quinn et al., 2008).                               by training another network to discriminate HCM shape codes from
+Therefore, our method can potentially be applied to visualize and ex-                           healthy shape codes. We can adapt this approach to perform CHD-
+amine the cardiac anatomies following surgical operations for specific                          type classification tasks in the latent shape code space. This will result
+patients, thereby facilitating surgical planning.                                               in a well-separated latent shape code distribution for different CHD
+   Our method can represent a patient-specific CHD anatomy using a                              types. Our method can thus be extended for analyzing shape variation
+type code and a shape code along the type-specific and shape-specific                           differences among various CHD types in the future.
+
+                                                                                           19
+F. Kong et al.                                                                                                         Medical Image Analysis 97 (2024) 103293
+
+
+    Both our method and the baseline methods encountered difficulties            Declaration of competing interest
+in representing smaller vessel branches, such as those connected to
+the aorta, pulmonary veins, and pulmonary arteries. This is primarily                The authors declare that they have no known competing finan-
+because these vessel branches are significantly smaller in size compared         cial interests or personal relationships that could have appeared to
+to cardiac structures and are less represented during joint training             influence the work reported in this paper.
+with the larger structures. Specifically, points near the boundaries
+of larger structures, such as the heart chambers and great vessels,              Data availability
+were more frequently sampled than points near the smaller vessel
+branches during training to compute the reconstruction loss. However,               Data will be made available on request.
+our method primarily focused on reconstructing CHD cardiac anatomies
+of the chambers and great vessels rather than vessel branches. Recent            Acknowledgments
+work on generative modeling using implicit methods to model aortic
+vessel branches (Wiputra et al., 2022) could be integrated with ours to             This work was supported by NSF 1663671, NIH R01EB029362, NIH
+generate more comprehensive anatomies of the heart.                              R01LM013120, and NIH R38HL143615. We thank Allyson Weiss for
+    We primarily focused on CHD types represented in the ‘‘ImageCHD’’            her assistance with creating ground truth segmentation.
+dataset and emphasized defects in the chambers and great vessels. How-
+ever, many additional CHD types, such as hypoplastic right/left heart            Appendix A. Processing of ‘‘imageCHD’’ dataset
+syndrome, aortic atresia, double inlet left ventricle, atrioventricular
+canal defect, etc., were not included in our study. Future work will                 The ground truth segmentation provided by the ‘‘imageCHD’’ dataset
+involve adding more CHD types to the training dataset to enable our              (Xu et al., 2020) had a few limitations. First, the images and seg-
+method to represent a wider variety of CHD types. Additionally, while            mentations provided did not contain slice spacing information, which
+our current experiments have focused on generating CHD anatomies                 caused some hearts in the original dataset to be un-physiologically flat
+based on CHD type and patient-specific shape, we have not extensively            along a certain axis. We assigned spacing values to the segmentation
+explored generative modeling of vessel connection variations handled             volumes so that a heart spans the same length when measured along
+by the correction module. Generative modeling of vessel branches                 axial, sagittal, and coronal axes for each volume. Moreover, the seg-
+can be further investigated in future work. However, since patients’             mentations included numerous small vessel branches that were outside
+vessel connections, regardless of CHD type, are diverse, recent work             the scope of modeling cardiac defects. Therefore, we applied Gaussian
+in synthetic vascular network generation based on physical princi-               smoothing with a standard deviation of 2 mm to eliminate these smaller
+ples (Sexton et al., 2023) in combination with data-driven approaches,           vessel branches. Additionally, the myocardium segmentations in the
+could be explored to create realistic vascular connections beyond the            dataset exhibited noise, with the presence of trabeculae structures and
+great vessels                                                                    undesired holes and gaps near the atrium and great vessel openings,
+                                                                                 which were unrelated to CHDs. We manually corrected these artifacts,
+6. Conclusions                                                                   removing noise to ensure that the resulting myocardium segmentations
+                                                                                 aligned with the provided diagnosis and image data. We used the
+    We have introduced a novel deep-learning approach that learns                ‘‘Segmentation Editor’’ tool in 3D Slicer to process the segmentation
+a CHD-type and CHD-shape disentangled representation of cardiac                  (see Fig. A.1).
+geometry for major CHD types. Our approach implicitly represents
+type-specific anatomies of the heart using neural SDFs and learns                Appendix B. Implementation and optimization details
+an invertible deformation for representing patient-specific shapes. In
+contrast to prior generative modeling approaches designed for nor-                   All neural networks in SDF4CHD were implemented using six fully
+mal cardiac topology, our approach accurately captures the unique                connected layers with leaky ReLU activation functions (𝛼 = 0.02).
+cardiac anatomical abnormalities corresponding to various CHDs and               Each layer contains 512 neurons. We used six Fourier encoding func-
+provides meaningful intermediate CHD states to represent a wide CHD              tions (Tancik et al., 2020) for 𝑑𝑒𝑐 and four encoding functions for 
+spectrum. When provided with a CHD-type diagnosis, our approach                  and  to augment the input coordinate values.
+can create synthetic cardiac anatomies with shape variations, all while              For DeepSDF, we utilized the default implementation and training
+retaining the specific abnormalities associated with that CHD type.              configuration (Park et al., 2019a), employing eight fully connected lay-
+We demonstrated the ability to augment image-segmentation pairs for              ers, each consisting of 512 neurons. We also used a residual connection
+rarer CHD types to significantly improve cardiac segmentation accuracy           from the input to the fourth layer. In the case of conditional DeepSDF,
+for CHD patients. We can also generate synthetic CHD meshes for                  we adopted the same 𝑒𝑛𝑐 implementation as in SDF4CHD for encoding
+computational simulations and systematically explore the effects of              the diagnosis information, which was subsequently concatenated with
+structural abnormalities on cardiac functions. In the future, we plan            the shape code. For NDF, we employed the same 𝑑𝑒𝑐 implementation
+to explore applying this approach to facilitate virtual surgery planning,        as in SDF4CHD to predict the template SDF, which was then deformed
+image segmentation, classification, shape analysis, and computational            using a deformation network implemented in the same manner as .
+simulations of cardiac function for CHD patients.                                Using the same network implementation ensured a fair comparison
+                                                                                 between the baselines and our method to verify the advantages of
+CRediT authorship contribution statement                                         our CHD-type and shape disentangled design. Furthermore, we applied
+                                                                                 the same number of encoding functions, latent code dimensions, and
+   Fanwei Kong: Conceptualization, Data curation, Formal analysis,               training procedures for all methods to maintain a fair comparison.
+Investigation, Methodology, Software, Validation, Visualization, Writ-               The network parameters, shape codes, and correction codes were
+ing – original draft, Writing – review & editing. Sascha Stocker:                computed by minimizing the total loss function using the Adam stochas-
+Methodology, Software, Writing – original draft. Perry S. Choi: Con-             tic gradient descent algorithm (Kingma and Ba, 2014). The initial
+ceptualization, Data curation, Writing – review & editing. Michael Ma:           learning rate was set to be 0.0001, while 𝛽1 and 𝛽2 for the Adam algo-
+Supervision, Writing – review & editing, Resources. Daniel B. Ennis:             rithm were set to 0.5 and 0.999, respectively. We sampled 16384 points
+Supervision, Writing – review & editing, Resources. Alison L. Mars-              during each gradient descent update. The points were sampled from a
+den: Conceptualization, Funding acquisition, Resources, Supervision,             probability distribution based on their distance from the boundaries of
+Writing – review & editing.                                                      the cardiac structure, with the points located on the cardiac boundaries
+
+                                                                            20
+F. Kong et al.                                                                                                                               Medical Image Analysis 97 (2024) 103293
+
+
+
+
+                               Fig. A.1. Comparison of ground truth segmentations provided by the ‘‘ImageCHD’’ dataset and after manual processing.
+
+
+                 Table S.1
+                 Dice scores for whole heart (WH) and individual cardiac structures in the represented seen geometries compared to different baselines. (* denotes
+                 significant differences in mean values when compared with ‘‘SDF4CHD’’; ! denotes significant differences in mean values when compared with
+                 ‘‘SDF4CHD+Corr’’; we assume p-Values< 0.0125 = 0.05∕4, based on a two-sided paired T-test after Bonferroni Correction for 4 comparisons.)
+                                     WH             LV              RV              LA                RA              Myo              Ao               PA
+                  SDF4CHD            89.7 ± 1.5     94.3 ± 2.2      92.5 ± 2.2      86.3 ± 3.9        90.4 ± 2.8      90.7 ± 3.1       84.4 ± 7.4       75.5 ± 14.3
+                  SDF4CHD+Corr       91.8 ± 1.0*    94.3 ± 2.1      92.6 ± 2.2*     90.2 ± 2.4*       93.5 ± 1.7*     91.5 ± 2.6*      89.2 ± 4.1*      82.7 ± 8.5*
+                  NDF                90.1 ± 1.5*!   94.2 ± 2.4      92.4 ± 2.0      87.9 ± 3.9*!      90.8 ± 2.8!     91.0 ± 2.7       84.6 ± 7.2!      77.1 ± 13.7*!
+                  CDeepSDF           92.1 ± 0.7*!   95.5 ± 1.2*!    94.5 ± 1.3*!    89.9 ± 2.5*       93.3 ± 1.3*     92.3 ± 1.9*!     88.7 ± 3.6*      80.9 ± 10.8*!
+                  DeepSDF            91.8 ± 0.8*    95.5 ± 1.2*!    94.3 ± 1.3*!    89.1 ± 2.8*!      93.3 ± 1.5*     92.1 ± 2.0*!     88.3 ± 4.6*!     80.0 ± 11.2*!
+
+
+
+                                                                                              we first freeze the trained network and optimize shape code 𝑍𝑆 to
+                                                                                              morph the type-specific anatomy to match the patient-specific anatomy
+                                                                                              obtained from the first time point of the time-series image data. We
+                                                                                              then freeze both 𝑍𝑆 and the network and optimize 𝑍𝑡𝑖𝑚𝑒 to match the
+                                                                                              deformed type-specific anatomy to the patient anatomy at all other
+                                                                                              time points. We create template meshes containing the ventricles and
+                                                                                              the aorta and pulmonary outflow tracts from the CHD type-specific
+                                                                                              anatomies using SimVascular Python API.
+                                                                                                  We created volume meshes at the start of systole and simulated
+                                                                                              the ejection phase of the ventricles. Cubic spline interpolation was
+                                                                                              applied to obtain 500 interpolated meshes to impose the movement
+                                                                                              on the volume mesh. We applied the Arbitrary Lagrangian-Eulerian
+                                                                                              (ALE) formulation of the incompressible Navier–Stokes equations with
+                                                                                              a stabilized FE finite-element Galerkin method implemented in the
+                                                                                              open-source software package svFSI to simulate the intraventricular
+                                                                                              flow and account for the moving boundary. Pressure boundary condi-
+Fig. B.1. Example point cloud sampled during training. On the left, the point cloud is
+overlaid with ground truth whole heart surfaces. On the right, a cross-sectional view
+                                                                                              tions of 100 and 20 mmHg were assumed at the aorta and pulmonary
+shows the point cloud and surfaces sliced at a plane. The blue points are outside the         outlets, respectively, for all anatomies.
+heart, while the orange points are inside the heart.
+                                                                                              Appendix D. Supplementary data
+
+assigned the highest probability. Fig. B.1 shows an example point cloud                           Supplementary material related to this article can be found online
+sampled during a training step. We adopted a learning rate schedule                           at https://doi.org/10.1016/j.media.2024.103293.
+where the learning rate was reduced by 30% if the validation point
+losses had not improved for 20 epochs. The minimum learning rate was                          References
+1e−6. The network was implemented in PyTorch and the training was
+conducted on a Nvidia A40 graphics processing unit (GPU). Table S.1                           Alison, M.S., Carswell, G., Michelle, C.A., Lau, M., Smith, Z., Echko, S., Olsen, W.,
+presents the Dice similarity scores for our method and the baseline                               Aw, A., Zimmerman, M., Smith, A., Sable, C., Echko, M.M., Wilner, L.B.,
+methods, evaluated on the training dataset post-training.                                         Olsen, H.E., Atalay, H.T., Awasthi, A., Bhutta, Z.A., Boucher, J.L., Castro, F.,
+                                                                                                  Cortesi, P.A., Dubey, M., Fischer, F., Hamidi, S., Hay, S.I., Hoang, C.L., Hugo-
+                                                                                                  Hamman, C.T., Jenkins, K.J., Kar, A., Khalil, I., Kumar, R.K., Kwan, G.F.,
+Appendix C. Methods of creating time-series meshes and conduct-                                   Mengistu, D.T., Mokdad, A.H., Naghavi, M., Negesa, L.B., Negoi, I., Negoi, R.I.,
+ing CFD simulations                                                                               Nguyen, C.T., Nguyen, H.L.T., Nguyen, L.H., Nguyen, S.H., Nguyen, T.H.T.,
+                                                                                                  Nixon, M.R., Noubiap, J.J.N., Patel, S., Peprah, E., Reiner, R.C., Roth, G.A., Tem-
+                                                                                                  sah, M.H., Tovani-Palone, M.R., Towbin, J.A., Tran, B.X., Tran, T.T., Truong, N.T.,
+   We applied realistic motion obtained from a set of time-series                                 Vos, T., Vosoughi, K., Weintraub, R.G., Weldegwergs, K.G., Zaidi, Z., Zheleva, B.,
+image data to the generated CHD cardiac anatomies. Namely, for the                                Zuhlke, L.J., Murray, C.J.L., Martin, G.R., Kassebaum, N.J., 2020. Global, regional,
+time-series image data, we optimize a set of shape codes {𝑍𝑡𝑖𝑚𝑒 }𝑇0                               and national burden of congenital heart disease, 1990–2017: a systematic analysis
+                                                                                                  for the global burden of disease study 2017. Lancet. Child Adolesc. Health 4,
+to additionally model the shape changes due to cardiac motion. We
+                                                                                                  185–200.
+then applied this set of time-series shape codes to morph a template                          Amirrajab, S., Khalil, Y.A., Lorenz, C., Weese, J., Pluim, J., Breeuwer, M., 2023.
+mesh derived from the learned CHD type-specific anatomies to generate                             Pathology synthesis of 3D-consistent cardiac MR images using 2D VAEs and GANs.
+time-series meshes suitable for CFD simulations. To optimize {𝑍𝑡𝑖𝑚𝑒 }𝑇0 ,                         Mach. Learn. Biomed. Imaging 2 (June 2023), 288–311.
+
+
+                                                                                         21
+F. Kong et al.                                                                                                                                     Medical Image Analysis 97 (2024) 103293
+
+
+Attar, R., Pereañez, M., Bowles, C., Piechnik, S.K., Neubauer, S., Petersen, S.E.,                 Liu, H.T.D., Williams, F., Jacobson, A., Fidler, S., Litany, O., 2022. Learning smooth
+     Frangi, A.F., 2019. 3D cardiac shape prediction with deep neural networks:                        neural functions via Lipschitz regularization. In: ACM SIGGRAPH 2022 Conference
+     Simultaneous use of images and patient metadata. In: Shen, D., Liu, T., Peters, T.M.,             Proceedings.
+     Staib, L.H., Essert, C., Zhou, S., Yap, P.T., Khan, A. (Eds.), Medical Image Com-             Loke, Y.H., Harahsheh, A.S., Krieger, A., Olivieri, L.J., 2017. Usage of 3D models
+     puting and Computer Assisted Intervention – MICCAI 2019. Springer International                   of tetralogy of Fallot for medical education: impact on learning congenital heart
+     Publishing, Cham, pp. 586–594.                                                                    disease. BMC Med. Educ. 17.
+Backer, C.L., Mavroudis, C., 2003. The rastelli operation. Oper. Tech. Thorac. Car-                Lu, J.C., Christensen, J.T., Yu, S., Donohue, J.E., Mahani, M.G., Agarwal, P.P.,
+     diovasc. Surg. 8 (3), 121–130. http://dx.doi.org/10.1053/S1522-2942(03)00034-                     Dorfman, A.L., 2014. Relation of right ventricular mass and volume to functional
+     7.                                                                                                health status in repaired tetralogy of Fallot. Am. J. Cardiol. 114 12, 1896–1901.
+Beetz, M., Acero, J.C., Banerjee, A., Eitel, I., Zacur, E., Lange, T., Stiermaier, T.,             Ma, Q., Li, L., Robinson, E.C., Kainz, B., Rueckert, D., Alansary, A., 2022. CortexODE:
+     Evertz, R., Backhaus, S.J., Thiele, H., Bueno-Orovio, A., Lamata, P., Schuster, A.,               Learning cortical surface reconstruction by neural ODEs. IEEE Trans. Med. Imaging
+     Grau, V., 2022. Interpretable cardiac anatomy modeling using variational mesh                     42, 430–443.
+     autoencoders. Front. Cardiovasc. Med. 9.                                                      Marelli, A., Ionescu-Ittu, R., Mackie, A., Guo, L., Dendukuri, N., Kaouache, M., 2014.
+Bell-Cheddar, Y.R., Devine, W.A., Díaz-Castrillón, C.E., Seese, L., Castro-Medina, M.,                 Lifetime prevalence of congenital heart disease in the general population from 2000
+     Morales, R., Follansbee, C.W., Alsaied, T., Lin, J.H.I., 2023. Double outlet right                to 2010. Circulation 130, 749–756.
+     ventricle. Front. Pediatr. 11.                                                                Marsden, A., Feinstein, J., 2015. Computational modeling and engineering in pediatric
+Biffi, C., Cerrolaza, J.J., Tarroni, G., Bai, W., de Marvao, A., Oktay, O., Ledig, C.,                 and congenital heart disease. Curr. Opin. Pediatr. 27 (5), 587–596.
+     Folgoc, L.L., Kamnitsas, K., Doumou, G., Duan, J., Prasad, S.K., Cook, S.A.,                  Mauger, C.A., Govil, S., Chabiniok, R., Gilbert, K., Hegde, S., Hussain, T., McCul-
+     O’Regan, D.P., Rueckert, D., 2019. Explainable anatomical shape analysis through                  loch, A.D., Occleshaw, C., Omens, J.H., Perry, J.C., Pushparajah, K., Suinesiapu-
+     deep hierarchical generative models. IEEE Trans. Med. Imaging 39, 2088–2099.                      tra, A., Zhong, L., Young, A.A., 2021. Right-left ventricular shape variations in
+Campello, V.M., Xia, T., Liu, X., Sanchez, P., Martín-Isla, C., Petersen, S.E., Seguí, S.,             tetralogy of fallot: associations with pulmonary regurgitation. J. Cardiovasc. Magn.
+     Tsaftaris, S.A., Lekadir, K., 2022. Cardiac aging synthesis from cross-sectional data             Resonance 23.
+     with conditional generative adversarial networks. Front. Cardiovasc. Med. 9.                  Micheletti, A., 2018. Congenital heart disease classification, epidemiology, diagnosis,
+Chen, Q., Merz, J., Sanghi, A., Shayani, H., Mahdavi-Amiri, A., Zhang, H., 2021. UNIST:                treatment, and outcome. Congenit. Heart Dis..
+     Unpaired neural implicit shape translation network. In: 2022 IEEE/CVF Conference              Mirza, M., Osindero, S., 2014. Conditional generative adversarial nets. arXiv:1411.1784.
+     on Computer Vision and Pattern Recognition. CVPR, pp. 18593–18601.                            Naimi, I., Clouse, M.L., Arya, B., Conwell, J.A., Lewin, M.B., Bhat, A.H., 2021.
+Chen, T.Q., Rubanova, Y., Bettencourt, J., Duvenaud, D.K., 2018. Neural ordinary                       Accuracy of fetal echocardiography in defining pulmonary artery anatomy and
+     differential equations. In: Neural Information Processing Systems.                                source of pulmonary blood flow in pulmonary atresia with ventricular septal defect
+Davlouros, P., Niwa, K., Webb, G.D., Gatzoulis, M.A., 2006. The right ventricle in                     (PA/VSD). Pediatr. Cardiol. 42, 1049–1057.
+     congenital heart disease. Heart 92, i27 – i38.                                                Narayanan, A., Kong, F., Shadden, S.C., 2024. LinFlo-Net: A two-stage deep learning
+Deng, Y., Yang, J., Tong, X., 2020. Deformed implicit field: Modeling 3D shapes with                   method to generate simulation ready meshes of the heart. Journal of Biomechanical
+     learned dense correspondence. In: 2021 IEEE/CVF Conference on Computer Vision                     Engineering 146 (7).
+     and Pattern Recognition. CVPR, pp. 10281–10291.                                               Niederer, S.A., Aboelkassem, Y., Cantwell, C.D., Corrado, C., Coveney, S., Cherry, E.M.,
+Dou, H., Ravikumar, N., Frangi, A.F., 2023. A conditional flow variational autoencoder                 Delhaas, T., Fenton, F.H., Panfilov, A.V., Pathmanathan, P., Plank, G., Riabiz, M.,
+     for controllable synthesis of virtual populations of anatomy. In: Greenspan, H.,                  Roney, C.H., dos Santos, R.W., Wang, L., 2020. Creation and application of virtual
+     Madabhushi, A., Mousavi, P., Salcudean, S., Duncan, J., Syeda-Mahmood, T.,                        patient cohorts of heart models. Phil. Trans. R. Soc. A 378.
+     Taylor, R. (Eds.), Medical Image Computing and Computer Assisted Intervention                 Oster, M.E., Lee, K.A., Honein, M.A., Riehle-Colarusso, T.J., Shin, M., Correa, A., 2013.
+     – MICCAI 2023. Springer Nature Switzerland, Cham, pp. 143–152.                                    Temporal trends in survival among infants with critical congenital heart defects.
+Duchateau, N., Sermesant, M., Delingette, H., Ayache, N., 2018. Model-based generation                 Pediatrics 131, e1502 – e1508.
+     of large databases of cardiac images: Synthesis of pathological cine MR sequences             Ouasfi, A., Boukhayma, A., 2024. Unsupervised occupancy learning from sparse point
+     from real healthy cases. IEEE Trans. Med. Imaging 37, 755–766.                                    cloud. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern
+Farrar, G., Suinesiaputra, A., Gilbert, K., Perry, J.C., Hegde, S., Marsden, A.L.,                     Recognition (CVPR). pp. 21729–21739.
+     Young, A.A., Omens, J.H., McCulloch, A.D., 2016. Atlas-based ventricular shape                Pace, D.F., Dalca, A.V., Brosch, T., Geva, T., Powell, A.J., Weese, J., Moghari, M.H.,
+     analysis for understanding congenital heart disease. Progr. Pediatr. Cardiol. 43,                 Golland, P., 2022. Learned iterative segmentation of highly variable anatomy from
+     61–69.                                                                                            limited data: Applications to whole heart segmentation for congenital heart disease.
+Fonseca, C.G., Backhaus, M., Bluemke, D.A., Britten, R., Chung, J.D., Cowan, B.R.,                     Med. Image Anal. 80, 102469.
+     Dinov, I.D., Finn, J.P., Hunter, P.J., Kadish, A.H., Lee, D.C., Lima, J.A.C., Medrano-        Park, J.J., Florence, P.R., Straub, J., Newcombe, R.A., Lovegrove, S., 2019a. DeepSDF:
+     Gracia, P., Shivkumar, K., Suinesiaputra, A., Tao, W., Young, A.A., 2011. The                     Learning continuous signed distance functions for shape representation. In: 2019
+     Cardiac Atlas Project—an imaging database for computational modeling and                          IEEE/CVF Conference on Computer Vision and Pattern Recognition. CVPR, pp.
+     statistical atlases of the heart. Bioinformatics 27, 2288–2295.                                   165–174.
+Gómez, S., Romo-Bucheli, D., Martínez, F., 2021. A digital cardiac disease biomarker               Park, T., Liu, M., Wang, T., Zhu, J., 2019. Semantic image synthesis with spatially-
+     from a generative progressive cardiac cine-MRI representation. Biomed. Eng. Lett.                 adaptive normalization. In: 2019 IEEE/CVF Conference on Computer Vision and
+     12, 75–84.                                                                                        Pattern Recognition (CVPR). pp. 2332–2341.
+Govil, S., Crabb, B., Deng, Y., Toso, L.D., Puyol-Antón, E., Pushparajah, K., Hegde, S.,           Qiao, M., Wang, S., Qiu, H., de Marvao, A., O’Regan, D.P., Rueckert, D., Bai, W.,
+     Perry, J.C., Omens, J.H., Hsiao, A., Young, A.A., McCulloch, A.D., 2023a. A deep                  2024. Cheart: A conditional spatio-temporal generative model for cardiac anatomy.
+     learning approach for fully automated cardiac shape modeling in tetralogy of fallot.              IEEE Trans. Med. Imaging 43 (3), 1259–1269. http://dx.doi.org/10.1109/TMI.
+     J. Cardiovasc. Magn. Resonance 25.                                                                2023.3331982.
+Govil, S., Mauger, C.A., Hegde, S., Occleshaw, C., Yu, X., Perry, J.C., Young, A.A.,               Quinn, D., Mcguirk, S.P., Metha, C., Nightingale, P., Giovanni, J.V.D., Dhillon, R.,
+     Omens, J.H., McCulloch, A.D., 2023b. Biventricular shape modes discriminate                       Miller, P.A., Stumper, O.F., Wright, J.G., Barron, D.J., Brawn, W.J., 2008. The
+     pulmonary valve replacement in tetralogy of fallot better than imaging indices.                   morphologic left ventricle that requires training by means of pulmonary artery
+     Sci. Rep. 13.                                                                                     banding before the double-switch procedure for congenitally corrected transposition
+Hermsen, J.L., Roldán-Alzate, A., Anagnostopoulos, P.V., 2020. Three-dimensional                       of the great arteries is at risk of late dysfunction. J. Thorac. Cardiovasc. Surg. 135
+     printing in congenital heart disease. J. Thorac. Dis. 12, 1194–1203.                              5, 1137–1144, 1144.e1–2.
+Hui, K.H., Li, R., Hu, J., Fu, C.W., 2022. Neural template: Topology-aware reconstruc-             Raju, A., Miao, S., Cheng, C.T., Lu, L., Han, M., Xiao, J., Liao, C.H., Huang, J.,
+     tion and disentangled generation of 3D meshes. In: 2022 IEEE/CVF Conference on                    Harrison, A.P., 2021. Deep implicit statistical shape models for 3D medical image
+     Computer Vision and Pattern Recognition. CVPR, pp. 18551–18561.                                   delineation. In: AAAI Conference on Artificial Intelligence.
+Jenkins, K.J., Gauvreau, K., Newburger, J.W., Spray, T.L., Moller, J.H., Iezzoni, L.I.,            Rodero, C., Strocchi, M., Marciniak, M., Longobardi, S., Whitaker, J., O’Neill, M.D.,
+     2002. Consensus-based method for risk adjustment for surgery for congenital heart                 Gillette, K.K., Augustin, C.M., Plank, G., Vigmond, E.J., Lamata, P., Niederer, S.A.,
+     disease. J. Thorac. Cardiovasc. Surg. 123 1, 110–118.                                             2021. Linking statistical shape models and simulated function in the healthy adult
+Kalaie, S., Frangi, A.F., Gooya, A., 2023. A geometric deep learning framework for                     human heart. PLoS Comput. Biol. 17.
+     generation of virtual left ventricles as graphs. In: International Conference on              Ryan, J., Plasencia, J.D., Richardson, R., Velez, D.A., Nigro, J.J., Pophal, S.G.,
+     Medical Imaging with Deep Learning.                                                               Frakes, D.H., 2018. 3D printing for congenital heart disease: a single site’s initial
+Kingma, D., Ba, J., 2014. Adam: A method for stochastic optimization. In: International                three-yearexperience. 3D Print. Med. 4.
+     Conference on Learning Representations.                                                       Sexton, Z.A., Hudson, A.R., Herrmann, J.E., Shiwarski, D.J., Pham, J., Szafron, J.M.,
+Kong, F., Marsden, A.L., 2023. Type and shape disentangled generative modeling for                     Wu, S.M., Skylar-Scott, M.A., Feinberg, A.W., Marsden, A.L., 2023. Rapid
+     congenital heart defects. In: STACOM@MICCAI.                                                      model-guided design of organ-scale synthetic vasculature for biomanufacturing.
+Kong, F., Shadden, S.C., 2022. Learning whole heart mesh generation from patient                   Si, H., 2015. Tetgen, a delaunay-based quality tetrahedral mesh generator. ACM
+     images for computational simulations. IEEE Trans. Med. Imaging 42, 533–545.                       Transactions on Mathematical Software 41 (2).
+Liu, Y., Chen, S., Zühlke, L., Black, G., Choy, M., Li, Keavney, B., 2019. Global birth            Sinha, R., Gooty, V.D., Jang, S., Dodge-Khatami, A., Salazar, J.D., 2019. Validity of
+     prevalence of congenital heart defects 1970–2017: updated systematic review and                   pulmonary valve Z-scores in predicting valve-sparing tetralogy repairs—Systematic
+     meta-analysis of 260 studies. Int. J. Epidemiol. 48, 455–463.                                     review †. Children 6.
+
+
+                                                                                              22
+F. Kong et al.                                                                                                                                     Medical Image Analysis 97 (2024) 103293
+
+
+Suinesiaputra, A., Ablin, P., Albà, X., Alessandrini, M., Allen, J., Bai, W., Çimen, S.,          Wiesner, D., Suk, J., Dummer, S., Svoboda, D., Wolterink, J.M., 2022. Implicit neural
+    Claes, P., Cowan, B.R., D’hooge, J., Duchateau, N., Ehrhardt, J., Frangi, A.F.,                   representations for generative modeling of living cell shapes. In: International
+    Gooya, A., Grau, V., Lekadir, K., Lu, A., Mukhopadhyay, A., Oksuz, I., Parajuli, N.,              Conference on Medical Image Computing and Computer-Assisted Intervention.
+    Pennec, X., Pereañez, M., Pinto, C., Piras, P., Rohé, M.-M., Rueckert, D., Säring, D.,        Wiputra, H., Matsumoto, S., Wagenseil, J.E., Braverman, A.C., Voeller, R.K., Baro-
+    Sermesant, M., Siddiqi, K., Tabassian, M., Teresi, L., Tsaftaris, S.A., Wilms, M.,                cas, V.H., 2022. Statistical shape representation of the thoracic aorta: accounting
+    Young, A.A., Zhang, X., Medrano-Gracia, P., 2018. Statistical shape modeling of the               for major branches of the aortic arch. Comput. Methods Biomech. Biomed. Eng.
+    left ventricle: Myocardial infarct classification challenge. IEEE J. Biomed. Health               26, 1557–1571.
+    Inf. 22, 503–515.                                                                             Xu, X., Jia, Q., Yuan, H., Qiu, H., Dong, Y., Xie, W., Yao, Z., Zhang, J., Nie, Z., Li, X.,
+Sun, S., Han, K., Kong, D., Tang, H., Yan, X., Xie, X., 2022. Topology-preserving shape               Shi, Y., Zou, J.Y., Huang, M., Jian, Z., 2023. A clinically applicable AI system
+    reconstruction and registration via neural diffeomorphic flow. In: 2022 IEEE/CVF                  for diagnosis of congenital heart diseases based on computed tomography images.
+    Conference on Computer Vision and Pattern Recognition. CVPR, pp. 20813–20823.                     Med. Image Anal..
+Tancik, M., Srinivasan, P.P., Mildenhall, B., Fridovich-Keil, S., Raghavan, N., Sing-             Xu, X., Wang, T., Jian, Z., Yuan, H., Huang, M., Cen, J., Jia, Q., Dong, Y., Shi, Y.,
+    hal, U., Ramamoorthi, R., Barron, J.T., Ng, R., 2020. Fourier features let networks               2020. ImageCHD: A 3D computed tomography image dataset for classification of
+    learn high frequency functions in low dimensional domains. In: Proceedings of the                 congenital heart disease. In: International Conference on Medical Image Computing
+    34th International Conference on Neural Information Processing Systems. NIPS ’20,                 and Computer-Assisted Intervention.
+    Curran Associates Inc., Red Hook, NY, USA.                                                    Xu, X., Wang, T., Zeng, D., Shi, Y., Jia, Q., Yuan, H., Huang, M., Jian, Z., 2019.
+Tang, R., Govil, S., Mauger, C.A., Hegde, S., Omens, J.H., Perry, J.C., McCulloch, A.D.,              Accurate congenital heart disease model generation for 3D printing. In: 2019 IEEE
+    2022. Modeling single ventricle morphology with a HLHS-specific biventricular                     International Workshop on Signal Processing Systems. SiPS, pp. 127–130.
+    template to enhance statistical shape and biomechanics analyses. In: Volume 9:                Yang, J., Wickramasinghe, U., Ni, B., Fua, P., 2022. ImplicitAtlas: Learning deformable
+    Mechanics of Solids, Structures, and Fluids; Micro- and Nano-Systems Engineering                  shape templates in medical imaging. In: 2022 IEEE/CVF Conference on Computer
+    and Packaging; Safety Engineering, Risk, and Reliability Analysis; Research Posters.              Vision and Pattern Recognition. CVPR, pp. 15840–15850.
+Thermos, S., Liu, X., O’Neil, A.Q., Tsaftaris, S.A., 2021. Controllable cardiac synthesis         Yuan, X., Liu, C., Wang, Y., 2023. 4D myocardium reconstruction with decoupled
+    via disentangled anatomy arithmetic. In: International Conference on Medical Image                motion and shape model. In: Proceedings of the IEEE/CVF International Conference
+    Computing and Computer-Assisted Intervention.                                                     on Computer Vision. ICCV, pp. 21252–21262.
+Tikenogullari, O.Z., Peirlinck, M., Chubb, H., Dubin, A.M., Kuhl, E., Marsden, A.L.,              Zheng, Z., Yu, T., Dai, Q., Liu, Y., 2020. Deep implicit templates for 3D shape
+    2023. Effects of cardiac growth on electrical dyssynchrony in the single ventricle                representation. In: 2021 IEEE/CVF Conference on Computer Vision and Pattern
+    patient. Comput. Methods Biomech. Biomed. Eng. 1–17.                                              Recognition. CVPR, pp. 1429–1439.
+Vieira, M.S., Hussain, T., Figueroa, C.A., 2015. Patient-specific image-based compu-              Zhu, C., Vedula, V., Parker, D., Wilson, N.M., Shadden, S.C., Marsden, A.L., 2022. svFSI:
+    tational modeling in congenital heart disease: A clinician perspective. J. Cardiol.               A multiphysics package for integrated cardiac modeling. J. Open Source Softw. 7,
+    Therapy 2, 436–448.                                                                               4118.
+
+
+
+
+                                                                                             23
+

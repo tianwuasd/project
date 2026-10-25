@@ -1,0 +1,46 @@
+[
+  {
+    "local_id": "L1",
+    "work_id": "work_669c3001a51d42b8",
+    "title": "VISTA3D - A Unified Segmentation Foundation Model For 3D Medical Imaging",
+    "attachment": {
+      "document_id": "doc_f2ae2239a302703043a71464",
+      "level": "full_text",
+      "diagnostics": []
+    },
+    "source_path": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\VISTA3D - A Unified Segmentation Foundation Model For 3D Medical Imaging\\VISTA3D - A Unified Segmentation Foundation Model For 3D Medical Imaging.pdf"
+  },
+  {
+    "local_id": "L2",
+    "work_id": "work_e8706d7715e44ae8",
+    "title": "REDNet - Reliable Evidential Discounting Network for Multi-Modality Medical Image Segmentation",
+    "attachment": {
+      "document_id": "doc_a7db2305ee83861d8943cfa0",
+      "level": "full_text",
+      "diagnostics": []
+    },
+    "source_path": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\REDNet - Reliable Evidential Discounting Network for Multi-Modality Medical Image Segmentation\\REDNet - Reliable Evidential Discounting Network for Multi-Modality Medical Image Segmentation.pdf"
+  },
+  {
+    "local_id": "L4",
+    "work_id": "work_035a8553e2314bc2",
+    "title": "Learned iterative segmentation of highly variable anatomy from limited data - Applications to whole heart segmentation for congenital heart disease",
+    "attachment": {
+      "document_id": "doc_a3ae9432211ef4069f9ba3f0",
+      "level": "full_text",
+      "diagnostics": []
+    },
+    "source_path": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Learned iterative segmentation of highly variable anatomy from limited data - Applications to whole heart segmentation for congenital heart disease\\Learned iterative segmentation of highly variable anatomy from limited data - Applications to whole heart segmentation for congenital heart disease.pdf"
+  },
+  {
+    "local_id": "L7",
+    "work_id": "work_a3a141cb15434c22",
+    "title": "SDF4CHD - Generative modeling of cardiac anatomies with congenital heart defects",
+    "attachment": {
+      "document_id": "doc_9305e394275645706ffe08d3",
+      "level": "full_text",
+      "diagnostics": []
+    },
+    "source_path": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\SDF4CHD - Generative modeling of cardiac anatomies with congenital heart defects\\SDF4CHD - Generative modeling of cardiac anatomies with congenital heart defects.pdf"
+  }
+]

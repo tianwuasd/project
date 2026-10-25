@@ -1,0 +1,503 @@
+{
+  "date": "2026-10-25",
+  "timezone": "Asia/Shanghai",
+  "application": "Academic Agent",
+  "version": "0.4.0",
+  "repository": "https://github.com/tianwuasd/testing_tools",
+  "commit": "922c702f37545051097f3dbeca965c8fce14ab89",
+  "application_path": "D:\\projects\\testing_tools\\academic_agent",
+  "project_path": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025",
+  "execution_mode": "Real source search, local import, per-work screening, PDF fetch/attach, Codex reading, separate-session review, versioned export through application CLI/API",
+  "backend": "codex",
+  "requested_model": null,
+  "observed_model": "not exposed by application results",
+  "automatic_innovation_pipeline_executed": false,
+  "framework_author": "Parent assistant synthesis using app evidence and independently checked primary methods",
+  "bibliographic_records": 61,
+  "selected_full_text_documents": 12,
+  "local_library_pdfs": 4,
+  "downloaded_primary_pdfs": 8,
+  "query_limit_per_source": 8,
+  "searches": [
+    {
+      "summary": {
+        "query": "Draft and Refine with Visual Experts",
+        "retained": 15,
+        "dropped_at_project_cap": 0,
+        "sources": [
+          {
+            "source": "openalex",
+            "status": "ok",
+            "records": 8,
+            "truncated": true,
+            "errors": []
+          },
+          {
+            "source": "semantic_scholar",
+            "status": "rate_limited",
+            "records": 0,
+            "truncated": false,
+            "errors": [
+              "HTTP 429; retry budget exhausted"
+            ]
+          },
+          {
+            "source": "arxiv",
+            "status": "ok",
+            "records": 8,
+            "truncated": true,
+            "errors": []
+          }
+        ]
+      },
+      "retained_work_ids": [
+        "work_020a62458a2c42a9",
+        "work_0bd013dad2904942",
+        "work_1e05e2b0eb6c452c",
+        "work_2a25ad05cb214313",
+        "work_2cd3ddba55b94873",
+        "work_59002ba90a484a4c",
+        "work_679dc653ae10481d",
+        "work_6eecc999e5714f57",
+        "work_7a38e306125e4641",
+        "work_83432079db774294",
+        "work_875aa70a356d4af9",
+        "work_a9592c63f9df46dc",
+        "work_c9b88995247d4118",
+        "work_f516794ed65843b7",
+        "work_fe635208107c4ca1"
+      ]
+    },
+    {
+      "summary": {
+        "query": "SegAgent",
+        "retained": 9,
+        "dropped_at_project_cap": 0,
+        "sources": [
+          {
+            "source": "openalex",
+            "status": "ok",
+            "records": 8,
+            "truncated": true,
+            "errors": []
+          },
+          {
+            "source": "semantic_scholar",
+            "status": "rate_limited",
+            "records": 0,
+            "truncated": false,
+            "errors": [
+              "HTTP 429; retry budget exhausted"
+            ]
+          },
+          {
+            "source": "arxiv",
+            "status": "ok",
+            "records": 1,
+            "truncated": false,
+            "errors": []
+          }
+        ]
+      },
+      "retained_work_ids": [
+        "work_0186a8e0770f4e88",
+        "work_2d339e5c9d8843f7",
+        "work_3513764023e24db6",
+        "work_7ed052502429493d",
+        "work_aa6dce0ed7f14b25",
+        "work_af761a7b373249db",
+        "work_c43e70d1b58f416b",
+        "work_cc7a09d10e9a4a96",
+        "work_cdfdf0b36806428d"
+      ]
+    },
+    {
+      "summary": {
+        "query": "learning to defer multiple experts",
+        "retained": 14,
+        "dropped_at_project_cap": 0,
+        "sources": [
+          {
+            "source": "openalex",
+            "status": "ok",
+            "records": 8,
+            "truncated": true,
+            "errors": []
+          },
+          {
+            "source": "semantic_scholar",
+            "status": "rate_limited",
+            "records": 0,
+            "truncated": false,
+            "errors": [
+              "HTTP 429; retry budget exhausted"
+            ]
+          },
+          {
+            "source": "arxiv",
+            "status": "ok",
+            "records": 8,
+            "truncated": true,
+            "errors": []
+          }
+        ]
+      },
+      "retained_work_ids": [
+        "work_105821379c8f4325",
+        "work_1692c4d69990419c",
+        "work_3a3332cd6f93434d",
+        "work_507f20164bb14b56",
+        "work_581e8df27e6743e5",
+        "work_5d1c00a2b3764ef3",
+        "work_605fef2b6e784a33",
+        "work_be430d2253ed4bc2",
+        "work_c034d147ef88411d",
+        "work_e414bed331054547",
+        "work_e6c7d8e0cd124d6c",
+        "work_e72c61a630b84230",
+        "work_e9b080b4776e4c6a",
+        "work_f99964e2e53d477c"
+      ]
+    },
+    {
+      "summary": {
+        "query": "generalist specialist collaborative refinement segmentation",
+        "retained": 16,
+        "dropped_at_project_cap": 0,
+        "sources": [
+          {
+            "source": "openalex",
+            "status": "ok",
+            "records": 8,
+            "truncated": true,
+            "errors": []
+          },
+          {
+            "source": "semantic_scholar",
+            "status": "rate_limited",
+            "records": 0,
+            "truncated": false,
+            "errors": [
+              "HTTP 429; retry budget exhausted"
+            ]
+          },
+          {
+            "source": "arxiv",
+            "status": "ok",
+            "records": 8,
+            "truncated": true,
+            "errors": []
+          }
+        ]
+      },
+      "retained_work_ids": [
+        "work_0e24982aebd04673",
+        "work_29bd397f74364935",
+        "work_37c6446b36184ba2",
+        "work_3d1047655e484ef9",
+        "work_4b1580cb4184427e",
+        "work_527dbfba70344c76",
+        "work_6572d29cec464414",
+        "work_864fba4def554ce3",
+        "work_96e458ab969142c9",
+        "work_9d7414586161439e",
+        "work_aeac6ec0026e412b",
+        "work_b8b1ef49ee17445d",
+        "work_c2157cbf6af043e4",
+        "work_daa966ee28d84fe8",
+        "work_dc3db188901f4579",
+        "work_f2ffbd553cf54941"
+      ]
+    },
+    {
+      "summary": {
+        "query": "DeferredSeg",
+        "retained": 3,
+        "dropped_at_project_cap": 0,
+        "sources": [
+          {
+            "source": "openalex",
+            "status": "ok",
+            "records": 4,
+            "truncated": false,
+            "errors": []
+          },
+          {
+            "source": "semantic_scholar",
+            "status": "rate_limited",
+            "records": 0,
+            "truncated": false,
+            "errors": [
+              "HTTP 429; retry budget exhausted"
+            ]
+          },
+          {
+            "source": "arxiv",
+            "status": "ok",
+            "records": 1,
+            "truncated": false,
+            "errors": []
+          }
+        ]
+      },
+      "retained_work_ids": [
+        "work_226b3fd938a04aa7",
+        "work_750f4a75835240a3",
+        "work_9693f9cab0c34ce2"
+      ]
+    }
+  ],
+  "search_scope": "Bounded targeted search, not systematic or exhaustive; remaining candidates were not all fully screened/read",
+  "search_gap": "Semantic Scholar returned HTTP 429 for all five queries; OpenAlex and arXiv succeeded; separate parent web checks supplemented discovery and verification",
+  "documents": [
+    {
+      "work_id": "work_1e05e2b0eb6c452c",
+      "title": "Draft and Refine with Visual Experts",
+      "doi": "10.48550/arxiv.2511.11005",
+      "arxiv_id": "2511.11005v3",
+      "source_pdf_url": "https://arxiv.org/pdf/2511.11005v3",
+      "local_source_path": "artifacts/d91360c4ceebb55bc0696d59d7999e604d7b955301f3b9f222a8854a20618691.pdf",
+      "document_id": "doc_165c29e833e03cfd92ae53d9",
+      "sha256": "d91360c4ceebb55bc0696d59d7999e604d7b955301f3b9f222a8854a20618691",
+      "level": "full_text",
+      "pages_provided": 11,
+      "reading_scope": "Full extracted document supplied to application reader and separate reviewer; parent independently checked selected method passages",
+      "claims": 15,
+      "verdicts": {
+        "supported": 14,
+        "partial": 1
+      }
+    },
+    {
+      "work_id": "work_aa6dce0ed7f14b25",
+      "title": "SegAgent: Exploring Pixel Understanding Capabilities in MLLMs by Imitating Human Annotator Trajectories",
+      "doi": null,
+      "arxiv_id": "2503.08625v1",
+      "source_pdf_url": "https://arxiv.org/pdf/2503.08625v1",
+      "local_source_path": "artifacts/d185c3ccb130ff91535630d33d01cdfa0b4c8c543f67b1eefb361b228b1d9927.pdf",
+      "document_id": "doc_d8186e2c40a9d4300de919e5",
+      "sha256": "d185c3ccb130ff91535630d33d01cdfa0b4c8c543f67b1eefb361b228b1d9927",
+      "level": "full_text",
+      "pages_provided": 18,
+      "reading_scope": "Full extracted document supplied to application reader and separate reviewer; parent independently checked selected method passages",
+      "claims": 15,
+      "verdicts": {
+        "supported": 15
+      }
+    },
+    {
+      "work_id": "work_5d1c00a2b3764ef3",
+      "title": "Two-Stage Learning to Defer with Multiple Experts",
+      "doi": "10.52202/075280-0159",
+      "arxiv_id": null,
+      "source_pdf_url": "https://papers.neurips.cc/paper_files/paper/2023/file/0b17d256cf1fe1cc084922a8c6b565b7-Paper-Conference.pdf",
+      "local_source_path": "artifacts/86a347b0144aea4dc8faf5c1e25681a4eaee237705341ecf41408c8885f81cd4.pdf",
+      "document_id": "doc_a640fa1df871842d55c3510c",
+      "sha256": "86a347b0144aea4dc8faf5c1e25681a4eaee237705341ecf41408c8885f81cd4",
+      "level": "full_text",
+      "pages_provided": 29,
+      "reading_scope": "Full extracted document supplied to application reader and separate reviewer; parent independently checked selected method passages",
+      "claims": 13,
+      "verdicts": {
+        "supported": 13
+      }
+    },
+    {
+      "work_id": "work_6572d29cec464414",
+      "title": "Balancing Multi-Target Semi-Supervised Medical Image Segmentation with Collaborative Generalist and Specialists",
+      "doi": null,
+      "arxiv_id": "2504.00862v1",
+      "source_pdf_url": "https://arxiv.org/pdf/2504.00862v1",
+      "local_source_path": "artifacts/158b4ef253a1a66e113d1dffcf84014aef6a2ac99aff6d0a51a4b4984409c697.pdf",
+      "document_id": "doc_fa9b959a24eeb86debc04b6c",
+      "sha256": "158b4ef253a1a66e113d1dffcf84014aef6a2ac99aff6d0a51a4b4984409c697",
+      "level": "full_text",
+      "pages_provided": 13,
+      "reading_scope": "Full extracted document supplied to application reader and separate reviewer; parent independently checked selected method passages",
+      "claims": 15,
+      "verdicts": {
+        "supported": 15
+      }
+    },
+    {
+      "work_id": "work_dc3db188901f4579",
+      "title": "U-CFR: Uncertainty-Guided Cascade Forward Refinement for Interactive Segmentation",
+      "doi": null,
+      "arxiv_id": null,
+      "source_pdf_url": "https://arxiv.org/pdf/2607.20705v1",
+      "local_source_path": "artifacts/8f1b3c8f831bc852abe63d6605dbfc6b7081a3d071704b7d04ec86340d47118b.pdf",
+      "document_id": "doc_3628754cfa67f573f6b520b8",
+      "sha256": "8f1b3c8f831bc852abe63d6605dbfc6b7081a3d071704b7d04ec86340d47118b",
+      "level": "full_text",
+      "pages_provided": 12,
+      "reading_scope": "Full extracted document supplied to application reader and separate reviewer; parent independently checked selected method passages",
+      "claims": 16,
+      "verdicts": {
+        "supported": 16
+      }
+    },
+    {
+      "work_id": "work_864fba4def554ce3",
+      "title": "NeuroRefiner: Morphology-Aware Multi-agent Refinement for 3D Fluorescence Microscopy Neuron Segmentation",
+      "doi": "10.1007/978-3-032-37098-3_33",
+      "arxiv_id": null,
+      "source_pdf_url": "https://arxiv.org/pdf/2608.09636v1",
+      "local_source_path": "artifacts/e447474541bb266fe5270d55c634d1f13f4a31c41499cb84e11663e540d87fde.pdf",
+      "document_id": "doc_74d94da70bc6c9179401aa79",
+      "sha256": "e447474541bb266fe5270d55c634d1f13f4a31c41499cb84e11663e540d87fde",
+      "level": "full_text",
+      "pages_provided": 21,
+      "reading_scope": "Full extracted document supplied to application reader and separate reviewer; parent independently checked selected method passages",
+      "claims": 19,
+      "verdicts": {
+        "supported": 19
+      }
+    },
+    {
+      "work_id": "work_b8b1ef49ee17445d",
+      "title": "Improving Policy Optimization with Generalist-Specialist Learning",
+      "doi": null,
+      "arxiv_id": "2206.12984v1",
+      "source_pdf_url": "https://arxiv.org/pdf/2206.12984v1",
+      "local_source_path": "artifacts/b78db77ab8f8261bb4fa69d4a382491d7b411ab4f9b7a61b47042fe8bed78370.pdf",
+      "document_id": "doc_c038e863ea0192aea65a5d2f",
+      "sha256": "b78db77ab8f8261bb4fa69d4a382491d7b411ab4f9b7a61b47042fe8bed78370",
+      "level": "full_text",
+      "pages_provided": 16,
+      "reading_scope": "Full extracted document supplied to application reader and separate reviewer; parent independently checked selected method passages",
+      "claims": 13,
+      "verdicts": {
+        "supported": 13
+      }
+    },
+    {
+      "work_id": "work_669c3001a51d42b8",
+      "title": "VISTA3D - A Unified Segmentation Foundation Model For 3D Medical Imaging",
+      "doi": null,
+      "arxiv_id": null,
+      "source_pdf_url": null,
+      "local_source_path": "artifacts/1e0f43ccc657591e28a40022f7c2cb14c94d31719a12ec78c572d9a0fa06a3a5.pdf",
+      "document_id": "doc_f2ae2239a302703043a71464",
+      "sha256": "1e0f43ccc657591e28a40022f7c2cb14c94d31719a12ec78c572d9a0fa06a3a5",
+      "level": "full_text",
+      "pages_provided": 11,
+      "reading_scope": "Full extracted document supplied to application reader and separate reviewer; parent independently checked selected method passages",
+      "claims": 15,
+      "verdicts": {
+        "supported": 15
+      }
+    },
+    {
+      "work_id": "work_e8706d7715e44ae8",
+      "title": "REDNet - Reliable Evidential Discounting Network for Multi-Modality Medical Image Segmentation",
+      "doi": null,
+      "arxiv_id": null,
+      "source_pdf_url": null,
+      "local_source_path": "artifacts/e10baea62dc75658bd74f16be67db1f211e7937e09b6ea69e3d2a2ea5ae383b8.pdf",
+      "document_id": "doc_a7db2305ee83861d8943cfa0",
+      "sha256": "e10baea62dc75658bd74f16be67db1f211e7937e09b6ea69e3d2a2ea5ae383b8",
+      "level": "full_text",
+      "pages_provided": 12,
+      "reading_scope": "Full extracted document supplied to application reader and separate reviewer; parent independently checked selected method passages",
+      "claims": 16,
+      "verdicts": {
+        "supported": 16
+      }
+    },
+    {
+      "work_id": "work_035a8553e2314bc2",
+      "title": "Learned iterative segmentation of highly variable anatomy from limited data - Applications to whole heart segmentation for congenital heart disease",
+      "doi": null,
+      "arxiv_id": null,
+      "source_pdf_url": null,
+      "local_source_path": "artifacts/81e2ddda7ce08f885cd60b0050179e7dd115972a3d5d6dfaa16f0614633fb4e3.pdf",
+      "document_id": "doc_a3ae9432211ef4069f9ba3f0",
+      "sha256": "81e2ddda7ce08f885cd60b0050179e7dd115972a3d5d6dfaa16f0614633fb4e3",
+      "level": "full_text",
+      "pages_provided": 14,
+      "reading_scope": "Full extracted document supplied to application reader and separate reviewer; parent independently checked selected method passages",
+      "claims": 19,
+      "verdicts": {
+        "supported": 18,
+        "partial": 1
+      }
+    },
+    {
+      "work_id": "work_750f4a75835240a3",
+      "title": "DeferredSeg: A multi-expert deferral framework for medical image segmentation",
+      "doi": "10.1016/j.patcog.2026.114811",
+      "arxiv_id": "2604.12411v2",
+      "source_pdf_url": "https://arxiv.org/pdf/2604.12411v2",
+      "local_source_path": "artifacts/aaf49740f21c4eb50cd9ccb6bdb856b870fa5d35e041b561ad19ce718afe6727.pdf",
+      "document_id": "doc_3e100deb0df450ee9d65bf41",
+      "sha256": "aaf49740f21c4eb50cd9ccb6bdb856b870fa5d35e041b561ad19ce718afe6727",
+      "level": "full_text",
+      "pages_provided": 50,
+      "reading_scope": "Full extracted document supplied to application reader and separate reviewer; parent independently checked selected method passages",
+      "claims": 22,
+      "verdicts": {
+        "supported": 22
+      }
+    },
+    {
+      "work_id": "work_a3a141cb15434c22",
+      "title": "SDF4CHD - Generative modeling of cardiac anatomies with congenital heart defects",
+      "doi": null,
+      "arxiv_id": null,
+      "source_pdf_url": null,
+      "local_source_path": "artifacts/01f34e8183b05c87fd30c9c858b9db39d4d99bee563511550e27cc4f852ac859.pdf",
+      "document_id": "doc_9305e394275645706ffe08d3",
+      "sha256": "01f34e8183b05c87fd30c9c858b9db39d4d99bee563511550e27cc4f852ac859",
+      "level": "full_text",
+      "pages_provided": 23,
+      "reading_scope": "Full extracted document supplied to application reader and separate reviewer; parent independently checked selected method passages",
+      "claims": 17,
+      "verdicts": {
+        "supported": 17
+      }
+    }
+  ],
+  "claims": 195,
+  "review_verdicts": {
+    "supported": 193,
+    "partial": 2
+  },
+  "review_limit": "Independent Codex sessions, not cross-model or human accuracy validation",
+  "budget": {
+    "attempts": {
+      "spent": 24,
+      "uncertain": 2
+    },
+    "consumed_or_reserved_calls": 26,
+    "monetary_cost": null,
+    "cost_status": "unknown"
+  },
+  "recovery": [
+    {
+      "issue": "Two in-flight reading results rejected by stale-input/version validation while extra literature was being added",
+      "affected": [
+        "Two-Stage Learning to Defer with Multiple Experts",
+        "CGS"
+      ],
+      "action": "Freeze corpus, rerun through application; valid existing results reused from cache; two uncertain attempts retained in budget",
+      "resolved": true
+    }
+  ],
+  "runtime": {
+    "python": "3.12.14 bundled desktop runtime",
+    "dependencies": "App-local .runs/python-deps, compatible-range pip install rather than uv.lock recreation",
+    "source_code_changed": false
+  },
+  "export": {
+    "version": "v-2026-10-25T054638-996790-0000-0128989e",
+    "snapshot": [
+      214,
+      52,
+      24,
+      "20b0f62633b254d5680d31767135940733fb8d37301216f2b59c034f7fac329f"
+    ]
+  },
+  "experiments_executed": false,
+  "patient_data_accessed": false,
+  "report": "通用学术Agent实跑_近邻与模型框架_2026-10-25.md"
+}

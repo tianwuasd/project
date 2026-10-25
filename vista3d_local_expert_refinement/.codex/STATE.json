@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-10-25T06:20:53.811353+00:00",
+  "timezone": "Asia/Shanghai",
+  "project_root": "D:\\projects\\vista3d_local_expert_refinement",
+  "title": "全局老师与局部学生：VISTA3D 选择性点击修正",
+  "phase": "literature_and_framework_ready_model_experiments_not_started",
+  "confirmed": {
+    "same_source_material": true,
+    "source_labeled_ct": true,
+    "source_unlabeled_ct": true,
+    "target_ct_use": "prediction",
+    "student_role": "local_specialization_and_test_time_advice",
+    "teacher_role": "global_segmentation_and_selective_refinement",
+    "final_output": "teacher_mask_after_accepted_student_clicks"
+  },
+  "proposed_not_user_fixed": {
+    "student_count": 2,
+    "first_stage_clicks": 1,
+    "test_time_parameter_updates": false,
+    "gate": "predicted_executor_specific_net_utility"
+  },
+  "model_experiments_executed": false,
+  "patient_data_copied": false,
+  "actual_academic_agent": {
+    "path": "D:\\projects\\testing_tools\\academic_agent",
+    "version": "0.4.0",
+    "commit": "922c702f37545051097f3dbeca965c8fce14ab89",
+    "original_project": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025",
+    "snapshot": "research/academic_agent_snapshot",
+    "export_version": "v-2026-10-25T054638-996790-0000-0128989e",
+    "model_identity": "not_exposed",
+    "automatic_innovation_pipeline_executed": false
+  },
+  "counts": {
+    "mentioned_paper_records": 42,
+    "unique_pdf_papers": 17,
+    "existing_note_files": 18,
+    "archived_discussion_files": 11,
+    "app_bibliographic_records": 61,
+    "app_full_text_reads": 12,
+    "claims": 195,
+    "supported_by_model_review": 193,
+    "partial_by_model_review": 2
+  },
+  "gaps": [
+    "label_names_and_ids",
+    "patient_counts_and_splits",
+    "source_center_count",
+    "teacher_checkpoint_and_click_interface",
+    "gpu_resources",
+    "external_labeled_evaluation",
+    "CT-PromptSAM_fulltext"
+  ],
+  "next_action": "Recover existing data documentation, then evaluate student complementarity and oracle analysis of executable click utility.",
+  "app_sidebar_registered": false,
+  "remote_repository_created": false,
+  "handoff_created": true,
+  "archive_validation": "passed",
+  "snapshot_application_status_check": {
+    "performed": true,
+    "date": "2026-10-25",
+    "latest_export_current": true,
+    "successful_jobs": 24,
+    "pending_or_failed_jobs": 0,
+    "budget_attempts_consumed": 26,
+    "model_calls_triggered_by_check": false
+  },
+  "github_sync": {
+    "authorized_by_user": true,
+    "repository": "tianwuasd/project",
+    "repository_visibility": "public",
+    "branch": "main",
+    "path": "vista3d_local_expert_refinement",
+    "url": "https://github.com/tianwuasd/project/tree/main/vista3d_local_expert_refinement",
+    "scope": "complete_existing_research_archive",
+    "remote_status_authority": "Git commit history and remote main ref"
+  }
+}

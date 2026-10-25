@@ -1,0 +1,147 @@
+{
+  "date": "2026-10-25",
+  "timezone": "Asia/Shanghai",
+  "review_type": "targeted cross-domain prior-art search; not systematic or exhaustive",
+  "requested_scope": "同源训练的全局老师与局部学生，在测试时通过建议审查与点击修正老师最终掩膜",
+  "workflow": {
+    "name": "ARS deep-research",
+    "version": "2.12.1 snapshot",
+    "route": "lit-review with methodology and devil's advocate review",
+    "source": "D:/projects/project/whole_heart/project1/03_workflow/skill_snapshots/deep-research.md",
+    "adapter": "D:/projects/project/whole_heart/project1/03_workflow/skill_snapshots/codex_adapter.md",
+    "original_install_available": false,
+    "missing_original_path": "D:/code_project/academic_tools",
+    "full_runtime_executed": false,
+    "verification_scripts_executed": false,
+    "later_access_diagnosis": {
+      "git_commit": "6f792cb",
+      "academic_tools_in_git_tree": true,
+      "sparse_checkout_excludes_academic_tools": true,
+      "partial_clone_filter": "blob:none",
+      "full_source_loaded": false,
+      "report": "学术agent接入核查_2026-10-25.md"
+    }
+  },
+  "roles": [
+    "主会话：综合及一手证据核验",
+    "academic_prior_art：跨领域近邻检索",
+    "architecture_review：方法和反方审查"
+  ],
+  "model_independence": "同一模型体系角色分工，不是跨模型验证",
+  "queries_executed_by_parent": [
+    "\"Learning to Defer\" \"Multiple Experts\"",
+    "\"residual reinforcement learning\" \"robot control\"",
+    "\"Fast Inference from Transformers via Speculative Decoding\"",
+    "\"Teaching Models to Express Their Uncertainty\" verifier critic iterative refinement generalist specialist",
+    "\"LLM-Blender\" PairRanker GenFuser ACL 2023",
+    "\"Training Language Models to Self-Correct\" reinforcement learning SCoRe",
+    "\"Large Language Models Cannot Self-Correct Reasoning Yet\" ICLR 2024",
+    "\"Adaptive Mixtures of Local Experts\" 1991",
+    "\"Draft and Refine with Visual Experts\" CVPR 2026",
+    "\"SegAgent\" CVPR 2025 process reward model"
+  ],
+  "inclusion": "可核验的一手论文；含推理协作、选择性修改、专家选择或点动作评价；基础类比单独标记",
+  "exclusion": "无法核验方法的二手概述；仅词汇相同；只有训练蒸馏但没有推理协作的工作不作为直接近邻",
+  "sources": [
+    {
+      "id": "R1",
+      "title": "Draft and Refine with Visual Experts",
+      "year": 2026,
+      "venue": "CVPR",
+      "url": "https://openaccess.thecvf.com/content/CVPR2026/html/Jeong_Draft_and_Refine_with_Visual_Experts_CVPR_2026_paper.html",
+      "method_url": "https://arxiv.org/html/2511.11005v1",
+      "scope": "arXiv v1 §3.1–3.4, §4.3, §5",
+      "limits": "正式PDF直连403；正式元数据和原稿方法分别记录",
+      "relation": "最接近专家反馈、主模型修正与保留原稿"
+    },
+    {
+      "id": "R2",
+      "title": "SegAgent: Exploring Pixel Understanding Capabilities in MLLMs by Imitating Human Annotator Trajectories",
+      "year": 2025,
+      "venue": "CVPR",
+      "url": "https://openaccess.thecvf.com/content/CVPR2025/papers/Zhu_SegAgent_Exploring_Pixel_Understanding_Capabilities_in_MLLMs_by_Imitating_Human_CVPR_2025_paper.pdf",
+      "method_url": "https://arxiv.org/html/2503.08625v1",
+      "scope": "§3, §4.1–4.4, Algorithm2, Appendix A/B/E relevant passages",
+      "limits": "主会话直开正式PDF受限，读原稿HTML及一手索引片段；子任务亦核验",
+      "relation": "自动点击、试运行和过程质量评价"
+    },
+    {
+      "id": "R3",
+      "title": "Learning to Defer to Multiple Experts: Consistent Surrogate Losses, Confidence Calibration, and Conformal Ensembles",
+      "year": 2023,
+      "venue": "AISTATS",
+      "url": "https://proceedings.mlr.press/v206/verma23a.html",
+      "scope": "parent metadata/abstract; subtask PDF §2–4",
+      "relation": "专家选择训练依据；分类理论非跨域分割保证"
+    },
+    {
+      "id": "R4",
+      "title": "LLM-Blender: Ensembling Large Language Models with Pairwise Ranking and Generative Fusion",
+      "year": 2023,
+      "venue": "ACL",
+      "url": "https://aclanthology.org/2023.acl-long.792/",
+      "scope": "PDF §2.3, §3 and §4 related method passages",
+      "relation": "评价候选后生成新结果"
+    },
+    {
+      "id": "R5",
+      "title": "Mixture-of-Agents Enhances Large Language Model Capabilities",
+      "year": 2025,
+      "venue": "ICLR",
+      "url": "https://proceedings.iclr.cc/paper_files/paper/2025/file/5434be94e82c54327bb9dcaf7fca52b6-Paper-Conference.pdf",
+      "scope": "§2.1–2.3; subtask additionally §3.3",
+      "relation": "proposer和aggregator角色"
+    },
+    {
+      "id": "R6",
+      "title": "DExperts: Decoding-Time Controlled Text Generation with Experts and Anti-Experts",
+      "year": 2021,
+      "venue": "ACL-IJCNLP",
+      "url": "https://aclanthology.org/2021.acl-long.522/",
+      "scope": "parent metadata/abstract; subtask PDF §2.1–2.2 equations2–5",
+      "relation": "小专家推理时引导基础模型；概率融合"
+    },
+    {
+      "id": "R7",
+      "title": "Adaptive Mixtures of Local Experts",
+      "year": 1991,
+      "venue": "Neural Computation",
+      "url": "https://ieeexplore.ieee.org/document/6797059",
+      "scope": "abstract and indexed introduction; image-only PDF not OCRed",
+      "relation": "基础类比"
+    },
+    {
+      "id": "R8",
+      "title": "Fast Inference from Transformers via Speculative Decoding",
+      "year": 2023,
+      "venue": "ICML",
+      "url": "https://proceedings.mlr.press/v202/leviathan23a.html",
+      "scope": "abstract/introduction",
+      "relation": "提议验证类比；不迁移分布保持保证"
+    },
+    {
+      "id": "R9",
+      "title": "Large Language Models Cannot Self-Correct Reasoning Yet",
+      "year": 2024,
+      "venue": "ICLR",
+      "url": "https://proceedings.iclr.cc/paper_files/paper/2024/hash/8b4add8b0aa8749d80a34ca5d941c355-Abstract-Conference.html",
+      "scope": "abstract only",
+      "relation": "反面证据；不能外推医学不可能纠错"
+    },
+    {
+      "id": "R10",
+      "title": "Training Language Models to Self-Correct via Reinforcement Learning",
+      "year": 2025,
+      "venue": "ICLR",
+      "url": "https://proceedings.iclr.cc/paper_files/paper/2025/hash/871ac99fdc5282d0301934d23945ebaa-Abstract-Conference.html",
+      "method_url": "https://arxiv.org/html/2409.12917v1",
+      "scope": "§3 reward/reference setup; §4–5 relevant statements",
+      "relation": "纠错训练分布及多轮目标；自生成轨迹不等于无正确性监督"
+    }
+  ],
+  "local_library": "延用本地证据.json 的逐文件来源及限定读取范围，未将既有精读笔记升级为本次全文阅读",
+  "novelty_assessment": "search-bounded overlap identified; no novelty certificate",
+  "review_verdict": "REVISE: carry out falsifiable feasibility studies before locking architecture",
+  "experiments_executed": false,
+  "patient_data_accessed": false
+}

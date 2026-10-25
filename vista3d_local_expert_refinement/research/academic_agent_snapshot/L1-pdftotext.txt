@@ -1,0 +1,705 @@
+                       This CVPR paper is the Open Access version, provided by the Computer Vision Foundation.
+                                    Except for this watermark, it is identical to the accepted version;
+                              the final published version of the proceedings is available on IEEE Xplore.
+
+
+
+
+ VISTA3D: A Unified Segmentation Foundation Model For 3D Medical Imaging
+
+            Yufan He1 , Pengfei Guo1 , Yucheng Tang1 , Andriy Myronenko1 , Vishwesh Nath1 ,
+                Ziyue Xu1 , Dong Yang1 , Can Zhao1 , Benjamin Simon3,4 , Mason Belue2 ,
+                    Stephanie Harmon3 , Baris Turkbey3 , Daguang Xu1 , Wenqi Li1
+                                                  1
+                                                    NVIDIA
+                               2
+                                 University of Arkansas for Medical Sciences
+                          3
+                            National Institutes of Health 4 University of Oxford
+
+
+                         Abstract                                1. Introduction
+                                                                 Three-dimensional medical imaging such as computed to-
+Foundation models for interactive segmentation in 2D nat-        mography (CT) is widely used for creating cross-sectional
+ural images and videos have sparked significant interest in      volumetric images within various body regions. As a major
+building 3D foundation models for medical imaging. How-          anatomic imaging modality, it reveals detailed morpholog-
+ever, the domain gaps and clinical use cases for 3D med-         ical information of body structures and abnormalities. In
+ical imaging require a dedicated model that diverges from        clinical practice, manual segmentation is time-consuming
+existing 2D solutions. Specifically, such foundation mod-        and tedious, thus developing better automatic models has
+els should support a full workflow that can actually reduce      been one of the most active research topics. A typical direc-
+human effort. Treating 3D medical images as sequences            tion is enhancing network architecture and tailoring train-
+of 2D slices and reusing interactive 2D foundation mod-          ing recipes for specific tasks [18, 22, 37, 54]. For each task,
+els seems straightforward, but 2D annotation is too time-        curating a specific set of training data and training expert
+consuming for 3D tasks. Moreover, for large cohort analy-        models is often performed, which requires strong engineer-
+sis, it’s the highly accurate automatic segmentation models      ing expertise. A model that solves a variety of tasks out of
+that reduce the most human effort. However, these mod-           the box is thus more desirable.
+els lack support for interactive corrections and lack zero-         Unlike natural images where there could be an unlimited
+shot ability for novel structures, which is a key feature of     number of object classes, the clinically relevant healthy hu-
+“foundation”. While reusing pre-trained 2D backbones             man anatomies revealed by CT or MRI are limited (such as
+in 3D enhances zero-shot potential, their performance on         liver, pancreas), thus training an automated segmentation
+complex 3D structures still lags behind leading 3D mod-          model that supports most of standard human anatomies is
+els. To address these issues, we present VISTA3D, Versatile      technically feasible [12, 24, 29, 58, 61]. However, in prac-
+Imaging SegmenTation and Annotation model, that targets          tice, clinicians may be more interested in rare pathologies
+to solve all these challenges and requirements with one          or animal data that are usually unsupported by those mod-
+unified foundation model. VISTA3D is built on top of the         els due to data scarcity. Lacking zero-shot capability to han-
+well-established 3D segmentation pipeline, and it is the first   dle those use cases becomes a significant limitation. Mean-
+model to achieve state-of-the-art performance in both 3D         while, it is important for the model to allow human input
+automatic (supporting 127 classes) and 3D interactive seg-       for correction for procedures like surgical planning.
+mentation, even when compared with top 3D expert models             Recently, large language models [2, 55, 57] have shown
+on large and diverse benchmarks. Additionally, VISTA3D’s         strong generalizability on various tasks and are considered
+3D interactive design allows efficient human correction,         the foundation models. The idea of a “promptable” sys-
+and a novel 3D supervoxel method that distills 2D pre-           tem has been proposed to achieve a flexible model that can
+trained backbones grants VISTA3D top 3D zero-shot per-           solve different tasks out-of-the-box. For image segmenta-
+formance. We believe the model, recipe, and insights repre-      tion, Segment Anything (SAM) [26] has gained great inter-
+sent a promising step towards a clinically useful 3D foun-       est and achieved impressive zero-shot performance. In the
+dation model. Code and weights are publicly available at         medical domain, recent work [33] hence adapted SAM to
+https://github.com/Project-MONAI/VISTA.                          medical imaging modalities via model fine-tuning. These
+                                                                 SAM-based methods demonstrate promising results in 2D
+
+
+
+                                                             20863
+Figure 1. Fig.(a) shows the full human-in-the-loop workflow VISTA3D supports. If the segmentation task X is within 127 supported
+classes (left green circle), VISTA3D performs accurate automatic segmentation. The doctor can inspect and efficiently edit the result with
+VISTA3D if needed. If X is a novel class (right blue circle), VISTA3D performs 3D interactive zero-shot segmentation. Fig.(b) shows
+the VISTA3D architecture. It contains two branches that share the same image encoder. The top auto-branch will activate out-of-the-box
+automatic segmentation if user provide a class prompt that’s within 127 supported classes. The bottom interactive branch will activate
+interactive segmentation if user provide 3D point click prompts. If both branches are activated, a merger module based on Alg. 1 will use
+interactive results to edit automatic results.
+
+
+that leverage interactive user input. For 3D medical im-                seen classes or use in-context learning via text or example
+ages, such prompt (e.g. point) binding to every class, ev-              guidance. The model should operate in 3D since 2D slice-
+ery slice, and every scan, often requires substantial human             by-slice methods are too time-consuming and may not fully
+effort, making it infeasible for large cohort data analysis.            leverage 3D visual contexts; 4) Few shot/transfer learning
+The recent Segment Anything in Video (SAM2) [44] trig-                  abilities that allow users to quickly finetune the model to
+gered even greater interest since a 3D scan is represented by           perform accurate automatic segmentation on new classes,
+a stack of 2D cross-sectional images (slices), while a video            given that existing in-context learning or open vocabulary
+is also a stack of 2D images (frames). However, our experi-             segmentation still fall short compared to expert 3D models
+ments show that the SAM2 framework, even well-finetuned                 in accuracy.
+on 3D medical datasets, cannot compare with VISTA3D,                        To support this workflow and achieve comparable per-
+especially on complicated 3D structures (details in the sup-            formances with the best expert models, we should build the
+plementary). This illustrates the big gap between 2D natural            model based on well-established 3D pipelines that rely on
+images or videos and cross-sectional medical images. Simi-              3D backbones and sliding window inference. However, this
+larly, SAM3D [5] extracts 3D volume features slice by slice             direction is not taking advantage of the existing 2D pre-
+with a 2D SAM encoder and a 3D decoder, but the results                 trained weights with a strong zero-shot ability(e.g. SAM).
+are much worse than 3D experts. Simply applying methods                 Reusing SAM weights and adding light-weight 3D adap-
+from natural images to 3D medical images will fall short.               tor modules [14, 60] seems viable but the automatic per-
+    Recent works exploring in-context learning for medical              formance on diverse classes (comparing to TotalSegmenta-
+image segmentation [6, 45, 51, 59] can segment any class                tor [12]) are limited due to freezing the majority of weights.
+guided by example image or text. This seems like an op-                 So the challenge is, how to build a model that possesses the
+timal case because it does not require model finetuning or              advantage of well-established 3D pipelines, while also uti-
+time-consuming human input. However, the performance                    lizing the insights and checkpoints from 2D natural images
+of such methods is far behind [45] the dataset-specific su-             to solve 3D problems. Based on this goal, we introduce
+pervised models (e.g. nnU-Net [22]).                                    VISTA3D, and our contributions are:
+    We envision that a foundation model for 3D medical im-              1. The first unified foundation model that supports a full
+age segmentation should support a full workflow (Fig. 1(a))                 annotation workflow, and achieves state-of-the-art 3D
+that can reduce human effort, which may have the follow-                    promptable automatic segmentation and interactive edit-
+ing essential capabilities: 1) Highly accurate automatic seg-               ing, benchmarked over 14 challenging datasets with 127
+mentation for common organs or structures; 2) Ability to                    classes and compared with well-established baselines.
+interact with human experts, allowing for effective refine-             2. A novel supervoxel methods are developed to distill
+ments of existing segmentation results; 3) Zero-shot capa-                  2D foundation models for 3D medical imaging, which
+bilities, either allow the user to interactively annotate un-               boosted VISTA3D’s zero-shot performance by 50% and
+
+
+
+                                                                 20864
+   achieved state-of-the-art 3D zero-shot performance with      multi-organ segmentation, the inability of zero-shot and in-
+   much less annotation efforts.                                teractive segmentation impedes their real-world applicabil-
+3. We curated a large CT dataset with 11454 scans, paired       ity. The in-context learning or open vocabulary segmenta-
+   it with partial manual labels, pseudo labels, and super-     tion [6, 45, 51, 59] are desirable, which can achieve auto-
+   voxels, and proposed a novel four-stage training recipe      matic segmentation on the unseen class by prompts or sup-
+   to tackle the challenges to achieve state-of-the-art per-    port examples. However, at the current stage, their perfor-
+   formances and editing experiences.                           mances fall short compared to the expert models, especially
+                                                                for 3D images [45].
+2. Related Work                                                 Interactive medical image segmentation. The Seg-
+                                                                ment Anything Model (SAM) [26] and its video vari-
+Dataset-specific supervised training. Many existing 3D          ant (SAM2) [44] have inspired and enabled various med-
+medical imaging segmentation methods [18, 22, 37, 54] are       ical imaging applications through the adaptation and fine-
+proposed to train dedicated models for a specific dataset.      tuning of medical data [14, 21, 33, 60]. MedSAM [33] fine-
+nnU-Net [22] is a well-established framework that can au-       tunes SAM on large 2D medical datasets using the bound-
+tomatically adapt to different datasets. This adaptation oc-    ing box but lacks the ability for detailed editing and han-
+curs seamlessly, mitigating the need for manual intervention    dling 3D inputs. The SAM adapters [14, 60] add 3D adap-
+or specialized expertise, which expedites the medical imag-     tor modules to the SAM backbone for efficient 3D finetun-
+ing segmentation models. Auto3DSeg1 presents a holistic         ing, however, the 3D performance was validated on lim-
+approach to tackling the challenge of large-scale 3D med-       ited classes and benchmarks. The work closely related
+ical image segmentation. It also provides automatic task        to ours is SegVol [11], a 3D foundation model designed
+adaptation. These two frameworks have proven their effec-       for 3D semantic and interactive segmentation. However,
+tiveness by winning numerous highly competitive 3D seg-         SegVol [11]’s performance relies heavily on the 3D bound-
+mentation challenges [10, 13, 22, 38–43]. Although auto-        ing box added with text prompts, and there is still a big per-
+configuration solutions can speed up the curation of task-      formance gap with its text prompt-based automatic segmen-
+specific expert models and achieve high performance, they       tation. Although those work approved their effectiveness
+lack inherent zero-shot capabilities and require human ef-      in segmenting 10 to 20 classes of 3D structures on bench-
+fort and resource in data preparation and training.             marks like BTCV [28] or AMOS [23], the problem is, that
+Foundational segmentation model. Foundation segmen-             those structures can be easily solved by automatic founda-
+tation models aim to develop a single unified deep learn-       tion models like TotalSegmentator [12]. It is important to
+ing model capable of segmenting multiple anatomical struc-      rethink the position of interactive models and how they can
+tures/organs from whole-body CT scans, rather than train-       really reduce human efforts for 3D medical segmentation.
+ing separate models for each organ. Totalsegmentator [12]
+is proposed for fully automatic segmentation of over 117
+anatomical structures in CT images covering various or-
+                                                                3. Method
+gans, bones, muscles, and vessels. It represents a sig-         3.1. Overview
+nificant contribution to the biomedical imaging commu-
+nity, enabling researchers and clinicians to leverage ac-       We separate the segmentation tasks into supported classes
+curate and comprehensive segmentation without requiring         and zero-shot classes. The supported classes are the classes
+time-consuming manual efforts. The Universal Model [29]         that have enough training data with annotations with which
+leverages text embeddings from the CLIP model to en-            we can train VISTA3D to perform automatic segmentation
+code the anatomical relationships between organs and tu-        (here we support 127 classes). We curated a global class
+mors and support the automatic segmentation of 31 classes.      index list and mapped the groundtruth indices from those
+SAT [61] supports automatic segmentation on 497 classes         partially annotated datasets to this list. We trained the auto-
+based on text prompts. Although they tried to incorpo-          matic head to accept the index as the prompt and output a bi-
+rate text embeddings into automatic segmentation, the text      nary segmentation. For zero-shot classes, the segmentation
+prompts only work with a fixed vocabulary and do not sup-       is mainly generated by the VISTA3D interactive branch,
+port zero-shot or open-vocabulary segmentation. Continual       which accepts user click coordinates in 3D. The interactive
+Segment [24] is a unified model capable of segmenting 143       segmentation also works for supported classes. The overall
+body organs by a frozen encoder coupled with incremen-          workflow is shown in Fig. 1(a). To train such a model, we
+tally added decoders to avoid catastrophically forgetting       curated a large dataset containing 11454 3D CT scans, gen-
+previously learned structures. While those foundational 3D      erated pseudo labels from TotalSegmentator model [12] and
+segmentation models represent significant advancements in       supervoxels using SAM pre-trained weights [26](see detail
+                                                                in Sec 3.3). A stage-by-stage training recipe is used to train
+  1 https://monai.io/apps/auto3dseg                             interactive and automatic workflows systematically.
+
+
+
+                                                           20865
+3.2. Model architecture                                              related operations including point embedding are changed
+                                                                     to 3D. The downsampled feature and the point embedding
+SAM’s [26] image encoder is a vision transformer
+                                                                     will go through cross-attention transformers and generate
+(ViT) [27] with 16×16 patch embedding. For 3D im-
+                                                                     the final output. 2) To increase the click response speed
+ages, ViT becomes extremely memory-demanding, since
+                                                                     for a better user experience, only a local patch centered at
+the token length (number of patches) is much longer com-
+                                                                     the click point will be segmented and used to refine auto-
+pared to 2D images. On the other hand, 16×16 patch
+                                                                     matic results. 3) For some classes that have ambiguity or
+embedding inevitably loses spatial details. Computation-
+                                                                     overlap, e.g. pancreas/pancreas tumor and colon/colon tu-
+ally feasible adaptations of transformers to 3D images have
+                                                                     mor, a single point click cannot solve the ambiguity. Since
+been proposed [17, 19], but the state-of-the-art results, as
+                                                                     the model knows the class x to segment beforehand, we can
+shown in the recent MICCAI 3D segmentation challenges,
+                                                                     add a special embedding to the click point automatically if x
+are still predominantly based on the convolutional architec-
+                                                                     lies in specific classes like colon/pancreas tumor. This em-
+tures. Specifically, the SegResNet model, a U-net type ar-
+                                                                     bedding can be used to distinguish ambiguous classes. Note
+chitecture, has won BraTS 2023 [37], KiTS 2023 [40] and
+                                                                     that this special embedding is the same for all classes with
+Seg.A 2023 [42] MICCAI 3D segmentation challenges. In
+                                                                     ambiguity. If we use class embedding in Ec to solve the am-
+VISTA3D, we use SegResNet [37] from MONAI [7], as a
+                                                                     biguity, the point head will learn a shortcut to ignore point
+backbone CNN, and followed the best practices in medical
+                                                                     clicks. 4) Another challenge is that the interactive branch
+image segmentation of patch-based training (we used 128-
+                                                                     needs to handle both supported classes and unseen classes
+voxel cubic patch) and sliding window inference.
+                                                                     (zero-shot), while there might be a conflict between these
+Automatic branch As shown in Fig. 1(b), there are two
+                                                                     two tasks. Segmenting supported class with high accuracy
+branches: the automatic branch (top) and the interactive
+                                                                     will require the model to remember or overfit specific fea-
+branch (bottom). The SegResNet encoder is shared between
+                                                                     tures about the class like the shape and position. However,
+two branches for learning image embedding. Each branch
+                                                                     organ-specific tuning could hurt zero-shot generalizability.
+has its own decoder with a skip connection with the shared
+                                                                     We mitigate this problem by adding a zero-shot embedding
+encoder. The auto-head contains an MLP layer M and a
+                                                                     to the point head cross-attention if the class x is a novel
+learnable N × C class embedding Ec (we use C = 256),
+                                                                     class. Examples can be found in the supplementary.
+where N represents N supported classes. The output fea-
+ture F from the decoder is of size C × H × W × D. If                 Interactive refinement over automatic results As can be
+the user wants to segment class i (this single number i is           seen in Fig. 1(b), the two branch outputs are independent
+the input prompt for the auto-head), the corresponding class         from each other. The use case by combining the results is to
+embedding Ec [i] is used to map the feature into segmenta-           interactively correct the automatic segmentation results. As
+tion logits, sigmoid(M (Ec [i]) × F ). Compared to models            illustrated in FocalClick [8], the interactive refinement over
+that output all classes and apply sof tmax at the end, our           existing masks could destroy the correct part. We observe
+promptable scheme reduces memory usage dramatically if               this behavior when simply combining the interactive results
+number of classes are huge. Meanwhile, it avoids the par-            and the automatic results. We used the local refinement idea
+tial label problem in training on diverse partially labeled          from FocalClick and proposed the following merging algo-
+datasets. We added this additional MLP layer M due to                rithm Alg. 1. The core idea is to add or remove only the
+empirically better performance.                                      connected component regions that contain the point clicks
+                                                                     to avoid unexpected modification.
+    Works [11, 29, 61] have tried to use text embedding like
+CLIP but none of them are able to achieve zero-shot or open
+                                                                     3.3. Data
+vocabulary segmentation with text, which is the main bene-
+fit of text prompts. Moreover, we empirically found CLIP-         We curated a collection of 11454 CT volumetric images ob-
+embedding gives slightly worse results than randomly ini-         tained from in-house and publicly available data sources [3,
+tialized class embeddings (used by VISTA3D).                      4, 12, 16, 20, 23, 25, 31, 32, 46–50, 52, 53, 56] with a
+Interactive branch For the interactive branch, the click          wide range of acquisition protocols and subject conditions.
+points’ 3D coordinates and their labels (positive or negative)    Among these, five of them are without labels, and the rest
+are accepted as prompts for the point head. The point head        have various voxel-wise annotation regions of interest, in-
+is based on the SAM’s [26] point prompt encoder, where            cluding anatomical structures and lesions. We denote the
+the feature map performs cross-attention with point embed-        ground truth from those datasets as manual labels or par-
+ding. We made several changes to satisfy the needs for 3D         tial labels. Each data source is randomly split into 64%
+medical images: 1) To keep the high-resolution details, the       training, 16% validation, and 20% test sets. We generated
+point head input feature is first upsampled back to the origi-    pseudo-labels of 117 classes using TotalSegmentator [12]
+nal image resolution with the long skip connection and then       and supervoxels using SAM for every scan. The unreliable
+2x downsampled to reduce the memory footprint. All the            pseudo-labels are removed by post-processing.
+
+
+
+                                                             20866
+Algorithm 1 Interactive refinement on the automatic results                             propose a novel method to distill the image understand-
+Require:      I positive and J negative clicks Ppi and Pnj , au-                        ing ability from SAM by generating 3D supervoxels from
+  tomatic and interactive output Ma and Mp                                              2D SAM feature maps. The algorithm is shown in Alg. 2.
+Ensure: size(Ma ) = size(Mp )                                                           We perform a 3D supervoxel algorithm on the upsampled
+  Denote “get 3D connected components” as CC(·).                                        SAM feature embedding, which is generated slice-by-slice
+     n
+  {Madd  }N ← CC((Mp − Ma ) > 0)                           \triangleright  N added      in three views. An example of generated supervoxel results
+  connected components                                                                  is shown in Fig. 2. We generate supervoxels for all 11454
+     k
+  {Mrm  }K ← CC((Ma − Mp ) > 0)            \triangleright  K removed                    CT scans and use them to train our interactive branch, and
+  connected components                                                                  this gives VISTA3D zero-shot capabilities. SegVol [11]
+  if ∃ Ppi ∈ M a then Madd    n       n
+                                  = Madd ∪ CC(M p )                                     used a similar idea but the supervoxel generation is based
+      i=1,··· ,I                                                                        on graph-cut, which is still on low-level image features.
+   end if \triangleright  If positive points in Ma , add Mp into addition               Instead, VISTA3D achieved better zero-shot performance
+   candidates.                                                                          through distilling knowledge from SAM.
+   Mf inal rm , Mf inal add ← {}, {}
+   for n = 1 to N do                                                                    Algorithm 2 3D supervoxel generation from SAM
+       if                ∃ Ppi ∈ Madd         n
+                                                 then Mf inal add =
+             i=1,··· ,I                                                                 Require: SAM pretrained ViT-H model Φ, image encoder
+                   n
+   Mf inal add ∪ Madd                                                                     ΦE , output scaling layer in the mask decoder Φs . \triangleright  All
+       end if                                                                             SAM components related to prompts are removed
+   end for                                                                              Ensure: Input 3D CT image V
+   for k = 1 to K do                                                                      V ← {x1 , x2 , · · · , xA }                       \triangleright  V as a stack of axial slices
+       if     ∃ Pnj ∈                    k
+                                        Mrm then Mf inal rm                    =          V ← {y1 , y2 , · · · , yC } \triangleright  V as a stack of coronal slices
+             j=1,··· ,J
+                                                                                          V ← {z1 , z2 , · · · , zS } \triangleright  V as a stack of sagittal slices
+   Mf inal rm ∪ Mrk m
+                                                                                          FA , FC , FS ← {}, {}, {}
+       end if
+                                                                                          for i = 1 to A;j = 1 to C;k = 1 to S do
+   end for
+                                                                                              FA = FA ∪ ΦS (ΦE (xi ))
+   return Ma + Mf inal add − Mf inal rm
+                                                                                              FC = FC ∪ ΦS (ΦE (yj ))
+                                                                                              FS = FS ∪ ΦS (ΦE (zk ))                                           \triangleright  Generate upsampled
+                                                                                          SAM feature for each slice at each axis.
+                                                                                          end for
+                                                                                          F3D ← FA + FC + FS                          \triangleright  FA , FC , FS are 3D tensors
+                                                                                          with the same size
+                                                                                          return SLIC(F3D , nsegments = 100, sigma = 3)                                                          \triangleright 
+                                                                                          We use SLIC [1] algorithm from skimage
+
+
+                                                                                        3.4. Recipe
+Figure 2. Generated supervoxel from Alg. 2, showing examples
+in axial, sagittal, and coronal views. Different colours represent                      The training has four stages to solve the class imbalance
+different supervoxels.                                                                  issues and complications between the automatic and inter-
+                                                                                        active branches.
+                                                                                        Stage1-Interactive branch training: This is the first stage
+Supervoxel generation The vast majority of SAM’s zero-                                  of VISTA3D training, and the goal is to train a strong im-
+shot capabilities come from this large-scale supervised                                 age encoder that can extract good and generalizable features
+training on its 11 million diverse and fully annotated im-                              from 3D CT images, and enable the interactive branch to
+ages [26]. Those annotations helped SAM learn how hu-                                   have good response to point clicks. In each iteration, the
+mans perceive an object, and become the image segmen-                                   inputs contain randomly cropped 128 cubic image patches,
+tation foundation model. However, the manual labels or                                  corresponding manual labels, pseudo labels, and supervox-
+pseudo-labels in 3D CT can only cover around one or two                                 els. We use a point sampler (details in supplementary) to
+hundred classes. We empirically found that this level of                                randomly sample points and its corresponding binary seg-
+class diversity is not enough for the model to achieve SAM-                             mentation mask for training. The mask is generated by
+like zero-shot ability in 3D. To solve this problem, most                               combining manual labels or pseudo labels with supervox-
+works decided to finetune SAM pretrained ViT checkpoint                                 els or supervoxels alone. The goal is to diversify the ground
+on 2D medical data to inherit this zero-shot ability, which                             truth and make the model responsive to all kinds of objects
+inevitably limited the adaptability to 3D images. Here we                               and boundaries. We also followed the SAM’s iterative train-
+
+
+
+                                                                                   20867
+ing scheme and sampled new points from the false positive           to train expert models for each dataset (same train/val/test
+or negative regions from previous predictions to improve            split as VISTA3D) until full convergence. TotalSegmenta-
+editing ability. We used an iteration of 5.                         tor is applied out-of-the-box as a foundation model. These
+Stage2-Interactive branch finetuning: The data imbal-               three baselines are the well-established “go-to” options for
+ance issue is severe in our curated dataset since some rare         automatic segmentation, and VISTA3D achieved compara-
+classes such as tumors are only presented in a limited num-         ble “auto” performances and much better performance if
+ber of images. Stage 1 has a large number of training iter-         minimum human input is available. Meanwhile, our model
+ations and if we oversample under-represented classes dur-          is much faster than Totalsegmentator (it has 5 model ensem-
+ing stage 1, those classes will soon overfit, moreover, over-       ble) as shown in Table. 2. In Fig. 3, we show an example
+fit at different iterations for different classes. We disabled      of using click points to correct automatic results. In Fig. 4,
+oversampling in stage 1, and under-represented classes were         we present a case of automatic segmentation over a monkey
+rarely sampled (still needs to be sampled). In stage 2, we          scan, showing the generalizability of the VISTA3D model.
+perform a quick finetuning with specific dataset oversam-           More examples are in the supplementary.
+pling to improve low-performing classes. Meanwhile, we
+removed the supervoxel and unlabeled dataset in finetuning.
+Stage3-Automatic branch training: The image encoder
+has been trained in the previous stages with all the 3D
+medical annotations and SAM-generated supervoxels. The
+training is based on binary segmentation without any class-
+specific information thus we can expect the encoder to gen-
+erate more generalizable features. We freeze the image en-          Figure 3. Correcting automatic segmentation with points. The left
+coder to avoid changes to the interactive branch and train          figure shows the automatic liver segmentation with a false negative
+                                                                    area. After a positive point, the false negative region is corrected.
+the auto branch decoder and head. The training is a com-
+                                                                    The third figure shows another slice with a false positive and a
+mon supervised training, but we randomly sample existing            negative point removed from the region shown in the last figure.
+class indexes from the manual labels and pseudo-labels and
+use the corresponding binary masks as ground truth.
+Stage4-Automatic branch finetuning: Similar to stage 2,
+we need to improve the performance of under-represented
+classes. We used MAISI [15] to generate synthetic data con-
+taining anomalies such as tumors and lesions to enlarge the
+under-represented class sample size. We sample uniformly
+across dataset and finetuned model for a few epochs.
+
+4. Supported classes results
+We first test the performance of the supported classes.             Figure 4. An example of monkey CT scan (2 sagittal slices). We
+For supported classes, the out-of-the-box performance of            can see that VISTA3D achieved more robust segmentation.
+a foundational model should have state-of-the-art or com-
+parable performances to the data-specific expert mod-
+els. Meanwhile, we claim VISTA3D interactive branch                 5. Zero-shot results
+can correct error regions in automatic results. We show
+the VISTA3D’s out-of-the-box automatic segmentation re-             In this section, we test the zero-shot ability of VISTA3D.
+sults (VISTA3D auto), interactive results with a single pos-        We compare with MedSAM [33] and SegVol [11] as they
+itive click sampled from the foreground center (VISTA3D             showed the best interactive performances in 2D and 3D sep-
+point), and the corrected automatic results with a single           arately. For the MedSAM baseline, we adopt the 3D infer-
+click point (VISTA3D auto + point) with Alg. 1 in Table. 1.         ence pipeline via a series of 2D slices as described in [33].
+The click point is randomly sampled from the false posi-            For segmentation targets that are larger than 10 voxels, tight
+tive (negative point) or false negative region (positive point),    bounding boxes for each slice were generated to simulate
+based on which has a larger area size. Note that VISTA3D            user-provided prompts. Each bounding box is considered
+is a patch-based method using sliding window inference,             the same annotation effort as two-point prompts in our eval-
+thus a click point will only affect the 128 cubic patch that        uations. For the SegVol baseline, the default settings [11]
+includes the point. The evaluation with a single point means        are evaluated using a positive point with three pairs of pos-
+1 click for each sliding window patch. As for baselines, we         itive and negative points (7 points in total), as well as the
+used the Auto3Dseg framework and the nnUNet framework               zoom-out-zoom-in inference strategy. For VISTA3D, We
+
+
+
+                                                               20868
+Table 1. Average dice score of the test split in each dataset. TotalSegV2 results are biased towards nnUNet and TotalSegmentator (the
+ground truth is generated by the pretrained TotalSegmentator model, which uses nnUNet architecture, and the training data may include our
+test split. Noted with *). The Bone Lesion is a private dataset with 237 CT scans. Detailed results of all classes are in the supplementary.
+
+                                 Auto3dSeg      nnUNet     TotalSegmentator    VISTA3D auto       VISTA3D point      VISTA3D auto+point
+ MSD03 Hepatic tumor [3]               0.616      0.617                   -              0.588              0.701                    0.687
+ MSD06 Lung tumor [3]                  0.562      0.554                   -              0.613              0.682                    0.719
+ MSD07 Pancreatic tumor [3]            0.485      0.488                   -              0.324              0.603                    0.638
+ MSD08 Hepatic tumor [3]               0.683      0.659                   -              0.682              0.733                    0.757
+ MSD09 Spleen [3]                      0.965      0.967               0.966              0.952              0.938                    0.954
+ MSD10 Colon tumor [3]                 0.475      0.473                   -              0.439              0.609                    0.633
+ Airway [53]                           0.896      0.899                   -              0.852              0.819                    0.867
+ Bone Lesion                           0.343      0.396                   -              0.491              0.536                    0.585
+ BTCV-Abdomen [47]                     0.807      0.825               0.846              0.849              0.815                    0.859
+ BTCV-Cervix [48]                      0.598      0.640               0.611              0.672              0.736                    0.775
+ VerSe [50]                            0.786      0.828               0.832              0.825              0.896                    0.906
+ AbdomenCT-1K [31]                     0.934      0.939               0.921              0.935              0.903                    0.940
+ AMOS22 [23]                           0.854      0.854               0.824              0.841              0.785                    0.856
+ TotalSegV2 [12]                       0.882     *0.906              *0.942              0.893              0.884                    0.918
+ Average                               0.706      0.718                   -              0.711              0.760                    0.792
+
+
+
+
+  Figure 5. Zero-shot dice scores. The X-axis is the number of click points. The Y-axis is the average dice score over the whole dataset.
+
+
+
+
+Figure 6. The fine-grained zero-shot interactive segmentation on kidney tumor. The first figure shows the region of the tumor. Step 1 click
+a positive point (red) on the tumor and get the results. Step 2 click more points to refine the details. The result has over-segmentation and
+add a negative point (blue) on step 3 to get the final results.
+
+
+
+
+                                                                   20869
+Table 2. Inference speed on a 16GB V100 GPU with varying                      Table 3. Finetuning performances of average test dice scores, with
+image sizes (size after resampled to 1.5x1.5x1.5mm). Default                  respect to the number of training cases.
+118 class automatic segmentation using VISTA3D and default 117
+class segmentation using TotalSegmentator [12]. No special model                 Dataset    # of cases   Auto3DSeg   nnU-Net   TotalSegmentator   VISTA3D
+                                                                                                 1         0.820      0.759          0.791          0.926
+optimization (e.g. tensorRT).                                                                    5         0.923      0.922          0.924          0.935
+                                                                                 Micro-CT       10         0.934      0.930          0.936          0.938
+                                                                                  Mouse         20         0.947      0.942          0.944          0.944
+     Size      333x333x603   512x512x512   512x512x768   1024x1024x512
+                                                                                                40         0.949      0.949          0.949          0.948
+   VISTA3D        1m07s         2m09s         3m25s          9m20s
+                                                                                                89         0.949      0.949          0.951          0.951
+   TotalSeg.      4m34s        12m01s        18m56s         40m13s                               1         0.214      0.185          0.779          0.795
+                                                                                                 5         0.611      0.562          0.823          0.839
+                                                                                                10         0.744      0.697          0.837          0.855
+                                                                                 WORD
+                                                                                                20         0.806      0.793          0.855          0.862
+                                                                                                40         0.862      0.831          0.857          0.869
+                                                                                               100         0.873      0.874          0.875          0.875
+
+
+
+
+                                                                              checkpoint. We perform finetuning on the automatic branch
+                                                                              under the setting of one-shot, five-shot, and until the full
+                                                                              training data split. The dataset we use includes the Whole
+                                                                              abdominal Organs Dataset (WORD) [30] and the micro-CT
+                                                                              mouse dataset [34]. We compare with training from scratch
+                                                                              methods (nnU-Net and Auto3DSeg, default setting), and
+Figure 7. The adjacent slices (slice N+4 and slice N-4) responses             finetuning Totalsegmentator pretrained checkpoint with de-
+to the clicks on slice N (the same slice and click on Fig. 6). The
+                                                                              fault nnU-Net pipeline. We use the train/val/test data split
+results show how the clicks affect 3D space.
+                                                                              from WORD [30] and our own split for the mouse dataset.
+                                                                              The results of the held-out test set are shown in Table 3.
+mimic user annotations to perform iterative point clicks.                     Compared with the baselines, VISTA3D showed much bet-
+The first point is sampled at the foreground center, then                     ter performance under few shot setting. Meanwhile, the
+the next point will be randomly sampled from the largest                      WORD results of using the full training split (100 cases) are
+connected false positive or false negative region, which has                  directly comparable with all the baselines in WORD [30]
+a larger area size. We evaluate the performance of 4 ex-                      paper and VISTA3D has the highest dice score (0.875) over
+ternal datasets with novel classes that our automatic seg-                    all 10 baselines. The results support our claim where users
+mentation does not support. 1) the murine dataset [34] in-                    can annotate a few examples and finetune VISTA3D to
+cludes 140 micro-CT scans (0.2mm resolution) with 4 an-                       build a data flywheel.
+notated mouse organs: heart, left lung, right lung, and spinal
+cord. The left lung showed similar results to the right lung,                 7. Conclusion
+and the example mouse CT scan and left lung results are
+                                                                              In this paper, we introduced VISTA3D, the first unified 3D
+shown in the appendix. 2) the C4KC-KITS (kidney tumor,
+                                                                              CT foundation segmentation model. All the components
+210 scans) dataset [20], the Adrenocortical Carcinoma (53
+                                                                              of VISTA3D are designed to fulfill our proposed human-
+scans) dataset [9, 35], the Hepatocellular Carcinoma (105
+                                                                              in-the-loop workflow, such that VISTA3D can be used out-
+scans) dataset [9, 36]. The results are shown in Fig. 5. The
+                                                                              of-the-box to save human effort. It achieved highly accu-
+results show the superior performance of VISTA3D in both
+                                                                              rate segmentation comparable with specialized expert mod-
+accuracy and reduced annotation efforts. VISTA3D trained
+                                                                              els for each dataset, state-of-the-art interactive segmenta-
+without supervoxel (VISTA-NoSupervoxel) is also shown
+                                                                              tion for both zero-shot and results editing, and strong trans-
+in the figure, and the results showed the importance of su-
+                                                                              fer learning ability. The large-scale training data with di-
+pervoxel for the zero-shot ability. In Fig. 6, we show the
+                                                                              verse types of labels, carefully designed model architecture,
+iterative point clicks of a kidney tumor from C4KC-KITS
+                                                                              and training recipes were vital for building this highly capa-
+dataset [20]. From step 1 to step 3 we can see how the
+                                                                              ble model. We also utilize the best practices in 3D medical
+segmentation responds to the clicks. Fig. 7 shows the re-
+                                                                              image analysis (e.g. sliding-window, patches, 3D convo-
+sponses on other slices without clicks. This shows how the
+                                                                              lutions, data synthesis) to improve the results. For future
+clicks respond in 3D space.
+                                                                              work, we are working on 1) enlarging the supported class
+6. Finetuning results                                                         number and modalities, including adding supports for MRI
+                                                                              and PET imaging, 2) improving the zero-shot experiences
+In many cases, interactive annotation is used to curate                       by developing smarter methods to better utilize the datasets
+enough data to train an accurate automatic model. We show                     and model checkpoints from natural images, and 3) validat-
+the potential of transfer learning using VISTA3D pretrained                   ing and integrating the workflow with clinical partners.
+
+
+
+                                                                         20870
+References                                                          [12] Wasserthal et al. TotalSegmentator: Robust segmentation of
+                                                                         104 anatomic structures in CT images. Radiology: Artificial
+ [1] Radhakrishna Achanta, Appu Shaji, Kevin Smith, Aurelien             Intelligence, 5(5):e230024, 2023. 1, 2, 3, 4, 7, 8
+     Lucchi, Pascal Fua, and Sabine Süsstrunk. SLIC superpix-      [13] Sergios Gatidis, Marcel Früh, Matthias Fabritius, Sijing Gu,
+     els compared to state-of-the-art superpixel methods. IEEE           Konstantin Nikolaou, Christian La Fougère, Jin Ye, Jun-
+     transactions on pattern analysis and machine intelligence,          jun He, Yige Peng, Lei Bi, et al. The autopet challenge:
+     34(11):2274–2282, 2012. 5                                           towards fully automated lesion segmentation in oncologic
+ [2] Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ah-               pet/ct imaging. 2023. 3
+     mad, Ilge Akkaya, Florencia Leoni Aleman, Diogo Almeida,       [14] Shizhan Gong, Yuan Zhong, Wenao Ma, Jinpeng Li, Zhao
+     Janko Altenschmidt, Sam Altman, Shyamal Anadkat, et al.             Wang, Jingyang Zhang, Pheng-Ann Heng, and Qi Dou.
+     GPT-4 technical report. arXiv preprint arXiv:2303.08774,            3dsam-adapter: Holistic adaptation of sam from 2d to 3d
+     2023. 1                                                             for promptable medical image segmentation. arXiv preprint
+ [3] Michela Antonelli, Annika Reinke, Spyridon Bakas, Key-              arXiv:2306.13465, 2023. 2, 3
+     van Farahani, Annette Kopp-Schneider, Bennett A Landman,       [15] Pengfei Guo, Can Zhao, Dong Yang, Ziyue Xu, Vish-
+     Geert Litjens, Bjoern Menze, Olaf Ronneberger, Ronald M             wesh Nath, Yucheng Tang, Benjamin Simon, Mason Belue,
+     Summers, et al. The medical segmentation decathlon. Nature          Stephanie Harmon, Baris Turkbey, et al. Maisi: Medical
+     communications, 13(1):4128, 2022. 4, 7                              ai for synthetic imaging. arXiv preprint arXiv:2409.11169,
+ [4] SG Armato III, G McLennan, L Bidaut, MF McNitt-Gray,                2024. 6
+     CR Meyer, AP Reeves, B Zhao, DR Aberle, CI Henschke,           [16] Stephanie A Harmon, Thomas H Sanford, Sheng Xu,
+     EA Hoffman, et al. Data from LIDC-IDRI [data set]. The              Evrim B Turkbey, Holger Roth, Ziyue Xu, Dong Yang, An-
+     Cancer Imaging Archive, 2015. 4                                     driy Myronenko, Victoria Anderson, Amel Amalou, et al.
+ [5] Nhat-Tan Bui, Dinh-Hieu Hoang, Minh-Triet Tran, Gian-               Artificial intelligence for the detection of covid-19 pneumo-
+     franco Doretto, Donald Adjeroh, Brijesh Patel, Arabinda             nia on chest ct using multinational datasets. Nature commu-
+     Choudhary, and Ngan Le. Sam3d: Segment anything model               nications, 11(1):4080, 2020. 4
+     in volumetric medical images. In 2024 IEEE International       [17] Ali Hatamizadeh, Yucheng Tang, Vishwesh Nath, Dong
+     Symposium on Biomedical Imaging (ISBI), pages 1–4. IEEE,            Yang, Andriy Myronenko, Bennett Landman, Holger R
+     2024. 2                                                             Roth, and Daguang Xu. Unetr: Transformers for 3D med-
+ [6] Victor Ion Butoi, Jose Javier Gonzalez Ortiz, Tianyu Ma,            ical image segmentation. In Proceedings of the IEEE/CVF
+     Mert R Sabuncu, John Guttag, and Adrian V Dalca. Uni-               winter conference on applications of computer vision, pages
+     verseg: Universal medical image segmentation. In Proceed-           574–584, 2022. 4
+     ings of the IEEE/CVF International Conference on Com-          [18] Yufan He, Dong Yang, Holger Roth, Can Zhao, and Daguang
+     puter Vision, pages 21438–21451, 2023. 2, 3                         Xu. Dints: Differentiable neural network topology search
+                                                                         for 3d medical image segmentation. In Proceedings of
+ [7] M Jorge Cardoso, Wenqi Li, Richard Brown, Nic Ma, Eric
+                                                                         the IEEE/CVF conference on computer vision and pattern
+     Kerfoot, Yiheng Wang, Benjamin Murrey, Andriy Myro-
+                                                                         recognition, pages 5841–5850, 2021. 1, 3
+     nenko, Can Zhao, Dong Yang, et al. Monai: An open-source
+                                                                    [19] Yufan He, Vishwesh Nath, Dong Yang, Yucheng Tang,
+     framework for deep learning in healthcare. arXiv preprint
+                                                                         Andriy Myronenko, and Daguang Xu. SwinUNETR-V2:
+     arXiv:2211.02701, 2022. 4
+                                                                         Stronger swin transformers with stagewise convolutions for
+ [8] Xi Chen, Zhiyan Zhao, Yilei Zhang, Manni Duan, Donglian             3D medical image segmentation. In MICCAI, 2023. 4
+     Qi, and Hengshuang Zhao. Focalclick: Towards prac-             [20] N Heller, N Sathianathen, A Kalapara, E Walczak, K Moore,
+     tical interactive image segmentation. In Proceedings of             H Kaluzniak, J Rosenberg, P Blake, Z Rengel, M Oestreich,
+     the IEEE/CVF Conference on Computer Vision and Pattern              et al. Data from C4KC-KITS [data set]. The Cancer Imaging
+     Recognition, pages 1300–1309, 2022. 4                               Archive, 10, 2019. 4, 8
+ [9] Kenneth Clark, Bruce Vendt, Kirk Smith, John Freymann,         [21] Yuhao Huang, Xin Yang, Lian Liu, Han Zhou, Ao Chang,
+     Justin Kirby, Paul Koppel, Stephen Moore, Stanley Phillips,         Xinrui Zhou, Rusi Chen, Junxuan Yu, Jiongquan Chen,
+     David Maffitt, Michael Pringle, et al. The cancer imaging           Chaoyu Chen, et al. Segment anything model for medical
+     archive (TCIA): maintaining and operating a public informa-         images? Medical Image Analysis, 92:103061, 2024. 3
+     tion repository. Journal of digital imaging, 26:1045–1057,     [22] Fabian Isensee, Paul F Jaeger, Simon AA Kohl, Jens Pe-
+     2013. 8                                                             tersen, and Klaus H Maier-Hein. nnU-Net: a self-configuring
+[10] Reuben Dorent, Roya Khajavi, Tagwa Idris, Erik Ziegler,             method for deep learning-based biomedical image segmen-
+     Bhanusupriya Somarouthu, Heather Jacene, Ann LaCasce,               tation. Nature Methods, 18(2):203–211, 2021. 1, 2, 3
+     Jonathan Deissler, Jan Ehrhardt, Sofija Engelson, et al.       [23] Yuanfeng Ji, Haotian Bai, Jie Yang, Chongjian Ge, Ye Zhu,
+     Lnq 2023 challenge: Benchmark of weakly-supervised tech-            Ruimao Zhang, Zhen Li, Lingyan Zhang, Wanling Ma, Xi-
+     niques for mediastinal lymph node quantification. arXiv             ang Wan, et al. AMOS: A large-scale abdominal multi-organ
+     preprint arXiv:2408.10069, 2024. 3                                  benchmark for versatile medical image segmentation. arXiv
+[11] Yuxin Du, Fan Bai, Tiejun Huang, and Bo Zhao. Segvol:               preprint arXiv:2206.08023, 2022. 3, 4, 7
+     Universal and interactive volumetric medical image segmen-     [24] Zhanghexuan Ji, Dazhou Guo, Puyang Wang, Ke Yan, Le
+     tation. arXiv preprint arXiv:2311.13385, 2023. 3, 4, 5, 6           Lu, Minfeng Xu, Qifeng Wang, Jia Ge, Mingchen Gao, Xi-
+
+
+
+
+                                                               20871
+     anghua Ye, et al. Continual segment: Towards a single,         [35] AW Moawad, AA Ahmed, et al. Voxel-level segmentation of
+     unified and non-forgetting continual segmentation model of          pathologically-proven adrenocortical carcinoma with Ki-67
+     143 whole-body organs in ct scans. In Proceedings of the            expression (Adrenal-ACC-Ki67-Seg)[data set]. The Cancer
+     IEEE/CVF International Conference on Computer Vision,               Imaging Archive, 2023. 8
+     pages 21140–21151, 2023. 1, 3                                  [36] Ali Morshid, Khaled M Elsayes, Ahmed M Khalaf, Mo-
+[25] C Daniel Johnson, Mei-Hsiu Chen, Alicia Y Toledano, Jay P           hab M Elmohr, Justin Yu, Ahmed O Kaseb, Manal Hassan,
+     Heiken, Abraham Dachman, Mark D Kuo, Christine O Me-                Armeen Mahvash, Zhihui Wang, John D Hazle, et al. A ma-
+     nias, Betina Siewert, Jugesh I Cheema, Richard G Obregon,           chine learning model to predict hepatocellular carcinoma re-
+     et al. Accuracy of CT colonography for detection of large           sponse to transcatheter arterial chemoembolization. Radiol-
+     adenomas and cancers. New England Journal of Medicine,              ogy: Artificial Intelligence, 1(5):e180021, 2019. 8
+     359(12):1207–1217, 2008. 4                                     [37] Andriy Myronenko. 3D MRI brain tumor segmentation us-
+[26] Alexander Kirillov, Eric Mintun, Nikhila Ravi, Hanzi Mao,           ing autoencoder regularization. In MICCAI Brainles. Brain
+     Chloe Rolland, Laura Gustafson, Tete Xiao, Spencer White-           Tumor Segmentation (BraTS) Challenge., pages 311–320.
+     head, Alexander C Berg, Wan-Yen Lo, et al. Segment any-             Springer, 2018. 1, 3, 4
+     thing. In Proceedings of the IEEE/CVF International Con-       [38] Andriy Myronenko, Dong Yang, Yufan He, and Daguang
+     ference on Computer Vision, pages 4015–4026, 2023. 1, 3,            Xu. Aorta segmentation from 3d ct in miccai seg. a. 2023
+     4, 5                                                                challenge. In MICCAI Challenge on Segmentation of the
+[27] Alexander Kolesnikov, Alexey Dosovitskiy, Dirk Weis-                Aorta, pages 13–18. Springer, 2023. 3
+     senborn, Georg Heigold, Jakob Uszkoreit, Lucas Beyer,          [39] Andriy Myronenko, Dong Yang, Yufan He, and Daguang
+     Matthias Minderer, Mostafa Dehghani, Neil Houlsby, Syl-             Xu. Automated 3d segmentation of kidneys and tumors
+     vain Gelly, Thomas Unterthiner, and Xiaohua Zhai. An im-            in miccai kits 2023 challenge. In International Challenge
+     age is worth 16x16 words: Transformers for image recogni-           on Kidney and Kidney Tumor Segmentation, pages 1–7.
+     tion at scale. In ICLR, 2021. 4                                     Springer, 2023.
+[28] Bennett Landman, Zhoubing Xu, J Igelsias, Martin Styner,
+                                                                    [40] Andriy Myronenko, Dong Yang, Yufan He, and Daguang
+     Thomas Langerak, and Arno Klein. Miccai multi-atlas la-
+                                                                         Xu. Automated 3D segmentation of kidneys and tumors in
+     beling beyond the cranial vault–workshop and challenge.
+                                                                         MICCAI KiTS 2023 challenge. In MICCAI 20023. Inter-
+     In Proc. MICCAI Multi-Atlas Labeling Beyond Cranial
+                                                                         national Challenge on Kidney and Kidney Tumor Segmenta-
+     Vault—Workshop Challenge, page 12, 2015. 3
+                                                                         tion, pages 1–7. Springer, 2023. 4
+[29] Jie Liu, Yixiao Zhang, Jie-Neng Chen, Junfei Xiao, Yongyi
+                                                                    [41] Andriy Myronenko, Dong Yang, Yufan He, and Daguang
+     Lu, Bennett A Landman, Yixuan Yuan, Alan Yuille, Yucheng
+                                                                         Xu. Auto3DSeg for brain tumor segmentation from 3D MRI
+     Tang, and Zongwei Zhou. Clip-driven universal model for
+                                                                         in BraTS 2023 challenge. In MICCAI. Brain Tumor Segmen-
+     organ segmentation and tumor detection. In Proceedings
+                                                                         tation (BraTS) Challenge., 2023.
+     of the IEEE/CVF International Conference on Computer Vi-
+     sion, pages 21152–21164, 2023. 1, 3, 4                         [42] Andriy Myronenko, Dong Yang, Yufan He, and Daguang
+                                                                         Xu. Aorta segmentation from 3D CT in MICCAI SEG.A.
+[30] Xiangde Luo, Wenjun Liao, Jianghong Xiao, Jieneng Chen,
+                                                                         2023 challenge. In MICCAI 20023. 3D Segmentation of the
+     Tao Song, Xiaofan Zhang, Kang Li, Dimitris N. Metaxas,
+                                                                         Aorta Challenge, 2023. 4
+     Guotai Wang, and Shaoting Zhang. Word: A large scale
+     dataset, benchmark and clinical applicable study for abdom-    [43] Kelly Payette, Céline Steger, Roxane Licandro, Priscille de
+     inal organ segmentation from ct image. Medical Image Anal-          Dumast, Hongwei Bran Li, Matthew Barkovich, Liu Li,
+     ysis, 82:102642, 2022. 8                                            Maik Dannecker, Chen Chen, Cheng Ouyang, et al. Multi-
+[31] Jun Ma, Yao Zhang, Song Gu, Cheng Zhu, Cheng Ge, Yichi              center fetal brain tissue annotation (feta) challenge 2022 re-
+     Zhang, Xingle An, Congcong Wang, Qiyuan Wang, Xin Liu,              sults. arXiv preprint arXiv:2402.09463, 2024. 3
+     et al. Abdomenct-1k: Is abdominal organ segmentation a         [44] Nikhila Ravi, Valentin Gabeur, Yuan-Ting Hu, Ronghang
+     solved problem? IEEE Transactions on Pattern Analysis               Hu, Chaitanya Ryali, Tengyu Ma, Haitham Khedr, Roman
+     and Machine Intelligence, 44(10):6695–6714, 2021. 4, 7              Rädle, Chloe Rolland, Laura Gustafson, et al. Sam 2:
+[32] Jun Ma, Yao Zhang, Song Gu, Cheng Ge, Shihao Ma,                    Segment anything in images and videos. arXiv preprint
+     Adamo Young, Cheng Zhu, Kangkang Meng, Xin Yang,                    arXiv:2408.00714, 2024. 2, 3
+     Ziyan Huang, et al. Unleashing the strengths of unla-          [45] Sucheng Ren, Xiaoke Huang, Xianhang Li, Junfei Xiao,
+     beled data in pan-cancer abdominal organ quantification: the        Jieru Mei, Zeyu Wang, Alan Yuille, and Yuyin Zhou. Medi-
+     flare22 challenge. arXiv preprint arXiv:2308.05862, 2023. 4         cal vision generalist: Unifying medical imaging tasks in con-
+[33] Jun Ma, Yuting He, Feifei Li, Lin Han, Chenyu You, and              text. arXiv preprint arXiv:2406.05565, 2024. 2, 3
+     Bo Wang. Segment anything in medical images. Nature            [46] Blaine Rister, Darvin Yi, Kaushik Shivakumar, Tomomi
+     Communications, 15:1–9, 2024. 1, 3, 6                               Nobashi, and Daniel L Rubin. CT-ORG, a new dataset for
+[34] Justin Malimban, Danny Lathouwers, Haibin Qian, Frank               multiple organ segmentation in computed tomography. Sci-
+     Verhaegen, Julia Wiedemann, Sytze Brandenburg, and Mar-             entific Data, 7(1):381, 2020. 4
+     ius Staring. Deep learning-based segmentation of the tho-      [47] H Roth, A Farag, EB Turkbey, L Lu, J Liu, and RM Sum-
+     rax in mouse micro-ct scans. Scientific reports, 12(1):1822,        mers. Data from pancreas-CT (version 2)[data set]. The Can-
+     2022. 8                                                             cer Imaging Archive (2016), 2016. 7
+
+
+
+
+                                                                20872
+[48] Holger R Roth, Le Lu, Amal Farag, Hoo-Chang Shin, Jiamin             on Computer Vision and Pattern Recognition (CVPR), pages
+     Liu, Evrim B Turkbey, and Ronald M Summers. Deeporgan:               11302–11312, 2024. 2, 3
+     Multi-level deep convolutional networks for automated pan-      [60] Junde Wu, Wei Ji, Yuanpei Liu, Huazhu Fu, Min Xu, Yanwu
+     creas segmentation. In MICCAI, pages 556–564. Springer,              Xu, and Yueming Jin. Medical sam adapter: Adapting seg-
+     2015. 7                                                              ment anything model for medical image segmentation. arXiv
+[49] Joel Saltz, Mary Saltz, Prateek Prasanna, Richard Moffitt,           preprint arXiv:2304.12620, 2023. 2, 3
+     Janos Hajagos, Erich Bremer, Joseph Balsamo, and Tahsin         [61] Ziheng Zhao, Yao Zhang, Chaoyi Wu, Xiaoman Zhang, Ya
+     Kurc. Stony Brook university COVID-19 positive cases. the            Zhang, Yanfeng Wang, and Weidi Xie. One model to rule
+     cancer imaging archive, 4, 2021.                                     them all: Towards universal segmentation for medical im-
+[50] Anjany Sekuboyina, Malek E Husseini, Amirhossein Bayat,              ages with text prompts. arXiv preprint arXiv:2312.17183,
+     Maximilian Löffler, Hans Liebl, Hongwei Li, Giles Tetteh,           2023. 1, 3, 4
+     Jan Kukačka, Christian Payer, Darko Štern, et al. Verse: A
+     vertebrae labelling and segmentation benchmark for multi-
+     detector CT images. Medical image analysis, 73:102166,
+     2021. 4, 7
+[51] Lingdong Shen, Fangxin Shang, Yehui Yang, Xiaoshuang
+     Huang, and Shining Xiang. Segicl: A universal in-context
+     learning framework for enhanced segmentation in medical
+     imaging. arXiv preprint arXiv:2403.16578, 2024. 2, 3
+[52] Amber L Simpson, Jacob Peoples, John M Creasy, Ga-
+     bor Fichtinger, Natalie Gangai, Krishna N Keshavamurthy,
+     Andras Lasso, Jinru Shia, Michael I D’Angelica, and
+     Richard KG Do. Preoperative CT and survival data for pa-
+     tients undergoing resection of colorectal liver metastases.
+     Scientific Data, 11(1):172, 2024. 4
+[53] Karen-Helene Støverud, David Bouget, Andre Pedersen,
+     Håkon Olav Leira, Thomas Langø, and Erlend Fager-
+     tun Hofstad. AeroPath: An airway segmentation bench-
+     mark dataset with challenging pathology. arXiv preprint
+     arXiv:2311.01138, 2023. 4, 7
+[54] Yucheng Tang, Dong Yang, Wenqi Li, Holger R Roth,
+     Bennett Landman, Daguang Xu, Vishwesh Nath, and Ali
+     Hatamizadeh. Self-supervised pre-training of swin trans-
+     formers for 3D medical image analysis. In Proceedings of
+     the IEEE/CVF conference on computer vision and pattern
+     recognition, pages 20730–20740, 2022. 1, 3
+[55] Gemini Team, Rohan Anil, Sebastian Borgeaud, Yonghui
+     Wu, Jean-Baptiste Alayrac, Jiahui Yu, Radu Soricut, Johan
+     Schalkwyk, Andrew M Dai, Anja Hauth, et al. Gemini: a
+     family of highly capable multimodal models. arXiv preprint
+     arXiv:2312.11805, 2023. 1
+[56] National Lung Screening Trial Research Team. Reduced
+     lung-cancer mortality with low-dose computed tomographic
+     screening. New England Journal of Medicine, 365(5):395–
+     409, 2011. 4
+[57] Hugo Touvron, Louis Martin, Kevin Stone, Peter Albert,
+     Amjad Almahairi, Yasmine Babaei, Nikolay Bashlykov,
+     Soumya Batra, Prajjwal Bhargava, Shruti Bhosale, et al.
+     Llama 2: Open foundation and fine-tuned chat models. arXiv
+     preprint arXiv:2307.09288, 2023. 1
+[58] Constantin Ulrich, Fabian Isensee, Tassilo Wald, Maxi-
+     milian Zenk, Michael Baumgartner, and Klaus H Maier-
+     Hein. Multi-dataset approach to medical image segmenta-
+     tion: Multitalent. In BVM Workshop, pages 78–78. Springer,
+     2024. 1
+[59] Junde Wu and Min Xu. One-prompt to segment all med-
+     ical images. In Proceedings of the IEEE/CVF Conference
+
+
+
+
+                                                                20873
+

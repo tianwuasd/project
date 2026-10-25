@@ -1,0 +1,537 @@
+[
+  {
+    "schema_version": 1,
+    "id": "work_1e05e2b0eb6c452c",
+    "record_revision": 4,
+    "title": "Draft and Refine with Visual Experts",
+    "authors": [
+      "Sungheon Jeong",
+      "Ryozo Masukawa",
+      "Jihong Park",
+      "Sanggeon Yun",
+      "Wenjun Huang",
+      "Hanning Chen",
+      "Mahdi Imani",
+      "Mohsen Imani"
+    ],
+    "year": 2025,
+    "doi": "10.48550/arxiv.2511.11005",
+    "arxiv_id": "2511.11005v3",
+    "source_ids": {
+      "openalex": "https://openalex.org/W4416591446",
+      "arxiv": "2511.11005v3"
+    },
+    "abstract": "While recent Large Vision-Language Models (LVLMs) exhibit strong multimodal reasoning abilities, they often produce ungrounded or hallucinated responses because they rely too heavily on linguistic priors instead of visual evidence. This limitation highlights the absence of a quantitative measure of how much these models actually use visual information during reasoning. We propose Draft and Refine (DnR), an agent framework driven by a question-conditioned utilization metric. The metric quantifies the model's reliance on visual evidence by first constructing a query-conditioned relevance map to localize question-specific cues and then measuring dependence through relevance-guided probabilistic masking. Guided by this metric, the DnR agent refines its initial draft using targeted feedback from external visual experts. Each expert's output (such as boxes or masks) is rendered as visual cues on the image, and the model is re-queried to select the response that yields the largest improvement in utilization. This process strengthens visual grounding without retraining or architectural changes. Experiments across VQA and captioning benchmarks show consistent accuracy gains and reduced hallucination, demonstrating that measuring visual utilization provides a principled path toward more interpretable and evidence-driven multimodal agent systems. Code is available at https://github.com/EavnJeong/Draft-and-Refine-with-Visual-Experts.",
+    "urls": [
+      "http://arxiv.org/abs/2511.11005",
+      "https://doi.org/10.48550/arxiv.2511.11005",
+      "http://arxiv.org/abs/2511.11005v3"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2511.11005v3",
+    "venue": "arXiv (Cornell University)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 0,
+        "retrieved_at": "2026-10-25T05:32:03.306227+00:00"
+      },
+      {
+        "source": "arxiv",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 0,
+        "retrieved_at": "2026-10-25T05:32:03.311149+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2511.11005v3",
+        "abstract": "While recent Large Vision-Language Models (LVLMs) exhibit strong multimodal reasoning abilities, they often produce ungrounded or hallucinated responses because they rely too heavily on linguistic priors instead of visual evidence. This limitation highlights the absence of a quantitative measure of how much these models actually use visual information during reasoning. We propose Draft and Refine (DnR), an agent framework driven by a question-conditioned utilization metric. The metric quantifies the model's reliance on visual evidence by first constructing a query-conditioned relevance map to localize question-specific cues and then measuring dependence through relevance-guided probabilistic masking. Guided by this metric, the DnR agent refines its initial draft using targeted feedback from external visual experts. Each expert's output (such as boxes or masks) is rendered as visual cues on the image, and the model is re-queried to select the response that yields the largest improvement in utilization. This process strengthens visual grounding without retraining or architectural changes. Experiments across VQA and captioning benchmarks show consistent accuracy gains and reduced hallucination, demonstrating that measuring visual utilization provides a principled path toward more interpretable and evidence-driven multimodal agent systems. Code is available at https://github.com/EavnJeong/Draft-and-Refine-with-Visual-Experts."
+      },
+      {
+        "type": "primary_pdf_selected",
+        "url": "https://arxiv.org/pdf/2511.11005v3",
+        "reason": "Version-pinned author manuscript or official proceedings PDF"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:10.015147+00:00",
+        "detail": "Notice lookup unavailable: HTTP 404"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2511.11005"
+      }
+    ],
+    "citekey": "ref_1e05e2b0eb6c452c",
+    "screening": "include",
+    "screening_reason": "非医学：专家建议经视觉接口回馈主模型，评价后采纳或保留原稿"
+  },
+  {
+    "schema_version": 1,
+    "id": "work_aa6dce0ed7f14b25",
+    "record_revision": 3,
+    "title": "SegAgent: Exploring Pixel Understanding Capabilities in MLLMs by Imitating Human Annotator Trajectories",
+    "authors": [
+      "Muzhi Zhu",
+      "Yuzhuo Tian",
+      "Hao Chen",
+      "Chunluan Zhou",
+      "Qingpei Guo",
+      "Yang Liu",
+      "Ming Yang",
+      "Chunhua Shen"
+    ],
+    "year": 2025,
+    "doi": null,
+    "arxiv_id": "2503.08625v1",
+    "source_ids": {
+      "arxiv": "2503.08625v1"
+    },
+    "abstract": "While MLLMs have demonstrated adequate image understanding capabilities, they still struggle with pixel-level comprehension, limiting their practical applications. Current evaluation tasks like VQA and visual grounding remain too coarse to assess fine-grained pixel comprehension accurately. Though segmentation is foundational for pixel-level understanding, existing methods often require MLLMs to generate implicit tokens, decoded through external pixel decoders. This approach disrupts the MLLM's text output space, potentially compromising language capabilities and reducing flexibility and extensibility, while failing to reflect the model's intrinsic pixel-level understanding. Thus, we introduce the Human-Like Mask Annotation Task (HLMAT), a new paradigm where MLLMs mimic human annotators using interactive segmentation tools. Modeling segmentation as a multi-step Markov Decision Process, HLMAT enables MLLMs to iteratively generate text-based click points, achieving high-quality masks without architectural changes or implicit tokens. Through this setup, we develop SegAgent, a model fine-tuned on human-like annotation trajectories, which achieves performance comparable to state-of-the-art (SOTA) methods and supports additional tasks like mask refinement and annotation filtering. HLMAT provides a protocol for assessing fine-grained pixel understanding in MLLMs and introduces a vision-centric, multi-step decision-making task that facilitates exploration of MLLMs' visual reasoning abilities. Our adaptations of policy improvement method StaR and PRM-guided tree search further enhance model robustness in complex segmentation tasks, laying a foundation for future advancements in fine-grained visual perception and multi-step decision-making for MLLMs.",
+    "urls": [
+      "http://arxiv.org/abs/2503.08625v1"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2503.08625v1",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "SegAgent",
+        "raw_response_index": 0,
+        "item_index": 0,
+        "retrieved_at": "2026-10-25T05:32:18.696945+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2503.08625v1",
+        "abstract": "While MLLMs have demonstrated adequate image understanding capabilities, they still struggle with pixel-level comprehension, limiting their practical applications. Current evaluation tasks like VQA and visual grounding remain too coarse to assess fine-grained pixel comprehension accurately. Though segmentation is foundational for pixel-level understanding, existing methods often require MLLMs to generate implicit tokens, decoded through external pixel decoders. This approach disrupts the MLLM's text output space, potentially compromising language capabilities and reducing flexibility and extensibility, while failing to reflect the model's intrinsic pixel-level understanding. Thus, we introduce the Human-Like Mask Annotation Task (HLMAT), a new paradigm where MLLMs mimic human annotators using interactive segmentation tools. Modeling segmentation as a multi-step Markov Decision Process, HLMAT enables MLLMs to iteratively generate text-based click points, achieving high-quality masks without architectural changes or implicit tokens. Through this setup, we develop SegAgent, a model fine-tuned on human-like annotation trajectories, which achieves performance comparable to state-of-the-art (SOTA) methods and supports additional tasks like mask refinement and annotation filtering. HLMAT provides a protocol for assessing fine-grained pixel understanding in MLLMs and introduces a vision-centric, multi-step decision-making task that facilitates exploration of MLLMs' visual reasoning abilities. Our adaptations of policy improvement method StaR and PRM-guided tree search further enhance model robustness in complex segmentation tasks, laying a foundation for future advancements in fine-grained visual perception and multi-step decision-making for MLLMs."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:25.995032+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2503.08625"
+      }
+    ],
+    "citekey": "ref_aa6dce0ed7f14b25",
+    "screening": "include",
+    "screening_reason": "自然图像：自动点击、过程质量模型与迭代修正"
+  },
+  {
+    "schema_version": 1,
+    "id": "work_5d1c00a2b3764ef3",
+    "record_revision": 3,
+    "title": "Two-Stage Learning to Defer with Multiple Experts",
+    "authors": [
+      "Anqi Mao",
+      "Christopher Mohri",
+      "Mehryar Mohri",
+      "Yutao Zhong"
+    ],
+    "year": 2023,
+    "doi": "10.52202/075280-0159",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W7133202358"
+    },
+    "abstract": "",
+    "urls": [
+      "https://doi.org/10.52202/075280-0159",
+      "https://doi.org/10.52202/075280-0159"
+    ],
+    "open_access_url": "https://papers.neurips.cc/paper_files/paper/2023/file/0b17d256cf1fe1cc084922a8c6b565b7-Paper-Conference.pdf",
+    "venue": "neural information processing systems",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "learning to defer multiple experts",
+        "raw_response_index": 0,
+        "item_index": 1,
+        "retrieved_at": "2026-10-25T05:32:30.924145+00:00"
+      },
+      {
+        "type": "primary_pdf_selected",
+        "url": "https://papers.neurips.cc/paper_files/paper/2023/file/0b17d256cf1fe1cc084922a8c6b565b7-Paper-Conference.pdf",
+        "reason": "Version-pinned author manuscript or official proceedings PDF"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:41.229153+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_5d1c00a2b3764ef3",
+    "screening": "include",
+    "screening_reason": "非医学分类：先训练预测器，再训练何时信任哪个专家"
+  },
+  {
+    "schema_version": 1,
+    "id": "work_6572d29cec464414",
+    "record_revision": 3,
+    "title": "Balancing Multi-Target Semi-Supervised Medical Image Segmentation with Collaborative Generalist and Specialists",
+    "authors": [
+      "You Wang",
+      "Zekun Li",
+      "Lei Qi",
+      "Qian Yu",
+      "Yinghuan Shi",
+      "Yang Gao"
+    ],
+    "year": 2025,
+    "doi": null,
+    "arxiv_id": "2504.00862v1",
+    "source_ids": {
+      "arxiv": "2504.00862v1"
+    },
+    "abstract": "Despite the promising performance achieved by current semi-supervised models in segmenting individual medical targets, many of these models suffer a notable decrease in performance when tasked with the simultaneous segmentation of multiple targets. A vital factor could be attributed to the imbalanced scales among different targets: during simultaneously segmenting multiple targets, large targets dominate the loss, leading to small targets being misclassified as larger ones. To this end, we propose a novel method, which consists of a Collaborative Generalist and several Specialists, termed CGS. It is centered around the idea of employing a specialist for each target class, thus avoiding the dominance of larger targets. The generalist performs conventional multi-target segmentation, while each specialist is dedicated to distinguishing a specific target class from the remaining target classes and the background. Based on a theoretical insight, we demonstrate that CGS can achieve a more balanced training. Moreover, we develop cross-consistency losses to foster collaborative learning between the generalist and the specialists. Lastly, regarding their intrinsic relation that the target class of any specialized head should belong to the remaining classes of the other heads, we introduce an inter-head error detection module to further enhance the quality of pseudo-labels. Experimental results on three popular benchmarks showcase its superior performance compared to state-of-the-art methods.",
+    "urls": [
+      "http://arxiv.org/abs/2504.00862v1"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2504.00862v1",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 0,
+        "retrieved_at": "2026-10-25T05:32:41.560659+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2504.00862v1",
+        "abstract": "Despite the promising performance achieved by current semi-supervised models in segmenting individual medical targets, many of these models suffer a notable decrease in performance when tasked with the simultaneous segmentation of multiple targets. A vital factor could be attributed to the imbalanced scales among different targets: during simultaneously segmenting multiple targets, large targets dominate the loss, leading to small targets being misclassified as larger ones. To this end, we propose a novel method, which consists of a Collaborative Generalist and several Specialists, termed CGS. It is centered around the idea of employing a specialist for each target class, thus avoiding the dominance of larger targets. The generalist performs conventional multi-target segmentation, while each specialist is dedicated to distinguishing a specific target class from the remaining target classes and the background. Based on a theoretical insight, we demonstrate that CGS can achieve a more balanced training. Moreover, we develop cross-consistency losses to foster collaborative learning between the generalist and the specialists. Lastly, regarding their intrinsic relation that the target class of any specialized head should belong to the remaining classes of the other heads, we introduce an inter-head error detection module to further enhance the quality of pseudo-labels. Experimental results on three popular benchmarks showcase its superior performance compared to state-of-the-art methods."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:47.118738+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2504.00862"
+      }
+    ],
+    "citekey": "ref_6572d29cec464414",
+    "screening": "include",
+    "screening_reason": "少标注多目标分割中的通才和专家训练，核验是否等同测试期点击协作"
+  },
+  {
+    "schema_version": 1,
+    "id": "work_b8b1ef49ee17445d",
+    "record_revision": 3,
+    "title": "Improving Policy Optimization with Generalist-Specialist Learning",
+    "authors": [
+      "Zhiwei Jia",
+      "Xuanlin Li",
+      "Zhan Ling",
+      "Shuang Liu",
+      "Yiran Wu",
+      "Hao Su"
+    ],
+    "year": 2022,
+    "doi": null,
+    "arxiv_id": "2206.12984v1",
+    "source_ids": {
+      "arxiv": "2206.12984v1"
+    },
+    "abstract": "Generalization in deep reinforcement learning over unseen environment variations usually requires policy learning over a large set of diverse training variations. We empirically observe that an agent trained on many variations (a generalist) tends to learn faster at the beginning, yet its performance plateaus at a less optimal level for a long time. In contrast, an agent trained only on a few variations (a specialist) can often achieve high returns under a limited computational budget. To have the best of both worlds, we propose a novel generalist-specialist training framework. Specifically, we first train a generalist on all environment variations; when it fails to improve, we launch a large population of specialists with weights cloned from the generalist, each trained to master a selected small subset of variations. We finally resume the training of the generalist with auxiliary rewards induced by demonstrations of all specialists. In particular, we investigate the timing to start specialist training and compare strategies to learn generalists with assistance from specialists. We show that this framework pushes the envelope of policy learning on several challenging and popular benchmarks including Procgen, Meta-World and ManiSkill.",
+    "urls": [
+      "http://arxiv.org/abs/2206.12984v1"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2206.12984v1",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 6,
+        "retrieved_at": "2026-10-25T05:32:41.560659+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2206.12984v1",
+        "abstract": "Generalization in deep reinforcement learning over unseen environment variations usually requires policy learning over a large set of diverse training variations. We empirically observe that an agent trained on many variations (a generalist) tends to learn faster at the beginning, yet its performance plateaus at a less optimal level for a long time. In contrast, an agent trained only on a few variations (a specialist) can often achieve high returns under a limited computational budget. To have the best of both worlds, we propose a novel generalist-specialist training framework. Specifically, we first train a generalist on all environment variations; when it fails to improve, we launch a large population of specialists with weights cloned from the generalist, each trained to master a selected small subset of variations. We finally resume the training of the generalist with auxiliary rewards induced by demonstrations of all specialists. In particular, we investigate the timing to start specialist training and compare strategies to learn generalists with assistance from specialists. We show that this framework pushes the envelope of policy learning on several challenging and popular benchmarks including Procgen, Meta-World and ManiSkill."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:49.808669+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2206.12984"
+      }
+    ],
+    "citekey": "ref_b8b1ef49ee17445d",
+    "screening": "include",
+    "screening_reason": "非医学机器人强化学习：专才训练和反向提升通才，区分蒸馏与推理协作"
+  },
+  {
+    "schema_version": 1,
+    "id": "work_669c3001a51d42b8",
+    "record_revision": 3,
+    "title": "VISTA3D - A Unified Segmentation Foundation Model For 3D Medical Imaging",
+    "authors": [],
+    "year": null,
+    "doi": null,
+    "arxiv_id": null,
+    "source_ids": {},
+    "abstract": "",
+    "urls": [],
+    "open_access_url": null,
+    "venue": "",
+    "provenance": [
+      {
+        "source": "ris_import"
+      },
+      {
+        "source": "local_import",
+        "file": "L1.ris"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "offline",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:47.964676+00:00",
+        "detail": "initial_import: network check skipped explicitly"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_669c3001a51d42b8",
+    "screening": "include",
+    "screening_reason": "交互式3D点击执行器与自动分支的直接依据"
+  },
+  {
+    "schema_version": 1,
+    "id": "work_e8706d7715e44ae8",
+    "record_revision": 3,
+    "title": "REDNet - Reliable Evidential Discounting Network for Multi-Modality Medical Image Segmentation",
+    "authors": [],
+    "year": null,
+    "doi": null,
+    "arxiv_id": null,
+    "source_ids": {},
+    "abstract": "",
+    "urls": [],
+    "open_access_url": null,
+    "venue": "",
+    "provenance": [
+      {
+        "source": "ris_import"
+      },
+      {
+        "source": "local_import",
+        "file": "L2.ris"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "offline",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:48.781195+00:00",
+        "detail": "initial_import: network check skipped explicitly"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_e8706d7715e44ae8",
+    "screening": "include",
+    "screening_reason": "可靠性折扣，检查模型间迁移边界"
+  },
+  {
+    "schema_version": 1,
+    "id": "work_035a8553e2314bc2",
+    "record_revision": 3,
+    "title": "Learned iterative segmentation of highly variable anatomy from limited data - Applications to whole heart segmentation for congenital heart disease",
+    "authors": [],
+    "year": null,
+    "doi": null,
+    "arxiv_id": null,
+    "source_ids": {},
+    "abstract": "",
+    "urls": [],
+    "open_access_url": null,
+    "venue": "",
+    "provenance": [
+      {
+        "source": "ris_import"
+      },
+      {
+        "source": "local_import",
+        "file": "L4.ris"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "offline",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:57.767594+00:00",
+        "detail": "initial_import: network check skipped explicitly"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_035a8553e2314bc2",
+    "screening": "include",
+    "screening_reason": "少样本变异解剖的迭代分割与停止监督"
+  },
+  {
+    "schema_version": 1,
+    "id": "work_750f4a75835240a3",
+    "record_revision": 5,
+    "title": "DeferredSeg: A multi-expert deferral framework for medical image segmentation",
+    "authors": [
+      "Qiuyu Tian",
+      "Haoliang Sun",
+      "Yunshan Wang",
+      "Yinghuan Shi",
+      "Yilong Yin"
+    ],
+    "year": 2026,
+    "doi": "10.1016/j.patcog.2026.114811",
+    "arxiv_id": "2604.12411v2",
+    "source_ids": {
+      "openalex": "https://openalex.org/W7154655660",
+      "arxiv": "2604.12411v2"
+    },
+    "abstract": "Segmentation models based on deep neural networks demonstrate strong generalization for medical image segmentation. However, they often exhibit overconfidence or underconfidence, leading to unreliable confidence scores for segmentation masks, especially in ambiguous regions. This undermines the trustworthiness required for clinical deployment. Motivated by the learning-to-defer (L2D) paradigm, we introduce DeferredSeg, a deferral-aware segmentation framework, i.e., a Human--AI collaboration system that determines whether to defer predictions to human experts in specific regions. DeferredSeg extends the base segmentor with an aggregated deferral predictor and additional routing channels that dynamically route each pixel to either the base segmentor or a human expert. To train this routing efficiently, we introduce a pixel-wise surrogate collaboration loss that supervises deferral decisions. In addition, to preserve spatial coherence within deferral regions, we propose a spatial-coherence loss that enforces smooth deferral masks, thereby enhancing reliability. Beyond single-expert deferral, we further extend the framework to a multi-expert setting by introducing multiple discrepancy experts for collaborative decision-making. To prevent overloading or underutilizing individual experts, we further design a load-balancing penalty that evenly distributes workload across expert branches. We evaluate DeferredSeg on three challenging medical datasets using MedSAM and CENet as the base segmentor for fair comparison. Experimental results show that DeferredSeg consistently outperforms the baseline, demonstrating its effectiveness for trustworthy dense medical segmentation. Moreover, the proposed framework is model-agnostic and can be readily applied to other segmentation architectures.",
+    "urls": [
+      "https://doi.org/10.1016/j.patcog.2026.114811",
+      "http://arxiv.org/abs/2604.12411v2",
+      "https://arxiv.org/abs/2604.12411"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2604.12411v2",
+    "venue": "Pattern Recognition",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "DeferredSeg",
+        "raw_response_index": 0,
+        "item_index": 0,
+        "retrieved_at": "2026-10-25T05:32:54.652537+00:00"
+      },
+      {
+        "source": "arxiv",
+        "query": "DeferredSeg",
+        "raw_response_index": 0,
+        "item_index": 0,
+        "retrieved_at": "2026-10-25T05:32:54.653545+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2604.12411v2",
+        "abstract": "Segmentation models based on deep neural networks demonstrate strong generalization for medical image segmentation. However, they often exhibit overconfidence or underconfidence, leading to unreliable confidence scores for segmentation masks, especially in ambiguous regions. This undermines the trustworthiness required for clinical deployment. Motivated by the learning-to-defer (L2D) paradigm, we introduce DeferredSeg, a deferral-aware segmentation framework, i.e., a Human--AI collaboration system that determines whether to defer predictions to human experts in specific regions. DeferredSeg extends the base segmentor with an aggregated deferral predictor and additional routing channels that dynamically route each pixel to either the base segmentor or a human expert. To train this routing efficiently, we introduce a pixel-wise surrogate collaboration loss that supervises deferral decisions. In addition, to preserve spatial coherence within deferral regions, we propose a spatial-coherence loss that enforces smooth deferral masks, thereby enhancing reliability. Beyond single-expert deferral, we further extend the framework to a multi-expert setting by introducing multiple discrepancy experts for collaborative decision-making. To prevent overloading or underutilizing individual experts, we further design a load-balancing penalty that evenly distributes workload across expert branches. We evaluate DeferredSeg on three challenging medical datasets using MedSAM and CENet as the base segmentor for fair comparison. Experimental results show that DeferredSeg consistently outperforms the baseline, demonstrating its effectiveness for trustworthy dense medical segmentation. Moreover, the proposed framework is model-agnostic and can be readily applied to other segmentation architectures."
+      },
+      {
+        "source": "openalex",
+        "query": "DeferredSeg",
+        "raw_response_index": 0,
+        "item_index": 1,
+        "retrieved_at": "2026-10-25T05:32:54.652537+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:33:01.981800+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2604.12411"
+      },
+      {
+        "type": "source_id_alias",
+        "source": "openalex",
+        "id": "https://openalex.org/W7154655660"
+      },
+      {
+        "type": "source_id_alias",
+        "source": "openalex",
+        "id": "https://openalex.org/W7204966302"
+      }
+    ],
+    "citekey": "ref_750f4a75835240a3",
+    "screening": "include",
+    "screening_reason": "最接近的像素级专家选择；核验专家来源和最终结果融合方式"
+  },
+  {
+    "schema_version": 1,
+    "id": "work_a3a141cb15434c22",
+    "record_revision": 3,
+    "title": "SDF4CHD - Generative modeling of cardiac anatomies with congenital heart defects",
+    "authors": [],
+    "year": null,
+    "doi": null,
+    "arxiv_id": null,
+    "source_ids": {},
+    "abstract": "",
+    "urls": [],
+    "open_access_url": null,
+    "venue": "",
+    "provenance": [
+      {
+        "source": "ris_import"
+      },
+      {
+        "source": "local_import",
+        "file": "L7.ris"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "offline",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:33:00.178608+00:00",
+        "detail": "initial_import: network check skipped explicitly"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_a3a141cb15434c22",
+    "screening": "include",
+    "screening_reason": "先心病拓扑多样性，避免正常解剖先验误修正"
+  }
+]

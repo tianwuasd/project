@@ -1,0 +1,79 @@
+{
+  "topic": "全局老师与局部学生在测试时通过建议审查和点击进行协同分割",
+  "mode": "scenario",
+  "stage": "literature_and_research_design",
+  "status": "academic_agent_research_completed_model_experiments_not_started",
+  "artifacts": [
+    "全局老师与局部学生_研究思路.md",
+    "本地证据.json",
+    "研究备忘录.md",
+    "跨领域近邻与模型框架_2026-10-25.md",
+    "跨领域检索记录_2026-10-25.json",
+    "学术agent接入核查_2026-10-25.md",
+    "通用学术Agent实跑_近邻与模型框架_2026-10-25.md",
+    "通用学术Agent运行记录_2026-10-25.json",
+    "通用学术Agent原文定位_2026-10-25.json"
+  ],
+  "confirmed": {
+    "target_ct_use": "prediction",
+    "source_labeled_ct": true,
+    "final_output": "吸收学生意见并通过点击修正后的老师分割",
+    "student_role": "不同局部的专长学习与测试时建议",
+    "teacher_role": "整体解剖与全局分割",
+    "shared_source_material": true,
+    "source_unlabeled_ct": true
+  },
+  "hypotheses": [
+    "局部专家能提供老师缺少的正确证据",
+    "老师能够选择有益异议",
+    "点击机制优于简单集成或局部覆盖",
+    "收益能迁移至外部中心"
+  ],
+  "experiments_executed": false,
+  "gaps": [
+    "实际分割结构与标注数量",
+    "来源中心数量与患者划分",
+    "ROI自动定位与类别映射",
+    "外部评价条件"
+  ],
+  "next_action": "以一个老师和两个局部学生先验证互补性及真值辅助点击收益",
+  "consensus_thread_id": "ISPMzj7LR8OSCv2akri68A",
+  "design_assumptions": {
+    "test_time_parameter_update": false,
+    "status": "第一版建议，未运行实验",
+    "teacher_checkpoint_fixed_for_utility_labels": true
+  },
+  "updated_at": "2026-10-25",
+  "cross_domain_review": {
+    "workflow": "ARS deep-research project snapshot",
+    "closest": "DnR; SegAgent; Learning to Defer; LLM-Blender",
+    "verdict": "REVISE: feasibility experiments required"
+  },
+  "academic_agent_source": {
+    "application": "Academic Agent",
+    "version": "0.4.0",
+    "root": "D:\\projects\\testing_tools\\academic_agent",
+    "research_project": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025",
+    "actually_executed": true
+  },
+  "previous_ars_source": {
+    "available": true,
+    "root": "D:/projects/project/academic_tools",
+    "ars_codex_version": "3.23.1",
+    "global_skill_registered_by_this_task": false,
+    "research_rerun_with_new_source": false
+  },
+  "cross_domain_review_latest": {
+    "closest": [
+      "CGS",
+      "DnR",
+      "SegAgent",
+      "DeferredSeg",
+      "NeuroRefiner",
+      "Two-Stage L2D",
+      "U-CFR"
+    ],
+    "verdict": "Feasibility supported at component level; full-system benefit and novelty remain hypotheses",
+    "report": "通用学术Agent实跑_近邻与模型框架_2026-10-25.md"
+  }
+}

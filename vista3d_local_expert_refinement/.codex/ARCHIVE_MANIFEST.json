@@ -1,0 +1,835 @@
+{
+  "created_at": "2026-10-25T06:13:35.860801+00:00",
+  "discussion_source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献信息\\研究构思\\VISTA3D_选择性纠错与跨中心学生训练",
+  "agent_source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025",
+  "discussion_filename_mapping": [
+    {
+      "original_name": "state.json",
+      "archived_path": "archive/discussion/state.json"
+    },
+    {
+      "original_name": "全局老师与局部学生_研究思路.md",
+      "archived_path": "archive/discussion/全局老师与局部学生_研究思路.md"
+    },
+    {
+      "original_name": "学术agent接入核查_2026-10-25.md",
+      "archived_path": "archive/discussion/学术agent接入核查_2026-10-25.md"
+    },
+    {
+      "original_name": "本地证据.json",
+      "archived_path": "archive/discussion/本地证据.json"
+    },
+    {
+      "original_name": "研究备忘录.md",
+      "archived_path": "archive/discussion/研究备忘录.md"
+    },
+    {
+      "original_name": "请用中文完成一个医学3D CT分割研究构想的定向近邻综述与可行性分析。核心意图必须准确：训练时全局老师和多个局部学生学习相同来源中心材料；老师学习整体解剖-全局.md",
+      "archived_path": "archive/discussion/Consensus_历史检索报告.md"
+    },
+    {
+      "original_name": "跨领域检索记录_2026-10-25.json",
+      "archived_path": "archive/discussion/跨领域检索记录_2026-10-25.json"
+    },
+    {
+      "original_name": "跨领域近邻与模型框架_2026-10-25.md",
+      "archived_path": "archive/discussion/跨领域近邻与模型框架_2026-10-25.md"
+    },
+    {
+      "original_name": "通用学术Agent原文定位_2026-10-25.json",
+      "archived_path": "archive/discussion/通用学术Agent原文定位_2026-10-25.json"
+    },
+    {
+      "original_name": "通用学术Agent实跑_近邻与模型框架_2026-10-25.md",
+      "archived_path": "archive/discussion/通用学术Agent实跑_近邻与模型框架_2026-10-25.md"
+    },
+    {
+      "original_name": "通用学术Agent运行记录_2026-10-25.json",
+      "archived_path": "archive/discussion/通用学术Agent运行记录_2026-10-25.json"
+    }
+  ],
+  "copied_files": [
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献信息\\研究构思\\VISTA3D_选择性纠错与跨中心学生训练\\state.json",
+      "destination": "archive/discussion/state.json",
+      "sha256": "4d8cc4e4efe7a57cfadb41f8036c7a1f67c04c3eed77b21ed670b8ea4fca6af4",
+      "bytes": 2917
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献信息\\研究构思\\VISTA3D_选择性纠错与跨中心学生训练\\全局老师与局部学生_研究思路.md",
+      "destination": "archive/discussion/全局老师与局部学生_研究思路.md",
+      "sha256": "e2a53c2d6451597e133558b99f01c9c72a97f6f13edb836f63923ba8018c2e12",
+      "bytes": 19103
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献信息\\研究构思\\VISTA3D_选择性纠错与跨中心学生训练\\学术agent接入核查_2026-10-25.md",
+      "destination": "archive/discussion/学术agent接入核查_2026-10-25.md",
+      "sha256": "0d0c434330a6645babfb5c7f0a6819bbeabdf6c3f8777d79086dc17c6f74901b",
+      "bytes": 3875
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献信息\\研究构思\\VISTA3D_选择性纠错与跨中心学生训练\\本地证据.json",
+      "destination": "archive/discussion/本地证据.json",
+      "sha256": "9283b0ed6e2e705f4d90bffd0a7f426ef38adff3a08e3da1650eab99573e48de",
+      "bytes": 8534
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献信息\\研究构思\\VISTA3D_选择性纠错与跨中心学生训练\\研究备忘录.md",
+      "destination": "archive/discussion/研究备忘录.md",
+      "sha256": "a796c862f477da008296f2b5b2b68bae2df8664558a83806f93fb5aae1676b16",
+      "bytes": 525
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献信息\\研究构思\\VISTA3D_选择性纠错与跨中心学生训练\\请用中文完成一个医学3D CT分割研究构想的定向近邻综述与可行性分析。核心意图必须准确：训练时全局老师和多个局部学生学习相同来源中心材料；老师学习整体解剖-全局.md",
+      "destination": "archive/discussion/Consensus_历史检索报告.md",
+      "sha256": "2f6eb97cee08883686ea5dbfc338c12f7c9d7ce342a2a518d9f63f2df0b22c94",
+      "bytes": 33469
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献信息\\研究构思\\VISTA3D_选择性纠错与跨中心学生训练\\跨领域检索记录_2026-10-25.json",
+      "destination": "archive/discussion/跨领域检索记录_2026-10-25.json",
+      "sha256": "67f02655e41eeb5ae25f48eb0b85379af659d9c7f61bcf20158407c63000805c",
+      "bytes": 7234
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献信息\\研究构思\\VISTA3D_选择性纠错与跨中心学生训练\\跨领域近邻与模型框架_2026-10-25.md",
+      "destination": "archive/discussion/跨领域近邻与模型框架_2026-10-25.md",
+      "sha256": "f7e96d7ab393285c99648d6950d1be8a481d3c48fe7c5a420200a1fa0914da86",
+      "bytes": 26706
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献信息\\研究构思\\VISTA3D_选择性纠错与跨中心学生训练\\通用学术Agent原文定位_2026-10-25.json",
+      "destination": "archive/discussion/通用学术Agent原文定位_2026-10-25.json",
+      "sha256": "30296f3aac3f0661aa3788b5a2d1ecfb0fb958175b23a69fcc8aacc9828eb6cf",
+      "bytes": 59080
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献信息\\研究构思\\VISTA3D_选择性纠错与跨中心学生训练\\通用学术Agent实跑_近邻与模型框架_2026-10-25.md",
+      "destination": "archive/discussion/通用学术Agent实跑_近邻与模型框架_2026-10-25.md",
+      "sha256": "c27a6b6eae70ba7459acb75a7d18c719fcedd8904bbe49268df990e4a83d18e3",
+      "bytes": 18310
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献信息\\研究构思\\VISTA3D_选择性纠错与跨中心学生训练\\通用学术Agent运行记录_2026-10-25.json",
+      "destination": "archive/discussion/通用学术Agent运行记录_2026-10-25.json",
+      "sha256": "7cd128a9d81496bb5e8daaf500cca37fa04fd077112e7496505f6daa9fa1b544",
+      "bytes": 18296
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\document-audit-summary.jsonl",
+      "destination": "research/academic_agent_snapshot/document-audit-summary.jsonl",
+      "sha256": "c61c7b2eb55df8fbe3af6395a671c89e95d6d45f955b15244d268a2e1a78e0e5",
+      "bytes": 3870
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\document-audit.json",
+      "destination": "research/academic_agent_snapshot/document-audit.json",
+      "sha256": "30296f3aac3f0661aa3788b5a2d1ecfb0fb958175b23a69fcc8aacc9828eb6cf",
+      "bytes": 59080
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\L1-pdftotext.txt",
+      "destination": "research/academic_agent_snapshot/L1-pdftotext.txt",
+      "sha256": "06815221aecee9cbba321f6cdf7babb8397597111710ca44f16920f8cc74f5fc",
+      "bytes": 70611
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\L1.ris",
+      "destination": "research/academic_agent_snapshot/L1.ris",
+      "sha256": "cdd4eb6e5ebcba6081939b2b2ca32c49e56a0b9fc8a7fc77c15850cff3801397",
+      "bytes": 99
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\L2-pdftotext.txt",
+      "destination": "research/academic_agent_snapshot/L2-pdftotext.txt",
+      "sha256": "f7da77d2f75d75c208418095d49075c0195f74ad2f994c89180bd1b50fb891d1",
+      "bytes": 81083
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\L2.ris",
+      "destination": "research/academic_agent_snapshot/L2.ris",
+      "sha256": "5f862815d009e1aa7e6fadb4b1c3cfc0c5d5234b7a4c96edbdc916bd09ed801d",
+      "bytes": 121
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\L4-pdftotext.txt",
+      "destination": "research/academic_agent_snapshot/L4-pdftotext.txt",
+      "sha256": "21cc977347468851ca8c0ebe740996aab2a47ac1d342ebde9a0edbdb76c8c7b9",
+      "bytes": 134115
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\L4-source.pdf",
+      "destination": "research/academic_agent_snapshot/L4-source.pdf",
+      "sha256": "81e2ddda7ce08f885cd60b0050179e7dd115972a3d5d6dfaa16f0614633fb4e3",
+      "bytes": 3481871
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\L4.ris",
+      "destination": "research/academic_agent_snapshot/L4.ris",
+      "sha256": "c54463518b65d4d5adcb959a5bd81014cd16ce353336b67c473fcafe9c5a21f7",
+      "bytes": 174
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\L7-pdftotext.txt",
+      "destination": "research/academic_agent_snapshot/L7-pdftotext.txt",
+      "sha256": "82400890076187c9d11ee151bfbc72ec2b5ca191dc9d83a5859a8054fa741e56",
+      "bytes": 180793
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\L7.ris",
+      "destination": "research/academic_agent_snapshot/L7.ris",
+      "sha256": "eeccd6ef70152a549b21aad809ddfdcec8a10ee345775e5703c20e6427414aa9",
+      "bytes": 107
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\local-mapping.json",
+      "destination": "research/academic_agent_snapshot/local-mapping.json",
+      "sha256": "51ed6699cf0e0b966654e34c25935910df49a9abfd0c10d11a3557b0b80c1eb8",
+      "bytes": 2533
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\project.json",
+      "destination": "research/academic_agent_snapshot/project.json",
+      "sha256": "1f85af340ef2ac77b37a4aaf1aa678e9825a72098491ebb9159f6e8534e12c5e",
+      "bytes": 924
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\read-completion.json",
+      "destination": "research/academic_agent_snapshot/read-completion.json",
+      "sha256": "199c9f9ce8ca50f5fb5e537f631b0f754f438bba6fda21c53759cc3cd0dd11aa",
+      "bytes": 1425
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\review-completion.json",
+      "destination": "research/academic_agent_snapshot/review-completion.json",
+      "sha256": "25198dc05d48596e0c7e5658f108dc67caf993c36d63f6762a594993f7aa72e7",
+      "bytes": 82466
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\reviewed-claims.json",
+      "destination": "research/academic_agent_snapshot/reviewed-claims.json",
+      "sha256": "4709ae9e7d0a9e33a696c5d288184ffafce98b82e970846d3ea30d33357fd609",
+      "bytes": 172438
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\run-manifest.json",
+      "destination": "research/academic_agent_snapshot/run-manifest.json",
+      "sha256": "7cd128a9d81496bb5e8daaf500cca37fa04fd077112e7496505f6daa9fa1b544",
+      "bytes": 18296
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\search-library.json",
+      "destination": "research/academic_agent_snapshot/search-library.json",
+      "sha256": "c614323572a7dddc251d8084588d3ed61db570d5c595828682095f47f32f50d7",
+      "bytes": 193401
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\selected-library.json",
+      "destination": "research/academic_agent_snapshot/selected-library.json",
+      "sha256": "ac095e2a75453c0caf2b84bc69fc1c7698b952ac56c7830fa899586417d1f664",
+      "bytes": 30398
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\01f34e8183b05c87fd30c9c858b9db39d4d99bee563511550e27cc4f852ac859.pdf",
+      "destination": "research/academic_agent_snapshot/artifacts/01f34e8183b05c87fd30c9c858b9db39d4d99bee563511550e27cc4f852ac859.pdf",
+      "sha256": "01f34e8183b05c87fd30c9c858b9db39d4d99bee563511550e27cc4f852ac859",
+      "bytes": 8271985
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\049d3994855545969c4f84fcd3b60a7267e5cb2f9c0abfc085a83c3ef4cce8d1.json",
+      "destination": "research/academic_agent_snapshot/artifacts/049d3994855545969c4f84fcd3b60a7267e5cb2f9c0abfc085a83c3ef4cce8d1.json",
+      "sha256": "049d3994855545969c4f84fcd3b60a7267e5cb2f9c0abfc085a83c3ef4cce8d1",
+      "bytes": 4454
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\0d1044f3ff0bf37d884d58d4130d0df7b0a85431cde44c20e1aac27168e0f5e4.json",
+      "destination": "research/academic_agent_snapshot/artifacts/0d1044f3ff0bf37d884d58d4130d0df7b0a85431cde44c20e1aac27168e0f5e4.json",
+      "sha256": "0d1044f3ff0bf37d884d58d4130d0df7b0a85431cde44c20e1aac27168e0f5e4",
+      "bytes": 4622
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\0d34a1e3c91dbc39fcb80b573fe73576afa81f83cb4b74aea6e8f28294905f58.json",
+      "destination": "research/academic_agent_snapshot/artifacts/0d34a1e3c91dbc39fcb80b573fe73576afa81f83cb4b74aea6e8f28294905f58.json",
+      "sha256": "0d34a1e3c91dbc39fcb80b573fe73576afa81f83cb4b74aea6e8f28294905f58",
+      "bytes": 3864
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\0f66689091c8e06112082182fc09bb637896744164c5d44572c90cb5bdc97b5f.json",
+      "destination": "research/academic_agent_snapshot/artifacts/0f66689091c8e06112082182fc09bb637896744164c5d44572c90cb5bdc97b5f.json",
+      "sha256": "0f66689091c8e06112082182fc09bb637896744164c5d44572c90cb5bdc97b5f",
+      "bytes": 5868
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\13dfe7902935dfc5ee3e5a780221ba17177b1c99f1b0eb2d3095aef0e5dacb0e.json",
+      "destination": "research/academic_agent_snapshot/artifacts/13dfe7902935dfc5ee3e5a780221ba17177b1c99f1b0eb2d3095aef0e5dacb0e.json",
+      "sha256": "13dfe7902935dfc5ee3e5a780221ba17177b1c99f1b0eb2d3095aef0e5dacb0e",
+      "bytes": 4451
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\158b4ef253a1a66e113d1dffcf84014aef6a2ac99aff6d0a51a4b4984409c697.pdf",
+      "destination": "research/academic_agent_snapshot/artifacts/158b4ef253a1a66e113d1dffcf84014aef6a2ac99aff6d0a51a4b4984409c697.pdf",
+      "sha256": "158b4ef253a1a66e113d1dffcf84014aef6a2ac99aff6d0a51a4b4984409c697",
+      "bytes": 1333833
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\167105d7125dc26c386747a87a8c57eb77b5898f0952bc5471bb3a5f5b8a829f.json",
+      "destination": "research/academic_agent_snapshot/artifacts/167105d7125dc26c386747a87a8c57eb77b5898f0952bc5471bb3a5f5b8a829f.json",
+      "sha256": "167105d7125dc26c386747a87a8c57eb77b5898f0952bc5471bb3a5f5b8a829f",
+      "bytes": 77299
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\1744a9764e2bdd00a3236bd02d55aa529d6596e0142d675343dbf7c0f6adf98a.json",
+      "destination": "research/academic_agent_snapshot/artifacts/1744a9764e2bdd00a3236bd02d55aa529d6596e0142d675343dbf7c0f6adf98a.json",
+      "sha256": "1744a9764e2bdd00a3236bd02d55aa529d6596e0142d675343dbf7c0f6adf98a",
+      "bytes": 5015
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\1e0f43ccc657591e28a40022f7c2cb14c94d31719a12ec78c572d9a0fa06a3a5.pdf",
+      "destination": "research/academic_agent_snapshot/artifacts/1e0f43ccc657591e28a40022f7c2cb14c94d31719a12ec78c572d9a0fa06a3a5.pdf",
+      "sha256": "1e0f43ccc657591e28a40022f7c2cb14c94d31719a12ec78c572d9a0fa06a3a5",
+      "bytes": 2714252
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\3235aad76673b7ab247d5b4443726057779f42966bd24199c85d1435787cbef2.json",
+      "destination": "research/academic_agent_snapshot/artifacts/3235aad76673b7ab247d5b4443726057779f42966bd24199c85d1435787cbef2.json",
+      "sha256": "3235aad76673b7ab247d5b4443726057779f42966bd24199c85d1435787cbef2",
+      "bytes": 4847
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\3caf0dd4904f791ee68a3ce6bd707ea887878933db6a81bf04aaf7f70b36fe81.json",
+      "destination": "research/academic_agent_snapshot/artifacts/3caf0dd4904f791ee68a3ce6bd707ea887878933db6a81bf04aaf7f70b36fe81.json",
+      "sha256": "3caf0dd4904f791ee68a3ce6bd707ea887878933db6a81bf04aaf7f70b36fe81",
+      "bytes": 4088
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\45d039b6bbbdb69117ab3cd87e40cba45456618206f15fc7581c0c5c5c8d7203.json",
+      "destination": "research/academic_agent_snapshot/artifacts/45d039b6bbbdb69117ab3cd87e40cba45456618206f15fc7581c0c5c5c8d7203.json",
+      "sha256": "45d039b6bbbdb69117ab3cd87e40cba45456618206f15fc7581c0c5c5c8d7203",
+      "bytes": 5973
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\483ee0f030ebd044a83fcf4ac03be0d852cdd6077342a6ab4e46e9cf15b1e768.json",
+      "destination": "research/academic_agent_snapshot/artifacts/483ee0f030ebd044a83fcf4ac03be0d852cdd6077342a6ab4e46e9cf15b1e768.json",
+      "sha256": "483ee0f030ebd044a83fcf4ac03be0d852cdd6077342a6ab4e46e9cf15b1e768",
+      "bytes": 4602
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\56b5da9bdb8ebec9900cf025e6d45b34497f895bc86a722e0aa541d3e0cab26d.json",
+      "destination": "research/academic_agent_snapshot/artifacts/56b5da9bdb8ebec9900cf025e6d45b34497f895bc86a722e0aa541d3e0cab26d.json",
+      "sha256": "56b5da9bdb8ebec9900cf025e6d45b34497f895bc86a722e0aa541d3e0cab26d",
+      "bytes": 4448
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\58b22f7418b99bbb72d4cf52080155846cb05e9ee1eb0277a78b9666b3d10424.json",
+      "destination": "research/academic_agent_snapshot/artifacts/58b22f7418b99bbb72d4cf52080155846cb05e9ee1eb0277a78b9666b3d10424.json",
+      "sha256": "58b22f7418b99bbb72d4cf52080155846cb05e9ee1eb0277a78b9666b3d10424",
+      "bytes": 4853
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\6837aa5a46085dfbe0860e63102026f29e3b5eaea13b0a0dc80d4734abd63ccc.json",
+      "destination": "research/academic_agent_snapshot/artifacts/6837aa5a46085dfbe0860e63102026f29e3b5eaea13b0a0dc80d4734abd63ccc.json",
+      "sha256": "6837aa5a46085dfbe0860e63102026f29e3b5eaea13b0a0dc80d4734abd63ccc",
+      "bytes": 95823
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\81e2ddda7ce08f885cd60b0050179e7dd115972a3d5d6dfaa16f0614633fb4e3.pdf",
+      "destination": "research/academic_agent_snapshot/artifacts/81e2ddda7ce08f885cd60b0050179e7dd115972a3d5d6dfaa16f0614633fb4e3.pdf",
+      "sha256": "81e2ddda7ce08f885cd60b0050179e7dd115972a3d5d6dfaa16f0614633fb4e3",
+      "bytes": 3481871
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\86a347b0144aea4dc8faf5c1e25681a4eaee237705341ecf41408c8885f81cd4.pdf",
+      "destination": "research/academic_agent_snapshot/artifacts/86a347b0144aea4dc8faf5c1e25681a4eaee237705341ecf41408c8885f81cd4.pdf",
+      "sha256": "86a347b0144aea4dc8faf5c1e25681a4eaee237705341ecf41408c8885f81cd4",
+      "bytes": 444390
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\873b0ad7095803deb0f6b3577a348c07d930b66d3e6797b78bae077ade701b5a.json",
+      "destination": "research/academic_agent_snapshot/artifacts/873b0ad7095803deb0f6b3577a348c07d930b66d3e6797b78bae077ade701b5a.json",
+      "sha256": "873b0ad7095803deb0f6b3577a348c07d930b66d3e6797b78bae077ade701b5a",
+      "bytes": 4408
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\8f1b3c8f831bc852abe63d6605dbfc6b7081a3d071704b7d04ec86340d47118b.pdf",
+      "destination": "research/academic_agent_snapshot/artifacts/8f1b3c8f831bc852abe63d6605dbfc6b7081a3d071704b7d04ec86340d47118b.pdf",
+      "sha256": "8f1b3c8f831bc852abe63d6605dbfc6b7081a3d071704b7d04ec86340d47118b",
+      "bytes": 4628964
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\8ff1df6bcdd43961b6d2c29fba1cd2568e352dec6c9bb3a83e48f674acb55620.json",
+      "destination": "research/academic_agent_snapshot/artifacts/8ff1df6bcdd43961b6d2c29fba1cd2568e352dec6c9bb3a83e48f674acb55620.json",
+      "sha256": "8ff1df6bcdd43961b6d2c29fba1cd2568e352dec6c9bb3a83e48f674acb55620",
+      "bytes": 53710
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\90b7c6838bde53cceacd16255ebd0b30ede9934f0d4ea67e401d32f9a2a568e2.json",
+      "destination": "research/academic_agent_snapshot/artifacts/90b7c6838bde53cceacd16255ebd0b30ede9934f0d4ea67e401d32f9a2a568e2.json",
+      "sha256": "90b7c6838bde53cceacd16255ebd0b30ede9934f0d4ea67e401d32f9a2a568e2",
+      "bytes": 74150
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\9eb95d246f95660c195c266d9bd96ac9b571517c54c87f7b23447d08b4d1e69a.json",
+      "destination": "research/academic_agent_snapshot/artifacts/9eb95d246f95660c195c266d9bd96ac9b571517c54c87f7b23447d08b4d1e69a.json",
+      "sha256": "9eb95d246f95660c195c266d9bd96ac9b571517c54c87f7b23447d08b4d1e69a",
+      "bytes": 5049
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\9ec04f805b7e631f742797f964d4e67e198a9270cd16d411edeeb08ca2069ae4.json",
+      "destination": "research/academic_agent_snapshot/artifacts/9ec04f805b7e631f742797f964d4e67e198a9270cd16d411edeeb08ca2069ae4.json",
+      "sha256": "9ec04f805b7e631f742797f964d4e67e198a9270cd16d411edeeb08ca2069ae4",
+      "bytes": 4384
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\a1e9225e9c37d8a07996c7a411dc79a6109213016ef736ea278b1c3dd3901285.json",
+      "destination": "research/academic_agent_snapshot/artifacts/a1e9225e9c37d8a07996c7a411dc79a6109213016ef736ea278b1c3dd3901285.json",
+      "sha256": "a1e9225e9c37d8a07996c7a411dc79a6109213016ef736ea278b1c3dd3901285",
+      "bytes": 62943
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\a5d1fdb6fa451c3bd2e117e92701fc0f02041240d7f4e0d6a8ca2574078d9276.json",
+      "destination": "research/academic_agent_snapshot/artifacts/a5d1fdb6fa451c3bd2e117e92701fc0f02041240d7f4e0d6a8ca2574078d9276.json",
+      "sha256": "a5d1fdb6fa451c3bd2e117e92701fc0f02041240d7f4e0d6a8ca2574078d9276",
+      "bytes": 4617
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\a5e4936f258a12203224d879134de20817937dc9771db71de4bc083468a32c3a.json",
+      "destination": "research/academic_agent_snapshot/artifacts/a5e4936f258a12203224d879134de20817937dc9771db71de4bc083468a32c3a.json",
+      "sha256": "a5e4936f258a12203224d879134de20817937dc9771db71de4bc083468a32c3a",
+      "bytes": 101383
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\a9b52d71351b90d250dd4e59f7961cffc06db0c8268c17f375f2dfeb763f89e2.json",
+      "destination": "research/academic_agent_snapshot/artifacts/a9b52d71351b90d250dd4e59f7961cffc06db0c8268c17f375f2dfeb763f89e2.json",
+      "sha256": "a9b52d71351b90d250dd4e59f7961cffc06db0c8268c17f375f2dfeb763f89e2",
+      "bytes": 3910
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\aa8dd763a2953beaebad53ce46c8781285abbc349b01c069abd5d133a44f8217.json",
+      "destination": "research/academic_agent_snapshot/artifacts/aa8dd763a2953beaebad53ce46c8781285abbc349b01c069abd5d133a44f8217.json",
+      "sha256": "aa8dd763a2953beaebad53ce46c8781285abbc349b01c069abd5d133a44f8217",
+      "bytes": 134988
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\aaf49740f21c4eb50cd9ccb6bdb856b870fa5d35e041b561ad19ce718afe6727.pdf",
+      "destination": "research/academic_agent_snapshot/artifacts/aaf49740f21c4eb50cd9ccb6bdb856b870fa5d35e041b561ad19ce718afe6727.pdf",
+      "sha256": "aaf49740f21c4eb50cd9ccb6bdb856b870fa5d35e041b561ad19ce718afe6727",
+      "bytes": 5541464
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\ac00f56f1004a7a0b5de4356af9c2130800ad5b76f2eb43b85188940038abb1d.json",
+      "destination": "research/academic_agent_snapshot/artifacts/ac00f56f1004a7a0b5de4356af9c2130800ad5b76f2eb43b85188940038abb1d.json",
+      "sha256": "ac00f56f1004a7a0b5de4356af9c2130800ad5b76f2eb43b85188940038abb1d",
+      "bytes": 60610
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\b4515d4b53e175e9a2f0c7ed7f24d86336a549a39b5318a2d2798a95e1573bd2.json",
+      "destination": "research/academic_agent_snapshot/artifacts/b4515d4b53e175e9a2f0c7ed7f24d86336a549a39b5318a2d2798a95e1573bd2.json",
+      "sha256": "b4515d4b53e175e9a2f0c7ed7f24d86336a549a39b5318a2d2798a95e1573bd2",
+      "bytes": 6974
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\b78db77ab8f8261bb4fa69d4a382491d7b411ab4f9b7a61b47042fe8bed78370.pdf",
+      "destination": "research/academic_agent_snapshot/artifacts/b78db77ab8f8261bb4fa69d4a382491d7b411ab4f9b7a61b47042fe8bed78370.pdf",
+      "sha256": "b78db77ab8f8261bb4fa69d4a382491d7b411ab4f9b7a61b47042fe8bed78370",
+      "bytes": 3966113
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\bec0f438306b6baba57ac6ad927a6511a94d51896f95f3b36d429be22d702999.json",
+      "destination": "research/academic_agent_snapshot/artifacts/bec0f438306b6baba57ac6ad927a6511a94d51896f95f3b36d429be22d702999.json",
+      "sha256": "bec0f438306b6baba57ac6ad927a6511a94d51896f95f3b36d429be22d702999",
+      "bytes": 5425
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\c93b6210b4a055454d40913b13efb2b509bdf81131991c94d2bcb34061de98be.json",
+      "destination": "research/academic_agent_snapshot/artifacts/c93b6210b4a055454d40913b13efb2b509bdf81131991c94d2bcb34061de98be.json",
+      "sha256": "c93b6210b4a055454d40913b13efb2b509bdf81131991c94d2bcb34061de98be",
+      "bytes": 6071
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\cfd5ef06875236e137c8eb92552954f2a2c857b3ebba3706811cec12d0c8a760.json",
+      "destination": "research/academic_agent_snapshot/artifacts/cfd5ef06875236e137c8eb92552954f2a2c857b3ebba3706811cec12d0c8a760.json",
+      "sha256": "cfd5ef06875236e137c8eb92552954f2a2c857b3ebba3706811cec12d0c8a760",
+      "bytes": 5210
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\d0f0eee77ef76c1e4ab2b2e84f46ac410637c36cecbde4dd7f86741406eac988.json",
+      "destination": "research/academic_agent_snapshot/artifacts/d0f0eee77ef76c1e4ab2b2e84f46ac410637c36cecbde4dd7f86741406eac988.json",
+      "sha256": "d0f0eee77ef76c1e4ab2b2e84f46ac410637c36cecbde4dd7f86741406eac988",
+      "bytes": 109827
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\d185c3ccb130ff91535630d33d01cdfa0b4c8c543f67b1eefb361b228b1d9927.pdf",
+      "destination": "research/academic_agent_snapshot/artifacts/d185c3ccb130ff91535630d33d01cdfa0b4c8c543f67b1eefb361b228b1d9927.pdf",
+      "sha256": "d185c3ccb130ff91535630d33d01cdfa0b4c8c543f67b1eefb361b228b1d9927",
+      "bytes": 9679238
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\d48d62348fdb3ae62703c464a8bc90dd0dae384f108eaaf7de205737b580a392.json",
+      "destination": "research/academic_agent_snapshot/artifacts/d48d62348fdb3ae62703c464a8bc90dd0dae384f108eaaf7de205737b580a392.json",
+      "sha256": "d48d62348fdb3ae62703c464a8bc90dd0dae384f108eaaf7de205737b580a392",
+      "bytes": 6346
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\d91360c4ceebb55bc0696d59d7999e604d7b955301f3b9f222a8854a20618691.pdf",
+      "destination": "research/academic_agent_snapshot/artifacts/d91360c4ceebb55bc0696d59d7999e604d7b955301f3b9f222a8854a20618691.pdf",
+      "sha256": "d91360c4ceebb55bc0696d59d7999e604d7b955301f3b9f222a8854a20618691",
+      "bytes": 1779685
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\e10baea62dc75658bd74f16be67db1f211e7937e09b6ea69e3d2a2ea5ae383b8.pdf",
+      "destination": "research/academic_agent_snapshot/artifacts/e10baea62dc75658bd74f16be67db1f211e7937e09b6ea69e3d2a2ea5ae383b8.pdf",
+      "sha256": "e10baea62dc75658bd74f16be67db1f211e7937e09b6ea69e3d2a2ea5ae383b8",
+      "bytes": 6347445
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\e17405c1588da9e28aaf562839a4f79031a268c589ca0e2fa107c6e670a1517a.json",
+      "destination": "research/academic_agent_snapshot/artifacts/e17405c1588da9e28aaf562839a4f79031a268c589ca0e2fa107c6e670a1517a.json",
+      "sha256": "e17405c1588da9e28aaf562839a4f79031a268c589ca0e2fa107c6e670a1517a",
+      "bytes": 6005
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\e447474541bb266fe5270d55c634d1f13f4a31c41499cb84e11663e540d87fde.pdf",
+      "destination": "research/academic_agent_snapshot/artifacts/e447474541bb266fe5270d55c634d1f13f4a31c41499cb84e11663e540d87fde.pdf",
+      "sha256": "e447474541bb266fe5270d55c634d1f13f4a31c41499cb84e11663e540d87fde",
+      "bytes": 1494791
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\e4e1daf75eb555f6fa0c0080a7f0a348fcc965c20e8261406e8ee73ee108dcd1.json",
+      "destination": "research/academic_agent_snapshot/artifacts/e4e1daf75eb555f6fa0c0080a7f0a348fcc965c20e8261406e8ee73ee108dcd1.json",
+      "sha256": "e4e1daf75eb555f6fa0c0080a7f0a348fcc965c20e8261406e8ee73ee108dcd1",
+      "bytes": 4781
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\eaa4dbc63b4f3daf05e4ab9d4a68004b22a53b2a1bf0a38737b8a2806ba838e3.json",
+      "destination": "research/academic_agent_snapshot/artifacts/eaa4dbc63b4f3daf05e4ab9d4a68004b22a53b2a1bf0a38737b8a2806ba838e3.json",
+      "sha256": "eaa4dbc63b4f3daf05e4ab9d4a68004b22a53b2a1bf0a38737b8a2806ba838e3",
+      "bytes": 45503
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\ebb4c4d3dbd6d8f496997117f74a48a6d0de71dfaae6de46b95bb016a7d3207a.json",
+      "destination": "research/academic_agent_snapshot/artifacts/ebb4c4d3dbd6d8f496997117f74a48a6d0de71dfaae6de46b95bb016a7d3207a.json",
+      "sha256": "ebb4c4d3dbd6d8f496997117f74a48a6d0de71dfaae6de46b95bb016a7d3207a",
+      "bytes": 69969
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\f2c3a6317b372b0764a26f098df6e6bf5bbdef32f86f143bf711012e850bca64.json",
+      "destination": "research/academic_agent_snapshot/artifacts/f2c3a6317b372b0764a26f098df6e6bf5bbdef32f86f143bf711012e850bca64.json",
+      "sha256": "f2c3a6317b372b0764a26f098df6e6bf5bbdef32f86f143bf711012e850bca64",
+      "bytes": 4135
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\fc31a3f78df36964b698ca95abea74061d200b3dc81e7b1d2d3ae571dd1f7fe6.json",
+      "destination": "research/academic_agent_snapshot/artifacts/fc31a3f78df36964b698ca95abea74061d200b3dc81e7b1d2d3ae571dd1f7fe6.json",
+      "sha256": "fc31a3f78df36964b698ca95abea74061d200b3dc81e7b1d2d3ae571dd1f7fe6",
+      "bytes": 59240
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\fd827938238d6128263247504fb27ed585257246b51d443c049a34cf084ef01f.json",
+      "destination": "research/academic_agent_snapshot/artifacts/fd827938238d6128263247504fb27ed585257246b51d443c049a34cf084ef01f.json",
+      "sha256": "fd827938238d6128263247504fb27ed585257246b51d443c049a34cf084ef01f",
+      "bytes": 4015
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\exports\\latest.json",
+      "destination": "research/academic_agent_snapshot/exports/latest.json",
+      "sha256": "bf65cffcf4944ba2ac90c7f53d3b402e6e3b4ab31022a76f8ee6fe51b4667890",
+      "bytes": 176
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\exports\\v-2026-10-25T054638-996790-0000-0128989e\\comparison.csv",
+      "destination": "research/academic_agent_snapshot/exports/v-2026-10-25T054638-996790-0000-0128989e/comparison.csv",
+      "sha256": "892861c4f8d19aa0ecea2b01589156a2e4cd0ecbbddc85f652187c524fd4ebb8",
+      "bytes": 46989
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\exports\\v-2026-10-25T054638-996790-0000-0128989e\\comparison.md",
+      "destination": "research/academic_agent_snapshot/exports/v-2026-10-25T054638-996790-0000-0128989e/comparison.md",
+      "sha256": "63933590a323ac3dcae120c28e1b9334b90073d1b796f4d15fe6d6a540d827c1",
+      "bytes": 47344
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\exports\\v-2026-10-25T054638-996790-0000-0128989e\\evidence-ledger.json",
+      "destination": "research/academic_agent_snapshot/exports/v-2026-10-25T054638-996790-0000-0128989e/evidence-ledger.json",
+      "sha256": "eff85c5e363d031c3b1944280583d0ebccbe4438bc4b482501bab0d7848a05a9",
+      "bytes": 1434822
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\exports\\v-2026-10-25T054638-996790-0000-0128989e\\gaps.md",
+      "destination": "research/academic_agent_snapshot/exports/v-2026-10-25T054638-996790-0000-0128989e/gaps.md",
+      "sha256": "3870bf0cec64521daa6552a90260d46c7837cfe6b42a32b7c7fe7f688d71f5ac",
+      "bytes": 10122
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\exports\\v-2026-10-25T054638-996790-0000-0128989e\\library.csv",
+      "destination": "research/academic_agent_snapshot/exports/v-2026-10-25T054638-996790-0000-0128989e/library.csv",
+      "sha256": "09bc7de9cab2f87cda901d62c60bd851768b71304ef231578002f13c556d048a",
+      "bytes": 14372
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\exports\\v-2026-10-25T054638-996790-0000-0128989e\\library.json",
+      "destination": "research/academic_agent_snapshot/exports/v-2026-10-25T054638-996790-0000-0128989e/library.json",
+      "sha256": "dce252544822b0342897eed69cbe145d77f80b567ce158dc24d73886dc1f7995",
+      "bytes": 210110
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\exports\\v-2026-10-25T054638-996790-0000-0128989e\\manifest.json",
+      "destination": "research/academic_agent_snapshot/exports/v-2026-10-25T054638-996790-0000-0128989e/manifest.json",
+      "sha256": "0fc8b1d5278a921db613aa78838f7466553eec78d145842a9b6b67ac1335d9d2",
+      "bytes": 1223
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\exports\\v-2026-10-25T054638-996790-0000-0128989e\\outline.md",
+      "destination": "research/academic_agent_snapshot/exports/v-2026-10-25T054638-996790-0000-0128989e/outline.md",
+      "sha256": "114c400f86c8b50f93d8b0f5789614a7effa08b02057c95422ef2e0f1b446462",
+      "bytes": 175
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\exports\\v-2026-10-25T054638-996790-0000-0128989e\\quality.json",
+      "destination": "research/academic_agent_snapshot/exports/v-2026-10-25T054638-996790-0000-0128989e/quality.json",
+      "sha256": "c15d72b006051b79267a9c9e7920b75c18b301fc24eb9ef2aef3a154dbd55c90",
+      "bytes": 868
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\exports\\v-2026-10-25T054638-996790-0000-0128989e\\query-log.json",
+      "destination": "research/academic_agent_snapshot/exports/v-2026-10-25T054638-996790-0000-0128989e/query-log.json",
+      "sha256": "c64cf51396fbcd4272cd8961353d7fcbea0dcafee64011b4ba717224e001d0c0",
+      "bytes": 1891700
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\exports\\v-2026-10-25T054638-996790-0000-0128989e\\reading-cards.md",
+      "destination": "research/academic_agent_snapshot/exports/v-2026-10-25T054638-996790-0000-0128989e/reading-cards.md",
+      "sha256": "1f91d250a06622da4ff44dea84000b28b4cf274be2eef53c53628569dcd15cdd",
+      "bytes": 74155
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\exports\\v-2026-10-25T054638-996790-0000-0128989e\\references.bib",
+      "destination": "research/academic_agent_snapshot/exports/v-2026-10-25T054638-996790-0000-0128989e/references.bib",
+      "sha256": "b29cb85529038c358d5d8360212e31ddcd792c86cf796c65dba7135bf56be90c",
+      "bytes": 21439
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\exports\\v-2026-10-25T054638-996790-0000-0128989e\\review.md",
+      "destination": "research/academic_agent_snapshot/exports/v-2026-10-25T054638-996790-0000-0128989e/review.md",
+      "sha256": "9809de30c7ddfe96e6734c6e1feb2e43d974397e7908a7b901e8a3c5464fc49d",
+      "bytes": 75809
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\research.db",
+      "destination": "research/academic_agent_snapshot/research.db",
+      "sha256": "80ec0144a7df1545f14a4461778d2e79cf34031e9128c12c081038096b400a3f",
+      "method": "sqlite_online_backup",
+      "bytes": 3067904
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\VISTA3D - A Unified Segmentation Foundation Model For 3D Medical Imaging\\VISTA3D - A Unified Segmentation Foundation Model For 3D Medical Imaging.pdf",
+      "destination": "literature/papers/L1_VISTA3D/paper.pdf",
+      "sha256": "1e0f43ccc657591e28a40022f7c2cb14c94d31719a12ec78c572d9a0fa06a3a5",
+      "bytes": 2714252
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\VISTA3D - A Unified Segmentation Foundation Model For 3D Medical Imaging\\VISTA3D - A Unified Segmentation Foundation Model For 3D Medical Imaging_批注.md",
+      "destination": "archive/local_notes/L1_VISTA3D/批注.md",
+      "sha256": "3a8bd98be4ef3450630fe473c4ff889e513fb785ed0808a73b5a727c441df54e",
+      "bytes": 28747
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\VISTA3D - A Unified Segmentation Foundation Model For 3D Medical Imaging\\VISTA3D - A Unified Segmentation Foundation Model For 3D Medical Imaging_精读.md",
+      "destination": "archive/local_notes/L1_VISTA3D/精读.md",
+      "sha256": "b068a162365bba3e49af0bbc8dadb3df87793dc90e7ed31171f3c0ddbb3b324a",
+      "bytes": 8666
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\REDNet - Reliable Evidential Discounting Network for Multi-Modality Medical Image Segmentation\\REDNet - Reliable Evidential Discounting Network for Multi-Modality Medical Image Segmentation.pdf",
+      "destination": "literature/papers/L2_REDNet/paper.pdf",
+      "sha256": "e10baea62dc75658bd74f16be67db1f211e7937e09b6ea69e3d2a2ea5ae383b8",
+      "bytes": 6347445
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\REDNet - Reliable Evidential Discounting Network for Multi-Modality Medical Image Segmentation\\REDNet - Reliable Evidential Discounting Network for Multi-Modality Medical Image Segmentation_批注.md",
+      "destination": "archive/local_notes/L2_REDNet/批注.md",
+      "sha256": "68a1021a3b0824f62e2e83dc6a31365bc7341b669ae64132097e357d7d64528e",
+      "bytes": 270
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\REDNet - Reliable Evidential Discounting Network for Multi-Modality Medical Image Segmentation\\REDNet - Reliable Evidential Discounting Network for Multi-Modality Medical Image Segmentation_精读.md",
+      "destination": "archive/local_notes/L2_REDNet/精读.md",
+      "sha256": "73984f15bfe000da6a492e255ab17694d8b0925cd64f7325dae0e3d36e6e5c5e",
+      "bytes": 8253
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Deep Closing - Enhancing Topological Connectivity in Medical Tubular Segmentation\\Deep Closing - Enhancing Topological Connectivity in Medical Tubular Segmentation.pdf",
+      "destination": "literature/papers/L3_Deep_Closing/paper.pdf",
+      "sha256": "f65fdb948610505882b7e57269769d94fcf28ef1a957124627477cb509bd978c",
+      "bytes": 4827819
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Deep Closing - Enhancing Topological Connectivity in Medical Tubular Segmentation\\Deep Closing - Enhancing Topological Connectivity in Medical Tubular Segmentation_批注.md",
+      "destination": "archive/local_notes/L3_Deep_Closing/批注.md",
+      "sha256": "63368cddb6234ff17089b433747cc3182ee7c2825052a99b270bc79c834903e2",
+      "bytes": 2302
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Deep Closing - Enhancing Topological Connectivity in Medical Tubular Segmentation\\Deep Closing - Enhancing Topological Connectivity in Medical Tubular Segmentation_精读.md",
+      "destination": "archive/local_notes/L3_Deep_Closing/精读.md",
+      "sha256": "2217b51169826da138f05e81ec77045157d2600c78cf40731ce24e021e73a3cb",
+      "bytes": 7454
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Learned iterative segmentation of highly variable anatomy from limited data - Applications to whole heart segmentation for congenital heart disease\\Learned iterative segmentation of highly variable anatomy from limited data - Applications to whole heart segmentation for congenital heart disease.pdf",
+      "destination": "literature/papers/L4_Learned_Iterative_CHD/paper.pdf",
+      "sha256": "81e2ddda7ce08f885cd60b0050179e7dd115972a3d5d6dfaa16f0614633fb4e3",
+      "bytes": 3481871
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Learned iterative segmentation of highly variable anatomy from limited data - Applications to whole heart segmentation for congenital heart disease\\Learned iterative segmentation of highly variable anatomy from limited data - Applications to whole heart segmentation for congenital heart disease_批注.md",
+      "destination": "archive/local_notes/L4_Learned_Iterative_CHD/批注.md",
+      "sha256": "2ceebbdc4506b2e7fbfd4effbec54db2a47c04b4aaee044106721b846041960d",
+      "bytes": 379
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Learned iterative segmentation of highly variable anatomy from limited data - Applications to whole heart segmentation for congenital heart disease\\Learned iterative segmentation of highly variable anatomy from limited data - Applications to whole heart segmentation for congenital heart disease_精读.md",
+      "destination": "archive/local_notes/L4_Learned_Iterative_CHD/精读.md",
+      "sha256": "2126f27babeb49eb12ff22d5f14083456edae026b785be9f06155862b6a537f2",
+      "bytes": 8863
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Structure-aware Semantic Discrepancy and Consistency for 3D Medical Image Self-supervised Learning\\Structure-aware Semantic Discrepancy and Consistency for 3D Medical Image Self-supervised Learning.pdf",
+      "destination": "literature/papers/L5_Structure_Self_Supervision/paper.pdf",
+      "sha256": "c36fc42c5a0c381732290154094291cf7d9d597b0c1682878d87ad47cdc44268",
+      "bytes": 18007677
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Structure-aware Semantic Discrepancy and Consistency for 3D Medical Image Self-supervised Learning\\Structure-aware Semantic Discrepancy and Consistency for 3D Medical Image Self-supervised Learning_批注.md",
+      "destination": "archive/local_notes/L5_Structure_Self_Supervision/批注.md",
+      "sha256": "2249acda8dd5798767ebbb928da409aab0898707f8e51aeff7a45828b903e329",
+      "bytes": 281
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Structure-aware Semantic Discrepancy and Consistency for 3D Medical Image Self-supervised Learning\\Structure-aware Semantic Discrepancy and Consistency for 3D Medical Image Self-supervised Learning_精读.md",
+      "destination": "archive/local_notes/L5_Structure_Self_Supervision/精读.md",
+      "sha256": "2e9db807baeda8d13b11b868041f50e4694ab28bccb20d910ed2165b237203c9",
+      "bytes": 8520
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Unsupervised Domain Adaptation with Variational Approximation for Cardiac Segmentation\\Unsupervised Domain Adaptation with Variational Approximation for Cardiac Segmentation.pdf",
+      "destination": "literature/papers/L6_Variational_UDA_Cardiac/paper.pdf",
+      "sha256": "31964bc406d8e817ddecf936ffc2e1ce5c2916dd7efcb359ca0fa55d5bbbf379",
+      "bytes": 2682809
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Unsupervised Domain Adaptation with Variational Approximation for Cardiac Segmentation\\Unsupervised Domain Adaptation with Variational Approximation for Cardiac Segmentation_批注.md",
+      "destination": "archive/local_notes/L6_Variational_UDA_Cardiac/批注.md",
+      "sha256": "4a9947d8ff072cb518b4652f8d0fe2587006f38dd6b80d276ab0590f6481f0ab",
+      "bytes": 254
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Unsupervised Domain Adaptation with Variational Approximation for Cardiac Segmentation\\Unsupervised Domain Adaptation with Variational Approximation for Cardiac Segmentation_精读.md",
+      "destination": "archive/local_notes/L6_Variational_UDA_Cardiac/精读.md",
+      "sha256": "e7318ec800fe53267e4dc063ecfe574d0621fa6bb420f025b1d89b2f3835e310",
+      "bytes": 9658
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\SDF4CHD - Generative modeling of cardiac anatomies with congenital heart defects\\SDF4CHD - Generative modeling of cardiac anatomies with congenital heart defects.pdf",
+      "destination": "literature/papers/L7_SDF4CHD/paper.pdf",
+      "sha256": "01f34e8183b05c87fd30c9c858b9db39d4d99bee563511550e27cc4f852ac859",
+      "bytes": 8271985
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\SDF4CHD - Generative modeling of cardiac anatomies with congenital heart defects\\SDF4CHD - Generative modeling of cardiac anatomies with congenital heart defects_批注.md",
+      "destination": "archive/local_notes/L7_SDF4CHD/批注.md",
+      "sha256": "1f86a8760c2803531944bbab43e67dfd7bfb4cf094a26cb61a55d7cefc4cf334",
+      "bytes": 245
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\SDF4CHD - Generative modeling of cardiac anatomies with congenital heart defects\\SDF4CHD - Generative modeling of cardiac anatomies with congenital heart defects_精读.md",
+      "destination": "archive/local_notes/L7_SDF4CHD/精读.md",
+      "sha256": "c0dfd75c68753e37225648c291d1520032d64a222f28c19d45b1c9467df42b5c",
+      "bytes": 9215
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\NETracer - A Topology-Aware Iterative Tracing Approach for Tubular Structure Extraction\\NETracer - A Topology-Aware Iterative Tracing Approach for Tubular Structure Extraction.pdf",
+      "destination": "literature/papers/L8_NETracer/paper.pdf",
+      "sha256": "4f7dfacdabf74c28d467090602a098ffd95e72eab5518086c491ceb6ccc3215e",
+      "bytes": 1604574
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\NETracer - A Topology-Aware Iterative Tracing Approach for Tubular Structure Extraction\\NETracer - A Topology-Aware Iterative Tracing Approach for Tubular Structure Extraction_批注.md",
+      "destination": "archive/local_notes/L8_NETracer/批注.md",
+      "sha256": "75c2ff541489836054338551c83aa3f0b70ebb3b08a8aa94f9c3694f01345303",
+      "bytes": 259
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\NETracer - A Topology-Aware Iterative Tracing Approach for Tubular Structure Extraction\\NETracer - A Topology-Aware Iterative Tracing Approach for Tubular Structure Extraction_精读.md",
+      "destination": "archive/local_notes/L8_NETracer/精读.md",
+      "sha256": "3360b67b40fa607a0dfaa5360c409bb0c3b867385e71300f140b586805b45be6",
+      "bytes": 8466
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Hierarchical Semantic Concept Modeling for Myocardial Pathology Segmentation in CMR\\Hierarchical Semantic Concept Modeling for Myocardial Pathology Segmentation in CMR.pdf",
+      "destination": "literature/papers/L9_Hierarchical_CMR/paper.pdf",
+      "sha256": "4a43f4fccaf65938b354e95711e546312fb920c40a9c1129f27ee58aeb71face",
+      "bytes": 6149671
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Hierarchical Semantic Concept Modeling for Myocardial Pathology Segmentation in CMR\\Hierarchical Semantic Concept Modeling for Myocardial Pathology Segmentation in CMR_批注.md",
+      "destination": "archive/local_notes/L9_Hierarchical_CMR/批注.md",
+      "sha256": "1ec2b598a9a5bd5d1e1cded12b45ff3c6ea31073589f5538eec79618936e10cc",
+      "bytes": 248
+    },
+    {
+      "source": "D:\\BaiduSyncdisk\\obsidian\\仓库\\小张的书桌\\科研\\文献阅读\\医疗图像\\Hierarchical Semantic Concept Modeling for Myocardial Pathology Segmentation in CMR\\Hierarchical Semantic Concept Modeling for Myocardial Pathology Segmentation in CMR_精读.md",
+      "destination": "archive/local_notes/L9_Hierarchical_CMR/精读.md",
+      "sha256": "27d3b926248c46171d60393a3c8cb125645da53778b281c1823c60021fe8f4c6",
+      "bytes": 9156
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\d91360c4ceebb55bc0696d59d7999e604d7b955301f3b9f222a8854a20618691.pdf",
+      "destination": "literature/papers/R01_DnR/paper.pdf",
+      "sha256": "d91360c4ceebb55bc0696d59d7999e604d7b955301f3b9f222a8854a20618691",
+      "bytes": 1779685
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\d185c3ccb130ff91535630d33d01cdfa0b4c8c543f67b1eefb361b228b1d9927.pdf",
+      "destination": "literature/papers/R02_SegAgent/paper.pdf",
+      "sha256": "d185c3ccb130ff91535630d33d01cdfa0b4c8c543f67b1eefb361b228b1d9927",
+      "bytes": 9679238
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\86a347b0144aea4dc8faf5c1e25681a4eaee237705341ecf41408c8885f81cd4.pdf",
+      "destination": "literature/papers/R03_Two_Stage_L2D/paper.pdf",
+      "sha256": "86a347b0144aea4dc8faf5c1e25681a4eaee237705341ecf41408c8885f81cd4",
+      "bytes": 444390
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\158b4ef253a1a66e113d1dffcf84014aef6a2ac99aff6d0a51a4b4984409c697.pdf",
+      "destination": "literature/papers/R04_CGS/paper.pdf",
+      "sha256": "158b4ef253a1a66e113d1dffcf84014aef6a2ac99aff6d0a51a4b4984409c697",
+      "bytes": 1333833
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\aaf49740f21c4eb50cd9ccb6bdb856b870fa5d35e041b561ad19ce718afe6727.pdf",
+      "destination": "literature/papers/R05_DeferredSeg/paper.pdf",
+      "sha256": "aaf49740f21c4eb50cd9ccb6bdb856b870fa5d35e041b561ad19ce718afe6727",
+      "bytes": 5541464
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\e447474541bb266fe5270d55c634d1f13f4a31c41499cb84e11663e540d87fde.pdf",
+      "destination": "literature/papers/R06_NeuroRefiner/paper.pdf",
+      "sha256": "e447474541bb266fe5270d55c634d1f13f4a31c41499cb84e11663e540d87fde",
+      "bytes": 1494791
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\8f1b3c8f831bc852abe63d6605dbfc6b7081a3d071704b7d04ec86340d47118b.pdf",
+      "destination": "literature/papers/R07_U_CFR/paper.pdf",
+      "sha256": "8f1b3c8f831bc852abe63d6605dbfc6b7081a3d071704b7d04ec86340d47118b",
+      "bytes": 4628964
+    },
+    {
+      "source": "D:\\projects\\testing_tools\\academic_agent\\projects\\vista_expert_clicks_20261025\\artifacts\\b78db77ab8f8261bb4fa69d4a382491d7b411ab4f9b7a61b47042fe8bed78370.pdf",
+      "destination": "literature/papers/R08_Generalist_Specialist_RL/paper.pdf",
+      "sha256": "b78db77ab8f8261bb4fa69d4a382491d7b411ab4f9b7a61b47042fe8bed78370",
+      "bytes": 3966113
+    }
+  ],
+  "integrity_note": "All copy entries byte-checked against source. SQLite is a consistent backup and separately integrity-checked. Normalized reading copies are derived; originals preserved under archive/local_notes."
+}

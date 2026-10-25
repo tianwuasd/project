@@ -1,0 +1,739 @@
+16                                     IEEE TRANSACTIONS ON MEDICAL IMAGING, VOL. 45, NO. 1, JANUARY 2026
+
+
+
+
+            REDNet: Reliable Evidential Discounting
+              Network for Multi-Modality Medical
+                    Image Segmentation
+        Shichen Sun , Member, IEEE, Yufei Chen , Xiaodong Yue , Chao Ma, and Xiahai Zhuang
+
+
+
+
+   Abstract — In the field of computer-aided diagnosis, par-                   [3], [4]. Single-modality medical images often lack the detail
+ticularly for tumor diseases, segmentation is a prerequisite                   needed for reliable diagnoses, especially for tumors which
+and primary step. Multi-modality images become essential                       prompting researchers to rely on multi-modality imaging to
+for achieving accurate segmentation, which offer critical
+insights beyond the limitations of single-modality data.                       achieve enhanced segmentation accuracy. Researchers have
+However, different modalities and images may suffer from                       designed different networks to improve segmentation perfor-
+different types of data imperfection, such as intensity                        mance on multi-modality [5], [6], [7].
+non-uniformity, motion artifact, and low quality due to                           The performance of existing multi-modal medical image
+hardware limitations, which challenge image segmentation                       segmentation frameworks is heavily dependent on high-quality
+algorithms. To address this challenge, we propose a Reli-
+able Evidential Discounting Network (REDNet), which is                         data from various modalities. In clinic scenarios, images often
+composed of three main modules: 1) the Intra-modality                          suffer from various types of imperfection due to uneven illu-
+Consistency Evaluation Module (ICEM) measuring the data                        mination, patient movement, hardware limitations, and other
+cohesion within the same modality; 2) the Cross-modality                       unexpected factors [8], [9], [10]. Models often perform poorly
+Difference Aggregation Module (CDAM) identifing data dis-                      when faced with imperfection in one or more modalities.
+crepancy across modalities; 3) the Discounting Fusion
+Module (DFM) processing the multi-modality evidence by                         Furthermore, many researchers have proposed uncertainty
+applying discounting strategies to fuse the data. This                         approaches to reduce the impact of imperfection on medi-
+approach maintains segmentation accuracy by effectively                        cal image segmentation models. Methods such as shadowed
+integrating multi-modality evidence, while discounting the                     sets [11], ensemble [12] and subjective logic [13] have
+influence of lower-quality data, ensuring reliable results                     shown potently of tackling imperfection. However, Karimi
+despite the presence of image imperfections. We evalu-
+ated REDNet on two distinct datasets, BRATS2021 and an                         and Gholipour [14] shows that uncertainty methods are less
+in-house pancreas dataset from Changhai Hospital. REDNet                       effective when there is a substantial discrepancy between test
+outperforms other methods, particularly in scenarios with                      and training data, which challenges the generalizability. Many
+imperfect image sources, and achieves reliable results in                      existing models may fail to detect imperfection in the data and
+multi-modality tumor segmentation.                                             cannot dynamically adjust based on data quality to reduce the
+  Index Terms— Reliable segmentation, multi-modality                           effects of flawed data.
+data, evidential learning, uncertainty.                                           In this work, we propose a reliable evidential discount-
+                     I. I NTRODUCTION                                          ing network, named REDNet, which not only dynamically
+                                                                               adjusts the contribution of modalities based on their real-time
+       EDICAL image segmentation aims to automatically
+M      and accurately delineate organs and tumors, serving as
+an essential component for computer-aided diagnosis [1], [2],
+                                                                               quality for better segmentation but also actively reduces
+                                                                               the impact of imperfection in multi-modality. REDNet is
+                                                                               composed of three main modules. The Intra-modality Con-
+ Received 4 June 2025; accepted 16 July 2025. Date of                          sistency Evaluation Module (ICEM) refines features within
+publication 21 July 2025; date of current version 31 December                  modalities by contrasting test against training data, while
+2025. This work was supported by the National Natural
+Science Foundation of China under Grant 62472315 and                           the Cross-modality Difference Aggregation Module (CDAM)
+Grant     62476165.        Recommended       by   Associate     Editor         extracts cross-modality insights by observing data discrepancy
+H. Soltanian-Zadeh. (Corresponding author: Yufei Chen.)                        across modalities. Unlike previous methods which apply static
+ Shichen Sun and Yufei Chen are with the School of Computer Science
+and Technology, Tongji University, Shanghai 201804, China (e-mail:             weights, the Discounting Fusion Module (DFM) offers an
+sunshichenmail@163.com; yufeichen@tongji.edu.cn).                              innovative approach that varies the level of discounting in
+ Xiaodong Yue is with the Artificial Intelligence Institute, Shanghai          response to the observed imperfection in each modality and
+University, Shanghai 200444, China (e-mail: yswantfly@shu.edu.cn).
+ Chao Ma is with the Department of Radiology, Changhai Hospital of             fuse the data from different modalities, thereby ensuring
+Shanghai, Naval Medical University, Shanghai 200433, China (e-mail:            reliable segmentation under diverse conditions.
+mengqihi@gmail.com).                                                              We conduct experiments to evaluate the effectiveness of the
+ Xiahai Zhuang is with the School of Data Science, Fudan University,
+Shanghai 200433, China (e-mail: zxh@fudan.edu.cn).                             proposed REDNet on the BRATS2021 challenge dataset [15]
+ Digital Object Identifier 10.1109/TMI.2025.3591124                            and in-house pancreas dataset. Our model performs well
+
+            1558-254X © 2025 IEEE. All rights reserved, including rights for text and data mining, and training of artificial intelligence
+                   and similar technologies. Personal use is permitted, but republication/redistribution requires IEEE permission.
+        Authorized licensed use limitedSee   https://www.ieee.org/publications/rights/index.html
+                                        to: TONGJI   UNIVERSITY. Downloaded on August 14,2026 atfor more information.
+                                                                                                 07:31:30 UTC from IEEE Xplore. Restrictions apply.
+SUN et al.: REDNet FOR MULTI-MODALITY MEDICAL IMAGE SEGMENTATION                                                                                   17
+
+
+
+
+against both conventional methods and uncertainty-based                      confidence. Uncertainty-based methods, as mentioned in [22],
+methods. Our model demonstrates strong performance in                        can be divided into probabilistic-based, ensemble-based, and
+introducing the impact of imperfection to the data as well                   evidence-based methods. Probabilistic-based [23], [24] meth-
+as handling the inherent imperfections present in medical                    ods capture ambiguity in the data by learning a distribution
+imaging data. The main contributions of this study are as                    over segmentations, rather than producing a single determin-
+follows:                                                                     istic output. Through this technique, the model can provide
+   • We propose a reliable evidential discounting network                    both the most likely segmentation result along with a measure
+     (REDNet). This framework is designed to dynamically                     of uncertainty, indicating the level of confidence for each pixel.
+     calibrate the influence of each modality by assessing their             Ensemble-based methods [12], [25] aim to quantify predictive
+     real-time quality and reducing the impact of imperfection.              uncertainty in deep learning models. By training multiple
+   • We present three modules: ICEM identifying consis-                      neural networks independently from different initializations,
+     tency between test and training data, CDAM evaluating                   this method constructs an ensemble of models. Evidence-based
+     data discrepancy across modalities and DFM fusing                       methods [7], [26] use an evidential layer which can quantify
+     multi-modal data by employing discounting methodolo-                    the evidence-based uncertainty using subject logic (SL) [13]
+     gies. DFM also customizes the impact of each modality                   and Dempster-Shafer theory (DST) [27], [28]. Zou et al. [7]
+     based on data quality at a pixel level.                                 propose a segmentation network which can generate robust
+   • We validate the proposed method on two distinct datasets,               segmentation results and reliable uncertainty using subject
+     BRATS2021 and an in-house pancreas dataset, compar-                     logic. Huang et al. [29] introduce an Evidential Segmentation
+     ing it with both classic and uncertainty-based methods.                 (ES) module that not only achieves improved segmentation
+     Our proposed framework performs well in both normal                     accuracy in 3D PET/CT imaging but also generates uncertainty
+     scenarios and imperfection scenarios.                                   maps that effectively quantify classification uncertainty.
+                                                                                Although these methods have made progress in quantify
+                      II. R ELATED W ORKS                                    uncertainty, they fall short in resisting noise. They can effec-
+                                                                             tively capture areas of uncertainty when data corruption is
+A. Multi-Modal Medical Image Segmentation
+                                                                             minimal, but fail to accurately measure uncertainty and yield
+   Many researchers have proposed multi-modal fusion meth-                   good segmentation results when the data is completely com-
+ods to fully utilize the different information contained in                  promised.
+multi-modal data. The current multi-modal fusion methods can
+be mainly divided into early fusion [7], [16], [17], interme-                                         III. M ETHODOLOGY
+diate fusion [18], [19], and decision fusion [20], [21]. Early
+                                                                                The overall framework of REDNet is shown in Fig.1. It is
+fusion methods mainly involve combining the raw data at the
+                                                                             composed of evidential-based uncertainty estimation mod-
+level of the original data. The typical method is to simply
+                                                                             ule, Intra-modality Consistency Evaluation Module (ICEM),
+concatenate or add the data and then input it into a neural
+                                                                             Cross-modality Difference Aggregation Module (CDAM), and
+network. Chang et al. [17] propose DPAFNet, based on dual-
+                                                                             Discounting Fusion Module (DFM). We are initially provided
+path (DP) module and multi-scale attention fusion (MAF)                                                                                M ,
+                                                                             with a set of multi-modality data, denoted as X = {x i }i=1
+module. By concatenating multimodal inputs, the network
+                                                                             where M represents the total number of modalities, each
+ensures precise tumor segmentation. Intermediate fusion is
+                                                                             x i ∈ R D,H,W represents an original input from a specific
+widely used in multi-modal fusion methods, because it allows
+                                                                             modality, X is the set of all modalities involved and D, H, W
+for the combination of information from different modalities
+                                                                             is the size of the image. The proposed framework processes 3D
+in a more meaningful and interpretable way. For example,
+                                                                             medical images, and all modules operate on volumetric data
+Xu et al. [18] innovate a knowledge-guided multimodal fusion
+                                                                             to preserve 3D contextual information. For each individual
+methodology, which uses multi-phase self-attention module to
+                                                                             modality, an evidence representation ei is then computed
+make full use of cross-modal information. Zhang et al. [19]
+                                                                             through a Subjective Logic Network:
+introduce a spatial aggregation module to encourages per-pixel
+interactions between different phases. Decision fusion achieves                                            ei = F i (x i ),                        (1)
+the final outcomes by integrating results from multiple phases
+                                                                             where ei ∈ RC,D,H,W and C is the class number. Each
+through methods, such as averaging. Guo et al. [20] employs
+                                                                             modality possesses its unique extractor F i . Then, the obtained
+averaging to merge segmentation outputs from multimodal
+                                                                             evidence from each modality is conveyed into the ICEM
+CNNs to improve segmentation accuracy.
+                                                                             and CDAM to extract single modality information and cross-
+   Although these methods offer high precision, they often rely
+                                                                             modality information, denoted as din and dc , respectively.
+on empirical design to extract multi-phase information. Yet,
+                                                                                Next, the data is introduced to the Discounting Fusion Mod-
+their results are not always explicitly interpreted, depriving
+                                                                             ule. Using the information received from ICEM and CDAM,
+clinicians of effective insights into the models reliability in
+                                                                             the credibility of each pixel is evaluated within each modality,
+uncertain scenarios.
+                                                                             leading to a discount on the evidence ei acquired in Eq. (1).
+                                                                             The final process constitutes using the Dempster-Shafer (DS)
+B. Uncertainty-Based Medical Image Segmentation                              Evidence Theory for an integrated fusion, resulting in a final
+  Using uncertainty in segmentation helps identify regions                   segmentation. For convenience, the symbols used in this paper
+where the model’s predictions have a lower degree of                         are summarized in Table I.
+
+       Authorized licensed use limited to: TONGJI UNIVERSITY. Downloaded on August 14,2026 at 07:31:30 UTC from IEEE Xplore. Restrictions apply.
+18                                                                             IEEE TRANSACTIONS ON MEDICAL IMAGING, VOL. 45, NO. 1, JANUARY 2026
+
+
+
+
+Fig. 1. This framework performs reliable multi-modality image segmentation. Treat all modality data as input data, where ‘Global’ denotes the
+concatenation of all modalities. Different imaging modalities are processed individually through evidential-based uncertainty estimation to extract
+features and generate evidence e i . These are then refined by Intra-modality Consistency Evaluation Module (ICEM) and Cross-modality Difference
+Aggregation Module (CDAM) for quality detection. The Discounting Fusion Module (DFM) processes the multi-modality evidence by applying
+discounting strategies to fuse the data.
+
+
+                                                                           TABLE I
+                                                        D EFINITION OF S YMBOLS U SED IN T HIS PAPER
+
+
+
+
+A. Evidential-Based Uncertainty Estimation                                     where C denotes the class number, bi,n j,k ≥ 0 and u i, j,k ≥ 0 are
+   Based on Dempster-Shafer Evidence Theory (DST) [30],                        the belief mass belonging to the n-th class and the uncertainty.
+a framework for Subjective Logic (SL) [13] is developed                        The coordinates (i, j, k) ∈ (D, H, W ) denote the position
+that specifically correlates belief and uncertainty with the                   of bi,n j,k and u i, j,k for the prediction. Assuming constant
+parameterization of the Dirichlet distribution. Subjective Logic               base rate, the evidence ei,n j,k are associated with the Dirichlet
+(SL) associates the parameters of the Dirichlet distribution                   parameters ai,n j,k by:
+with the belief distribution, where the Dirichlet distribution
+                                                                                                                ai,n j,k = ei,n j,k + 1,                  (3)
+can be considered as the conjugate prior of the categorical
+distribution [31]. SL assigns a belief mass b and an uncer-                    where ei,n j,k ≥ 0 is obtained directly from the backbone
+tainty mass to each phase, presenting the segmentation and                     network with a softplus activation function. Thus, the belief
+ensuring trustworthy results. Each image pixel for the s-th                    mass and the uncertainty can be formulated as:
+phase prediction is assigned a belief mass and uncertainty,                                          ei,n j,k       ai,n j,k − 1                    C
+with the following constraint:                                                          bi,n j,k =              =                  and u i, j,k =     ,   (4)
+                                                                                                        S                S                          S
+                       C                                                                       PC                            PC
+                                                                                                               n=1 (ei, j,k + 1) denotes the
+                       X
+                                                                               where S =             n               n
+                             bi,n j,k + u i, j,k = 1,                    (2)                    n=1 ai, j,k =
+                       n=1                                                     Dirichlet strength. A greater amount of evidence ei,n j,k leads
+
+        Authorized licensed use limited to: TONGJI UNIVERSITY. Downloaded on August 14,2026 at 07:31:30 UTC from IEEE Xplore. Restrictions apply.
+SUN et al.: REDNet FOR MULTI-MODALITY MEDICAL IMAGE SEGMENTATION                                                                                     19
+
+
+
+
+to a higher probability being assigned to the corresponding                     In summary, this module refines modality-specific informa-
+outcome. Conversely, when there is a lack of evidence, the                   tion at the pixel level and dynamically enhances features by
+resultant belief is less certain, thereby increasing the measure             incorporating the diversity θ, permitting the module to adapt
+of uncertainty.                                                              based on the modality data’s quality.
+
+B. Intra-Modality Consistency Evaluation Module                              C. Cross-Modality Difference Aggregator Module
+   As seen in Fig. 1, this module focuses on intra-modality                      To fully exploit the information between multimodal data,
+analysis and recalibrates each pixel’s information. By quanti-               we further propose a cross-modality diversity aggregator mod-
+fying the data cohesion between the test data and training set               ule. When significant discrepancies are detected between a
+distributions, it refines pixel-level characteristics and adapts             specific modality and others, it suggests potential unreliability
+feature representation to ensure robust against imperfection.                in that modality (e.g., due to noise, artifacts, or modality-
+For a more refined characterization of the feature space,                    specific biases). To mitigate this, the module adaptively
+we compute the spectrum of the feature, which can be com-                    reduces the weight assigned to the unreliable modality in
+puted using singular value decomposition (SVD). As described                 the final prediction. This ensures that regions with incon-
+in Sec. III-A, for each modality, we obtain the evidence                     sistent or noisy signals contribute less to the segmentation
+matrix denoted as e ∈ RC,D,H,W Then it is reshaped into                      outcome, thereby enhancing overall robustness. This module
+e ∈ R D∗H ∗W,C , followed by the computation of its SVD:                     integrates information from different modalities to enhance
+                                                                             system robustness and precision. It reduces the impact of
+                            e = U 6V T ,                              (5)    areas with significant discrepancies where different modalities
+where U and V are orthonormal matrices and the diagonal                      provide different information. This allows the model to focus
+matrix 6 is comprised of the singular values of e, with these                more on different information across modalities and minimizes
+diagonal elements being non-negative. The vector of singular                 imperfection interference.
+                                                                                               M denote the set of input modalities, where
+                                                                                 Let X = {x i }i=1
+values, s = diag(6), reflects the principal components of the
+                                                                               i
+                                                                             x is the i − th modality image. For two distinct modalities
+feature.
+   Inspired by [14], we design a way to quantify the con-                    x i , x j ∈ X and j ̸ = i, let ei and e j be their corresponding
+                                                                                                                                   i, j
+sistency between the singular values s with training-data.                   evidence. We define the differential evidence ediff as the
+We compute the singular values of all training data and store                difference in evidence between modalities i and j, which can
+           i
+them as Strain  in a training epoch i. Given an evidence e in                be articulated through the following expressions:
+test or in the next epoch, we calculate its singular values s.                                      i, j
+                                                                                                   ecom  = ei ⊙ e j ,
+The consistency between the given data and training-data can
+be define as:                                                                                          γ = max(e j , c),
+                                                                                                     i, j
+                                                                                                   ediff = ei − ecom
+                                                                                                                 i, j
+                                                                                                                      /(γ + ϵ),                     (9)
+                                  
+                        ∥s − st ∥1
+             θ = min                 , ∀st ∈ Strain
+                                              i
+                                                    ,      (6)
+                            C                                                where ei , e j ∈ (C, D, H, W ), ⊙ is element-wise multiplica-
+                                                                                    i, j
+where C is the class number, st is defined as the singular                   tion, ecom denotes the commonality between ei , e j at matching
+values of training data, s represents the singular values of                 spatial locations. max(e j , c) represents taking the maximum
+test-time input data or data from subsequent epochs. θ reflect               value across the class channels. Parameter γ serves as a nor-
+diversity: a low value indicates high consistency, while a high              malization factor. The differential evidence, ediff , is calculated
+value indicates less consistency.                                            by subtracting the normalized common evidence from ei , and
+   To precisely capture per-pixel modality-specific informa-                 γ ensures that the minimum value of the resulting difference
+tion, we have added convolutional layers to complement the                   is zero. The ϵ term is infinitesimal value to avoid singularity
+consistency metric, thus representing modality details more                  (such as ϵ = 1e−10). This method ensures that ediff highlights
+effectively:                                                                 the distinct features of ei relative to e j .
+                                                                                                                                             i, j
+                                                                                Then, we combine ei with the differential evidence ediff
+                 f ′ = σ (F1 (e)) ∗ θt + σ (F2 (e)),                  (7)    from all other modalities:
+where Fi (·) is convolution layers and σ (·) represents the
+                                                                                                             n                  o
+                                                                                                                   i, j
+                                                                                             i
+                                                                                           f concat = Concat ei , ediff | j ̸ = i ,
+sigmoid activation function.
+   Then, the output of ICEM block can be obtained by param-                                      ψ = F( f concat
+                                                                                                          i
+                                                                                                                 ).                                (10)
+eterized adjustment:                                                                                                        i
+                                                                                This operation obtains a fused feature, f concat , which cap-
+                                                                                                            i
+                         din = σ (α − f ), ′
+                                                                      (8)    tures the unique features of e and highlights its differences
+                                                                             from other modalities. F(·), the convolution layers, then pro-
+where α is a learnable parameter, din can adjust the impact                  cesses this combined set of features to create a Cross-Modality
+of modalities based on the imperfection situation: the high din              Descriptor (ψ), enhancing the network’s ability to detect how
+discount the modality’s contribution to fusion, Conversely, low              much a modality differs from others. We calculate cross
+divergence retains the modality’s influence, as din approaches               modality weights dc in modality i, using:
+one. This ensures feature fusion is finely tuned to the quality
+of the data.                                                                                                dc = I − σ (ψ),                        (11)
+
+       Authorized licensed use limited to: TONGJI UNIVERSITY. Downloaded on August 14,2026 at 07:31:30 UTC from IEEE Xplore. Restrictions apply.
+20                                                                          IEEE TRANSACTIONS ON MEDICAL IMAGING, VOL. 45, NO. 1, JANUARY 2026
+
+
+
+
+where I is an all-ones matrix representing that the maximum                  mass functions m 1 and m 2 from independent modalities are
+weight is one. The lesser the difference, as indicated by                    merged:
+a smaller σ (ψ), the greater the weight attributed. Eq. 11                              1  1 2                               1
+translates the difference detection into weights for downstream                bk =           bk bk + bk1 u 2 + bk2 u 1 , u =      u 1 u 2 , (14)
+                                                                                     1−C                                      1−C
+tasks. This step is critical for ensuring that the fusion process
+                                                                             where C = i̸= j bi1 b2j represents the conflict level between
+                                                                                           P
+is both interpretable and adaptive to input-specific modality
+                                                                                                        1
+relationships. A large discrepancy between modalities i and                  the two mass sets and 1−C       acts as the normalizing factor.
+ j increases ψ, reducing dc . To apply more discounts in the                    Then, the joint opinion m, derived by merging opinions from
+fusion process. Small discrepancies make the dc closer to 1,                 different modalities, can be expressed as follows:
+resulting in fewer discounts. In this way, it gives priority to
+                                                                                                 m = m 1 ⊕ m 2 ⊕ · · · ⊕ m |X | .                  (15)
+those features that are more reliable in multimodal analysis,
+while reducing the impact of imperfection.                                   After discounting the evidence using the trust-discounting
+                                                                             operator, we proceed with the fusion of the resulting dis-
+D. Discounting Fusion Module                                                 counted evidence:
+                                                                                                  merge
+   In our framework, evidence is dynamically adjusted based                                     md         (X ) = ⊕∀x∈X (m dx (X )),               (16)
+on the quality of the modality, to express degrees of trust in an                    merge
+                                                                             where m d     (X ) represents the aggregated belief function and
+information source. This adjustment occurs before the fusion
+                                                                             is the final result.
+stage. Let variable X be a belief, and let opinion m(X ) =
+(b, u). The framework mathematically modulates the opinion
+on X by applying a trust-discounting operator m d (X ):                      E. Loss Function
+                                                                               The loss function in the training procedure consists of
+                      bkd = dk ∗ bk ,                                        phase-wise and fusion-wise losses, which can be defined as:
+                                X
+                      ud = 1 −        dk ∗ bk ,                     (12)                                   phase-wise
+                                    C
+                                                                                           z        }|        {
+                                                                                            λp X        λd X
+where bkd and u d represent the discounted belief and uncer-                            L=       Lt +        Ld + λm Lm ,                          (17)
+                                                                                           |X |        |X |       | {z }
+                                                                                                     x∈X                x∈X
+tainty, respectively. d k represents the discount factor for the                                                                  merge-wise
+k th category. This discounting serves to diminish the influence             where λ p , λd , λm are uniformly set to 1. Lt is proposed in [31]
+of less reliable information sources.                                        to quantify the voxel-wise uncertainty and belief mass. It can
+    Trust discounting is a technique that scales beliefs accord-             be defined as:
+ing to the assessed reliability of the information source.
+By weighting the information in this way, we can achieve                                       Lt = Lice + λ p LKL + λs Ldice .                    (18)
+a more detailed evaluation that considers both the content of                Lice is designed for the imbalance of brain tumor and LKL
+the evidence and the credibility of the information source.                  guarantees that incorrect labels get less evidence even shrink-
+    Building upon discounting operator, we integrate the din and             ing to 0. Both Ld and Lm represent the Dice loss, which
+dc matrices, indicative of intra-modality and cross-modality                 respectively impose constraints on the outcomes following
+information, respectively, to calculate the discount factor. This            discounting and on the results fusion, ensuring consistency
+integration allows for a more granular calibration of the                    and accuracy in the segmentation process.
+discounting:
+                          (α ∗ din ) + (β ∗ dc )                                                        IV. E XPERIMENT
+                   dk =                          ,                  (13)
+                                (α + β)                                      A. Experimental Setup
+where α and β are hyperparameters, both of them are set                         1) Dataset: We evaluated REDNet on both external dataset
+to the value of 1. This adjustment, taking into account both                 and in-house pancreas dataset. The external dataset con-
+intra-modality and cross-modality information, enables the                   sists of 1251 MRI cases can be openly obtained from
+dynamic tuning of evidence based on the quality of the                       the Multimodal Brain Tumor Segmentation Challenge 2021
+modality before advancing to the fusion stage. By refining                   (BraTS2021) [15]. The BraTS image segmentation challenge
+the degree of uncertainty, it allows useful information to                   started in 2012 and has been conducted yearly as a crucial
+play a more significant role while reducing the impact of                    component of the MICCAI [32]. The BraTS dataset is a widely
+imperfection data. The discounting strategy is adaptive to data              used benchmark for brain tumor segmentation research. All the
+quality: for high-quality inputs with minimal imperfections,                 imaging datasets have been segmented manually, by one to
+the computed discount factor d approaches 1, effectively                     four raters, following the same annotation protocol, and their
+preserving the original segmentation. This ensures that the                  annotations were approved by experienced neuro-radiologists.
+framework defaults to standard predict when data reliability                 For each scan, there are four modalities: T1-weighted (T1),
+is assured, avoiding unnecessary modifications.                              post-contrast T1-weighted (T1Gd), T2-weighted(T2), and
+   Having applied the discounting method to evaluate the                     T2 Fluid Attenuated Inversion Recovery (FLAIR). Annota-
+credibility of the evidence, we proceed to the data fusion                   tions of the 1251 scans include the GD-enhancing tumor
+phase. Using Reduced Dempster’s Combination Rule [31], two                   (ET-label 4), the peritumoral edema (ED-label2), and the
+
+       Authorized licensed use limited to: TONGJI UNIVERSITY. Downloaded on August 14,2026 at 07:31:30 UTC from IEEE Xplore. Restrictions apply.
+SUN et al.: REDNet FOR MULTI-MODALITY MEDICAL IMAGE SEGMENTATION                                                                                     21
+
+
+
+
+                                                           TABLE II
+ T HE P ERFORMANCE OF D IFFERENT M ODELS IN BRATS 21 DATASET AND IN-H OUSE DATASET († M EANS U NCERTAINTY-B ASED MODELS ). THE
+                                            TOP-2 R ESULTS ARE IN R ED AND B LUE
+
+
+
+
+necrotic and non-enhancing tumor core (NCR/NET -label1).                     based on performance in the validation set. To be fair, all
+Following [33], we divided the 1251 scans into 834, 208 and                  reported results are the direct output of the model without any
+209 scans for training, validation and testing, respectively.                post-processing.
+Using the same pre-processing operation as in [33]. The                         1) Overall Evaluation: We carried out tests on both
+in-house dataset from Changhai Hospital includes 139 patients                BRATS2021 and our in-house pancreas dataset. As shown
+diagnosed with either SCN (Serous Cystic Neoplasm) or MCN                    in Table II, our segmentation strategy displayed outstanding
+(Mucinous Cystic Neoplasm). All volumes contain arterial                     performance without imperfection, outperforming most cur-
+phases (AP), portal venous phases (VP), and delayed phases                   rent technologies in fundamental metrics such as Dice and
+(DP). Experienced radiologists annotated the pancreas and                    HD95. In the BraTS dataset, while it slightly trails the brain
+tumor regions in the volumes. The in-plane size of volumes is                tumor-focused CKD method in some aspects, it outperforms
+512 × 512 with spacing ranges from 0.546 mm to 0.896 mm,                     other methods. On the in-house dataset, our method exceeds
+and the number of slices ranges from 102 to 289. The                         the performance of other models. Our in-house pancreas
+volumes of three phases are co-registered into venous phase                  dataset includes real clinical data collected over 10+ years
+by Elastix [34] toolbox.                                                     from different scanners, which better reflect actual clinical
+   2) Implementation Details: The framework was implemented                  scenarios. Here, our method outperforms others because it is
+in Python with the PyTorch-based medical image framework                     designed to handle imperfections.
+MONAI and was trained and tested on a NVIDIA 4090 GPU.                          2) Evaluation on Model Reliable With Imperfection: To assess
+We set the learning rate to 1e − 4 and the number of                         the robustness of our proposed model against imperfection
+epochs for model training to 200. Adopting the approach                      interference, we conducted experiments simulating a range of
+from [40], we first trained our model on single modality                     imperfect environments. Gaussian noise is a widely adopted
+datasets using the trusted segmentation module to establish                  synthetic imperfection for evaluating robustness in both gen-
+a robust baseline for each modality independently. After this                eral image processing and multi-modal frameworks. While
+initial stage, we engaged in advanced multi-modality train-                  real-world multi-modal data may exhibit diverse imperfections
+ing, combining the strengths of each individual modality to                  (e.g., motion artifacts, or modality-specific distortions). Gaus-
+enhance the model’s performance and accuracy. In training                    sian noise serving as a standardized benchmark is widely used
+stage, we initially identify the volume’s minimal bounding                   in research. Following [41], [42], and [43], we adopted the
+box and then proceed to randomly split it into a volume size                 addition of Gaussian noise to the input data. The noise model
+of 128 × 128 × 128. The data augmentation techniques are                     is expressed mathematically as:
+similar to [33]. In the test phase, we use the sliding window
+method with an overlap rate of 0.6. In our experiments, we use                                       xnoisy = x + N (0, σ 2 ),                     (19)
+Dice score and 95% Hausdorff distance (HD95) to evaluate the                 where x represents the clean input data, while xnoisy denotes
+segmentation results.                                                        the corresponding data corrupted by additive noise. N (0, σ 2 )
+                                                                             is the Gaussian noise generator with a mean of zero and a
+B. Comparisons With Other Methods                                            variance of σ 2 .
+   Our work presents a comparative analysis of the pro-                         As show in Fig. 2, the experiments are conducted on
+posed REDNet model against well-established models. These                    two datasets and each represented by two rows of images.
+include CNN architectures such as Attention U-Net [35], 3D                   Each dataset shows four different imperfection scenarios,
+U-Net [37], UNet++ [38], and transformer-based models                        each depicted in a respective graph for both Dice and
+like UNETR [36], as well as a hybrid model [33] that                         HD95 metrics. Under noise-free conditions, our method might
+integrates both CNN and transformer techniques. Assessments                  not outperform the CKD-TransBTS method, which employs
+also extend to various uncertainty-based models [7], [12], [39].             clinical knowledge specifically designed for brain tumor seg-
+All the baseline models and our proposed model are trained                   mentation. However, it still surpasses the accuracy of most
+with the same dataset split. The selection of the model was                  compared methods. Importantly, our method demonstrates
+
+       Authorized licensed use limited to: TONGJI UNIVERSITY. Downloaded on August 14,2026 at 07:31:30 UTC from IEEE Xplore. Restrictions apply.
+22                                                                           IEEE TRANSACTIONS ON MEDICAL IMAGING, VOL. 45, NO. 1, JANUARY 2026
+
+
+
+
+Fig. 2. The figure presents quantitative comparisons against varying imperfection magnitudes, with σ = {0,0.1,0.3,0.5,1,1.5,2,2.5,3,3.5 }. Subfigures
+(a)–(d) display imperfection-affected images from the BRATS 2021 dataset across different modalities: (a) FLAIR; (b) T1Gd; (c) FLAIR and T1Gd;
+(d) FLAIR, T1Gd, and T1, respectively. Subfigures (e)–(h) depict the in-house dataset with noise introduced in sequences (e) AP; (f) VP; (g) AP and
+VP; (h) VP and DP.
+
+
+
+superior performance in noisy conditions, consistently main-                  non-existent. In contrast, our method maintains a robust per-
+taining the highest Dice and the lowest HD95 scores,                          formance and provides a consistently accurate representation.
+thereby outperforming all other methods in these scenarios.                      Furthermore, while Gaussian noise is a widely adopted syn-
+Our network is capable of efficiently extracting information                  thetic benchmark for methodological validation, we have also
+from both single and multiple modalities, achieving superior                  evaluated our method on two common imperfections in MRI:
+segmentation accuracy that can be applied across various                      Rayleigh noise and intensity non-uniformity (INU). Rayleigh
+datasets.                                                                     Noise: Noise in MRI images follows a Rayleigh distribution,
+   We show the performances of our models against these                       particularly in low signal-to-noise ratio (SNR) regions [44].
+perturbed scenarios. As show in Fig 3, we have visualized the                 To simulate this realistic condition, we introduced Rayleigh
+segmentation performance of different models under imper-                     noise into the BraTS dataset. Intensity Non-Uniformity (INU):
+fect conditions. We present cases of two patients, with each                  INU (also known as bias field) is a highly prevalent artifact in
+patient’s data displayed in three rows. The first row illustrates             MRI [45]. It manifests as smooth, spatially varying intensity
+the situation without noise, the second row shows noise added                 inhomogeneities, causing the same tissue type to exhibit differ-
+to the FLAIR, and the third row presents noise added to both                  ent intensities across the image [46]. This artifact arises from
+the FLAIR and T1Gd. With the addition of noise, the accuracy                  factors like magnetic field or radio frequency (RF) inhomo-
+of other methods’ segmentation outcomes declines. While                       geneity and patient anatomy [47]. We applied synthetic INU
+CKD-TransBTS achieves marginally higher metrics due to its                    fields to the BraTS dataset to model this imperfection. We con-
+domain-specific architectural priors, our framework prioritizes               ducted experiments on the BraTS dataset under Rayleigh noise
+task-agnostic generalizability and reliability in imperfect sce-              (scale=2) and INU conditions (magnitude=50). Our method
+narios. In the first case, with a larger tumor region, as the noise           was compared against eight well-performed models. Our
+increases, UNET++ begins to produce excessive predictions,                    method maintained high segmentation accuracy under both
+while SegResNet, TBraTS, Udrop, and UNETR mistakenly                          Rayleigh noise and INU corruption, outperforming all com-
+classify the regions. In the second case, with noise added, the               pared methods across the standard BraTS evaluation metrics.
+UNet+ results progressively overestimate the area, while the                     Furthermore, we also selected imperfect data that actually
+SegResNet results shrink progressively until they are nearly                  exists in clinical practice to verify the effectiveness of our
+
+        Authorized licensed use limited to: TONGJI UNIVERSITY. Downloaded on August 14,2026 at 07:31:30 UTC from IEEE Xplore. Restrictions apply.
+SUN et al.: REDNet FOR MULTI-MODALITY MEDICAL IMAGE SEGMENTATION                                                                                    23
+
+
+
+
+Fig. 3. Visualization of quantitative comparison of other methods on the BraTS21 dataset with noisy. Within each patient’s three-row set, the first
+row depicts the noiseless scenario, the second showcases added noise in the FLAIR modality, and the third indicates noise addition in both FLAIR
+and T1Gd modalities. The level of noise σ = 3.5.
+
+                                                               TABLE III
+                P ERFORMANCE C OMPARISON OF D IFFERENT M ODELS ON THE B RATS21 DATASET U NDER R AYLEIGH N OISE AND
+                                          I NTENSITY N ON -U NIFORMITY (INU) C ONDITIONS
+
+
+
+
+model. In clinical image analysis, inherent and unforeseeable                 ensures that the model automatically identifies and down-
+imperfections in data inevitably compromise segmentation                      weights unreliable modalities caused by clinical imperfections
+accuracy. For instance, different CT scanners produce images                  (e.g., motion artifacts or scanner variations), while prioritizing
+with varying intensity distributions, leading to data hetero-                 high-quality imaging information. The inclusion of test data
+geneity that adversely affects segmentation precision. In our                 from uCT 960+ and iCT 256 scanners explicitly evaluates
+study, the majority of the imaging data was sourced from                      our method’s robustness to real-world imperfections, such as
+the Aquilion ONE device. As illustrated in Fig. 4, we select                  cross-device intensity distribution shifts. While segmentation
+different anatomical position to show the results. The first                  quality decreases for out-of-distribution scanners, the results
+patient images whose distribution closely matches the average                 remain anatomically consistent, underscoring the framework’s
+distribution of our training data, resulting in optimal segmen-               clinical applicability.
+tation outcomes. Conversely, the second and third patients                       This robustness to imperfection highlights the practical
+display images from the uCT 960+ and iCT 256 scanners,                        utility of our method in real-world clinical settings, where data
+respectively, which deviate from the training data distri-                    quality cannot be guaranteed.
+bution, causing degradation in segmentation quality. When
+processing clinical pancreas data, our model leverages din                    C. Ablation Studies
+and dc to dynamically suppress the weights of bad modalities                     To better demonstrate the effectiveness across different
+during multi-modal fusion, while enhancing the contribution                   modules, we chose the BRATS2021 dataset to simulate imper-
+of good modalities. This adaptive discounting mechanism                       fections for our ablation experiments. Its higher quality allows
+
+        Authorized licensed use limited to: TONGJI UNIVERSITY. Downloaded on August 14,2026 at 07:31:30 UTC from IEEE Xplore. Restrictions apply.
+24                                                                            IEEE TRANSACTIONS ON MEDICAL IMAGING, VOL. 45, NO. 1, JANUARY 2026
+
+
+
+
+Fig. 4. This visualization compares segmentation results for inherent data imperfection. The first column shows the average intensity across all
+patients, and the second displays individual distributions for three patients. The intensity distributions represent whole-abdomen CT scans (not
+individual slices). Columns three to five present the actual patient images, while six to eleven illustrate segmentation results and labels from different
+methods. Each patient is represented by two rows: the first row corresponds to the pancreatic head region, and the second row to the pancreatic
+body region. The patient in the Rows 1-2, closest to the average distribution, shows optimal segmentation, while those farther from the average
+(Rows 3-6) yield poorer results.
+
+
+                                                                 TABLE IV
+  A BLATION S TUDIES ON T RUST D ISCOUNTING F USION (F), I NTRA -M ODALITY C ONSISTENCY E VALUATION M ODULE (I) AND C ROSS -M ODALITY
+      D IFFERENCE AGGREGATION M ODULE (C). T EST W ERE C ONDUCTED B ETWEEN E ACH B ASELINE M ODEL AND O UR M ODEL ON F OUR
+     D IFFERENT I MPERFECTION C ONDITIONS ( “N-” I S U SED TO D ENOTE THE P RESENCE OF I MPERFECTION IN THE S PECIFIED M ODALITIES )
+
+
+
+
+for clearer evaluation of the impact of varying imperfection                  accuracy. As displayed in Table IV, there is an improvement
+levels on different modules.                                                  in the performance of Model2 compared to Model1. However,
+   1) Effectiveness of Discounting Fusion Module: The Dis-                    when confronted with imperfection conditions, the capacity to
+counting Fusion Module is designed for the integration of                     maintain this level of segmentation precision becomes more
+outcomes from multiple modalities. Different from tradi-                      challenging.
+tional fusion techniques, this module utilizes both intra-modal                 2) Effectiveness of Intra-Modality Consistency Evaluation
+and cross-modal information to adjust results to improve                      Module: The Intra-modality Consistency Evaluation Module
+segmentation.                                                                 (ICEM) plays a role in enhancing the model’s ability to extract
+   Our ablation study aims to determine the significance                      features from a single modality and offers better performance
+of this module by evaluating it within both Model1 and                        when imperfection affects a minority of the modalities. Our
+Model2. Model1 employs DS evidence theory to directly                         ablation study will assess its significance by evaluating model
+fuse multimodal outputs from the evidential-based uncertainty                 performance without this module.
+estimation. In contrast, Model2 capitalizes on convolutional                     The results show that the Intra-modality Consistency Eval-
+networks to first extract features from the data across differ-               uation Module (Model3) outperforms the baseline Model1
+ent imaging phases before applying DS evidence theory for                     and Model2 across all imperfection scenarios. For example,
+fusion. The F module then uses this information to selectively                under the N-T1Gd imperfection condition, Model3 shows
+discount the data, which leads to enhanced segmentation                       enhanced performance with ET, TC, and WT scores of 0.6955,
+
+        Authorized licensed use limited to: TONGJI UNIVERSITY. Downloaded on August 14,2026 at 07:31:30 UTC from IEEE Xplore. Restrictions apply.
+SUN et al.: REDNet FOR MULTI-MODALITY MEDICAL IMAGE SEGMENTATION                                                                                      25
+
+
+
+
+0.8107 and 0.9197 respectively, compared to the baseline
+scores of 0.6760, 0.8027 and 0.9099. This indicates the mod-
+ule’s effectiveness in processing modality-specific information
+and mitigating the impact of imperfection. As imperfection
+affects more modalities, the ET scores decrease significantly,
+but the WT results remain relatively robust. For example,
+he ET score drops to 0.6221 under the N-T1Gd-FLAIR-T1
+condition, while the WT score shows stability, decreasing
+slightly from 0.9314 to 0.8750. The module do better on
+extracting information from a single modality and minimizing
+the influence of imperfection data. This approach leads to                   Fig. 5. Evaluating the link between diversity(θ in Eq. (6)) and imperfection
+                                                                             on BraTS21. As imperfection increases, diversity grows accordingly.
+impressive performance in handling imperfection within a
+single modality and in preserving the accuracy of whole
+tumor segmentation. However, as the imperfection increases,
+its reliability decreases when it comes to the detailed analysis
+of the core tumor structure.
+   3) Effectiveness of Cross-Modality Diversity Aggregator Mod-
+ule: To improve feature extraction and imperfection detec-
+tion by cross-modality insights, we have developed a
+Cross-modality Difference Aggregation Module (CDAM). Our
+ablation study compared the performance of our model with
+and without this module.
+   Compared with Model1, Model2 and Model3, Model4                           Fig. 6.     The top row (a)–(e) visualizes the evidence from various
+                                                                             modalities with (f) showing the corresponding ground truth labels. The
+exhibits the highest segmentation accuracy among all models,                 second row (g)–(j) illustrates the discrepancy between the FLAIR modal-
+with ET, TC, and WT scores of 0.8521, 0.8961, and 0.9337,                    ity and others, derived from Eq. (9), while (k) displays the outcome from
+respectively. This outcome shows the superior capability of                  Eq. (11), indicating the extent of discounting applied by the CDAM.
+the CDAM in extracting and integrating information across
+modalities, enhancing the accuracy of tumor segmentation.
+Under single modality imperfection conditions, specifically                     In CDAM, we acquire information disparity between the
+N-T1Gd, Model4 slightly underperforms Model3. However,                       current modality and other modalities and harnessing it by
+as imperfection scenarios become more complex, as seen with                  neural network learning. This can discern areas of conflict
+N-T1Gd-FLAIR and N-T1Gd-FLAIR-T1, the benefits of the                        when exposed to noise, thus offering discounts. Fig 6 presents
+CDAM perform better. Model4 maintains robust performance                     the scenario where imperfection with σ = 3.5 is introduced
+in the face of complex imperfection, particularly in multimodal              into the FLAIR images. The first row shows the segmented
+imperfection conditions, showing that the presence of the                    results in different modalities by our network’s branches and
+CDAM significantly contributes to the stability of the model’s               the ground truth. With the presence of imperfection, the evi-
+outputs.                                                                     dence from the FLAIR modality worsens, while the data from
+                                                                             other modalities remain unaffected, resulting in consistently
+D. Analysis of Model                                                         good segmentation outcomes. The second row measures the
+   We visualize intermediate results to analyze the effective-               discrepancy between the FLAIR modality and the others.
+ness of our approach.                                                        These captured discrepancies are then processed through the
+   1) Imperfection-Aware: ICEM assesses the quality of testing               neural network, which adeptly reduces the influence of areas
+data by quantifying its differences with the training data. The              where the modal information diverges substantially from that
+presence of imperfection tends to amplify this discrepancy.                  in other modalities. In the final discount map, sections likely
+Imperfection is incrementally introduced into FLAIR images,                  to contain errors are intelligently discounted, as indicated by
+and for each patient, the degree of diversity (θ) was calculated             the color of red for areas with minimal adjustment and blue for
+as described in Eq. (6). Subsequently, these values were                     those with greater discounting. This accurate modality-based
+plotted in a boxplot to visualize the variabilities. As show in              discrimination enables the network to selectively apply correc-
+Fig 5, the boxplot analysis reveals that our ICEM effectively                tions, mitigating the impact of inaccuracies in the segmentation
+detects discrepancies between test and training datasets with                results.
+different imperfection levels. The central lines within each                    2) Uncertainty in Discounting: Our study utilizes the theory
+box, representing the median diversity values, exhibit a slight              of discounting in subjective logic, applying a discount to
+upward trend as imperfection levels increase, suggesting a                   mass and uncertainty values. The methodologies perform
+rise in detected variances. Moreover, the expansion of the                   discounting based on the credibility of the information source.
+interquartile range (IQR) with increasing imperfection levels                As depicted in the Fig. 7, the top row presents a depiction
+shows the increasing variability in data. As the data imper-                 of the pre-discount state, while the second row illustrates the
+fection intensifies, this module performs well in capturing the              state post-discounting. In the initial undiscarded condition,
+level of discrepancy.                                                        we observe that the system predicts no results due to data
+
+       Authorized licensed use limited to: TONGJI UNIVERSITY. Downloaded on August 14,2026 at 07:31:30 UTC from IEEE Xplore. Restrictions apply.
+26                                                                           IEEE TRANSACTIONS ON MEDICAL IMAGING, VOL. 45, NO. 1, JANUARY 2026
+
+
+
+
+                                                                              methods. Its ability to discern between reliable and imper-
+                                                                              fection data has significant implications for improving
+                                                                              computer-aided diagnosis systems, paving the way for
+                                                                              enhanced patient outcomes in clinical settings.
+
+                                                                                                               R EFERENCES
+                                                                               [1] R. Ranjbarzadeh, A. Caputo, E. B. Tirkolaee, S. J. Ghoushchi, and
+                                                                                   M. Bendechache, “Brain tumor segmentation of MRI images: A com-
+                                                                                   prehensive review on the application of artificial intelligence tools,”
+                                                                                   Comput. Biol. Med., vol. 152, Jan. 2023, Art. no. 106405.
+                                                                               [2] Y. Chen, C. Xu, W. Ding, S. Sun, X. Yue, and H. Fujita, “Target-aware
+                                                                                   U-net with fuzzy skip connections for refined pancreas segmentation,”
+                                                                                   Appl. Soft Comput., vol. 131, Dec. 2022, Art. no. 109818.
+                                                                               [3] H. Ghorpade et al., “Automatic segmentation of pancreas and pancreatic
+                                                                                   tumor: A review of a decade of research,” IEEE Access, vol. 11,
+                                                                                   pp. 108727–108745, 2023.
+Fig. 7. The figure presents the impact of imperfection-induced dis-            [4] C. Pei et al., “Multi-source domain adaptation for medical image
+counting on FLAIR modality. Subfigures (a) and (b) show pre-discount               segmentation,” IEEE Trans. Med. Imag., vol. 43, no. 4, pp. 1640–1651,
+predicted probability and uncertainty. Subfigures (d) and (e) illus-               Apr. 2024.
+trate post-discount probability and uncertainty, respectively. Subfigure       [5] L. Weninger, O. Rippel, S. Koppers, and D. Merhof, “Segmentation of
+(c) shows the segmentation labels.                                                 brain tumors and patient survival prediction: Methods for the BraTS
+                                                                                   2018 challenge,” in Proc. 4th Int. Workshop, Multiple Sclerosis, Stroke
+                                                                                   Traumatic Brain Injuries, Granada, Spain, Sep. 2019, pp. 3–12.
+                                                                               [6] T. Qu et al., “M3 Net: A multi-scale multi-view framework for multi-
+corruption. However, because the damage is extensive, the                          phase pancreas segmentation based on cross-phase non-local attention,”
+uncertainty is quite low, which could potentially impair the                       Med. Image Anal., vol. 75, Jan. 2022, Art. no. 102232.
+fusion process. The second row reveals the situation after                     [7] K. Zou, X. Yuan, X. Shen, M. Wang, and H. Fu, “TBraTS: Trusted brain
+                                                                                   tumor segmentation,” in Proc. Int. Conf. Med. Image Comput. Comput.-
+the discounting procedure has been applied. Even though the                        Assist. Intervent, 2022, pp. 503–513.
+system’s prediction is still absent due to the network issue, the              [8] H. Xu, C. Ye, F. Zhang, X. Li, and C. Zhang, “A medical image
+corresponding prediction region exhibits a heightened level of                     segmentation method with anti-noise and bias-field correction,” IEEE
+                                                                                   Access, vol. 8, pp. 98548–98561, 2020.
+uncertainty after the discounting adjustment. This adjustment                  [9] D. Tenbrinck et al., “Impact of physical noise modeling on image
+leads to a better representation, reflecting the actual reliability                segmentation in echocardiography,” in Proc. VCBM, 2012, pp. 33–40.
+of the corrupted data.                                                        [10] Y. Yang, D. Tian, and B. Wu, “A fast and reliable noise-resistant medical
+                                                                                   image segmentation and bias field correction model,” Magn. Reson.
+   3) Discussion: The proposed method is designed to address                       Imag., vol. 54, pp. 15–31, Dec. 2018.
+general data imperfections by dynamically discounting unre-                   [11] H. Zheng et al., “Deep pancreas segmentation with uncertain regions of
+liable modalities, rather than explicitly learning specific                        shadowed sets,” Magn. Reson. Imag., vol. 68, pp. 45–52, May 2020.
+                                                                              [12] B. Lakshminarayanan, A. Pritzel, and C. Blundell, “Simple and scalable
+imperfection patterns. This method enables generalization to                       predictive uncertainty estimation using deep ensembles,” in Proc. Adv.
+unseen imperfections, as it prioritizes modalities with higher                     Neural Inf. Process. Syst., 2016.
+agreement and suppresses those exhibiting deviations from                     [13] A. Jsang, Subjective Logic: A Formalism for Reasoning Under Uncer-
+                                                                                   tainty. Cham, Switzerland: Springer, 2018.
+the normal. Therefore, it demonstrates more robust perfor-                    [14] D. Karimi and A. Gholipour, “Improving calibration and out-of-
+mance when facing practical problems. While our discounting                        distribution detection in deep models for medical image segmentation,”
+fusion module effectively suppresses unreliable modalities,                        IEEE Trans. Artif. Intell., vol. 4, no. 2, pp. 383–397, Apr. 2023.
+                                                                              [15] U. Baid et al., “The RSNA-ASNR-MICCAI BraTS 2021 benchmark
+the discounting operator scales down belief masses even for                        on brain tumor segmentation and radiogenomic classification,” 2021,
+perfectly reliable data. Though the discount factor is close                       arXiv:2107.02314.
+to 1, it still reduces the belief values. This always-on discount-            [16] S. Pereira, A. Pinto, V. Alves, and C. A. Silva, “Brain tumor segmenta-
+                                                                                   tion using convolutional neural networks in MRI images,” IEEE Trans.
+ing slightly diminishes usable information from high-quality                       Med. Imag., vol. 35, no. 5, pp. 1240–1251, May 2016.
+sources. We hope to explore more reasonable discounting                       [17] Y. Chang, Z. Zheng, Y. Sun, M. Zhao, Y. Lu, and Y. Zhang, “DPAFNet:
+mechanisms in future work.                                                         A residual dual-path attention-fusion convolutional neural network for
+                                                                                   multimodal brain tumor segmentation,” Biomed. Signal Process. Control,
+                                                                                   vol. 79, Jan. 2023, Art. no. 104037.
+                                                                              [18] X. Xu et al., “A knowledge-guided framework for fine-grained classifica-
+                          V. C ONCLUSION                                           tion of liver lesions based on multi-phase CT images,” IEEE J. Biomed.
+   In summary, the proposed REDNet exhibits robustness by                          Health Informat., vol. 27, no. 1, pp. 386–396, Jan. 2023.
+                                                                              [19] Y. Zhang et al., “Multi-phase liver tumor segmentation with spatial
+addressing the issue of imperfection in multimodal medi-                           aggregation and uncertain region inpainting,” in Proc. 24th Int. Conf.
+cal image segmentation. Its reliable performance on both                           Med. Image Comput. Comput. Assist. Intervent. (MICCAI), Strasbourg,
+the BRATS2021 dataset and in-house datasets underscores                            France. Cham, Switzerland: Springer, Sep. 2021, pp. 68–77.
+                                                                              [20] Z. Guo, X. Li, H. Huang, N. Guo, and Q. Li, “Medical image segmen-
+its potential for clinical applications. With its combina-                         tation based on multi-modal convolutional neural network: Study on
+tion of Intra-modality Consistency Evaluation Module and                           image fusion schemes,” in Proc. IEEE 15th Int. Symp. Biomed. Imag.
+Cross-Modality Difference Aggregator Module and Dis-                               (ISBI), Apr. 2018, pp. 903–907.
+                                                                              [21] K. Kamnitsas et al., “Ensembles of multiple models and architectures for
+counting Fusion Module, REDNet dynamically adjusts the                             robust brain tumour segmentation,” in Proc. 3rd Int. Workshop Multiple
+contributions of different modalities, enhancing the reliability                   Sclerosis, Stroke Traumatic Brain Injuries, Quebec City, QC, Canada.
+in segmentation tasks.                                                             Cham, Switzerland: Springer, 2017, pp. 450–462.
+                                                                              [22] C. Hu et al., “Trustworthy multi-phase liver tumor segmentation via
+   Even when faced with challenging imperfection conditions,                       evidence-based uncertainty,” Eng. Appl. Artif. Intell., vol. 133, Jul. 2024,
+REDNet consistently outperforms traditional segmentation                           Art. no. 108289.
+
+        Authorized licensed use limited to: TONGJI UNIVERSITY. Downloaded on August 14,2026 at 07:31:30 UTC from IEEE Xplore. Restrictions apply.
+SUN et al.: REDNet FOR MULTI-MODALITY MEDICAL IMAGE SEGMENTATION                                                                                           27
+
+
+
+
+[23] S. Kohl et al., “A probabilistic U-net for segmentation of ambiguous         [36] A. Hatamizadeh et al., “UNETR: Transformers for 3D medical image
+     images,” in Proc. Adv. Neural Inf. Process. Syst., vol. 31, Feb. 2018.            segmentation,” in Proc. IEEE/CVF Winter Conf. Appl. Comput. Vis.
+[24] A. A. Adegun, S. Viriri, and M. H. Yousaf, “A probabilistic-based deep            (WACV), Jan. 2022, pp. 1748–1758.
+     learning model for skin lesion segmentation,” Appl. Sci., vol. 11, no. 7,    [37] A. Myronenko, “3D MRI brain tumor segmentation using autoencoder
+     p. 3025, Mar. 2021.                                                               regularization,” in Proc. 4th Int. Workshop Multiple Sclerosis, Stroke
+[25] S. Rosas-Gonzalez, T. Birgui-Sekou, M. Hidane, I. Zemmoura, and                   Traumatic Brain Injuries, Granada, Spain, Sep. 2018, pp. 311–320.
+     C. Tauber, “Asymmetric ensemble of asymmetric U-Net models for               [38] Z. Zhou, M. M. R. Siddiquee, N. Tajbakhsh, and J. Liang, “UNet++:
+     brain tumor segmentation with uncertainty estimation,” Frontiers Neu-             A nested U-net architecture for medical image segmentation,” in Proc.
+     rol., vol. 12, Sep. 2021, Art. no. 609646.                                        4th Int. Workshop Deep Learn. Med. Image Anal. Multimodal Learn.
+[26] G. Kim, Y. Chen, S. Qi, Y. Fu, and Q. Zhang, “Uncertainty based border-           Clin. Decis. Support, Granada, Spain, Sep. 2018, pp. 3–11.
+     aware segmentation network for deep caries,” in Proc. Workshop Clin.         [39] T. Nair, D. Precup, D. L. Arnold, and T. Arbel, “Exploring uncertainty
+     Image-Based Procedures, 2023, pp. 70–80.                                          measures in deep networks for multiple sclerosis lesion detection and
+[27] A. P. Dempster, “Upper and lower probability inferences based on a                segmentation,” Med. Image Anal., vol. 59, Jan. 2020, Art. no. 101557.
+     sample from a finite univariate population,” Biometrika, vol. 54, no. 3/4,   [40] L. Huang, T. Denœux, P. Véra, and S. Ruan, “Evidence fusion with
+     pp. 515–528, Dec. 1967.                                                           contextual discounting for multi-modality medical image segmentation,”
+[28] G. Shafer, A Mathematical Theory of Evidence, vol. 42. Princeton, NJ,             in Proc. Int. Conf. Med. Image Comput. Comput.-Assist. Intervent, 2022,
+     USA: Princeton Univ. Press, 1976.                                                 pp. 401–411.
+[29] L. Huang, S. Ruan, P. Decazes, and T. Denœux, “Evidential segmenta-          [41] V. Jain, A. Datar, and Y. K. Jain, “Medical image denoising using
+     tion of 3D PET/CT images,” in Proc. Int. Conf. Belief Functions. Cham,            optimal attention block-based pyramid denoising network,” Biomed.
+     Switzerland: Springer, 2021, pp. 159–167.                                         Signal Process. Control, vol. 108, Oct. 2025, Art. no. 107794.
+[30] A. P. Dempster, “A generalization of Bayesian inference,” J. Roy. Stat.      [42] C. Hu et al., “Trustworthy multi-phase liver tumor segmentation via
+     Soc. B, Stat. Methodol., vol. 30, no. 2, pp. 205–232, Jul. 1968.                  evidence-based uncertainty,” 2023, arXiv:2305.05344.
+[31] Z. Han, C. Zhang, H. Fu, and J. T. Zhou, “Trusted multi-view classifica-     [43] H. Zhou, Z. Xue, Y. Liu, B. Li, J. Du, and M. Liang, “RTMC: A rubost
+     tion with dynamic evidential fusion,” IEEE Trans. Pattern Anal. Mach.             trusted multi-view classification framework,” in Proc. IEEE Int. Conf.
+     Intell., vol. 45, no. 2, pp. 2551–2566, Feb. 2023.                                Multimedia Expo. (ICME), Jul. 2023, pp. 576–581.
+[32] A. Ghosh and S. Thakur, “Review of brain tumor MRI image segmen-             [44] M. A. J. Rani and C. Thulasi, “MRI-based tumor semantic segmentation
+     tation methods for BraTS challenge dataset,” in Proc. 12th Int. Conf.             and SVM classification,” Appl. Laser, vol. 31, no. 1, pp. 1–7, 2024.
+     Cloud Comput., Data Sci. Eng. (Confluence), Jan. 2022, pp. 405–410.          [45] R. C. Herrick, L. A. Hayman, K. H. Taber, P. J. Diaz-Marchan,
+[33] J. Lin et al., “CKD-TransBTS: Clinical knowledge-driven hybrid                    and M. D. Kuo, “Artifacts and pitfalls in MR imaging of the orbit:
+     transformer with modality-correlated cross-attention for brain tumor              A clinical review,” RadioGraphics, vol. 17, no. 3, pp. 707–724,
+     segmentation,” IEEE Trans. Med. Imag., vol. 42, no. 8, pp. 2451–2461,             May 1997.
+     Aug. 2023.                                                                   [46] S. Leger, S. Löck, V. Hietschold, R. Haase, H. J. Böhme, and
+[34] S. Klein, M. Staring, K. Murphy, M. A. Viergever, and J. P. W. Pluim,             N. Abolmaali, “Physical correction model for automatic correction of
+     “Elastix: A toolbox for intensity-based medical image registration,”              intensity non-uniformity in magnetic resonance imaging,” Phys. Imag.
+     IEEE Trans. Med. Imag., vol. 29, no. 1, pp. 196–205, Jan. 2010.                   Radiat. Oncol., vol. 4, pp. 32–38, Oct. 2017.
+[35] J. Schlemper et al., “Attention gated networks: Learning to lever-           [47] A. Simmons, P. S. Tofts, G. J. Barker, and S. R. Arridge, “Sources
+     age salient regions in medical images,” Med. Image Anal., vol. 53,                of intensity nonuniformity in spin echo images at 1.5T,” Magn. Reson.
+     pp. 197–207, Apr. 2019.                                                           Med., vol. 32, no. 1, pp. 121–128, Jul. 1994.
+
+
+
+
+         Authorized licensed use limited to: TONGJI UNIVERSITY. Downloaded on August 14,2026 at 07:31:30 UTC from IEEE Xplore. Restrictions apply.
+

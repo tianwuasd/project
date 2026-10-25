@@ -1,0 +1,3235 @@
+[
+  {
+    "schema_version": 1,
+    "id": "work_1e05e2b0eb6c452c",
+    "record_revision": 3,
+    "title": "Draft and Refine with Visual Experts",
+    "authors": [
+      "Sungheon Jeong",
+      "Ryozo Masukawa",
+      "Jihong Park",
+      "Sanggeon Yun",
+      "Wenjun Huang",
+      "Hanning Chen",
+      "Mahdi Imani",
+      "Mohsen Imani"
+    ],
+    "year": 2025,
+    "doi": "10.48550/arxiv.2511.11005",
+    "arxiv_id": "2511.11005v3",
+    "source_ids": {
+      "openalex": "https://openalex.org/W4416591446",
+      "arxiv": "2511.11005v3"
+    },
+    "abstract": "While recent Large Vision-Language Models (LVLMs) exhibit strong multimodal reasoning abilities, they often produce ungrounded or hallucinated responses because they rely too heavily on linguistic priors instead of visual evidence. This limitation highlights the absence of a quantitative measure of how much these models actually use visual information during reasoning. We propose Draft and Refine (DnR), an agent framework driven by a question-conditioned utilization metric. The metric quantifies the model's reliance on visual evidence by first constructing a query-conditioned relevance map to localize question-specific cues and then measuring dependence through relevance-guided probabilistic masking. Guided by this metric, the DnR agent refines its initial draft using targeted feedback from external visual experts. Each expert's output (such as boxes or masks) is rendered as visual cues on the image, and the model is re-queried to select the response that yields the largest improvement in utilization. This process strengthens visual grounding without retraining or architectural changes. Experiments across VQA and captioning benchmarks show consistent accuracy gains and reduced hallucination, demonstrating that measuring visual utilization provides a principled path toward more interpretable and evidence-driven multimodal agent systems. Code is available at https://github.com/EavnJeong/Draft-and-Refine-with-Visual-Experts.",
+    "urls": [
+      "http://arxiv.org/abs/2511.11005",
+      "https://doi.org/10.48550/arxiv.2511.11005",
+      "http://arxiv.org/abs/2511.11005v3"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2511.11005",
+    "venue": "arXiv (Cornell University)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 0,
+        "retrieved_at": "2026-10-25T05:32:03.306227+00:00"
+      },
+      {
+        "source": "arxiv",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 0,
+        "retrieved_at": "2026-10-25T05:32:03.311149+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2511.11005v3",
+        "abstract": "While recent Large Vision-Language Models (LVLMs) exhibit strong multimodal reasoning abilities, they often produce ungrounded or hallucinated responses because they rely too heavily on linguistic priors instead of visual evidence. This limitation highlights the absence of a quantitative measure of how much these models actually use visual information during reasoning. We propose Draft and Refine (DnR), an agent framework driven by a question-conditioned utilization metric. The metric quantifies the model's reliance on visual evidence by first constructing a query-conditioned relevance map to localize question-specific cues and then measuring dependence through relevance-guided probabilistic masking. Guided by this metric, the DnR agent refines its initial draft using targeted feedback from external visual experts. Each expert's output (such as boxes or masks) is rendered as visual cues on the image, and the model is re-queried to select the response that yields the largest improvement in utilization. This process strengthens visual grounding without retraining or architectural changes. Experiments across VQA and captioning benchmarks show consistent accuracy gains and reduced hallucination, demonstrating that measuring visual utilization provides a principled path toward more interpretable and evidence-driven multimodal agent systems. Code is available at https://github.com/EavnJeong/Draft-and-Refine-with-Visual-Experts."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:10.015147+00:00",
+        "detail": "Notice lookup unavailable: HTTP 404"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2511.11005"
+      }
+    ],
+    "citekey": "ref_1e05e2b0eb6c452c",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_020a62458a2c42a9",
+    "record_revision": 2,
+    "title": "Dynamic Mixture-of-Experts for Visual Autoregressive Model",
+    "authors": [
+      "Jort Vincenti",
+      "Metod Jazbec",
+      "Guoxuan Xia"
+    ],
+    "year": 2025,
+    "doi": "10.48550/arxiv.2510.08629",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W4417114134"
+    },
+    "abstract": "Visual Autoregressive Models (VAR) offer efficient and high-quality image generation but suffer from computational redundancy due to repeated Transformer calls at increasing resolutions. We introduce a dynamic Mixture-of-Experts router integrated into VAR. The new architecture allows to trade compute for quality through scale-aware thresholding. This thresholding strategy balances expert selection based on token complexity and resolution, without requiring additional training. As a result, we achieve 20% fewer FLOPs, 11% faster inference and match the image quality achieved by the dense baseline.",
+    "urls": [
+      "http://arxiv.org/abs/2510.08629",
+      "https://doi.org/10.48550/arxiv.2510.08629"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2510.08629",
+    "venue": "arXiv (Cornell University)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 1,
+        "retrieved_at": "2026-10-25T05:32:03.306227+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:11.936582+00:00",
+        "detail": "Notice lookup unavailable: HTTP 404"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_020a62458a2c42a9",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_2a25ad05cb214313",
+    "record_revision": 2,
+    "title": "Visual Boosting Techniques for Spatiotemporal Dense Pixel Visualizations",
+    "authors": [
+      "Julius Rauscher",
+      "Frederik L. Dennig",
+      "Udo Schlegel",
+      "Daniel A. Keim",
+      "Tobias Schreck"
+    ],
+    "year": 2026,
+    "doi": "10.2312/eurova.20261004",
+    "arxiv_id": "2604.25298v1",
+    "source_ids": {
+      "arxiv": "2604.25298v1"
+    },
+    "abstract": "The analysis of spatiotemporal data is essential in domains such as epidemiology and environmental monitoring, where understanding the interplay between spatially distributed phenomena and their temporal evolution is critical. Dense pixel visualizations offer a compact, effective overview of spatiotemporal dynamics. However, the necessary linearization of 2D geographic space into a 1D ordering inevitably introduces structural distortions that manifest as visual artifacts. We propose a measure-driven visual analytics approach that captures visual artifacts through neighborhood preservation measures for 1D orderings and renders them using visual boosting techniques such as glyphs, halos, and hatching. We demonstrate our approach through a usage scenario analyzing COVID-19 incidence data across German districts, showing that interactive, measure-driven boosting enables analysts to reliably distinguish genuine spatial patterns from linearization artifacts.",
+    "urls": [
+      "http://arxiv.org/abs/2604.25298v1"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2604.25298v1",
+    "venue": "17th International EuroVis Workshop on Visual Analytics (EuroVA2026)",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 1,
+        "retrieved_at": "2026-10-25T05:32:03.311149+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2604.25298v1",
+        "abstract": "The analysis of spatiotemporal data is essential in domains such as epidemiology and environmental monitoring, where understanding the interplay between spatially distributed phenomena and their temporal evolution is critical. Dense pixel visualizations offer a compact, effective overview of spatiotemporal dynamics. However, the necessary linearization of 2D geographic space into a 1D ordering inevitably introduces structural distortions that manifest as visual artifacts. We propose a measure-driven visual analytics approach that captures visual artifacts through neighborhood preservation measures for 1D orderings and renders them using visual boosting techniques such as glyphs, halos, and hatching. We demonstrate our approach through a usage scenario analyzing COVID-19 incidence data across German districts, showing that interactive, measure-driven boosting enables analysts to reliably distinguish genuine spatial patterns from linearization artifacts."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:10.989529+00:00",
+        "detail": "Notice lookup unavailable: HTTP 404"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2604.25298"
+      }
+    ],
+    "citekey": "ref_2a25ad05cb214313",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_83432079db774294",
+    "record_revision": 2,
+    "title": "Siamese High-Level Feature Refine Network for Visual Object Tracking",
+    "authors": [
+      "Md. Maklachur Rahman",
+      "Md Rishad Ahmed",
+      "Lamyanba Laishram",
+      "Seock Ho Kim",
+      "Soon Ki Jung"
+    ],
+    "year": 2020,
+    "doi": "10.3390/electronics9111918",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W3100541543"
+    },
+    "abstract": "Siamese network-based trackers are broadly applied to solve visual tracking problems due to its balanced performance in terms of speed and accuracy. Tracking desired objects in challenging scenarios is still one of the fundamental concerns during visual tracking. This research paper proposes a feature refined end-to-end tracking framework with real-time tracking speed and considerable performance. The feature refine network has been incorporated to enhance the target feature representation power, utilizing high-level semantic information. Besides, it allows the network to capture the salient information to locate the target and learns to represent the target feature in a more generalized way advancing the overall tracking performance, particularly in the challenging sequences. But, only the feature refine module is unable to handle such challenges because of its less discriminative ability. To overcome this difficulty, we employ an attention module inside the feature refine network that strengths the tracker discrimination ability between the target and background. Furthermore, we conduct extensive experiments to ensure the proposed tracker’s effectiveness using several popular tracking benchmarks, demonstrating that our proposed model achieves state-of-the-art performance over other trackers.",
+    "urls": [
+      "https://doi.org/10.3390/electronics9111918",
+      "https://doi.org/10.3390/electronics9111918"
+    ],
+    "open_access_url": "https://www.mdpi.com/2079-9292/9/11/1918/pdf?version=1605493133",
+    "venue": "Electronics",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 2,
+        "retrieved_at": "2026-10-25T05:32:03.306227+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:16.706796+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_83432079db774294",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_59002ba90a484a4c",
+    "record_revision": 2,
+    "title": "VIANA: Visual Interactive Annotation of Argumentation",
+    "authors": [
+      "Fabian Sperrle",
+      "Rita Sevastjanova",
+      "Rebecca Kehlbeck",
+      "Mennatallah El-Assady"
+    ],
+    "year": 2019,
+    "doi": null,
+    "arxiv_id": "1907.12413v1",
+    "source_ids": {
+      "arxiv": "1907.12413v1"
+    },
+    "abstract": "Argumentation Mining addresses the challenging tasks of identifying boundaries of argumentative text fragments and extracting their relationships. Fully automated solutions do not reach satisfactory accuracy due to their insufficient incorporation of semantics and domain knowledge. Therefore, experts currently rely on time-consuming manual annotations. In this paper, we present a visual analytics system that augments the manual annotation process by automatically suggesting which text fragments to annotate next. The accuracy of those suggestions is improved over time by incorporating linguistic knowledge and language modeling to learn a measure of argument similarity from user interactions. Based on a long-term collaboration with domain experts, we identify and model five high-level analysis tasks. We enable close reading and note-taking, annotation of arguments, argument reconstruction, extraction of argument relations, and exploration of argument graphs. To avoid context switches, we transition between all views through seamless morphing, visually anchoring all text- and graph-based layers. We evaluate our system with a two-stage expert user study based on a corpus of presidential debates. The results show that experts prefer our system over existing solutions due to the speedup provided by the automatic suggestions and the tight integration between text and graph views.",
+    "urls": [
+      "http://arxiv.org/abs/1907.12413v1"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/1907.12413v1",
+    "venue": "2019 IEEE Conference on Visual Analytics Science and Technology (VAST)",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 2,
+        "retrieved_at": "2026-10-25T05:32:03.311149+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "1907.12413v1",
+        "abstract": "Argumentation Mining addresses the challenging tasks of identifying boundaries of argumentative text fragments and extracting their relationships. Fully automated solutions do not reach satisfactory accuracy due to their insufficient incorporation of semantics and domain knowledge. Therefore, experts currently rely on time-consuming manual annotations. In this paper, we present a visual analytics system that augments the manual annotation process by automatically suggesting which text fragments to annotate next. The accuracy of those suggestions is improved over time by incorporating linguistic knowledge and language modeling to learn a measure of argument similarity from user interactions. Based on a long-term collaboration with domain experts, we identify and model five high-level analysis tasks. We enable close reading and note-taking, annotation of arguments, argument reconstruction, extraction of argument relations, and exploration of argument graphs. To avoid context switches, we transition between all views through seamless morphing, visually anchoring all text- and graph-based layers. We evaluate our system with a two-stage expert user study based on a corpus of presidential debates. The results show that experts prefer our system over existing solutions due to the speedup provided by the automatic suggestions and the tight integration between text and graph views."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:10.991214+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:1907.12413"
+      }
+    ],
+    "citekey": "ref_59002ba90a484a4c",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_0bd013dad2904942",
+    "record_revision": 2,
+    "title": "A Literature Review Comparing Experts’ and Non-Experts’ Visual Processing of Graphs during Problem-Solving and Learning",
+    "authors": [
+      "Verena Ruf",
+      "Anna Horrer",
+      "Markus Berndt",
+      "Sarah Isabelle Hofer",
+      "Frank Fischer",
+      "Martin Rudolf Fischer",
+      "Jan Zottmann",
+      "Jochen Kühn",
+      "Stefan Küchemann"
+    ],
+    "year": 2023,
+    "doi": "10.3390/educsci13020216",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W4321377577"
+    },
+    "abstract": "The interpretation of graphs plays a pivotal role in education because it is relevant for understanding and representing data and comprehending concepts in various domains. Accordingly, many studies examine students’ gaze behavior by comparing different levels of expertise when interpreting graphs. This literature review presents an overview of 32 articles comparing the gaze behavior of experts and non-experts during problem-solving and learning with graphs up to January 2022. Most studies analyzed students’ dwell time, fixation duration, and fixation count on macro- and meso-, as well as on micro-level areas of interest. Experts seemed to pay more attention to relevant parts of the graph and less to irrelevant parts of a graph, in line with the information-reduction hypothesis. Experts also made more integrative eye movements within a graph in terms of dynamic metrics. However, the determination of expertise is inconsistent. Therefore, we recommend four factors that will help to better determine expertise. This review gives an overview of evaluation strategies for different types of graphs and across various domains, which could facilitate instructing students in evaluating graphs.",
+    "urls": [
+      "https://doi.org/10.3390/educsci13020216",
+      "https://doi.org/10.3390/educsci13020216"
+    ],
+    "open_access_url": "https://www.mdpi.com/2227-7102/13/2/216/pdf?version=1676799360",
+    "venue": "Education Sciences",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 3,
+        "retrieved_at": "2026-10-25T05:32:03.306227+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:11.040435+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_0bd013dad2904942",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_2cd3ddba55b94873",
+    "record_revision": 2,
+    "title": "Chaos in DNA inversions (Draft paper)",
+    "authors": [
+      "Jacques M. Bahi",
+      "Nathalie Côté",
+      "Christophe Guyeux"
+    ],
+    "year": 2011,
+    "doi": null,
+    "arxiv_id": "1105.1512v1",
+    "source_ids": {
+      "arxiv": "1105.1512v1"
+    },
+    "abstract": "This is a draft paper, proving that the inversion process that occurs in DNA mutations, is indeed chaotic as it is defined by the Devaney's theory.",
+    "urls": [
+      "http://arxiv.org/abs/1105.1512v1"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/1105.1512v1",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 3,
+        "retrieved_at": "2026-10-25T05:32:03.311149+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "1105.1512v1",
+        "abstract": "This is a draft paper, proving that the inversion process that occurs in DNA mutations, is indeed chaotic as it is defined by the Devaney's theory."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:10.991214+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:1105.1512"
+      }
+    ],
+    "citekey": "ref_2cd3ddba55b94873",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_679dc653ae10481d",
+    "record_revision": 2,
+    "title": "Refining posthuman aesthetic pedagogy for teacher education through multidisciplinary expert consultation",
+    "authors": [
+      "Okhee Jeong"
+    ],
+    "year": 2026,
+    "doi": "10.3389/feduc.2026.1940834",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W7220944996"
+    },
+    "abstract": "Artificial intelligence and digitally mediated creative practices are changing not only the tools available to teachers but also the conditions under which teachers exercise professional judgment. Although posthuman scholarship offers a rich vocabulary for understanding relational agency among humans, technologies, materials, and environments, its educational implications often remain philosophically expansive and pedagogically underspecified. This study therefore refined an initial conceptual framework of Posthuman Aesthetic Pedagogy for teacher education through multidisciplinary expert consultation. The study used a theory-informed qualitative design rather than an inductive theory-generation approach. Five expert fields spanning art education, curriculum studies, educational philosophy, media aesthetics, and contemporary artistic practice critically examined the framework's coherence, educational relevance, conceptual relations, and implications. Consultation data were interpreted recursively in relation to the initial framework through three analytic lenses: conceptual confirmation, conceptual divergence, and conceptual refinement. Experts broadly confirmed the value of relationality, mediation, dialogicity, transformative creativity, and reflective responsibility, while questioning any account that treated technology as a neutral tool, aesthetic experience as private appreciation, or creativity as unconstrained novelty. The refined framework consequently positions professional judgment as the connective pedagogical capacity through which future teachers notice distributed agency, interpret technologically mediated situations, deliberate with others, create alternatives, and assume responsibility for educational consequences. The contribution is threefold: conceptually, the study clarifies the internal relations of Posthuman Aesthetic Pedagogy; methodologically, it demonstrates how expert consultation can refine rather than falsely “validate” a theory-informed framework; and educationally, it offers a teacher-education orientation that complements competency frameworks by foregrounding situated, aesthetic, ethical judgment. Although it requires empirical examination in teacher-education settings, this framework provides a defensible basis for designing learning experiences in which teachers critically and creatively negotiate complex human-technology relations.",
+    "urls": [
+      "https://doi.org/10.3389/feduc.2026.1940834",
+      "https://doi.org/10.3389/feduc.2026.1940834"
+    ],
+    "open_access_url": "https://www.frontiersin.org/journals/education/articles/10.3389/feduc.2026.1940834/pdf",
+    "venue": "Frontiers in Education",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 4,
+        "retrieved_at": "2026-10-25T05:32:03.306227+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:12.887429+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_679dc653ae10481d",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_875aa70a356d4af9",
+    "record_revision": 2,
+    "title": "Lexara-RF: Reference-Free Metrics for Evaluating Conversational Visual Analytics Agents",
+    "authors": [
+      "Srishti Palani",
+      "Vidya Setlur"
+    ],
+    "year": 2026,
+    "doi": null,
+    "arxiv_id": "2609.17842v1",
+    "source_ids": {
+      "arxiv": "2609.17842v1"
+    },
+    "abstract": "Conversational visual analytics (CVA) agents powered by large language models generate visualizations and natural-language explanations from open-ended queries. Evaluating these multimodal outputs is challenging: curated reference benchmarks are costly to author, cannot comprehensively capture the space of valid responses, and are unavailable in production. Building on the Lexara evaluation framework, we introduce Lexara-RF, a reference-free set of metrics that scores CVA outputs using only the prompt, data, and model response. We reformulate evaluation as verification: 13 metrics operationalize visualization design theory and Gricean cooperative principles as computable consistency, intent-alignment, and design validity checks. On a human-rated corpus of CVA test-cases, Lexara-RF achieves alignment comparable to reference-based formulations, outperforms surface-similarity NLG baselines, and localizes structurally grounded failures with high accuracy.",
+    "urls": [
+      "http://arxiv.org/abs/2609.17842v1"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2609.17842v1",
+    "venue": "2026 IEEE Visualization and Visual Analytics (VIS) Conference",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 4,
+        "retrieved_at": "2026-10-25T05:32:03.311149+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2609.17842v1",
+        "abstract": "Conversational visual analytics (CVA) agents powered by large language models generate visualizations and natural-language explanations from open-ended queries. Evaluating these multimodal outputs is challenging: curated reference benchmarks are costly to author, cannot comprehensively capture the space of valid responses, and are unavailable in production. Building on the Lexara evaluation framework, we introduce Lexara-RF, a reference-free set of metrics that scores CVA outputs using only the prompt, data, and model response. We reformulate evaluation as verification: 13 metrics operationalize visualization design theory and Gricean cooperative principles as computable consistency, intent-alignment, and design validity checks. On a human-rated corpus of CVA test-cases, Lexara-RF achieves alignment comparable to reference-based formulations, outperforms surface-similarity NLG baselines, and localizes structurally grounded failures with high accuracy."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:13.834909+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2609.17842"
+      }
+    ],
+    "citekey": "ref_875aa70a356d4af9",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_7a38e306125e4641",
+    "record_revision": 2,
+    "title": "Refining a taxonomy for guideline implementation: results of an exercise in abstract classification",
+    "authors": [
+      "Danielle Mazza",
+      "Phillip J. Bairstow",
+      "Heather Buchan",
+      "Samantha Paubrey Chakraborty",
+      "Oliver van Hecke",
+      "Cathy Grech",
+      "Ilkka Kunnamo"
+    ],
+    "year": 2013,
+    "doi": "10.1186/1748-5908-8-32",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W2134964371"
+    },
+    "abstract": "BACKGROUND: To better understand the efficacy of various implementation strategies, improved methods for describing and classifying the nature of these strategies are urgently required. The aim of this study was to develop and pilot the feasibility of a taxonomy to classify the nature and content of implementation strategies. METHODS: A draft implementation taxonomy was developed based on the Cochrane Effective Practice and Organisation of Care (EPOC) data collection checklist. The draft taxonomy had four domains (professional, financial, organisational and regulatory) covering 49 distinct strategies. We piloted the draft taxonomy by using it to classify the implementation strategies described in the conference abstracts of the implementation stream of the 2010 Guideline International Network Conference. Five authors classified the strategies in each abstract individually. Final categorisation was then carried out in a face-to-face consensus meeting involving three authors. RESULTS: The implementation strategies described in 71 conference abstracts were classified. Approximately 15.5% of abstracts utilised strategies that could not be categorised using the draft taxonomy. Of those strategies that could be categorised, the majority were professionally focused (57%). A total of 41% of projects used only one implementation strategy, with 29% using two and 31% three or more. The three most commonly used strategies were changes in quality assurance, quality improvement and/or performance measurement systems, changes in information and communication technology, and distribution of guideline materials (via hard-copy, audio-visual and/or electronic means). CONCLUSIONS: Further refinement of the draft taxonomy is required to provide hierarchical dimensions and granularity, particularly in the areas of patient-focused interventions, those concerned with audit and feedback and quality improvement, and electronic forms of implementation, including electronic decision support.",
+    "urls": [
+      "https://doi.org/10.1186/1748-5908-8-32",
+      "https://doi.org/10.1186/1748-5908-8-32"
+    ],
+    "open_access_url": "https://implementationscience.biomedcentral.com/counter/pdf/10.1186/1748-5908-8-32",
+    "venue": "Implementation Science",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 5,
+        "retrieved_at": "2026-10-25T05:32:03.306227+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:13.834196+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_7a38e306125e4641",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_f516794ed65843b7",
+    "record_revision": 2,
+    "title": "ExpertFlow: Efficient Mixture-of-Experts Inference via Predictive Expert Caching and Token Scheduling",
+    "authors": [
+      "Xin He",
+      "Shunkang Zhang",
+      "Kaijie Tang",
+      "Shaohuai Shi",
+      "Yuxin Wang",
+      "Zihao Zeng",
+      "Zhenheng Tang",
+      "Xiaowen Chu",
+      "Haiyan Yin",
+      "Ivor W. Tsang",
+      "Yew Soon Ong"
+    ],
+    "year": 2024,
+    "doi": "10.1145/3770743.3804292",
+    "arxiv_id": "2410.17954v2",
+    "source_ids": {
+      "arxiv": "2410.17954v2"
+    },
+    "abstract": "Sparse Mixture-of-Experts (MoE) models can outperform dense large language models at similar computation by activating only a small set of experts per token. However, stacking many expert modules introduces substantial parameter memory, which makes MoE models difficult to deploy in memory-constrained environments such as single-GPU devices. Offloading alleviates this issue by storing inactive experts in CPU memory and loading them on demand, but existing methods remain limited: static caches disregard input-dependent routing, and methods that train separate models to predict expert usage ahead of time are often inaccurate or require significant training cost. We propose ExpertFlow, a lightweight MoE inference system that addresses this routing dependency through three coordinated components: 1) a transformer-based routing path predictor that estimates expert usage across all MoE layers in a single forward pass, 2) a token scheduler that groups tokens with similar predicted routes to improve expert utilization, and 3) a predictive expert cache that loads only the required experts while correcting mispredictions at runtime. Together, these components enable efficient expert loading and execution, reducing GPU memory usage by up to 93.72% and improving inference throughput by up to 10x over strong offloading baselines on a single GPU.",
+    "urls": [
+      "http://arxiv.org/abs/2410.17954v2"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2410.17954v2",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 5,
+        "retrieved_at": "2026-10-25T05:32:03.311149+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2410.17954v2",
+        "abstract": "Sparse Mixture-of-Experts (MoE) models can outperform dense large language models at similar computation by activating only a small set of experts per token. However, stacking many expert modules introduces substantial parameter memory, which makes MoE models difficult to deploy in memory-constrained environments such as single-GPU devices. Offloading alleviates this issue by storing inactive experts in CPU memory and loading them on demand, but existing methods remain limited: static caches disregard input-dependent routing, and methods that train separate models to predict expert usage ahead of time are often inaccurate or require significant training cost. We propose ExpertFlow, a lightweight MoE inference system that addresses this routing dependency through three coordinated components: 1) a transformer-based routing path predictor that estimates expert usage across all MoE layers in a single forward pass, 2) a token scheduler that groups tokens with similar predicted routes to improve expert utilization, and 3) a predictive expert cache that loads only the required experts while correcting mispredictions at runtime. Together, these components enable efficient expert loading and execution, reducing GPU memory usage by up to 93.72% and improving inference throughput by up to 10x over strong offloading baselines on a single GPU."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:16.596235+00:00",
+        "detail": "Notice lookup unavailable: HTTP 404"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2410.17954"
+      }
+    ],
+    "citekey": "ref_f516794ed65843b7",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_fe635208107c4ca1",
+    "record_revision": 2,
+    "title": "Almost an Expert",
+    "authors": [
+      "Alvin Yuan",
+      "Kurt Luther",
+      "Markus Krause",
+      "Sophie Isabel Vennix",
+      "Steven P. Dow",
+      "Björn Hartmann"
+    ],
+    "year": 2016,
+    "doi": "10.1145/2818048.2819953",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W2292054779"
+    },
+    "abstract": "Expert feedback is valuable but hard to obtain for many designers. Online crowds can provide fast and affordable feedback, but workers may lack relevant domain knowledge and experience. Can expert rubrics address this issue and help novices provide expert-level feedback? To evaluate this, we conducted an experiment with a 2x2 factorial design. Student designers received feedback on a visual design from both experts and novices, who produced feedback using either an expert rubric or no rubric. We found that rubrics helped novice workers provide feedback that was rated nearly as valuable as expert feedback. A follow-up analysis on writing style showed that student designers found feedback most helpful when it was emotionally positive and specific, and that a rubric increased the occurrence of these characteristics in feedback. The analysis also found that expertise correlated with longer critiques, but not the other favorable characteristics. An informal evaluation indicates that experts may instead have produced value by providing clearer justifications.",
+    "urls": [
+      "https://doi.org/10.1145/2818048.2819953",
+      "https://doi.org/10.1145/2818048.2819953"
+    ],
+    "open_access_url": "https://dl.acm.org/doi/pdf/10.1145/2818048.2819953",
+    "venue": "ACM Conference on Computer-Supported Cooperative Work & Social Computing (CSCW)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 6,
+        "retrieved_at": "2026-10-25T05:32:03.306227+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:18.504801+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_fe635208107c4ca1",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_a9592c63f9df46dc",
+    "record_revision": 2,
+    "title": "Zoom-Refine: Boosting High-Resolution Multimodal Understanding via Localized Zoom and Self-Refinement",
+    "authors": [
+      "Xuan Yu",
+      "Dayan Guan",
+      "Yanfeng Gu"
+    ],
+    "year": 2025,
+    "doi": null,
+    "arxiv_id": "2506.01663v2",
+    "source_ids": {
+      "arxiv": "2506.01663v2"
+    },
+    "abstract": "Multimodal Large Language Models (MLLM) often struggle to interpret high-resolution images accurately, where fine-grained details are crucial for complex visual understanding. We introduce Zoom-Refine, a novel training-free method that enhances MLLM capabilities to address this issue. Zoom-Refine operates through a synergistic process of \\textit{Localized Zoom} and \\textit{Self-Refinement}. In the \\textit{Localized Zoom} step, Zoom-Refine leverages the MLLM to provide a preliminary response to an input query and identifies the most task-relevant image region by predicting its bounding box coordinates. During the \\textit{Self-Refinement} step, Zoom-Refine then integrates fine-grained details from the high-resolution crop (identified by \\textit{Localized Zoom}) with its initial reasoning to re-evaluate and refine its preliminary response. Our method harnesses the MLLM's inherent capabilities for spatial localization, contextual reasoning and comparative analysis without requiring additional training or external experts. Comprehensive experiments demonstrate the efficacy of Zoom-Refine on two challenging high-resolution multimodal benchmarks. Code is available at \\href{https://github.com/xavier-yu114/Zoom-Refine}{\\color{magenta}github.com/xavier-yu114/Zoom-Refine}",
+    "urls": [
+      "http://arxiv.org/abs/2506.01663v2"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2506.01663v2",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 6,
+        "retrieved_at": "2026-10-25T05:32:03.311149+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2506.01663v2",
+        "abstract": "Multimodal Large Language Models (MLLM) often struggle to interpret high-resolution images accurately, where fine-grained details are crucial for complex visual understanding. We introduce Zoom-Refine, a novel training-free method that enhances MLLM capabilities to address this issue. Zoom-Refine operates through a synergistic process of \\textit{Localized Zoom} and \\textit{Self-Refinement}. In the \\textit{Localized Zoom} step, Zoom-Refine leverages the MLLM to provide a preliminary response to an input query and identifies the most task-relevant image region by predicting its bounding box coordinates. During the \\textit{Self-Refinement} step, Zoom-Refine then integrates fine-grained details from the high-resolution crop (identified by \\textit{Localized Zoom}) with its initial reasoning to re-evaluate and refine its preliminary response. Our method harnesses the MLLM's inherent capabilities for spatial localization, contextual reasoning and comparative analysis without requiring additional training or external experts. Comprehensive experiments demonstrate the efficacy of Zoom-Refine on two challenging high-resolution multimodal benchmarks. Code is available at \\href{https://github.com/xavier-yu114/Zoom-Refine}{\\color{magenta}github.com/xavier-yu114/Zoom-Refine}"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:13.834909+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2506.01663"
+      }
+    ],
+    "citekey": "ref_a9592c63f9df46dc",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_c9b88995247d4118",
+    "record_revision": 2,
+    "title": "Refining Child Pornography Law",
+    "authors": [
+      "Carissa Byrne Hessick"
+    ],
+    "year": 2016,
+    "doi": "10.3998/mpub.8822605",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W4236909019"
+    },
+    "abstract": "The legal definition of child pornography is, at best, unclear. In part because of this ambiguity and in part because of the nature of the crime itself, the prosecution and sentencing of perpetrators, the protection of and restitution for victims, and the means for preventing repeat offenses are deeply controversial. In an effort to clarify the questions and begin to formulate answers, in this volume, experts in law, sociology, and social examine child pornography law and its consequences. Focusing on the roles of language and crime definition, the contributors present a range of views about the increasingly visible role that child pornography plays in the national conversation on child safety, as well as the wisdom of the punishment of those who produce, distribute, and possess materials which may be considered child pornography.",
+    "urls": [
+      "https://doi.org/10.3998/mpub.8822605",
+      "https://doi.org/10.3998/mpub.8822605"
+    ],
+    "open_access_url": "https://doi.org/10.3998/mpub.8822605",
+    "venue": "University of Michigan Press eBooks",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 7,
+        "retrieved_at": "2026-10-25T05:32:03.306227+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:15.659650+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_c9b88995247d4118",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_6eecc999e5714f57",
+    "record_revision": 2,
+    "title": "Bigraphical Refinement",
+    "authors": [
+      "Gian Perrone",
+      "Søren Debois",
+      "Thomas Hildebrandt"
+    ],
+    "year": 2011,
+    "doi": "10.4204/eptcs.55.2",
+    "arxiv_id": "1106.4091v1",
+    "source_ids": {
+      "arxiv": "1106.4091v1"
+    },
+    "abstract": "We propose a mechanism for the vertical refinement of bigraphical reactive systems, based upon a mechanism for limiting observations and utilising the underlying categorical structure of bigraphs. We present a motivating example to demonstrate that the proposed notion of refinement is sensible with respect to the theory of bigraphical reactive systems; and we propose a sufficient condition for guaranteeing the existence of a safety-preserving vertical refinement. We postulate the existence of a complimentary notion of horizontal refinement for bigraphical agents, and finally we discuss the connection of this work to the general refinement of Reeves and Streader.",
+    "urls": [
+      "http://arxiv.org/abs/1106.4091v1"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/1106.4091v1",
+    "venue": "EPTCS 55, 2011, pp. 20-36",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "Draft and Refine with Visual Experts",
+        "raw_response_index": 0,
+        "item_index": 7,
+        "retrieved_at": "2026-10-25T05:32:03.311149+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "1106.4091v1",
+        "abstract": "We propose a mechanism for the vertical refinement of bigraphical reactive systems, based upon a mechanism for limiting observations and utilising the underlying categorical structure of bigraphs. We present a motivating example to demonstrate that the proposed notion of refinement is sensible with respect to the theory of bigraphical reactive systems; and we propose a sufficient condition for guaranteeing the existence of a safety-preserving vertical refinement. We postulate the existence of a complimentary notion of horizontal refinement for bigraphical agents, and finally we discuss the connection of this work to the general refinement of Reeves and Streader."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:17.754650+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:1106.4091"
+      }
+    ],
+    "citekey": "ref_6eecc999e5714f57",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_2d339e5c9d8843f7",
+    "record_revision": 2,
+    "title": "SegAgent: Exploring Pixel Understanding Capabilities in MLLMs by Imitating Human Annotator Trajectories",
+    "authors": [
+      "Muzhi Zhu",
+      "Yuzhuo Tian",
+      "Hao Chen",
+      "Chunluan Zhou",
+      "Qingpei Guo",
+      "Yang Liu",
+      "Ming Zhu Yang",
+      "Chunhua Shen"
+    ],
+    "year": 2025,
+    "doi": "10.1109/cvpr52734.2025.00349",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W4413147628"
+    },
+    "abstract": "While MLLMs have demonstrated impressive image understanding capabilities, they still struggle with pixel-level comprehension, limiting their practical applications. Current evaluation tasks such as VQA and visual grounding remain too coarse to assess fine-grained pixel comprehension accurately. Although segmentation is foundational for pixel-level understanding, existing methods often require MLLMs to generate implicit tokens, decoded through external pixel decoders. This approach disrupts the MLLM’s text output space, potentially compromising language capabilities and reducing flexibility and extensibility while failing to reflect the model’s intrinsic pixel-level understanding. Thus, we introduce the Human-Like Mask Annotation Task (HLMAT), a new paradigm where MLLMs mimic human annotators using interactive segmentation tools. Modelling segmentation as a multi-step Markov Decision Process, HLMAT enables MLLMs to iteratively generate text-based click points, achieving high-quality masks without architectural changes or implicit tokens. Through this setup, we develop SegAgent, a model fine-tuned on human-like annotation trajectories, which achieves performance comparable to SoTA methods and supports additional tasks like mask refinement and annotation filtering. HLMAT provides a protocol for assessing fine-grained pixel understanding in MLLMs and introduces a vision-centric, multi-step decision-making task that facilitates the exploration of MLLMs’ visual reasoning abilities. Our adaptations of policy improvement method StaR and PRM guided tree search further enhance model robustness in complex segmentation tasks, laying a foundation for future advancements in fine-grained visual perception and multi-step decision-making for MLLMs. Code can be found at https://github.com/aim-uofa/SegAgent.",
+    "urls": [
+      "https://doi.org/10.1109/cvpr52734.2025.00349",
+      "https://doi.org/10.1109/cvpr52734.2025.00349"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2503.08625",
+    "venue": "IEEE Computer Society Conference on Computer Vision and Pattern Recognition/Proceedings - IEEE Computer Society Conference on Computer Vision and Pattern Recognition/Proceedings",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "SegAgent",
+        "raw_response_index": 0,
+        "item_index": 0,
+        "retrieved_at": "2026-10-25T05:32:18.696377+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:25.994223+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_2d339e5c9d8843f7",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_aa6dce0ed7f14b25",
+    "record_revision": 2,
+    "title": "SegAgent: Exploring Pixel Understanding Capabilities in MLLMs by Imitating Human Annotator Trajectories",
+    "authors": [
+      "Muzhi Zhu",
+      "Yuzhuo Tian",
+      "Hao Chen",
+      "Chunluan Zhou",
+      "Qingpei Guo",
+      "Yang Liu",
+      "Ming Yang",
+      "Chunhua Shen"
+    ],
+    "year": 2025,
+    "doi": null,
+    "arxiv_id": "2503.08625v1",
+    "source_ids": {
+      "arxiv": "2503.08625v1"
+    },
+    "abstract": "While MLLMs have demonstrated adequate image understanding capabilities, they still struggle with pixel-level comprehension, limiting their practical applications. Current evaluation tasks like VQA and visual grounding remain too coarse to assess fine-grained pixel comprehension accurately. Though segmentation is foundational for pixel-level understanding, existing methods often require MLLMs to generate implicit tokens, decoded through external pixel decoders. This approach disrupts the MLLM's text output space, potentially compromising language capabilities and reducing flexibility and extensibility, while failing to reflect the model's intrinsic pixel-level understanding. Thus, we introduce the Human-Like Mask Annotation Task (HLMAT), a new paradigm where MLLMs mimic human annotators using interactive segmentation tools. Modeling segmentation as a multi-step Markov Decision Process, HLMAT enables MLLMs to iteratively generate text-based click points, achieving high-quality masks without architectural changes or implicit tokens. Through this setup, we develop SegAgent, a model fine-tuned on human-like annotation trajectories, which achieves performance comparable to state-of-the-art (SOTA) methods and supports additional tasks like mask refinement and annotation filtering. HLMAT provides a protocol for assessing fine-grained pixel understanding in MLLMs and introduces a vision-centric, multi-step decision-making task that facilitates exploration of MLLMs' visual reasoning abilities. Our adaptations of policy improvement method StaR and PRM-guided tree search further enhance model robustness in complex segmentation tasks, laying a foundation for future advancements in fine-grained visual perception and multi-step decision-making for MLLMs.",
+    "urls": [
+      "http://arxiv.org/abs/2503.08625v1"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2503.08625v1",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "SegAgent",
+        "raw_response_index": 0,
+        "item_index": 0,
+        "retrieved_at": "2026-10-25T05:32:18.696945+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2503.08625v1",
+        "abstract": "While MLLMs have demonstrated adequate image understanding capabilities, they still struggle with pixel-level comprehension, limiting their practical applications. Current evaluation tasks like VQA and visual grounding remain too coarse to assess fine-grained pixel comprehension accurately. Though segmentation is foundational for pixel-level understanding, existing methods often require MLLMs to generate implicit tokens, decoded through external pixel decoders. This approach disrupts the MLLM's text output space, potentially compromising language capabilities and reducing flexibility and extensibility, while failing to reflect the model's intrinsic pixel-level understanding. Thus, we introduce the Human-Like Mask Annotation Task (HLMAT), a new paradigm where MLLMs mimic human annotators using interactive segmentation tools. Modeling segmentation as a multi-step Markov Decision Process, HLMAT enables MLLMs to iteratively generate text-based click points, achieving high-quality masks without architectural changes or implicit tokens. Through this setup, we develop SegAgent, a model fine-tuned on human-like annotation trajectories, which achieves performance comparable to state-of-the-art (SOTA) methods and supports additional tasks like mask refinement and annotation filtering. HLMAT provides a protocol for assessing fine-grained pixel understanding in MLLMs and introduces a vision-centric, multi-step decision-making task that facilitates exploration of MLLMs' visual reasoning abilities. Our adaptations of policy improvement method StaR and PRM-guided tree search further enhance model robustness in complex segmentation tasks, laying a foundation for future advancements in fine-grained visual perception and multi-step decision-making for MLLMs."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:25.995032+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2503.08625"
+      }
+    ],
+    "citekey": "ref_aa6dce0ed7f14b25",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_0186a8e0770f4e88",
+    "record_revision": 2,
+    "title": "Les services publics economiques entre experts, praticiens et gouvernants dans le premier XX^e siecle: d'une configuration historique a l'autre",
+    "authors": [
+      "Michel Margairaz"
+    ],
+    "year": 2005,
+    "doi": null,
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W2266461447"
+    },
+    "abstract": "A travers les experiences theoriques et pratiques des juristes, des gestionnaires et des gouvernants, on a mis en evidence l'extension progressive des services publics economiques. Sur la periode 1880-1950, se segagent deux configurations successives: la premiere, republicaine et decentralisee, reposant sur des entreprises privees; la seconde, a la suite des chocs de la Grande depression desannees 1930 et de la seconde Guerre mondiale, melant services publics et entreprises nationales",
+    "urls": [
+      "https://hal.science/halshs-00087918v1"
+    ],
+    "open_access_url": null,
+    "venue": "HAL (Le Centre pour la Communication Scientifique Directe)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "SegAgent",
+        "raw_response_index": 0,
+        "item_index": 1,
+        "retrieved_at": "2026-10-25T05:32:18.696377+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:24.249527+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_0186a8e0770f4e88",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_cc7a09d10e9a4a96",
+    "record_revision": 2,
+    "title": "Summarizing Scientific Articles: Experiments with Relevance and Rhetorical Status",
+    "authors": [
+      "Simone Teufel",
+      "Marc Moens"
+    ],
+    "year": 2002,
+    "doi": "10.1162/089120102762671936",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W2442495973"
+    },
+    "abstract": "In this article we propose a strategy for the summarization of scientific articles that concentrates on the rhetorical status of statements in an article: Material for summaries is selected in such a way that summaries can highlight the new contribution of the source article and situate it with respect to earlier work. We provide a gold standard for summaries of this kind consisting of a substantial corpus of conference articles in computational linguistics annotated with human judgments of the rhetorical status and relevance of each sentence in the articles. We present several experiments measuring our judges' agreement on these annotations. We also present an algorithm that, on the basis of the annotated training material, selects content from unseen articles and classifies it into a fixed set of seven rhetorical categories. The output of this extraction and classification system can be viewed as a single-document summary in its own right; alternatively, it provides starting material for the generation of task-oriented and user-tailored summaries designed to give users an overview of a scientific field.",
+    "urls": [
+      "https://doi.org/10.1162/089120102762671936",
+      "https://doi.org/10.1162/089120102762671936"
+    ],
+    "open_access_url": "https://direct.mit.edu/coli/article-pdf/28/4/409/1797892/089120102762671936.pdf",
+    "venue": "Computational Linguistics",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "SegAgent",
+        "raw_response_index": 0,
+        "item_index": 2,
+        "retrieved_at": "2026-10-25T05:32:18.696377+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:28.834089+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_cc7a09d10e9a4a96",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_c43e70d1b58f416b",
+    "record_revision": 2,
+    "title": "DRAgent: Discriminative Reasoning Agent for Referring Expression Segmentation",
+    "authors": [
+      "Yujie Qi",
+      "Luyan Zhang"
+    ],
+    "year": 2026,
+    "doi": "10.48550/arxiv.2608.22885",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W7204193829"
+    },
+    "abstract": "Referring Expression Segmentation (RES) aims to generate a pixel-level mask for the object specified by a language expression. Recent methods based on multimodal large language models (MLLMs) often rely on one-pass coordinate prediction for visual localization, which serializes continuous spatial locations as discrete text tokens and may lead to localization bias and alignment errors. To address these issues, we propose DRAgent, an MLLM-driven discriminative reasoning (DR) framework for RES. Instead of requiring the MLLM to generate localization coordinates, DRAgent first constructs a detector-generated candidate space and then uses the MLLM as a visual-semantic target discriminator. Specifically, the MLLM performs reliable target selection among potential distractors through a two-stage DR mechanism, which first screens high-recall candidates and then performs instance-wise verification. The selected target box is subsequently used as a spatial prompt for a foundation segmentation model to produce the final pixel-level mask. Furthermore, we construct a self-consistency-filtered reasoning-chain data pipeline for LoRA-based fine-tuning, providing more reliable supervision for enhancing the MLLM's discriminative reasoning capability. Experiments demonstrate that DRAgent achieves competitive performance on RefCOCO, RefCOCO+, and RefCOCOg.",
+    "urls": [
+      "https://arxiv.org/abs/2608.22885",
+      "https://doi.org/10.48550/arxiv.2608.22885"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2608.22885",
+    "venue": "arXiv (Cornell University)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "SegAgent",
+        "raw_response_index": 0,
+        "item_index": 3,
+        "retrieved_at": "2026-10-25T05:32:18.696377+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:26.965663+00:00",
+        "detail": "Notice lookup unavailable: HTTP 404"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_c43e70d1b58f416b",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_cdfdf0b36806428d",
+    "record_revision": 2,
+    "title": "Evolving, Not Training: Zero-Shot Reasoning Segmentation via Evolutionary Prompting",
+    "authors": [
+      "Kai Ye",
+      "Xiaotong You",
+      "Jianghang Lin",
+      "Jiayi Ji",
+      "Pingyang Dai",
+      "Liujuan Cao"
+    ],
+    "year": 2025,
+    "doi": "10.48550/arxiv.2512.24702",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W7117974136"
+    },
+    "abstract": "Reasoning Segmentation requires models to interpret complex, context-dependent linguistic queries to achieve pixel-level localization. Current dominant approaches rely heavily on Supervised Fine-Tuning (SFT) or Reinforcement Learning (RL). However, SFT suffers from catastrophic forgetting and domain dependency, while RL is often hindered by training instability and rigid reliance on predefined reward functions. Although recent training-free methods circumvent these training burdens, they are fundamentally limited by a static inference paradigm. These methods typically rely on a single-pass \"generate-then-segment\" chain, which suffers from insufficient reasoning depth and lacks the capability to self-correct linguistic hallucinations or spatial misinterpretations. In this paper, we challenge these limitations and propose EVOL-SAM3, a novel zero-shot framework that reformulates reasoning segmentation as an inference-time evolutionary search process. Instead of relying on a fixed prompt, EVOL-SAM3 maintains a population of prompt hypotheses and iteratively refines them through a \"Generate-Evaluate-Evolve\" loop. We introduce a Visual Arena to assess prompt fitness via reference-free pairwise tournaments, and a Semantic Mutation operator to inject diversity and correct semantic errors. Furthermore, a Heterogeneous Arena module integrates geometric priors with semantic reasoning to ensure robust final selection. Extensive experiments demonstrate that EVOL-SAM3 not only substantially outperforms static baselines but also significantly surpasses fully supervised state-of-the-art methods on the challenging ReasonSeg benchmark in a zero-shot setting. The code is available at https://github.com/AHideoKuzeA/Evol-SAM3.",
+    "urls": [
+      "http://arxiv.org/abs/2512.24702",
+      "https://doi.org/10.48550/arxiv.2512.24702"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2512.24702",
+    "venue": "arXiv (Cornell University)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "SegAgent",
+        "raw_response_index": 0,
+        "item_index": 4,
+        "retrieved_at": "2026-10-25T05:32:18.696377+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:30.702623+00:00",
+        "detail": "Notice lookup unavailable: HTTP 404"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_cdfdf0b36806428d",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_3513764023e24db6",
+    "record_revision": 2,
+    "title": "Affordance2Action: Task-Conditioned Scene-level Affordance Grounding for Real-Time Manipulation",
+    "authors": [
+      "Litao Liu",
+      "Yifan Han",
+      "Pengfei Yi",
+      "Wenbo Yu",
+      "Hanqing Wang",
+      "Haoran Du",
+      "Enze Yuan",
+      "Zilin Yuan",
+      "Ruiding Feng",
+      "Michael Liu",
+      "Qi Zhang",
+      "Jingjin Yu"
+    ],
+    "year": 2026,
+    "doi": "10.48550/arxiv.2606.04172",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W7163538286"
+    },
+    "abstract": "Task-conditioned manipulation requires grounding instructions to task-relevant functional parts rather than object categories. This setting is scene-dependent and often one-to-many in cluttered scenes: the same object may afford different interactions across tasks, while a single task may correspond to either one functional region or multiple valid functional regions, depending on the scene layout. Existing affordance datasets and benchmarks remain misaligned with this setting, as they typically focus on grasping or object-level affordances, rely on synthetic scenes, or assume a single instruction-region correspondence. We present Affordance2Action (A2A), a benchmark-centered learning framework for scene-level, task-conditioned part affordance grounding. At its core is A2A-Bench, a manipulation-oriented benchmark that covers both single-region and multi-region instruction correspondences in everyday scenes, with the latter highlighting the ambiguity and diversity of affordance grounding in realistic multi-object environments. To construct it at scale, we build A2A-AffordGen, an agent-assisted annotation pipeline that combines language-model filtering, interactive part segmentation, instance-level mask-out refinement, task-reasoning instruction generation, and human verification. A2A-Bench's supervision further supports diverse downstream applications, with real-time affordance grounding and affordance-conditioned manipulation policies as two representative examples. Experiments show that A2A exposes substantial gaps in generic segmentation, VLM-based grounding, and affordance distillation baselines, while improving task-level localization and providing useful spatial priors for downstream manipulation.",
+    "urls": [
+      "https://arxiv.org/abs/2606.04172",
+      "https://doi.org/10.48550/arxiv.2606.04172"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2606.04172",
+    "venue": "arXiv (Cornell University)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "SegAgent",
+        "raw_response_index": 0,
+        "item_index": 5,
+        "retrieved_at": "2026-10-25T05:32:18.696377+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:28.028213+00:00",
+        "detail": "Notice lookup unavailable: HTTP 404"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_3513764023e24db6",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_af761a7b373249db",
+    "record_revision": 2,
+    "title": "FeVOS: Foresight Expression Video Object Segmentation",
+    "authors": [
+      "Kehan Lan",
+      "Kaining Ying",
+      "Henghui Ding"
+    ],
+    "year": 2026,
+    "doi": "10.1007/978-3-032-37314-4_19",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W7165913987"
+    },
+    "abstract": "",
+    "urls": [
+      "https://doi.org/10.1007/978-3-032-37314-4_19",
+      "https://doi.org/10.1007/978-3-032-37314-4_19"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2606.25585",
+    "venue": "Lecture notes in computer science",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "SegAgent",
+        "raw_response_index": 0,
+        "item_index": 6,
+        "retrieved_at": "2026-10-25T05:32:18.696377+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:27.862773+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_af761a7b373249db",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_7ed052502429493d",
+    "record_revision": 2,
+    "title": "ALTo: Adaptive-Length Tokenizer for Autoregressive Mask Generation",
+    "authors": [
+      "Lingfeng Wang",
+      "Hualing Lin",
+      "Senda Chen",
+      "Tao Wang",
+      "Changxu Cheng",
+      "Yangyang Zhong",
+      "Dong Zheng",
+      "Wuyue Zhao"
+    ],
+    "year": 2025,
+    "doi": "10.52202/085713-0542",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W4416452372"
+    },
+    "abstract": "While humans effortlessly draw visual objects and shapes by adaptively allocating attention based on their complexity, existing multimodal large language models (MLLMs) remain constrained by rigid token representations. Bridging this gap, we propose ALTo, an adaptive length tokenizer for autoregressive mask generation. To achieve this, a novel token length predictor is designed, along with a length regularization term and a differentiable token chunking strategy. We further build ALToLLM that seamlessly integrates ALTo into MLLM. Preferences on the trade-offs between mask quality and efficiency is implemented by group relative policy optimization (GRPO). Experiments demonstrate that ALToLLM achieves state-of-the-art performance with adaptive token cost on popular segmentation benchmarks. Code and models are released at https://github.com/yayafengzi/ALToLLM.",
+    "urls": [
+      "https://doi.org/10.52202/085713-0542",
+      "https://doi.org/10.52202/085713-0542"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2505.16495",
+    "venue": "neural information processing systems",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "SegAgent",
+        "raw_response_index": 0,
+        "item_index": 7,
+        "retrieved_at": "2026-10-25T05:32:18.696377+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:26.083552+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_7ed052502429493d",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_3a3332cd6f93434d",
+    "record_revision": 2,
+    "title": "Principled Approaches for Learning to Defer with Multiple Experts",
+    "authors": [
+      "Anqi Mao",
+      "Mehryar Mohri",
+      "Yutao Zhong"
+    ],
+    "year": 2024,
+    "doi": "10.1007/978-3-031-63735-3_7",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W4400874336"
+    },
+    "abstract": "",
+    "urls": [
+      "https://doi.org/10.1007/978-3-031-63735-3_7",
+      "https://doi.org/10.1007/978-3-031-63735-3_7"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2310.14774",
+    "venue": "Lecture notes in computer science",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "learning to defer multiple experts",
+        "raw_response_index": 0,
+        "item_index": 0,
+        "retrieved_at": "2026-10-25T05:32:30.924145+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:38.467499+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_3a3332cd6f93434d",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_e72c61a630b84230",
+    "record_revision": 2,
+    "title": "One-Stage Top-$k$ Learning-to-Defer: Score-Based Surrogates with Theoretical Guarantees",
+    "authors": [
+      "Yannis Montreuil",
+      "Axel Carlier",
+      "Lai Xing Ng",
+      "Wei Tsang Ooi"
+    ],
+    "year": 2025,
+    "doi": null,
+    "arxiv_id": "2505.10160v2",
+    "source_ids": {
+      "arxiv": "2505.10160v2"
+    },
+    "abstract": "We introduce the first one-stage Top-$k$ Learning-to-Defer framework, which unifies prediction and deferral by learning a shared score-based model that selects the $k$ most cost-effective entities-labels or experts-per input. While existing one-stage L2D methods are limited to deferring to a single expert, our approach jointly optimizes prediction and deferral across multiple entities through a single end-to-end objective. We define a cost-sensitive loss and derive a novel convex surrogate that is independent of the cardinality parameter $k$, enabling generalization across Top-$k$ regimes without retraining. Our formulation recovers the Top-1 deferral policy of prior score-based methods as a special case, and we prove that our surrogate is both Bayes-consistent and $\\mathcal{H}$-consistent under mild assumptions. We further introduce an adaptive variant, Top-$k(x)$, which dynamically selects the number of consulted entities per input to balance predictive accuracy and consultation cost. Experiments on CIFAR-10 and SVHN confirm that our one-stage Top-$k$ method strictly outperforms Top-1 deferral, while Top-$k(x)$ achieves superior accuracy-cost trade-offs by tailoring allocations to input complexity.",
+    "urls": [
+      "http://arxiv.org/abs/2505.10160v2"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2505.10160v2",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "learning to defer multiple experts",
+        "raw_response_index": 0,
+        "item_index": 0,
+        "retrieved_at": "2026-10-25T05:32:30.926107+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2505.10160v2",
+        "abstract": "We introduce the first one-stage Top-$k$ Learning-to-Defer framework, which unifies prediction and deferral by learning a shared score-based model that selects the $k$ most cost-effective entities-labels or experts-per input. While existing one-stage L2D methods are limited to deferring to a single expert, our approach jointly optimizes prediction and deferral across multiple entities through a single end-to-end objective. We define a cost-sensitive loss and derive a novel convex surrogate that is independent of the cardinality parameter $k$, enabling generalization across Top-$k$ regimes without retraining. Our formulation recovers the Top-1 deferral policy of prior score-based methods as a special case, and we prove that our surrogate is both Bayes-consistent and $\\mathcal{H}$-consistent under mild assumptions. We further introduce an adaptive variant, Top-$k(x)$, which dynamically selects the number of consulted entities per input to balance predictive accuracy and consultation cost. Experiments on CIFAR-10 and SVHN confirm that our one-stage Top-$k$ method strictly outperforms Top-1 deferral, while Top-$k(x)$ achieves superior accuracy-cost trade-offs by tailoring allocations to input complexity."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:39.397810+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2505.10160"
+      }
+    ],
+    "citekey": "ref_e72c61a630b84230",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_5d1c00a2b3764ef3",
+    "record_revision": 2,
+    "title": "Two-Stage Learning to Defer with Multiple Experts",
+    "authors": [
+      "Anqi Mao",
+      "Christopher Mohri",
+      "Mehryar Mohri",
+      "Yutao Zhong"
+    ],
+    "year": 2023,
+    "doi": "10.52202/075280-0159",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W7133202358"
+    },
+    "abstract": "",
+    "urls": [
+      "https://doi.org/10.52202/075280-0159",
+      "https://doi.org/10.52202/075280-0159"
+    ],
+    "open_access_url": null,
+    "venue": "neural information processing systems",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "learning to defer multiple experts",
+        "raw_response_index": 0,
+        "item_index": 1,
+        "retrieved_at": "2026-10-25T05:32:30.924145+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:41.229153+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_5d1c00a2b3764ef3",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_507f20164bb14b56",
+    "record_revision": 2,
+    "title": "Principled Approaches for Learning to Defer with Multiple Experts",
+    "authors": [
+      "Anqi Mao",
+      "Mehryar Mohri",
+      "Yutao Zhong"
+    ],
+    "year": 2023,
+    "doi": null,
+    "arxiv_id": "2310.14774v2",
+    "source_ids": {
+      "arxiv": "2310.14774v2"
+    },
+    "abstract": "We present a study of surrogate losses and algorithms for the general problem of learning to defer with multiple experts. We first introduce a new family of surrogate losses specifically tailored for the multiple-expert setting, where the prediction and deferral functions are learned simultaneously. We then prove that these surrogate losses benefit from strong $H$-consistency bounds. We illustrate the application of our analysis through several examples of practical surrogate losses, for which we give explicit guarantees. These loss functions readily lead to the design of new learning to defer algorithms based on their minimization. While the main focus of this work is a theoretical analysis, we also report the results of several experiments on SVHN and CIFAR-10 datasets.",
+    "urls": [
+      "http://arxiv.org/abs/2310.14774v2"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2310.14774v2",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "learning to defer multiple experts",
+        "raw_response_index": 0,
+        "item_index": 1,
+        "retrieved_at": "2026-10-25T05:32:30.926107+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2310.14774v2",
+        "abstract": "We present a study of surrogate losses and algorithms for the general problem of learning to defer with multiple experts. We first introduce a new family of surrogate losses specifically tailored for the multiple-expert setting, where the prediction and deferral functions are learned simultaneously. We then prove that these surrogate losses benefit from strong $H$-consistency bounds. We illustrate the application of our analysis through several examples of practical surrogate losses, for which we give explicit guarantees. These loss functions readily lead to the design of new learning to defer algorithms based on their minimization. While the main focus of this work is a theoretical analysis, we also report the results of several experiments on SVHN and CIFAR-10 datasets."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:36.623874+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2310.14774"
+      }
+    ],
+    "citekey": "ref_507f20164bb14b56",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_be430d2253ed4bc2",
+    "record_revision": 3,
+    "title": "Learning to Defer to Multiple Experts: Consistent Surrogate Losses, Confidence Calibration, and Conformal Ensembles",
+    "authors": [
+      "Rajeev Verma",
+      "Daniel Barrejón",
+      "Eric Nalisnick"
+    ],
+    "year": 2022,
+    "doi": "10.48550/arxiv.2210.16955",
+    "arxiv_id": "2210.16955v2",
+    "source_ids": {
+      "openalex": "https://openalex.org/W4307931498",
+      "arxiv": "2210.16955v2"
+    },
+    "abstract": "We study the statistical properties of learning to defer (L2D) to multiple experts. In particular, we address the open problems of deriving a consistent surrogate loss, confidence calibration, and principled ensembling of experts. Firstly, we derive two consistent surrogates -- one based on a softmax parameterization, the other on a one-vs-all (OvA) parameterization -- that are analogous to the single expert losses proposed by Mozannar and Sontag (2020) and Verma and Nalisnick (2022), respectively. We then study the frameworks' ability to estimate P( m_j = y | x ), the probability that the jth expert will correctly predict the label for x. Theory shows the softmax-based loss causes mis-calibration to propagate between the estimates while the OvA-based loss does not (though in practice, we find there are trade offs). Lastly, we propose a conformal inference technique that chooses a subset of experts to query when the system defers. We perform empirical validation on tasks for galaxy, skin lesion, and hate speech classification.",
+    "urls": [
+      "http://arxiv.org/abs/2210.16955",
+      "https://doi.org/10.48550/arxiv.2210.16955",
+      "http://arxiv.org/abs/2210.16955v2"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2210.16955",
+    "venue": "arXiv (Cornell University)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "learning to defer multiple experts",
+        "raw_response_index": 0,
+        "item_index": 2,
+        "retrieved_at": "2026-10-25T05:32:30.924145+00:00"
+      },
+      {
+        "source": "arxiv",
+        "query": "learning to defer multiple experts",
+        "raw_response_index": 0,
+        "item_index": 4,
+        "retrieved_at": "2026-10-25T05:32:30.926107+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2210.16955v2",
+        "abstract": "We study the statistical properties of learning to defer (L2D) to multiple experts. In particular, we address the open problems of deriving a consistent surrogate loss, confidence calibration, and principled ensembling of experts. Firstly, we derive two consistent surrogates -- one based on a softmax parameterization, the other on a one-vs-all (OvA) parameterization -- that are analogous to the single expert losses proposed by Mozannar and Sontag (2020) and Verma and Nalisnick (2022), respectively. We then study the frameworks' ability to estimate P( m_j = y | x ), the probability that the jth expert will correctly predict the label for x. Theory shows the softmax-based loss causes mis-calibration to propagate between the estimates while the OvA-based loss does not (though in practice, we find there are trade offs). Lastly, we propose a conformal inference technique that chooses a subset of experts to query when the system defers. We perform empirical validation on tasks for galaxy, skin lesion, and hate speech classification."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:38.381596+00:00",
+        "detail": "Notice lookup unavailable: HTTP 404"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2210.16955"
+      }
+    ],
+    "citekey": "ref_be430d2253ed4bc2",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_1692c4d69990419c",
+    "record_revision": 2,
+    "title": "When More Experts Hurt: Underfitting in Multi-Expert Learning to Defer",
+    "authors": [
+      "Shuqi Liu",
+      "Yuzhou Cao",
+      "Lei Feng",
+      "Bo An",
+      "Luke Ong"
+    ],
+    "year": 2026,
+    "doi": null,
+    "arxiv_id": "2602.17144v1",
+    "source_ids": {
+      "arxiv": "2602.17144v1"
+    },
+    "abstract": "Learning to Defer (L2D) enables a classifier to abstain from predictions and defer to an expert, and has recently been extended to multi-expert settings. In this work, we show that multi-expert L2D is fundamentally more challenging than the single-expert case. With multiple experts, the classifier's underfitting becomes inherent, which seriously degrades prediction performance, whereas in the single-expert setting it arises only under specific conditions. We theoretically reveal that this stems from an intrinsic expert identifiability issue: learning which expert to trust from a diverse pool, a problem absent in the single-expert case and renders existing underfitting remedies failed. To tackle this issue, we propose PiCCE (Pick the Confident and Correct Expert), a surrogate-based method that adaptively identifies a reliable expert based on empirical evidence. PiCCE effectively reduces multi-expert L2D to a single-expert-like learning problem, thereby resolving multi expert underfitting. We further prove its statistical consistency and ability to recover class probabilities and expert accuracies. Extensive experiments across diverse settings, including real-world expert scenarios, validate our theoretical results and demonstrate improved performance.",
+    "urls": [
+      "http://arxiv.org/abs/2602.17144v1"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2602.17144v1",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "learning to defer multiple experts",
+        "raw_response_index": 0,
+        "item_index": 2,
+        "retrieved_at": "2026-10-25T05:32:30.926107+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2602.17144v1",
+        "abstract": "Learning to Defer (L2D) enables a classifier to abstain from predictions and defer to an expert, and has recently been extended to multi-expert settings. In this work, we show that multi-expert L2D is fundamentally more challenging than the single-expert case. With multiple experts, the classifier's underfitting becomes inherent, which seriously degrades prediction performance, whereas in the single-expert setting it arises only under specific conditions. We theoretically reveal that this stems from an intrinsic expert identifiability issue: learning which expert to trust from a diverse pool, a problem absent in the single-expert case and renders existing underfitting remedies failed. To tackle this issue, we propose PiCCE (Pick the Confident and Correct Expert), a surrogate-based method that adaptively identifies a reliable expert based on empirical evidence. PiCCE effectively reduces multi-expert L2D to a single-expert-like learning problem, thereby resolving multi expert underfitting. We further prove its statistical consistency and ability to recover class probabilities and expert accuracies. Extensive experiments across diverse settings, including real-world expert scenarios, validate our theoretical results and demonstrate improved performance."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:36.622874+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2602.17144"
+      }
+    ],
+    "citekey": "ref_1692c4d69990419c",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_105821379c8f4325",
+    "record_revision": 2,
+    "title": "Cost-Sensitive Learning to Defer to Multiple Experts with Workload Constraints",
+    "authors": [
+      "Jean V. Alves",
+      "Diogo Leitão",
+      "Jesus, Sérgio",
+      "Marco O. P. Sampaio",
+      "Javier Liébana",
+      "Pedro Saleiro",
+      "Mário A. T. Figueiredo",
+      "Pedro Bizarro"
+    ],
+    "year": 2024,
+    "doi": "10.48550/arxiv.2403.06906",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W4392737484"
+    },
+    "abstract": "Learning to defer (L2D) aims to improve human-AI collaboration systems by learning how to defer decisions to humans when they are more likely to be correct than an ML classifier. Existing research in L2D overlooks key real-world aspects that impede its practical adoption, namely: i) neglecting cost-sensitive scenarios, where type I and type II errors have different costs; ii) requiring concurrent human predictions for every instance of the training dataset; and iii) not dealing with human work-capacity constraints. To address these issues, we propose the \\textit{deferral under cost and capacity constraints framework} (DeCCaF). DeCCaF is a novel L2D approach, employing supervised learning to model the probability of human error under less restrictive data requirements (only one expert prediction per instance) and using constraint programming to globally minimize the error cost, subject to workload limitations. We test DeCCaF in a series of cost-sensitive fraud detection scenarios with different teams of 9 synthetic fraud analysts, with individual work-capacity constraints. The results demonstrate that our approach performs significantly better than the baselines in a wide array of scenarios, achieving an average $8.4\\%$ reduction in the misclassification cost. The code used for the experiments is available at https://github.com/feedzai/deccaf",
+    "urls": [
+      "http://arxiv.org/abs/2403.06906",
+      "https://doi.org/10.48550/arxiv.2403.06906"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2403.06906",
+    "venue": "arXiv (Cornell University)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "learning to defer multiple experts",
+        "raw_response_index": 0,
+        "item_index": 3,
+        "retrieved_at": "2026-10-25T05:32:30.924145+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:37.492336+00:00",
+        "detail": "Notice lookup unavailable: HTTP 404"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_105821379c8f4325",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_f99964e2e53d477c",
+    "record_revision": 2,
+    "title": "Active Learning in Incomplete Label Multiple Instance Multiple Label Learning",
+    "authors": [
+      "Tam Nguyen",
+      "Raviv Raich"
+    ],
+    "year": 2021,
+    "doi": null,
+    "arxiv_id": "2107.10804v2",
+    "source_ids": {
+      "arxiv": "2107.10804v2"
+    },
+    "abstract": "In multiple instance multiple label learning, each sample, a bag, consists of multiple instances. To alleviate labeling complexity, each sample is associated with a set of bag-level labels leaving instances within the bag unlabeled. This setting is more convenient and natural for representing complicated objects, which have multiple semantic meanings. Compared to single instance labeling, this approach allows for labeling larger datasets at an equivalent labeling cost. However, for sufficiently large datasets, labeling all bags may become prohibitively costly. Active learning uses an iterative labeling and retraining approach aiming to provide reasonable classification performance using a small number of labeled samples. To our knowledge, only a few works in the area of active learning in the MIML setting are available. These approaches can provide practical solutions to reduce labeling cost but their efficacy remains unclear. In this paper, we propose a novel bag-class pair based approach for active learning in the MIML setting. Due to the partial availability of bag-level labels, we focus on the incomplete-label MIML setting for the proposed active learning approach. Our approach is based on a discriminative graphical model with efficient and exact inference. For the query process, we adapt active learning criteria to the novel bag-class pair selection strategy. Additionally, we introduce an online stochastic gradient descent algorithm to provide an efficient model update after each query. Numerical experiments on benchmark datasets illustrate the robustness of the proposed approach.",
+    "urls": [
+      "http://arxiv.org/abs/2107.10804v2"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2107.10804v2",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "learning to defer multiple experts",
+        "raw_response_index": 0,
+        "item_index": 3,
+        "retrieved_at": "2026-10-25T05:32:30.926107+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2107.10804v2",
+        "abstract": "In multiple instance multiple label learning, each sample, a bag, consists of multiple instances. To alleviate labeling complexity, each sample is associated with a set of bag-level labels leaving instances within the bag unlabeled. This setting is more convenient and natural for representing complicated objects, which have multiple semantic meanings. Compared to single instance labeling, this approach allows for labeling larger datasets at an equivalent labeling cost. However, for sufficiently large datasets, labeling all bags may become prohibitively costly. Active learning uses an iterative labeling and retraining approach aiming to provide reasonable classification performance using a small number of labeled samples. To our knowledge, only a few works in the area of active learning in the MIML setting are available. These approaches can provide practical solutions to reduce labeling cost but their efficacy remains unclear. In this paper, we propose a novel bag-class pair based approach for active learning in the MIML setting. Due to the partial availability of bag-level labels, we focus on the incomplete-label MIML setting for the proposed active learning approach. Our approach is based on a discriminative graphical model with efficient and exact inference. For the query process, we adapt active learning criteria to the novel bag-class pair selection strategy. Additionally, we introduce an online stochastic gradient descent algorithm to provide an efficient model update after each query. Numerical experiments on benchmark datasets illustrate the robustness of the proposed approach."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:39.398838+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2107.10804"
+      }
+    ],
+    "citekey": "ref_f99964e2e53d477c",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_e414bed331054547",
+    "record_revision": 2,
+    "title": "No Need for Learning to Defer? A Training Free Deferral Framework to Multiple Experts through Conformal Prediction",
+    "authors": [
+      "Tim Bary",
+      "Benoit M. M. Macq",
+      "Petit, Louis"
+    ],
+    "year": 2025,
+    "doi": "10.48550/arxiv.2509.12573",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W4415316201"
+    },
+    "abstract": "AI systems often struggle to provide reliable predictions across all inputs, motivating hybrid human-AI decision-making. Existing Learning to Defer (L2D) approaches address this by training models to selectively defer to human experts. However, these approaches require extensive training data annotated by all experts and are sensitive to changes in expert composition, necessitating costly retraining. We propose a training-free, model- and expert-agnostic framework for expert deferral based on conformal prediction. Our method leverages prediction sets from a conformal predictor to quantify label-specific uncertainty and selects the most suitable expert using a segregativity criterion, which measures how well an expert discriminates among plausible labels. Experiments across three models on CIFAR10-H and HAM10000 demonstrate that our method can reduce the number of training labels per expert by up to 91.3% while maintaining predictive accuracy in low-data regimes. Being training-free, it also reduces training time by two orders of magnitude, offering a scalable, alternative to L2D for real-world human-AI collaboration.",
+    "urls": [
+      "http://arxiv.org/abs/2509.12573",
+      "https://doi.org/10.48550/arxiv.2509.12573"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2509.12573",
+    "venue": "arXiv (Cornell University)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "learning to defer multiple experts",
+        "raw_response_index": 0,
+        "item_index": 4,
+        "retrieved_at": "2026-10-25T05:32:30.924145+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:39.397241+00:00",
+        "detail": "Notice lookup unavailable: HTTP 404"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_e414bed331054547",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_581e8df27e6743e5",
+    "record_revision": 3,
+    "title": "Mastering Multiple-Expert Routing: Realizable $H$-Consistency and Strong Guarantees for Learning to Defer",
+    "authors": [
+      "Anqi Mao",
+      "Mehryar Mohri",
+      "Yutao Zhong"
+    ],
+    "year": 2025,
+    "doi": "10.48550/arxiv.2506.20650",
+    "arxiv_id": "2506.20650v2",
+    "source_ids": {
+      "openalex": "https://openalex.org/W4414989999",
+      "arxiv": "2506.20650v2"
+    },
+    "abstract": "The problem of learning to defer with multiple experts consists of optimally assigning input instances to experts, balancing the trade-off between their accuracy and computational cost. This is a critical challenge in natural language generation, but also in other fields such as image processing, and medical diagnostics. Recent studies have proposed surrogate loss functions to optimize deferral, but challenges remain in ensuring their consistency properties. This paper introduces novel surrogate loss functions and efficient algorithms with strong theoretical learning guarantees. We address open questions regarding realizable $H$-consistency, $H$-consistency bounds, and Bayes-consistency for both single-stage (jointly learning predictor and deferral function) and two-stage (learning only the deferral function with a fixed expert) learning scenarios. For single-stage deferral, we introduce a family of new realizable $H$-consistent surrogate losses and further prove $H$-consistency for a selected member. For two-stage deferral, we derive new surrogate losses that achieve realizable $H$-consistency, $H$-consistency bounds, and Bayes-consistency for the two-expert scenario and, under natural assumptions, multiple-expert scenario. Additionally, we provide enhanced theoretical guarantees under low-noise assumptions for both scenarios. Finally, we report the results of experiments using our proposed surrogate losses, comparing their performance against existing baselines.",
+    "urls": [
+      "http://arxiv.org/abs/2506.20650",
+      "https://doi.org/10.48550/arxiv.2506.20650",
+      "http://arxiv.org/abs/2506.20650v2"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2506.20650",
+    "venue": "arXiv (Cornell University)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "learning to defer multiple experts",
+        "raw_response_index": 0,
+        "item_index": 5,
+        "retrieved_at": "2026-10-25T05:32:30.924145+00:00"
+      },
+      {
+        "source": "arxiv",
+        "query": "learning to defer multiple experts",
+        "raw_response_index": 0,
+        "item_index": 6,
+        "retrieved_at": "2026-10-25T05:32:30.926107+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2506.20650v2",
+        "abstract": "The problem of learning to defer with multiple experts consists of optimally assigning input instances to experts, balancing the trade-off between their accuracy and computational cost. This is a critical challenge in natural language generation, but also in other fields such as image processing, and medical diagnostics. Recent studies have proposed surrogate loss functions to optimize deferral, but challenges remain in ensuring their consistency properties. This paper introduces novel surrogate loss functions and efficient algorithms with strong theoretical learning guarantees. We address open questions regarding realizable $H$-consistency, $H$-consistency bounds, and Bayes-consistency for both single-stage (jointly learning predictor and deferral function) and two-stage (learning only the deferral function with a fixed expert) learning scenarios. For single-stage deferral, we introduce a family of new realizable $H$-consistent surrogate losses and further prove $H$-consistency for a selected member. For two-stage deferral, we derive new surrogate losses that achieve realizable $H$-consistency, $H$-consistency bounds, and Bayes-consistency for the two-expert scenario and, under natural assumptions, multiple-expert scenario. Additionally, we provide enhanced theoretical guarantees under low-noise assumptions for both scenarios. Finally, we report the results of experiments using our proposed surrogate losses, comparing their performance against existing baselines."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:37.462549+00:00",
+        "detail": "Notice lookup unavailable: HTTP 404"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2506.20650"
+      }
+    ],
+    "citekey": "ref_581e8df27e6743e5",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_605fef2b6e784a33",
+    "record_revision": 2,
+    "title": "Learning to Defer with Limited Expert Predictions",
+    "authors": [
+      "Patrick Hemmer",
+      "Lukas Thede",
+      "Michael Vössing",
+      "Johannes Jakubik",
+      "Niklas Kühl"
+    ],
+    "year": 2023,
+    "doi": null,
+    "arxiv_id": "2304.07306v1",
+    "source_ids": {
+      "arxiv": "2304.07306v1"
+    },
+    "abstract": "Recent research suggests that combining AI models with a human expert can exceed the performance of either alone. The combination of their capabilities is often realized by learning to defer algorithms that enable the AI to learn to decide whether to make a prediction for a particular instance or defer it to the human expert. However, to accurately learn which instances should be deferred to the human expert, a large number of expert predictions that accurately reflect the expert's capabilities are required -- in addition to the ground truth labels needed to train the AI. This requirement shared by many learning to defer algorithms hinders their adoption in scenarios where the responsible expert regularly changes or where acquiring a sufficient number of expert predictions is costly. In this paper, we propose a three-step approach to reduce the number of expert predictions required to train learning to defer algorithms. It encompasses (1) the training of an embedding model with ground truth labels to generate feature representations that serve as a basis for (2) the training of an expertise predictor model to approximate the expert's capabilities. (3) The expertise predictor generates artificial expert predictions for instances not yet labeled by the expert, which are required by the learning to defer algorithms. We evaluate our approach on two public datasets. One with \"synthetically\" generated human experts and another from the medical domain containing real-world radiologists' predictions. Our experiments show that the approach allows the training of various learning to defer algorithms with a minimal number of human expert predictions. Furthermore, we demonstrate that even a small number of expert predictions per class is sufficient for these algorithms to exceed the performance the AI and the human expert can achieve individually.",
+    "urls": [
+      "http://arxiv.org/abs/2304.07306v1"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2304.07306v1",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "learning to defer multiple experts",
+        "raw_response_index": 0,
+        "item_index": 5,
+        "retrieved_at": "2026-10-25T05:32:30.926107+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2304.07306v1",
+        "abstract": "Recent research suggests that combining AI models with a human expert can exceed the performance of either alone. The combination of their capabilities is often realized by learning to defer algorithms that enable the AI to learn to decide whether to make a prediction for a particular instance or defer it to the human expert. However, to accurately learn which instances should be deferred to the human expert, a large number of expert predictions that accurately reflect the expert's capabilities are required -- in addition to the ground truth labels needed to train the AI. This requirement shared by many learning to defer algorithms hinders their adoption in scenarios where the responsible expert regularly changes or where acquiring a sufficient number of expert predictions is costly. In this paper, we propose a three-step approach to reduce the number of expert predictions required to train learning to defer algorithms. It encompasses (1) the training of an embedding model with ground truth labels to generate feature representations that serve as a basis for (2) the training of an expertise predictor model to approximate the expert's capabilities. (3) The expertise predictor generates artificial expert predictions for instances not yet labeled by the expert, which are required by the learning to defer algorithms. We evaluate our approach on two public datasets. One with \"synthetically\" generated human experts and another from the medical domain containing real-world radiologists' predictions. Our experiments show that the approach allows the training of various learning to defer algorithms with a minimal number of human expert predictions. Furthermore, we demonstrate that even a small number of expert predictions per class is sufficient for these algorithms to exceed the performance the AI and the human expert can achieve individually."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:37.493670+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2304.07306"
+      }
+    ],
+    "citekey": "ref_605fef2b6e784a33",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_e6c7d8e0cd124d6c",
+    "record_revision": 2,
+    "title": "How can humans leverage machine learning? From Medical Data Wrangling to Learning to Defer to Multiple Experts",
+    "authors": [
+      "Daniel Barrejón",
+      "Pablo M. Olmos",
+      "Antonio Artés-Rodrı́guez"
+    ],
+    "year": 2021,
+    "doi": "10.1109/jbhi.2021.3123839",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W3211041519"
+    },
+    "abstract": "Medical data sets are usually corrupted by noise and missing data. These missing patterns are commonly assumed to be completely random, but in medical scenarios, the reality is that these patterns occur in bursts due to sensors that are off for some time or data collected in a misaligned uneven fashion, among other causes. This paper proposes to model medical data records with heterogeneous data types and bursty missing data using sequential variational autoencoders (VAEs). In particular, we propose a new methodology, the Shi-VAE, which extends the capabilities of VAEs to sequential streams of data with missing observations. We compare our model against state-of-the-art solutions in an intensive care unit database (ICU) and a dataset of passive human monitoring. Furthermore, we find that standard error metrics such as RMSE are not conclusive enough to assess temporal models and include in our analysis the cross-correlation between the ground truth and the imputed signal. We show that Shi-VAE achieves the best performance in terms of using both metrics, with lower computational complexity than the GP-VAE model, which is the state-of-the-art method for medical records.",
+    "urls": [
+      "http://arxiv.org/abs/2103.07206",
+      "https://doi.org/10.1109/jbhi.2021.3123839"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2103.07206",
+    "venue": "arXiv (Cornell University)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "learning to defer multiple experts",
+        "raw_response_index": 0,
+        "item_index": 6,
+        "retrieved_at": "2026-10-25T05:32:30.924145+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:41.164980+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_e6c7d8e0cd124d6c",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_c034d147ef88411d",
+    "record_revision": 2,
+    "title": "Consistent Estimators for Learning to Defer to an Expert",
+    "authors": [
+      "Hussein Mozannar",
+      "David Alexander Sontag"
+    ],
+    "year": 2020,
+    "doi": "10.48550/arxiv.2006.01862",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W3033575144"
+    },
+    "abstract": "Learning algorithms are often used in conjunction with expert decision makers in practical scenarios, however this fact is largely ignored when designing these algorithms. In this paper we explore how to learn predictors that can either predict or choose to defer the decision to a downstream expert. Given only samples of the expert's decisions, we give a procedure based on learning a classifier and a rejector and analyze it theoretically. Our approach is based on a novel reduction to cost sensitive learning where we give a consistent surrogate loss for cost sensitive learning that generalizes the cross entropy loss. We show the effectiveness of our approach on a variety of experimental tasks.",
+    "urls": [
+      "http://arxiv.org/abs/2006.01862",
+      "https://doi.org/10.48550/arxiv.2006.01862"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2006.01862",
+    "venue": "arXiv (Cornell University)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "learning to defer multiple experts",
+        "raw_response_index": 0,
+        "item_index": 7,
+        "retrieved_at": "2026-10-25T05:32:30.924145+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:39.323469+00:00",
+        "detail": "Notice lookup unavailable: HTTP 404"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_c034d147ef88411d",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_e9b080b4776e4c6a",
+    "record_revision": 2,
+    "title": "To Defer or Not to Defer? Online Learning with LLMs and Congested Experts",
+    "authors": [
+      "Vasileios Saketos",
+      "William Reveillard",
+      "Alexandre Proutiere",
+      "Sebastian Dalleiger",
+      "Ming Xiao"
+    ],
+    "year": 2026,
+    "doi": null,
+    "arxiv_id": "2610.15128v1",
+    "source_ids": {
+      "arxiv": "2610.15128v1"
+    },
+    "abstract": "Modern AI systems increasingly combine large language models (LLMs) with human experts, using the LLM to handle routine queries while deferring uncertain cases for expert review. When expert capacity is limited, however, deferral decisions must account not only for the reliability of the LLM but also for congestion in the expert queue. We formulate this as an online sequential decision-making problem in which, for each query, the system observes the confidence signal of the LLM's answer and must decide whether to output the answer or defer the query to a capacity-constrained expert. The reliability of the confidence signal is initially unknown and must be learned from expert feedback, which is both selectively observed (only deferred queries are labeled) and delayed by queuing. We propose \\texttt{KL-PBD}, a learning algorithm that uses Kullback--Leibler lower confidence bounds on the unknown reliability parameters to guide deferral decisions. For $K$ confidence levels and horizon $T$, \\texttt{KL-PBD} achieves $O(K\\log T)$ gap-dependent regret when the accuracy at every confidence level is bounded away from the deferral boundary, and $\\widetilde{O}(\\sqrt{KT})$ worst-case regret. We establish matching lower bounds, showing that these rates are optimal up to logarithmic factors. Finally, we validate our approach on synthetic instances and real-world question-answering datasets, namely GSM8K, NuminaMath, and MedMCQA, using Qwen LLMs.",
+    "urls": [
+      "http://arxiv.org/abs/2610.15128v1"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2610.15128v1",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "learning to defer multiple experts",
+        "raw_response_index": 0,
+        "item_index": 7,
+        "retrieved_at": "2026-10-25T05:32:30.926107+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2610.15128v1",
+        "abstract": "Modern AI systems increasingly combine large language models (LLMs) with human experts, using the LLM to handle routine queries while deferring uncertain cases for expert review. When expert capacity is limited, however, deferral decisions must account not only for the reliability of the LLM but also for congestion in the expert queue. We formulate this as an online sequential decision-making problem in which, for each query, the system observes the confidence signal of the LLM's answer and must decide whether to output the answer or defer the query to a capacity-constrained expert. The reliability of the confidence signal is initially unknown and must be learned from expert feedback, which is both selectively observed (only deferred queries are labeled) and delayed by queuing. We propose \\texttt{KL-PBD}, a learning algorithm that uses Kullback--Leibler lower confidence bounds on the unknown reliability parameters to guide deferral decisions. For $K$ confidence levels and horizon $T$, \\texttt{KL-PBD} achieves $O(K\\log T)$ gap-dependent regret when the accuracy at every confidence level is bounded away from the deferral boundary, and $\\widetilde{O}(\\sqrt{KT})$ worst-case regret. We establish matching lower bounds, showing that these rates are optimal up to logarithmic factors. Finally, we validate our approach on synthetic instances and real-world question-answering datasets, namely GSM8K, NuminaMath, and MedMCQA, using Qwen LLMs."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:39.397810+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2610.15128"
+      }
+    ],
+    "citekey": "ref_e9b080b4776e4c6a",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_0e24982aebd04673",
+    "record_revision": 2,
+    "title": "CT-PromptSAM: Collaborative Prompting With Hybrid CNN–Transformer for Remote Sensing Semantic Segmentation",
+    "authors": [
+      "Xin Wang",
+      "Bei Li",
+      "Li Li"
+    ],
+    "year": 2025,
+    "doi": "10.1109/lgrs.2025.3612187",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W4414348485"
+    },
+    "abstract": "Remote sensing (RS) semantic segmentation (SS) faces critical challenges in small-object detection and boundary precision due to scale variation and complex scenes. This letter proposes CT-PromptSAM, a specialist-generalist framework integrating a CNN-Transformer specialist network and a SAM-adaptive generalist network. The specialist network employs a tandem-encoder for local-global feature fusion, coupled with three decoder modules: Up-sampling Feature Refinement Module (UFRM), Multi-scale Feature Interaction Module (MFIM), and Mutual-guided Semantic-Spatial Attention Module (MSSAM), to generate task-adaptive masks for small-class enhancement. The generalist network adapts Segment Anything Model (SAM) to RS via multi-modal prompts, forming a “local-global-boundary” collaborative loop for boundary refinement. On Vaihingen and Potsdam datasets, CT-PromptSAM achieves state-of-the-art small-class IoU and mean Boundary F1-score, outperforming competitors with comparable parameter efficiency. By fusing RS-specific semantic priors (from the specialist) and SAM’s geometric precision (from the generalist), the framework balances small-object and boundary tasks, validating its efficacy in complex RS scenes. Our code is publicly available at: https://github.com/WangXin81/CT-PromptSAM/.",
+    "urls": [
+      "https://doi.org/10.1109/lgrs.2025.3612187",
+      "https://doi.org/10.1109/lgrs.2025.3612187"
+    ],
+    "open_access_url": null,
+    "venue": "IEEE Geoscience and Remote Sensing Letters",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 0,
+        "retrieved_at": "2026-10-25T05:32:41.559660+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:50.783926+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_0e24982aebd04673",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_6572d29cec464414",
+    "record_revision": 2,
+    "title": "Balancing Multi-Target Semi-Supervised Medical Image Segmentation with Collaborative Generalist and Specialists",
+    "authors": [
+      "You Wang",
+      "Zekun Li",
+      "Lei Qi",
+      "Qian Yu",
+      "Yinghuan Shi",
+      "Yang Gao"
+    ],
+    "year": 2025,
+    "doi": null,
+    "arxiv_id": "2504.00862v1",
+    "source_ids": {
+      "arxiv": "2504.00862v1"
+    },
+    "abstract": "Despite the promising performance achieved by current semi-supervised models in segmenting individual medical targets, many of these models suffer a notable decrease in performance when tasked with the simultaneous segmentation of multiple targets. A vital factor could be attributed to the imbalanced scales among different targets: during simultaneously segmenting multiple targets, large targets dominate the loss, leading to small targets being misclassified as larger ones. To this end, we propose a novel method, which consists of a Collaborative Generalist and several Specialists, termed CGS. It is centered around the idea of employing a specialist for each target class, thus avoiding the dominance of larger targets. The generalist performs conventional multi-target segmentation, while each specialist is dedicated to distinguishing a specific target class from the remaining target classes and the background. Based on a theoretical insight, we demonstrate that CGS can achieve a more balanced training. Moreover, we develop cross-consistency losses to foster collaborative learning between the generalist and the specialists. Lastly, regarding their intrinsic relation that the target class of any specialized head should belong to the remaining classes of the other heads, we introduce an inter-head error detection module to further enhance the quality of pseudo-labels. Experimental results on three popular benchmarks showcase its superior performance compared to state-of-the-art methods.",
+    "urls": [
+      "http://arxiv.org/abs/2504.00862v1"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2504.00862v1",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 0,
+        "retrieved_at": "2026-10-25T05:32:41.560659+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2504.00862v1",
+        "abstract": "Despite the promising performance achieved by current semi-supervised models in segmenting individual medical targets, many of these models suffer a notable decrease in performance when tasked with the simultaneous segmentation of multiple targets. A vital factor could be attributed to the imbalanced scales among different targets: during simultaneously segmenting multiple targets, large targets dominate the loss, leading to small targets being misclassified as larger ones. To this end, we propose a novel method, which consists of a Collaborative Generalist and several Specialists, termed CGS. It is centered around the idea of employing a specialist for each target class, thus avoiding the dominance of larger targets. The generalist performs conventional multi-target segmentation, while each specialist is dedicated to distinguishing a specific target class from the remaining target classes and the background. Based on a theoretical insight, we demonstrate that CGS can achieve a more balanced training. Moreover, we develop cross-consistency losses to foster collaborative learning between the generalist and the specialists. Lastly, regarding their intrinsic relation that the target class of any specialized head should belong to the remaining classes of the other heads, we introduce an inter-head error detection module to further enhance the quality of pseudo-labels. Experimental results on three popular benchmarks showcase its superior performance compared to state-of-the-art methods."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:47.118738+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2504.00862"
+      }
+    ],
+    "citekey": "ref_6572d29cec464414",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_c2157cbf6af043e4",
+    "record_revision": 2,
+    "title": "SemiSAM-O1: Pushing the Boundary of Annotation-Efficient Medical Image Segmentation with Generalist Knowledge Fusion",
+    "authors": [
+      "Yichi Zhang",
+      "Le Xue",
+      "Bichun Xu",
+      "Judong Luo",
+      "Zhigang Wu",
+      "Yu Fu",
+      "Zixin Hu",
+      "Yuan Cheng",
+      "Yuan Qi"
+    ],
+    "year": 2026,
+    "doi": "10.48550/arxiv.2604.24109",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W7157005737"
+    },
+    "abstract": "Semi-supervised learning (SSL) has become a promising solution to alleviate the annotation burden of deep learning-based medical image segmentation models. While recent advances in foundation model-driven SSL have pushed the boundary to extremely limited annotation scenarios, they fail to maintain robust competitive performance in complex imaging modalities. In this paper, we propose SemiSAM-O1, an annotation-efficient framework using only one annotated template case for segmentation. SemiSAM-O1 extends the specialist-generalist collaborative learning framework to the extreme one-label setting by fully exploiting the foundation model's feature representation capability beyond its prompting interface. SemiSAM-O1 operates in two stages. In the first stage, the foundation model's encoder extracts dense features from all volumes, and class prototypes derived from the single annotated template are propagated to the unlabeled pool via feature similarity to produce coarse initial pseudo-labels. In the second stage, an iterative training-and-refinement loop progressively improves both the segmentation model and the pseudo-labels over multiple rounds, where each round trains the model from scratch on current pseudo-labels and generates updated predictions with voxel-wise uncertainty estimates. An uncertainty-guided refinement step further leverages the foundation model's global feature space to correct high-uncertainty regions by aggregating labels from their most similar confident neighbors, establishing a virtuous cycle of mutual improvement. Extensive experiments on a wide range of segmentation tasks across different modalities and anatomical targets demonstrate that SemiSAM-O1 significantly narrows the performance gap between one-label semi-supervised learning and full supervision, while significantly reducing the computational overhead of online foundation model inference.",
+    "urls": [
+      "https://arxiv.org/abs/2604.24109",
+      "https://doi.org/10.48550/arxiv.2604.24109"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2604.24109",
+    "venue": "arXiv (Cornell University)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 1,
+        "retrieved_at": "2026-10-25T05:32:41.559660+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:50.795705+00:00",
+        "detail": "Notice lookup unavailable: HTTP 404"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_c2157cbf6af043e4",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_aeac6ec0026e412b",
+    "record_revision": 2,
+    "title": "GSCo: Towards Generalizable AI in Medicine via Generalist-Specialist Collaboration",
+    "authors": [
+      "Sunan He",
+      "Yuxiang Nie",
+      "Hongmei Wang",
+      "Shu Yang",
+      "Yihui Wang",
+      "Zhiyuan Cai",
+      "Zhixuan Chen",
+      "Yingxue Xu",
+      "Luyang Luo",
+      "Huiling Xiang",
+      "Xi Lin",
+      "Mingxiang Wu",
+      "Yifan Peng",
+      "George Shih",
+      "Ziyang Xu",
+      "Xian Wu",
+      "Qiong Wang",
+      "Ronald Cheong Kin Chan",
+      "Varut Vardhanabhuti",
+      "Winnie Chiu Wing Chu",
+      "Yefeng Zheng",
+      "Pranav Rajpurkar",
+      "Kang Zhang",
+      "Hao Chen"
+    ],
+    "year": 2024,
+    "doi": null,
+    "arxiv_id": "2404.15127v2",
+    "source_ids": {
+      "arxiv": "2404.15127v2"
+    },
+    "abstract": "Generalist foundation models (GFMs) are renowned for their exceptional capability and flexibility in effectively generalizing across diverse tasks and modalities. In the field of medicine, while GFMs exhibit superior generalizability based on their extensive intrinsic knowledge as well as proficiency in instruction following and in-context learning, specialist models excel in precision due to their domain knowledge. In this work, for the first time, we explore the synergy between the GFM and specialist models, to enable precise medical image analysis on a broader scope. Specifically, we propose a cooperative framework, Generalist-Specialist Collaboration (GSCo), which consists of two stages, namely the construction of GFM and specialists, and collaborative inference on downstream tasks. In the construction stage, we develop MedDr, the largest open-source GFM tailored for medicine, showcasing exceptional instruction-following and in-context learning capabilities. Meanwhile, a series of lightweight specialists are crafted for downstream tasks with low computational cost. In the collaborative inference stage, we introduce two cooperative mechanisms, Mixture-of-Expert Diagnosis and Retrieval-Augmented Diagnosis, to harvest the generalist's in-context learning abilities alongside the specialists' domain expertise. For a comprehensive evaluation, we curate a large-scale benchmark featuring 28 datasets and about 250,000 images. Extensive results demonstrate that MedDr consistently outperforms state-of-the-art GFMs on downstream datasets. Furthermore, GSCo exceeds both GFMs and specialists across all out-of-domain disease diagnosis datasets. These findings indicate a significant paradigm shift in the application of GFMs, transitioning from separate models for specific tasks to a collaborative approach between GFMs and specialists, thereby advancing the frontiers of generalizable AI in medicine.",
+    "urls": [
+      "http://arxiv.org/abs/2404.15127v2"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2404.15127v2",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 1,
+        "retrieved_at": "2026-10-25T05:32:41.560659+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2404.15127v2",
+        "abstract": "Generalist foundation models (GFMs) are renowned for their exceptional capability and flexibility in effectively generalizing across diverse tasks and modalities. In the field of medicine, while GFMs exhibit superior generalizability based on their extensive intrinsic knowledge as well as proficiency in instruction following and in-context learning, specialist models excel in precision due to their domain knowledge. In this work, for the first time, we explore the synergy between the GFM and specialist models, to enable precise medical image analysis on a broader scope. Specifically, we propose a cooperative framework, Generalist-Specialist Collaboration (GSCo), which consists of two stages, namely the construction of GFM and specialists, and collaborative inference on downstream tasks. In the construction stage, we develop MedDr, the largest open-source GFM tailored for medicine, showcasing exceptional instruction-following and in-context learning capabilities. Meanwhile, a series of lightweight specialists are crafted for downstream tasks with low computational cost. In the collaborative inference stage, we introduce two cooperative mechanisms, Mixture-of-Expert Diagnosis and Retrieval-Augmented Diagnosis, to harvest the generalist's in-context learning abilities alongside the specialists' domain expertise. For a comprehensive evaluation, we curate a large-scale benchmark featuring 28 datasets and about 250,000 images. Extensive results demonstrate that MedDr consistently outperforms state-of-the-art GFMs on downstream datasets. Furthermore, GSCo exceeds both GFMs and specialists across all out-of-domain disease diagnosis datasets. These findings indicate a significant paradigm shift in the application of GFMs, transitioning from separate models for specific tasks to a collaborative approach between GFMs and specialists, thereby advancing the frontiers of generalizable AI in medicine."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:49.808669+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2404.15127"
+      }
+    ],
+    "citekey": "ref_aeac6ec0026e412b",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_96e458ab969142c9",
+    "record_revision": 2,
+    "title": "EoS-FM: Can an Ensemble of Specialist Models Act as a Generalist Feature Extractor?",
+    "authors": [
+      "Pierre Adorni",
+      "Minh‐Tan Pham",
+      "Stéphane May",
+      "Sébastien Lefèvre"
+    ],
+    "year": 2026,
+    "doi": "10.1007/978-3-032-37624-4_28",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W4416790924"
+    },
+    "abstract": "",
+    "urls": [
+      "https://doi.org/10.1007/978-3-032-37624-4_28",
+      "https://doi.org/10.1007/978-3-032-37624-4_28"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2511.21523",
+    "venue": "Lecture notes in computer science",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 2,
+        "retrieved_at": "2026-10-25T05:32:41.559660+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:48.950072+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_96e458ab969142c9",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_4b1580cb4184427e",
+    "record_revision": 2,
+    "title": "An Open Natural Language Processing Development Framework for EHR-based Clinical Research: A case demonstration using the National COVID Cohort Collaborative (N3C)",
+    "authors": [
+      "Sijia Liu",
+      "Andrew Wen",
+      "Liwei Wang",
+      "Huan He",
+      "Sunyang Fu",
+      "Robert Miller",
+      "Andrew Williams",
+      "Daniel Harris",
+      "Ramakanth Kavuluru",
+      "Mei Liu",
+      "Noor Abu-el-rub",
+      "Dalton Schutte",
+      "Rui Zhang",
+      "Masoud Rouhizadeh",
+      "John D. Osborne",
+      "Yongqun He",
+      "Umit Topaloglu",
+      "Stephanie S Hong",
+      "Joel H Saltz",
+      "Thomas Schaffter",
+      "Emily Pfaff",
+      "Christopher G. Chute",
+      "Tim Duong",
+      "Melissa A. Haendel",
+      "Rafael Fuentes",
+      "Peter Szolovits",
+      "Hua Xu",
+      "Hongfang Liu",
+      "National COVID Cohort Collaborative",
+      "Natural Language Processing",
+      "Subgroup",
+      "National COVID Cohort Collaborative"
+    ],
+    "year": 2021,
+    "doi": null,
+    "arxiv_id": "2110.10780v3",
+    "source_ids": {
+      "arxiv": "2110.10780v3"
+    },
+    "abstract": "While we pay attention to the latest advances in clinical natural language processing (NLP), we can notice some resistance in the clinical and translational research community to adopt NLP models due to limited transparency, interpretability, and usability. In this study, we proposed an open natural language processing development framework. We evaluated it through the implementation of NLP algorithms for the National COVID Cohort Collaborative (N3C). Based on the interests in information extraction from COVID-19 related clinical notes, our work includes 1) an open data annotation process using COVID-19 signs and symptoms as the use case, 2) a community-driven ruleset composing platform, and 3) a synthetic text data generation workflow to generate texts for information extraction tasks without involving human subjects. The corpora were derived from texts from three different institutions (Mayo Clinic, University of Kentucky, University of Minnesota). The gold standard annotations were tested with a single institution's (Mayo) ruleset. This resulted in performances of 0.876, 0.706, and 0.694 in F-scores for Mayo, Minnesota, and Kentucky test datasets, respectively. The study as a consortium effort of the N3C NLP subgroup demonstrates the feasibility of creating a federated NLP algorithm development and benchmarking platform to enhance multi-institution clinical NLP study and adoption. Although we use COVID-19 as a use case in this effort, our framework is general enough to be applied to other domains of interest in clinical NLP.",
+    "urls": [
+      "http://arxiv.org/abs/2110.10780v3"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2110.10780v3",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 2,
+        "retrieved_at": "2026-10-25T05:32:41.560659+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2110.10780v3",
+        "abstract": "While we pay attention to the latest advances in clinical natural language processing (NLP), we can notice some resistance in the clinical and translational research community to adopt NLP models due to limited transparency, interpretability, and usability. In this study, we proposed an open natural language processing development framework. We evaluated it through the implementation of NLP algorithms for the National COVID Cohort Collaborative (N3C). Based on the interests in information extraction from COVID-19 related clinical notes, our work includes 1) an open data annotation process using COVID-19 signs and symptoms as the use case, 2) a community-driven ruleset composing platform, and 3) a synthetic text data generation workflow to generate texts for information extraction tasks without involving human subjects. The corpora were derived from texts from three different institutions (Mayo Clinic, University of Kentucky, University of Minnesota). The gold standard annotations were tested with a single institution's (Mayo) ruleset. This resulted in performances of 0.876, 0.706, and 0.694 in F-scores for Mayo, Minnesota, and Kentucky test datasets, respectively. The study as a consortium effort of the N3C NLP subgroup demonstrates the feasibility of creating a federated NLP algorithm development and benchmarking platform to enhance multi-institution clinical NLP study and adoption. Although we use COVID-19 as a use case in this effort, our framework is general enough to be applied to other domains of interest in clinical NLP."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:47.118738+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2110.10780"
+      }
+    ],
+    "citekey": "ref_4b1580cb4184427e",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_f2ffbd553cf54941",
+    "record_revision": 2,
+    "title": "TAGS: A Test-Time Generalist–Specialist Framework with Retrieval-Augmented Reasoning and Verification",
+    "authors": [
+      "Jianghao Wu",
+      "Feilong Tang",
+      "Yulong Li",
+      "Ming-Che Hu",
+      "Haochen Xue",
+      "Shoaib Jameel",
+      "Zongyuan Ge",
+      "Yutong Xie",
+      "Imran Razzak"
+    ],
+    "year": 2026,
+    "doi": "10.18653/v1/2026.findings-acl.757",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W4414581114"
+    },
+    "abstract": "Recent advances such as Chain-of-Thought prompting have significantly improved large language models (LLMs) in zero-shot medical reasoning.However, prompting-based methods often remain shallow and unstable, while fine-tuned medical LLMs suffer from poor generalization under distribution shifts and limited adaptability to unseen clinical scenarios.To address these limitations, we present TAGS, a test-time framework that combines a broadly capable generalist with a domainspecific specialist to offer complementary perspectives without any model fine-tuning or parameter updates.To support this generalist-specialist reasoning process, we introduce two auxiliary modules: a hierarchical retrieval mechanism that provides multi-scale exemplars by selecting examples based on both semantic and rationale-level similarity, and a reliability scorer that evaluates reasoning consistency to guide final answer aggregation.TAGS achieves strong performance across nine MedQA benchmarks, boosting GPT-4o accuracy by 13.8%, DeepSeek-R1 by 16.8%, and improving a vanilla 7B model from 14.1% to 23.9%.These results surpass several fine-tuned medical LLMs, without any parameter updates.Outside Training Data Question: Child with Type I Diabetes.What is the advised time for fundus examinations from the time of diagnosis?Options: A. After 5 years B. After 2 years C.After 10 years D. At the time of diagnosis Reasoning Process: Diabetic retinopathy is a complication of diabetes that affects the eyes.It is caused by damage to the blood vessels of the light-sensitive tissue at the back of the eye (retina)…",
+    "urls": [
+      "https://doi.org/10.18653/v1/2026.findings-acl.757",
+      "https://doi.org/10.18653/v1/2026.findings-acl.757"
+    ],
+    "open_access_url": "https://aclanthology.org/2026.findings-acl.757.pdf",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 3,
+        "retrieved_at": "2026-10-25T05:32:41.559660+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:52.595727+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_f2ffbd553cf54941",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_37c6446b36184ba2",
+    "record_revision": 2,
+    "title": "On-Device Collaborative Language Modeling via a Mixture of Generalists and Specialists",
+    "authors": [
+      "Dongyang Fan",
+      "Bettina Messmer",
+      "Nikita Doikov",
+      "Martin Jaggi"
+    ],
+    "year": 2024,
+    "doi": null,
+    "arxiv_id": "2409.13931v4",
+    "source_ids": {
+      "arxiv": "2409.13931v4"
+    },
+    "abstract": "On-device LLMs have gained increasing attention for their ability to enhance privacy and provide a personalized user experience. To facilitate private learning with scarce data, Federated Learning has become a standard approach. However, it faces challenges such as computational resource heterogeneity and data heterogeneity among end users. We propose CoMiGS ($\\textbf{Co}$llaborative learning with a $\\textbf{Mi}$xture of $\\textbf{G}$eneralists and $\\textbf{S}$pecialists), the first approach to address both challenges. A key innovation of our method is the bi-level optimization formulation of the Mixture-of-Experts learning objective, where the router is optimized using a separate validation set to ensure alignment with the target distribution. We solve our objective with alternating minimization, for which we provide a theoretical analysis. Our method shares generalist experts across users while localizing a varying number of specialist experts, thereby adapting to users' computational resources and preserving privacy. Through extensive experiments, we show CoMiGS effectively balances general and personalized knowledge for each token generation. We demonstrate that CoMiGS remains robust against overfitting-due to the generalists' regularizing effect-while adapting to local data through specialist expertise. We open source our codebase for collaborative LLMs.",
+    "urls": [
+      "http://arxiv.org/abs/2409.13931v4"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2409.13931v4",
+    "venue": "ICML 2025",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 3,
+        "retrieved_at": "2026-10-25T05:32:41.560659+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2409.13931v4",
+        "abstract": "On-device LLMs have gained increasing attention for their ability to enhance privacy and provide a personalized user experience. To facilitate private learning with scarce data, Federated Learning has become a standard approach. However, it faces challenges such as computational resource heterogeneity and data heterogeneity among end users. We propose CoMiGS ($\\textbf{Co}$llaborative learning with a $\\textbf{Mi}$xture of $\\textbf{G}$eneralists and $\\textbf{S}$pecialists), the first approach to address both challenges. A key innovation of our method is the bi-level optimization formulation of the Mixture-of-Experts learning objective, where the router is optimized using a separate validation set to ensure alignment with the target distribution. We solve our objective with alternating minimization, for which we provide a theoretical analysis. Our method shares generalist experts across users while localizing a varying number of specialist experts, thereby adapting to users' computational resources and preserving privacy. Through extensive experiments, we show CoMiGS effectively balances general and personalized knowledge for each token generation. We demonstrate that CoMiGS remains robust against overfitting-due to the generalists' regularizing effect-while adapting to local data through specialist expertise. We open source our codebase for collaborative LLMs."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:47.118738+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2409.13931"
+      }
+    ],
+    "citekey": "ref_37c6446b36184ba2",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_dc3db188901f4579",
+    "record_revision": 2,
+    "title": "U-CFR: Uncertainty-Guided Cascade Forward Refinement for Interactive Segmentation",
+    "authors": [
+      "Elijah Danquah Darko",
+      "Min Xian",
+      "Terence Soule",
+      "Tiankai Yao",
+      "Matthew William Anderson"
+    ],
+    "year": 2026,
+    "doi": null,
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W7171267789"
+    },
+    "abstract": "Interactive image segmentation is critical for efficient image annotation; however, existing methods often require many corrective clicks or rely on passive refinement schemes that converge slowly. We propose Uncertainty-Guided Cascade Forward Refinement (U-CFR), a novel inference-time framework that enables models to autonomously self-correct after each user interaction. U-CFR introduces a boundary-aware uncertainty score that fuses segmentation uncertainty, contour gradients, and explicit edge predictions to guide the placement of internal pseudo-clicks. These self-generated clicks target the most ambiguous boundary regions, providing strong corrective signals without additional manual input. To support this process, we design a dual-head network with a shared encoder-decoder backbone: a segmentation head ensures region consistency, while an edge head sharpens boundary alignment. In inference, U-CFR launches a cascade of refinement steps, where each stage leverages the uncertainty-driven pseudo-clicks to refine the mask progressively. Experiments on standard benchmark datasets demonstrate that the proposed U-CFR improves click efficiency, initial mask quality, and boundary accuracy. It reduces the required clicks by over 10% on challenging datasets like Berkeley and offers a more intelligent and efficient interactive annotation.",
+    "urls": [
+      "https://arxiv.org/abs/2607.20705"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2607.20705",
+    "venue": "arXiv (Cornell University)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 4,
+        "retrieved_at": "2026-10-25T05:32:41.559660+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:50.796200+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_dc3db188901f4579",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_527dbfba70344c76",
+    "record_revision": 2,
+    "title": "3D Kidneys and Kidney Tumor Semantic Segmentation using Boundary-Aware Networks",
+    "authors": [
+      "Andriy Myronenko",
+      "Ali Hatamizadeh"
+    ],
+    "year": 2019,
+    "doi": null,
+    "arxiv_id": "1909.06684v1",
+    "source_ids": {
+      "arxiv": "1909.06684v1"
+    },
+    "abstract": "Automated segmentation of kidneys and kidney tumors is an important step in quantifying the tumor's morphometrical details to monitor the progression of the disease and accurately compare decisions regarding the kidney tumor treatment. Manual delineation techniques are often tedious, error-prone and require expert knowledge for creating unambiguous representation of kidneys and kidney tumors segmentation. In this work, we propose an end-to-end boundary aware fully Convolutional Neural Networks (CNNs) for reliable kidney and kidney tumor semantic segmentation from arterial phase abdominal 3D CT scans. We propose a segmentation network consisting of an encoder-decoder architecture that specifically accounts for organ and tumor edge information by devising a dedicated boundary branch supervised by edge-aware loss terms. We have evaluated our model on 2019 MICCAI KiTS Kidney Tumor Segmentation Challenge dataset and our method has achieved dice scores of 0.9742 and 0.8103 for kidney and tumor repetitively and an overall composite dice score of 0.8923.",
+    "urls": [
+      "http://arxiv.org/abs/1909.06684v1"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/1909.06684v1",
+    "venue": "MICCAI Kidney Tumor Segmentation Challenge 2019",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 4,
+        "retrieved_at": "2026-10-25T05:32:41.560659+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "1909.06684v1",
+        "abstract": "Automated segmentation of kidneys and kidney tumors is an important step in quantifying the tumor's morphometrical details to monitor the progression of the disease and accurately compare decisions regarding the kidney tumor treatment. Manual delineation techniques are often tedious, error-prone and require expert knowledge for creating unambiguous representation of kidneys and kidney tumors segmentation. In this work, we propose an end-to-end boundary aware fully Convolutional Neural Networks (CNNs) for reliable kidney and kidney tumor semantic segmentation from arterial phase abdominal 3D CT scans. We propose a segmentation network consisting of an encoder-decoder architecture that specifically accounts for organ and tumor edge information by devising a dedicated boundary branch supervised by edge-aware loss terms. We have evaluated our model on 2019 MICCAI KiTS Kidney Tumor Segmentation Challenge dataset and our method has achieved dice scores of 0.9742 and 0.8103 for kidney and tumor repetitively and an overall composite dice score of 0.8923."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:47.118738+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:1909.06684"
+      }
+    ],
+    "citekey": "ref_527dbfba70344c76",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_864fba4def554ce3",
+    "record_revision": 2,
+    "title": "NeuroRefiner: Morphology-Aware Multi-agent Refinement for 3D Fluorescence Microscopy Neuron Segmentation",
+    "authors": [
+      "Haiyang Yan",
+      "Jinyue Guo",
+      "Yanchao Zhang",
+      "Bingqing Wang",
+      "Zhenchen Li",
+      "Jing Liu",
+      "Jiazheng Liu",
+      "Linlin Li",
+      "Hua Han"
+    ],
+    "year": 2026,
+    "doi": "10.1007/978-3-032-37098-3_33",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W7202204684"
+    },
+    "abstract": "",
+    "urls": [
+      "https://doi.org/10.1007/978-3-032-37098-3_33",
+      "https://doi.org/10.1007/978-3-032-37098-3_33"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2608.09636",
+    "venue": "Lecture notes in computer science",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 5,
+        "retrieved_at": "2026-10-25T05:32:41.559660+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:50.856166+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_864fba4def554ce3",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_29bd397f74364935",
+    "record_revision": 2,
+    "title": "BRIGHT: A Collaborative Generalist-Specialist Foundation Model for Breast Pathology",
+    "authors": [
+      "Xiaojing Guo",
+      "Jiatai Lin",
+      "Yumian Jia",
+      "Jingqi Huang",
+      "Zeyan Xu",
+      "Weidong Li",
+      "Longfei Wang",
+      "Jingjing Chen",
+      "Qin Li",
+      "Weiwei Wang",
+      "Lifang Cui",
+      "Wen Yue",
+      "Zhiqiang Cheng",
+      "Xiaolong Wei",
+      "Jianzhong Yu",
+      "Xia Jin",
+      "Baizhou Li",
+      "Honghong Shen",
+      "Jing Li",
+      "Chunlan Li",
+      "Yanfen Cui",
+      "Yi Dai",
+      "Yiling Yang",
+      "Xiaolong Qian",
+      "Liu Yang",
+      "Yang Yang",
+      "Guangshen Gao",
+      "Yaqing Li",
+      "Lili Zhai",
+      "Chenying Liu",
+      "Tianhua Zhang",
+      "Zhenwei Shi",
+      "Cheng Lu",
+      "Xingchen Zhou",
+      "Jing Xu",
+      "Miaoqing Zhao",
+      "Fang Mei",
+      "Jiaojiao Zhou",
+      "Ning Mao",
+      "Fangfang Liu",
+      "Chu Han",
+      "Zaiyi Liu"
+    ],
+    "year": 2026,
+    "doi": null,
+    "arxiv_id": "2603.03030v2",
+    "source_ids": {
+      "arxiv": "2603.03030v2"
+    },
+    "abstract": "Generalist pathology foundation models (PFMs), pretrained on large-scale multi-organ datasets, have demonstrated remarkable predictive capabilities across diverse clinical applications. However, their proficiency on the full spectrum of clinically essential tasks within a specific organ system remains an open question due to the lack of large-scale validation cohorts for a single organ as well as the absence of a tailored training paradigm that can effectively translate broad histomorphological knowledge into the organ-specific expertise required for specialist-level interpretation. In this study, we propose BRIGHT, the first PFM specifically designed for breast pathology, trained on over 51,000 breast whole-slide images derived from a cohort of over 40,000 patients across 19 hospitals. BRIGHT employs a collaborative generalist-specialist framework to capture both universal and organ-specific features. To comprehensively evaluate the performance of PFMs on breast oncology, we curate the largest multi-institutional cohorts to date for downstream task development and evaluation, comprising over 25,000 WSIs across 10 hospitals. The validation cohorts cover the full spectrum of breast pathology across 25 distinct clinical tasks spanning diagnosis, biomarker prediction, treatment response and survival prediction. Extensive experiments demonstrate that BRIGHT outperforms five leading generalist PFMs, achieving state-of-the-art (SOTA) performance in 25 of 25 internal validation tasks and in 4 of 11 external validation tasks with excellent heatmap interpretability. By evaluating on large-scale validation cohorts, this study not only demonstrates BRIGHT's clinical utility in breast oncology but also validates a collaborative generalist-specialist paradigm, providing a scalable template for developing PFMs on a specific organ system, accelerating the translation of foundation models into ...",
+    "urls": [
+      "http://arxiv.org/abs/2603.03030v2"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2603.03030v2",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 5,
+        "retrieved_at": "2026-10-25T05:32:41.560659+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2603.03030v2",
+        "abstract": "Generalist pathology foundation models (PFMs), pretrained on large-scale multi-organ datasets, have demonstrated remarkable predictive capabilities across diverse clinical applications. However, their proficiency on the full spectrum of clinically essential tasks within a specific organ system remains an open question due to the lack of large-scale validation cohorts for a single organ as well as the absence of a tailored training paradigm that can effectively translate broad histomorphological knowledge into the organ-specific expertise required for specialist-level interpretation. In this study, we propose BRIGHT, the first PFM specifically designed for breast pathology, trained on over 51,000 breast whole-slide images derived from a cohort of over 40,000 patients across 19 hospitals. BRIGHT employs a collaborative generalist-specialist framework to capture both universal and organ-specific features. To comprehensively evaluate the performance of PFMs on breast oncology, we curate the largest multi-institutional cohorts to date for downstream task development and evaluation, comprising over 25,000 WSIs across 10 hospitals. The validation cohorts cover the full spectrum of breast pathology across 25 distinct clinical tasks spanning diagnosis, biomarker prediction, treatment response and survival prediction. Extensive experiments demonstrate that BRIGHT outperforms five leading generalist PFMs, achieving state-of-the-art (SOTA) performance in 25 of 25 internal validation tasks and in 4 of 11 external validation tasks with excellent heatmap interpretability. By evaluating on large-scale validation cohorts, this study not only demonstrates BRIGHT's clinical utility in breast oncology but also validates a collaborative generalist-specialist paradigm, providing a scalable template for developing PFMs on a specific organ system, accelerating the translation of foundation models into ..."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:47.118738+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2603.03030"
+      }
+    ],
+    "citekey": "ref_29bd397f74364935",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_daa966ee28d84fe8",
+    "record_revision": 2,
+    "title": "SC-CoSF: Self-Correcting Collaborative and Co-Training for Image Fusion and Semantic Segmentation",
+    "authors": [
+      "Dongrui Yang",
+      "Lihong Qiao",
+      "Yucheng Shu"
+    ],
+    "year": 2025,
+    "doi": "10.3390/s25123575",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W4411096918"
+    },
+    "abstract": "Multimodal image fusion and semantic segmentation play pivotal roles in autonomous driving and robotic systems, yet their inherent interdependence remains underexplored. To address this gap and overcome performance bottlenecks, we propose SC-CoSF, a novel coupled framework that jointly optimizes these tasks through synergistic learning. Our approach replaces traditional duplex encoders with a weight-sharing CNN encoder, implicitly aligning multimodal features while reducing parameter overhead. The core innovation lies in our Self-correction and Collaboration Fusion Module (Sc-CFM), which integrates (1) a Self-correction Long-Range Relationship Branch (Sc-LRB) to strengthen global semantic modeling, (2) a Self-correction Fine-Grained Branch (Sc-FGB) for enhanced visual detail retention through local feature aggregation, and (3) a Dual-branch Collaborative Recalibration (DCR) mechanism for cross-task feature refinement. This design preserves critical edge textures and color contrasts for segmentation while leveraging segmentation-derived spatial priors to guide fusion. We further introduce the Interactive Context Recovery Mamba Decoder (ICRM) to restore lost long-range dependencies during the upsampling process; meanwhile, we propose the Region Adaptive Weighted Reconstruction Decoder (ReAW), which is mainly used to reduce feature redundancy in image fusion tasks. End-to-end joint training enables gradient propagation across all task branches via shared parameters, exploiting inter-task consistency for superior performance. Experiments demonstrate significant improvements over independently optimized baselines in both fusion quality and segmentation accuracy.",
+    "urls": [
+      "https://doi.org/10.3390/s25123575",
+      "https://doi.org/10.3390/s25123575"
+    ],
+    "open_access_url": "https://www.mdpi.com/1424-8220/25/12/3575/pdf?version=1749202225",
+    "venue": "Sensors",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 6,
+        "retrieved_at": "2026-10-25T05:32:41.559660+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:32:54.409179+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_daa966ee28d84fe8",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_b8b1ef49ee17445d",
+    "record_revision": 2,
+    "title": "Improving Policy Optimization with Generalist-Specialist Learning",
+    "authors": [
+      "Zhiwei Jia",
+      "Xuanlin Li",
+      "Zhan Ling",
+      "Shuang Liu",
+      "Yiran Wu",
+      "Hao Su"
+    ],
+    "year": 2022,
+    "doi": null,
+    "arxiv_id": "2206.12984v1",
+    "source_ids": {
+      "arxiv": "2206.12984v1"
+    },
+    "abstract": "Generalization in deep reinforcement learning over unseen environment variations usually requires policy learning over a large set of diverse training variations. We empirically observe that an agent trained on many variations (a generalist) tends to learn faster at the beginning, yet its performance plateaus at a less optimal level for a long time. In contrast, an agent trained only on a few variations (a specialist) can often achieve high returns under a limited computational budget. To have the best of both worlds, we propose a novel generalist-specialist training framework. Specifically, we first train a generalist on all environment variations; when it fails to improve, we launch a large population of specialists with weights cloned from the generalist, each trained to master a selected small subset of variations. We finally resume the training of the generalist with auxiliary rewards induced by demonstrations of all specialists. In particular, we investigate the timing to start specialist training and compare strategies to learn generalists with assistance from specialists. We show that this framework pushes the envelope of policy learning on several challenging and popular benchmarks including Procgen, Meta-World and ManiSkill.",
+    "urls": [
+      "http://arxiv.org/abs/2206.12984v1"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2206.12984v1",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 6,
+        "retrieved_at": "2026-10-25T05:32:41.560659+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2206.12984v1",
+        "abstract": "Generalization in deep reinforcement learning over unseen environment variations usually requires policy learning over a large set of diverse training variations. We empirically observe that an agent trained on many variations (a generalist) tends to learn faster at the beginning, yet its performance plateaus at a less optimal level for a long time. In contrast, an agent trained only on a few variations (a specialist) can often achieve high returns under a limited computational budget. To have the best of both worlds, we propose a novel generalist-specialist training framework. Specifically, we first train a generalist on all environment variations; when it fails to improve, we launch a large population of specialists with weights cloned from the generalist, each trained to master a selected small subset of variations. We finally resume the training of the generalist with auxiliary rewards induced by demonstrations of all specialists. In particular, we investigate the timing to start specialist training and compare strategies to learn generalists with assistance from specialists. We show that this framework pushes the envelope of policy learning on several challenging and popular benchmarks including Procgen, Meta-World and ManiSkill."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:49.808669+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2206.12984"
+      }
+    ],
+    "citekey": "ref_b8b1ef49ee17445d",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_9d7414586161439e",
+    "record_revision": 2,
+    "title": "Generalist Open-World Temporal Perception",
+    "authors": [
+      "Cristian Sminchisescu"
+    ],
+    "year": 2026,
+    "doi": "10.48550/arxiv.2609.06823",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W7212023571"
+    },
+    "abstract": "The next generation of artificial intelligence systems will likely be natively temporal and multimodal in both inputs and outputs: able to converse, perceive, predict, reason, and synthesize through a shared world representation. Realizing this requires a temporal perceptual substrate integrating sensory streams, language, and structured outputs within a multimodal world model. We seek a generalist open-world perceptual system that represents biological forms, natural physical structures, and artifacts, and their interactions, as a coherent, temporally persistent process. The model should infer geometry, articulation, semantics, interaction structure, and uncertainty from raw multimodal streams; maintain identity through occlusion and viewpoint change; generalize across species, forms, mechanisms, and materials; and abstain or expand its ontology when encountering the unknown. The objective is a structured world state supporting understanding, prediction, counterfactual reasoning, and controllable synthesis. Recent work suggests that some cross-modal and reasoning-like capabilities can emerge from large-scale generative video pretraining, reminiscent of language-model scaling. Yet these capabilities are often accessed through language probes or expressed through photorealistic video, leaving explicit semantic, geometric, or temporal structure largely unexposed. This paper articulates an alternative and complementary paradigm: perception and synthesis as distinct conditionings within a shared Generalist Open-World Temporal Perception Architecture (GOWTPA). Recognition, structured prediction, and simulation arise as different conditionings of the same generative substrate, while reasoning and embodiment-specific policies build upon the resulting world state. This positions generalist temporal perception as a potential foundation layer for broader multimodal intelligence and physical AI.",
+    "urls": [
+      "https://arxiv.org/abs/2609.06823",
+      "https://doi.org/10.48550/arxiv.2609.06823"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2609.06823",
+    "venue": "arXiv (Cornell University)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 7,
+        "retrieved_at": "2026-10-25T05:32:41.559660+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:49.807136+00:00",
+        "detail": "Notice lookup unavailable: HTTP 404"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_9d7414586161439e",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_3d1047655e484ef9",
+    "record_revision": 2,
+    "title": "GSL-PCD: Improving Generalist-Specialist Learning with Point Cloud Feature-based Task Partitioning",
+    "authors": [
+      "Xiu Yuan"
+    ],
+    "year": 2024,
+    "doi": null,
+    "arxiv_id": "2411.06733v1",
+    "source_ids": {
+      "arxiv": "2411.06733v1"
+    },
+    "abstract": "Generalization in Deep Reinforcement Learning (DRL) across unseen environment variations often requires training over a diverse set of scenarios. Many existing DRL algorithms struggle with efficiency when handling numerous variations. The Generalist-Specialist Learning (GSL) framework addresses this by first training a generalist model on all variations, then creating specialists from the generalist's weights, each focusing on a subset of variations. The generalist then refines its learning with assistance from the specialists. However, random task partitioning in GSL can impede performance by assigning vastly different variations to the same specialist, often resulting in each specialist focusing on only one variation, which raises computational costs. To improve this, we propose Generalist-Specialist Learning with Point Cloud Feature-based Task Partitioning (GSL-PCD). Our approach clusters environment variations based on features extracted from object point clouds and uses balanced clustering with a greedy algorithm to assign similar variations to the same specialist. Evaluations on robotic manipulation tasks from the ManiSkill benchmark demonstrate that point cloud feature-based partitioning outperforms vanilla partitioning by 9.4%, with a fixed number of specialists, and reduces computational and sample requirements by 50% to achieve comparable performance.",
+    "urls": [
+      "http://arxiv.org/abs/2411.06733v1"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2411.06733v1",
+    "venue": "",
+    "provenance": [
+      {
+        "source": "arxiv",
+        "query": "generalist specialist collaborative refinement segmentation",
+        "raw_response_index": 0,
+        "item_index": 7,
+        "retrieved_at": "2026-10-25T05:32:41.560659+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2411.06733v1",
+        "abstract": "Generalization in Deep Reinforcement Learning (DRL) across unseen environment variations often requires training over a diverse set of scenarios. Many existing DRL algorithms struggle with efficiency when handling numerous variations. The Generalist-Specialist Learning (GSL) framework addresses this by first training a generalist model on all variations, then creating specialists from the generalist's weights, each focusing on a subset of variations. The generalist then refines its learning with assistance from the specialists. However, random task partitioning in GSL can impede performance by assigning vastly different variations to the same specialist, often resulting in each specialist focusing on only one variation, which raises computational costs. To improve this, we propose Generalist-Specialist Learning with Point Cloud Feature-based Task Partitioning (GSL-PCD). Our approach clusters environment variations based on features extracted from object point clouds and uses balanced clustering with a greedy algorithm to assign similar variations to the same specialist. Evaluations on robotic manipulation tasks from the ManiSkill benchmark demonstrate that point cloud feature-based partitioning outperforms vanilla partitioning by 9.4%, with a fixed number of specialists, and reduces computational and sample requirements by 50% to achieve comparable performance."
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:47.118738+00:00",
+        "detail": "No valid DOI available for notice lookup"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2411.06733"
+      }
+    ],
+    "citekey": "ref_3d1047655e484ef9",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_669c3001a51d42b8",
+    "record_revision": 3,
+    "title": "VISTA3D - A Unified Segmentation Foundation Model For 3D Medical Imaging",
+    "authors": [],
+    "year": null,
+    "doi": null,
+    "arxiv_id": null,
+    "source_ids": {},
+    "abstract": "",
+    "urls": [],
+    "open_access_url": null,
+    "venue": "",
+    "provenance": [
+      {
+        "source": "ris_import"
+      },
+      {
+        "source": "local_import",
+        "file": "L1.ris"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "offline",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:47.964676+00:00",
+        "detail": "initial_import: network check skipped explicitly"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_669c3001a51d42b8",
+    "screening": "include",
+    "screening_reason": "交互式3D点击执行器与自动分支的直接依据"
+  },
+  {
+    "schema_version": 1,
+    "id": "work_e8706d7715e44ae8",
+    "record_revision": 3,
+    "title": "REDNet - Reliable Evidential Discounting Network for Multi-Modality Medical Image Segmentation",
+    "authors": [],
+    "year": null,
+    "doi": null,
+    "arxiv_id": null,
+    "source_ids": {},
+    "abstract": "",
+    "urls": [],
+    "open_access_url": null,
+    "venue": "",
+    "provenance": [
+      {
+        "source": "ris_import"
+      },
+      {
+        "source": "local_import",
+        "file": "L2.ris"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "offline",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:48.781195+00:00",
+        "detail": "initial_import: network check skipped explicitly"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_e8706d7715e44ae8",
+    "screening": "include",
+    "screening_reason": "可靠性折扣，检查模型间迁移边界"
+  },
+  {
+    "schema_version": 1,
+    "id": "work_035a8553e2314bc2",
+    "record_revision": 3,
+    "title": "Learned iterative segmentation of highly variable anatomy from limited data - Applications to whole heart segmentation for congenital heart disease",
+    "authors": [],
+    "year": null,
+    "doi": null,
+    "arxiv_id": null,
+    "source_ids": {},
+    "abstract": "",
+    "urls": [],
+    "open_access_url": null,
+    "venue": "",
+    "provenance": [
+      {
+        "source": "ris_import"
+      },
+      {
+        "source": "local_import",
+        "file": "L4.ris"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "offline",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:32:57.767594+00:00",
+        "detail": "initial_import: network check skipped explicitly"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_035a8553e2314bc2",
+    "screening": "include",
+    "screening_reason": "少样本变异解剖的迭代分割与停止监督"
+  },
+  {
+    "schema_version": 1,
+    "id": "work_750f4a75835240a3",
+    "record_revision": 4,
+    "title": "DeferredSeg: A multi-expert deferral framework for medical image segmentation",
+    "authors": [
+      "Qiuyu Tian",
+      "Haoliang Sun",
+      "Yunshan Wang",
+      "Yinghuan Shi",
+      "Yilong Yin"
+    ],
+    "year": 2026,
+    "doi": "10.1016/j.patcog.2026.114811",
+    "arxiv_id": "2604.12411v2",
+    "source_ids": {
+      "openalex": "https://openalex.org/W7154655660",
+      "arxiv": "2604.12411v2"
+    },
+    "abstract": "Segmentation models based on deep neural networks demonstrate strong generalization for medical image segmentation. However, they often exhibit overconfidence or underconfidence, leading to unreliable confidence scores for segmentation masks, especially in ambiguous regions. This undermines the trustworthiness required for clinical deployment. Motivated by the learning-to-defer (L2D) paradigm, we introduce DeferredSeg, a deferral-aware segmentation framework, i.e., a Human--AI collaboration system that determines whether to defer predictions to human experts in specific regions. DeferredSeg extends the base segmentor with an aggregated deferral predictor and additional routing channels that dynamically route each pixel to either the base segmentor or a human expert. To train this routing efficiently, we introduce a pixel-wise surrogate collaboration loss that supervises deferral decisions. In addition, to preserve spatial coherence within deferral regions, we propose a spatial-coherence loss that enforces smooth deferral masks, thereby enhancing reliability. Beyond single-expert deferral, we further extend the framework to a multi-expert setting by introducing multiple discrepancy experts for collaborative decision-making. To prevent overloading or underutilizing individual experts, we further design a load-balancing penalty that evenly distributes workload across expert branches. We evaluate DeferredSeg on three challenging medical datasets using MedSAM and CENet as the base segmentor for fair comparison. Experimental results show that DeferredSeg consistently outperforms the baseline, demonstrating its effectiveness for trustworthy dense medical segmentation. Moreover, the proposed framework is model-agnostic and can be readily applied to other segmentation architectures.",
+    "urls": [
+      "https://doi.org/10.1016/j.patcog.2026.114811",
+      "http://arxiv.org/abs/2604.12411v2",
+      "https://arxiv.org/abs/2604.12411"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2604.12411v2",
+    "venue": "Pattern Recognition",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "DeferredSeg",
+        "raw_response_index": 0,
+        "item_index": 0,
+        "retrieved_at": "2026-10-25T05:32:54.652537+00:00"
+      },
+      {
+        "source": "arxiv",
+        "query": "DeferredSeg",
+        "raw_response_index": 0,
+        "item_index": 0,
+        "retrieved_at": "2026-10-25T05:32:54.653545+00:00"
+      },
+      {
+        "source": "arxiv_version",
+        "arxiv_id": "2604.12411v2",
+        "abstract": "Segmentation models based on deep neural networks demonstrate strong generalization for medical image segmentation. However, they often exhibit overconfidence or underconfidence, leading to unreliable confidence scores for segmentation masks, especially in ambiguous regions. This undermines the trustworthiness required for clinical deployment. Motivated by the learning-to-defer (L2D) paradigm, we introduce DeferredSeg, a deferral-aware segmentation framework, i.e., a Human--AI collaboration system that determines whether to defer predictions to human experts in specific regions. DeferredSeg extends the base segmentor with an aggregated deferral predictor and additional routing channels that dynamically route each pixel to either the base segmentor or a human expert. To train this routing efficiently, we introduce a pixel-wise surrogate collaboration loss that supervises deferral decisions. In addition, to preserve spatial coherence within deferral regions, we propose a spatial-coherence loss that enforces smooth deferral masks, thereby enhancing reliability. Beyond single-expert deferral, we further extend the framework to a multi-expert setting by introducing multiple discrepancy experts for collaborative decision-making. To prevent overloading or underutilizing individual experts, we further design a load-balancing penalty that evenly distributes workload across expert branches. We evaluate DeferredSeg on three challenging medical datasets using MedSAM and CENet as the base segmentor for fair comparison. Experimental results show that DeferredSeg consistently outperforms the baseline, demonstrating its effectiveness for trustworthy dense medical segmentation. Moreover, the proposed framework is model-agnostic and can be readily applied to other segmentation architectures."
+      },
+      {
+        "source": "openalex",
+        "query": "DeferredSeg",
+        "raw_response_index": 0,
+        "item_index": 1,
+        "retrieved_at": "2026-10-25T05:32:54.652537+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "no_notice_found",
+        "checked_at": "2026-10-25T05:33:01.981800+00:00",
+        "detail": "Crossref notice metadata checked; absence of a notice does not establish validity or semantic support"
+      }
+    ],
+    "relations": [
+      {
+        "type": "version_of",
+        "target": "arxiv:2604.12411"
+      },
+      {
+        "type": "source_id_alias",
+        "source": "openalex",
+        "id": "https://openalex.org/W7154655660"
+      },
+      {
+        "type": "source_id_alias",
+        "source": "openalex",
+        "id": "https://openalex.org/W7204966302"
+      }
+    ],
+    "citekey": "ref_750f4a75835240a3",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_226b3fd938a04aa7",
+    "record_revision": 2,
+    "title": "DeferredSeg:A Multi-Expert Deferral Framework for Medical Image Segmentation",
+    "authors": [
+      "Qiuyu Tian",
+      "Haoliang Sun",
+      "Yunshan Wang",
+      "Yinghuan Shi",
+      "Yilong Yin"
+    ],
+    "year": 2026,
+    "doi": "10.48550/arxiv.2604.12411",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W7154472425"
+    },
+    "abstract": "Segmentation models based on deep neural networks demonstrate strong generalization for medical image segmentation. However, they often exhibit overconfidence or underconfidence, leading to unreliable confidence scores for segmentation masks, especially in ambiguous regions. This undermines the trustworthiness required for clinical deployment. Motivated by the learning-to-defer (L2D) paradigm, we introduce DeferredSeg, a deferral-aware segmentation framework, i.e., a Human--AI collaboration system that determines whether to defer predictions to human experts in specific regions. DeferredSeg extends the base segmentor with an aggregated deferral predictor and additional routing channels that dynamically route each pixel to either the base segmentor or a human expert. To train this routing efficiently, we introduce a pixel-wise surrogate collaboration loss that supervises deferral decisions. In addition, to preserve spatial coherence within deferral regions, we propose a spatial-coherence loss that enforces smooth deferral masks, thereby enhancing reliability. Beyond single-expert deferral, we further extend the framework to a multi-expert setting by introducing multiple discrepancy experts for collaborative decision-making. To prevent overloading or underutilizing individual experts, we further design a load-balancing penalty that evenly distributes workload across expert branches. We evaluate DeferredSeg on three challenging medical datasets using MedSAM and CENet as the base segmentor for fair comparison. Experimental results show that DeferredSeg consistently outperforms the baseline, demonstrating its effectiveness for trustworthy dense medical segmentation. Moreover, the proposed framework is model-agnostic and can be readily applied to other segmentation architectures.",
+    "urls": [
+      "https://doi.org/10.48550/arxiv.2604.12411",
+      "https://doi.org/10.48550/arxiv.2604.12411"
+    ],
+    "open_access_url": "https://doi.org/10.48550/arxiv.2604.12411",
+    "venue": "arXiv (Cornell University)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "DeferredSeg",
+        "raw_response_index": 0,
+        "item_index": 2,
+        "retrieved_at": "2026-10-25T05:32:54.652537+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:33:00.975955+00:00",
+        "detail": "Notice lookup unavailable: HTTP 404"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_226b3fd938a04aa7",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_9693f9cab0c34ce2",
+    "record_revision": 2,
+    "title": "From Few-Shot Segmentation to Clinician-in-the-Loop Medical Image Analysis",
+    "authors": [
+      "Yazhou Zhu"
+    ],
+    "year": 2026,
+    "doi": "10.48550/arxiv.2609.10001",
+    "arxiv_id": null,
+    "source_ids": {
+      "openalex": "https://openalex.org/W7212189190"
+    },
+    "abstract": "Few-shot medical image segmentation (FSMIS) seeks to delineate unseen structures from a small support set, but its standard formulation fixes task-defining evidence before inference. This assumption is fragile under acquisition shift, atypical pathology, ambiguous boundaries, and poor image quality. Adding clinician interaction and rapid adaptation is not sufficient: the binding constraint is deciding when asking or changing is warranted. We therefore reframe FSMIS as a three-layer sequential decision problem. First, decidable self-assessment separates errors that a bounded intervention can repair from those that no admissible intervention can reach. We formalize this distinction through a correctable set defined by the update operator and remaining interaction budget. Second, selective interaction allocates a distinct expert-attention budget by response-conditioned net expected value of information, yielding explicit accept, query, and defer actions. Third, bounded adaptation emphasizes reversibility and independent safety reassessment rather than speed. A complementary cross-case memory stores reproducible correction priors over failure modes instead of disease-specific mask priors. This structure links sparse support representation, cross-domain robustness, multi-level risk estimation, clinician feedback, and governed experience transfer. We state six hypotheses with an explicit dependency order and propose a minimal pilot that can falsify the foundational self-assessment claim before a clinician study. The central claim is not that interaction resolves domain shift, but that scarce expert attention should be used only when a bounded intervention is expected to reach a clinically better outcome.",
+    "urls": [
+      "https://arxiv.org/abs/2609.10001",
+      "https://doi.org/10.48550/arxiv.2609.10001"
+    ],
+    "open_access_url": "https://arxiv.org/pdf/2609.10001",
+    "venue": "arXiv (Cornell University)",
+    "provenance": [
+      {
+        "source": "openalex",
+        "query": "DeferredSeg",
+        "raw_response_index": 0,
+        "item_index": 3,
+        "retrieved_at": "2026-10-25T05:32:54.652537+00:00"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "crossref",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:33:00.940158+00:00",
+        "detail": "Notice lookup unavailable: HTTP 404"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_9693f9cab0c34ce2",
+    "screening": "pending",
+    "screening_reason": ""
+  },
+  {
+    "schema_version": 1,
+    "id": "work_a3a141cb15434c22",
+    "record_revision": 3,
+    "title": "SDF4CHD - Generative modeling of cardiac anatomies with congenital heart defects",
+    "authors": [],
+    "year": null,
+    "doi": null,
+    "arxiv_id": null,
+    "source_ids": {},
+    "abstract": "",
+    "urls": [],
+    "open_access_url": null,
+    "venue": "",
+    "provenance": [
+      {
+        "source": "ris_import"
+      },
+      {
+        "source": "local_import",
+        "file": "L7.ris"
+      }
+    ],
+    "publication_checks": [
+      {
+        "schema_version": 1,
+        "source": "offline",
+        "status": "unknown",
+        "checked_at": "2026-10-25T05:33:00.178608+00:00",
+        "detail": "initial_import: network check skipped explicitly"
+      }
+    ],
+    "relations": [],
+    "citekey": "ref_a3a141cb15434c22",
+    "screening": "include",
+    "screening_reason": "先心病拓扑多样性，避免正常解剖先验误修正"
+  }
+]

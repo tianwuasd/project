@@ -1,0 +1,73 @@
+{
+  "results": [
+    {
+      "work_id": "work_1e05e2b0eb6c452c",
+      "status": "ok",
+      "claims": 15
+    },
+    {
+      "work_id": "work_aa6dce0ed7f14b25",
+      "status": "ok",
+      "claims": 15
+    },
+    {
+      "work_id": "work_5d1c00a2b3764ef3",
+      "status": "ok",
+      "claims": 13
+    },
+    {
+      "work_id": "work_6572d29cec464414",
+      "status": "ok",
+      "claims": 15
+    },
+    {
+      "work_id": "work_dc3db188901f4579",
+      "status": "ok",
+      "claims": 16
+    },
+    {
+      "work_id": "work_864fba4def554ce3",
+      "status": "ok",
+      "claims": 19
+    },
+    {
+      "work_id": "work_b8b1ef49ee17445d",
+      "status": "ok",
+      "claims": 13
+    },
+    {
+      "work_id": "work_669c3001a51d42b8",
+      "status": "ok",
+      "claims": 15
+    },
+    {
+      "work_id": "work_e8706d7715e44ae8",
+      "status": "ok",
+      "claims": 16
+    },
+    {
+      "work_id": "work_035a8553e2314bc2",
+      "status": "ok",
+      "claims": 19
+    },
+    {
+      "work_id": "work_750f4a75835240a3",
+      "status": "ok",
+      "claims": 22
+    },
+    {
+      "work_id": "work_a3a141cb15434c22",
+      "status": "ok",
+      "claims": 17
+    }
+  ],
+  "budget": {
+    "attempts": {
+      "spent": 12,
+      "uncertain": 2
+    },
+    "consumed_or_reserved_calls": 14,
+    "monetary_cost": null,
+    "cost_status": "unknown"
+  }
+}
