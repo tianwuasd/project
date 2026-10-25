@@ -28,6 +28,9 @@ def load_settings():
     allowed = settings['allowed_gpus']
     if allowed is not None and (not isinstance(allowed, list) or not all(isinstance(x, str) for x in allowed)):
         raise ValueError('allowed_gpus 应为编号/完整UUID字符串列表，或 null')
+    if os.environ.get('WHOLE_HEART_MANAGED') == '1':
+        settings['allowed_gpus'] = json.loads(os.environ['WHOLE_HEART_GPU_UUIDS'])
+        settings['max_gpus'] = min(settings['max_gpus'], int(os.environ['WHOLE_HEART_GPU_LIMIT']))
     return settings
 
 

@@ -71,6 +71,16 @@ def bind_workspace(code_root, work_root, data_root, gpu_memory):
     template = read_json(metadata / "case_inventory.json")
     cases = resolve_cases(data_root, template["cases"])
     logical_splits = read_json(metadata / "splits_v1.json")
+    # 复制历史输入后保留原始来源元数据/摘要；不能因代码快照路径不同重写缓存契约。
+    existing = work_root / '04_data/manifests/case_inventory.json'
+    split_path = work_root / '04_data/manifests/splits_v1.json'
+    if config_path.exists() and existing.exists() and split_path.exists():
+        old_inventory, old_splits = read_json(existing), read_json(split_path)
+        if old_inventory['cases'] != cases or old_splits['folds'] != logical_splits['folds']:
+            raise ValueError('已绑定工作区的来源或划分发生变化，请新建任务')
+        if old_splits['inventory_sha256'] != digest(existing):
+            raise ValueError('已有来源清单摘要不符')
+        return config
     write_json(config_path, config)
     inventory = dict(template, cases=cases, source_code_root=str(code_root), path_relocated=True)
     manifest_path = work_root / "04_data/manifests/case_inventory.json"

@@ -9,6 +9,7 @@ import numpy as np
 from data_pipeline import ROOT, CODE_ROOT, FOLDS, load_json
 from prepare_nnunet import configure_paths
 from server_data import digest, write_json
+from model_catalog import MODELS, trainer_class
 
 
 def select_checkpoint(folder):
@@ -54,7 +55,7 @@ def publish_initial_weight(record, report, other, initial_hash):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("fold", choices=list(FOLDS))
-    parser.add_argument("method", choices=["B0", "B1"])
+    parser.add_argument("method", choices=list(MODELS))
     parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
     configure_paths()
@@ -104,7 +105,7 @@ def main():
     report["history"].append({"started": time.strftime("%Y-%m-%d %H:%M:%S"), "resumed_from": str(checkpoint) if checkpoint else None})
     write_json(record, report)
     try:
-        cls = Project1B0 if args.method == "B0" else Project1B1
+        cls = trainer_class(args.method)
         trainer = cls(load_json(prep / "Project1Plans.json"), "3d_fullres", 0, load_json(prep / "dataset.json"))
         trainer.output_folder_base = str(out)
         trainer.output_folder = str(out / "fold_0")

@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import time
+from model_catalog import parse_models, parse_folds, save_selection, load_selection
 
 CODE_ROOT = Path(__file__).resolve().parents[1]
 SCOPES = {"ct-first": ["ct_holdG"], "mr-first": ["mr_holdE"], "all": ["ct_holdG", "ct_holdA", "ct_holdB", "mr_holdE", "mr_holdCD"]}
@@ -17,7 +18,11 @@ def child(script, *arguments):
     """参数列表直接调用，不经过 shell，数据目录中的空格或符号不会变成命令。"""
     command = [sys.executable, "-B", "-X", "utf8", str(CODE_ROOT / "05_src" / script), *map(str, arguments)]
     print(f"\n执行阶段：{script} {' '.join(map(str, arguments))}", flush=True)
-    subprocess.run(command, check=True, cwd=CODE_ROOT)
+    if os.environ.get('WHOLE_HEART_MANAGED') == '1':
+        from task_worker import run_child
+        run_child(command, os.environ.copy(), cwd=CODE_ROOT)
+    else:
+        subprocess.run(command, check=True, cwd=CODE_ROOT)
 
 
 def runtime_check(work, gpu_memory):
@@ -97,8 +102,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("data_root", nargs="?", help="原始数据目录；支持包含中心子文件夹")
     parser.add_argument("--work-dir", default=str(CODE_ROOT / "server_work"))
-    parser.add_argument("--mode", choices=["check", "smoke", "train", "resume", "experiment", "evaluate", "status"])
-    parser.add_argument("--scope", choices=list(SCOPES), default="ct-first")
+    parser.add_argument("--mode", choices=["check", "prepare", "smoke", "train", "resume", "experiment", "evaluate", "summarize", "status"])
+    parser.add_argument("--scope", choices=list(SCOPES))
+    parser.add_argument("--folds", help="预先选定的留出方向，逗号分隔")
+    parser.add_argument("--models", "--methods", dest="models", help="B0、B1或B0,B1")
+    parser.add_argument("--managed", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--gpu-memory", type=float, default=None, help="规划显存预算，默认5 GiB；已有工作区沿用已保存值")
     parser.add_argument("--yes-train", action="store_true", help="仅在明确接受长训练时使用，省略输入TRAIN确认")
     args = parser.parse_args()
@@ -120,8 +128,9 @@ def main():
     gpu_memory = args.gpu_memory if args.gpu_memory is not None else previous.get("gpu_memory_gb", 5)
     if not math.isfinite(gpu_memory) or gpu_memory < 2:
         raise ValueError("规划显存预算必须是至少2 GiB的有限数值")
-    mode, scope = args.mode, args.scope
-    if mode in {"experiment", "evaluate"}:
+    mode, scope = args.mode, args.scope or 'ct-first'
+    methods = parse_models(args.models)
+    if mode in {"experiment", "evaluate"} and args.scope is None:
         scope = "all"
     if mode is None:
         print("\n1 只检查环境与数据\n2 短测 CT+MRI（推荐首次选择）\n3 正式训练：CT 留出G，基线+增强\n4 正式训练：MRI 留出E，基线+增强\n5 正式训练：完整10次\n6 继续上次正式训练\n")
@@ -134,8 +143,12 @@ def main():
         if not queue_file.exists():
             raise ValueError("没有上次正式训练队列；首次运行请选择短测或正式训练")
         scope = read_json(queue_file)["scope"]
+        methods = read_json(queue_file).get('methods', methods)
+    folds_selected = parse_folds(args.folds) if args.folds else SCOPES[scope]
+    if mode == 'resume':
+        folds_selected = read_json(queue_file).get('folds', folds_selected)
     if mode in {"train", "resume", "experiment"}:
-        print(f"将运行 {2*len(SCOPES[scope])} 个正式实验；本机旧预算为全10次约155小时，服务器速度需重新实测。")
+        print(f"将运行 {len(methods)*len(folds_selected)} 个正式实验；模型：{','.join(methods)}；耗时需按实际服务器测量。")
         if not args.yes_train and input("确定开始长训练请输入 TRAIN，其余输入取消：").strip() != "TRAIN":
             print("已取消，没有启动训练。")
             return
@@ -153,11 +166,26 @@ def main():
     # 防止不同代码副本同时写入同一个输出目录。
     with FileLock(str(work / ".run.lock"), timeout=0):
         bind_workspace(CODE_ROOT, work, data, gpu_memory)
+        if args.models is not None or args.folds is not None:
+            save_selection(work, folds_selected, methods)
+        if args.managed:
+            selected = load_selection(work)
+            methods, folds_selected = selected['methods'], selected['folds']
+        if mode == 'summarize':
+            child('evaluation_summary.py')
+            return
         if mode == 'evaluate':
             # 自动评估不需要事先选一张空闲卡，也不覆盖训练时的环境快照。
             child('evaluation_parallel.py')
             return
-        if gpus:
+        if mode == 'prepare':
+            for fold in folds_selected:
+                child('server_prepare.py', fold, '--gpu-memory', gpu_memory)
+            return
+        if args.managed:
+            # 环境已由任务层记录；CPU准备不为尚未使用的GPU等待。
+            pass
+        elif gpus:
             check_selected_gpus(work, gpu_memory, gpus)
         else:
             runtime_check(work, gpu_memory)
@@ -180,19 +208,19 @@ def main():
                 child("run_smoke_suite.py")
                 child("summarize_smoke.py")
                 write_json(gate, evidence)
-        folds = ["ct_holdG", "mr_holdE"] if mode == "smoke" else SCOPES[scope]
+        folds = (["ct_holdG", "mr_holdE"] if mode == "smoke" else folds_selected) if not args.managed else folds_selected
         if mode != "smoke":
-            write_json(queue_file, {"scope": scope, "folds": folds, "methods": ["B0", "B1"]})
+            write_json(queue_file, {"scope": scope, "folds": folds, "methods": methods})
         # 预处理只执行一次；多卡时全部准备好后，再并行独立模型，避免并发改同一缓存。
         for fold in folds:
             child("server_prepare.py", fold, "--gpu-memory", gpu_memory)
             if mode != "smoke" and not gpus:
-                for method in ["B0", "B1"]:
+                for method in methods:
                     extra = ["--resume"] if mode in {"resume", "experiment"} else []
                     child("server_train.py", fold, method, *extra)
         if mode != 'smoke' and gpus:
             from gpu_queue import run_training_queue
-            run_training_queue([(fold, method) for fold in folds for method in ['B0', 'B1']],
+            run_training_queue([(fold, method) for fold in folds for method in methods],
                                gpus, work, resume=mode in {'resume', 'experiment'})
         if mode == "smoke":
             child("run_smoke_suite.py")

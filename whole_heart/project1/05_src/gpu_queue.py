@@ -6,7 +6,7 @@ import signal
 import subprocess
 import sys
 import time
-from gpu_devices import select_gpus, GPUCoolingDown
+from gpu_devices import select_gpus, GPUCoolingDown, GPUBusy
 from server_data import write_json
 
 CODE = Path(__file__).resolve().parents[1]
@@ -38,6 +38,9 @@ def stop_owned_process(process):
     try:
         process.wait(timeout=15)
     except subprocess.TimeoutExpired:
+        if os.environ.get('WHOLE_HEART_MANAGED') == '1':
+            print('模型子进程仍在退出；不强杀，继承锁保持到实际结束。', flush=True)
+            return
         if os.name == 'posix':
             os.killpg(process.pid, signal.SIGKILL)
         else:
@@ -59,6 +62,10 @@ def run_training_queue(tasks, gpus, work, resume=True):
     records = [dict(fold=f, method=m, status='pending') for f, m in tasks]
     pending, active, failure = deque(records), {}, None
     used_gpus = set()
+    managed = os.environ.get('WHOLE_HEART_MANAGED') == '1'
+    limit = int(os.environ.get('WHOLE_HEART_GPU_LIMIT', len(gpus)))
+    if not 1 <= limit <= len(gpus):
+        raise ValueError('GPU并发上限无效')
     state = dict(status='running', gpu_uuids=gpus, jobs=records)
     state_path = work / '00_admin/gpu_queue.json'
     write_json(state_path, state)
@@ -86,13 +93,19 @@ def run_training_queue(tasks, gpus, work, resume=True):
                 write_json(state_path, state)
             if failure is None:
                 for gpu in gpus:
-                    if gpu in active or not pending:
+                    if gpu in active or not pending or len(active) >= limit:
                         continue
                     record = pending.popleft()
                     stream = None
                     try:
                         # 数据准备可能耗时较长；真正使用该卡之前再检查，而非只信启动时状态。
-                        check_handoff(gpu, gpu in used_gpus)
+                        try:
+                            check_handoff(gpu, gpu in used_gpus)
+                        except (GPUBusy, GPUCoolingDown):
+                            if not managed:
+                                raise
+                            pending.appendleft(record)
+                            continue
                         if terminating[0]:
                             raise InterruptedError('队列收到停止信号')
                         env = os.environ.copy()
@@ -104,9 +117,17 @@ def run_training_queue(tasks, gpus, work, resume=True):
                         stream = log.open('w', encoding='utf-8')
                         command = [sys.executable, '-u', '-B', '-X', 'utf8', str(CODE / '05_src/server_train.py'),
                                    record['fold'], record['method'], *(['--resume'] if resume else [])]
+                        extra = {}
+                        if managed:
+                            from task_worker import child_options
+                            extra = child_options()
                         process = subprocess.Popen(command, cwd=CODE, env=env, stdin=subprocess.DEVNULL,
-                                                   stdout=stream, stderr=subprocess.STDOUT, start_new_session=True)
+                                                   stdout=stream, stderr=subprocess.STDOUT, start_new_session=True, **extra)
+                        if managed:
+                            from task_worker import register_child
+                            register_child(process, 'train')
                         active[gpu] = (process, stream, record)
+                        state['status'] = 'running'
                         used_gpus.add(gpu)
                         record.update(status='running', gpu_uuid=gpu, pid=process.pid, log=str(log))
                         print(f"启动 {record['fold']}/{record['method']}，GPU={gpu}，日志：{log}", flush=True)
@@ -125,6 +146,10 @@ def run_training_queue(tasks, gpus, work, resume=True):
                     raise RuntimeError(failure)
             if active:
                 time.sleep(1)
+            elif pending and not failure:
+                state['status'] = 'waiting_gpu'
+                write_json(state_path, state)
+                time.sleep(5)
         state['status'] = 'completed'
     except BaseException as error:
         state.update(status='failed', error=str(error))

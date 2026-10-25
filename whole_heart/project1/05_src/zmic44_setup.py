@@ -105,7 +105,11 @@ def ensure_conda(base, env):
     if actual != SHA256:
         raise RuntimeError(f'安装包SHA256不符，停止执行：{download}')
     prefix.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(['bash', str(download), '-b', '-p', str(prefix)], env=env, check=True)
+    if os.environ.get('WHOLE_HEART_MANAGED') == '1':
+        from task_worker import run_child
+        run_child(['bash', str(download), '-b', '-p', str(prefix)], env)
+    else:
+        subprocess.run(['bash', str(download), '-b', '-p', str(prefix)], env=env, check=True)
     if not executable.is_file():
         raise RuntimeError('Miniforge 安装没有生成 conda')
     return executable
@@ -141,7 +145,7 @@ def run_worker(config_path, mode):
             if gpus:
                 env['CUDA_VISIBLE_DEVICES'] = gpus[0]
             env['WHOLE_HEART_GPU_UUIDS'] = json.dumps(gpus)
-            command = ['bash', str(CODE / 'start_server.sh'), config['data'], '--work-dir', str(work),
+            command = ['bash', str(CODE / 'bootstrap_server.sh'), config['data'], '--work-dir', str(work),
                        '--mode', mode, '--scope', 'all', '--gpu-memory', '5', '--yes-train']
             subprocess.run(command, env=env, check=True)
             state['status'] = 'completed'
@@ -153,7 +157,7 @@ def run_worker(config_path, mode):
             write_json(state_file, state)
 
 
-def main():
+def legacy_main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base-dir', help=f"可选：环境/缓存/日志目录；首次默认 {DEFAULT_PATHS['base']}")
     parser.add_argument('--work-dir', help=f"可选：预处理/模型/结果目录；首次默认 {DEFAULT_PATHS['work']}")
@@ -256,6 +260,13 @@ def main():
         print(f'已提交后台任务 PID={process.pid}，尚不代表运行成功。\n日志：{log}\n'
               f'查看进度：tail -f "{log}"\n查看状态：bash run_zmic44.sh --mode status\n'
               '日志开始正常更新后可断开SSH；Ctrl+C退出tail不会停止训练。')
+
+
+def main():
+    if '--worker' in sys.argv:
+        return legacy_main()
+    from task_panel import main as panel_main
+    return panel_main()
 
 
 if __name__ == '__main__':

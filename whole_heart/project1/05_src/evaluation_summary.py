@@ -70,7 +70,7 @@ def summarize(root):
             writer.writeheader()
             writer.writerows(rows)
     result = {}
-    lines = ['# B0/B1 完整中心留出评价', '',
+    lines = ['# 所选模型的中心留出评价', '',
              '模型全部完成并冻结后才评价目标中心；来源开发集 EMA Dice 选择 best 检查点。',
              'raw 为主要结果；lcc 是预先指定的逐类最大连通块（26邻域）次要分析，两组同规则。',
              '完整标注范围，无官方血管截断；HD(max)与HD95均为毫米，不能冒充官方排行榜。', '',
@@ -79,9 +79,12 @@ def summarize(root):
     for modality in ['CT', 'MRI']:
         for variant in ['raw', 'lcc']:
             rows = [r for r in case_rows if r['modality'] == modality and r['variant'] == variant]
-            pair = paired_summary(rows)
+            if not rows:
+                continue
+            selected_methods = sorted({r['method'] for r in rows})
+            pair = paired_summary(rows) if set(selected_methods) == {'B0', 'B1'} else None
             methods = {}
-            for method in ['B0', 'B1']:
+            for method in selected_methods:
                 subset = [r for r in rows if r['method'] == method]
                 folds = {fold: float(np.mean([r['macro_dice'] for r in subset if r['fold'] == fold]))
                          for fold in sorted({r['fold'] for r in subset})}
@@ -93,7 +96,9 @@ def summarize(root):
                                        pooled_class_hd_mm=distance_summary([r['hd_mm'] for r in distances]),
                                        pooled_class_hd95_mm=distance_summary([r['hd95_mm'] for r in distances]))
             result[f'{modality}_{variant}'] = dict(methods=methods, paired=pair)
-            lines.append(f"| {modality} | {variant} | {methods['B0']['center_equal_dice']:.4f} | {methods['B1']['center_equal_dice']:.4f} | {pair['mean_delta']:+.4f} [{pair['ci95'][0]:+.4f}, {pair['ci95'][1]:+.4f}] |")
+            values = [f"{methods[m]['center_equal_dice']:.4f}" if m in methods else '未选择' for m in ['B0', 'B1']]
+            delta = f"{pair['mean_delta']:+.4f} [{pair['ci95'][0]:+.4f}, {pair['ci95'][1]:+.4f}]" if pair else '不适用：仅单模型'
+            lines.append(f"| {modality} | {variant} | {values[0]} | {values[1]} | {delta} |")
     lines += ['', '## 如何看结果', '',
               'Dice越高越好；B1−B0为正表示增强组在本次实验中更好。逐中心与最差中心结果见summary.json；逐病例和七结构明细见两个CSV。',
               '单侧结构缺失计Dice=0、HD/HD95=inf，绝不删掉失败病例；双侧缺失记空并报告数量。病例Dice对有定义结构取均值，CSV保留实际分母。',

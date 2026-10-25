@@ -1,0 +1,214 @@
+test_legacy_full_default_cannot_be_silently_narrowed (test_model_selection.ModelSelectionTests.test_legacy_full_default_cannot_be_silently_narrowed) ... ok
+test_persisted_selection_cannot_change (test_model_selection.ModelSelectionTests.test_persisted_selection_cannot_change) ... ok
+test_single_multi_and_rejection (test_model_selection.ModelSelectionTests.test_single_multi_and_rejection) ... ok
+test_history_tolerates_broken_neighbour_without_changing_last (test_task_panel.JobTests.test_history_tolerates_broken_neighbour_without_changing_last) ... ok
+test_lock_contention_does_not_create_task_directory (test_task_panel.JobTests.test_lock_contention_does_not_create_task_directory) ... ok
+test_same_names_unique_directories_and_immutable_selection (test_task_panel.JobTests.test_same_names_unique_directories_and_immutable_selection) ... ok
+test_stop_only_matches_identity_and_deduplicates (test_task_panel.JobTests.test_stop_only_matches_identity_and_deduplicates) ... ok
+test_cpu_form_does_not_query_gpu_and_keeps_multistep_selection (test_task_panel.PanelTests.test_cpu_form_does_not_query_gpu_and_keeps_multistep_selection) ... ok
+test_epoch_estimate_uses_completed_timed_epochs_only (test_task_panel.PanelTests.test_epoch_estimate_uses_completed_timed_epochs_only) ... ok
+test_gpu_candidates_respect_allocation_even_when_idle (test_task_panel.PanelTests.test_gpu_candidates_respect_allocation_even_when_idle) ... ok
+test_multi_model_form_and_explicit_cli_override_saved (test_task_panel.PanelTests.test_multi_model_form_and_explicit_cli_override_saved) ... ok
+test_navigation_preserves_zero_and_cancel (test_task_panel.PanelTests.test_navigation_preserves_zero_and_cancel) ... ok
+test_no_environment_or_gpu_for_status_with_site_packages_disabled (test_task_panel.PanelTests.test_no_environment_or_gpu_for_status_with_site_packages_disabled) ... ok
+test_prediction_progress_counts_only_recorded_completed_cases (test_task_panel.PanelTests.test_prediction_progress_counts_only_recorded_completed_cases) ... ok
+test_result_navigation_and_query_do_not_modify_old_results (test_task_panel.PanelTests.test_result_navigation_and_query_do_not_modify_old_results) ... ok
+test_append_keeps_original_models_and_completed_receipts (test_task_lifecycle.InputTests.test_append_keeps_original_models_and_completed_receipts) ... ok
+test_missing_cache_is_specific_mismatch_but_wrong_source_is_not (test_task_lifecycle.InputTests.test_missing_cache_is_specific_mismatch_but_wrong_source_is_not) ... ok
+test_private_cache_copy_does_not_change_source_and_keeps_selection (test_task_lifecycle.InputTests.test_private_cache_copy_does_not_change_source_and_keeps_selection) ... ok
+test_resume_code_integrity_is_not_bypassed (test_task_lifecycle.InputTests.test_resume_code_integrity_is_not_bypassed) ... ok
+已请求中断，正在退出；保留最后完整检查点。请查询状态确认退出。
+
+模型可多选：1 B0 基线 nnU-Net；2 B1 外观增强 nnU-Net
+GPU
+原站最新提交未确认，按首条有效且可快进的线路处理。
+检查下载线路：https://gh-proxy.com/https://github.com/tianwuasd/project.git
+检查下载线路：https://ghfast.top/https://github.com/tianwuasd/project.git
+检查下载线路：https://gitclone.com/github.com/tianwuasd/project.git
+检查下载线路：https://github.com/tianwuasd/project.git
+test_all_failed_routes_keep_existing_checkout_and_no_pointer (test_task_lifecycle.UpdateTests.test_all_failed_routes_keep_existing_checkout_and_no_pointer) ... ok
+test_archive_cannot_escape_or_include_siblings (test_task_lifecycle.UpdateTests.test_archive_cannot_escape_or_include_siblings) ... ok
+原站最新提交未确认，按首条有效且可快进的线路处理。
+检查下载线路：https://gh-proxy.com/https://github.com/tianwuasd/project.git
+检查下载线路：https://ghfast.top/https://github.com/tianwuasd/project.git
+test_bounded_mirror_fallback_publishes_isolated_release_and_stops (test_task_lifecycle.UpdateTests.test_bounded_mirror_fallback_publishes_isolated_release_and_stops) ... ok
+test_release_pointer_and_all_file_hashes_are_checked (test_task_lifecycle.UpdateTests.test_release_pointer_and_all_file_hashes_are_checked) ... ok
+test_compute_failure_keeps_completed_prepare_and_stops_prediction (test_task_worker.WorkerTests.test_compute_failure_keeps_completed_prepare_and_stops_prediction) ... ok
+test_order_selection_and_complete_state (test_task_worker.WorkerTests.test_order_selection_and_complete_state) ... ok
+test_child_holds_lock_after_parent_descriptor_closes (test_task_posix.LinuxLifecycleTests.test_child_holds_lock_after_parent_descriptor_closes) ... skipped 'requires actual Linux /proc and flock'
+test_cpu_prepare_does_not_check_or_allocate_gpu (test_selection_pipeline.SelectionPipelineTests.test_cpu_prepare_does_not_check_or_allocate_gpu) ... ok
+test_only_b1_is_dispatched_in_selected_fold (test_selection_pipeline.SelectionPipelineTests.test_only_b1_is_dispatched_in_selected_fold) ... ok
+已选择独立版本 new；旧任务仍用原快照。备份：D:\practice\wholeheart_panel_tests\tmpo00e5i6v\runtime\update_backups\1792858369688589000
+将运行 1 个正式实验；模型：B1；耗时需按实际服务器测量。
+所选训练队列完成。模型已保存；外层目标中心批量评价尚未执行。
+所有输出：D:\practice\wholeheart_panel_tests\tmphf4xv2j_\work
+评价及配对汇总完成：D:\practice\wholeheart_panel_tests\tmpd9g4_v17\09_reports\final_evaluation
+test_single_b1_freezes_and_summarizes_without_b0_or_mri (test_selection_pipeline.SelectionPipelineTests.test_single_b1_freezes_and_summarizes_without_b0_or_mri) ... ok
+test_evaluate_does_not_require_a_preselected_idle_gpu (test_full_experiment_queue.QueueTests.test_evaluate_does_not_require_a_preselected_idle_gpu) ... ok
+test_full_order_and_resume_reuses_smoke (test_full_experiment_queue.QueueTests.test_full_order_and_resume_reuses_smoke) ... ok
+test_last_training_failure_prevents_evaluation (test_full_experiment_queue.QueueTests.test_last_training_failure_prevents_evaluation) ... ok
+test_multigpu_prepares_once_then_waits_before_evaluation (test_full_experiment_queue.QueueTests.test_multigpu_prepares_once_then_waits_before_evaluation) ... ok
+test_allocation_intersection_and_internal_first_gpu_override (test_evaluation_parallel.GPUSelectionTests.test_allocation_intersection_and_internal_first_gpu_override) ... ok
+test_failed_query_does_not_report_idle (test_evaluation_parallel.GPUSelectionTests.test_failed_query_does_not_report_idle) ... ok
+test_invalid_config_rejected (test_evaluation_parallel.GPUSelectionTests.test_invalid_config_rejected) ... ok
+将运行 10 个正式实验；模型：B0,B1；耗时需按实际服务器测量。
+完整实验完成，报告：D:\practice\wholeheart_panel_tests\tmpjx2thsss\work\09_reports\final_evaluation\README.md
+所有输出：D:\practice\wholeheart_panel_tests\tmpjx2thsss\work
+将运行 10 个正式实验；模型：B0,B1；耗时需按实际服务器测量。
+完整实验完成，报告：D:\practice\wholeheart_panel_tests\tmpjx2thsss\work\09_reports\final_evaluation\README.md
+所有输出：D:\practice\wholeheart_panel_tests\tmpjx2thsss\work
+将运行 10 个正式实验；模型：B0,B1；耗时需按实际服务器测量。
+将运行 10 个正式实验；模型：B0,B1；耗时需按实际服务器测量。
+完整实验完成，报告：D:\practice\wholeheart_panel_tests\tmpptsp61q_\work\09_reports\final_evaluation\README.md
+所有输出：D:\practice\wholeheart_panel_tests\tmpptsp61q_\work
+将运行 10 个正式实验；模型：B0,B1；耗时需按实际服务器测量。
+GPU 0 跳过：已有计算进程（即使利用率为0也跳过）
+GPU 1 跳过：空闲显存 7000 MiB 不足
+GPU 0 跳过：已有计算进程（即使利用率为0也跳过）
+GPU 1 跳过：空闲显存 7000 MiB 不足
+GPU 2 跳过：利用率 70% 过高
+GPU 0 跳过：已有计算进程（即使利用率为0也跳过）
+GPU 1 跳过：空闲显存 7000 MiB 不足
+test_process_low_memory_and_transient_load_are_not_idle (test_evaluation_parallel.GPUSelectionTests.test_process_low_memory_and_transient_load_are_not_idle) ... ok
+test_compatibility_requires_exact_audited_release_and_legacy (test_evaluation_parallel.ParallelQueueTests.test_compatibility_requires_exact_audited_release_and_legacy) ... ok
+test_environment_mismatch_does_not_rewrite_training_record (test_evaluation_parallel.ParallelQueueTests.test_environment_mismatch_does_not_rewrite_training_record) ... ok
+评价自动选择 3 张GPU：['GPU-0', 'GPU-1', 'GPU-2']
+开始评价 fold0/B0，GPU=GPU-0，日志：D:\practice\wholeheart_panel_tests\tmp4jnhqg7u\08_results\evaluation\queue_logs\1792858369977994000_fold0_B0.log
+开始评价 fold1/B0，GPU=GPU-1，日志：D:\practice\wholeheart_panel_tests\tmp4jnhqg7u\08_results\evaluation\queue_logs\1792858369977994000_fold1_B0.log
+开始评价 fold2/B0，GPU=GPU-2，日志：D:\practice\wholeheart_panel_tests\tmp4jnhqg7u\08_results\evaluation\queue_logs\1792858369977994000_fold2_B0.log
+评价 fold0/B0: failed，日志 D:\practice\wholeheart_panel_tests\tmp4jnhqg7u\08_results\evaluation\queue_logs\1792858369977994000_fold0_B0.log
+test_failure_stops_owned_workers_and_prevents_final_report (test_evaluation_parallel.ParallelQueueTests.test_failure_stops_owned_workers_and_prevents_final_report) ... ok
+没有空闲GPU，30秒后重查。
+评价自动选择 1 张GPU：['GPU-1']
+开始评价 ct_holdA/B0，GPU=GPU-1，日志：D:\practice\wholeheart_panel_tests\tmpsyq2ju6j\08_results\evaluation\queue_logs\1792858369991359100_ct_holdA_B0.log
+评价 ct_holdA/B0: completed，日志 D:\practice\wholeheart_panel_tests\tmpsyq2ju6j\08_results\evaluation\queue_logs\1792858369991359100_ct_holdA_B0.log
+test_no_gpu_waits_then_uses_one (test_evaluation_parallel.ParallelQueueTests.test_no_gpu_waits_then_uses_one) ... ok
+评价自动选择 1 张GPU：['GPU-0']
+开始评价 ct_holdA/B0，GPU=GPU-0，日志：D:\practice\wholeheart_panel_tests\tmpt1_xr2u5\08_results\evaluation\queue_logs\1792858370006006700_ct_holdA_B0.log
+test_sigterm_cleans_only_owned_worker_and_does_not_summarize (test_evaluation_parallel.ParallelQueueTests.test_sigterm_cleans_only_owned_worker_and_does_not_summarize) ... ok
+评价自动选择 3 张GPU：['GPU-0', 'GPU-1', 'GPU-2']
+开始评价 fold0/B0，GPU=GPU-0，日志：D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold0_B0.log
+开始评价 fold1/B0，GPU=GPU-1，日志：D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold1_B0.log
+开始评价 fold2/B0，GPU=GPU-2，日志：D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold2_B0.log
+评价 fold0/B0: completed，日志 D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold0_B0.log
+评价 fold1/B0: completed，日志 D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold1_B0.log
+评价 fold2/B0: completed，日志 D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold2_B0.log
+开始评价 fold3/B0，GPU=GPU-0，日志：D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold3_B0.log
+开始评价 fold4/B0，GPU=GPU-1，日志：D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold4_B0.log
+开始评价 fold5/B0，GPU=GPU-2，日志：D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold5_B0.log
+评价 fold3/B0: completed，日志 D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold3_B0.log
+评价 fold4/B0: completed，日志 D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold4_B0.log
+评价 fold5/B0: completed，日志 D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold5_B0.log
+开始评价 fold6/B0，GPU=GPU-0，日志：D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold6_B0.log
+开始评价 fold7/B0，GPU=GPU-1，日志：D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold7_B0.log
+开始评价 fold8/B0，GPU=GPU-2，日志：D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold8_B0.log
+评价 fold6/B0: completed，日志 D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold6_B0.log
+评价 fold7/B0: completed，日志 D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold7_B0.log
+评价 fold8/B0: completed，日志 D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold8_B0.log
+开始评价 fold9/B0，GPU=GPU-0，日志：D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold9_B0.log
+评价 fold9/B0: completed，日志 D:\practice\wholeheart_panel_tests\tmpgooi5oah\08_results\evaluation\queue_logs\1792858370015041000_fold9_B0.log
+test_ten_jobs_maximum_three_workers_and_single_summary (test_evaluation_parallel.ParallelQueueTests.test_ten_jobs_maximum_three_workers_and_single_summary) ... ok
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, RTX3090, 23000, 0
+2, GPU-two, RTX3090, 23000, 0
+3, GPU-three, RTX3090, 23000, 0
+
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, RTX3090, 23000, 0
+2, GPU-two, RTX3090, 23000, 0
+3, GPU-three, RTX3090, 23000, 0
+
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, RTX3090, 23000, 0
+2, GPU-two, RTX3090, 23000, 0
+3, GPU-three, RTX3090, 23000, 0
+
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, RTX3090, 23000, 0
+2, GPU-two, RTX3090, 23000, 0
+3, GPU-three, RTX3090, 23000, 0
+
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, RTX3090, 23000, 0
+2, GPU-two, RTX3090, 23000, 0
+3, GPU-three, RTX3090, 23000, 0
+
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, RTX3090, 23000, 0
+2, GPU-two, RTX3090, 23000, 0
+3, GPU-three, RTX3090, 23000, 0
+
+test_count_ids_and_uuid_alias_duplicates (test_gpu_queue.GPUSelectionTests.test_count_ids_and_uuid_alias_duplicates) ... ok
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, RTX3090, 23000, 0
+2, GPU-two, RTX3090, 23000, 0
+3, GPU-three, RTX3090, 23000, 0
+
+启动 ct_holdA/B0，GPU=GPU-zero，日志：D:\practice\wholeheart_panel_tests\tmp_2gdf_ry\07_experiments\queue_logs\1792858370059138500_ct_holdA_B0.log
+启动 ct_holdA/B1，GPU=GPU-three，日志：D:\practice\wholeheart_panel_tests\tmp_2gdf_ry\07_experiments\queue_logs\1792858370059138500_ct_holdA_B1.log
+启动 ct_holdB/B0，GPU=GPU-three，日志：D:\practice\wholeheart_panel_tests\tmp_2gdf_ry\07_experiments\queue_logs\1792858370059138500_ct_holdB_B0.log
+启动 ct_holdB/B1，GPU=GPU-three，日志：D:\practice\wholeheart_panel_tests\tmp_2gdf_ry\07_experiments\queue_logs\1792858370059138500_ct_holdB_B1.log
+test_dynamic_queue_single_device_per_process (test_gpu_queue.QueueTests.test_dynamic_queue_single_device_per_process) ... ok
+启动 ct_holdA/B0，GPU=GPU-zero，日志：D:\practice\wholeheart_panel_tests\tmpina73l3h\07_experiments\queue_logs\1792858370079040600_ct_holdA_B0.log
+启动 ct_holdA/B1，GPU=GPU-three，日志：D:\practice\wholeheart_panel_tests\tmpina73l3h\07_experiments\queue_logs\1792858370079040600_ct_holdA_B1.log
+ct_holdA/B1 失败，日志：D:\practice\wholeheart_panel_tests\tmpina73l3h\07_experiments\queue_logs\1792858370079040600_ct_holdA_B1.log；停止派发新任务，已运行模型继续收尾。
+test_failure_stops_new_dispatch_and_drains_running_job (test_gpu_queue.QueueTests.test_failure_stops_new_dispatch_and_drains_running_job) ... ok
+test_handoff_only_retries_stale_utilization_without_external_process (test_gpu_queue.QueueTests.test_handoff_only_retries_stale_utilization_without_external_process) ... ok
+test_launch_error_stops_before_training (test_gpu_queue.QueueTests.test_launch_error_stops_before_training) ... ok
+test_paired_initialization_does_not_fail_on_running_record (test_gpu_queue.QueueTests.test_paired_initialization_does_not_fail_on_running_record) ... ok
+启动 foldA/B0，GPU=GPU-zero，日志：D:\practice\wholeheart_panel_tests\tmp6urgt1e9\work\07_experiments\queue_logs\1792858370113511500_foldA_B0.log
+启动 foldA/B1，GPU=GPU-three，日志：D:\practice\wholeheart_panel_tests\tmp6urgt1e9\work\07_experiments\queue_logs\1792858370113511500_foldA_B1.log
+启动 foldB/B0，GPU=GPU-zero，日志：D:\practice\wholeheart_panel_tests\tmp6urgt1e9\work\07_experiments\queue_logs\1792858370113511500_foldB_B0.log
+test_real_cpu_subprocesses_receive_only_assigned_gpu (test_gpu_queue.QueueTests.test_real_cpu_subprocesses_receive_only_assigned_gpu) ... ok
+启动 ct_holdA/B0，GPU=GPU-zero，日志：D:\practice\wholeheart_panel_tests\tmppdolie7_\07_experiments\queue_logs\1792858372158660500_ct_holdA_B0.log
+test_sigterm_cleans_owned_job_and_restores_handler (test_gpu_queue.QueueTests.test_sigterm_cleans_owned_job_and_restores_handler) ... ok
+test_environment_is_personal_and_no_hardcoded_local_proxy (test_zmic44_setup.WizardTests.test_environment_is_personal_and_no_hardcoded_local_proxy) ... ok
+test_failed_first_binding_allows_only_lock_file (test_zmic44_setup.WizardTests.test_failed_first_binding_allows_only_lock_file) ... ok
+test_invalid_installer_never_executes (test_zmic44_setup.WizardTests.test_invalid_installer_never_executes) ... ok
+test_paths_remain_editable_after_saving_and_cli_takes_priority (test_zmic44_setup.WizardTests.test_paths_remain_editable_after_saving_and_cli_takes_priority) ... ok
+
+路径
+服务器预设：/server/default
+
+路径
+服务器预设：/server/default
+上次选择：/previous
+
+路径
+服务器预设：/server/default
+上次选择：/previous
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, NVIDIA RTX 3090, 23000, 0
+1, GPU-one, NVIDIA RTX 3090, 24000, 0
+
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, NVIDIA RTX 3090, 23000, 0
+1, GPU-one, NVIDIA RTX 3090, 24000, 0
+
+GPU编号 / UUID / 名称 / 空闲MiB / 利用率：
+0, GPU-zero, NVIDIA RTX 3090, 23000, 0
+1, GPU-one, NVIDIA RTX 3090, 24000, 0
+
+test_single_gpu_uuid_and_refuse_active_card (test_zmic44_setup.WizardTests.test_single_gpu_uuid_and_refuse_active_card) ... ok
+test_checkpoint_priority_never_uses_smoke_or_best (test_server_launcher.ServerDataTests.test_checkpoint_priority_never_uses_smoke_or_best) ... ok
+test_missing_duplicate_and_changed_files_fail (test_server_launcher.ServerDataTests.test_missing_duplicate_and_changed_files_fail) ... ok
+校验通过：Case0001 (eligible)
+校验通过：Case0002 (quarantined)
+校验通过：Case0001 (eligible)
+校验通过：Case0002 (quarantined)
+test_relocation_preserves_splits_quarantine_and_sources (test_server_launcher.ServerDataTests.test_relocation_preserves_splits_quarantine_and_sources) ... ok
+test_workspace_cannot_overwrite_source_or_unknown_files (test_server_launcher.ServerDataTests.test_workspace_cannot_overwrite_source_or_unknown_files) ... ok
+test_all_ten_required_and_frozen_checkpoint_cannot_change (test_evaluation.EvaluationTests.test_all_ten_required_and_frozen_checkpoint_cannot_change) ... ok
+test_bootstrap_weights_centers_equally (test_evaluation.EvaluationTests.test_bootstrap_weights_centers_equally) ... ok
+test_empty_failure_is_not_dropped (test_evaluation.EvaluationTests.test_empty_failure_is_not_dropped) ... ok
+test_incomplete_model_blocks_target_evaluation (test_evaluation.EvaluationTests.test_incomplete_model_blocks_target_evaluation) ... ok
+test_lcc_is_per_class_and_26_connected (test_evaluation.EvaluationTests.test_lcc_is_per_class_and_26_connected) ... ok
+本模型尚无完整轮次检查点，失败现场保留于 D:\practice\wholeheart_panel_tests\tmpqvf9xl66\07_experiments\recovery_archive\ct_holdG_B1_seed0_1792858372941363700；仅该模型从seed0重新开始。
+test_no_checkpoint_recovery_preserves_other_runs_and_archive (test_evaluation.EvaluationTests.test_no_checkpoint_recovery_preserves_other_runs_and_archive) ... ok
+评价及配对汇总完成：D:\practice\wholeheart_panel_tests\tmpdkh2jdet\09_reports\final_evaluation
+test_summary_writes_reports_and_keeps_infinite_distances (test_evaluation.EvaluationTests.test_summary_writes_reports_and_keeps_infinite_distances) ... ok
+
+----------------------------------------------------------------------
+Ran 67 tests in 4.202s
+
+OK (skipped=1)

@@ -1,6 +1,11 @@
 """标准库GPU选择：显式填写数量和编号，不抢占其他计算任务。"""
 import csv
 import subprocess
+import os
+
+
+class GPUBusy(RuntimeError):
+    """A permitted device is temporarily unavailable; managed queues may wait."""
 
 
 class GPUCoolingDown(RuntimeError):
@@ -12,6 +17,8 @@ def select_gpus(count=None, selection=None):
         ['nvidia-smi', '--query-gpu=index,uuid,name,memory.free,utilization.gpu',
          '--format=csv,noheader,nounits'], text=True, timeout=15)
     rows = [[cell.strip() for cell in row] for row in csv.reader(output.splitlines()) if row]
+    from evaluation_gpu import allowed_ids
+    visible = allowed_ids([dict(index=r[0], uuid=r[1]) for r in rows], {'allowed_gpus': None})
     print('GPU编号 / UUID / 名称 / 空闲MiB / 利用率：\n' + output, flush=True)
     choices = str(selection).replace('，', ',').replace(',', ' ').split() if selection is not None else None
     if count is None:
@@ -28,6 +35,8 @@ def select_gpus(count=None, selection=None):
         if len(matched) != 1:
             raise ValueError(f'GPU编号不存在：{choice}')
         row = matched[0]
+        if row[1] not in visible:
+            raise ValueError(f'GPU {row[0]} 不在继承的可见/分配范围内')
         if row[1] in selected:
             raise ValueError('不能重复选择同一张显卡')
         selected.append(row[1])
@@ -36,10 +45,11 @@ def select_gpus(count=None, selection=None):
         ['nvidia-smi', '--query-compute-apps=gpu_uuid,pid', '--format=csv,noheader,nounits'], text=True, timeout=15)
     busy = {line.split(',')[0].strip() for line in active.splitlines()}
     if busy.intersection(selected):
-        raise RuntimeError('所选GPU已有计算进程，不抢占或终止其他任务；请重新选择空闲卡')
+        raise GPUBusy('所选GPU已有计算进程，不抢占或终止其他任务；请等待空闲卡')
     for row in selected_rows:
-        if float(row[3]) < 6000:
-            raise RuntimeError(f'GPU {row[0]} 空闲显存不足6000MiB')
+        required = max(6000, (float(os.environ.get('WHOLE_HEART_GPU_MEMORY', 5))+.5)*1024) if os.environ.get('WHOLE_HEART_MANAGED') == '1' else 6000
+        if float(row[3]) < required:
+            raise GPUBusy(f'GPU {row[0]} 空闲显存不足{required:g}MiB')
         if float(row[4]) > 10:
             raise GPUCoolingDown(f'GPU {row[0]} 当前利用率仍高于10%，请等待空闲')
     return selected

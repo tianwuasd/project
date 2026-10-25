@@ -1,4 +1,4 @@
-"""十个正式模型冻结后，逐病例推理、恢复原图坐标并评价；支持断点继续。
+"""预选正式模型冻结后逐病例推理与评价；旧无选择清单实验仍要求全部十组。
 
 目标中心只在本文件中用于最终评价。best 来自来源开发集的 EMA Dice，
 final 仅用于确认训练完整；不允许根据目标分数选择模型或后处理。
@@ -16,6 +16,7 @@ from data_pipeline import ROOT, CODE_ROOT, FOLDS, LABELS, inverse_labels, map_la
 from prepare_nnunet import configure_paths
 from server_data import digest, read_json, write_json
 from metrics import binary_metrics
+from model_catalog import load_selection, trainer_class
 
 PROTOCOL = {'version': 1, 'checkpoint': 'checkpoint_best.pth',
             'selection': 'source development patch EMA foreground Dice',
@@ -36,7 +37,7 @@ def establish_protocol():
 
 def require_completed(run):
     if run.get('status') != 'completed' or not run.get('formal_training'):
-        raise ValueError('十个正式训练必须全部完成后才能打开目标中心评价')
+        raise ValueError('预先选定的正式训练必须全部完成后才能打开目标中心评价')
 
 
 def compatible_evaluation_code(recorded, current):
@@ -55,16 +56,17 @@ def compatible_evaluation_code(recorded, current):
 
 
 def freeze_models():
-    """先检查全部十个模型，再一次性保存不可变的检查点清单。"""
+    """检查预先冻结的完整选择，再一次性保存不可变的检查点清单。"""
     establish_protocol()
     splits = read_json(ROOT / '04_data/manifests/splits_v1.json')['folds']
     code = {p.name: digest(p) for p in sorted((CODE_ROOT / '05_src').glob('*.py'))}
     models = []
-    for fold in FOLDS:
+    selected = load_selection(ROOT, default_folds=list(FOLDS))
+    for fold in selected['folds']:
         initial = []
         split = splits[fold]
         prep = ROOT / '04_data/derived/nnUNet_preprocessed' / f"Dataset{split['dataset_id']:03d}_{fold}"
-        for method in ['B0', 'B1']:
+        for method in selected['methods']:
             out = ROOT / '07_experiments/formal' / f'{fold}_{method}_seed0'
             run = read_json(out / 'run.json')
             require_completed(run)
@@ -83,7 +85,7 @@ def freeze_models():
             models.append(dict(fold=fold, method=method, checkpoint=str(best),
                                checkpoint_sha256=digest(best), final_sha256=digest(final),
                                signature=expected, targets=split['target']))
-        if not initial[0] or initial[0] != initial[1]:
+        if not all(initial) or len(set(initial)) != 1:
             raise ValueError(f'{fold} B0/B1初始权重不同')
     frozen = dict(protocol=PROTOCOL, models=models)
     path = ROOT / '08_results/evaluation/frozen_models.json'
@@ -154,7 +156,7 @@ def make_predictor(model):
     from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
     split = read_json(ROOT / '04_data/manifests/splits_v1.json')['folds'][model['fold']]
     prep = ROOT / '04_data/derived/nnUNet_preprocessed' / f"Dataset{split['dataset_id']:03d}_{model['fold']}"
-    cls = Project1B0 if model['method'] == 'B0' else Project1B1
+    cls = trainer_class(model['method'])
     trainer = cls(read_json(prep / 'Project1Plans.json'), '3d_fullres', 0, read_json(prep / 'dataset.json'))
     trainer.initialize()
     trainer.load_checkpoint(model['checkpoint'])

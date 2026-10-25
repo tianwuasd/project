@@ -1,0 +1,22 @@
+test_append_keeps_original_models_and_completed_receipts (test_task_lifecycle.InputTests.test_append_keeps_original_models_and_completed_receipts) ... ok
+test_missing_cache_is_specific_mismatch_but_wrong_source_is_not (test_task_lifecycle.InputTests.test_missing_cache_is_specific_mismatch_but_wrong_source_is_not) ... ok
+test_private_cache_copy_does_not_change_source_and_keeps_selection (test_task_lifecycle.InputTests.test_private_cache_copy_does_not_change_source_and_keeps_selection) ... ok
+test_resume_code_integrity_is_not_bypassed (test_task_lifecycle.InputTests.test_resume_code_integrity_is_not_bypassed) ... ok
+原站最新提交未确认，按首条有效且可快进的线路处理。
+检查下载线路：https://gh-proxy.com/https://github.com/tianwuasd/project.git
+检查下载线路：https://ghfast.top/https://github.com/tianwuasd/project.git
+检查下载线路：https://gitclone.com/github.com/tianwuasd/project.git
+检查下载线路：https://github.com/tianwuasd/project.git
+test_all_failed_routes_keep_existing_checkout_and_no_pointer (test_task_lifecycle.UpdateTests.test_all_failed_routes_keep_existing_checkout_and_no_pointer) ... ok
+test_archive_cannot_escape_or_include_siblings (test_task_lifecycle.UpdateTests.test_archive_cannot_escape_or_include_siblings) ... ok
+原站最新提交未确认，按首条有效且可快进的线路处理。
+检查下载线路：https://gh-proxy.com/https://github.com/tianwuasd/project.git
+检查下载线路：https://ghfast.top/https://github.com/tianwuasd/project.git
+test_bounded_mirror_fallback_publishes_isolated_release_and_stops (test_task_lifecycle.UpdateTests.test_bounded_mirror_fallback_publishes_isolated_release_and_stops) ... ok
+test_release_pointer_and_all_file_hashes_are_checked (test_task_lifecycle.UpdateTests.test_release_pointer_and_all_file_hashes_are_checked) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.461s
+
+OK
+已选择独立版本 new；旧任务仍用原快照。备份：D:\practice\wholeheart_panel_tests\tmpm8fvdm7j\runtime\update_backups\1792858542494053600

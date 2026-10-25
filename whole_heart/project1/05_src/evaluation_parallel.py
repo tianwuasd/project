@@ -78,11 +78,18 @@ def run_queue(models, sha, settings, work):
                     logfile = logdir / f"{stamp}_{record['fold']}_{record['method']}.log"
                     stream = logfile.open('w', encoding='utf-8')
                     try:
+                        extra = {}
+                        if os.environ.get('WHOLE_HEART_MANAGED') == '1':
+                            from task_worker import child_options
+                            extra = child_options()
                         process = subprocess.Popen(
                             [sys.executable, '-u', '-B', str(Path(__file__).resolve()),
                              '--worker', str(record['index']), '--frozen-sha', sha],
                             cwd=CODE, env=env, stdin=subprocess.DEVNULL, stdout=stream,
-                            stderr=subprocess.STDOUT, start_new_session=True)
+                            stderr=subprocess.STDOUT, start_new_session=True, **extra)
+                        if extra:
+                            from task_worker import register_child
+                            register_child(process, 'predict')
                     except BaseException:
                         stream.close()
                         raise

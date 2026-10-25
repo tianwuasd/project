@@ -1,0 +1,15 @@
+{
+  "description": "字段示例；实际执行使用任务面板或CLI，勿将占位路径作为真实输入。",
+  "name": "CT B0和B1实验",
+  "runtime": "/personal/wholeheart_runtime",
+  "results": "/results/wholeheart_jobs",
+  "data": "/data/Wholeheart_Train_Dataset",
+  "tasks": ["prepare", "smoke", "train", "predict"],
+  "methods": ["B0", "B1"],
+  "folds": ["ct_holdG"],
+  "gpus": ["GPU-替换为本次获准的完整UUID"],
+  "gpu_count": 1,
+  "gpu_memory": 5,
+  "preprocess_cache": "reuse",
+  "input_job": null
+}
