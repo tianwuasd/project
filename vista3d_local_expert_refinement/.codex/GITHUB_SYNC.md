@@ -2,6 +2,8 @@
 
 日期：2026-10-25。用户明确指令：“上传到github的project中”。
 
+在明确说明目标仓库公开、内容包括 17 篇 PDF、研究数据库、历史讨论、含本地路径的 .codex 交接记录后，用户进一步确认：“确认完整公开上传”。本次完整归档的公开发布因此已有明确授权。
+
 - 仓库：[tianwuasd/project](https://github.com/tianwuasd/project)，已核实为公开仓库，拥有推送权限。
 - 分支：`main`。
 - 子目录：[`vista3d_local_expert_refinement`](https://github.com/tianwuasd/project/tree/main/vista3d_local_expert_refinement)。

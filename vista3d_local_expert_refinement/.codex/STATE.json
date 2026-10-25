@@ -74,6 +74,14 @@
     "path": "vista3d_local_expert_refinement",
     "url": "https://github.com/tianwuasd/project/tree/main/vista3d_local_expert_refinement",
     "scope": "complete_existing_research_archive",
-    "remote_status_authority": "Git commit history and remote main ref"
+    "remote_status_authority": "Git commit history and remote main ref",
+    "explicit_publication_confirmed": true,
+    "confirmation_text": "确认完整公开上传",
+    "confirmed_public_materials": [
+      "17 paper PDFs",
+      "Academic Agent research database",
+      "historical discussion",
+      "Codex handoff including local paths"
+    ]
   }
 }
