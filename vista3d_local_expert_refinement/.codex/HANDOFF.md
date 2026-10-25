@@ -96,3 +96,8 @@ GitHub代码发布完成。Linux CI https://github.com/tianwuasd/project/actions
 本机80项回归中75通过、5跳过；真实CPU小张量检查、RNG/线程池限制、Bash语法及无site-packages查询通过。独立只读审查的3项发现已修复。Linux进程、真实nnU-Net/GPU、服务器部署及实际LFS权限仍待目标环境，不是已完成真实实验。直接升级见 docs/SERVER_GIT_UPDATE.md；旧任务快照不改写。患者训练未启动。
 
 代码已发布并核验GitHub main：`de307c6e98355c5e077a65947ed29412662df221`。本次Linux CI 40211433316仍在启动前因账户计费/支出限制失败，步骤为0；Linux验收未通过也未实际运行。服务器和真实GPU验证保持待执行。
+
+
+## 更新功能测试补丁（2026-10-26）
+
+用户要求发布一个小更新以测试服务器更新。面板版本从v0.3.0改为v0.3.1，除此之外无流程改动。Python语法与无site-packages实际启动/退出检查通过，未创建runtime；用户随后测试u并重开，应看到v0.3.1。

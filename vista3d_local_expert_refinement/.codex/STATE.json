@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-25T16:18:50.122131+00:00",
+  "updated_at": "2026-10-25T17:23:05.009400+00:00",
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
@@ -202,5 +202,13 @@
       "code_commit": "de307c6e98355c5e077a65947ed29412662df221",
       "reason": "GitHub account payment or spending limit; not a test execution failure"
     }
+  },
+  "panel_update_test_patch": {
+    "version": "0.3.1",
+    "date": "2026-10-26",
+    "purpose": "visible panel version for user update test",
+    "change": "PANEL_VERSION only; no workflow change",
+    "validation": "AST and real panel launch/quit with -S; no runtime created",
+    "server_update_test": "pending user"
   }
 }
