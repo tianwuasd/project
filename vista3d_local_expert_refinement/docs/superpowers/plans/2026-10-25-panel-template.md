@@ -30,9 +30,9 @@ Files: 创建 05_src/task_progress.py；修改 task_queries.py；测试 tests/te
 
 Interfaces: `task_progress.step_lines(job, plan, work, state)`、`process_lines(job)`、`task_queries.log_sources(job)`；query 增加 log_source='all' 和 processes scope。
 
-- [ ] 加入旧记录、安装阶段、预处理完成病例、过期等待、身份检查和有界日志测试，先确认失败。
-- [ ] 实现只读聚合，中文状态、时间和路径，保留 models 原计时。
-- [ ] 通过新测试及 test_task_panel.py 回归。
+- [x] 加入旧记录、安装阶段、预处理完成病例、过期等待、身份检查和有界日志测试，先确认失败。
+- [x] 实现只读聚合，中文状态、时间和路径，保留 models 原计时。
+- [x] 通过新测试及 test_task_panel.py 回归。
 
 ### Task 2: 环境阶段与可恢复安装
 
@@ -40,15 +40,17 @@ Files: 修改 runtime_setup.py、task_worker.py、bootstrap_server.sh；测试 t
 
 Interfaces: `runtime_setup.report_progress(env, phase, message, **fields)` 写 job/environment.json；安装器保存依赖签名凭证，仅成功后标记。
 
-- [ ] 测试 pip 配置隔离、下载字节、校验失败、环境失败阶段和 CPU 前置顺序。
-- [ ] 加入安装子阶段、时间戳和下载计数，worker 设置 current_step=installation 后再运行安装。
-- [ ] Bash 按依赖配置摘要决定检查/安装；支持已存在独立环境的核验；shell 语法与控制面回归通过。
+- [x] 测试 pip 配置隔离、下载字节、校验失败、环境失败阶段和 CPU 前置顺序。
+- [x] 加入安装子阶段、时间戳和下载计数，worker 设置 current_step=installation 后再运行安装。
+- [x] Bash 按依赖配置摘要决定检查/安装；支持已存在独立环境的核验；shell 语法与控制面回归通过。
 
 ### Task 3: 友好导航与发布
 
 Files: 修改 task_panel.py、docs/SERVER_PANEL.md；新增 .github/workflows/vista3d-panel.yml；更新 .codex 交接。
 
-- [ ] 加入日志选择/持续刷新/环境入口/取消不提交的菜单测试。
-- [ ] 实现分层查询、分组新建表单、环境独立入口和提交后查询提示。
-- [ ] 本地运行控制面与协议回归；Linux CI 运行实际进程测试；独立审查修改。
-- [ ] 将本次增量文件发布 tianwuasd/project main，核验远端提交与 CI，给服务器受管更新命令。
+- [x] 加入日志选择/持续刷新/环境入口/取消不提交的菜单测试。
+- [x] 实现分层查询、分组新建表单、环境独立入口和提交后查询提示。
+- [x] 本地运行控制面与协议回归；Linux CI 运行实际进程测试；独立审查修改。
+- [x] 将本次增量文件发布 tianwuasd/project main，核验远端提交与 CI，给服务器受管更新命令。
+
+执行注记：本地46项中42通过、4项Linux专属跳过；Linux CI已提交但被GitHub账户付款/支出上限在启动前阻止。独立审查问题已修复。代码已发布，Linux实际运行仍待平台恢复或服务器执行，不将此项标作通过。

@@ -6,6 +6,8 @@
 
 实现和操作见 docs/SERVER_PANEL.md；模板逐项对应见 docs/superpowers/specs/2026-10-25-panel-template-design.md；验证范围见 docs/PANEL_TEMPLATE_VALIDATION.md。Windows Python3.11回归46项（42通过、4项Linux专属跳过），Bash语法通过；Linux CI另核对发布记录。独立审查所报安装失败阶段问题已修复并复核。没有连接目标服务器、安装真实服务器环境或启动患者训练。B0协议不变，旧任务继续使用原快照；新版worker的进度字段用于新建/独立重跑。
 
+GitHub代码发布完成。Linux CI https://github.com/tianwuasd/project/actions/runs/40205509176 在任何测试步骤执行前因账户付款/支出上限被阻止；42项本地通过、4项Linux专属待测，不宣称Linux全部通过。
+
 服务器进入本项目原检出目录，沿用原runtime执行 `bash start_server.sh --update`，再 `bash start_server.sh`；若有自定义runtime，两条命令都加同一 `--runtime`。当前任务的后续工作是核实服务器部署、环境与获准GPU短测，不把本地测试写成真实服务器成果。
 
 最后整理：2026-10-25。项目：`D:/code_project/vista3d_local_expert_refinement`。
