@@ -16,6 +16,32 @@ from chd_ct.server import inspection, jobs, updater  # noqa: E402
 
 @unittest.skipUnless(sys.platform == "linux", "Requires Linux process groups and flock")
 class UpdateProcessTests(unittest.TestCase):
+    def test_progress_timeout_reaps_helpers_before_reader_threads_return(self):
+        import threading
+
+        with tempfile.TemporaryDirectory(prefix="chd_git_progress_timeout_") as directory:
+            root = Path(directory)
+            executable = root / "git"
+            executable.write_text(
+                f"#!{sys.executable}\n"
+                "import subprocess, sys, time\nfrom pathlib import Path\n"
+                "child=subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\n"
+                f"Path({str(root / 'child')!r}).write_text(str(child.pid))\n"
+                "sys.stderr.write('Receiving objects: 1% (1/100)\\r');sys.stderr.flush()\n"
+                "time.sleep(60)\n"
+            )
+            executable.chmod(0o700)
+            with patch.dict(os.environ, {"PATH": str(root) + os.pathsep + os.environ["PATH"]}):
+                with self.assertRaises(subprocess.TimeoutExpired):
+                    updater.git(root, "fetch", timeout=0.5, progress_log=root / "fetch.log", stage="对象下载")
+            child = int((root / "child").read_text())
+            for _ in range(30):
+                if jobs.identity(child) is None:
+                    break
+                time.sleep(0.1)
+            self.assertIsNone(jobs.identity(child), "Git helper survived streaming timeout")
+            self.assertFalse([t for t in threading.enumerate() if t.name.startswith("chd-git-")])
+
     def test_timeout_kills_git_and_helper_processes(self):
         with tempfile.TemporaryDirectory(prefix="chd_git_timeout_") as directory:
             root = Path(directory)

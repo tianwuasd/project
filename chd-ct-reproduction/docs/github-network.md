@@ -1,4 +1,4 @@
-# GitHub 代理、私有仓库更新与结果上传（0.22.0）
+# GitHub 代理、私有仓库更新与结果上传（0.22.1）
 
 面板新增 `c GitHub 网络设置`；`u` 更新代码、`w` 上传已提交代码、`v` 上传完成任务的产物分别读取其原 runtime 的 `network.json`。配置只保存代理地址、Git 线路和密钥路径，不保存订阅、密码、令牌或密钥内容。保存设置不代表连通性验证通过。
 
@@ -32,7 +32,7 @@ SSH 模式需要兼容上述参数的 OpenBSD nc；只找到名为 nc 的程序�
 
 ## 旧面板首次升级
 
-0.20.0 及更早的 `u` 不支持此网络配置，也不向私有仓库提供认证。先确认共享这份代码的所有任务均已结束；仅退出面板不会结束后台任务。下面的一次性命令持默认 runtime 的任务锁、拒绝脏工作区、备份当前 CT 代码，再从官方 SSH 快进更新。其他 runtime 的任务应先另外确认停止。需要 `nc` 和 `flock` 已安装，且已完成官方 SSH 主机指纹核验。
+0.20.0 及更早的 `u` 不支持此网络配置；0.21.0—0.22.0 的下载总上限仍为45秒。遇到旧入口超时可用以下一次性升级，不反复要求旧菜单下载它无法取得的修复。先确认共享这份代码的所有任务均已结束；仅退出面板不会结束后台任务。命令持默认 runtime 的任务锁、拒绝脏工作区、备份当前 CT 代码，再从官方 SSH 快进更新。其他 runtime 的任务应先另外确认停止。需要 `nc` 和 `flock` 已安装，且已完成官方 SSH 主机指纹核验。
 
 ```bash
 (
@@ -50,17 +50,29 @@ url=ssh://git@ssh.github.com:443/tianwuasd/project.git
 [ "$(git ls-remote --get-url "$url")" = "$url" ] || { echo '存在 Git URL 重写，请先检查。'; exit 1; }
 export GIT_SSH_COMMAND='ssh -F /dev/null -i ~/.ssh/project_readonly_ed25519 -p 443 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o "ProxyCommand=nc -X connect -x 127.0.0.1:17891 %h %p"'
 export GIT_SSH_VARIANT=ssh
-backup=$(mktemp -d "$runtime/upgrade-0.22-XXXXXXXX")
+backup=$(mktemp -d "$runtime/upgrade-0.22.1-XXXXXXXX")
 git rev-parse HEAD >"$backup/before.txt"
-git archive --format=tar --output="$backup/ct-before.tar" HEAD chd-ct-reproduction
-timeout 120 git fetch --no-tags --no-recurse-submodules "$url" main
-git merge --ff-only --no-overwrite-ignore --no-edit FETCH_HEAD
+timeout 180 git archive --format=tar --output="$backup/ct-before.tar" HEAD chd-ct-reproduction
+timeout 900 git fetch --progress --no-tags --no-recurse-submodules "$url" main
+timeout 120 git merge --ff-only --no-overwrite-ignore --no-edit FETCH_HEAD
 git rev-parse HEAD
 echo "备份位于 $backup"
 )
 ```
 
 失败保留备份和旧配置，不用 reset 或删除锁绕过。升级后执行上节配置并重新打开面板。上述命令只在括号内设置 SSH 环境，不改全局 Git 或 shell 配置。此文档提供操作步骤，不代表已在 zmic44 执行。
+
+## 更新阶段、进度与失败记录
+
+0.22.1 保留原 runtime 的 SSH 密钥和代理上下文，显式设置会覆盖子进程继承的 `GIT_SSH_COMMAND`。SSH 建连上限仍为10秒；版本查询30秒，对象下载总上限900秒，本地备份180秒，应用120秒。当前仓库包含多个工程和较长历史，因此下载与小型引用查询分开计时；这些是初始上限，不是实测耗时或固定等待时长。HTTP 路径仍保留 Git 原有低速保护，远端主动断开也会提前失败。
+
+`fetch --progress` 的对象数量、字节、速率按实际输出显示，stderr回车更新也及时处理；stdout/stderr同时读取，避免阻塞。没有新的进度时每5秒显示仍在进行/等待及已用时间，不编造百分比和ETA。心跳和持续输出都不延长总上限；没有单独的无进展看门狗。备份写tar文件，二进制内容不进入进度终端。
+
+每次记录在 `<runtime>/updates/<本次目录>/`：`query.log`、`fetch-N.log`、`archive.log`、`apply.log` 和 `update.json`。日志遮蔽认证头、URL用户信息/参数和常见token，单日志最多1 MiB；达到上限仍继续下载，控制台进度继续，回执保留末尾输出/阶段耗时。日志包含实际路径，按私有运维文件保存。原始文件内容和所有可能格式的秘密不是自动审计范围。
+
+版本查询成功只证明本次读到了main提交。后续下载超时先查下载日志、代理出口和对象量，不直接重建密钥。面板显示具体失败阶段、原因和日志位置。超时/取消时Linux先回收本次Git及同进程组的SSH/代理子进程，再结束读线程和释放运行锁。
+
+下载或版本校验失败不应用更新；保留Git已完整取得的对象供下一次尝试，不清空缓存，且不承诺字节级断点续传。应用阶段失败可能已经改变HEAD或部分检出文件：保留备份并退出旧面板，先核对实际状态，不能一概宣称仍在旧版，也不自动reset。公共模式仍可换下一条线路；私有模式不转公共镜像。
 
 ## 通过同一 SSH 密钥上传
 

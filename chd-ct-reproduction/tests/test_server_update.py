@@ -318,7 +318,7 @@ def test_ignored_local_data_cannot_be_overwritten_by_new_tracked_path(repository
     local_git(remote, "add", "-f", "chd-ct-reproduction/data/example.txt")
     local_git(remote, "commit", "-m", "track example")
     repo = updater.inspect_repository(root / "chd-ct-reproduction")
-    with pytest.raises(ValueError, match="Git 操作失败"):
+    with pytest.raises(ValueError, match="应用更新失败.*本地文件"):
         updater.update(repo, tmp_path / "runtime")
     assert (root / "chd-ct-reproduction/data/example.txt").read_text() == "USER DATA"
     assert local_git(root, "rev-parse", "HEAD") == repo["head"]
