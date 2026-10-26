@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import sys
 import subprocess
 import tempfile
@@ -19,7 +20,7 @@ class PrivateUpdateTests(unittest.TestCase):
             local_git(upstream,'config','user.name','Synthetic Test')
             local_git(upstream,'config','user.email','synthetic@example.invalid')
             project=upstream/task_update.SUBDIR
-            for relative in ['05_src/task_panel.py','05_src/task_worker.py','bootstrap_server.sh',
+            for relative in ['05_src/task_panel.py','05_src/task_worker.py','05_src/task_runtime.py','bootstrap_server.sh','start_server.sh',
                              '06_configs/baseline.json','04_data/manifests/README.md']:
                 file=project/relative;file.parent.mkdir(parents=True,exist_ok=True);file.write_text('# v1\n')
             local_git(upstream,'add','.');local_git(upstream,'commit','-m','initial')
@@ -68,9 +69,11 @@ class PrivateUpdateTests(unittest.TestCase):
         # Historical mirror identity is accepted, while downloads stay official.
         self.assertIn('https://gh-proxy.com/https://github.com/tianwuasd/project.git',task_update.ORIGINS)
         process=Mock(returncode=0);process.communicate.return_value=(b'ok',b'')
-        with patch.object(task_update.subprocess,'Popen',return_value=process) as launch:
+        with patch.dict(os.environ,{'GIT_DIR':'unrelated.git','GIT_CONFIG_COUNT':'1'}),patch.object(task_update.subprocess,'Popen',return_value=process) as launch:
             task_update.git(Path('.'),'status')
         command=launch.call_args.args[0]
+        self.assertNotIn('GIT_DIR',launch.call_args.kwargs['env'])
+        self.assertNotIn('GIT_CONFIG_COUNT',launch.call_args.kwargs['env'])
         self.assertNotIn('credential.helper=',command)
         self.assertNotIn('http.extraHeader=',command)
 

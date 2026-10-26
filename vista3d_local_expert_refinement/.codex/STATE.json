@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-26T09:08:27.584594+00:00",
+  "updated_at": "2026-10-26T09:55:16.139420+00:00",
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
@@ -14,7 +14,7 @@
     "expert_role": "local_specialization_and_test_time_advice",
     "primary_role": "global_segmentation_and_selective_refinement",
     "dataset_for_next_plan": "wholeheart",
-    "current_turn_scope": "fix_managed_release_new_task_path_guard_and_supplement_github_update_skill"
+    "current_turn_scope": "audit_update_chain_against_CT_and_AAOCA_code_only_download_stall_and_skill_supplement"
   },
   "proposed_not_user_fixed": {
     "first_stage_clicks": 1,
@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Update original runtime to v0.3.5, reopen, submit task4 and verify last-job/history. Supplement GitHub update mechanism in skill; CT remains primary template.",
+  "next_action": "Use one-time small-download bootstrap for old server updater, reopen v0.3.6 and verify actual SSH/proxy download and task4 submission. CT remains the primary skill template.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -269,5 +269,17 @@
     "local_git_update_then_submit": "passed_twice_including_cache_eviction",
     "server_deployed": false,
     "real_server_submission_verified": false
+  },
+  "panel_code_only_update": {
+    "version": "0.3.6",
+    "validation": "docs/CODE_ONLY_UPDATE_VALIDATION.json",
+    "control_tests": {
+      "total": 112,
+      "passed": 107,
+      "skipped": 5
+    },
+    "actual_github_https_code_read": "passed_59_files_archive_378880_bytes_pack_1015354_bytes",
+    "server_deployed": false,
+    "server_ssh_proxy_verified": false
   }
 }

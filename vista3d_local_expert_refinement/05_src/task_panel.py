@@ -14,7 +14,7 @@ import task_runtime as jobs
 from task_queries import query, follow, result_lines, read_optional, log_sources
 from task_progress import STATES
 
-PANEL_VERSION = '0.3.5'
+PANEL_VERSION = '0.3.6'
 
 
 class Back(Exception):
@@ -478,7 +478,8 @@ def main(argv=None):
         from task_update import selected_entry
         entry = selected_entry(runtime)
         if entry:
-            return subprocess.call([sys.executable, '-B', str(entry), *(sys.argv[1:] if argv is None else argv), '--loaded-release'])
+            return subprocess.call([sys.executable, '-B', str(entry), *(sys.argv[1:] if argv is None else argv),
+                                    '--runtime', runtime, '--loaded-release'])
     saved = read_optional(Path(runtime) / 'settings.json') or {}
     if args.configure_network or args.show_network:
         from panel_publication import network

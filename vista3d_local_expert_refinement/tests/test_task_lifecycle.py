@@ -112,7 +112,8 @@ class UpdateTests(unittest.TestCase):
             root=Path(temp);repository=root/'repo';repository.mkdir();runtime=root/'runtime'
             data=io.BytesIO()
             with tarfile.open(fileobj=data,mode='w') as archive:
-                for relative in ['05_src/task_panel.py','05_src/task_worker.py','bootstrap_server.sh']:
+                for relative in ['05_src/task_panel.py','05_src/task_worker.py','05_src/task_runtime.py',
+                                 '06_configs/baseline.json','04_data/manifests/README.md','bootstrap_server.sh','start_server.sh']:
                     member=tarfile.TarInfo(updater.SUBDIR+'/'+relative);member.size=2
                     archive.addfile(member,io.BytesIO(b'ok'))
             routes=[]
@@ -123,9 +124,15 @@ class UpdateTests(unittest.TestCase):
                 elif args==('rev-parse','HEAD'):result.stdout='old'
                 elif args[:2]==('ls-remote','--get-url'):result.stdout=args[2]
                 elif args[0]=='ls-remote':raise subprocess.TimeoutExpired(args,12)
-                elif args[0]=='fetch' and updater.UPSTREAM in args:
+                elif args[0]=='fetch':
                     routes.append(updater.UPSTREAM)
-                elif args==('rev-parse','FETCH_HEAD'):result.stdout='new'
+                elif args==('rev-parse','refs/heads/vista-candidate'):result.stdout='new'
+                elif args[0]=='ls-tree':
+                    result.stdout=b''.join(b'100644 blob '+b'a'*40+b'\t'+(updater.SUBDIR+'/'+name).encode()+b'\0'
+                        for name in ['05_src/task_panel.py','05_src/task_worker.py','05_src/task_runtime.py',
+                                     '06_configs/baseline.json','04_data/manifests/README.md','bootstrap_server.sh','start_server.sh'])
+                elif args[:2]==('cat-file','--batch-check=%(objectname) %(objecttype)'):
+                    result.stdout='a'*40+' blob\n'
                 elif args[0]=='archive':result.stdout=data.getvalue()
                 return result
             with patch.object(updater,'git',side_effect=fake_git):updater.update(runtime)
@@ -146,7 +153,7 @@ class UpdateTests(unittest.TestCase):
                 elif args==('rev-parse','HEAD'):result.stdout='old'
                 elif args[0]=='archive':result.stdout=b'backup'
                 elif args[:2]==('ls-remote','--get-url'):result.stdout=args[2]
-                elif args[0]=='ls-remote' or (args[0]=='fetch' and updater.UPSTREAM in args):raise subprocess.TimeoutExpired(args,kwargs['timeout'])
+                elif args[0]=='ls-remote' or args[0]=='fetch':raise subprocess.TimeoutExpired(args,kwargs['timeout'])
                 return result
             with patch.object(updater,'git',side_effect=fake_git),self.assertRaises(ValueError):updater.update(runtime)
             self.assertFalse((runtime/'release.json').exists())

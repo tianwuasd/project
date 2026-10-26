@@ -129,3 +129,10 @@ GitHub代码发布完成。Linux CI https://github.com/tianwuasd/project/actions
 用户task4在GPU表单之后报“请选择本项目专用子目录”，未到RUN提交，不是任务丢失。路径保护把runtime/releases/SHA的runtime祖先判非法。仅对runtime和直接受管release布局（40位SHA、清单存在）增加例外；数据、结果、普通代码祖先等保护保持。新建页区分旧输入和未提交任务，默认步骤显示为逗号列表。详见docs/MANAGED_RELEASE_PATH_FIX.md及MANAGED_RELEASE_VALIDATION.json。
 
 107项回归102通过5跳过；追加纯本地Git双更新/缓存重建后从新release提交真实快照与计划，最近任务和历史可查，worker启动模拟。服务器部署、Linux后台和真实CT/GPU仍待实测。u不经过该新建校验，可原入口升级v0.3.5后重开再n；不改旧任务快照或缓存。skill后续仅补GitHub更新机制，其他流程仍以CT详版为主。
+
+
+## GitHub更新整体核查与按需下载（2026-10-26，v0.3.6）
+
+用户要求与其他项目整体对照：CT保持完整详版，借鉴AAOCA的blob:none元信息、按需文件对象和禁止归档隐式联网。VISTA改为只下载运行目录与必要启动文件，不取其它项目、文献和历史文件内容；保留提交图/快进校验。120秒无可见计数/字节推进停止，重复旧计数不续命，等待提示不重放历史速度。保留900秒下载阶段总限、原认证/代理和独立release，补齐候选语法和原runtime转交。详见docs/UPDATE_CHAIN_AUDIT.md和CODE_ONLY_UPDATE_VALIDATION.json。
+
+112项回归107通过5条件跳过。Windows真实GitHub HTTPS只读验证取3004172快照的59个运行文件，归档378880字节，缓存pack1015354字节；不是服务器SSH/代理验收。旧033—035入口用docs/CODE_ONLY_UPDATE.md的一次性引导，先取新更新器单文件再取运行文件，不merge原检出，不修改旧release快照或自动恢复任务。无新训练模式、真实CT/GPU或Linux后台验收。

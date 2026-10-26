@@ -8,9 +8,24 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / '05_src'))
 import task_runtime as jobs
+import task_panel as panel
+import runtime_setup
 
 
 class ManagedReleasePaths(unittest.TestCase):
+    def test_release_handoff_preserves_runtime_resolved_from_legacy_settings(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);runtime=root/'original-runtime';legacy=root/'checkout-settings.json'
+            def optional(path):return {'base':str(runtime)} if Path(path)==legacy else None
+            with patch.object(runtime_setup,'SETTINGS',legacy), \
+                 patch.object(runtime_setup,'DEFAULT_PATHS',{'base':str(root/'unused-runtime')}), \
+                 patch.object(panel,'read_optional',side_effect=optional), \
+                 patch('task_update.selected_entry',return_value=root/'release/05_src/task_panel.py'), \
+                 patch.object(panel.subprocess,'call',return_value=0) as launch:
+                panel.main(['--profile','generic','--query','history'])
+            command=launch.call_args.args[0]
+            self.assertIn('--runtime',command)
+            self.assertEqual(command[command.index('--runtime')+1],str(runtime.resolve()))
     def fixture(self, root, name='a' * 40, marker=True):
         raw = root / 'raw'
         raw.mkdir()
