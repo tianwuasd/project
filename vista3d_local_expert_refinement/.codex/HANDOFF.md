@@ -113,3 +113,12 @@ GitHub代码发布完成。Linux CI https://github.com/tianwuasd/project/actions
 用户服务器日志确认读取私有GitHub main f345e372df7d6b5a6e252fff26a3d01cd0638c36成功，随后独立缓存fetch在45秒总限时被中断；runtime代理/密钥设置匹配。v0.3.3把引用查询、下载、归档分开为30/900/180秒，fetch显示真实Git进度、等待耗时并保留stderr日志，直接显示具体失败原因；超时/取消回收子进程，失败不切换旧指针。保留20 GiB及原科学配置，未部署服务器或启动模型任务。
 
 本地99项回归94通过5条件跳过；5项新增下载针对性回归再次通过，Python语法检查通过。证据为docs/UPDATE_DOWNLOAD_VALIDATION.json。用户明确要求把此经验更新到server-engineering技能；通用阶段/证据规则与Vista具体时限分别记录，未宣称具有独立无进展看门狗。技能格式、链接与应用场景核对通过。旧45秒入口需先按docs/SERVER_GIT_UPDATE.md手动获取修复，再用新入口测试菜单；真实服务器传输、Linux进程组与实际版本切换仍待验收。
+
+
+## 预处理规划0线程回归修复（2026-10-26，v0.3.4）
+
+用户提供的20 GiB任务在8例fit指纹完成后失败于nnU-Net规划器torch.set_num_threads(0)。v0.3.2把通用configure_paths的DA设置由2改0导致这一回归；现已按阶段分离，准备使用正数共享CPU预算，训练/短测/预测仍显式保持串行增强。保留20 GiB和正式训练预算。用户撤回新增快速全流程模式的工作，本次只修bug。
+
+104项控制回归99通过5条件跳过；官方2.8.1估算方法体与真实3D U-Net在本机CPU复现原异常，修复后1/4线程通过；现有权重/优化器/RNG及恢复一步验证再次通过。详见docs/PLANNER_THREAD_FIX.md与PLANNER_THREAD_VALIDATION.json。本机Torch2.12.1不同于服务器2.8.0，未做真实CT/GPU验收或部署。发布版本以远端main/Git记录为准。
+
+旧失败任务冻结bug代码，r不会获得新修复；需更新后新建包含prepare的任务。旧缓存实现签名变化且本次预处理未完成，不强制迁移或改写快照。历史输入复用和原任务续跑仍是不同入口。

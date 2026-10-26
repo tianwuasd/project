@@ -15,7 +15,9 @@ def configure_paths():
         os.environ[key] = str(ROOT / folder)
     os.environ["nnUNet_compile"] = "false"
     os.environ["nnUNet_wandb_enabled"] = "false"
-    os.environ["nnUNet_n_proc_DA"] = "0"
+    # nnU-Net's planner also reads this setting as a Torch thread count.
+    # Training/prediction entry points separately select serial augmentation (0).
+    os.environ["nnUNet_n_proc_DA"] = str(max(1, int(os.environ.get('WHOLE_HEART_CPU_THREADS', '1'))))
     os.environ.setdefault('OMP_NUM_THREADS',os.environ.get('WHOLE_HEART_CPU_THREADS','1'))
 
 
