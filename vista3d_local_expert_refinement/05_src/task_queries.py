@@ -23,8 +23,12 @@ def read_optional(path):
         return None
 
 
-def context(job):
+def context(job,runtime=None):
     job = Path(job)
+    if os.environ.get('VISTA_CATALOG_VERSION')=='2':
+        if runtime is None:raise ValueError('读取新版任务前必须指定并核对运行目录')
+        from pipeline_catalog import resolve
+        job=resolve(runtime,job)
     plan = read_optional(job / 'plan.json')
     if plan:
         return plan, Path(plan['workspace']), read_optional(job / 'state.json') or {}
@@ -150,8 +154,8 @@ def prediction_lines(work):
     return lines
 
 
-def result_lines(job, section='summary', detailed=False):
-    plan, work, state = context(job)
+def result_lines(job, section='summary', detailed=False, runtime=None):
+    plan, work, state = context(job,runtime)
     lines = [f"任务：{clean(plan.get('name', Path(job).name))}；状态：{state.get('status', '旧记录/未知')}"]
     if plan.get('job_kind')=='assessment':
         result=read_optional(work/'09_reports/assessment.json') or {}
@@ -210,9 +214,9 @@ def result_lines(job, section='summary', detailed=False):
     return lines
 
 
-def log_sources(job):
+def log_sources(job,runtime=None):
     job = Path(job)
-    _, work, _ = context(job)
+    _, work, _ = context(job,runtime)
     candidates = [('0', '总日志 / 环境安装与调度', job/'launcher.log')]
     candidates += [('step:'+p.stem, '步骤 / '+p.stem, p) for p in sorted((job/'logs').glob('*.log'))]
     candidates += [('model:'+p.parent.name, '模型 / '+p.parent.name, p) for p in sorted((work/'07_experiments/formal').glob('*/training.log'))]
@@ -269,15 +273,15 @@ def query(kind, runtime, job=None, section='summary', detailed=False, log_source
     job = Path(job) if job else latest(runtime)
     if not job:
         return '尚无任务；新建前不会安装环境或使用显卡。'
-    plan, work, state = context(job)
+    plan, work, state = context(job,runtime)
     if kind == 'results':
-        return '\n'.join(result_lines(job, section, detailed))
+        return '\n'.join(result_lines(job, section, detailed,runtime))
     if kind == 'models':
         return '\n'.join(model_lines(work) + prediction_lines(work))
     if kind == 'processes':
         return '\n'.join(process_lines(job))
     if kind == 'logs':
-        candidates = [(key,label,p) for key,label,p in log_sources(job) if log_source in {'all',key}]
+        candidates = [(key,label,p) for key,label,p in log_sources(job,runtime) if log_source in {'all',key}]
         return '\n\n'.join(f'{label}：{p}\n{tail(p, 10000)}' for _,label,p in candidates) or '所选日志尚未生成；可返回总日志查看安装与当前阶段。'
     lines = [f"任务：{clean(plan.get('name', job.name))}", f'目录：{job}', f'工作区：{work}']
     if state:
@@ -323,7 +327,7 @@ def follow(kind, runtime, job=None, **kwargs):
                     print(query('status', runtime, current), flush=True)
                     last_summary = time.monotonic()
                 if current:
-                    for key,label,path in log_sources(current):
+                    for key,label,path in log_sources(current,runtime):
                         if kwargs.get('log_source','all') in {'all',key}:
                             text = cursor.read(path)
                             if text:

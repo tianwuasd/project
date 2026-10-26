@@ -7,6 +7,7 @@ No public Git download mirror, gh login, API token, or training import is used.
 
 import hashlib
 import json
+import os
 import re
 import shutil
 import stat
@@ -114,6 +115,9 @@ def _finished(job, runtime):
     from . import inspection
 
     job, runtime = _safe_path(job), _safe_path(runtime)
+    if os.environ.get('VISTA_CATALOG_VERSION')=='2':
+        from pipeline_catalog import resolve
+        job=resolve(runtime,job)
     from task_runtime import load_plan
     plan = load_plan(job)
     state = _json(_safe_path(job / "state.json"))

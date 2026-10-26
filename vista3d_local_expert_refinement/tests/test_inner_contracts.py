@@ -138,7 +138,9 @@ class InnerContracts(unittest.TestCase):
                 def poll(self):self.polls+=1;return 0 if self.polls>2 else None
             def idle(*_):return ['GPU-0'] if len(launched)==0 else ['GPU-0','GPU-1']
             records=[dict(fold='ct_holdG',method='B0',index=0,case_id=f'Case{i}',status='pending') for i in range(5)]
-            with patch.object(queue,'idle_gpus',side_effect=idle),patch.object(queue.subprocess,'Popen',Process),patch.object(queue.time,'sleep'),patch.object(queue.time,'monotonic',side_effect=range(10000)):
+            with patch.object(queue,'idle_gpus',side_effect=idle),patch.object(queue.subprocess,'Popen',Process),\
+                 patch.object(queue,'prediction_budget',return_value=dict(workers=2,threads_per_worker=1,capacity_status='bounded')),\
+                 patch.object(queue.time,'sleep'),patch.object(queue.time,'monotonic',side_effect=range(10000)):
                 queue.run_phase(records,'sha',dict(max_gpus=2,retry_seconds=1),Path(tmp))
             self.assertIn('GPU-1',launched)
 

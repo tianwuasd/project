@@ -61,6 +61,11 @@ class GPUSelectionTests(unittest.TestCase):
 
 
 class ParallelQueueTests(unittest.TestCase):
+    def setUp(self):
+        budget=patch.object(queue,'prediction_budget',side_effect=lambda work,records,maximum:
+            dict(workers=maximum,threads_per_worker=1,capacity_status='bounded'))
+        budget.start();self.addCleanup(budget.stop)
+
     def test_sigterm_cleans_only_owned_worker_and_does_not_summarize(self):
         with tempfile.TemporaryDirectory() as temp:
             work = Path(temp)

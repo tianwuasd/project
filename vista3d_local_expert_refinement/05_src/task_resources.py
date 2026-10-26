@@ -4,7 +4,7 @@ import os
 import time
 import shutil
 from pathlib import Path
-from server_data import write_json
+from server_data import write_json,read_json
 
 
 def probe():
@@ -93,6 +93,52 @@ def case_budget(work,paths,spacing=None):
     report=dict(snapshot,workers=limit,threads_per_worker=1,estimated_bytes_per_case=largest,
                 rule='header raw/resampled voxels * 128 + 1 GiB, <=75% available RAM; bounded estimate, not peak measurement')
     write_json(Path(work)/'00_admin/cpu-case-budget.json',report)
+    return report
+
+
+def prediction_budget(work,records,maximum):
+    """Aggregate host gate for GPU infer, using raw and per-fold resampled headers."""
+    import nibabel as nib
+    work=Path(work)
+    inventory={c['case_id']:c for c in read_json(work/'04_data/manifests/case_inventory.json')['cases']}
+    splits=read_json(work/'04_data/manifests/splits_v1.json')['folds']
+    headers=[];seen=set()
+    for record in records:
+        key=(record['fold'],record['case_id'])
+        if key in seen:continue
+        seen.add(key)
+        image=nib.load(str(inventory[record['case_id']]['image']))
+        raw=math.prod(image.shape)
+        dataset=splits[record['fold']]['dataset_id']
+        plan=read_json(work/f'04_data/derived/nnUNet_preprocessed/Dataset{dataset:03d}_{record["fold"]}/WholeheartBaselinePlans.json')
+        config=plan['configurations']['3d_fullres']
+        spacing=config.get('spacing')
+        # NibabelIO presents z,y,x to nnU-Net; its planned spacing uses that order.
+        shape=list(reversed(image.shape));zooms=list(reversed(image.header.get_zooms()[:3]))
+        axes=plan.get('transpose_forward',[0,1,2])
+        shape=[shape[i] for i in axes];zooms=[zooms[i] for i in axes]
+        resampled=[max(1,math.ceil(n*s/t)) for n,s,t in zip(shape,zooms,spacing)] if spacing else shape
+        estimated=raw*16+max(raw,math.prod(resampled))*128+1024**3
+        headers.append(dict(fold=record['fold'],case_id=record['case_id'],raw_shape=list(image.shape),
+            raw_spacing=[float(v) for v in image.header.get_zooms()[:3]],planned_spacing=spacing,
+            transpose_forward=axes,resampled_shape_plans=resampled,estimated_bytes=estimated,
+            spacing_evidence='planned 3d_fullres spacing' if spacing else 'missing; raw-grid estimate only'))
+    snapshot=probe();slots=max(1,int(snapshot['cpu_slots']))
+    threads=max(1,min(slots,int(os.environ.get('WHOLE_HEART_CPU_THREADS','1'))))
+    limit=min(int(maximum),slots//threads)
+    largest=max((row['estimated_bytes'] for row in headers),default=0)
+    memory=snapshot.get('available_memory_bytes')
+    status='bounded'
+    if memory is None:
+        limit=min(limit,1);status='unknown_memory_conservative_one_worker'
+    else:
+        limit=min(limit,int(memory*.75)//max(1,largest))
+        if limit<1:status='known_insufficient_memory'
+    if (snapshot.get('io_pressure') or {}).get('avg10',0)>=10:limit=min(limit,2)
+    report=dict(snapshot,workers=max(0,limit),threads_per_worker=threads,
+        estimated_bytes_per_case=largest,cases=headers,capacity_status=status,
+        rule='raw voxels *16 + max(raw,resampled) voxels *128 +1 GiB per process; aggregate <=75% current RAM and CPU threads; I/O pressure cap2; unknown RAM cap1')
+    write_json(work/'00_admin/prediction-host-budget.json',report)
     return report
 
 

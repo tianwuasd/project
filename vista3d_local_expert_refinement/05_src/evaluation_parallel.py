@@ -12,6 +12,7 @@ import time
 from evaluation_gpu import idle_gpus, load_settings
 from gpu_queue import stop_owned_process
 from server_data import digest, read_json, write_json
+from task_resources import prediction_budget
 
 CODE = Path(__file__).resolve().parents[1]
 
@@ -59,13 +60,23 @@ def run_phase(records, sha, settings, work, phase='gpu'):
                 for gpu in available:
                     if not pending or terminating[0]:
                         break
+                    threads=None
+                    if phase=='gpu':
+                        budget=prediction_budget(work,list(pending)+[r for _,_,r in active.values()],settings['max_gpus'])
+                        state['host_budget']=budget
+                        if len(active)>=budget['workers']:
+                            if not active and budget['capacity_status']=='known_insufficient_memory':
+                                raise MemoryError('预测前主机RAM不足以容纳一例原图/重采样/logits估算；未启动GPU病例，请查看 prediction-host-budget.json')
+                            break
+                        threads=str(budget['threads_per_worker'])
                     record = pending.popleft()
                     env = os.environ.copy()
                     env['WHOLE_HEART_WORKSPACE'] = str(work)
                     env['CUDA_VISIBLE_DEVICES'] = gpu if phase=='gpu' else ''
                     env.pop('WHOLE_HEART_GPU_UUIDS', None)
                     for key in ['OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'NUMEXPR_NUM_THREADS']:
-                        env[key] = env.get('WHOLE_HEART_CPU_THREADS','1') if phase=='gpu' else '1'
+                        env[key] = threads if phase=='gpu' else '1'
+                    if phase=='gpu':env['WHOLE_HEART_CPU_THREADS']=threads
                     if phase=='cpu':env['WHOLE_HEART_CPU_THREADS']='1'
                     logfile = logdir / f"{stamp}_{phase}_{record['fold']}_{record['method']}_{record.get('case_id','all')}.log"
                     stream = logfile.open('w', encoding='utf-8')
@@ -127,7 +138,7 @@ def run_queue(models,sha,settings,work):
     if os.environ.get('VISTA_GPU_LEASES'):
         from cooperative_control import release_devices
         from gpu_fleet import verified_keepers
-        release_devices(verified_keepers(os.environ['VISTA_GPU_LEASES']),wait=True)
+        release_devices(verified_keepers(os.environ['VISTA_GPU_LEASES']),wait=True,final=True)
     print('所有GPU病例进程已退出；开始CPU原网格恢复、压缩、LCC与Dice/HD95。',flush=True)
     for r in records:
         r['status']='completed' if cached(work,models[r['index']],r['case_id'],sha,'cpu') else 'pending'

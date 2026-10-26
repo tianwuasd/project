@@ -38,6 +38,7 @@ class AutomaticExecutionTests(unittest.TestCase):
             return self.measurement(gpus,local,resource,4 if len(called)==1 else 3)
         snapshot=dict(cpu_slots=128,available_memory_bytes=200*2**30,shared_memory_available_bytes=100*2**30)
         with patch('task_resources.probe',return_value=snapshot),patch.object(control,'trial',side_effect=measure),\
+             patch.object(control,'topology',side_effect=lambda g:[['same GPU','24576','driver'] for _ in g]),\
              patch.object(control,'release_devices'),contextlib.redirect_stdout(io.StringIO()):
             chosen=control.tune(root,'ct_holdG','B0','assessment',[f'GPU-{i}' for i in range(8)])
         return chosen,called
@@ -60,6 +61,7 @@ class AutomaticExecutionTests(unittest.TestCase):
             record=read_json(root/'00_admin/optimization/ct_holdG_B0.json')
             self.assertIn('OOM',record['failed_candidates'][0]['error'])
             self.assertEqual(len(record['candidates']),1)
+            self.assertEqual([r['world_size'] for r in record['measurement_coverage']],[1])
 
     def test_interruption_is_not_a_successful_fallback(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -332,6 +332,19 @@ def history(runtime):
     return _rows(runtime, _read_index(runtime))
 
 
+def resolve(runtime, job):
+    """Return a current validated handle; diagnostic history rows are not handles."""
+    runtime = _runtime(runtime)
+    index = _read_index(runtime)
+    key = str(_path(job))
+    if key not in index['jobs']:
+        raise ValueError('任务不在新版索引中，未读取任务内容')
+    try:
+        return _valid_record(runtime, key, index['jobs'][key])
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise ValueError('新版任务记录缺失或损坏，不能打开或操作该任务') from error
+
+
 def latest(runtime):
     runtime = _runtime(runtime)
     index = _read_index(runtime)

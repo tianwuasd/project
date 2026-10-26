@@ -64,6 +64,7 @@ def run(plan):
             chosen=model['chosen'];resource=chosen['effective_cpu']
             receipt=dict(status='passed',committed=True,created_at=time.time(),ttl_seconds=7*24*3600,
                 identity=model['identity'],chosen=chosen,assessment_report=str(target),assessment_sha256=digest(target),
+                measurement_coverage=chosen['measurement_coverage'],
                 required_cpu_slots=resource['total_cpu_slots'],required_ram_bytes=resource['estimated_ram_bytes'],
                 required_shm_bytes=resource['estimated_shm_bytes'])
             write_json(Path(plan['runtime'])/f"optimization/{model['fold']}_{model['method']}.json",receipt)

@@ -5,6 +5,24 @@ from pathlib import Path
 import time
 
 
+def restore_reader_grid(reader,segmentation,properties,original,path):
+    """Use the selected nnU-Net writer to undo its reader-specific axis order."""
+    import nibabel as nib
+    import numpy as np
+    temporary=Path(path).with_name(Path(path).name+'.axes.tmp.nii.gz')
+    temporary.parent.mkdir(parents=True,exist_ok=True)
+    try:
+        reader.write_seg(segmentation,str(temporary),properties)
+        restored=nib.load(temporary)
+        if restored.shape!=original.shape or not np.allclose(restored.affine,original.affine,atol=1e-4,rtol=0):
+            raise ValueError('测评推理未正确恢复原图空间')
+        result=np.asarray(restored.dataobj).copy()
+        del restored
+        return result
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def predict(work,fold,method,training,case_id):
     os.environ['WHOLE_HEART_WORKSPACE']=str(work)
     from prepare_nnunet import configure_paths
@@ -41,6 +59,7 @@ def predict(work,fold,method,training,case_id):
     if reference_file.shape!=original.shape or not np.allclose(reference_file.affine,original.affine,atol=1e-4,rtol=0):
         raise ValueError('cal标签与影像空间不一致')
     path=work/f'08_results/assessment/{fold}_{method}/{case_id}.nii.gz'
+    segmentation=restore_reader_grid(reader,segmentation,properties,original,path)
     save_prediction(path,segmentation,original)
     result=dict(status='passed',case_id=case_id,prediction=str(path),prediction_sha256=digest(path),
         checkpoint=str(checkpoint),checkpoint_sha256=digest(checkpoint),seconds=time.monotonic()-started,

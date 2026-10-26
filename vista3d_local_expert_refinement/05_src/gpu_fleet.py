@@ -12,6 +12,7 @@ import subprocess
 import sys
 import threading
 import time
+from uuid import uuid4
 
 from server_data import read_json,write_json
 from task_runtime import identity,alive
@@ -40,6 +41,8 @@ class GPUFleet:
         self.error=None;self.cooldown={};self.lock=threading.RLock()
         self.python=str(python or sys.executable)
         self._release_seen=None
+        self.generation=uuid4().hex
+        self.discovery_enabled=True
 
     def start(self):
         self.thread=threading.Thread(target=self._watch,name='gpu-discovery',daemon=True)
@@ -52,6 +55,7 @@ class GPUFleet:
                 row=read_json(ready)
                 if row['pid']==process.pid and alive(row):rows.append(row)
         write_json(self.path,dict(schema_version=1,updated=time.time(),keepers=rows,
+            generation=self.generation,discovery_enabled=self.discovery_enabled,release_ack=self._release_seen,
             policy='physical ∩ allocated/visible ∩ twice-idle; 1s sampling; program leases only',
             error=str(self.error) if self.error else None))
 
@@ -62,18 +66,23 @@ class GPUFleet:
         settings=dict(allowed_gpus=None,min_free_mib=6000,
             planner_gpu_memory_gib=self.memory,max_utilization_percent=10)
         try:
-            while not self.stop.is_set():
+            while not self.stop.wait(1):
                 with self.lock:
                     request=self.path.with_name('gpu-release-request.json')
                     if request.exists():
                         command=read_json(request)
-                        if command.get('id')!=self._release_seen:
+                        if command.get('generation')==self.generation and command.get('id')!=self._release_seen:
+                            if command.get('final'):self.discovery_enabled=False
                             used=set(self.processes)-set(command['gpu_uuids'])
+                            if command.get('final'):used=set()
                             self.release_unused(used)
                             self._release_seen=command['id']
                     for uuid,(process,stream,_) in list(self.processes.items()):
                         if process.poll() is not None:
                             stream.close();del self.processes[uuid];self.cooldown[uuid]=time.monotonic()+60
+                    if not self.discovery_enabled:
+                        stable.clear();self._publish()
+                        continue
                     rows=snapshot();permitted=allowed_ids(rows,settings)
                     if not permitted:raise ValueError('服务器实际显卡与本次可见分配范围没有交集')
                     for row in rows:
@@ -97,7 +106,6 @@ class GPUFleet:
                         event(self.job,'cpu_memory.sample',snapshot=probe())
                         last_cpu=time.monotonic()
                     self._publish()
-                self.stop.wait(1)
         except BaseException as error:
             self.error=error
             with self.lock:self._publish()
@@ -125,6 +133,12 @@ class GPUFleet:
             if rows or not wait:return list(rows)
             print('CPU前置已完成；等待当前分配范围内空闲GPU，1秒重查。',flush=True)
             if self.stop.wait(1):raise InterruptedError('GPU保留组已停止')
+
+    def resume_discovery(self):
+        """Only an explicitly selected later GPU phase can resume this invocation."""
+        with self.lock:
+            self.discovery_enabled=True
+            self._publish()
 
     def release_unused(self,used):
         with self.lock:

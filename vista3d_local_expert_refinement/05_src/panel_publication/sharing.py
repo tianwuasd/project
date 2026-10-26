@@ -1,5 +1,6 @@
 """CT publication lifecycle adapted to Vista frozen tasks, with preview and same-package retry."""
 from pathlib import Path
+import os
 import shlex
 from task_runtime import load_plan, active_processes, runtime_lock, latest, now
 from server_data import read_json, write_json
@@ -16,6 +17,9 @@ def run_upload(args, profile, interactive):
         runtime=Path(args.runtime or profile['runtime']).expanduser().resolve()
         job=latest(runtime) if args.upload_job=='latest' else Path(args.upload_job).expanduser().resolve()
         if not job:raise ValueError('没有可上传任务')
+    if os.environ.get('VISTA_CATALOG_VERSION')=='2':
+        from pipeline_catalog import resolve
+        job=resolve(runtime,job)
     plan=load_plan(job)
     if Path(plan['runtime']).resolve()!=runtime or args.runtime and Path(args.runtime).resolve()!=runtime:
         raise ValueError('上传必须使用原任务runtime')

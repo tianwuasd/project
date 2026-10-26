@@ -39,12 +39,20 @@ def ask(label, default=None):
 
 def choose_job(runtime, allow_none=False):
     records = jobs.history(runtime)
+    modern=os.environ.get('VISTA_CATALOG_VERSION')=='2'
     if allow_none:
+        if modern:
+            from pipeline_catalog import resolve
+            checked=[]
+            for row in records:
+                try:resolve(runtime,row['directory'])
+                except (ValueError,OSError):continue
+                checked.append(row)
+            records=checked
         records = [r for r in records if (Path(r.get('workspace', r['directory']))/'04_data/manifests/case_inventory.json').is_file()]
         print('这里只列出已有数据清单的输入任务；仅安装环境的任务无需选作缓存。')
     for i, row in enumerate(records, 1):
         print(f"{i}. {jobs.clean(row['name'])} [{STATES.get(row['status'], row['status'])}] {row['directory']}")
-    modern=os.environ.get('VISTA_CATALOG_VERSION')=='2'
     if modern and not records:raise ValueError('新版尚无可选择的任务；请先在预处理、训练或完整测评板块创建。')
     text = '选择任务编号' if modern else '选择历史编号；d手工填写旧任务/工作区'
     if allow_none:
@@ -56,7 +64,11 @@ def choose_job(runtime, allow_none=False):
         return ask('完整路径')
     if not str(value).isdigit() or not 1 <= int(value) <= len(records):
         raise ValueError('历史编号无效')
-    return records[int(value)-1]['directory']
+    job=records[int(value)-1]['directory']
+    if modern:
+        from pipeline_catalog import resolve
+        job=resolve(runtime,job)
+    return str(job)
 
 
 def choose_stage_source(runtime,stage):
@@ -87,7 +99,10 @@ def stage_config(args,saved,stage,interactive=True):
         row=allowed.get(str(Path(source).resolve()))
         needed='prepare' if stage=='train' else 'train'
         if not row or row['stage']!=needed or row['status']!='completed':raise ValueError('来源必须为新版已完成的'+needed+'任务')
+        from pipeline_catalog import resolve
+        source=resolve(profile['runtime'],source)
         upstream=jobs.load_plan(source)
+        source=str(source)
         data=upstream['data'];preprocessor=upstream['preprocessor']
         profile['gpu_memory']=upstream['gpu_memory']
         print('来源数据：'+data+'；预处理：'+PREPROCESSORS.get(preprocessor,preprocessor))
@@ -121,6 +136,9 @@ def stage_config(args,saved,stage,interactive=True):
 
 
 def restart_job(args,runtime,job):
+    if os.environ.get('VISTA_CATALOG_VERSION')=='2':
+        from pipeline_catalog import resolve
+        job=resolve(runtime,job)
     plan=jobs.load_plan(job)
     print(query('status',runtime,job))
     active=jobs.active_processes(job)
@@ -321,11 +339,16 @@ def preview_config(config):
     if config['tasks'] != ['environment']:
         print('原始数据：' + config['data'])
         print('模型：' + ', '.join(config['methods']) + '；方向：' + ', '.join(config['folds']))
-    if config.get('gpus'):
+    if config['tasks']==['prepare']:
+        print('本次仅CPU预处理；显存预算只用于网络patch/batch规划。')
+    elif config.get('gpus'):
         print('获准 GPU：' + ', '.join(config['gpus']) + f"；并发上限：{config['gpu_count']}")
     elif config.get('gpu_policy')=='automatic':
         print('GPU/CPU：自动探测、测评选优；GPU上限按实际服务器和分配范围，不需要填写卡号。')
-        print('batch允许自动调整；正式250轮、每轮250训练/50验证保持，实际采样量将明确记录。')
+        if set(config['tasks'])&{'train','assessment'}:
+            print('batch允许自动调整；正式250轮、每轮250训练/50验证保持，实际采样量将明确记录。')
+        elif config['tasks']==['predict']:
+            print('仅使用所选训练任务的冻结模型预测，按主机容量安排病例并发。')
     else:
         print('本次仅 CPU 步骤；不会申请显卡。')
     if any(t in config['tasks'] for t in ['prepare','smoke','train']):
@@ -348,7 +371,7 @@ def log_menu(runtime, job=None):
     if not target:
         print('尚无任务日志。先新建环境或计算任务。'); return
     while True:
-        sources = log_sources(target)
+        sources = log_sources(target,runtime)
         print('\n日志中心：' + str(target) + '\n总日志包含环境安装；模型日志包含实际 epoch/loss。')
         for index, (_,label,path) in enumerate(sources):
             print(f'{index}. {label}\n   {path}')
@@ -373,7 +396,7 @@ def job_menu(runtime, job):
             action = ask('选择', 's')
             if action == '0': return
             if action == 'l': log_menu(runtime, job)
-            elif action == 'o': result_menu(job)
+            elif action == 'o': result_menu(job,runtime)
             elif action in {'s','m','p'}:
                 view_menu({'s':'status','m':'models','p':'processes'}[action], runtime, job)
             else: print('请选择显示的操作。')
@@ -400,7 +423,7 @@ def environment_menu(args, runtime, saved):
         return
 
 
-def result_menu(job):
+def result_menu(job,runtime=None):
     sections = {'1': ('summary','分割摘要'), '2': ('cases','病例与七结构'),
                 '3': ('training','训练与数据'), '4': ('files','文件与来源')}
     while True:
@@ -413,7 +436,7 @@ def result_menu(job):
                 print('请输入有效编号'); continue
             section, title = sections[choice]
             detailed, page = False, 0
-            lines = result_lines(job, section, detailed)
+            lines = result_lines(job, section, detailed,runtime)
             while True:
                 pages = max(1, (len(lines)+19)//20)
                 page = max(0, min(page, pages-1))
@@ -427,7 +450,7 @@ def result_menu(job):
                     break
                 if action in {'d','s','r'}:
                     detailed = action == 'd' if action != 'r' else detailed
-                    lines, page = result_lines(job, section, detailed), 0
+                    lines, page = result_lines(job, section, detailed,runtime), 0
                 elif action in {'n','p'}:
                     page += 1 if action == 'n' else -1
         except (Back, KeyboardInterrupt):
@@ -438,7 +461,8 @@ def panel(args, runtime, saved):
     import server_profile
     profile=server_profile.load(getattr(args,'profile',None))
     while True:
-        active = any(jobs.active_processes(row['directory']) for row in jobs.history(runtime))
+        rows=jobs.history(runtime)
+        active = any(row['status']=='running' for row in rows)
         print(f'\nVISTA3D / nnU-Net 服务器任务面板 v{PANEL_VERSION}\n运行目录：' + runtime + '\n' + query('status', runtime))
         server_profile.show(profile,dict(runtime=runtime,results=args.results or saved.get('results_base') or profile['results'],data=args.data or saved.get('data') or profile['data']))
         print('\ns 任务概览  t 持续进度  g 显卡(1秒刷新)  m 模型 epoch/loss\nl 选择详细日志  p 本任务/我的进程  h 任务列表  o 查看结果')
@@ -486,7 +510,7 @@ def panel(args, runtime, saved):
                 selected.upload_job=choose_job(runtime);selected.upload_package=None;selected.yes_upload=False
                 run_upload(selected,profile,True)
             elif action == 'o':
-                result_menu(choose_job(runtime))
+                result_menu(choose_job(runtime),runtime)
             elif action in {'a','1','2','3'}:
                 config = stage_config(args,saved,{'a':'assessment','1':'prepare','2':'train','3':'predict'}[action])
                 preview_config(config)
@@ -516,10 +540,13 @@ def panel(args, runtime, saved):
             elif action == 'u':
                 from task_update import update
                 if active:
-                    targets=[r for r in jobs.history(runtime) if jobs.active_processes(r['directory'])]
+                    targets=[r for r in jobs.history(runtime) if r['status']=='running']
                     if len(targets)!=1:
                         raise ValueError('存在多个活动任务记录，请先用x逐一确认停止目标')
                     target=targets[0]['directory']
+                    if os.environ.get('VISTA_CATALOG_VERSION')=='2':
+                        from pipeline_catalog import resolve
+                        target=resolve(runtime,target)
                     print(query('status',runtime,target))
                     if ask('中断上方任务、保留检查点并等待退出后更新？[y/N]','n').lower()!='y':
                         continue
@@ -620,13 +647,12 @@ def _main(argv=None):
         if args.append_tasks:raise ValueError('新版不追加旧步骤；请使用独立预处理/训练/预测板块，或重启已有任务。')
         # Explicit CLI paths also belong to the new catalog. Do not probe an old
         # task merely because it was supplied as a convenient default/path.
-        targets=[args.job,args.upload_job,args.rerun_job,
+        targets=[args.job,args.upload_job if args.upload_job!='latest' else None,args.rerun_job,
                  args.resume_job if args.resume_job not in {None,'latest'} else None]
         if any(targets):
-            from pipeline_catalog import history
-            known={r['directory'] for r in history(runtime)}
-            if any(str(Path(t).expanduser().resolve()) not in known for t in targets if t):
-                raise ValueError('新版只使用新版任务目录索引；该任务未登记，未读取旧任务。')
+            from pipeline_catalog import resolve
+            for target in targets:
+                if target:resolve(runtime,Path(target).expanduser().absolute())
     if args.configure_network or args.show_network:
         from panel_publication import network
         if args.show_network:

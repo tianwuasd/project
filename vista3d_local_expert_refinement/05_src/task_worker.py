@@ -102,12 +102,12 @@ def wait_gpu(plan):
 def execute(job, lock_fd):
     plan = load_plan(job)
     job, work, code = Path(job), Path(plan['workspace']), Path(plan['code'])
-    os.environ.update(WHOLE_HEART_JOB=str(job), WHOLE_HEART_LOCK_FD=str(lock_fd), WHOLE_HEART_MANAGED='1')
+    os.environ.update(WHOLE_HEART_JOB=str(job), WHOLE_HEART_LOCK_FD=str(lock_fd), WHOLE_HEART_MANAGED='1',PYTHONFAULTHANDLER='1')
     from runtime_setup import environment, ensure_conda, report_progress
     from task_inputs import copy_input, receipt
     env = environment(Path(plan['runtime']))
     env.update(WHOLE_HEART_JOB=str(job), WHOLE_HEART_LOCK_FD=str(lock_fd), WHOLE_HEART_MANAGED='1',
-               WHOLE_HEART_CONTROL_PYTHON=sys.executable,
+               WHOLE_HEART_CONTROL_PYTHON=sys.executable,PYTHONFAULTHANDLER='1',
                WHOLE_HEART_WORKSPACE=str(work), WHOLE_HEART_GPU_UUIDS=json.dumps(plan.get('gpus', [])),
                WHOLE_HEART_GPU_LIMIT=str(plan.get('gpu_count', 1)), WHOLE_HEART_GPU_MEMORY=str(plan.get('gpu_memory', 5)))
     if plan.get('gpu_policy')=='automatic':
@@ -189,6 +189,7 @@ def execute(job, lock_fd):
                     if fleet is None:
                         from gpu_fleet import GPUFleet
                         fleet=GPUFleet(job,plan['runtime'],plan['gpu_memory'],python=python).start()
+                    else:fleet.resume_discovery()
                     env['VISTA_GPU_LEASES']=str(fleet.path)
                     step_env['VISTA_GPU_LEASES']=str(fleet.path)
                     # Waiting happens only at a GPU stage, after CPU preprocessing.
