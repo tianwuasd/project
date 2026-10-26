@@ -439,7 +439,7 @@ class Panel:
             raise Exit()
 
     def run(self):
-        self.emit('AAOCA 服务器工作台 — 独立于原始资料整理入口 | 归档修复：AAOCA-20261026-02')
+        self.emit('AAOCA 服务器工作台 — 独立于原始资料整理入口 | 更新测试：AAOCA-20261026-03')
         while True:
             try:
                 if self.selected:
