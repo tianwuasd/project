@@ -107,17 +107,61 @@ class UpdateScopeTests(unittest.TestCase):
             available=set(git(runtime/'update_cache.git','cat-file','--batch-all-objects','--batch-check=%(objectname)').splitlines())
             self.assertTrue(set(excluded).isdisjoint(available))
 
-    def test_repeated_transfer_counters_do_not_hide_a_stall(self):
+    def test_repeated_transfer_counters_do_not_extend_total_deadline(self):
         script="import sys,time\nfor _ in range(12):\n sys.stderr.write('Receiving objects: 13% (28/210), 53.18 MiB | 3.95 MiB/s\\r');sys.stderr.flush();time.sleep(.04)\n"
         real_popen=subprocess.Popen;children=[]
         def spawn(command,**kwargs):
             child=real_popen([sys.executable,'-u','-c',script],**kwargs);children.append(child);return child
         with tempfile.TemporaryDirectory() as temp,patch.object(updater.subprocess,'Popen',side_effect=spawn), \
-             patch.object(updater,'PROGRESS_POLL_SECONDS',.02),patch.object(updater,'PROGRESS_HEARTBEAT_SECONDS',.03), \
-             patch.object(updater,'STALL_TIMEOUT_SECONDS',.15,create=True),contextlib.redirect_stdout(io.StringIO()):
-            with self.assertRaisesRegex(ValueError,'推进|停滞'):
-                updater.git(Path(temp),'fetch',timeout=3,progress_log=Path(temp)/'fetch.log')
+             patch.object(updater,'HEARTBEAT_SECONDS',.03,create=True),contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaises(subprocess.TimeoutExpired):
+                updater.git(Path(temp),'fetch',timeout=.15,progress_log=Path(temp)/'fetch.log',stage='对象下载')
             self.assertTrue(all(child.poll() is not None for child in children))
+
+    def test_main_advancing_during_download_is_rechecked_before_publishing(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);git,upstream,original,head,excluded=self.fixture(root)
+            queried=git(upstream,'rev-parse','HEAD');real_git=updater.git;queries=[]
+            def moving_main(where,*args,**kwargs):
+                result=real_git(where,*args,**kwargs)
+                if args and args[0]=='ls-remote' and '--get-url' not in args:
+                    queries.append(result.stdout.split()[0])
+                    if len(queries)==1:
+                        (upstream/updater.SUBDIR/'05_src/task_panel.py').write_bytes(b'# code v3 after version query\n')
+                        git(upstream,'add','.');git(upstream,'commit','-qm','concurrent main advance')
+                return result
+            runtime=root/'runtime'
+            with patch.object(updater,'CODE',original/updater.SUBDIR),patch.object(network,'routes',return_value=(upstream.as_uri(),)),patch.object(updater,'git',side_effect=moving_main):
+                updater.update(runtime)
+            self.assertEqual(updater.selected_entry(runtime).read_bytes(),b'# code v3 after version query\n')
+            self.assertEqual(len(queries),2)
+            self.assertEqual(queries[0],queried)
+            self.assertNotEqual(queries[0],queries[1])
+
+    def test_divergence_or_continually_moving_main_keeps_old_release(self):
+        for mutation in ['divergence','moves_again']:
+            with self.subTest(mutation=mutation),tempfile.TemporaryDirectory() as temp:
+                root=Path(temp);git,upstream,original,head,excluded=self.fixture(root)
+                real_git=updater.git;queries=[]
+                def moving_main(where,*args,**kwargs):
+                    is_query=args and args[0]=='ls-remote' and '--get-url' not in args
+                    if is_query and len(queries)==1 and mutation=='moves_again':
+                        (upstream/updater.SUBDIR/'05_src/task_panel.py').write_bytes(b'# code v4\n')
+                        git(upstream,'add','.');git(upstream,'commit','-qm','main moves again')
+                    result=real_git(where,*args,**kwargs)
+                    if is_query:
+                        queries.append(result.stdout.split()[0])
+                        if len(queries)==1:
+                            if mutation=='divergence':git(upstream,'checkout','-B','main',head)
+                            (upstream/updater.SUBDIR/'05_src/task_panel.py').write_bytes(b'# code v3\n')
+                            git(upstream,'add','.');git(upstream,'commit','-qm','changed main')
+                    return result
+                runtime=root/'runtime'
+                with patch.object(updater,'CODE',original/updater.SUBDIR),patch.object(network,'routes',return_value=(upstream.as_uri(),)),patch.object(updater,'git',side_effect=moving_main):
+                    with self.assertRaises(ValueError):updater.update(runtime)
+                self.assertFalse((runtime/'release.json').exists())
+                self.assertEqual(git(original,'rev-parse','HEAD'),head)
+                self.assertEqual(len(queries),2)
 
     def test_broken_candidate_code_keeps_the_previous_pointer(self):
         with tempfile.TemporaryDirectory() as temp:
