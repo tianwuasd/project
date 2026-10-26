@@ -63,8 +63,8 @@ class BaselineNNUNet(nnUNetTrainer):
             os.replace(temporary, filename)
 
     def load_checkpoint(self, filename_or_checkpoint):
-        checkpoint=torch.load(filename_or_checkpoint,map_location='cpu',weights_only=False) if isinstance(filename_or_checkpoint,(str,Path)) else filename_or_checkpoint
-        super().load_checkpoint(checkpoint)
+        from checkpoint_compat import load_parent_checkpoint
+        checkpoint=load_parent_checkpoint(super().load_checkpoint,filename_or_checkpoint,torch)
         self._vista_resume_rng=checkpoint.get('vista_rng_state')
         self.rng_state_restored=bool(self._vista_resume_rng)
         if self._vista_resume_rng:

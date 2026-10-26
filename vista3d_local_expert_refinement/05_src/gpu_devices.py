@@ -14,12 +14,12 @@ class GPUCoolingDown(RuntimeError):
 
 def select_gpus(count=None, selection=None):
     output = subprocess.check_output(
-        ['nvidia-smi', '--query-gpu=index,uuid,name,memory.free,utilization.gpu',
+        ['nvidia-smi', '--query-gpu=index,uuid,name,memory.free,utilization.gpu,memory.total',
          '--format=csv,noheader,nounits'], text=True, timeout=15)
     rows = [[cell.strip() for cell in row] for row in csv.reader(output.splitlines()) if row]
     from evaluation_gpu import allowed_ids
     visible = allowed_ids([dict(index=r[0], uuid=r[1]) for r in rows], {'allowed_gpus': None})
-    print('GPU编号 / UUID / 名称 / 空闲MiB / 利用率：\n' + output, flush=True)
+    print('GPU编号 / UUID / 名称 / 空闲MiB / 利用率 / 总显存MiB：\n' + output, flush=True)
     choices = str(selection).replace('，', ',').replace(',', ' ').split() if selection is not None else None
     if count is None:
         count = len(choices) if choices is not None else int(input('使用几张显卡？[回车默认1]：').strip() or '1')
@@ -47,7 +47,11 @@ def select_gpus(count=None, selection=None):
     if busy.intersection(selected):
         raise GPUBusy('所选GPU已有计算进程，不抢占或终止其他任务；请等待空闲卡')
     for row in selected_rows:
-        required = max(6000, (float(os.environ.get('WHOLE_HEART_GPU_MEMORY', 5))+.5)*1024) if os.environ.get('WHOLE_HEART_MANAGED') == '1' else 6000
+        required=6000
+        if os.environ.get('WHOLE_HEART_MANAGED')=='1':
+            from gpu_budget import required_free_mib
+            if len(row)<6:raise ValueError('GPU查询缺少总显存，不能核对规划预算')
+            required=required_free_mib(os.environ.get('WHOLE_HEART_GPU_MEMORY',5),row[5])
         if float(row[3]) < required:
             raise GPUBusy(f'GPU {row[0]} 空闲显存不足{required:g}MiB')
         if float(row[4]) > 10:

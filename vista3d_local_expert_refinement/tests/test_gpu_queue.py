@@ -10,7 +10,7 @@ import gpu_devices
 import gpu_queue
 from server_data import read_json, write_json
 
-ROWS = '0, GPU-zero, RTX3090, 23000, 0\n2, GPU-two, RTX3090, 23000, 0\n3, GPU-three, RTX3090, 23000, 0\n'
+ROWS = '0, GPU-zero, RTX3090, 23000, 0, 24576\n2, GPU-two, RTX3090, 23000, 0, 24576\n3, GPU-three, RTX3090, 23000, 0, 24576\n'
 
 
 class GPUSelectionTests(unittest.TestCase):

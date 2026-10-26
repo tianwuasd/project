@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-25T17:23:05.009400+00:00",
+  "updated_at": "2026-10-26T05:33:11.969758+00:00",
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
@@ -14,7 +14,7 @@
     "expert_role": "local_specialization_and_test_time_advice",
     "primary_role": "global_segmentation_and_selective_refinement",
     "dataset_for_next_plan": "wholeheart",
-    "current_turn_scope": "refine_panel_template_and_publish_code"
+    "current_turn_scope": "repair_checkpoint_restore_and_default_20g_new_tasks_publish_skill"
   },
   "proposed_not_user_fixed": {
     "first_stage_clicks": 1,
@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Update the server panel using the original runtime, verify actual installation and authorized GPU smoke on the server; no patient training started by this change.",
+  "next_action": "Fix server proxy exit, update original runtime to v0.3.2, then create a new 20 GiB task including prepare and full-size preflight.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -210,5 +210,22 @@
     "change": "PANEL_VERSION only; no workflow change",
     "validation": "AST and real panel launch/quit with -S; no runtime created",
     "server_update_test": "pending user"
+  },
+  "panel_recovery_fix": {
+    "version": "0.3.2",
+    "date": "2026-10-26",
+    "validation": "docs/REPAIR_VALIDATION.json",
+    "default_planner_gib": 20,
+    "old_frozen_snapshots_changed": false,
+    "new_task_requires_prepare": true,
+    "control_tests": {
+      "total": 94,
+      "passed": 89,
+      "skipped": 5
+    },
+    "checkpoint_cpu": "passed_official_2.8.1_methods_with_local_torch_2.12.1",
+    "real_gpu_validated": false,
+    "server_deployed": false,
+    "publication_authority": "Remote main ref and Git history"
   }
 }

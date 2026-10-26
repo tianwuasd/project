@@ -13,5 +13,7 @@
     "ssh_key": "~/.ssh/project_readonly_ed25519"
   },
   "gpu_count": 1,
-  "gpu_candidates": "auto"
+  "gpu_candidates": "auto",
+  "gpu_memory": 20,
+  "gpu_memory_policy": "zmic44-20g-v1"
 }

@@ -14,7 +14,7 @@ import task_runtime as jobs
 from task_queries import query, follow, result_lines, read_optional, log_sources
 from task_progress import STATES
 
-PANEL_VERSION = '0.3.1'
+PANEL_VERSION = '0.3.2'
 
 
 class Back(Exception):
@@ -82,14 +82,14 @@ def show_gpu_choices():
     from evaluation_gpu import query as gpu_query, allowed_ids
     rows=[]
     processes=gpu_query('gpu_uuid,pid','compute-apps')
-    for index,uuid,name,free,util in gpu_query('index,uuid,name,memory.free,utilization.gpu'):
-        rows.append(dict(index=index,uuid=uuid,name=name,free=free,util=util))
+    for index,uuid,name,free,util,total in gpu_query('index,uuid,name,memory.free,utilization.gpu,memory.total'):
+        rows.append(dict(index=index,uuid=uuid,name=name,free=free,util=util,total=total))
     visible=allowed_ids(rows,{'allowed_gpus':None})
     print('\n当前显卡状态（空闲不代表已预约；执行前再次检查）：')
-    print('编号 / 型号 / 空闲显存MiB / 利用率 / 计算进程PID / 本次分配可见范围')
+    print('编号 / 型号 / 总显存MiB / 空闲显存MiB / 利用率 / 计算进程PID / 本次分配可见范围')
     for row in rows:
         pids=','.join(p[1] for p in processes if p[0]==row['uuid']) or '无'
-        print(f"{row['index']} / {row['name']} / {row['free']} / {row['util']}% / {pids} / " + ('范围内' if row['uuid'] in visible else '范围外'))
+        print(f"{row['index']} / {row['name']} / {row['total']} / {row['free']} / {row['util']}% / {pids} / " + ('范围内' if row['uuid'] in visible else '范围外'))
     print('auto 表示授权当前分配可见范围为候选；不会超过并发上限，不抢占外部进程。')
 
 
@@ -149,20 +149,36 @@ def new_config(args, saved, interactive=True):
         gpus = resolve_gpus(selection)
     elif interactive:
         print('\n本次仅 CPU 步骤，无需设置 GPU。')
+    from gpu_budget import DEFAULT_MEMORY_GIB,MEMORY_POLICY
+    planning=any(t in tasks for t in ['prepare','smoke','train'])
+    if args.gpu_memory is not None:
+        memory=float(args.gpu_memory)
+    elif source_config and not planning:
+        memory=float(source_config.get('gpu_memory',DEFAULT_MEMORY_GIB))
+    elif saved.get('gpu_memory_policy')==MEMORY_POLICY:
+        memory=float(saved.get('gpu_memory',profile.get('gpu_memory',DEFAULT_MEMORY_GIB)))
+    else:
+        memory=float(profile.get('gpu_memory',DEFAULT_MEMORY_GIB))
+        if saved.get('gpu_memory') and saved['gpu_memory']!=memory:
+            print(f'新任务显存默认已按RTX3090设为{memory:g} GiB；旧任务仍保留原计划。')
     config = dict(runtime=runtime,
                   results=results, data=data,name=name,tasks=tasks,profile=profile['name'],conda=profile.get('conda',''),
                   methods=methods, folds=folds, gpus=gpus, gpu_count=count,
-                  gpu_memory=float(args.gpu_memory or (source_config or {}).get('gpu_memory', saved.get('gpu_memory', 5))),
+                  gpu_memory=memory,gpu_memory_policy=MEMORY_POLICY,
                   input_job=source, preprocess_cache=args.preprocess_cache or 'reuse')
     if gpus:
         config['gpu_candidates']=selection
     if interactive and args.gpu_memory is None and any(t in tasks for t in ['prepare','smoke','train']):
-        config['gpu_memory'] = float(ask('网络规划显存预算GiB（已有输入需保持一致）', config['gpu_memory']))
+        config['gpu_memory'] = float(ask('网络规划显存预算GiB（24 GiB卡默认20，预留约4 GiB；改预算需新计划）', config['gpu_memory']))
     if source and 'prepare' in tasks and interactive and args.preprocess_cache is None:
         choice = ask('预处理：1尝试沿用（缓存不兼容则新建） 2新建', '1')
         if choice not in {'1','2'}:
             raise ValueError('缓存选择无效')
         config['preprocess_cache'] = 'reuse' if choice == '1' else 'new'
+    if source_config and planning and float(source_config.get('gpu_memory',config['gpu_memory']))!=config['gpu_memory']:
+        if 'prepare' not in tasks:raise ValueError('历史输入使用另一显存计划；请加入1预处理，为新预算生成独立计划和缓存')
+        config['preprocess_cache']='new'
+        print('规划显存已改变：独立新建计划和预处理缓存，保留历史任务。')
     return jobs.validate_request(config)
 
 
@@ -174,9 +190,11 @@ def preview_config(config):
         print('原始数据：' + config['data'])
         print('模型：' + ', '.join(config['methods']) + '；方向：' + ', '.join(config['folds']))
     if config.get('gpus'):
-        print('获准 GPU：' + ', '.join(config['gpus']) + f"；并发上限：{config['gpu_count']}；规划显存：{config['gpu_memory']} GiB")
+        print('获准 GPU：' + ', '.join(config['gpus']) + f"；并发上限：{config['gpu_count']}")
     else:
         print('本次仅 CPU 步骤；不会申请显卡。')
+    if any(t in config['tasks'] for t in ['prepare','smoke','train']):
+        print(f"网络规划显存预算：{config['gpu_memory']:g} GiB（用于生成patch/batch计划，不是显存硬限额）")
     print('提交后在后台执行；退出面板或日志查看不会停止任务。')
 
 

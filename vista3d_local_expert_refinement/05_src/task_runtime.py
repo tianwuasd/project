@@ -173,7 +173,8 @@ def validate_request(config):
     if not name or len(name) > 100 or name != clean(name):
         raise ValueError('任务名称需为1–100个可显示字符，不能包含控制字符')
     c['name'] = name
-    memory = c.get('gpu_memory', 5)
+    memory = c.get('gpu_memory',20)
+    c['gpu_memory']=memory
     if isinstance(memory, bool) or not isinstance(memory, (int,float)) or not math.isfinite(memory) or memory < 2:
         raise ValueError('规划显存预算需为至少2 GiB的有限数值')
     if c['tasks'] != ['environment'] and not str(c.get('data', '')).strip():

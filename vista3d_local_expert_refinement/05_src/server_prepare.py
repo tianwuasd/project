@@ -160,7 +160,7 @@ def prepare(fold, gpu_memory):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("fold", choices=list(FOLDS))
-    parser.add_argument("--gpu-memory", type=float, default=5)
+    parser.add_argument("--gpu-memory", type=float, default=20)
     parser.add_argument('--case',help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.case:

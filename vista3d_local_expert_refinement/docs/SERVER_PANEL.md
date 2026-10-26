@@ -117,7 +117,7 @@ bash start_server.sh
 
 当前完整适配与证据以 [v0.3严格验收表](CT_STRICT_AUDIT.md) 为准；v0.2设计仅作历史记录，产物上传已纳入。跨步骤显存holder未新增，实际计算退出即释放GPU，不承诺独占预约。
 
-GPU 监控只是实时探测，不是集群资源预约。必须遵守已有调度分配；程序与 `CUDA_VISIBLE_DEVICES`／SLURM 范围取交集，繁忙时等待，不抢占外部进程。显存等待阈值至少 6000 MiB，并随规划预算提高；OOM 时保留日志和检查点，不自动改 batch size 后混入原实验。
+GPU 监控只是实时探测，不是集群资源预约。必须遵守已有调度分配；程序与 `CUDA_VISIBLE_DEVICES`／SLURM 范围取交集，繁忙时等待，不抢占外部进程。v0.3.2新任务默认20 GiB规划预算，面板分别展示总显存和空闲显存；24 GiB卡名义留4 GiB，不保证无OOM。空闲门槛按规划预算与实测总量计算，20 GiB/24 GiB卡要求20992 MiB，预算超过容量报错。OOM时保留日志和检查点，不自动改batch后混入原实验。改变旧5 GiB计划的恢复办法见 [检查点修复与新计划](CHECKPOINT_RECOVERY.md)。
 
 结果目录含 `plan.json`、`state.json`、`code/`、`logs/`、`receipts/`、`workspace/`。正式模型在 `workspace/07_experiments/formal/`，预测在 `workspace/08_results/predictions/`，最终 CSV/报告在 `workspace/09_reports/final_evaluation/`。
 

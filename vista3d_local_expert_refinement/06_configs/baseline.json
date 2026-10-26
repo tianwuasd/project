@@ -12,7 +12,7 @@
   "validation_iterations_per_epoch": 50,
   "nnunet": "2.8.1",
   "configuration": "3d_fullres",
-  "planner_gpu_memory_gb_default": 5,
+  "planner_gpu_memory_gb_default": 20,
   "seed": 0,
   "split_seed": 20260919,
   "evaluation": "source-best checkpoint; original-grid per-class Dice and HD95; raw output primary"

@@ -31,7 +31,7 @@ def load_settings():
     if os.environ.get('WHOLE_HEART_MANAGED') == '1':
         settings['allowed_gpus'] = json.loads(os.environ['WHOLE_HEART_GPU_UUIDS'])
         settings['max_gpus'] = int(os.environ['WHOLE_HEART_GPU_LIMIT'])
-        settings['min_free_mib'] = max(settings['min_free_mib'], (float(os.environ.get('WHOLE_HEART_GPU_MEMORY', 5))+.5)*1024)
+        settings['planner_gpu_memory_gib'] = float(os.environ.get('WHOLE_HEART_GPU_MEMORY',5))
     return settings
 
 
@@ -43,17 +43,17 @@ def query(fields, kind='gpu'):
 
 def snapshot():
     """字段不可读取就报错，不能把 N/A 或查询失败当作空闲。"""
-    rows = query('index,uuid,memory.free,utilization.gpu')
+    rows = query('index,uuid,memory.free,utilization.gpu,memory.total')
     busy = {row[0] for row in query('gpu_uuid,pid', 'compute-apps')}
     if not rows or any(not uuid.startswith('GPU-') for uuid in busy):
         raise RuntimeError('无法可靠读取GPU/计算进程列表')
     result = []
-    for index, uuid, free, utilization in rows:
-        free, utilization = float(free), float(utilization)
-        if not math.isfinite(free) or not math.isfinite(utilization):
+    for index, uuid, free, utilization, total in rows:
+        free, utilization, total = float(free), float(utilization), float(total)
+        if not math.isfinite(free) or not math.isfinite(utilization) or not math.isfinite(total) or total<=0:
             raise ValueError('GPU监测数值无效')
         result.append(dict(index=index, uuid=uuid, free_mib=free,
-                           utilization=utilization, busy=uuid in busy))
+                           utilization=utilization,total_mib=total, busy=uuid in busy))
     return result
 
 
@@ -87,12 +87,17 @@ def allowed_ids(rows, settings, environ=None):
 
 
 def idle_reason(row, settings):
+    required=settings['min_free_mib']
+    if settings.get('planner_gpu_memory_gib') is not None:
+        from gpu_budget import required_free_mib
+        if row.get('total_mib') is None:raise ValueError('无法读取GPU总显存，停止显存预算核对')
+        required=required_free_mib(settings['planner_gpu_memory_gib'],row['total_mib'],required)
     if row['busy']:
         return '已有计算进程（即使利用率为0也跳过）'
     if row['utilization'] > settings['max_utilization_percent']:
         return f"利用率 {row['utilization']:g}% 过高"
-    if row['free_mib'] < settings['min_free_mib']:
-        return f"空闲显存 {row['free_mib']:g} MiB 不足"
+    if row['free_mib'] < required:
+        return f"空闲显存 {row['free_mib']:g} MiB 不足（本卡启动门槛 {required:g} MiB）"
     return None
 
 

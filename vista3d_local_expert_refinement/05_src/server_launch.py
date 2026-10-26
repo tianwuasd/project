@@ -38,7 +38,10 @@ def runtime_check(work, gpu_memory):
     from task_resources import torch_threads
     torch_threads(torch)
     free, total = torch.cuda.mem_get_info()
-    if free / 2**30 < gpu_memory + 0.5:
+    from gpu_budget import required_free_mib
+    required=required_free_mib(gpu_memory,total/2**20)
+    print(f"单卡总显存 {total/2**30:.2f} GiB；当前空闲 {free/2**30:.2f} GiB；规划预算 {gpu_memory:g} GiB；启动空闲门槛 {required/1024:.2f} GiB",flush=True)
+    if free/2**20 < required:
         raise RuntimeError(f"可用显存只有 {free/2**30:.1f} GiB，无法使用 {gpu_memory:g} GiB 的规划预算；请选择空闲 GPU 或新工作区中的较低预算")
     net = torch.nn.Conv3d(1, 8, 3, padding=1).cuda()
     value = net(torch.randn(1, 1, 24, 24, 24, device="cuda")).float().square().mean()
@@ -108,7 +111,7 @@ def main():
     parser.add_argument("--folds", help="预先选定的留出方向，逗号分隔")
     parser.add_argument("--models", "--methods", dest="models", help="B0")
     parser.add_argument("--managed", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--gpu-memory", type=float, default=None, help="规划显存预算，默认5 GiB；已有工作区沿用已保存值")
+    parser.add_argument("--gpu-memory", type=float, default=None, help="规划显存预算，新工作区默认20 GiB；已有工作区沿用冻结值")
     parser.add_argument("--yes-train", action="store_true", help="仅在明确接受长训练时使用，省略输入TRAIN确认")
     args = parser.parse_args()
     work = Path(args.work_dir).expanduser().resolve()
@@ -126,7 +129,7 @@ def main():
         raise ValueError(f"数据目录不存在：{data}")
     if work == CODE_ROOT or work in CODE_ROOT.parents or work.is_relative_to(data) or data.is_relative_to(work):
         raise ValueError("结果目录必须独立于原始数据，且不能直接使用代码目录")
-    gpu_memory = args.gpu_memory if args.gpu_memory is not None else previous.get("gpu_memory_gb", 5)
+    gpu_memory = args.gpu_memory if args.gpu_memory is not None else previous.get("gpu_memory_gb",20)
     if not math.isfinite(gpu_memory) or gpu_memory < 2:
         raise ValueError("规划显存预算必须是至少2 GiB的有限数值")
     mode, scope = args.mode, args.scope or 'ct-first'

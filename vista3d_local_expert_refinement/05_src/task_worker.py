@@ -82,7 +82,7 @@ print('依赖版本与CPU环境检查通过；尚未申请GPU。',flush=True)
 
 def wait_gpu(plan):
     from evaluation_gpu import snapshot, allowed_ids, idle_reason
-    settings = dict(allowed_gpus=plan['gpus'], min_free_mib=max(6000, (plan.get('gpu_memory', 5)+.5)*1024),
+    settings = dict(allowed_gpus=plan['gpus'], min_free_mib=6000,planner_gpu_memory_gib=plan.get('gpu_memory',5),
                     max_utilization_percent=10)
     last = 0
     while True:

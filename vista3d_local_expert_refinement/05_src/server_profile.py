@@ -14,7 +14,7 @@ def load(name=None):
         return json.loads((CODE/'06_configs/servers/zmic44.json').read_text(encoding='utf-8'))
     return dict(name='generic', runtime=str(Path.home()/'.local/share/vista3d_baseline_runtime'),
                 results=str(Path.home()/'vista3d_baseline_results'), data='', conda='', network=None,
-                gpu_count=1, gpu_candidates='auto')
+                gpu_count=1, gpu_candidates='auto',gpu_memory=20,gpu_memory_policy='zmic44-20g-v1')
 
 
 def paths(profile, saved=None, args=None):

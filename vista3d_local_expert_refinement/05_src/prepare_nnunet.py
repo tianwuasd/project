@@ -15,14 +15,14 @@ def configure_paths():
         os.environ[key] = str(ROOT / folder)
     os.environ["nnUNet_compile"] = "false"
     os.environ["nnUNet_wandb_enabled"] = "false"
-    os.environ["nnUNet_n_proc_DA"] = "2"
-    os.environ["OMP_NUM_THREADS"] = "2"
+    os.environ["nnUNet_n_proc_DA"] = "0"
+    os.environ.setdefault('OMP_NUM_THREADS',os.environ.get('WHOLE_HEART_CPU_THREADS','1'))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('fold', choices=list(FOLDS))
-    parser.add_argument('--gpu-memory', type=float, default=5)
+    parser.add_argument('--gpu-memory', type=float, default=20)
     args = parser.parse_args()
     from server_prepare import prepare
     prepare(args.fold, args.gpu_memory)
