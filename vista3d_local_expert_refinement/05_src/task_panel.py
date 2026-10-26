@@ -14,7 +14,7 @@ import task_runtime as jobs
 from task_queries import query, follow, result_lines, read_optional, log_sources
 from task_progress import STATES
 
-PANEL_VERSION = '0.3.4'
+PANEL_VERSION = '0.3.5'
 
 
 class Back(Exception):
@@ -100,7 +100,8 @@ def new_config(args, saved, interactive=True):
         if argument is not None:
             return argument
         suggestion = saved.get(key, default)
-        return ask(label, suggestion) if interactive else suggestion
+        displayed = ','.join(map(str, suggestion)) if isinstance(suggestion, (list, tuple)) else suggestion
+        return ask(label, displayed) if interactive else suggestion
     runtime = str(Path(args.runtime or saved.get('runtime') or profile['runtime']).expanduser().resolve())
     if interactive:
         print('\n新建任务：命名 → 步骤 → 路径 → 输入 → 步骤配置 → 冻结预览。每页 b 返回、q 退出。')
@@ -112,6 +113,7 @@ def new_config(args, saved, interactive=True):
         server_profile.show(profile,dict(runtime=runtime,results=results,data=data))
     source = args.input_job
     if source is None and interactive and tasks != ['environment']:
+        print(f'“{jobs.clean(name)}”尚未提交；下面选择旧任务作为输入，不是新任务列表。完成预览并输入 RUN 后才创建。')
         source = choose_job(runtime, allow_none=True)
     if source == 'none':
         source = None

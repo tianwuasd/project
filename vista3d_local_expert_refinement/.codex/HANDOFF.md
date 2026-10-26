@@ -122,3 +122,10 @@ GitHub代码发布完成。Linux CI https://github.com/tianwuasd/project/actions
 104项控制回归99通过5条件跳过；官方2.8.1估算方法体与真实3D U-Net在本机CPU复现原异常，修复后1/4线程通过；现有权重/优化器/RNG及恢复一步验证再次通过。详见docs/PLANNER_THREAD_FIX.md与PLANNER_THREAD_VALIDATION.json。本机Torch2.12.1不同于服务器2.8.0，未做真实CT/GPU验收或部署。发布版本以远端main/Git记录为准。
 
 旧失败任务冻结bug代码，r不会获得新修复；需更新后新建包含prepare的任务。旧缓存实现签名变化且本次预处理未完成，不强制迁移或改写快照。历史输入复用和原任务续跑仍是不同入口。
+
+
+## 受管更新后新建任务修复（2026-10-26，v0.3.5）
+
+用户task4在GPU表单之后报“请选择本项目专用子目录”，未到RUN提交，不是任务丢失。路径保护把runtime/releases/SHA的runtime祖先判非法。仅对runtime和直接受管release布局（40位SHA、清单存在）增加例外；数据、结果、普通代码祖先等保护保持。新建页区分旧输入和未提交任务，默认步骤显示为逗号列表。详见docs/MANAGED_RELEASE_PATH_FIX.md及MANAGED_RELEASE_VALIDATION.json。
+
+107项回归102通过5跳过；追加纯本地Git双更新/缓存重建后从新release提交真实快照与计划，最近任务和历史可查，worker启动模拟。服务器部署、Linux后台和真实CT/GPU仍待实测。u不经过该新建校验，可原入口升级v0.3.5后重开再n；不改旧任务快照或缓存。skill后续仅补GitHub更新机制，其他流程仍以CT详版为主。

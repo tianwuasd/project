@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-26T08:38:21.563013+00:00",
+  "updated_at": "2026-10-26T09:08:27.584594+00:00",
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
@@ -14,7 +14,7 @@
     "expert_role": "local_specialization_and_test_time_advice",
     "primary_role": "global_segmentation_and_selective_refinement",
     "dataset_for_next_plan": "wholeheart",
-    "current_turn_scope": "fix_planner_zero_thread_regression_only_no_new_quick_workflow"
+    "current_turn_scope": "fix_managed_release_new_task_path_guard_and_supplement_github_update_skill"
   },
   "proposed_not_user_fixed": {
     "first_stage_clicks": 1,
@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Update server to v0.3.4; create a new task including prepare, then verify actual CT/GPU phases. Old frozen tasks are not hot-patched.",
+  "next_action": "Update original runtime to v0.3.5, reopen, submit task4 and verify last-job/history. Supplement GitHub update mechanism in skill; CT remains primary template.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -257,5 +257,17 @@
     "real_gpu_validated": false,
     "new_diagnostic_workflow_added": false,
     "publication_authority": "Remote main ref and Git history"
+  },
+  "panel_release_path_fix": {
+    "version": "0.3.5",
+    "validation": "docs/MANAGED_RELEASE_VALIDATION.json",
+    "control_tests": {
+      "total": 107,
+      "passed": 102,
+      "skipped": 5
+    },
+    "local_git_update_then_submit": "passed_twice_including_cache_eviction",
+    "server_deployed": false,
+    "real_server_submission_verified": false
   }
 }

@@ -14,6 +14,7 @@ import subprocess
 import sys
 import time
 import math
+import re
 from uuid import uuid4
 
 from model_catalog import parse_models, parse_folds
@@ -187,9 +188,15 @@ def validate_request(config):
     for left, right in [(raw, runtime), (raw, results), (runtime, results)]:
         if left == right or left in right.parents or right in left.parents:
             raise ValueError('原始数据、运行环境、结果根目录必须相互独立')
-    for path in [runtime, results]:
-        if path == Path(path.anchor) or path == Path.home() or path == CODE or path in CODE.parents or path.is_relative_to(CODE):
-            raise ValueError('请选择本项目专用子目录')
+    for key, path in [('runtime', runtime), ('results', results)]:
+        # The updater intentionally installs code inside runtime/releases/<SHA>.
+        # Only that managed layout may use its runtime ancestor for new jobs.
+        managed_runtime = (key == 'runtime' and CODE.parent == path / 'releases'
+                           and re.fullmatch(r'[0-9a-f]{40}', CODE.name)
+                           and (CODE / 'release_manifest.json').is_file())
+        if (path == Path(path.anchor) or path == Path.home() or path == CODE
+                or (path in CODE.parents and not managed_runtime) or path.is_relative_to(CODE)):
+            raise ValueError(f'请选择本项目专用子目录：{key}={path}')
     if not c.get('input_job') and 'prepare' not in c['tasks'] and any(t in c['tasks'] for t in ['smoke', 'train', 'predict']):
         raise ValueError('首次模型运行需要选择预处理，或选择已有输入任务')
     if 'predict' in c['tasks'] and 'train' not in c['tasks'] and not c.get('input_job'):
