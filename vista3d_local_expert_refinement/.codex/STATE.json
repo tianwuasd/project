@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-26T18:10:43.737022+00:00",
+  "updated_at": "2026-10-26T18:26:49.317285+00:00",
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
@@ -357,8 +357,9 @@
     "restart_policy": "single restart action; incomplete resumes commit, completed creates independent same-stage run",
     "delete_policy": "scoped reversible trash; block active tasks/dependents",
     "utility_menus": "update,network,code/results upload,status,GPU,processes,logs,results retained",
-    "implementation_validation": "203 control tests:195 pass8conditional skip;14focused integration pass;actual pinned CPU reader/loader/checkpoint and Gloo2to3 APIs passed;synthetic60case preprocessing passed;targetGPUpending",
+    "implementation_validation": "206 control tests:198pass8conditional skips;14focused integration pass;actual pinned CPU reader/loader/checkpoint and Gloo2to3 APIs passed;synthetic60case preprocessing passed;targetGPUpending",
     "validation": "docs/SERVER_PANEL_V2_VALIDATION.json",
-    "menu_utilities_retained": true
+    "menu_utilities_retained": true,
+    "code_review_release_gate": "approved at ef99141; no open Critical/Important findings"
   }
 }

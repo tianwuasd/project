@@ -1,34 +1,99 @@
 {
   "date": "2026-10-27",
   "panel_version": "0.4.0",
-  "implementation_head_before_documentation": "c7145192e440cb7bba8756181d1eef58d465955e",
+  "implementation_head_before_documentation": "ef99141061b745912de21df6afd9d6938a0ec4a1",
   "publication_authority": "Verify GitHub main ref; this file is a validation snapshot, not a deployment receipt",
   "skill_updated": false,
-  "formal_budget": {"epochs": 250, "train_updates_per_epoch": 250, "validation_updates_per_epoch": 50},
+  "formal_budget": {
+    "epochs": 250,
+    "train_updates_per_epoch": 250,
+    "validation_updates_per_epoch": 50
+  },
   "automatic_global_batch": "explicitly user approved; reference/effective batch and patch sampling recorded",
-  "main_boards": ["prepare", "train", "predict", "assessment"],
+  "main_boards": [
+    "prepare",
+    "train",
+    "predict",
+    "assessment"
+  ],
   "source_flow": "raw+preprocessor -> completed prepare+model -> completed train/model",
   "task_catalog": "new-only runtime/pipeline_v2/index.json; no old task discovery",
   "restart": "incomplete resumes complete commits; completed creates independent same-stage run",
   "delete": "recoverable trash; no disk space reclaimed; active/dependent/redirected/nested paths guarded",
-  "retained_utilities": ["status", "progress", "GPU", "models", "processes", "logs", "results", "stop", "update", "network", "code upload", "artifact upload"],
+  "retained_utilities": [
+    "status",
+    "progress",
+    "GPU",
+    "models",
+    "processes",
+    "logs",
+    "results",
+    "stop",
+    "update",
+    "network",
+    "code upload",
+    "artifact upload"
+  ],
   "control_suite": {
     "command": "python -B -X utf8 tests/run_panel_suite.py",
-    "tests": 203, "passed": 195, "conditional_skips": 8, "seconds": 79.238,
+    "tests": 206,
+    "passed": 198,
+    "conditional_skips": 8,
+    "seconds": 80.882,
     "resource_warning": false,
-    "private_log": "D:/projects/sync-reports/vista-integration-fix-final-head-panel-suite-20261027.log"
+    "private_log": "D:/projects/sync-reports/vista-integration-fix2-panel-suite-20261027.log"
   },
-  "catalog_filesystem": {"tests": 31, "passed": 28, "privilege_skips": 3, "actual_windows_junction_and_hardlink_guards": "passed"},
-  "focused_integration": {"tests": 14, "passed": 14},
+  "catalog_filesystem": {
+    "tests": 31,
+    "passed": 28,
+    "privilege_skips": 3,
+    "actual_windows_junction_and_hardlink_guards": "passed"
+  },
+  "focused_integration": {
+    "tests": 14,
+    "passed": 14
+  },
   "actual_api_evidence": [
-    {"script": "tests/nnunet_loader_api_smoke.py", "scope": "real pinned loader/augmentations; serial/spawn/consumed-state parity; CPU only", "status": "passed"},
-    {"script": "tests/checkpoint_api_smoke.py", "scope": "actual pinned/project save/load; filename/path/mapping/legacy; CPU synthetic", "status": "passed"},
-    {"script": "tests/nnunet_membership_checkpoint_api_smoke.py", "scope": "real Gloo2->3, reordered retained UUID RNG/new UUID stream, weights/optimizer, epoch iterators, resumed update; tiny Linear, constructor bypass", "status": "passed"},
-    {"script": "tests/assessment_reader_api_smoke.py", "scope": "actual pinned NibabelIO; asymmetric3x4x5 shape, voxels, affine, official label write, Dice1; no GPU predictor", "status": "passed"},
-    {"private_script": "D:/projects/sync-reports/vista_synthetic_preparation_20261027.py", "scope": "actual bind/export/full8fit planning/3assessment preprocessing; synthetic60 images,48 excluded labels invalid+untouched; CPU only", "status": "passed", "private_report": "D:/projects/sync-reports/vista-cpu-preparation-20261027/1793037284771326600/report.json"}
+    {
+      "script": "tests/nnunet_loader_api_smoke.py",
+      "scope": "real pinned loader/augmentations; serial/spawn/consumed-state parity; CPU only",
+      "status": "passed"
+    },
+    {
+      "script": "tests/checkpoint_api_smoke.py",
+      "scope": "actual pinned/project save/load; filename/path/mapping/legacy; CPU synthetic",
+      "status": "passed"
+    },
+    {
+      "script": "tests/nnunet_membership_checkpoint_api_smoke.py",
+      "scope": "real Gloo2->3, reordered retained UUID RNG/new UUID stream, weights/optimizer, epoch iterators, resumed update; tiny Linear, constructor bypass",
+      "status": "passed"
+    },
+    {
+      "script": "tests/assessment_reader_api_smoke.py",
+      "scope": "actual pinned NibabelIO; asymmetric3x4x5 shape, voxels, affine, official label write, Dice1; no GPU predictor",
+      "status": "passed"
+    },
+    {
+      "private_script": "D:/projects/sync-reports/vista_synthetic_preparation_20261027.py",
+      "scope": "actual bind/export/full8fit planning/3assessment preprocessing; synthetic60 images,48 excluded labels invalid+untouched; CPU only",
+      "status": "passed",
+      "private_report": "D:/projects/sync-reports/vista-cpu-preparation-20261027/1793037284771326600/report.json"
+    }
   ],
-  "local_stack": {"platform": "Windows", "python": "3.11.15 for actual ML APIs", "torch": "2.12.1+cu126", "nnunet": "2.8.1", "CUDA_compute_executed": false},
-  "target_stack": {"platform": "Linux", "torch": "2.8.0+cu128", "nnunet": "2.8.1", "GPU_record": "historical zmic44 8xRTX3090; user preflight160x192x192/batch2/12.7807GiB allocated; not refreshed live inventory"},
+  "local_stack": {
+    "platform": "Windows",
+    "python": "3.11.15 for actual ML APIs",
+    "torch": "2.12.1+cu126",
+    "nnunet": "2.8.1",
+    "CUDA_compute_executed": false
+  },
+  "target_stack": {
+    "platform": "Linux",
+    "torch": "2.8.0+cu128",
+    "nnunet": "2.8.1",
+    "GPU_record": "historical zmic44 8xRTX3090; user preflight160x192x192/batch2/12.7807GiB allocated; not refreshed live inventory"
+  },
   "nonpassing_optional_probe": {
     "scope": "attempted real-constructor CPU lifecycle with fixture-only CPU bindings",
     "result": "native Windows gamma augmentation access violation; not passing evidence",
@@ -40,8 +105,22 @@
     "status": "pending target complete assessment",
     "SSH_command_executed_on_server": false,
     "reason": "recorded host reachable but login authentication unavailable; local GPU probe had an existing compute process",
-    "pending": ["Linux actual flock lifecycle", "target CUDA/NCCL", "full-size real-source trial", "actual keeper ownership/release", "formal epoch membership transition", "real throughput/VRAM/host-memory peaks"],
+    "pending": [
+      "Linux actual flock lifecycle",
+      "target CUDA/NCCL",
+      "full-size real-source trial",
+      "actual keeper ownership/release",
+      "formal epoch membership transition",
+      "real throughput/VRAM/host-memory peaks"
+    ],
     "formal_training_or_model_quality_claim": false,
     "zero_bug_or_global_optimum_claim": false
+  },
+  "code_review_release_gate": {
+    "status": "approved",
+    "head": "ef99141061b745912de21df6afd9d6938a0ec4a1",
+    "critical_open": 0,
+    "important_open": 0,
+    "target_runtime_acceptance": "separate and pending"
   }
 }
