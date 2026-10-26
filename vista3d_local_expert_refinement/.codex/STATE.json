@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-26T14:17:43.591106+00:00",
+  "updated_at": "2026-10-26T18:10:43.737022+00:00",
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
-  "phase": "nnunet_baseline_implemented_software_validated",
+  "phase": "independent_stage_panel_implemented_local_validated_target_pending",
   "confirmed": {
     "same_source_material": true,
     "source_labeled_ct": true,
@@ -14,7 +14,7 @@
     "expert_role": "local_specialization_and_test_time_advice",
     "primary_role": "global_segmentation_and_selective_refinement",
     "dataset_for_next_plan": "wholeheart",
-    "current_turn_scope": "fix_missing_promisor_object_inventory_and_refresh_update_skill"
+    "current_turn_scope": "independent_stage_boards_cooperative_DDP_assessment_and_recovery"
   },
   "proposed_not_user_fixed": {
     "first_stage_clicks": 1,
@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Implement independent main-menu prepare/train/predict boards, fresh v2 catalog, restart and reversible delete; preserve utilities; finish backend reviews/target acceptance and code publication, skill deferred",
+  "next_action": "Verify final review and live GitHub main; when main matches the reviewed release, run server panel a for target assessment. Skill updates remain deferred.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -321,7 +321,7 @@
     "epoch_approval": "pending",
     "current_epoch_budget": 250,
     "design": "docs/superpowers/specs/2026-10-26-cooperative-training-design.md",
-    "design_status": "approved implementation; latest goal adds isolated complete assessment and automatic resources",
+    "design_status": "independent stage v2 implemented and locally validated; target GPU acceptance pending; verify live GitHub main for publication",
     "performance_timing_draft": "5 timing tests and 13 existing inner-contract tests passed; 4 changed modules parsed; no server acceptance",
     "batch_budget_status": "user explicitly permits automatic global batch growth with sampling changes in preview/logs; 250 epochs and 250 train/50 validation updates remain fixed",
     "skill_update": "explicitly deferred by latest user instruction; do not edit/install/publish skill",
@@ -357,6 +357,8 @@
     "restart_policy": "single restart action; incomplete resumes commit, completed creates independent same-stage run",
     "delete_policy": "scoped reversible trash; block active tasks/dependents",
     "utility_menus": "update,network,code/results upload,status,GPU,processes,logs,results retained",
-    "implementation_validation": "controls143/138pass5skip; automaticpolicy6pass; real pinned loader CPU parity and2rank Gloo actual checkpoint methods passed; integrated GPU/server acceptance pending"
+    "implementation_validation": "203 control tests:195 pass8conditional skip;14focused integration pass;actual pinned CPU reader/loader/checkpoint and Gloo2to3 APIs passed;synthetic60case preprocessing passed;targetGPUpending",
+    "validation": "docs/SERVER_PANEL_V2_VALIDATION.json",
+    "menu_utilities_retained": true
   }
 }

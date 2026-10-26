@@ -174,3 +174,9 @@ GitHub代码发布完成。Linux CI https://github.com/tianwuasd/project/actions
 实现只在本发布checkout分支codex/vista-full-assessment，不覆盖另一个研究chat的D:/projects/vista3d_local_expert_refinement。确定性spawn加载器与有界分布式启动器已分别提交并通过独立修复复审；Windows上的实际nnU-Net2.8.1加载/增强/恢复CPU接口测试通过，实际项目检查点方法在2rankCPU Gloo下验证权重、优化器、逐rankRNG和恢复后更新通过。完整控制回归143项138通过5跳过，自动配置6项和独立板块4项通过；新目录索引仍在实施/审查。集成后完整GPU/NCCL、实际服务器预处理/训练/预测与恢复尚未验收，当前未发布这次大修。
 
 服务器只读SSH抵达10.12.208.180但登录认证失败，没有执行远程命令。8×3090/CPU/RAM/路径记录仍为历史服务器记录和用户贴回证据；首次服务器测评必须采集实况，不把本机4060 Laptop或CPU Gloo结果冒充3090性能。当前目标补充见docs/superpowers/specs/2026-10-27-independent-stages.md。
+
+## 2026-10-27：v0.4.0本机验收收敛
+
+新增独立板块和保留功能已实现，六项集成审查问题完成修复并通过复审；实现头c714519。最终控制回归203项195通过8条件跳过，无ResourceWarning；14项集成回归通过。实际固定版本读取器完成非立方体坐标/体素/标签/指标验证，CPU Gloo完成2→3进程的权重/优化器/旧UUID随机状态与新UUID种子、下一轮迭代器和更新。另用60例合成影像通过真实清单/导出/8fit规划/3例预处理，48份排除标签故意无效并保持不变。详见docs/SERVER_PANEL_V2_VALIDATION.json。
+
+额外CPU全构造器探针在本机Windows gamma增强原生异常，未计为通过，私有日志保留，正式库/增强方法未绕过；目标Linux Torch2.8 CUDA/NCCL/真实完整尺寸仍待服务器a测评。新任务日志含资源采集、原生故障栈、按rank输出、训练/验证批次、优化理由与缺失证据。发布状态请核对GitHub main及Git历史，不把本机验收记录当作远程部署回执。Skill仍暂缓。
