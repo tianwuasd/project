@@ -148,6 +148,54 @@ class ParallelQueueTests(unittest.TestCase):
                 self.assertEqual(idle.call_count, 2)
                 self.assertEqual(start.call_args.kwargs['env']['CUDA_VISIBLE_DEVICES'], 'GPU-1')
 
+    def test_managed_gpu_waits_for_verified_acquisition_then_admits_new_card(self):
+        for initial in [{'GPU-held': {}}, {}]:
+            with self.subTest(initially_held=list(initial)), tempfile.TemporaryDirectory() as temp:
+                work=Path(temp);lease=work/'diagnostics/gpu-leases.json'
+                write_json(lease,dict(error=None))
+                restrictions=[];proc=Mock(pid=123);proc.poll.return_value=0
+                def idle(settings,candidates=None):
+                    self.assertIsNotNone(candidates,'managed idle probe must restrict its candidates')
+                    restrictions.append(list(candidates))
+                    return [gpu for gpu in ['GPU-new'] if gpu in candidates]
+                with patch.dict(os.environ,{'VISTA_GPU_LEASES':str(lease)}),\
+                     patch('gpu_fleet.verified_keepers',side_effect=[initial,{'GPU-held':{},'GPU-new':{}}]) as verified,\
+                     patch.object(queue,'idle_gpus',side_effect=idle),\
+                     patch.object(queue.subprocess,'Popen',return_value=proc) as start,\
+                     patch.object(queue.time,'sleep'),patch.object(queue.time,'monotonic',side_effect=range(10000)):
+                    queue.run_phase([dict(fold='ct_holdG',method='B0',index=0,case_id='Case1',status='pending')],
+                        'sha',dict(max_gpus=2,retry_seconds=1),work)
+                self.assertEqual(restrictions,[list(initial),['GPU-held','GPU-new']])
+                self.assertEqual(verified.call_count,2)
+                start.assert_called_once()
+                self.assertEqual(start.call_args.kwargs['env']['CUDA_VISIBLE_DEVICES'],'GPU-new')
+
+    def test_managed_gpu_reports_fleet_error_before_idle_probe_or_process_launch(self):
+        with tempfile.TemporaryDirectory() as temp:
+            work=Path(temp);lease=work/'diagnostics/gpu-leases.json'
+            write_json(lease,dict(error='simulated acquisition failure'))
+            with patch.dict(os.environ,{'VISTA_GPU_LEASES':str(lease)}),\
+                 patch('gpu_fleet.verified_keepers') as verified,\
+                 patch.object(queue,'idle_gpus',side_effect=AssertionError('idle probe ran before fleet error')) as idle,\
+                 patch.object(queue.subprocess,'Popen') as start,\
+                 self.assertRaisesRegex(RuntimeError,'simulated acquisition failure'):
+                queue.run_phase([dict(fold='ct_holdG',method='B0',index=0,case_id='Case1',status='pending')],
+                    'sha',dict(max_gpus=2,retry_seconds=1),work)
+            verified.assert_not_called();idle.assert_not_called();start.assert_not_called()
+            self.assertEqual(read_json(work/'08_results/evaluation/status.json')['status'],'failed')
+
+    def test_legacy_gpu_queue_keeps_unrestricted_idle_probe_without_fleet(self):
+        with tempfile.TemporaryDirectory() as temp:
+            work=Path(temp);proc=Mock(pid=123);proc.poll.return_value=0
+            settings=dict(max_gpus=1,retry_seconds=1)
+            with patch.dict(os.environ,{},clear=True),patch('cooperative_control.devices') as held,\
+                 patch.object(queue,'idle_gpus',return_value=['GPU-free']) as idle,\
+                 patch.object(queue.subprocess,'Popen',return_value=proc) as start:
+                queue.run_phase([dict(fold='ct_holdG',method='B0',index=0,case_id='Case1',status='pending')],
+                    'sha',settings,work)
+            held.assert_not_called();idle.assert_called_once_with(settings)
+            self.assertEqual(start.call_args.kwargs['env']['CUDA_VISIBLE_DEVICES'],'GPU-free')
+
     def test_old_project_compatibility_file_is_not_accepted(self):
         try:import evaluation as ev
         except ModuleNotFoundError:self.skipTest('requires imaging dependencies; no model execution')

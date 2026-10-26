@@ -54,8 +54,13 @@ def run_phase(records, sha, settings, work, phase='gpu'):
                 if rc:
                     raise RuntimeError(f"评价失败：{record['log']}；停止队列，已完成病例保留")
             if pending and len(active) < settings['max_gpus']:
-                available = ([f'CPU-{i}' for i in range(settings['max_gpus'])] if phase=='cpu'
-                             else idle_gpus(settings))
+                if phase=='cpu':
+                    available=[f'CPU-{i}' for i in range(settings['max_gpus'])]
+                elif os.environ.get('VISTA_GPU_LEASES'):
+                    from cooperative_control import devices
+                    available=idle_gpus(settings,candidates=devices(False))
+                else:
+                    available=idle_gpus(settings)
                 available=[g for g in available if g not in active][:settings['max_gpus']-len(active)]
                 for gpu in available:
                     if not pending or terminating[0]:
