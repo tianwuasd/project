@@ -231,16 +231,18 @@ def download_runtime(cache, url, current, known, log):
         if kind!='blob' or mode not in {'100644','100755'}:raise ValueError('运行代码清单包含非普通文件')
         paths.append(name.decode('utf-8'));blobs.add(oid)
     if not paths:raise ValueError('目标提交没有VISTA运行文件')
-    data=('\n'.join(sorted(blobs))+'\n').encode('ascii')
-    available=inspect('cat-file','--batch-check=%(objectname) %(objecttype)',input_bytes=data).stdout
-    present={row.split()[0] for row in available.splitlines() if row.endswith(' blob')}
+    def stored_blobs():
+        # A stdin --batch-check lookup may try to fetch missing promisor objects.
+        # Enumerate only stored objects; keep implicit network access disabled.
+        available=inspect('cat-file','--batch-all-objects','--batch-check=%(objectname) %(objecttype)').stdout
+        return {row.split()[0] for row in available.splitlines() if row.endswith(' blob')}
+    present=stored_blobs()
     missing=sorted(blobs-present)
     print(f'运行代码：{len(paths)}个文件；需下载{len(missing)}个文件对象，复用{len(blobs)-len(missing)}个缓存对象。',flush=True)
     for start in range(0,len(missing),128):
         fetch('--no-write-fetch-head','--filter=blob:none','origin',*missing[start:start+128])
     # Detect missing objects here, with implicit networking disabled.
-    verified=inspect('cat-file','--batch-check=%(objectname) %(objecttype)',input_bytes=data).stdout
-    if any(not row.endswith(' blob') for row in verified.splitlines()) or len(verified.splitlines())!=len(blobs):
+    if not blobs.issubset(stored_blobs()):
         raise ValueError('运行代码对象不完整，未切换版本')
     remaining()
     return commit,paths

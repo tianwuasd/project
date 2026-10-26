@@ -89,6 +89,24 @@ class UpdateScopeTests(unittest.TestCase):
             self.assertTrue(set(excluded).isdisjoint(available))
             self.assertEqual(updater.selected_entry(runtime).read_bytes(),b'# code v3\n')
 
+    def test_missing_promisor_inventory_never_probes_missing_object_types(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);git,upstream,original,head,excluded=self.fixture(root)
+            runtime=root/'runtime';inventories=[];real_git=updater.git
+            def guarded_git(where,*args,**kwargs):
+                if args and args[0]=='cat-file' and any(arg.startswith('--batch-check') for arg in args):
+                    if '--batch-all-objects' not in args:
+                        raise ValueError('warning: lazy fetching disabled; fatal: could not fetch missing object from promisor remote')
+                    self.assertIsNone(kwargs.get('input_bytes'))
+                    inventories.append(args)
+                return real_git(where,*args,**kwargs)
+            with patch.object(updater,'CODE',original/updater.SUBDIR),patch.object(network,'routes',return_value=(upstream.as_uri(),)),patch.object(updater,'git',side_effect=guarded_git):
+                updater.update(runtime)
+            self.assertGreaterEqual(len(inventories),2)
+            self.assertEqual(updater.selected_entry(runtime).read_bytes(),b'# code v2 $Format:%H$\n')
+            available=set(git(runtime/'update_cache.git','cat-file','--batch-all-objects','--batch-check=%(objectname)').splitlines())
+            self.assertTrue(set(excluded).isdisjoint(available))
+
     def test_repeated_transfer_counters_do_not_hide_a_stall(self):
         script="import sys,time\nfor _ in range(12):\n sys.stderr.write('Receiving objects: 13% (28/210), 53.18 MiB | 3.95 MiB/s\\r');sys.stderr.flush();time.sleep(.04)\n"
         real_popen=subprocess.Popen;children=[]

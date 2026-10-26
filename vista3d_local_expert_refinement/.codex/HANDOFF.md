@@ -136,3 +136,10 @@ GitHub代码发布完成。Linux CI https://github.com/tianwuasd/project/actions
 用户要求与其他项目整体对照：CT保持完整详版，借鉴AAOCA的blob:none元信息、按需文件对象和禁止归档隐式联网。VISTA改为只下载运行目录与必要启动文件，不取其它项目、文献和历史文件内容；保留提交图/快进校验。120秒无可见计数/字节推进停止，重复旧计数不续命，等待提示不重放历史速度。保留900秒下载阶段总限、原认证/代理和独立release，补齐候选语法和原runtime转交。详见docs/UPDATE_CHAIN_AUDIT.md和CODE_ONLY_UPDATE_VALIDATION.json。
 
 112项回归107通过5条件跳过。Windows真实GitHub HTTPS只读验证取3004172快照的59个运行文件，归档378880字节，缓存pack1015354字节；不是服务器SSH/代理验收。旧033—035入口用docs/CODE_ONLY_UPDATE.md的一次性引导，先取新更新器单文件再取运行文件，不merge原检出，不修改旧release快照或自动恢复任务。无新训练模式、真实CT/GPU或Linux后台验收。
+
+
+## 部分克隆缺失对象枚举修复（2026-10-26，v0.3.7）
+
+服务器已成功读取SSH脚本、main和目录信息，但cat-file stdin类型查询触发缺失promisor对象自动补取，并被本地禁网保护拦截。32a752…为036的task_update.py。改为batch-all-objects枚举实际存储对象，下载前后均用本地集合验证；保留隐式网络禁用和按需下载，不删缓存/改密钥/热改旧快照。
+
+113项回归108通过5跳过；新增真实过滤Git+故障注入回归。Git2.53/2.54本机未复现同一fatal但枚举均正常，不推断服务器版本。Windows实际GitHub HTTPS下载成功，错误对象已显式取回，服务器037发布仍待验收。详见docs/PROMISOR_INVENTORY_FIX.md/VALIDATION.json。原终端f/r变量仍在时直接重跑最后一行引导，无需再次取脚本。

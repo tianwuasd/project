@@ -131,7 +131,7 @@ class UpdateTests(unittest.TestCase):
                     result.stdout=b''.join(b'100644 blob '+b'a'*40+b'\t'+(updater.SUBDIR+'/'+name).encode()+b'\0'
                         for name in ['05_src/task_panel.py','05_src/task_worker.py','05_src/task_runtime.py',
                                      '06_configs/baseline.json','04_data/manifests/README.md','bootstrap_server.sh','start_server.sh'])
-                elif args[:2]==('cat-file','--batch-check=%(objectname) %(objecttype)'):
+                elif args[:2]==('cat-file','--batch-all-objects'):
                     result.stdout='a'*40+' blob\n'
                 elif args[0]=='archive':result.stdout=data.getvalue()
                 return result
