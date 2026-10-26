@@ -156,11 +156,29 @@ def _upstreams(plan):
     return list(dict.fromkeys(str(_path(value)) for value in values))
 
 
+def _guard_process_metadata(job):
+    """Check only this known job's shallow metadata before the shared probe."""
+    state = _path(job / 'state.json')
+    if state.lstat().st_nlink != 1:
+        raise ValueError('任务状态记录不能与其他文件共享硬链接')
+    processes = _path(job / 'processes')
+    if not processes.exists():
+        return
+    if not processes.is_dir():
+        raise ValueError('任务进程记录目录损坏')
+    for candidate in processes.glob('*.json'):
+        candidate = _path(candidate)
+        info = candidate.lstat()
+        if candidate.parent != processes or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise ValueError('任务进程记录不能重定向到其他目录或文件')
+
+
 def _plan_record(runtime, job):
     job = _path(job)
     # These are the only job files read; no discovery or legacy fallback.
     _path(job / 'plan.json')
     _path(job / 'state.json')
+    _guard_process_metadata(job)
     try:
         plan = load_plan(job)
     except (AttributeError, TypeError, KeyError) as error:
@@ -225,6 +243,29 @@ def _valid_record(runtime, key, record):
     return job
 
 
+def _stored_path(value):
+    """Compare pinned ownership without resolving or opening its filesystem."""
+    if not isinstance(value, str) or not value:
+        raise ValueError('登记目录所有权记录损坏')
+    path = Path(value)
+    if not path.is_absolute() or '..' in path.parts:
+        raise ValueError('登记目录所有权记录损坏')
+    return path
+
+
+def _check_ownership(index, key, job):
+    for other, record in index['jobs'].items():
+        if other == key:
+            continue
+        if not isinstance(record, dict) or record.get('directory') != other:
+            raise ValueError('其他任务登记目录所有权损坏，未移动任务')
+        owned = [_stored_path(record['directory'])]
+        if 'trash_directory' in record:
+            owned.append(_stored_path(record['trash_directory']))
+        if any(job == path or job.is_relative_to(path) or path.is_relative_to(job) for path in owned):
+            raise ValueError('任务目录与其他登记任务或可恢复目录重叠')
+
+
 def register(runtime, job):
     """Register one verified frozen plan; repeat registration cannot rebind it."""
     runtime = _runtime(runtime)
@@ -234,6 +275,7 @@ def register(runtime, job):
         key = record['directory']
         if key in index['jobs'] and index['jobs'][key] != record:
             raise ValueError('任务已经登记，不能重新绑定或恢复已删除任务')
+        _check_ownership(index, key, Path(key))
         for upstream in record['upstream_jobs']:
             if upstream == key or upstream not in index['jobs']:
                 raise ValueError('上游任务必须来自新版索引，且不能引用自身')
@@ -307,17 +349,44 @@ def _dependents(runtime, index, key):
     for other, record in index['jobs'].items():
         if other == key:
             continue
-        try:
-            job = _record_path(runtime, other, record)
-            if record.get('state') == 'trashed':
-                continue
-            if record.get('state') == 'trashing' and not job.exists():
-                continue
-            if key in record['upstream_jobs']:
-                rows.append(_row(record, record.get('state', 'unknown')))
-        except (OSError, ValueError, KeyError, TypeError):
+        if not isinstance(record, dict):
             continue
+        upstreams = record.get('upstream_jobs', [])
+        if not isinstance(upstreams, list):
+            raise ValueError('下游任务引用记录损坏，不能确认依赖')
+        if key not in upstreams:
+            continue
+        if record.get('state') == 'trashed':
+            continue
+        if record.get('state') == 'trashing' and _completed_move(runtime, other, record):
+            continue
+        # Registered provenance remains a blocker when its downstream files,
+        # root identity, or display metadata have become unreadable/damaged.
+        rows.append(dict(directory=other, name=record.get('name', Path(other).name),
+                         workspace=record.get('workspace', ''), created=record.get('created', ''),
+                         stage=record.get('stage', ''), upstream_jobs=record.get('upstream_jobs', []),
+                         status=record.get('state', '记录缺失或损坏')))
     return rows
+
+
+def _completed_move(runtime, key, record):
+    try:
+        source = _record_path(runtime, key, record)
+        destination = _path(record['trash_directory'])
+        root = Path(record['results_root'])
+        return (destination.parent == root / '.trash' and not os.path.lexists(source)
+                and _identity(destination) == record['job_identity'])
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
+def _move_not_started(runtime, key, record, destination):
+    try:
+        _valid_record(runtime, key, record)
+        _path(destination)
+        return not os.path.lexists(destination)
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
 
 
 def dependents(runtime, job):
@@ -345,6 +414,7 @@ def trash(runtime, job):
             raise ValueError('任务仍有活动进程，不能删除')
         if _dependents(runtime, index, key):
             raise ValueError('仍有未删除的下游任务，不能删除')
+        _check_ownership(index, key, source)
         recycle = _path(Path(record['results_root']) / '.trash')
         recycle.mkdir(exist_ok=True)
         destination = _path(recycle / (source.name + '_' + uuid4().hex))
@@ -358,14 +428,17 @@ def trash(runtime, job):
         try:
             # Recheck path identities immediately before the only filesystem move.
             _valid_record(runtime, key, record)
+            _check_ownership(index, key, source)
             _path(destination)
             os.rename(source, destination)
         except BaseException:
-            index['jobs'][key] = record
-            index['selected'] = previous_selected
-            # If rollback persistence itself fails, the retained pending intent
-            # still records both paths and keeps the original job hidden.
-            _write_index(runtime, index)
+            # An interruption may arrive after rename has actually succeeded.
+            # Restore selection only if identity checks prove no move occurred;
+            # otherwise the persisted intent keeps the destination recoverable.
+            if _move_not_started(runtime, key, record, destination):
+                index['jobs'][key] = record
+                index['selected'] = previous_selected
+                _write_index(runtime, index)
             raise
         index['jobs'][key] = dict(pending, state='trashed')
         try:

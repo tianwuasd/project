@@ -136,6 +136,55 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(set(self.read_index()['jobs']), {str(job) for job in jobs})
         self.assertEqual(len(catalog.history(self.runtime)), len(jobs))
 
+    def nested_job(self, outer):
+        job = self.job('assessment')
+        plan = json.loads((job / 'plan.json').read_text(encoding='utf-8'))
+        nested = outer / 'workspace' / 'pipeline_v2' / 'assessment' / 'inner'
+        nested.parent.mkdir(parents=True)
+        job.rename(nested)
+        plan.update(directory=str(nested), results=str(nested.parent), workspace=str(nested / 'workspace'))
+        self.plan(nested, plan)
+        return nested
+
+    def test_overlapping_ownership_is_rejected_in_both_registration_orders(self):
+        for inner_first in [False, True]:
+            with self.subTest(inner_first=inner_first):
+                outer = self.job()
+                inner = self.nested_job(outer)
+                first, rejected = (inner, outer) if inner_first else (outer, inner)
+                catalog.register(self.runtime, first)
+                with self.assertRaisesRegex(ValueError, '重叠'):
+                    catalog.register(self.runtime, rejected)
+                self.assertTrue(outer.is_dir())
+                self.assertTrue(inner.is_dir())
+
+    def test_trash_fails_closed_for_preexisting_nested_registered_job(self):
+        outer = self.job()
+        inner = self.nested_job(outer)
+        catalog.register(self.runtime, outer)
+        index = self.read_index()
+        index['jobs'][str(inner)] = catalog._plan_record(self.runtime, inner)
+        write(self.index, index)
+        with self.assertRaisesRegex(ValueError, '重叠'):
+            catalog.trash(self.runtime, outer)
+        self.assertTrue(outer.is_dir())
+        self.assertTrue(inner.is_dir())
+
+    def test_trash_protects_another_recorded_recovery_directory(self):
+        outer, other = self.job(), self.job('train')
+        catalog.register(self.runtime, outer)
+        catalog.register(self.runtime, other)
+        destination = catalog.trash(self.runtime, other)
+        recovery = outer / 'workspace' / 'saved-recovery'
+        recovery.parent.mkdir()
+        destination.rename(recovery)
+        index = self.read_index()
+        index['jobs'][str(other)]['trash_directory'] = str(recovery)
+        write(self.index, index)
+        with self.assertRaisesRegex(ValueError, '重叠'):
+            catalog.trash(self.runtime, outer)
+        self.assertTrue(recovery.is_dir())
+
     def test_corrupt_top_level_index_does_not_fallback_or_get_overwritten(self):
         job = self.job()
         self.index.parent.mkdir(parents=True)
@@ -192,6 +241,23 @@ class CatalogTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, '下游'):
             catalog.trash(self.runtime, prepare)
         self.assertTrue(prepare.is_dir())
+
+    def test_missing_or_replaced_downstream_root_keeps_its_upstream_blocker(self):
+        prepare = self.job()
+        train = self.job('train', upstream=[prepare])
+        catalog.register(self.runtime, prepare)
+        catalog.register(self.runtime, train)
+        moved = train.parent.with_name('moved-train')
+        train.parent.rename(moved)
+        for replaced in [False, True]:
+            with self.subTest(replaced=replaced):
+                if replaced:
+                    train.parent.mkdir()
+                self.assertEqual([r['directory'] for r in catalog.dependents(self.runtime, prepare)], [str(train)])
+                with self.assertRaisesRegex(ValueError, '下游'):
+                    catalog.trash(self.runtime, prepare)
+        self.assertTrue(prepare.is_dir())
+        self.assertTrue((moved / train.name).is_dir())
 
     def test_trash_is_recoverable_and_leaves_raw_runtime_and_unindexed_jobs(self):
         code = self.root / 'original-code'
@@ -313,6 +379,69 @@ class CatalogTests(unittest.TestCase):
         finally:
             link.rmdir()
 
+    def assert_linked_process_metadata_is_isolated(self, job):
+        # The real unsafe helper is never invoked; the test itself must not read
+        # any old/unindexed content even when run against a regressed guard.
+        with patch.object(catalog, 'active_processes', side_effect=AssertionError('redirected metadata reached probe')):
+            self.assertEqual(catalog.history(self.runtime)[0]['status'], '记录缺失或损坏')
+            self.assertIsNone(catalog.latest(self.runtime))
+            with self.assertRaises(ValueError):
+                catalog.trash(self.runtime, job)
+        self.assertTrue(job.is_dir())
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows process metadata junction safety')
+    def test_windows_junction_process_directory_is_never_probed(self):
+        job = self.job()
+        catalog.register(self.runtime, job)
+        unindexed = self.root / 'unindexed-processes'
+        unindexed.mkdir()
+        (unindexed / 'foreign.json').write_text('must not read', encoding='utf-8')
+        link = job / 'processes'
+        result = subprocess.run(['cmd', '/c', 'mklink', '/J', str(link), str(unindexed)], capture_output=True, text=True)
+        if result.returncode:
+            self.skipTest('Windows junction creation unavailable: ' + result.stderr)
+        try:
+            self.assert_linked_process_metadata_is_isolated(job)
+        finally:
+            link.rmdir()
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows process metadata junction safety')
+    def test_windows_junction_process_entry_is_never_probed(self):
+        job = self.job()
+        catalog.register(self.runtime, job)
+        unindexed = self.root / 'unindexed-process-entry'
+        unindexed.mkdir()
+        (job / 'processes').mkdir()
+        link = job / 'processes' / 'foreign.json'
+        result = subprocess.run(['cmd', '/c', 'mklink', '/J', str(link), str(unindexed)], capture_output=True, text=True)
+        if result.returncode:
+            self.skipTest('Windows junction creation unavailable: ' + result.stderr)
+        try:
+            self.assert_linked_process_metadata_is_isolated(job)
+        finally:
+            link.rmdir()
+
+    def test_symlink_process_json_is_never_probed(self):
+        job = self.job()
+        catalog.register(self.runtime, job)
+        foreign = self.root / 'unindexed-foreign.json'
+        foreign.write_text('must not read', encoding='utf-8')
+        (job / 'processes').mkdir()
+        try:
+            (job / 'processes' / 'linked.json').symlink_to(foreign)
+        except OSError as error:
+            self.skipTest('OS does not permit file symlinks: ' + str(error))
+        self.assert_linked_process_metadata_is_isolated(job)
+
+    def test_hardlinked_process_json_is_never_probed(self):
+        job = self.job()
+        catalog.register(self.runtime, job)
+        foreign = self.root / 'unindexed-hardlink.json'
+        foreign.write_text('must not read', encoding='utf-8')
+        (job / 'processes').mkdir()
+        os.link(foreign, job / 'processes' / 'linked.json')
+        self.assert_linked_process_metadata_is_isolated(job)
+
     def test_intent_write_failure_never_moves_job(self):
         job = self.job()
         catalog.register(self.runtime, job)
@@ -355,6 +484,27 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(catalog.history(self.runtime), [])
         self.assertIsNone(catalog.latest(self.runtime))
         self.assertEqual(calls, ['trashing', 'trashed'])
+
+    def test_completed_rename_then_interrupt_retains_recovery_intent(self):
+        job = self.job()
+        catalog.register(self.runtime, job)
+        rename = os.rename
+
+        def move_then_interrupt(source, destination):
+            rename(source, destination)
+            raise KeyboardInterrupt('interrupted at successful rename boundary')
+
+        with patch.object(catalog.os, 'rename', side_effect=move_then_interrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                catalog.trash(self.runtime, job)
+        record = self.read_index()['jobs'][str(job)]
+        self.assertEqual(record['state'], 'trashing')
+        self.assertFalse(job.exists())
+        destination = Path(record['trash_directory'])
+        self.assertTrue((destination / 'plan.json').is_file())
+        self.assertEqual(catalog._identity(destination), record['job_identity'])
+        self.assertEqual(catalog.history(self.runtime), [])
+        self.assertIsNone(catalog.latest(self.runtime))
 
     def test_failed_rename_and_failed_rollback_remain_recoverable_and_block_upstream(self):
         prepare = self.job()
