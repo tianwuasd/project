@@ -94,11 +94,21 @@ def git(root, *args, timeout=30, emit=None, log=None):
     env = {k: v for k, v in network.child_env(ssh=settings['git_transport'] == 'github-ssh').items()
            if not k.startswith('GIT_') or k in {'GIT_SSH_COMMAND', 'GIT_SSH_VARIANT'}}
     env.update(GIT_TERMINAL_PROMPT='0', GCM_INTERACTIVE='Never')
+    local_archive = bool(args and args[0] == 'archive')
+    if local_archive:
+        # Publishing is an exact code whitelist, independent of attributes in
+        # this monorepo's other projects. A bare cache has no working-tree
+        # attributes. Prevent lazy fetching even if an object is unexpectedly
+        # absent; GIT_ALLOW_PROTOCOL works with older server Git versions too.
+        env.update(GIT_ALLOW_PROTOCOL='', GIT_ATTR_NOSYSTEM='1')
     if emit is not None:
         env['LC_ALL'] = 'C'
     options = ['git', '-c', 'core.askPass=', '-c', 'http.followRedirects=false',
                '-c', 'http.' + network.HTTPS_UPSTREAM + '.followRedirects=false',
                '-c', 'http.version=HTTP/1.1', '-c', 'http.lowSpeedLimit=1', '-c', 'http.lowSpeedTime=15']
+    if local_archive:
+        options += ['-c', 'core.attributesfile=' + os.devnull,
+                    '-c', 'core.autocrlf=false', '-c', 'core.eol=lf']
     if settings['proxy']:
         options += ['-c', 'http.proxy=' + settings['proxy'],
                     '-c', 'http.' + network.HTTPS_UPSTREAM + '.proxy=' + settings['proxy']]
@@ -296,8 +306,8 @@ def _update(registry, settings, emit):
                 attempt = {'name': name, 'url': url, 'started_at': now()}
                 report['attempts'].append(attempt)
                 try:
-                    # A private promisor remote also routes archive's lazy blob
-                    # fetches through this same candidate, never the checkout origin.
+                    # All code blobs are fetched here. Archive below is strictly
+                    # local and must not silently fetch repository attributes.
                     git(cache, 'config', 'remote.origin.url', url)
                     git(cache, 'config', 'remote.origin.promisor', 'true')
                     git(cache, 'config', 'remote.origin.partialclonefilter', 'blob:none')
@@ -343,7 +353,7 @@ def _update(registry, settings, emit):
                             fetch('--no-tags', 'origin', *blobs[offset:offset + 128])
                         remaining_budget()
                     with update_stage(registry, report, '本地归档与校验', emit):
-                        data = git(cache, 'archive', commit, *paths, timeout=ARCHIVE_TIMEOUT,
+                        data = git(cache, 'archive', '--worktree-attributes', commit, *paths, timeout=ARCHIVE_TIMEOUT,
                                    emit=emit, log=log)
                         extract_release(data, staging)
                     attempt.update(state='verified', commit=commit)

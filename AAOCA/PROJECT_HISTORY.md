@@ -2,6 +2,10 @@
 
 This is the public, non-patient-specific history. Detailed patient mappings and local paths belong to the private workspace memory.
 
+## 2026-10-26: offline archive for partial-clone updates
+
+A real partial-clone reproduction showed that git archive implicitly fetched .gitattributes from selected and unrelated repository directories after the explicit code download had completed. Previous synthetic repositories lacked attributes and missed this behavior. Archive now uses working-tree attributes in its dedicated bare cache, disables external attributes and line-ending conversion for that child, and prohibits Git transport. Whitelisted files match raw Git blobs. Incomplete local objects fail without hidden network waits; the previous release remains selected. Regressions include unfetched attributes, export-ignore settings and an unavailable remote during archive. The welcome marker AAOCA-20261026-02 identifies this fix. Numerical preprocessing and independent segmentation are unchanged.
+
 ## 2026-10-26: bounded Git downloads with live progress
 
 The private preprocessing updater separates 30-second reference queries, a shared 900-second object-download budget and 180-second local archives. Git transfer counters stream live while both pipes are drained; binary archives stay out of terminal output. Per-attempt logs and stage timings distinguish authentication, connection, download timeout, validation and cancellation. Retry preserves the old release and reuses the runtime-owned bare object cache. The same runtime network configuration applies throughout. Old 45-second updaters use the documented one-time bootstrap. Numerical preprocessing and independent segmentation remain unchanged.

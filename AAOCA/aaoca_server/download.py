@@ -15,7 +15,9 @@ class GitFailure(ValueError):
     """A classified diagnostic that never includes raw credential-helper output."""
 
 
-def diagnostic(stderr):
+def diagnostic(stderr, *, local_only=False):
+    if local_only:
+        return '本地归档失败，隐式联网已禁止；请检查缓存对象完整性和本地 Git 状态'
     text = stderr.lower()
     categories = [
         (('host key verification failed', 'remote host identification has changed'), 'SSH 主机校验失败；请核验已保存主机指纹'),
@@ -162,7 +164,8 @@ def run(args, *, env=None, cwd=None, timeout=900, emit=print, log=None, heartbea
         if safe:
             report(safe)
         if child.wait() != 0:
-            reason = diagnostic(b''.join(stderr).decode('utf-8', 'replace'))
+            reason = diagnostic(b''.join(stderr).decode('utf-8', 'replace'),
+                                local_only=bool(env is not None and env.get('GIT_ALLOW_PROTOCOL') == ''))
             report(reason)
             raise GitFailure(reason)
         return b''.join(stdout)

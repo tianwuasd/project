@@ -11,6 +11,23 @@ timeout 30 git ls-remote ssh://git@ssh.github.com:443/tianwuasd/project.git refs
 
 返回提交号和 `refs/heads/main` 证明可读取该私有仓库，不代表具有写权限。认证失败不会通过公共镜像重试；不要把私钥内容粘贴到命令、面板或聊天中。
 
+## 已配置官方 SSH 时的简短修复更新
+
+若旧面板下载完成后停在“本地归档与校验”，先 Ctrl+C 结束这次更新。根因是旧归档器在部分克隆中隐式读取未下载的属性文件；仅延长时限不能解决。先确认预处理任务停止，在之前已经配置好官方 SSH origin 和密钥/代理的原仓库执行：
+
+```bash
+cd /data5/zhougaowei/zhangruichen_workspace/aaoca_code/project &&
+git pull --ff-only &&
+(
+  set -e
+  p=/data5/zhougaowei/zhangruichen_workspace/aaoca_runtime/panel/release.json
+  if [ -f "$p" ]; then mv "$p" "$p.before-archive-fix-$(date +%s)-$$"; fi
+  bash AAOCA/start_aaoca_server.sh
+)
+```
+
+备份旧发布指针后从更新的仓库加载；旧发布目录仍保留。看到 `归档修复：AAOCA-20261026-02` 表示已加载修复。随后再测试 `u`，归档阶段不会联网。若尚未配置 SSH，先使用本页下方明确指定密钥/代理的一次性升级方法；该方法从最新临时代码启动修复后的更新器，不要求旧 `u` 自举。
+
 ## 已有旧代码或旧独立发布目录
 
 旧更新器仍可能在45秒中断下载，需用下面一次性入口取得修复，不能反复调用旧 `u` 自举。新版查询30秒、对象下载总预算900秒、归档180秒，并显示真实Git进度。下方首次下载命令用900秒上限和 `--progress`，由SSH本身执行10秒连接限制。

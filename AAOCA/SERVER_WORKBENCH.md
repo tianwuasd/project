@@ -129,7 +129,7 @@ bash start_aaoca_server.sh
 
 更新采用分阶段有界时限：官方 main 查询最多 **30秒**，对象下载共用 **900秒总预算**（历史对象和各批AAOCA文件对象合计，不逐批重置），本地归档最多 **180秒**。连接建立仍限10秒；完成后立即继续，上限不代表固定等待。版本相同直接结束，不重复下载对象。fetch 显式启用 `--progress`，实时显示 Git 提供的对象数、字节与速率；处理回车刷新并同时读取两个输出管道，不把二进制归档打印到终端。无新输出时每5秒显示等待及用时，不虚构百分比或ETA，心跳不延长总时限。需要干净的 main Git 工作副本、仓库之外的 runtime，并且本面板登记的任务全部可确认停止；不会绕过未知进程状态或活动锁。
 
-只把预处理代码发布到 `<runtime>/releases/<提交号>/`，共享 checkout、原始整理和独立分割不被此更新器改写。旧代码备份到 `<runtime>/backups/`，历史保存原代码及 Python 路径，续跑仍用原实现与环境。其他旧终端需退出重开；原启动命令和相同 runtime 会加载新发布。每次日志留在 `<runtime>/downloads/<尝试ID>/git-download.log`，阶段时间、原因及路径写入 `update-last.json`。Git进度与分类诊断可见，原始认证助手输出不写日志。对象缓存在 `<runtime>/download-cache/repository.git`，同一runtime重试复用已完整落盘的对象；不保证未完成pack字节级断点续传。超时/取消先回收本次Git及SSH后代再释放调度锁，旧发布指针不变，不自动删除缓存。已确认main SHA后下载失败，应检查对象传输阶段，不能据此认定密钥无效。
+只把预处理代码发布到 `<runtime>/releases/<提交号>/`，共享 checkout、原始整理和独立分割不被此更新器改写。旧代码备份到 `<runtime>/backups/`，历史保存原代码及 Python 路径，续跑仍用原实现与环境。其他旧终端需退出重开；原启动命令和相同 runtime 会加载新发布。归档阶段严格禁止 Git 网络协议，并在独立 bare 缓存使用 `--worktree-attributes`、禁用用户/系统属性与自动换行转换，按白名单发布原始 Git 文件字节；不会为仓库内 `.gitattributes` 隐式补下载。对象若缺失会立即报本地归档错误，保留旧版本。每次日志留在 `<runtime>/downloads/<尝试ID>/git-download.log`，阶段时间、原因及路径写入 `update-last.json`。Git进度与分类诊断可见，原始认证助手输出不写日志。对象缓存在 `<runtime>/download-cache/repository.git`，同一runtime重试复用已完整落盘的对象；不保证未完成pack字节级断点续传。超时/取消先回收本次Git及SSH后代再释放调度锁，旧发布指针不变，不自动删除缓存。已确认main SHA后下载失败，应检查对象传输阶段，不能据此认定密钥无效。
 
 ### 环境安装单独进行
 

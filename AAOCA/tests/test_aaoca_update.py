@@ -172,6 +172,65 @@ class UpdateTests(unittest.TestCase):
         self.assertTrue(report['stages'])
         self.assertTrue(all(s['seconds'] >= 0 for s in report['stages']))
 
+    def test_bare_archive_ignores_tree_and_config_attributes_for_whitelisted_code(self):
+        (self.upstream / '.gitattributes').write_text('*.py export-ignore\n')
+        (self.source / '.gitattributes').write_text('aaoca_server/panel.py export-ignore\n')
+        other = self.upstream / 'unselected'; other.mkdir()
+        (other / '.gitattributes').write_text('# unrelated attribute object\n')
+        self.official = self.commit()
+        attributes = self.root / 'configured-attributes'
+        attributes.write_text('* export-ignore\n')
+        original = updater.git.side_effect
+        def configure_archive(root, *args, **kwargs):
+            if args[0] == 'archive':
+                self.real_git(root, 'config', 'core.attributesfile', str(attributes))
+            return original(root, *args, **kwargs)
+        with patch.object(updater, 'git', side_effect=configure_archive):
+            self.assertTrue(self.update()['changed'])
+        release = updater.managed_release(self.registry.root)
+        expected = self.real_git(self.upstream, 'show', 'HEAD:AAOCA/aaoca_server/panel.py')
+        self.assertEqual((release / 'aaoca_server/panel.py').read_bytes(), expected)
+
+    def test_archive_with_unfetched_attributes_succeeds_without_remote_access(self):
+        (self.source / '.gitattributes').write_text('# intentionally unfetched parent attribute\n')
+        other = self.upstream / 'unselected'; other.mkdir()
+        (other / '.gitattributes').write_text('# intentionally unfetched unrelated attribute\n')
+        self.official = self.commit()
+        original = updater.git.side_effect
+        run = updater.download.run
+        environments = []
+        def trace_run(args, **kwargs):
+            if 'archive' in args:
+                environments.append(kwargs['env'])
+            return run(args, **kwargs)
+        def offline_archive(root, *args, **kwargs):
+            if args[0] == 'archive':
+                self.real_git(root, 'config', 'remote.origin.url', (self.root / 'missing-remote').as_uri())
+            return original(root, *args, **kwargs)
+        with patch.object(updater, 'git', side_effect=offline_archive), \
+             patch.object(updater.download, 'run', side_effect=trace_run):
+            self.assertTrue(self.update()['changed'])
+        self.assertEqual(environments[0]['GIT_ALLOW_PROTOCOL'], '')
+        self.assertEqual(environments[0]['GIT_ATTR_NOSYSTEM'], '1')
+        cache = Path(read(self.registry.root / 'update-last.json')['cache'])
+        present = self.real_git(cache, 'cat-file', '--batch-all-objects', '--batch-check=%(objectname)').splitlines()
+        missing_attr = self.real_git(self.upstream, 'rev-parse', 'HEAD:AAOCA/.gitattributes').strip()
+        self.assertNotIn(missing_attr, present)  # The archive did not fetch it.
+
+    def test_missing_code_blob_fails_locally_without_hidden_fetch_or_publication(self):
+        self.advance()
+        original = updater.git.side_effect
+        def omit_code_blobs(root, *args, **kwargs):
+            if args[0] == 'fetch' and '--filter=blob:none' not in args:
+                return b''  # Simulate an incomplete object download.
+            return original(root, *args, **kwargs)
+        with patch.object(updater, 'git', side_effect=omit_code_blobs):
+            with self.assertRaisesRegex(ValueError, '本地归档.*隐式联网已禁止'):
+                self.update()
+        self.assertFalse((self.registry.root / 'release.json').exists())
+        report = read(self.registry.root / 'update-last.json')
+        self.assertEqual(report['stages'][-1]['error_kind'], 'git')
+
     def test_failed_download_cache_is_reused_on_retry(self):
         self.advance()
         with patch.object(updater, 'extract_release', side_effect=ValueError('synthetic corrupt archive')):
