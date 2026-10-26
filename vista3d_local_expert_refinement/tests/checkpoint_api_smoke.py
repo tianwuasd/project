@@ -47,6 +47,8 @@ def main():
         load_checkpoint=namespace['load_checkpoint']
         def on_train_start(self):
             random.random();np.random.rand();torch.rand(2) # Simulated loader initialization consumes RNG.
+            self.dataloader_train=iter(())
+            self.dataloader_val=iter(())
     project_source=(CODE/'05_src/project_trainers.py').read_text(encoding='utf-8')
     trainer=next(n for n in ast.parse(project_source).body if isinstance(n,ast.ClassDef) and n.name=='BaselineNNUNet')
     selected=[n for n in trainer.body if isinstance(n,ast.FunctionDef) and n.name in {'save_checkpoint','load_checkpoint','on_train_start'}]

@@ -14,7 +14,7 @@ import task_runtime as jobs
 from task_queries import query, follow, result_lines, read_optional, log_sources
 from task_progress import STATES
 
-PANEL_VERSION = '0.3.10'
+PANEL_VERSION = '0.4.0'
 
 
 class Back(Exception):
@@ -44,17 +44,98 @@ def choose_job(runtime, allow_none=False):
         print('这里只列出已有数据清单的输入任务；仅安装环境的任务无需选作缓存。')
     for i, row in enumerate(records, 1):
         print(f"{i}. {jobs.clean(row['name'])} [{STATES.get(row['status'], row['status'])}] {row['directory']}")
-    text = '选择历史编号；d手工填写旧任务/工作区'
+    modern=os.environ.get('VISTA_CATALOG_VERSION')=='2'
+    if modern and not records:raise ValueError('新版尚无可选择的任务；请先在预处理、训练或完整测评板块创建。')
+    text = '选择任务编号' if modern else '选择历史编号；d手工填写旧任务/工作区'
     if allow_none:
         text += '；0不使用历史输入'
     value = ask(text, '0' if allow_none else '1' if records else 'd')
     if allow_none and value == '0':
         return None
-    if value == 'd':
+    if value == 'd' and not modern:
         return ask('完整路径')
     if not str(value).isdigit() or not 1 <= int(value) <= len(records):
         raise ValueError('历史编号无效')
     return records[int(value)-1]['directory']
+
+
+def choose_stage_source(runtime,stage):
+    from pipeline_catalog import history
+    rows=[r for r in history(runtime) if r.get('stage')==stage and r.get('status')=='completed']
+    if not rows:
+        raise ValueError('没有已完成的新版'+{'prepare':'预处理','train':'训练'}[stage]+'任务；请先完成对应板块。')
+    for i,row in enumerate(rows,1):
+        print(f"{i}. {jobs.clean(row['name'])} / {row['directory']}")
+    value=ask('选择来源'+{'prepare':'预处理','train':'训练'}[stage]+'任务','1')
+    if not str(value).isdigit() or not 1<=int(value)<=len(rows):raise ValueError('来源任务编号无效')
+    return rows[int(value)-1]['directory']
+
+
+def stage_config(args,saved,stage,interactive=True):
+    """Independent boards: raw->prepare, prepare->train, trained model->predict."""
+    import server_profile
+    from assessment_policy import automatic_request,PREPROCESSORS
+    profile=dict(server_profile.load(getattr(args,'profile',None)))
+    profile['runtime']=args.runtime or profile['runtime']
+    base_results=getattr(args,'results',None) or saved.get('results_base') or profile['results']
+    source=None;upstream=None
+    if stage in {'train','predict'}:
+        source=getattr(args,'input_job',None) or (choose_stage_source(profile['runtime'],'prepare' if stage=='train' else 'train') if interactive else None)
+        if not source:raise ValueError('请指定已完成的来源任务')
+        from pipeline_catalog import history
+        allowed={r['directory']:r for r in history(profile['runtime'])}
+        row=allowed.get(str(Path(source).resolve()))
+        needed='prepare' if stage=='train' else 'train'
+        if not row or row['stage']!=needed or row['status']!='completed':raise ValueError('来源必须为新版已完成的'+needed+'任务')
+        upstream=jobs.load_plan(source)
+        data=upstream['data'];preprocessor=upstream['preprocessor']
+        profile['gpu_memory']=upstream['gpu_memory']
+        print('来源数据：'+data+'；预处理：'+PREPROCESSORS.get(preprocessor,preprocessor))
+    else:
+        data=getattr(args,'data',None) or saved.get('data') or profile['data']
+        if interactive:data=ask('来源数据目录',data)
+        preprocessor=getattr(args,'preprocessor',None) or 'nnunet_default'
+        if len(PREPROCESSORS)>1 and interactive:
+            print('预处理：'+'；'.join(f'{key} {label}' for key,label in PREPROCESSORS.items()))
+            preprocessor=ask('预处理方法',preprocessor)
+        else:print('预处理：'+PREPROCESSORS.get(preprocessor,preprocessor)+'（自动）')
+    methods=getattr(args,'models',None) or ','.join((upstream or {}).get('methods',['B0']))
+    if stage in {'train','assessment'} and interactive:
+        print('模型：'+'；'.join(f'{key} {value["label"]}' for key,value in MODELS.items()))
+        methods=ask('训练模型' if stage=='train' else '测评模型',methods)
+    if stage=='predict':
+        allowed_models=upstream['methods']
+        if len(allowed_models)>1 and interactive:methods=ask('选择已训练模型（'+','.join(allowed_models)+'）',methods)
+        chosen=parse_models(methods)
+        if not set(chosen)<=set(allowed_models):raise ValueError('所选模型不属于来源训练任务')
+        methods=','.join(chosen)
+    config=automatic_request(profile,data,methods,preprocessor=preprocessor,
+        kind='assessment' if stage=='assessment' else 'formal',blocks=stage if stage!='assessment' else 'all')
+    config.update(catalog_schema=2,stage=stage,tasks=[stage],input_job=source,
+        formal_training=stage=='train',
+        upstream_jobs=[str(Path(source).resolve())] if source else [],results_base=str(Path(base_results).expanduser().resolve()),
+        results=str(Path(base_results).expanduser().resolve()/'pipeline_v2'/stage),
+        name={'prepare':'预处理','train':'训练','predict':'预测','assessment':'完整测评'}[stage]+' '+Path(data).name+(' '+','.join(config['methods']) if stage!='prepare' else ''))
+    if upstream:config['folds']=upstream['folds'][:]
+    return jobs.validate_request(config)
+
+
+def restart_job(args,runtime,job):
+    plan=jobs.load_plan(job)
+    print(query('status',runtime,job))
+    active=jobs.active_processes(job)
+    completed=(read_json(Path(job)/'state.json').get('status')=='completed')
+    print('将新建同板块独立任务，保留本次结果。' if completed else '将从最近完整保存位置继续；未提交的当前轮可能重算。')
+    if ask('重启以上任务，输入 RESTART；其它输入返回','')!='RESTART':return
+    if active:
+        jobs.stop(job);deadline=time.monotonic()+60
+        while jobs.active_processes(job) and time.monotonic()<deadline:time.sleep(1)
+        if jobs.active_processes(job):raise ValueError('进程尚未退出，未启动第二份任务；可在进程菜单查看。')
+    if completed:
+        config=dict(plan,name=plan['name']+' 重启')
+        if plan['stage']=='prepare':config.update(input_job=None,upstream_jobs=[],preprocess_cache='new')
+        return jobs.submit(config,args.foreground)
+    return jobs.resume(job,args.foreground,check='simple')
 
 
 def resolve_gpus(value):
@@ -143,10 +224,11 @@ def new_config(args, saved, interactive=True):
             folds = parse_folds(ask('范围：ct-first / all，或逗号分隔方向', 'ct-first'))
         if interactive:
             show_gpu_choices()
-        raw_count=value(args.gpu_count,'gpu_count',profile['gpu_count'],'最多同时使用几张 GPU（1—5；不足时少卡运行，无卡时等待）')
-        if isinstance(raw_count,bool) or str(raw_count).strip() not in {'1','2','3','4','5'}:
-            raise ValueError('显卡并发上限需为1至5的整数')
-        count=int(raw_count)
+        raw_count=value(args.gpu_count,'gpu_count',profile['gpu_count'],'最多同时使用几张 GPU（正整数；不超过实际服务器和分配范围）')
+        from training_policy import validate_gpu_count
+        count=validate_gpu_count(raw_count)
+        if count is None:
+            count=len(resolve_gpus('auto'))
         selection=value(args.gpus,'gpu_candidates',profile['gpu_candidates'],'允许使用的候选 GPU 编号/UUID，逗号分隔，或 auto（卡数可少于/多于上限）')
         gpus = resolve_gpus(selection)
     elif interactive:
@@ -184,6 +266,54 @@ def new_config(args, saved, interactive=True):
     return jobs.validate_request(config)
 
 
+def simple_config(args,saved,*,kind='formal',interactive=True):
+    """Primary choices only. Actual GPU allocation is deferred until execution."""
+    import server_profile
+    from assessment_policy import automatic_request,PREPROCESSORS
+    profile=dict(server_profile.load(getattr(args,'profile',None)))
+    for key in ['runtime','results']:
+        profile[key]=getattr(args,key,None) or saved.get(key) or profile[key]
+    data=getattr(args,'data',None) or saved.get('data') or profile['data']
+    if interactive:data=ask('数据目录',data)
+    methods=getattr(args,'models',None) or ','.join(saved.get('methods',['B0']))
+    if interactive:
+        print('模型：'+'；'.join(f'{key} {value["label"]}' for key,value in MODELS.items()))
+        methods=ask('模型',methods)
+    preprocessing=getattr(args,'preprocessor',None) or 'nnunet_default'
+    if len(PREPROCESSORS)>1 and interactive:
+        print('预处理：'+'；'.join(f'{key} {label}' for key,label in PREPROCESSORS.items()))
+        preprocessing=ask('预处理方法',preprocessing)
+    else:print('预处理：'+PREPROCESSORS.get(preprocessing,preprocessing)+'（自动）')
+    blocks=getattr(args,'tasks',None) or 'all'
+    if kind=='formal' and interactive:
+        blocks=ask('正式任务：1预处理 2训练 3预测；可多选','1,2,3')
+    config=automatic_request(profile,data,methods,preprocessor=preprocessing,kind=kind,blocks=blocks)
+    if kind=='formal':
+        config['selected_blocks']=config['tasks'][:]
+        # Select the newest compatible formal input, never an assessment model.
+        source=None
+        for row in jobs.history(config['runtime']):
+            if row.get('status') in {'running','queued','waiting_gpu'}:continue
+            path=Path(row['directory'])
+            try:
+                old=jobs.load_plan(path)
+                state=read_json(path/'state.json')
+                if (old.get('job_kind','formal')!='formal' or Path(old['data']).resolve()!=Path(config['data'])
+                        or old.get('methods')!=config['methods'] or old.get('folds')!=config['folds']
+                        or old.get('gpu_memory',20)!=config['gpu_memory']):continue
+                needed='train' if 'predict' in config['tasks'] and 'train' not in config['tasks'] else 'prepare'
+                if state.get('steps',{}).get(needed,{}).get('status')=='completed':
+                    source=str(path);break
+            except (OSError,ValueError,KeyError):continue
+        config['input_job']=source
+        if not source and 'train' in config['tasks'] and 'prepare' not in config['tasks']:
+            config['tasks'].insert(0,'prepare')
+            config['automatic_prerequisites']=['prepare']
+        if not source and 'predict' in config['tasks'] and 'train' not in config['tasks']:
+            raise ValueError('没有可用的已训练模型；请先选择训练，或从历史任务选择已有模型')
+    return jobs.validate_request(config)
+
+
 def preview_config(config):
     print('\n提交预览\n任务名称：' + jobs.clean(config['name']))
     print('执行顺序：' + ' → '.join(['独立环境检查', *(jobs.TASKS[t] for t in config['tasks'] if t != 'environment')]))
@@ -193,6 +323,9 @@ def preview_config(config):
         print('模型：' + ', '.join(config['methods']) + '；方向：' + ', '.join(config['folds']))
     if config.get('gpus'):
         print('获准 GPU：' + ', '.join(config['gpus']) + f"；并发上限：{config['gpu_count']}")
+    elif config.get('gpu_policy')=='automatic':
+        print('GPU/CPU：自动探测、测评选优；GPU上限按实际服务器和分配范围，不需要填写卡号。')
+        print('batch允许自动调整；正式250轮、每轮250训练/50验证保持，实际采样量将明确记录。')
     else:
         print('本次仅 CPU 步骤；不会申请显卡。')
     if any(t in config['tasks'] for t in ['prepare','smoke','train']):
@@ -307,17 +440,18 @@ def panel(args, runtime, saved):
     while True:
         active = any(jobs.active_processes(row['directory']) for row in jobs.history(runtime))
         print(f'\nVISTA3D / nnU-Net 服务器任务面板 v{PANEL_VERSION}\n运行目录：' + runtime + '\n' + query('status', runtime))
-        server_profile.show(profile,dict(runtime=runtime,results=args.results or saved.get('results') or profile['results'],data=args.data or saved.get('data') or profile['data']))
-        print('\ns 任务概览  t 持续进度  g 显卡(1秒刷新)  m 模型 epoch/loss\nl 选择详细日志  p 本任务/我的进程  h 历史任务  o 查看结果')
-        print('x 中断指定任务（保留完整检查点）' if active else 'n 新建任务  e 独立环境准备  r 续跑/追加  k 完成任务独立重跑')
+        server_profile.show(profile,dict(runtime=runtime,results=args.results or saved.get('results_base') or profile['results'],data=args.data or saved.get('data') or profile['data']))
+        print('\ns 任务概览  t 持续进度  g 显卡(1秒刷新)  m 模型 epoch/loss\nl 选择详细日志  p 本任务/我的进程  h 任务列表  o 查看结果')
+        print('1 预处理（来源数据/方法）  2 训练（选择预处理任务/模型）  3 预测（选择训练模型）')
+        print('a 完整测评（独立短流程）  r 重启任务  d 删除任务  x 中断任务（保留完整检查点）')
         print('u 更新程序  c GitHub网络设置  w 上传已提交代码  v 上传日志/指标/权重（SSH+Git LFS）')
         print('0/q 退出面板（后台任务继续）；普通输入页 b 返回、q 退出。')
         try:
             action = ask('选择；回车只看状态', 's')
             if action == '0':
                 return 0
-            if active and action in {'n','e','r','k'}:
-                print('此运行目录仍有活动任务。先查看进程或明确中断并等它退出，再提交任务。'); continue
+            if active and action in {'a','1','2','3','e'}:
+                print('新版当前仍有活动任务；可查看进度、重启或中断，退出后再提交计算。');continue
             if action in {'s','g','m','l','p','h','t'}:
                 kind = {'s':'status','g':'gpu','m':'models','l':'logs','p':'processes','h':'history','t':'status'}[action]
                 if action == 'g':
@@ -353,31 +487,27 @@ def panel(args, runtime, saved):
                 run_upload(selected,profile,True)
             elif action == 'o':
                 result_menu(choose_job(runtime))
-            elif action == 'n':
-                config = new_config(args, saved)
+            elif action in {'a','1','2','3'}:
+                config = stage_config(args,saved,{'a':'assessment','1':'prepare','2':'train','3':'predict'}[action])
                 preview_config(config)
                 if ask('提交以上任务？输入 RUN；其它输入返回', '') == 'RUN':
                     jobs.submit(config, args.foreground)
                     saved = config
             elif action == 'r':
                 job = choose_job(runtime)
-                state = read_optional(Path(job) / 'state.json') or {}
-                check = ask('续跑检查：simple简单 full全面 none跳过历史产物', 'simple')
-                if state.get('status') == 'completed':
-                    tasks = ask('追加未执行的后续步骤：predict / summarize')
-                    jobs.append_tasks(job, tasks, args.foreground, check)
-                else:
-                    jobs.resume(job, args.foreground, check)
-            elif action == 'k':
+                restart_job(args,runtime,job)
+            elif action == 'd':
+                if active:raise ValueError('当前有新版计算任务运行；待退出后再删除，避免目录与启动操作交错。')
                 job = choose_job(runtime)
-                old = jobs.load_plan(job)
-                if (read_optional(Path(job) / 'state.json') or {}).get('status') != 'completed':
-                    raise ValueError('主动重跑只接受已完成任务；中断任务请续跑')
-                config = dict(old, input_job=str(job), tasks=jobs.parse_tasks(ask('重跑步骤', ','.join(old['tasks']))),
-                              name=ask('新任务名称', old['name']+' 重跑'), preprocess_cache='new')
-                config['preprocess_cache']='new' if 'prepare' in config['tasks'] else 'reuse'
-                if ask('独立重跑并保留原结果？输入 RUN', '') == 'RUN':
-                    jobs.submit(config, args.foreground)
+                from pipeline_catalog import dependents,trash
+                dependencies=dependents(runtime,job)
+                if jobs.active_processes(job):raise ValueError('任务仍在运行，请先中断并等所有子进程退出。')
+                if dependencies:
+                    raise ValueError('下游任务仍依赖此来源，请先处理下游：'+'；'.join(r['name'] for r in dependencies))
+                print('将从新版任务列表移除，并移入可恢复回收区（暂不释放磁盘空间）：'+str(job))
+                if ask('删除以上任务，输入 DELETE；其它输入返回','')=='DELETE':
+                    destination=trash(runtime,job)
+                    print('已移入回收区：'+str(destination))
             elif action == 'x':
                 job = choose_job(runtime)
                 print(query('status', runtime, job))
@@ -425,6 +555,10 @@ def make_parser():
     p.add_argument('--name')
     p.add_argument('--tasks', help='environment,prepare,smoke,train,predict,summarize，多选')
     p.add_argument('--models', '--methods', dest='models', help='B0；当前仅监督基线')
+    p.add_argument('--preprocessor',choices=['nnunet_default'])
+    p.add_argument('--assessment',action='store_true',help='独立少量真实数据完整测评；资源自动选择')
+    p.add_argument('--stage',choices=['prepare','train','predict'],help='独立板块；训练/预测使用 --input-job 选择新版来源')
+    p.add_argument('--legacy-jobs',action='store_true',help=argparse.SUPPRESS)
     p.add_argument('--scope', choices=list(SCOPES))
     p.add_argument('--folds')
     p.add_argument('--input-job')
@@ -463,8 +597,9 @@ def make_parser():
     return p
 
 
-def main(argv=None):
+def _main(argv=None):
     args = make_parser().parse_args(argv)
+    os.environ['VISTA_CATALOG_VERSION']='1' if args.legacy_jobs else '2'
     from runtime_setup import DEFAULT_PATHS, SETTINGS
     import server_profile
     profile=server_profile.load(args.profile)
@@ -480,7 +615,18 @@ def main(argv=None):
         if entry:
             return subprocess.call([sys.executable, '-B', str(entry), *(sys.argv[1:] if argv is None else argv),
                                     '--runtime', runtime, '--loaded-release'])
-    saved = read_optional(Path(runtime) / 'settings.json') or {}
+    saved = read_optional(Path(runtime) / ('settings.json' if args.legacy_jobs else 'settings_v2.json')) or {}
+    if not args.legacy_jobs:
+        if args.append_tasks:raise ValueError('新版不追加旧步骤；请使用独立预处理/训练/预测板块，或重启已有任务。')
+        # Explicit CLI paths also belong to the new catalog. Do not probe an old
+        # task merely because it was supplied as a convenient default/path.
+        targets=[args.job,args.upload_job,args.rerun_job,
+                 args.resume_job if args.resume_job not in {None,'latest'} else None]
+        if any(targets):
+            from pipeline_catalog import history
+            known={r['directory'] for r in history(runtime)}
+            if any(str(Path(t).expanduser().resolve()) not in known for t in targets if t):
+                raise ValueError('新版只使用新版任务目录索引；该任务未登记，未读取旧任务。')
     if args.configure_network or args.show_network:
         from panel_publication import network
         if args.show_network:
@@ -535,11 +681,30 @@ def main(argv=None):
                       'train':'environment,prepare,train', 'experiment':'environment,prepare,smoke,train,predict',
                       'evaluate':'predict'}[args.mode]
         args.scope = args.scope or ('all' if args.mode in {'experiment','evaluate'} else 'ct-first')
+    if args.assessment:
+        config=stage_config(args,saved,'assessment',interactive=not args.non_interactive)
+        preview_config(config)
+        if not args.non_interactive and ask('输入 RUN 开始独立短测，其它输入返回','')!='RUN':return 0
+        return jobs.submit(config,args.foreground)
+    if args.stage:
+        config=stage_config(args,saved,args.stage,interactive=not args.non_interactive)
+        preview_config(config)
+        if not args.non_interactive and ask('提交以上独立板块？输入 RUN','')!='RUN':return 0
+        return jobs.submit(config,args.foreground)
     if args.tasks:
+        if not args.legacy_jobs:raise ValueError('新版使用 --stage prepare/train/predict；测评使用 --assessment。')
         return jobs.submit(new_config(args, saved, interactive=not args.non_interactive), args.foreground)
     if args.non_interactive:
         raise ValueError('非交互运行请指定 --tasks 或 --query')
     return panel(args, runtime, saved)
+
+
+def main(argv=None):
+    previous=os.environ.get('VISTA_CATALOG_VERSION')
+    try:return _main(argv)
+    finally:
+        if previous is None:os.environ.pop('VISTA_CATALOG_VERSION',None)
+        else:os.environ['VISTA_CATALOG_VERSION']=previous
 
 
 if __name__ == '__main__':

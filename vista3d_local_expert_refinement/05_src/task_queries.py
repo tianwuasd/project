@@ -8,7 +8,7 @@ import re
 import math
 import subprocess
 import time
-from datetime import datetime
+from datetime import datetime,timezone
 from server_data import read_json
 from task_runtime import active_processes, clean, history, latest
 from task_progress import STATES, step_lines, process_lines
@@ -62,7 +62,14 @@ def model_lines(work):
             train=last(r'train[_ ]loss\s*[:=]?\s*(-?[0-9.eE+]+)')
             val=last(r'val[_ ]loss\s*[:=]?\s*(-?[0-9.eE+]+)')
             lr=last(r'(?:Current learning rate|learning rate|\blr)\s*[:=]\s*([0-9.eE+-]+)')
-            lines.append(f'{fold}/{method} / {status} / {epoch}/{run.get("planned_epochs","—")} / {train} / {val} / {lr} / {record.get("gpu_uuid","—")}')
+            group=(run.get('history') or [{}])[-1].get('configuration',{})
+            gpu_label=','.join(group.get('gpu_uuids',[])) or record.get('gpu_uuid','—')
+            lines.append(f'{fold}/{method} / {status} / {epoch}/{run.get("planned_epochs","—")} / {train} / {val} / {lr} / {gpu_label}')
+            if group:
+                lines.append(f"  同一实验协同{len(group.get('gpu_uuids',[]))}卡；全局batch={group.get('global_batch_size')}；每轮采样{group.get('train_patches_per_epoch')}（原{group.get('reference_train_patches_per_epoch')}）。")
+            progress=read_optional(base/'progress.rank0.json')
+            if progress and status=='running':
+                lines.append(f"  当前轮{progress['epoch']+1}/{progress['planned_epochs']}，{progress['phase']}批次{progress['batch']}/{progress['total_batches']}；更新时间{datetime.fromtimestamp(progress['updated'],timezone.utc).isoformat(timespec='seconds')}")
     for path in sorted((work / '07_experiments/formal').glob('*/run.json')):
         value = read_optional(path)
         if not value:
@@ -146,6 +153,20 @@ def prediction_lines(work):
 def result_lines(job, section='summary', detailed=False):
     plan, work, state = context(job)
     lines = [f"任务：{clean(plan.get('name', Path(job).name))}；状态：{state.get('status', '旧记录/未知')}"]
+    if plan.get('job_kind')=='assessment':
+        result=read_optional(work/'09_reports/assessment.json') or {}
+        lines += ['独立工程测评：'+result.get('status','尚未生成')+'；少量来源病例，不代表正式模型效果。',
+                  '完整报告：'+str(work/'09_reports/assessment.json'),
+                  '错误与缺失证据：'+str(work/'diagnostics')]
+        if section in {'summary','training'}:
+            lines += [s['name']+'：'+s['status'] for s in result.get('stages',[])]
+            for item in result.get('models',[]):
+                value=item['chosen']
+                lines.append(f"{item['fold']}/{item['method']}：{value['world_size']}卡，全局batch={value['global_batch_size']}，中位训练步{value['median_step_seconds']:.3f}s；恢复验证通过。")
+        elif section=='cases':
+            lines += [f"{m['prediction']['case_id']}：预测/原网格/指标写出 {m['prediction']['status']}" for m in result.get('models',[])]
+        elif section=='files':lines.append('独立测评工作区：'+str(work))
+        return lines
     summary = read_optional(work / '09_reports/final_evaluation/summary.json')
     if section == 'summary':
         if not summary:
@@ -200,6 +221,9 @@ def log_sources(job):
     for area,name in [('00_admin/preflight','正式尺寸预检'),('00_admin/preparation_logs','预处理病例'),('09_reports','短测套件')]:
         candidates += [(area+':'+str(p.relative_to(work/area)),name+' / '+str(p.relative_to(work/area)),p) for p in sorted((work/area).rglob('*.log'))]
     candidates += [('smoke:'+str(p.relative_to(work/'07_experiments')),'完整尺寸短测 / '+p.parent.name+' / '+p.name,p) for root in sorted((work/'07_experiments').glob('smoke_*')) for p in root.glob('*.log')]
+    ranks=list((work/'07_experiments').rglob('rank-*/*.log'))
+    ranks=sorted(ranks,key=lambda p:p.stat().st_mtime)[-100:]
+    candidates += [('rank:'+str(p.relative_to(work)),'协同进程 / '+str(p.relative_to(work)),p) for p in ranks]
     return [(key, label, p) for key,label,p in candidates if p.is_file()]
 
 
@@ -230,7 +254,9 @@ class LogCursor:
 def query(kind, runtime, job=None, section='summary', detailed=False, log_source='all', process_scope='task'):
     if kind == 'history':
         entries = history(runtime)
-        return '\n'.join(f"{i}. {clean(x['name'])} [{x['status']}] {x['directory']}" for i,x in enumerate(entries,1)) or '暂无命名任务。可用 --job 指定旧工作区只读查看。'
+        empty=('新版尚无任务；旧记录不参与列表。' if os.environ.get('VISTA_CATALOG_VERSION')=='2'
+               else '暂无命名任务。可用 --job 指定旧工作区只读查看。')
+        return '\n'.join(f"{i}. {clean(x['name'])} [{x['status']}] {x['directory']}" for i,x in enumerate(entries,1)) or empty
     if kind == 'gpu':
         try:
             return subprocess.check_output(['nvidia-smi'], text=True, timeout=15)
@@ -278,6 +304,12 @@ def query(kind, runtime, job=None, section='summary', detailed=False, log_source
             lines.extend(f"  {v['fold']}/{v['method']}：{v.get('status', '未知')} {v.get('gpu_uuid','')}" for v in value.get('jobs', []))
     if state.get('current_step') == 'train':
         lines += model_lines(work)
+    if plan.get('job_kind')=='assessment':
+        assessment=read_optional(work/'09_reports/assessment.json') or {}
+        if assessment:
+            lines.append('完整测评：'+assessment.get('status','运行中')+'；独立短流程，不代表正式模型效果。')
+            lines.extend('  '+s['name']+'：'+s['status'] for s in assessment.get('stages',[])[-6:])
+            lines.append('详尽报告：'+str(work/'09_reports/assessment.json'))
     return '\n'.join(lines + prediction_lines(work))
 
 

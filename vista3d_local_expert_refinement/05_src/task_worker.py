@@ -110,6 +110,8 @@ def execute(job, lock_fd):
                WHOLE_HEART_CONTROL_PYTHON=sys.executable,
                WHOLE_HEART_WORKSPACE=str(work), WHOLE_HEART_GPU_UUIDS=json.dumps(plan.get('gpus', [])),
                WHOLE_HEART_GPU_LIMIT=str(plan.get('gpu_count', 1)), WHOLE_HEART_GPU_MEMORY=str(plan.get('gpu_memory', 5)))
+    if plan.get('gpu_policy')=='automatic':
+        env.update(VISTA_GPU_POLICY='automatic',VISTA_RUNTIME=str(plan['runtime']))
     # Retain inherited allocation; only individual compute children narrow CUDA.
     env['WHOLE_HEART_EVAL_VISIBLE_DEVICES'] = env.get('CUDA_VISIBLE_DEVICES', '__UNRESTRICTED__')
     if plan.get('conda') and Path(plan['conda']).is_file():
@@ -122,6 +124,7 @@ def execute(job, lock_fd):
     def interrupt(*_):
         raise KeyboardInterrupt('收到停止请求')
     old = signal.signal(signal.SIGTERM, interrupt)
+    fleet=None
     try:
         if plan.get('source') and not (work / '00_admin/input_receipt.json').exists():
             state.update(current_step='input')
@@ -169,6 +172,9 @@ def execute(job, lock_fd):
                 from model_catalog import save_selection
                 save_selection(work, plan['folds'], plan['methods'])
                 record_environment(python, conda, work, env)
+                if not (job/'diagnostics/resource-snapshot.json').exists():
+                    from runtime_observations import collect
+                    collect(job,dict(data=plan['data'],runtime=plan['runtime'],workspace=str(work)))
                 mode = {'predict': 'evaluate', 'train': 'resume' if (work / '00_admin/last_queue.json').exists() else 'train'}.get(step, step)
                 step_env = dict(env)
                 if step == 'smoke':
@@ -179,10 +185,20 @@ def execute(job, lock_fd):
                     state.update(status='running')
                     write_json(job / 'state.json', state)
                     step_env['WHOLE_HEART_GPU_UUIDS'] = json.dumps([step_env['CUDA_VISIBLE_DEVICES']])
+                if plan.get('gpu_policy')=='automatic' and step in {'train','predict'}:
+                    if fleet is None:
+                        from gpu_fleet import GPUFleet
+                        fleet=GPUFleet(job,plan['runtime'],plan['gpu_memory'],python=python).start()
+                    env['VISTA_GPU_LEASES']=str(fleet.path)
+                    step_env['VISTA_GPU_LEASES']=str(fleet.path)
+                    # Waiting happens only at a GPU stage, after CPU preprocessing.
+                    fleet.devices(wait=True)
                 command = [str(python), '-u', '-B', str(code / '05_src/server_launch.py'), plan['data'],
                            '--work-dir', str(work), '--mode', mode, '--folds', ','.join(plan['folds']),
                            '--models', ','.join(plan['methods']), '--gpu-memory', str(plan.get('gpu_memory', 5)),
                            '--yes-train', '--managed']
+                if step=='assessment':
+                    command=[str(python),'-u','-B',str(code/'05_src/assessment_run.py'),str(job/'plan.json')]
                 with logfile.open('a', encoding='utf-8') as stream:
                     run_child(command, step_env, cwd=code, output=stream)
             receipt(job, step)
@@ -191,6 +207,9 @@ def execute(job, lock_fd):
             write_json(job / 'state.json', state)
         state.update(status='completed', ended=now())
     except BaseException as error:
+        from runtime_observations import failure
+        failure(job,state.get('current_step','unknown'),error,workspace=str(work),
+            launcher_log=str(job/'launcher.log'),step_log=state.get('steps',{}).get(state.get('current_step'),{}).get('log'))
         state.update(status='interrupted' if isinstance(error, KeyboardInterrupt) else 'failed', error=str(error), ended=now())
         step = state.get('current_step')
         if step == 'installation':
@@ -199,8 +218,16 @@ def execute(job, lock_fd):
             state['steps'][step].update(status=state['status'], error=str(error), ended=state['ended'])
         raise
     finally:
-        write_json(job / 'state.json', state)
-        signal.signal(signal.SIGTERM, old)
+        try:
+            if fleet:fleet.close()
+        except BaseException as error:
+            state.update(status='failed',error='GPU保留进程清理未完成：'+str(error),ended=now())
+            from runtime_observations import failure
+            failure(job,'gpu_cleanup',error,workspace=str(work))
+            raise
+        finally:
+            write_json(job / 'state.json', state)
+            signal.signal(signal.SIGTERM, old)
 
 
 if __name__ == '__main__':

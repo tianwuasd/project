@@ -79,25 +79,25 @@ def main():
         trainer.on_epoch_start()
         trainer.on_train_epoch_start()
         torch.cuda.reset_peak_memory_stats()
-        outputs, times = [], []
+        from training_timing import measure_step, summarize_steps
+        outputs, times, train_timings = [], [], []
         for step in range(args.steps):
-            torch.cuda.synchronize()
-            tick = time.perf_counter()
-            batch = next(trainer.dataloader_train)
-            value = trainer.train_step(batch)
-            torch.cuda.synchronize()
-            times.append(time.perf_counter() - tick)
+            batch, value, measured = measure_step(trainer.dataloader_train, trainer.train_step, torch.cuda.synchronize)
+            train_timings.append(measured)
+            times.append(measured['total_seconds'])
             if not np.isfinite(value["loss"]).all():
                 raise FloatingPointError("训练 loss 非有限数")
             outputs.append(value)
             print(f"{run_id} step {step+1}/{args.steps}: {times[-1]:.3f}s loss={float(value['loss']):.5f}", flush=True)
         trainer.on_train_epoch_end(outputs)
         trainer.on_validation_epoch_start()
-        tick = time.perf_counter()
+        val_outputs, val_timings = [], []
         with torch.no_grad():
-            val_outputs = [trainer.validation_step(next(trainer.dataloader_val)) for _ in range(2)]
-        torch.cuda.synchronize()
-        val_seconds = (time.perf_counter()-tick)/2
+            for _ in range(2):
+                _, value, measured = measure_step(trainer.dataloader_val, trainer.validation_step, torch.cuda.synchronize)
+                val_outputs.append(value)
+                val_timings.append(measured)
+        val_seconds = sum(item['total_seconds'] for item in val_timings)/len(val_timings)
         if not all(np.isfinite(v["loss"]).all() for v in val_outputs):
             raise FloatingPointError("开发集 loss 非有限数")
         trainer.on_validation_epoch_end(val_outputs)
@@ -106,6 +106,8 @@ def main():
         trainer.save_checkpoint(str(checkpoint))
         trained_hash = state_hash(trainer.network)
         report.update({"train_seconds_excluding_first_two": times[2:], "median_step_seconds": float(np.median(times[2:])), "validation_step_seconds": val_seconds, "peak_allocated_gib": torch.cuda.max_memory_allocated()/2**30, "peak_reserved_gib": torch.cuda.max_memory_reserved()/2**30, "train_loss_finite": True, "val_loss_finite": True})
+        report['phase_timing'] = dict(train=summarize_steps(train_timings, warmup=2), validation=summarize_steps(val_timings))
+        report['measured_training_steps'] = len(train_timings)-2
         # 释放原网络后建立新实例，实际加载权重与优化器，不仅检查文件存在。
         del outputs, trainer
         gc.collect()

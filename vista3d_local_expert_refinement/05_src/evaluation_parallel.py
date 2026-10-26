@@ -124,6 +124,10 @@ def run_queue(models,sha,settings,work):
     for r in records:
         if cached(work,models[r['index']],r['case_id'],sha,'gpu'):r['status']='completed'
     run_phase(records,sha,settings,work,'gpu')
+    if os.environ.get('VISTA_GPU_LEASES'):
+        from cooperative_control import release_devices
+        from gpu_fleet import verified_keepers
+        release_devices(verified_keepers(os.environ['VISTA_GPU_LEASES']),wait=True)
     print('所有GPU病例进程已退出；开始CPU原网格恢复、压缩、LCC与Dice/HD95。',flush=True)
     for r in records:
         r['status']='completed' if cached(work,models[r['index']],r['case_id'],sha,'cpu') else 'pending'

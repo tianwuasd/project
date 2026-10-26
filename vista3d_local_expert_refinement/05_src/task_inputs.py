@@ -225,7 +225,8 @@ def receipt(job, step):
     work = Path(plan['workspace'])
     roots = {'environment': [], 'prepare': ['04_data'], 'smoke': ['09_reports/smoke_summary.json'],
              'train': ['07_experiments/formal'], 'predict': ['08_results/evaluation'],
-             'summarize': ['09_reports/final_evaluation']}[step]
+             'summarize': ['09_reports/final_evaluation'],
+             'assessment': ['09_reports/assessment.json','00_admin/assessment.json']}[step]
     paths = []
     for relative in roots:
         path = work / relative

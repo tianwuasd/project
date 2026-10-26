@@ -68,10 +68,10 @@ def before_training(work,fold,method,frozen_cpu=None):
       candidates=[budget] if frozen_cpu else sorted({1,min(2,budget),budget});measurements=[]
       for threads in candidates:
         trial=report.with_name(report.stem+f'.threads{threads}.json')
-        command=[sys.executable,'-B','-u',str(CODE/'05_src/smoke_train.py'),fold,method,'--steps','3','--report-file',str(trial)]
+        command=[sys.executable,'-B','-u',str(CODE/'05_src/smoke_train.py'),fold,method,'--steps','12','--report-file',str(trial)]
         env=os.environ.copy();env['WHOLE_HEART_CPU_THREADS']=str(threads)
         for key in ['OMP_NUM_THREADS','MKL_NUM_THREADS','OPENBLAS_NUM_THREADS','NUMEXPR_NUM_THREADS']:env[key]=str(threads)
-        print(f'完整尺寸预检CPU候选：{threads}线程；串行增强，3步训练+验证+恢复；日志 {report.with_suffix(".log")}',flush=True)
+        print(f'完整尺寸预检CPU候选：{threads}线程；串行增强，2步预热+10步测量+验证+恢复；日志 {report.with_suffix(".log")}',flush=True)
         with report.with_suffix('.log').open('a',encoding='utf-8') as stream:
             if os.environ.get('WHOLE_HEART_MANAGED')=='1':
                 from task_worker import run_child
@@ -82,7 +82,7 @@ def before_training(work,fold,method,frozen_cpu=None):
         measurements.append(dict(threads=threads,augmentation_workers=0,step_seconds=value['median_step_seconds'],report=str(trial),sha256=digest(trial)))
       selected=min(measurements,key=lambda item:item['step_seconds']);value=read_json(selected['report'])
       value.update(effective_cpu=dict(threads=selected['threads'],augmentation_workers=0),cpu_tuning=dict(candidates=measurements,
-          selection='minimum measured steady step time after two warmup steps; bounded short sample, not global optimum',
+          selection='minimum measured median over ten steps after two warmup steps; bounded sample, not global optimum',
           serial_loader_reason='preserve B0 serial augmentation and checkpoint global RNG semantics; augmentation worker search deliberately disabled'))
       write_json(report,value)
     effective=ensure(Path(work),fold,method,gpu,hardware[0],run)

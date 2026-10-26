@@ -48,9 +48,16 @@ class GPUSelectionTests(unittest.TestCase):
     def test_invalid_config_rejected(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / 'config.json'
-            write_json(path, dict(self.settings, max_gpus=6))
+            write_json(path, dict(self.settings, max_gpus=0))
             with patch.object(gpu, 'CONFIG', path), self.assertRaises(ValueError):
                 gpu.load_settings()
+
+    def test_config_accepts_more_than_five_devices_without_fixed_server_assumption(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'config.json'
+            write_json(path,dict(self.settings,max_gpus=8))
+            with patch.object(gpu,'CONFIG',path):
+                self.assertEqual(gpu.load_settings()['max_gpus'],8)
 
 
 class ParallelQueueTests(unittest.TestCase):

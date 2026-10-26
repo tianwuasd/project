@@ -213,11 +213,17 @@ def main():
         # 预处理只执行一次；多卡时全部准备好后，再并行独立模型，避免并发改同一缓存。
         for fold in folds:
             child("server_prepare.py", fold, "--gpu-memory", gpu_memory)
-            if mode != "smoke" and not gpus:
+            if mode!='smoke' and os.environ.get('VISTA_GPU_POLICY')=='automatic':
+                from evaluation import establish_protocol
+                establish_protocol()
+                for method in methods:
+                    extra=['--resume'] if mode in {'resume','experiment'} else []
+                    child('cooperative_control.py',fold,method,*extra)
+            elif mode != "smoke" and not gpus:
                 for method in methods:
                     extra = ["--resume"] if mode in {"resume", "experiment"} else []
                     child("server_train.py", fold, method, *extra)
-        if mode != 'smoke' and gpus:
+        if mode != 'smoke' and gpus and os.environ.get('VISTA_GPU_POLICY')!='automatic':
             from gpu_queue import run_training_queue
             run_training_queue([(fold, method) for fold in folds for method in methods],
                                gpus, work, resume=mode in {'resume', 'experiment'})

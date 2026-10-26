@@ -289,6 +289,14 @@ def git(root, *args, timeout=20, check=True, binary=False, progress_log=None, in
             else:process.wait()
         raise
     finally:
+        # Stream readers have joined (or communicate has drained them). Explicitly
+        # release handles even on streaming success and interrupted downloads.
+        if process is not None:
+            for name in ['stdin','stdout','stderr']:
+                stream=getattr(process,name,None)
+                if stream is not None and not stream.closed:
+                    try:stream.close()
+                    except OSError:pass
         for sig,handler in handlers.items():signal.signal(sig,handler)
 
 

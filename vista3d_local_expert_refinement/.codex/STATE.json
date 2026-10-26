@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-26T14:06:05.422246+00:00",
+  "updated_at": "2026-10-26T14:17:43.591106+00:00",
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "User tests v0.3.10 menu update marker; cooperative multi-GPU and epoch review remain deferred.",
+  "next_action": "Implement independent main-menu prepare/train/predict boards, fresh v2 catalog, restart and reversible delete; preserve utilities; finish backend reviews/target acceptance and code publication, skill deferred",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -310,5 +310,53 @@
       "skipped": 5
     },
     "server_deployed": false
+  },
+  "major_revision_request": {
+    "scope": [
+      "use validated Vista GitHub update template in remote skill",
+      "cooperative multi-GPU training of one experiment",
+      "CT acceleration parity audit"
+    ],
+    "epoch_change_requires_explicit_user_approval": true,
+    "epoch_approval": "pending",
+    "current_epoch_budget": 250,
+    "design": "docs/superpowers/specs/2026-10-26-cooperative-training-design.md",
+    "design_status": "approved implementation; latest goal adds isolated complete assessment and automatic resources",
+    "performance_timing_draft": "5 timing tests and 13 existing inner-contract tests passed; 4 changed modules parsed; no server acceptance",
+    "batch_budget_status": "user explicitly permits automatic global batch growth with sampling changes in preview/logs; 250 epochs and 250 train/50 validation updates remain fixed",
+    "skill_update": "explicitly deferred by latest user instruction; do not edit/install/publish skill",
+    "full_assessment_required": true,
+    "formal_blocks": [
+      "prepare",
+      "train",
+      "predict"
+    ],
+    "gpu_policy": "automatic visible/allocated/idle intersection; dynamic physical-device upper bound; one-second polling; qualified-card hold and complete-checkpoint regroup",
+    "server_reported_reference": {
+      "patch_size": [
+        160,
+        192,
+        192
+      ],
+      "batch_size": 2,
+      "device": "RTX3090",
+      "allocated_peak_gib": 12.78068208694458,
+      "cpu_threads": 2,
+      "augmentation_workers": 0
+    },
+    "review": "docs/TRAINING_BUDGET_REVIEW_2026-10-26.md",
+    "training_parameter_code_changed": true,
+    "primary_ui_spec": "docs/superpowers/specs/2026-10-27-independent-stages.md",
+    "formal_boards": [
+      "prepare",
+      "train",
+      "predict"
+    ],
+    "source_flow": "raw+method -> prepare; completed prepare+model -> train; completed train/model -> predict",
+    "old_task_policy": "do not scan/read/import old jobs; fresh pipeline_v2 catalog only",
+    "restart_policy": "single restart action; incomplete resumes commit, completed creates independent same-stage run",
+    "delete_policy": "scoped reversible trash; block active tasks/dependents",
+    "utility_menus": "update,network,code/results upload,status,GPU,processes,logs,results retained",
+    "implementation_validation": "controls143/138pass5skip; automaticpolicy6pass; real pinned loader CPU parity and2rank Gloo actual checkpoint methods passed; integrated GPU/server acceptance pending"
   }
 }

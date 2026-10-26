@@ -22,8 +22,9 @@ from server_data import digest, read_json, write_json
 
 CODE = Path(__file__).resolve().parents[1]
 TASKS = {'environment': '环境准备与CPU软件检查', 'prepare': '数据预处理', 'smoke': '所选模型完整尺寸预检',
-         'train': '模型训练', 'predict': '模型预测与逐例评估', 'summarize': '已有评价汇总'}
-GPU_TASKS = {'smoke', 'train', 'predict'}
+         'train': '模型训练', 'predict': '模型预测与逐例评估', 'summarize': '已有评价汇总',
+         'assessment': '完整测评（独立短流程）'}
+GPU_TASKS = {'smoke', 'train', 'predict', 'assessment'}
 
 
 def now():
@@ -105,6 +106,9 @@ def load_plan(job):
 
 def history(runtime):
     """Read damaged neighbours independently; never rewrite last-job while browsing."""
+    if os.environ.get('VISTA_CATALOG_VERSION')=='2':
+        from pipeline_catalog import history as current_history
+        return current_history(runtime)
     runtime = Path(runtime)
     paths = set()
     try:
@@ -152,6 +156,9 @@ def legacy_configs(runtime):
 
 
 def latest(runtime):
+    if os.environ.get('VISTA_CATALOG_VERSION')=='2':
+        from pipeline_catalog import latest as current_latest
+        return current_latest(runtime)
     try:
         return Path(read_json(Path(runtime) / 'last-job.json')['directory'])
     except (OSError, ValueError, KeyError, TypeError):
@@ -208,8 +215,16 @@ def validate_request(config):
     if 'prepare' in c['tasks'] and 'predict' in c['tasks'] and 'train' not in c['tasks']:
         raise ValueError('重算预处理后预测必须同时选择训练，不能搭配旧模型')
     if GPU_TASKS.intersection(c['tasks']):
-        if not c.get('gpus') or isinstance(c.get('gpu_count'),bool) or not 1 <= int(c.get('gpu_count',0)) <= 5 or len(c['gpus']) != len(set(c['gpus'])):
-            raise ValueError('GPU任务需明确候选GPU和有效并发上限')
+        from training_policy import validate_gpu_count
+        if c.get('gpu_policy')=='automatic':
+            if c.get('gpus') or c.get('gpu_count') not in (0,None):
+                raise ValueError('自动GPU策略不混用固定卡号/卡数；执行时按实际分配探测')
+            c['gpus'],c['gpu_count']=[],0
+        else:
+            count=validate_gpu_count(c.get('gpu_count'))
+            if not c.get('gpus') or count is None or len(c['gpus']) != len(set(c['gpus'])):
+                raise ValueError('GPU任务需明确候选GPU和有效并发上限')
+            c['gpu_count']=count
     return c
 
 
@@ -236,9 +251,10 @@ def launch(job, lock, foreground=False):
 def submit(config, foreground=False):
     config = validate_request(config)
     runtime, results = Path(config['runtime']), Path(config['results'])
-    with runtime_lock(runtime) as lock:
+    modern=config.get('catalog_schema')==2
+    with runtime_lock(runtime/'pipeline_v2' if modern else runtime) as lock:
         legacy_state = runtime / 'job_state.json'
-        if legacy_state.exists():
+        if not modern and legacy_state.exists():
             legacy = read_json(legacy_state)
             if legacy.get('pid') and identity(legacy['pid']):
                 raise ValueError('检测到旧入口记录的进程仍存在，先核查旧任务；未启动新任务')
@@ -269,20 +285,25 @@ def submit(config, foreground=False):
         write_json(job / 'plan.json', plan)
         write_json(job / 'state.json', dict(name=plan['name'], status='queued', plan_sha256=digest(job / 'plan.json'),
                    steps={t: {'status': 'pending'} for t in plan['tasks']}))
-        try:
-            old = read_json(runtime / 'history.json').get('jobs', [])
-        except (OSError, ValueError):
-            old = []
-        write_json(runtime / 'history.json', {'jobs': list(dict.fromkeys([*old, str(job)]))})
-        write_json(runtime / 'last-job.json', {'directory': str(job)})
+        if modern:
+            from pipeline_catalog import register
+            register(runtime,job)
+        else:
+            try:
+                old = read_json(runtime / 'history.json').get('jobs', [])
+            except (OSError, ValueError):
+                old = []
+            write_json(runtime / 'history.json', {'jobs': list(dict.fromkeys([*old, str(job)]))})
+            write_json(runtime / 'last-job.json', {'directory': str(job)})
         if config['tasks'] != ['environment']:
-            write_json(runtime / 'settings.json', config)
+            write_json(runtime / ('settings_v2.json' if modern else 'settings.json'), config)
         return launch(job, lock, foreground)
 
 
 def resume(job, foreground=False, check='simple'):
     plan = load_plan(job)
-    with runtime_lock(plan['runtime']) as lock:
+    root=Path(plan['runtime'])/('pipeline_v2' if plan.get('catalog_schema')==2 else '')
+    with runtime_lock(root) as lock:
         if active_processes(job):
             raise ValueError('任务进程仍存活，不能接续')
         from task_inputs import verify_resume
@@ -293,7 +314,10 @@ def resume(job, foreground=False, check='simple'):
             return 0
         state.update(status='queued', resume_check=check)
         write_json(Path(job) / 'state.json', state)
-        write_json(Path(plan['runtime']) / 'last-job.json', {'directory': str(job)})
+        if plan.get('catalog_schema')==2:
+            from pipeline_catalog import select
+            select(plan['runtime'],job)
+        else:write_json(Path(plan['runtime']) / 'last-job.json', {'directory': str(job)})
         return launch(job, lock, foreground)
 
 
@@ -315,8 +339,10 @@ def append_tasks(job, tasks, foreground=False, check='simple'):
     added = [t for t in parse_tasks(tasks) if t not in plan['tasks']]
     if not added:
         raise ValueError('没有缺失步骤；已经完成的步骤请使用独立重跑')
-    if GPU_TASKS.intersection(added) and (not plan.get('gpus') or not 1 <= plan.get('gpu_count', 0) <= 5):
-        raise ValueError('原任务没有获准GPU范围；请新建任务、选择此历史输入并明确GPU，不能直接追加计算')
+    if GPU_TASKS.intersection(added) and plan.get('gpu_policy')!='automatic':
+        from training_policy import validate_gpu_count
+        if not plan.get('gpus') or validate_gpu_count(plan.get('gpu_count')) is None:
+            raise ValueError('原任务没有获准GPU范围；请新建任务、选择此历史输入并明确GPU，不能直接追加计算')
     order = list(TASKS)
     if min(map(order.index, added)) <= max(map(order.index, plan['tasks'])):
         raise ValueError('只能追加尚未执行的后续步骤；重算上游请新建重跑任务')

@@ -15,7 +15,14 @@ CONFIG = Path(__file__).resolve().parents[1] / '06_configs/evaluation_gpu.json'
 
 def load_settings():
     settings = json.loads(CONFIG.read_text(encoding='utf-8'))
-    bounds = {'max_gpus': (1, 5), 'min_free_mib': (1024, 1048576),
+    from training_policy import validate_gpu_count
+    maximum=validate_gpu_count(settings['max_gpus'])
+    if maximum is None:
+        current=snapshot()
+        maximum=len(allowed_ids(current, settings))
+        if not maximum:raise ValueError('实际分配范围没有可用GPU')
+    settings['max_gpus']=maximum
+    bounds = {'min_free_mib': (1024, 1048576),
               'max_utilization_percent': (0, 10), 'idle_samples': (2, 10),
               'sample_interval_seconds': (1, 30), 'retry_seconds': (1, 60)}
     for key, (low, high) in bounds.items():
@@ -28,7 +35,12 @@ def load_settings():
     allowed = settings['allowed_gpus']
     if allowed is not None and (not isinstance(allowed, list) or not all(isinstance(x, str) for x in allowed)):
         raise ValueError('allowed_gpus 应为编号/完整UUID字符串列表，或 null')
-    if os.environ.get('WHOLE_HEART_MANAGED') == '1':
+    if os.environ.get('VISTA_GPU_POLICY')=='automatic':
+        settings.update(allowed_gpus=None,idle_samples=2,sample_interval_seconds=1,retry_seconds=1,
+            planner_gpu_memory_gib=float(os.environ.get('WHOLE_HEART_GPU_MEMORY','20')))
+        settings['max_gpus']=len(allowed_ids(snapshot(),settings))
+        if settings['max_gpus']<1:raise ValueError('本次分配范围没有GPU')
+    elif os.environ.get('WHOLE_HEART_MANAGED') == '1':
         settings['allowed_gpus'] = json.loads(os.environ['WHOLE_HEART_GPU_UUIDS'])
         settings['max_gpus'] = int(os.environ['WHOLE_HEART_GPU_LIMIT'])
         settings['planner_gpu_memory_gib'] = float(os.environ.get('WHOLE_HEART_GPU_MEMORY',5))
@@ -43,17 +55,30 @@ def query(fields, kind='gpu'):
 
 def snapshot():
     """字段不可读取就报错，不能把 N/A 或查询失败当作空闲。"""
-    rows = query('index,uuid,memory.free,utilization.gpu,memory.total')
-    busy = {row[0] for row in query('gpu_uuid,pid', 'compute-apps')}
+    rows = query('index,uuid,memory.free,utilization.gpu,memory.total,power.draw,clocks.sm,temperature.gpu')
+    processes=query('gpu_uuid,pid','compute-apps')
+    keepers={}
+    if os.environ.get('VISTA_GPU_LEASES'):
+        from gpu_fleet import verified_keepers
+        keepers=verified_keepers(os.environ['VISTA_GPU_LEASES'])
+    busy={uuid for uuid,pid in processes
+          if not(uuid in keepers and str(keepers[uuid]['pid'])==pid)}
     if not rows or any(not uuid.startswith('GPU-') for uuid in busy):
         raise RuntimeError('无法可靠读取GPU/计算进程列表')
     result = []
-    for index, uuid, free, utilization, total in rows:
+    for values in rows:
+        index,uuid,free,utilization,total=values[:5]
         free, utilization, total = float(free), float(utilization), float(total)
         if not math.isfinite(free) or not math.isfinite(utilization) or not math.isfinite(total) or total<=0:
             raise ValueError('GPU监测数值无效')
         result.append(dict(index=index, uuid=uuid, free_mib=free,
-                           utilization=utilization,total_mib=total, busy=uuid in busy))
+                           utilization=utilization,total_mib=total, busy=uuid in busy,
+                           process_pids=[int(pid) for gpu,pid in processes if gpu==uuid]))
+        for name,value in zip(['power_watts','sm_clock_mhz','temperature_c'],values[5:]):
+            try:
+                number=float(value)
+                result[-1][name]=number if math.isfinite(number) else None
+            except ValueError:result[-1][name]=None
     return result
 
 

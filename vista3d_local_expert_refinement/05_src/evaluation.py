@@ -150,6 +150,7 @@ def make_predictor(model):
     cls = trainer_class(model['method'])
     trainer = cls(read_json(prep / 'WholeheartBaselinePlans.json'), '3d_fullres', 0, read_json(prep / 'dataset.json'))
     trainer.initialize()
+    trainer._vista_inference_only=True
     trainer.load_checkpoint(model['checkpoint'])
     trainer.network.eval()
     trainer.set_deep_supervision_enabled(False)

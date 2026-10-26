@@ -63,9 +63,8 @@ def run_training_queue(tasks, gpus, work, resume=True):
     pending, active, failure = deque(records), {}, None
     used_gpus = set()
     managed = os.environ.get('WHOLE_HEART_MANAGED') == '1'
-    limit = int(os.environ.get('WHOLE_HEART_GPU_LIMIT', len(gpus)))
-    if not 1 <= limit <= 5:
-        raise ValueError('GPU并发上限无效')
+    from training_policy import validate_gpu_count
+    limit = min(validate_gpu_count(os.environ.get('WHOLE_HEART_GPU_LIMIT',len(gpus))) or len(gpus),len(gpus))
     state = dict(status='running', gpu_uuids=gpus, jobs=records)
     state_path = work / '00_admin/gpu_queue.json'
     write_json(state_path, state)
@@ -149,7 +148,7 @@ def run_training_queue(tasks, gpus, work, resume=True):
             elif pending and not failure:
                 state['status'] = 'waiting_gpu'
                 write_json(state_path, state)
-                time.sleep(5)
+                time.sleep(1)
         state['status'] = 'completed'
     except BaseException as error:
         state.update(status='failed', error=str(error))
