@@ -54,7 +54,7 @@ class SlowFirstLoader(RandomLoader):
                     raise RuntimeError('second worker never finished')
                 time.sleep(.01)
         value = super().__next__()
-        Path(self.marker_dir, str(self.seed)).write_text(str(time.monotonic()))
+        Path(self.marker_dir, str(self.seed)).write_text(str(time.perf_counter_ns()))
         return value
 
 
@@ -154,6 +154,12 @@ class LockLoader(RandomLoader):
         return stat.st_ino
 
 
+def delayed_lock_worker(*_args):
+    """Stay before _worker_main's detach until parent registration fails."""
+    Path(os.environ['BATCH_POOL_BOOTSTRAP_MARKER']).write_text(str(os.getpid()))
+    time.sleep(30)
+
+
 class BatchPoolTests(unittest.TestCase):
     def collect(self, loader, count=8, **settings):
         iterator = EpochBatchIterator(loader, timeout_seconds=20, **settings)
@@ -191,8 +197,8 @@ class BatchPoolTests(unittest.TestCase):
             second_seed = deterministic_seed(7, 0, 0, 'train', 1)
             actual = self.collect(SlowFirstLoader(temp, first_seed), count=4, workers=2, seed=7)
             self.assertEqual(actual, self.collect(RandomLoader(), count=4, workers=0, seed=7))
-            self.assertLess(float(Path(temp, str(second_seed)).read_text()),
-                            float(Path(temp, str(first_seed)).read_text()))
+            self.assertLess(int(Path(temp, str(second_seed)).read_text()),
+                            int(Path(temp, str(first_seed)).read_text()))
 
     def test_finite_prefetch_during_consumer_pause(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -393,6 +399,58 @@ class BatchPoolTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             iterator.load_state_dict(dict(state, version=999))
         iterator.close()
+
+    def test_lock_transfer_is_deferred_until_spawn_serialization(self):
+        import batch_pool
+        from multiprocessing import reduction
+        with patch.object(reduction, 'DupFd', create=True) as duplicate:
+            transfer = batch_pool._SpawnLockFd(1234)
+            duplicate.assert_not_called()
+            with self.assertRaisesRegex(RuntimeError, 'spawn serialization'):
+                pickle.dumps(transfer)
+            duplicate.assert_not_called()
+
+    @unittest.skipUnless(os.name == 'posix', 'requires POSIX flock and descriptor inheritance')
+    def test_registration_failure_before_worker_detach_releases_lock(self):
+        import batch_pool
+        import fcntl
+        import task_worker
+        before = {process.pid for process in mp.active_children()}
+        with tempfile.TemporaryDirectory() as temp:
+            lock_path = Path(temp, 'workflow.lock')
+            marker = Path(temp, 'before-detach')
+            fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+            iterator = EpochBatchIterator(RandomLoader(), workers=1, timeout_seconds=20)
+            def fail_registration(*_args):
+                deadline = time.monotonic() + 10
+                while not marker.exists():
+                    if time.monotonic() >= deadline:
+                        raise AssertionError('child did not reach delayed bootstrap')
+                    time.sleep(.01)
+                raise RuntimeError('registration failed before worker detach')
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                with patch.dict(os.environ, {'WHOLE_HEART_LOCK_FD': str(fd),
+                                             'WHOLE_HEART_MANAGED': '1',
+                                             'BATCH_POOL_BOOTSTRAP_MARKER': str(marker)}), patch.object(
+                        batch_pool, '_worker_main', delayed_lock_worker), patch.object(
+                        task_worker, 'register_child', side_effect=fail_registration):
+                    with self.assertRaisesRegex(RuntimeError, 'registration failed before worker detach'):
+                        next(iterator)
+                self.assert_no_new_children(before)
+                os.close(fd)
+                fd = None
+                probe = os.open(lock_path, os.O_RDWR)
+                try:
+                    # Parent is still alive. No abandoned transfer may retain
+                    # its flock after the only worker has been joined.
+                    fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                finally:
+                    os.close(probe)
+            finally:
+                iterator.close()
+                if fd is not None:
+                    os.close(fd)
 
     @unittest.skipUnless(os.name == 'posix', 'requires POSIX flock and descriptor inheritance')
     def test_each_spawn_child_holds_shared_lock_and_parent_process_group(self):

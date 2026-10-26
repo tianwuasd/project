@@ -98,6 +98,26 @@ def _generate(loader, seed, preserve=False):
         return next(loader)
 
 
+def _spawn_lock_handle(handle):
+    return handle
+
+
+class _SpawnLockFd:
+    """Borrow the parent's FD; transfer it only through active spawn pickling."""
+
+    def __init__(self, fd):
+        self.fd = fd
+
+    def __reduce__(self):
+        from multiprocessing import context, reduction
+        if context.get_spawning_popen() is None:
+            raise RuntimeError('lock FD transfer requires active spawn serialization')
+        # During Process.start(), DupFd uses Popen's inherited-FD list. Calling
+        # it earlier uses resource_sharer's parent cache, whose duplicate would
+        # leak if the child dies before detach(). No parent-side cache is used.
+        return _spawn_lock_handle, (reduction.DupFd(self.fd),)
+
+
 def _worker_main(loader_bytes, connection, lock_handle):
     """Spawn target; owned duplicate closes normally, without explicit flock unlock."""
     lock_fd = None
@@ -225,20 +245,14 @@ class EpochBatchIterator:
                 parent, child = ctx.Pipe()
                 lock_handle = None
                 try:
-                    # A distinct DupFd is required: detach() consumes its token.
-                    if descriptors:
-                        from multiprocessing.reduction import DupFd
-                        lock_handle = DupFd(descriptors[0])
-                    else:
-                        lock_handle = None
+                    # Each child reduces this borrowed FD inside its own
+                    # Process.start(); no unconsumed parent transfer is created.
+                    lock_handle = _SpawnLockFd(descriptors[0]) if descriptors else None
                     process = ctx.Process(target=_worker_main, args=(loader_bytes, child, lock_handle),
                                           name=f'batch-{self.stage}')
                     process.start()
                 except BaseException:
                     parent.close()
-                    if lock_handle is not None:
-                        # If spawning failed, no child can consume this DupFd.
-                        os.close(lock_handle.detach())
                     raise
                 finally:
                     child.close()
