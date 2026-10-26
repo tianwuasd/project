@@ -81,6 +81,16 @@ def _write_record(path, value):
     os.replace(temporary, path)
 
 
+def _initialize_group(dist, invocation, backend, rank, world_size, timeout_seconds):
+    # Pass native filesystem text directly. Torch's POSIX file:// handler does
+    # not URL-decode its path, so as_uri() corrupts spaces, Unicode and '%'.
+    timeout = timedelta(seconds=timeout_seconds)
+    store = dist.FileStore(str(invocation / 'rendezvous'), world_size)
+    store.set_timeout(timeout)
+    dist.init_process_group(backend=backend, store=store, world_size=world_size,
+                            rank=rank, timeout=timeout)
+
+
 def _rank_main(target, arguments, selected, invocation, rank, backend,
                init_timeout_seconds, transferred_lock):
     invocation = Path(invocation)
@@ -107,12 +117,8 @@ def _rank_main(target, arguments, selected, invocation, rank, backend,
         import torch.distributed as dist
         if backend == 'nccl':
             torch.cuda.set_device(rank)
-        # A unique absent FileStore path avoids a parent CUDA context or a
-        # close/rebind TCP rendezvous race, including on Windows Gloo.
-        dist.init_process_group(backend=backend,
-                                init_method=(invocation / 'rendezvous').as_uri(),
-                                world_size=world_size, rank=rank,
-                                timeout=timedelta(seconds=init_timeout_seconds))
+        # A unique FileStore avoids parent CUDA and TCP close/rebind races.
+        _initialize_group(dist, invocation, backend, rank, world_size, init_timeout_seconds)
         module, name = target.split(':')
         function = getattr(importlib.import_module(module), name)
         result = function(rank, world_size, arguments)

@@ -4,14 +4,14 @@ import json
 import multiprocessing as mp
 import os
 import pickle
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import signal
 import sys
 import tempfile
 import threading
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / '05_src'))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -61,6 +61,19 @@ class ValidationTests(unittest.TestCase):
                              backend='gloo', lock_fd=5)
             duplicate.assert_not_called()
 
+    def test_posix_rendezvous_passes_native_path_without_url_encoding(self):
+        from datetime import timedelta
+        from ddp_runtime import _initialize_group
+        invocation = PurePosixPath('/tmp/ddp logs/实验 50% #? /invocation')
+        distributed = Mock()
+        _initialize_group(distributed, invocation, 'gloo', 1, 2, 7)
+        distributed.FileStore.assert_called_once_with(str(invocation / 'rendezvous'), 2)
+        store = distributed.FileStore.return_value
+        store.set_timeout.assert_called_once_with(timedelta(seconds=7))
+        distributed.init_process_group.assert_called_once_with(
+            backend='gloo', store=store, world_size=2, rank=1,
+            timeout=timedelta(seconds=7))
+
 
 @unittest.skipUnless(HAS_TORCH, 'requires CPU Torch/Gloo; no dependency installed by test')
 class DistributedTests(unittest.TestCase):
@@ -103,6 +116,30 @@ class DistributedTests(unittest.TestCase):
         self.assertEqual({r['pid'] for r in registered}, {r['pid'] for r in first + second})
         self.assertTrue(all(r['role'] == 'ddp-rank' for r in registered))
         self.assertFalse(torch.cuda.is_initialized())
+
+    def _assert_real_gloo_log_path(self, name):
+        import torch
+        directory = self.directory / name
+        results = launch_ranks('ddp_runtime_fixture:echo', {'path_test': True},
+                               ['CPU-A', 'CPU-B'], directory, backend='gloo',
+                               timeout_seconds=40, init_timeout_seconds=20)
+        self.assertEqual(len(results), 2)
+        for rank, result in enumerate(results):
+            log_dir = Path(result['log_dir'])
+            self.assertEqual(log_dir.parent.parent, directory)
+            self.assertEqual(result['rank'], rank)
+            self.assertEqual(result['result']['argument'], {'path_test': True})
+            self.assertFalse(result['result']['cuda'])
+            self.assertTrue((log_dir / 'result.json').is_file())
+        self.assertFalse(torch.cuda.is_initialized())
+
+    def test_real_gloo_supports_spaces_and_literal_percent_in_log_path(self):
+        self._assert_real_gloo_log_path('ddp logs 50%')
+
+    @unittest.skipUnless(os.name == 'posix', 'installed Windows Torch FileStore cannot open Unicode paths')
+    def test_real_gloo_supports_log_path_with_spaces_chinese_and_percent(self):
+        # Required Linux target acceptance: Unicode + spaces + '%' together.
+        self._assert_real_gloo_log_path('ddp logs 实验 50%')
 
     def test_real_gradient_loss_optimizer_and_all_rank_rng_resume(self):
         import torch
