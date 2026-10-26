@@ -2,6 +2,10 @@
 
 This is the public, non-patient-specific history. Detailed patient mappings and local paths belong to the private workspace memory.
 
+## 2026-10-26: bounded Git downloads with live progress
+
+The private preprocessing updater separates 30-second reference queries, a shared 900-second object-download budget and 180-second local archives. Git transfer counters stream live while both pipes are drained; binary archives stay out of terminal output. Per-attempt logs and stage timings distinguish authentication, connection, download timeout, validation and cancellation. Retry preserves the old release and reuses the runtime-owned bare object cache. The same runtime network configuration applies throughout. Old 45-second updaters use the documented one-time bootstrap. Numerical preprocessing and independent segmentation remain unchanged.
+
 ## 2026-10-26: private authenticated preprocessing panel
 
 The preprocessing panel follows the current CT engineering template while preserving its original defaults and c/p shortcuts. Official authenticated HTTPS or explicit SSH-443 replaces public code mirrors; per-runtime nonsecret network settings and child-only proxy configuration are independent of PyPI mirrors. Failed authentication never falls back to mirrors. The one-time upgrade entry handles existing release pointers and freezes the actual old code for historical resume. Results have read-only layered, paginated views; logs follow delayed creation, replacement and truncation. Numerical preprocessing and independent segmentation are unchanged. Synthetic tests do not imply server deployment or clinical validation. See SERVER_WORKBENCH.md and PRIVATE_UPGRADE.md.

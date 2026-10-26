@@ -10,6 +10,7 @@ import tarfile
 import tempfile
 import time
 import unittest
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from aaoca_server import environment, mirrors, network, updater
@@ -153,6 +154,65 @@ class UpdateTests(unittest.TestCase):
         with patch.object(updater, 'extract_release', side_effect=ValueError('synthetic corrupt archive')):
             with self.assertRaises(ValueError): self.update()
         self.assertEqual(self.routes, [network.HTTPS_UPSTREAM])
+        self.assertFalse((self.registry.root / 'release.json').exists())
+
+    def test_download_has_separate_limits_real_progress_and_stage_receipts(self):
+        self.advance()
+        self.assertTrue(self.update()['changed'])
+        calls = updater.git.call_args_list
+        queries = [c for c in calls if c.args[1] == 'ls-remote' and '--get-url' not in c.args]
+        fetches = [c for c in calls if c.args[1] == 'fetch']
+        archives = [c for c in calls if c.args[1] == 'archive']
+        self.assertEqual(queries[0].kwargs['timeout'], 30)
+        self.assertTrue(all(100 < c.kwargs['timeout'] <= 900 for c in fetches))
+        self.assertTrue(all('--progress' in c.args for c in fetches))
+        self.assertEqual(archives[0].kwargs['timeout'], 180)
+        report = read(self.registry.root / 'update-last.json')
+        self.assertTrue(Path(report['log']).is_file())
+        self.assertTrue(report['stages'])
+        self.assertTrue(all(s['seconds'] >= 0 for s in report['stages']))
+
+    def test_failed_download_cache_is_reused_on_retry(self):
+        self.advance()
+        with patch.object(updater, 'extract_release', side_effect=ValueError('synthetic corrupt archive')):
+            with self.assertRaises(ValueError): self.update()
+        first = read(self.registry.root / 'update-last.json')
+        cache = Path(first['cache'])
+        marker = cache / 'preserved-marker'; marker.touch()
+        self.assertTrue(self.update()['changed'])
+        self.assertEqual(read(self.registry.root / 'update-last.json')['cache'], str(cache))
+        self.assertTrue(marker.exists())
+
+    def test_fetch_timeout_names_stage_preserves_current_pointer_and_logs(self):
+        self.advance()
+        original = updater.git.side_effect
+        def fail_fetch(root, *args, **kwargs):
+            if args[0] == 'fetch':
+                raise subprocess.TimeoutExpired(['git', 'fetch'], kwargs['timeout'])
+            return original(root, *args, **kwargs)
+        with patch.object(updater, 'git', side_effect=fail_fetch):
+            with self.assertRaisesRegex(ValueError, '对象下载.*超时'):
+                self.update()
+        report = read(self.registry.root / 'update-last.json')
+        self.assertEqual(report['stages'][-1]['error_kind'], 'timeout')
+        self.assertTrue(Path(report['cache']).exists())
+        self.assertFalse((self.registry.root / 'release.json').exists())
+
+    def test_shared_deadline_applies_to_cached_object_inspection(self):
+        self.advance()
+        with patch.object(updater, 'extract_release', side_effect=ValueError('synthetic archive failure')):
+            with self.assertRaises(ValueError): self.update()
+        clock = [0.0]
+        original = updater.git.side_effect
+        def slow_cache(root, *args, **kwargs):
+            result = original(root, *args, **kwargs)
+            if args[0] == 'cat-file':
+                clock[0] += 901
+            return result
+        with patch.object(updater, 'time', SimpleNamespace(monotonic=lambda: clock[0])), \
+             patch.object(updater, 'git', side_effect=slow_cache):
+            with self.assertRaisesRegex(ValueError, '对象下载.*超时'):
+                self.update()
         self.assertFalse((self.registry.root / 'release.json').exists())
 
     def test_moving_remote_is_rejected_when_confirmed_commit_changes(self):

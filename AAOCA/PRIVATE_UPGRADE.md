@@ -13,6 +13,8 @@ timeout 30 git ls-remote ssh://git@ssh.github.com:443/tianwuasd/project.git refs
 
 ## 已有旧代码或旧独立发布目录
 
+旧更新器仍可能在45秒中断下载，需用下面一次性入口取得修复，不能反复调用旧 `u` 自举。新版查询30秒、对象下载总预算900秒、归档180秒，并显示真实Git进度。下方首次下载命令用900秒上限和 `--progress`，由SSH本身执行10秒连接限制。
+
 先从旧面板确认预处理后台已停止；此升级器也会检查历史进程和锁。原 Git 工作区必须干净且在 main。临时下载只取 AAOCA 代码；更新器备份旧任务实际使用的代码，在原 runtime 发布新版并切换指针，不改原共享 checkout。失败保留原版本和下载目录。
 
 ```bash
@@ -22,10 +24,10 @@ cd /data5/zhougaowei/zhangruichen_workspace/aaoca_code
   export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
   export GIT_SSH_COMMAND="ssh -F /dev/null -i '$HOME/.ssh/project_readonly_ed25519' -p 443 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o 'ProxyCommand=nc -X connect -x 127.0.0.1:17891 %h %p'"
   bootstrap_dir=$(mktemp -d /tmp/aaoca-private-upgrade.XXXXXX)
-  timeout 180 git clone --filter=blob:none --no-checkout --single-branch --branch main \
+  timeout 900 git clone --progress --filter=blob:none --no-checkout --single-branch --branch main \
     ssh://git@ssh.github.com:443/tianwuasd/project.git "$bootstrap_dir/project"
   git -C "$bootstrap_dir/project" sparse-checkout set AAOCA
-  timeout 180 git -C "$bootstrap_dir/project" checkout main
+  timeout 900 git -C "$bootstrap_dir/project" -c core.progressDelay=0 checkout --progress main
   python_bin=/data5/zhougaowei/zhangruichen_workspace/aaoca_runtime/venv/bin/python
   if [ ! -x "$python_bin" ]; then python_bin=python3; fi
   "$python_bin" "$bootstrap_dir/project/AAOCA/upgrade_aaoca_server.py" \
@@ -59,9 +61,9 @@ cd /data5/zhougaowei/zhangruichen_workspace/aaoca_code
   set -eu
   export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null GIT_TERMINAL_PROMPT=0
   export GIT_SSH_COMMAND="ssh -F /dev/null -i '$HOME/.ssh/project_readonly_ed25519' -p 443 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -o 'ProxyCommand=nc -X connect -x 127.0.0.1:17891 %h %p'"
-  timeout 180 git clone --filter=blob:none --sparse --single-branch --branch main \
+  timeout 900 git clone --progress --filter=blob:none --sparse --single-branch --branch main \
     ssh://git@ssh.github.com:443/tianwuasd/project.git project
-  timeout 180 git -C project sparse-checkout set AAOCA
+  timeout 900 git -C project sparse-checkout set AAOCA
 )
 cd project/AAOCA
 python3 setup_aaoca_environment.py

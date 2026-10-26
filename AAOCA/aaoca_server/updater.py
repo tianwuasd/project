@@ -1,5 +1,6 @@
 """Authenticated official updates and isolated releases for the private repository."""
 import io
+from contextlib import contextmanager
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -9,12 +10,16 @@ import subprocess
 import sys
 import tarfile
 import threading
+import time
 import uuid
 
-from . import mirrors, network
+from . import download, mirrors, network
 from .state import dispatch_lock, now, read, separate, write
 
 CODE_ROOT = Path(__file__).resolve().parent.parent
+QUERY_TIMEOUT = 30
+FETCH_TIMEOUT = 900
+ARCHIVE_TIMEOUT = 180
 RELEASE_FILES = ('aaoca_preprocessing', 'aaoca_server', 'start_aaoca_server.py',
                  'start_aaoca_server.sh', 'preprocess_aaoca.py', 'setup_aaoca_environment.py',
                  'upgrade_aaoca_server.py',
@@ -22,26 +27,29 @@ RELEASE_FILES = ('aaoca_preprocessing', 'aaoca_server', 'start_aaoca_server.py',
                  'PREPROCESSING_WORKFLOW.md', 'SERVER_WORKBENCH.md', 'PRIVATE_UPGRADE.md')
 
 
-def command(args, *, cwd=None, env=None, timeout=45):
+def command(args, *, cwd=None, env=None, timeout=QUERY_TIMEOUT):
     """Reap only this command's process group before releasing caller locks."""
     child = None
+    handlers = {}
+    interrupted = []
+    def interrupt(sig, frame):
+        interrupted.append(True)
+        if child is not None:
+            raise KeyboardInterrupt
     try:
-        interrupted = []
         can_defer = threading.current_thread() is threading.main_thread()
-        previous_handler = signal.getsignal(signal.SIGINT)
         if can_defer:
-            signal.signal(signal.SIGINT, lambda *_: interrupted.append(True))
-        try:
-            child = subprocess.Popen(args, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
-                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                     start_new_session=os.name != 'nt')
-        finally:
-            if can_defer:
-                signal.signal(signal.SIGINT, previous_handler)
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                handlers[sig] = signal.signal(sig, interrupt)
+        child = subprocess.Popen(args, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                 start_new_session=os.name != 'nt')
         if interrupted:
             raise KeyboardInterrupt
         stdout, stderr = child.communicate(timeout=timeout)
     except BaseException:
+        for sig in handlers:
+            signal.signal(sig, signal.SIG_IGN)
         if child is not None:
             if os.name == 'nt':
                 subprocess.run(['taskkill', '/PID', str(child.pid), '/T', '/F'],
@@ -70,18 +78,24 @@ def command(args, *, cwd=None, env=None, timeout=45):
                 except ProcessLookupError:
                     pass
         raise
+    finally:
+        for sig, handler in handlers.items():
+            signal.signal(sig, handler)
     if child.returncode:
         raise ValueError(stderr.decode('utf-8', 'replace')[-1000:] or f'command failed ({child.returncode})')
     return stdout
 
 
-def git(root, *args, timeout=30):
+def git(root, *args, timeout=30, emit=None, log=None):
+    started = time.monotonic()
     settings = network.current()
     # Keep the user's normal credential helpers, but do not inherit repository
     # redirection/config injection from another Git process.
     env = {k: v for k, v in network.child_env(ssh=settings['git_transport'] == 'github-ssh').items()
            if not k.startswith('GIT_') or k in {'GIT_SSH_COMMAND', 'GIT_SSH_VARIANT'}}
     env.update(GIT_TERMINAL_PROMPT='0', GCM_INTERACTIVE='Never')
+    if emit is not None:
+        env['LC_ALL'] = 'C'
     options = ['git', '-c', 'core.askPass=', '-c', 'http.followRedirects=false',
                '-c', 'http.' + network.HTTPS_UPSTREAM + '.followRedirects=false',
                '-c', 'http.version=HTTP/1.1', '-c', 'http.lowSpeedLimit=1', '-c', 'http.lowSpeedTime=15']
@@ -94,15 +108,58 @@ def git(root, *args, timeout=30):
     if args and args[0] in {'fetch', 'ls-remote', 'archive'} and '--get-url' not in args:
         official = network.routes(settings)[0]
         try:
-            resolved = command([*options, 'ls-remote', '--get-url', official], env=env, timeout=timeout).decode().strip()
+            resolved = command([*options, 'ls-remote', '--get-url', official], env=env,
+                               timeout=min(timeout, QUERY_TIMEOUT)).decode().strip()
         except ValueError:
             raise ValueError('无法核验官方线路配置；请检查 Git 配置') from None
         if resolved != official:
             raise ValueError('Git URL 重写改变了官方地址；请检查 insteadOf，未发送认证或访问镜像')
     try:
+        if emit is not None:
+            remaining = timeout - (time.monotonic() - started)
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(['git', args[0]], timeout)
+            return download.run([*options, *args], env=env, timeout=remaining, emit=emit, log=log)
         return command([*options, *args], env=env, timeout=timeout)
+    except download.GitFailure:
+        raise
     except ValueError:
         raise ValueError('Git 操作失败；请检查官方线路、代理、主机指纹和仓库认证。不会回退公共镜像。') from None
+
+
+@contextmanager
+def update_stage(registry, report, label, emit):
+    started = time.monotonic()
+    stage = dict(name=label, started_at=now(), state='running')
+    report['stages'].append(stage)
+    report['phase'] = label
+    write(registry.root / 'update-last.json', report)
+    with Path(report['log']).open('a', encoding='utf-8') as log:
+        log.write(now() + ' 开始 ' + label + '\n')
+    emit(label + '；日志：' + report['log'])
+    try:
+        yield
+        stage['state'] = 'completed'
+    except subprocess.TimeoutExpired as exc:
+        stage.update(state='failed', error_kind='timeout')
+        message = f'{label}超时（上限 {exc.timeout:.1f} 秒）；旧版和下载缓存保留。日志：{report["log"]}'
+        stage['error'] = message
+        raise ValueError(message) from None
+    except KeyboardInterrupt:
+        stage.update(state='cancelled', error_kind='cancelled')
+        emit(label + '已取消，Git 子进程已回收，旧版及缓存保留。日志：' + report['log'])
+        raise
+    except BaseException as exc:
+        stage.update(state='failed', error_kind='validation' if not isinstance(exc, download.GitFailure) else 'git',
+                     error=str(exc))
+        raise ValueError(f'{label}失败：{exc}；旧版和缓存保留。日志：{report["log"]}') from None
+    finally:
+        stage.update(finished_at=now(), seconds=time.monotonic() - started)
+        with Path(report['log']).open('a', encoding='utf-8') as log:
+            log.write(f'{now()} {label} {stage["state"]}，用时 {stage["seconds"]:.3f} 秒\n')
+            if stage.get('error'):
+                log.write(stage['error'] + '\n')
+        write(registry.root / 'update-last.json', report)
 
 
 def extract_release(data, destination):
@@ -206,19 +263,33 @@ def _update(registry, settings, emit):
         head = git(root, 'rev-parse', 'HEAD').decode().strip()
         baseline = previous.get('commit') or head
         attempt_root = registry.root / 'downloads' / uuid.uuid4().hex
-        cache = attempt_root / 'repository.git'
-        cache.mkdir(parents=True)
+        attempt_root.mkdir(parents=True)
+        cache = registry.root / 'download-cache' / 'repository.git'
+        if not cache.resolve().is_relative_to(registry.root.resolve()):
+            raise ValueError('下载缓存路径超出原 runtime；请保留并检查缓存目录')
+        cache.mkdir(parents=True, exist_ok=True)
         git(cache, 'init', '--bare')
-        report = {'started_at': now(), 'previous': baseline, 'attempts': [], 'state': 'checking'}
+        log = attempt_root / 'git-download.log'
+        log.touch()
+        if os.name == 'posix':
+            log.chmod(0o600)
+        report = {'started_at': now(), 'previous': baseline, 'attempts': [], 'state': 'checking',
+                  'cache': str(cache), 'log': str(log), 'stages': [],
+                  'limits': dict(query_seconds=QUERY_TIMEOUT, fetch_seconds=FETCH_TIMEOUT,
+                                 archive_seconds=ARCHIVE_TIMEOUT)}
         expected = None
-        emit('通过官方认证线路核对提交（最多 12 秒）；旧公共镜像配置不用于私有仓库。')
+        emit('通过原 runtime 的官方认证线路更新；版本查询最多30秒，对象下载总上限900秒，归档最多180秒。')
         try:
             url = network.routes(settings)[0]
-            refs = git(cache, 'ls-remote', url, 'refs/heads/main', timeout=12).decode().split()
-            if not refs or not re.fullmatch(r'[0-9a-f]{40}', refs[0]):
-                raise ValueError('官方 main 提交未确认；请检查仓库访问权限')
-            expected = refs[0]
-            report['official_confirmed'] = bool(expected)
+            with update_stage(registry, report, '版本查询', emit):
+                refs = git(cache, 'ls-remote', url, 'refs/heads/main', timeout=QUERY_TIMEOUT,
+                           emit=emit, log=log).decode().split()
+                if not refs or not re.fullmatch(r'[0-9a-f]{40}', refs[0]):
+                    raise ValueError('官方 main 提交未确认；请检查仓库访问权限')
+                expected = refs[0]
+                report['official_confirmed'] = True
+                report['remote_commit'] = expected
+                emit('已确认官方 main：' + expected)
             for name in [settings['git_transport']]:
                 emit('正在尝试更新线路：' + name)
                 staging = attempt_root / ('staging-' + uuid.uuid4().hex)
@@ -230,28 +301,57 @@ def _update(registry, settings, emit):
                     git(cache, 'config', 'remote.origin.url', url)
                     git(cache, 'config', 'remote.origin.promisor', 'true')
                     git(cache, 'config', 'remote.origin.partialclonefilter', 'blob:none')
-                    git(cache, 'fetch', '--no-tags', '--filter=blob:none', 'origin',
-                        '+refs/heads/main:refs/heads/candidate', timeout=45)
-                    commit = git(cache, 'rev-parse', 'refs/heads/candidate').decode().strip()
-                    if expected and commit != expected:
-                        raise ValueError('核对后官方提交已变化，请稍后重试')
-                    git(cache, 'merge-base', '--is-ancestor', baseline, commit)
-                    if commit != baseline:
-                        paths = ['AAOCA/' + name for name in RELEASE_FILES]
-                        listing = git(cache, 'ls-tree', '-r', '-z', commit, '--', *paths)
+                    if expected == baseline:
+                        report['state'] = 'unchanged'
+                        return {'changed': False, 'message': '已与官方最新版本一致，无需下载对象。'}
+                    paths = ['AAOCA/' + item for item in RELEASE_FILES]
+                    with update_stage(registry, report, '对象下载', emit):
+                        deadline = time.monotonic() + FETCH_TIMEOUT
+
+                        def remaining_budget():
+                            remaining = deadline - time.monotonic()
+                            if remaining <= 0:
+                                raise subprocess.TimeoutExpired(['git', 'download-stage'], FETCH_TIMEOUT)
+                            return remaining
+
+                        def fetch(*arguments):
+                            result = git(cache, 'fetch', '--progress', *arguments,
+                                         timeout=remaining_budget(), emit=emit, log=log)
+                            remaining_budget()
+                            return result
+
+                        def inspect(*arguments):
+                            result = git(cache, *arguments, timeout=min(QUERY_TIMEOUT, remaining_budget()))
+                            remaining_budget()
+                            return result
+
+                        fetch('--no-tags', '--filter=blob:none', 'origin',
+                              '+refs/heads/main:refs/heads/candidate')
+                        commit = inspect('rev-parse', 'refs/heads/candidate').decode().strip()
+                        if commit != expected:
+                            raise ValueError('版本校验：核对后官方提交已变化，请稍后重试')
+                        inspect('merge-base', '--is-ancestor', baseline, commit)
+                        listing = inspect('ls-tree', '-r', '-z', commit, '--', *paths)
                         blobs = sorted({item.split(b'\t', 1)[0].split()[2].decode()
                                         for item in listing.split(b'\0') if item})
-                        # Batch required blobs instead of archive lazily opening
-                        # one network connection for every source file.
+                        if blobs:
+                            existing = inspect('cat-file', '--batch-all-objects',
+                                               '--batch-check=%(objectname) %(objecttype)').decode().splitlines()
+                            available = {row.split()[0] for row in existing}
+                            blobs = [blob for blob in blobs if blob not in available]
                         for offset in range(0, len(blobs), 128):
-                            git(cache, 'fetch', '--no-tags', 'origin', *blobs[offset:offset + 128], timeout=45)
-                        data = git(cache, 'archive', commit, *paths, timeout=45)
+                            fetch('--no-tags', 'origin', *blobs[offset:offset + 128])
+                        remaining_budget()
+                    with update_stage(registry, report, '本地归档与校验', emit):
+                        data = git(cache, 'archive', commit, *paths, timeout=ARCHIVE_TIMEOUT,
+                                   emit=emit, log=log)
                         extract_release(data, staging)
                     attempt.update(state='verified', commit=commit)
                     break
                 except (ValueError, OSError, SyntaxError, tarfile.TarError, subprocess.TimeoutExpired) as exc:
                     attempt.update(state='failed', reason=str(exc))
                     emit('官方更新未完成；保留当前版本：' + str(exc))
+                    raise
             else:
                 raise ValueError('官方线路更新失败；当前程序保持不变，详见 update-last.json；不会回退公共镜像')
             if commit == baseline:
@@ -288,7 +388,8 @@ def _update(registry, settings, emit):
             report.update(state='updated', **record)
             return {'changed': True, 'message': '官方更新完成。请重新打开面板载入新版；历史任务保留原代码和环境。'}
         except BaseException as exc:
-            report.update(state='failed', error=type(exc).__name__ + ': ' + str(exc))
+            report.update(state='cancelled' if isinstance(exc, KeyboardInterrupt) else 'failed',
+                          error=type(exc).__name__ + ': ' + str(exc))
             raise
         finally:
             report['finished_at'] = now()
