@@ -2,6 +2,10 @@
 
 This is the public, non-patient-specific history. Detailed patient mappings and local paths belong to the private workspace memory.
 
+## 2026-10-26: private authenticated preprocessing panel
+
+The preprocessing panel follows the current CT engineering template while preserving its original defaults and c/p shortcuts. Official authenticated HTTPS or explicit SSH-443 replaces public code mirrors; per-runtime nonsecret network settings and child-only proxy configuration are independent of PyPI mirrors. Failed authentication never falls back to mirrors. The one-time upgrade entry handles existing release pointers and freezes the actual old code for historical resume. Results have read-only layered, paginated views; logs follow delayed creation, replacement and truncation. Numerical preprocessing and independent segmentation are unchanged. Synthetic tests do not imply server deployment or clinical validation. See SERVER_WORKBENCH.md and PRIVATE_UPGRADE.md.
+
 ## 2026-10-23: ordered mirrors and measured processing progress
 
 The preprocessing workbench adds ordered update routes, isolated releases, backups and recorded code/interpreter paths for historical resume. A verified unchanged candidate also ends mirror fallback. Environment setup is separate, creates a new venv, tries one PyPI mirror at a time and stops after installation/import validation. The panel provides live case and available slice progress with explicit failure counts and stage labels. Numerical preprocessing code is unchanged; no server speed or real CT validation is implied. See SERVER_WORKBENCH.md.

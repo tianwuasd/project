@@ -1,4 +1,4 @@
-"""Known public download routes. Order is preference, not a speed guarantee."""
+"""PyPI routes and recognition of historical checkout origins (not update routes)."""
 from .state import read, write
 
 OFFICIAL = 'https://github.com/tianwuasd/project.git'
@@ -35,6 +35,7 @@ def save(runtime, settings):
 
 def known_origin(url):
     accepted = [*CODE.values(), 'https://gh-proxy.org/' + OFFICIAL,
-                'git@github.com:tianwuasd/project.git']
+                'git@github.com:tianwuasd/project.git',
+                'ssh://git@ssh.github.com:443/tianwuasd/project.git']
     normalize = lambda value: value.rstrip('/').removesuffix('.git')
     return normalize(url) in {normalize(value) for value in accepted}

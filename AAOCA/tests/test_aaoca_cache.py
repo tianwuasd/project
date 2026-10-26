@@ -64,7 +64,7 @@ class TemplateTests(unittest.TestCase):
         write(self.runtime / 'history.json', [{'output': str(self.root / 'new')},
                                             {'output': str(self.root / 'old'), 'name': '旧任务'}])
         before = (self.runtime / 'history.json').read_bytes()
-        answers = iter(['2'])
+        answers = iter(['2', '0'])
         panel = Panel(self.runtime, ask=lambda _: next(answers), emit=lambda _: None)
         self.assertEqual(panel.selected['name'], 'new')
         panel.results()

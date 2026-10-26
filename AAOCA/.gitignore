@@ -21,6 +21,8 @@
 !/start_segmentation.sh
 !/SEGMENTATION_WORKBENCH.md
 !/SERVER_WORKBENCH.md
+!/PRIVATE_UPGRADE.md
+!/upgrade_aaoca_server.py
 !/一键处理.cmd
 !/common.py
 !/convert_ct.py

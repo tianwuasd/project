@@ -1,4 +1,4 @@
-"""Offline mirror/release tests using synthetic local Git repositories."""
+"""Offline private-route/release tests using synthetic local Git repositories."""
 import io
 import os
 import signal
@@ -12,7 +12,7 @@ import time
 import unittest
 from unittest.mock import Mock, patch
 
-from aaoca_server import environment, mirrors, updater
+from aaoca_server import environment, mirrors, network, updater
 from aaoca_server.panel import Panel
 from aaoca_server.progress import bar, lines
 from aaoca_server.state import Registry, read, write
@@ -33,9 +33,9 @@ class MirrorTests(unittest.TestCase):
     def test_mirror_menu_saves_order_and_cancel_does_not_save(self):
         with tempfile.TemporaryDirectory() as temp:
             runtime = Path(temp) / 'panel'
-            answers = iter(['m', '1', 'gitclone ghfast official', 'w', 'q'])
+            answers = iter(['m', '2', 'sjtu tuna', 'w', 'q'])
             Panel(runtime, ask=lambda _: next(answers), emit=lambda _: None).run()
-            self.assertEqual(mirrors.load(runtime)['code'], ['gitclone', 'ghfast', 'official'])
+            self.assertEqual(mirrors.load(runtime)['pypi'], ['sjtu', 'tuna'])
             before = (runtime / 'mirrors.json').read_bytes()
             answers = iter(['m', '2', 'aliyun tuna', 'b', 'q'])
             Panel(runtime, ask=lambda _: next(answers), emit=lambda _: None).run()
@@ -82,17 +82,19 @@ class UpdateTests(unittest.TestCase):
         self.real_git(self.upstream, 'config', 'uploadpack.allowAnySHA1InWant', 'true')
         self.addCleanup(patch.stopall)
         patch.object(updater, 'CODE_ROOT', self.code).start()
-        patch.dict(mirrors.CODE, {'gh-proxy': self.upstream.as_uri(), 'ghfast': self.upstream.as_uri()}).start()
-        self.official = None
+        self.official = self.base
         self.routes = []
 
         def git(root, *args, **kwargs):
+            if args[:2] == ('ls-remote', '--get-url'):
+                return self.real_git(root, *args, **kwargs)
             if args[0] == 'ls-remote':
                 if self.official:
                     return (self.official + '\trefs/heads/main\n').encode()
                 raise ValueError('synthetic official offline')
             if args[:2] == ('config', 'remote.origin.url'):
                 self.routes.append(args[2])
+                args = (*args[:2], self.upstream.as_uri())
             return self.real_git(root, *args, **kwargs)
         patch.object(updater, 'git', side_effect=git).start()
 
@@ -104,15 +106,16 @@ class UpdateTests(unittest.TestCase):
 
     def advance(self):
         (self.source / 'aaoca_server/version.txt').write_text('next version', encoding='utf-8')
-        return self.commit()
+        self.official = self.commit()
+        return self.official
 
     def update(self):
         return updater.update(self.registry, emit=lambda _: None)
 
-    def test_same_version_offline_stops_after_first_mirror(self):
+    def test_same_version_official_stops_after_one_route(self):
         result = self.update()
         self.assertFalse(result['changed'])
-        self.assertIn('官方最新状态未确认', result['message'])
+        self.assertIn('已与官方最新版本一致', result['message'])
         self.assertEqual(len(self.routes), 1)
         self.assertEqual(read(self.registry.root / 'update-last.json')['state'], 'unchanged')
         self.assertFalse((self.registry.root / 'release.json').exists())
@@ -137,28 +140,22 @@ class UpdateTests(unittest.TestCase):
         with patch.object(updater, 'CODE_ROOT', release):
             self.assertFalse(self.update()['changed'])
 
-    def test_unavailable_first_route_falls_back_and_then_stops(self):
-        commit = self.advance(); self.official = commit
-        mirrors.CODE['gh-proxy'] = (self.root / 'missing.git').as_uri()
-        self.assertTrue(self.update()['changed'])
-        self.assertEqual(len(self.routes), 2)
-        report = read(self.registry.root / 'update-last.json')
-        self.assertEqual([x['state'] for x in report['attempts']], ['failed', 'verified'])
+    def test_official_auth_failure_never_uses_legacy_mirrors(self):
+        self.official = None
+        mirrors.save(self.registry.root, mirrors.DEFAULTS)
+        with self.assertRaises(ValueError): self.update()
+        self.assertEqual(self.routes, [])
+        self.assertFalse((self.registry.root / 'release.json').exists())
+        self.assertEqual(read(self.registry.root / 'update-last.json')['state'], 'failed')
 
-    def test_bad_archive_is_failure_and_next_valid_route_is_used(self):
+    def test_bad_archive_stops_without_public_fallback(self):
         self.advance()
-        original = updater.extract_release
-        calls = []
-        def extract(data, target):
-            calls.append(target)
-            if len(calls) == 1:
-                raise ValueError('synthetic corrupt archive')
-            return original(data, target)
-        with patch.object(updater, 'extract_release', side_effect=extract):
-            self.assertTrue(self.update()['changed'])
-        self.assertEqual(len(self.routes), 2)
+        with patch.object(updater, 'extract_release', side_effect=ValueError('synthetic corrupt archive')):
+            with self.assertRaises(ValueError): self.update()
+        self.assertEqual(self.routes, [network.HTTPS_UPSTREAM])
+        self.assertFalse((self.registry.root / 'release.json').exists())
 
-    def test_stale_mirror_is_rejected_when_official_is_known(self):
+    def test_moving_remote_is_rejected_when_confirmed_commit_changes(self):
         self.official = 'f' * 40
         mirrors.save(self.registry.root, {**mirrors.DEFAULTS, 'code': ['gh-proxy']})
         with self.assertRaises(ValueError): self.update()
@@ -179,6 +176,27 @@ class UpdateTests(unittest.TestCase):
         self.real_git(self.checkout, 'remote', 'set-url', 'origin', 'https://github.com/other/project.git')
         with self.assertRaises(ValueError): self.update()
         self.assertEqual(self.routes, [])
+
+    def test_checkout_local_url_rewrite_prevents_any_network_attempt(self):
+        self.real_git(self.checkout, 'config', 'url.https://mirror.invalid/.insteadOf', 'https://github.com/')
+        with self.assertRaisesRegex(ValueError, '重写'):
+            self.update()
+        self.assertEqual(self.routes, [])
+
+    def test_bootstrap_upgrades_existing_release_and_backs_up_actual_old_code(self):
+        from aaoca_server.bootstrap import upgrade
+        self.advance()
+        self.update()
+        old = updater.managed_release(self.registry.root)
+        self.registry.register({'name': 'old-release-job', 'output': str(self.root / 'old-job'),
+                                'code_root': str(old), 'python': sys.executable})
+        (self.source / 'aaoca_server/version.txt').write_text('version two')
+        self.official = self.commit()
+        self.assertTrue(upgrade(self.registry.root, self.checkout, emit=lambda _: None)['changed'])
+        self.assertEqual(updater.managed_release(self.registry.root).name, self.official)
+        saved = Path(self.registry.entries()[0]['code_root'])
+        self.assertEqual((saved / 'aaoca_server/version.txt').read_text(), 'next version')
+        self.assertEqual(self.real_git(self.checkout, 'rev-parse', 'HEAD').decode().strip(), self.base)
 
     def test_launcher_follows_published_pointer_without_dependencies(self):
         self.advance(); self.update()

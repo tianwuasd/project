@@ -1,4 +1,4 @@
-"""Ordered public mirrors and isolated releases; never replace a shared checkout."""
+"""Authenticated official updates and isolated releases for the private repository."""
 import io
 import os
 from pathlib import Path, PurePosixPath
@@ -11,14 +11,15 @@ import tarfile
 import threading
 import uuid
 
-from . import mirrors
+from . import mirrors, network
 from .state import dispatch_lock, now, read, separate, write
 
 CODE_ROOT = Path(__file__).resolve().parent.parent
 RELEASE_FILES = ('aaoca_preprocessing', 'aaoca_server', 'start_aaoca_server.py',
                  'start_aaoca_server.sh', 'preprocess_aaoca.py', 'setup_aaoca_environment.py',
+                 'upgrade_aaoca_server.py',
                  'pyproject.toml', 'requirements-preprocess.txt', 'PREPROCESSING.md',
-                 'PREPROCESSING_WORKFLOW.md', 'SERVER_WORKBENCH.md')
+                 'PREPROCESSING_WORKFLOW.md', 'SERVER_WORKBENCH.md', 'PRIVATE_UPGRADE.md')
 
 
 def command(args, *, cwd=None, env=None, timeout=45):
@@ -75,13 +76,33 @@ def command(args, *, cwd=None, env=None, timeout=45):
 
 
 def git(root, *args, timeout=30):
-    # Network runs ONLY in our fresh private bare repository, which contains no
-    # user auth headers, credential helpers, URL rewrites or inherited Git config.
-    env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
-    env.update(GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_GLOBAL=os.devnull,
-               GIT_TERMINAL_PROMPT='0', GCM_INTERACTIVE='Never')
-    return command(['git', '-c', 'credential.helper=', '-c', 'http.extraHeader=',
-                    '-c', 'http.version=HTTP/1.1', '-C', str(root), *args], env=env, timeout=timeout)
+    settings = network.current()
+    # Keep the user's normal credential helpers, but do not inherit repository
+    # redirection/config injection from another Git process.
+    env = {k: v for k, v in network.child_env(ssh=settings['git_transport'] == 'github-ssh').items()
+           if not k.startswith('GIT_') or k in {'GIT_SSH_COMMAND', 'GIT_SSH_VARIANT'}}
+    env.update(GIT_TERMINAL_PROMPT='0', GCM_INTERACTIVE='Never')
+    options = ['git', '-c', 'core.askPass=', '-c', 'http.followRedirects=false',
+               '-c', 'http.' + network.HTTPS_UPSTREAM + '.followRedirects=false',
+               '-c', 'http.version=HTTP/1.1', '-c', 'http.lowSpeedLimit=1', '-c', 'http.lowSpeedTime=15']
+    if settings['proxy']:
+        options += ['-c', 'http.proxy=' + settings['proxy'],
+                    '-c', 'http.' + network.HTTPS_UPSTREAM + '.proxy=' + settings['proxy']]
+    options += ['-C', str(root)]
+    # --get-url only expands Git config; it does not contact the destination.
+    # Guard lazy promisor fetching (archive) as well as explicit network calls.
+    if args and args[0] in {'fetch', 'ls-remote', 'archive'} and '--get-url' not in args:
+        official = network.routes(settings)[0]
+        try:
+            resolved = command([*options, 'ls-remote', '--get-url', official], env=env, timeout=timeout).decode().strip()
+        except ValueError:
+            raise ValueError('无法核验官方线路配置；请检查 Git 配置') from None
+        if resolved != official:
+            raise ValueError('Git URL 重写改变了官方地址；请检查 insteadOf，未发送认证或访问镜像')
+    try:
+        return command([*options, *args], env=env, timeout=timeout)
+    except ValueError:
+        raise ValueError('Git 操作失败；请检查官方线路、代理、主机指纹和仓库认证。不会回退公共镜像。') from None
 
 
 def extract_release(data, destination):
@@ -154,7 +175,12 @@ def same_release(existing, staging):
 
 
 def update(registry, emit=print):
-    settings = mirrors.load(registry.root)
+    settings = network.load(registry.root)
+    with network.use(settings):
+        return _update(registry, settings, emit)
+
+
+def _update(registry, settings, emit):
     previous = read(registry.root / 'release.json', {})
     checkout = Path(previous.get('checkout') or os.environ.get('AAOCA_PREPROCESS_CHECKOUT', CODE_ROOT))
     root = Path(git(checkout, 'rev-parse', '--show-toplevel').decode().strip())
@@ -163,6 +189,10 @@ def update(registry, emit=print):
     origin = git(root, 'config', '--get', 'remote.origin.url').decode().strip()
     if not mirrors.known_origin(origin):
         raise ValueError('origin 不是已知 AAOCA 项目地址，已保留原配置')
+    official = network.routes(settings)[0]
+    resolved = git(root, 'ls-remote', '--get-url', official).decode().strip()
+    if resolved != official:
+        raise ValueError('原仓库 Git URL 重写改变了官方地址；请检查 insteadOf，未访问网络')
     if git(root, 'symbolic-ref', '--short', 'HEAD').decode().strip() != 'main':
         raise ValueError('请使用 main 分支更新；不会自动切换分支')
     gitdir = Path(git(root, 'rev-parse', '--absolute-git-dir').decode().strip())
@@ -181,17 +211,15 @@ def update(registry, emit=print):
         git(cache, 'init', '--bare')
         report = {'started_at': now(), 'previous': baseline, 'attempts': [], 'state': 'checking'}
         expected = None
-        emit('核对官方提交（最多 12 秒），然后按配置顺序下载。')
+        emit('通过官方认证线路核对提交（最多 12 秒）；旧公共镜像配置不用于私有仓库。')
         try:
-            try:
-                refs = git(cache, 'ls-remote', mirrors.OFFICIAL, 'refs/heads/main', timeout=12).decode().split()
-                if refs and re.fullmatch(r'[0-9a-f]{40}', refs[0]):
-                    expected = refs[0]
-            except (ValueError, subprocess.TimeoutExpired):
-                pass
+            url = network.routes(settings)[0]
+            refs = git(cache, 'ls-remote', url, 'refs/heads/main', timeout=12).decode().split()
+            if not refs or not re.fullmatch(r'[0-9a-f]{40}', refs[0]):
+                raise ValueError('官方 main 提交未确认；请检查仓库访问权限')
+            expected = refs[0]
             report['official_confirmed'] = bool(expected)
-            for name in settings['code']:
-                url = mirrors.CODE[name]
+            for name in [settings['git_transport']]:
                 emit('正在尝试更新线路：' + name)
                 staging = attempt_root / ('staging-' + uuid.uuid4().hex)
                 attempt = {'name': name, 'url': url, 'started_at': now()}
@@ -206,7 +234,7 @@ def update(registry, emit=print):
                         '+refs/heads/main:refs/heads/candidate', timeout=45)
                     commit = git(cache, 'rev-parse', 'refs/heads/candidate').decode().strip()
                     if expected and commit != expected:
-                        raise ValueError('镜像提交与官方当前提交不一致')
+                        raise ValueError('核对后官方提交已变化，请稍后重试')
                     git(cache, 'merge-base', '--is-ancestor', baseline, commit)
                     if commit != baseline:
                         paths = ['AAOCA/' + name for name in RELEASE_FILES]
@@ -223,13 +251,12 @@ def update(registry, emit=print):
                     break
                 except (ValueError, OSError, SyntaxError, tarfile.TarError, subprocess.TimeoutExpired) as exc:
                     attempt.update(state='failed', reason=str(exc))
-                    emit('本线路未完成，尝试下一条：' + str(exc))
+                    emit('官方更新未完成；保留当前版本：' + str(exc))
             else:
-                raise ValueError('所有配置线路均失败；当前程序保持不变，详见 update-last.json')
+                raise ValueError('官方线路更新失败；当前程序保持不变，详见 update-last.json；不会回退公共镜像')
             if commit == baseline:
                 report['state'] = 'unchanged'
-                return {'changed': False, 'message': '已与官方最新版本一致。' if expected else
-                        '此线路与当前版本一致，已停止尝试其他镜像；官方最新状态未确认。'}
+                return {'changed': False, 'message': '已与官方最新版本一致。'}
             if git(root, 'status', '--porcelain').strip() or git(root, 'rev-parse', 'HEAD').decode().strip() != head:
                 raise ValueError('下载期间仓库发生变化，保留当前程序')
             registry.ensure_idle()
@@ -259,8 +286,7 @@ def update(registry, emit=print):
                           backup=str(backup), official_confirmed=bool(expected))
             write(registry.root / 'release.json', record)
             report.update(state='updated', **record)
-            return {'changed': True, 'message': '更新完成，已停止尝试其他镜像。请重新打开面板载入新版；历史任务保留原代码和环境。'
-                    + ('' if expected else ' 官方最新状态未确认。')}
+            return {'changed': True, 'message': '官方更新完成。请重新打开面板载入新版；历史任务保留原代码和环境。'}
         except BaseException as exc:
             report.update(state='failed', error=type(exc).__name__ + ': ' + str(exc))
             raise

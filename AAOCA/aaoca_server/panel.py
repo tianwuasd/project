@@ -6,6 +6,7 @@ import math
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import sys
 import time
 import uuid
@@ -147,35 +148,71 @@ class Panel:
 
     def results(self):
         self.selected = self.choose()
-        self.show_status()
-        self.emit('结果目录：' + self.current()['output'])
-        self.emit('完整结果可从独立粗分割面板选择；本面板不会启动分割。')
+        from . import views
+        data = views.snapshot(self.current())
+        while True:
+            self.emit('结果中心：' + self.current()['name'])
+            self.emit('1 状态与产物摘要  2 预处理与资源  3 病例与失败  4 文件与来源\nr 刷新  b/0 返回  q 退出')
+            try:
+                section = self.prompt('结果栏目：').lower()
+            except Back:
+                return
+            if section == '0':
+                return
+            if section == 'r':
+                data = views.snapshot(self.current())
+                continue
+            if section not in {'1', '2', '3', '4'}:
+                self.emit('请选择 1–4。')
+                continue
+            detail, page = False, 0
+            while True:
+                pages = views.paginate(views.content(data, section, detail), shutil.get_terminal_size((80, 24)).columns)
+                page = min(page, len(pages) - 1)
+                self.emit(f"{'详细' if detail else '简洁'} | 第 {page + 1}/{len(pages)} 页")
+                for line in pages[page]:
+                    self.emit(line)
+                try:
+                    action = self.prompt('s 简洁  d 详细  n/p 翻页  r 刷新  b/0 返回  q 退出：').lower()
+                except Back:
+                    break
+                if action == '0':
+                    break
+                if action in {'s', 'd'}:
+                    detail, page = action == 'd', 0
+                elif action == 'n':
+                    page = min(page + 1, len(pages) - 1)
+                elif action == 'p':
+                    page = max(0, page - 1)
+                elif action == 'r':
+                    data, page = views.snapshot(self.current()), 0
 
     def logs(self, follow=False):
+        from .views import LogCursor
         status = job_status(self.current()['output'])
         path = Path(status['runtime']) / 'worker.log'
-        if not path.exists():
-            self.emit('尚无日志'); return
-        with path.open('rb') as handle:
-            handle.seek(0, 2)
-            length = handle.tell()
-            handle.seek(max(0, length - 65536))
-            if length > 65536:
-                handle.readline()
-            self.emit(handle.read().decode('utf-8', errors='replace'))
-            if follow:
-                self.emit('实时日志：Ctrl+C 返回面板，后台任务继续运行。')
-                try:
-                    while job_status(self.current()['output'])['alive'] is True:
-                        time.sleep(.5)
-                        data = handle.read()
-                        if data:
-                            self.emit(data.decode('utf-8', errors='replace'))
-                    data = handle.read()
-                    if data:
-                        self.emit(data.decode('utf-8', errors='replace'))
-                except KeyboardInterrupt:
-                    self.emit('已返回面板。')
+        self.emit('日志路径：' + str(path))
+        cursor = LogCursor(path)
+        self.emit(cursor.read() or '尚无日志内容。')
+        if not follow:
+            return
+        self.emit('实时日志：Ctrl+C 返回面板，后台任务继续运行。')
+        refreshed = 0
+        try:
+            while True:
+                status = job_status(self.current()['output'])
+                data = cursor.read()
+                if data:
+                    self.emit(data)
+                if time.monotonic() - refreshed >= 5 and 'progress' in status:
+                    self.show_status()
+                    refreshed = time.monotonic()
+                if status['alive'] is not True and not cursor.pending:
+                    self.emit('当前无可确认的运行进程，日志跟随结束。')
+                    return
+                time.sleep(.5)
+        except KeyboardInterrupt:
+            self.emit('已返回面板。')
 
     def show_plan(self, settings):
         validate_paths(settings, self.registry.root)
@@ -360,21 +397,39 @@ class Panel:
         from . import mirrors
         draft = mirrors.load(self.registry.root)
         while True:
-            for kind, choices in [('code', mirrors.CODE), ('pypi', mirrors.PYPI)]:
+            for kind, choices in [('pypi', mirrors.PYPI)]:
                 self.emit(kind + ' 当前顺序：' + ' → '.join(draft[kind]))
                 self.emit('可用线路：' + '；'.join(f'{name}={url}' for name, url in choices.items()))
-            self.emit('1 程序更新顺序  2 环境安装顺序  w 保存  b 返回  q 退出')
+            self.emit('私有代码更新请使用 a 网络设置；旧代码镜像顺序不再生效。')
+            self.emit('2 环境安装顺序  w 保存  b 返回  q 退出')
             action = self.prompt('镜像设置：').lower()
             if action == 'w':
                 with dispatch_lock(self.registry.root):
                     mirrors.save(self.registry.root, draft)
                 self.emit('镜像顺序已保存；首个成功后停止。')
                 return
-            if action in {'1', '2'}:
-                kind = 'code' if action == '1' else 'pypi'
+            if action == '2':
+                kind = 'pypi'
                 candidate = dict(draft)
                 candidate[kind] = self.prompt('按优先顺序输入线路名称，以空格分隔：').lower().split()
                 draft = mirrors.validate(candidate)
+
+    def configure_network(self):
+        from . import network
+        draft = network.load(self.registry.root)
+        network.show(draft, self.emit)
+        proxy = self.prompt(f"HTTP 代理 [{draft['proxy'] or '未设置'}]（none 清除；b 返回）：")
+        transport = self.prompt(f"官方线路 github-https / github-ssh [{draft['git_transport']}]：")
+        draft['proxy'] = '' if proxy == 'none' else proxy or draft['proxy']
+        draft['git_transport'] = transport or draft['git_transport']
+        if draft['git_transport'] == 'github-ssh':
+            draft['ssh_key'] = self.prompt(f"密钥路径 [{draft['ssh_key'] or '~/.ssh/project_readonly_ed25519'}]：") or draft['ssh_key'] or '~/.ssh/project_readonly_ed25519'
+        network.validate(draft)
+        network.show(draft, self.emit)
+        if self.prompt('输入 w 保存；其他输入取消：').lower() == 'w':
+            with dispatch_lock(self.registry.root):
+                network.save(self.registry.root, **draft)
+            self.emit('网络设置已保存，尚未验证连接；用 u 更新程序。')
 
     def update(self):
         from .updater import update
@@ -393,14 +448,14 @@ class Panel:
                     self.emit('目录：' + self.selected['output'])
                 else:
                     self.emit('\n当前任务：暂无')
-                self.emit('n 新建/沿用缓存  c 预处理配置  s 进度  p 实时进度条  l 日志  f 实时日志\nh 历史任务  o 查看结果  r 续跑  k 已完成任务重跑  x 停止  e 环境\nu 更新程序  m 镜像配置  q/0 退出')
+                self.emit('n 新建/沿用缓存  c 预处理配置  s 进度  p 实时进度条  l 日志  f 实时日志\nh 历史任务  o 结果中心  r 续跑  k 已完成任务重跑  x 停止  e 环境\nu 官方更新  a 网络设置  m 环境镜像  q/0 退出')
                 action = self.prompt('操作 [s]：').lower() or 's'
                 if action == '0':
                     raise Exit()
                 actions = {'n': self.new, 'c': self.configure, 's': self.show_status, 'l': self.logs,
                            'f': lambda: self.logs(True), 'h': self.history, 'r': self.resume,
                            'x': self.stop, 'e': self.environment, 'u': self.update, 'm': self.mirrors,
-                           'p': self.watch_progress,
+                           'p': self.watch_progress, 'a': self.configure_network,
                            'o': self.results, 'k': self.rerun}
                 if action in actions:
                     actions[action]()
@@ -424,9 +479,16 @@ def main(argv=None):
     queries = parser.add_mutually_exclusive_group()
     queries.add_argument('--status', action='store_true', help='只读最近任务状态后退出')
     queries.add_argument('--logs', action='store_true', help='只读最近任务日志后退出')
-    queries.add_argument('--update', action='store_true', help='按配置镜像更新程序后退出，不安装依赖')
+    queries.add_argument('--update', action='store_true', help='通过官方认证线路更新预处理，不安装依赖')
+    queries.add_argument('--network-status', action='store_true', help='只读网络设置，不测试连接')
+    queries.add_argument('--configure-network', action='store_true', help='保存私有仓库网络设置')
+    parser.add_argument('--github-proxy', help='本机 HTTP 代理；none 清除')
+    parser.add_argument('--github-transport', choices=('github-https', 'github-ssh'))
+    parser.add_argument('--github-ssh-key', help='部署密钥路径；不传入密钥内容')
     queries.add_argument('--watch', action='store_true', help='每秒刷新最近任务进度条，Ctrl+C 退出查看')
     args = parser.parse_args(argv)
+    if any(value is not None for value in (args.github_proxy, args.github_transport, args.github_ssh_key)) and not args.configure_network:
+        parser.error('网络参数需和 --configure-network 一起使用')
     try:
         from .updater import CODE_ROOT, managed_release
         runtime = Path(args.runtime).expanduser().resolve()
@@ -437,7 +499,7 @@ def main(argv=None):
         # Old root shell launchers may still select the system Python after an
         # isolated update. Interactive sessions find the original server venv.
         preferred = defaults.environment_default() / 'bin/python'
-        if (not (args.status or args.logs or args.watch or args.update)
+        if (not (args.status or args.logs or args.watch or args.update or args.network_status or args.configure_network)
                 and sys.prefix == sys.base_prefix and not os.environ.get('AAOCA_PREPROCESS_PYTHON')
                 and preferred.is_file()
                 and os.path.abspath(sys.executable) != os.path.abspath(preferred)):
@@ -447,6 +509,24 @@ def main(argv=None):
         panel = Panel(args.runtime, overrides)
         if args.checkout:
             os.environ['AAOCA_PREPROCESS_CHECKOUT'] = str(Path(args.checkout).expanduser().resolve())
+        if args.network_status or args.configure_network:
+            from . import network
+            if args.configure_network:
+                if all(value is None for value in (args.github_proxy, args.github_transport, args.github_ssh_key)):
+                    try:
+                        panel.configure_network()
+                    except (Back, Exit, EOFError, KeyboardInterrupt):
+                        print('已取消；网络设置未更改。')
+                else:
+                    values = dict(proxy='' if args.github_proxy == 'none' else args.github_proxy,
+                                  git_transport=args.github_transport, ssh_key=args.github_ssh_key)
+                    # Validate before taking a lock, so invalid requests create nothing.
+                    network.validate({**network.load(runtime), **{k: v for k, v in values.items() if v is not None}})
+                    with dispatch_lock(runtime):
+                        network.save(runtime, **values)
+                    print('网络设置已保存；尚未验证连接。')
+            network.show(network.load(runtime))
+            return 0
         if args.update:
             from .updater import update
             print(update(panel.registry)['message'])
