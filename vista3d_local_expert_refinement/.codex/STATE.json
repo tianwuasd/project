@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-26T11:27:06.400774+00:00",
+  "updated_at": "2026-10-26T12:40:27.217756+00:00",
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Publish v0.3.7; rerun existing bootstrap script in the same server terminal, then confirm actual release and task submission.",
+  "next_action": "User tests menu update to v0.3.8 before the requested collaborative multi-GPU and training-budget changes.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -292,5 +292,19 @@
     },
     "ssh_repository_reads": "user transcript confirms successful reads; full updated release pending",
     "server_deployed": false
+  },
+  "panel_small_update_test": {
+    "version": "0.3.8",
+    "change": "panel version display only",
+    "validation": "syntax and stdlib-only read-only status query passed; no runtime created",
+    "server_update_test": "pending user menu update",
+    "deferred_work": [
+      "cooperative multi-GPU training for one experiment",
+      "paper-grounded epoch/update budget review",
+      "CT acceleration parity audit"
+    ],
+    "training_parameters_changed": false,
+    "gpu_scheduling_changed": false,
+    "active_server_job_modified": false
   }
 }
