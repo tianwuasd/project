@@ -107,3 +107,9 @@ GitHub代码发布完成。Linux CI https://github.com/tianwuasd/project/actions
 用户提供的完整日志确认旧5 GiB任务完成短测训练/验证后，在nnU-Net2.8.1检查点dict分支触发UnboundLocalError；正式训练未开始。v0.3.2修复父类文件名传参，保留优化器/RNG恢复和原子保存。用户最新指定新任务预算20 GiB，替代24 GiB要求；旧保存偏好按策略版本迁移，新计划与缓存独立，旧任务快照不热改。恢复操作见docs/CHECKPOINT_RECOVERY.md。
 
 本地94项回归89通过、5条件跳过；真实Torch CPU与官方2.8.1方法体复现原异常并通过路径/字典、优化器/RNG及恢复一步更新。CPU Torch为2.12.1，服务器固定2.8.0+cu128仍需验收；未运行CT或GPU，未迁移原冻结任务。证据为docs/REPAIR_VALIDATION.json。源码/skill发布不代表服务器已更新。当前服务器代理日志显示上游节点连接超时，公钥指纹已由用户比对一致，Read/write来自仓库页面；网络恢复与实际仓库读取/写入仍独立核验。
+
+## 菜单更新下载超时修复（2026-10-26）
+
+用户服务器日志确认读取私有GitHub main f345e372df7d6b5a6e252fff26a3d01cd0638c36成功，随后独立缓存fetch在45秒总限时被中断；runtime代理/密钥设置匹配。v0.3.3把引用查询、下载、归档分开为30/900/180秒，fetch显示真实Git进度、等待耗时并保留stderr日志，直接显示具体失败原因；超时/取消回收子进程，失败不切换旧指针。保留20 GiB及原科学配置，未部署服务器或启动模型任务。
+
+本地99项回归94通过5条件跳过；5项新增下载针对性回归再次通过，Python语法检查通过。证据为docs/UPDATE_DOWNLOAD_VALIDATION.json。用户明确要求把此经验更新到server-engineering技能；通用阶段/证据规则与Vista具体时限分别记录，未宣称具有独立无进展看门狗。技能格式、链接与应用场景核对通过。旧45秒入口需先按docs/SERVER_GIT_UPDATE.md手动获取修复，再用新入口测试菜单；真实服务器传输、Linux进程组与实际版本切换仍待验收。

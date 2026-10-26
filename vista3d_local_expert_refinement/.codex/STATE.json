@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-26T05:33:11.969758+00:00",
+  "updated_at": "2026-10-26T07:01:23.906780+00:00",
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
@@ -14,7 +14,7 @@
     "expert_role": "local_specialization_and_test_time_advice",
     "primary_role": "global_segmentation_and_selective_refinement",
     "dataset_for_next_plan": "wholeheart",
-    "current_turn_scope": "repair_checkpoint_restore_and_default_20g_new_tasks_publish_skill"
+    "current_turn_scope": "fix_menu_download_timeout_and_sync_server_engineering_skill"
   },
   "proposed_not_user_fixed": {
     "first_stage_clicks": 1,
@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Fix server proxy exit, update original runtime to v0.3.2, then create a new 20 GiB task including prepare and full-size preflight.",
+  "next_action": "One-time manual Git upgrade to v0.3.3, then test menu update in the original runtime; full-size GPU preflight for new 20 GiB task remains pending.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -226,6 +226,19 @@
     "checkpoint_cpu": "passed_official_2.8.1_methods_with_local_torch_2.12.1",
     "real_gpu_validated": false,
     "server_deployed": false,
+    "publication_authority": "Remote main ref and Git history"
+  },
+  "panel_download_fix": {
+    "version": "0.3.3",
+    "validation": "docs/UPDATE_DOWNLOAD_VALIDATION.json",
+    "fetch_timeout_seconds": 900,
+    "control_tests": {
+      "total": 99,
+      "passed": 94,
+      "skipped": 5
+    },
+    "source_of_server_failure": "user-provided attempts.json",
+    "server_acceptance": "pending",
     "publication_authority": "Remote main ref and Git history"
   }
 }
