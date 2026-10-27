@@ -40,8 +40,9 @@ class ResetHookLoader(PrivateLoader):
 
 
 class SlowFirstLoader(RandomLoader):
-    def __init__(self, marker_dir, first_seed):
+    def __init__(self, marker_dir, first_seed, await_seed=None):
         self.marker_dir, self.first_seed = marker_dir, first_seed
+        self.await_seed=await_seed
 
     def reseed(self, seed):
         self.seed = seed
@@ -49,7 +50,8 @@ class SlowFirstLoader(RandomLoader):
     def __next__(self):
         if self.seed == self.first_seed:
             deadline = time.monotonic() + 10
-            while not list(Path(self.marker_dir).iterdir()):
+            while not (Path(self.marker_dir,str(self.await_seed)).exists() if self.await_seed is not None
+                       else list(Path(self.marker_dir).iterdir())):
                 if time.monotonic() > deadline:
                     raise RuntimeError('second worker never finished')
                 time.sleep(.01)
@@ -115,6 +117,14 @@ class TensorLoader(RandomLoader):
         if torch.cuda.is_initialized():
             raise AssertionError('CUDA initialized')
         return {'data': torch.rand((2, 3)), 'array': np.random.random((2, 3))}
+
+
+class VariableTensorLoader(TensorLoader):
+    def __init__(self): self.calls=0
+    def __next__(self):
+        import torch
+        self.calls+=1
+        return torch.ones(4 if self.calls==1 else 1024)
 
 
 class PinBatch:
@@ -211,6 +221,18 @@ class BatchPoolTests(unittest.TestCase):
             finally:
                 iterator.close()
 
+    def test_total_prefetch_slots_keep_fast_worker_busy_behind_slow_sequence(self):
+        with tempfile.TemporaryDirectory() as temp:
+            first=deterministic_seed(0,0,0,'train',0)
+            fourth=deterministic_seed(0,0,0,'train',3)
+            iterator=EpochBatchIterator(SlowFirstLoader(temp,first,fourth),workers=2,prefetch=4,phase_steps=4,timeout_seconds=20)
+            try:
+                next(iterator)
+                self.assertEqual(len(list(Path(temp).iterdir())),4)
+                self.assertEqual(iterator.observations()['queue_depth_peak'],4)
+                self.assertLess(int(Path(temp,str(fourth)).read_text()),int(Path(temp,str(first)).read_text()))
+            finally:iterator.close()
+
     def test_exact_resume_ignores_prefetched_work_and_worker_count(self):
         iterator = EpochBatchIterator(PrivateLoader(), workers=2, seed=99, epoch=3,
                                       rank=1, stage='validation', prefetch=4, timeout_seconds=20)
@@ -234,15 +256,16 @@ class BatchPoolTests(unittest.TestCase):
         finally:
             resumed.close()
 
-    def test_active_epoch_reset_restarts_spawn_sequence(self):
+    def test_active_epoch_reset_preserves_spawn_pids_and_sequence(self):
         before = {p.pid for p in mp.active_children()}
         iterator = EpochBatchIterator(RandomLoader(), workers=2, timeout_seconds=20)
         try:
             expected = next(iterator)
             old_workers = list(iterator._processes)
             iterator.set_epoch(0)
-            self.assertTrue(all(not process.is_alive() for process in old_workers))
+            self.assertTrue(all(process.is_alive() for process in old_workers))
             self.assertEqual(next(iterator), expected)
+            self.assertEqual(iterator._processes, old_workers)
             state = iterator.state_dict()
             next_expected = next(iterator)
             iterator.load_state_dict(state)
@@ -250,6 +273,112 @@ class BatchPoolTests(unittest.TestCase):
         finally:
             iterator.close()
         self.assert_no_new_children(before)
+
+    def test_phase_bound_pause_and_replay_preserve_workers(self):
+        with tempfile.TemporaryDirectory() as temp:
+            iterator = EpochBatchIterator(RecordedLoader(temp), workers=2, prefetch=8,
+                                          phase_steps=3, worker_threads=2, timeout_seconds=20)
+            try:
+                first = next(iterator)
+                workers = list(iterator._processes)
+                state = iterator.state_dict()
+                iterator.pause()
+                count = len(list(Path(temp).iterdir()))
+                time.sleep(.15)
+                self.assertEqual(len(list(Path(temp).iterdir())), count)
+                self.assertEqual(iterator.observations()['pending_batches'], 0)
+                self.assertEqual(iterator.observations()['ready_batches'], 0)
+                self.assertEqual(iterator.state_dict(), state)
+                tail = [next(iterator) for _ in range(2)]
+                with self.assertRaises(StopIteration): next(iterator)
+                self.assertLessEqual(len(list(Path(temp).iterdir())), 3)
+                iterator.load_state_dict(state)
+                self.assertEqual([next(iterator) for _ in range(2)], tail)
+                iterator.set_epoch(0)
+                self.assertEqual(next(iterator), first)
+                self.assertEqual(iterator._processes, workers)
+                self.assertTrue(all(p.is_alive() for p in workers))
+            finally: iterator.close()
+
+    def test_outer_prepared_cursor_rewind_matches_consumed_checkpoint(self):
+        iterator = EpochBatchIterator(PrivateLoader(), workers=2, prefetch=4, timeout_seconds=20)
+        try:
+            expected = [next(iterator) for _ in range(5)]
+            pids = iterator.observations()['worker_pids']
+            iterator.rewind(2)  # outer queue prepared 5 but the model consumed only 2
+            self.assertEqual(iterator.state_dict()['next_index'],2)
+            self.assertEqual([next(iterator) for _ in range(3)],expected[2:])
+            self.assertEqual(iterator.observations()['worker_pids'],pids)
+            with self.assertRaises(ValueError):iterator.rewind(99)
+        finally:iterator.close()
+
+    def test_phase_limit_change_is_explicit_and_cannot_skip_consumed_work(self):
+        iterator=EpochBatchIterator(PrivateLoader(),phase_steps=5)
+        try:
+            next(iterator)
+            with self.assertRaises(ValueError):iterator.set_phase_steps(0)
+            iterator.set_phase_steps(2)
+            next(iterator)
+            with self.assertRaises(StopIteration):next(iterator)
+            iterator.set_epoch(1)
+            iterator.set_phase_steps(1)
+            next(iterator)
+            with self.assertRaises(StopIteration):next(iterator)
+        finally:iterator.close()
+
+    @unittest.skipUnless(importlib.util.find_spec('torch') and importlib.util.find_spec('numpy'), 'tensor runtime')
+    def test_reusable_shared_transport_and_bounded_pipe_fallback(self):
+        import torch
+        for budget in (0, 4096):
+            with self.subTest(budget=budget):
+                iterator = EpochBatchIterator(TensorLoader(), workers=1, prefetch=2,
+                    worker_threads=2, max_shared_bytes=budget, timeout_seconds=30)
+                try:
+                    first = next(iterator); saved = first['data'].clone()
+                    next(iterator); next(iterator)
+                    iterator.pause()
+                    obs = iterator.observations()
+                    self.assertTrue(torch.equal(first['data'], saved))
+                    self.assertEqual(obs['workers'][0]['torch_threads'], 2)
+                    self.assertLessEqual(obs['shared_allocated_bytes'], budget)
+                    if budget:
+                        self.assertGreater(obs['shared_batches'], 1)
+                        self.assertEqual(obs['pipe_batches'], 0)
+                        self.assertGreater(obs['shared_reuses'], 0)
+                    else:
+                        self.assertGreater(obs['pipe_batches'], 1)
+                        self.assertIn('shared_budget', obs['fallback_reasons'])
+                finally: iterator.close()
+                self.assertEqual(iterator.observations()['shared_allocated_bytes'], 0)
+
+    @unittest.skipUnless(importlib.util.find_spec('torch') and importlib.util.find_spec('numpy'), 'tensor runtime')
+    def test_shared_allocation_failure_and_larger_batch_have_explicit_pipe_fallback(self):
+        from multiprocessing import shared_memory
+        with patch.object(shared_memory,'SharedMemory',side_effect=OSError('injected allocation fault')):
+            iterator=EpochBatchIterator(TensorLoader(),workers=1,prefetch=1,phase_steps=1,timeout_seconds=30)
+            try:
+                next(iterator);iterator.pause()
+                self.assertEqual(iterator.observations()['pipe_batches'],1)
+                self.assertTrue(any('injected allocation fault' in reason for reason in iterator.observations()['fallback_reasons']))
+                self.assertEqual(iterator.observations()['shared_allocated_bytes'],0)
+            finally:iterator.close()
+        iterator=EpochBatchIterator(VariableTensorLoader(),workers=1,prefetch=1,phase_steps=2,timeout_seconds=30)
+        try:
+            first=next(iterator);second=next(iterator);iterator.pause()
+            self.assertEqual((len(first),len(second)),(4,1024))
+            self.assertTrue((first==1).all())
+            self.assertIn('shared_slot_capacity',iterator.observations()['fallback_reasons'])
+            self.assertEqual(iterator.observations()['shared_allocated_bytes'],16)
+        finally:iterator.close()
+
+    def test_pause_timeout_closes_all_owned_workers(self):
+        warm=[deterministic_seed(0,0,0,'train',0)]
+        iterator=EpochBatchIterator(WarmThenSleepLoader(warm),workers=1,prefetch=1,timeout_seconds=20)
+        next(iterator)
+        iterator.timeout_seconds=.2
+        with self.assertRaisesRegex(TimeoutError,'sequence=1'):iterator.pause()
+        self.assertTrue(iterator.observations()['closed'])
+        self.assertEqual(iterator.observations()['worker_pids'],[])
 
     def test_completed_prefetch_does_not_timeout_when_consumer_pauses(self):
         iterator = EpochBatchIterator(RandomLoader(), workers=1, timeout_seconds=20)

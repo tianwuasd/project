@@ -118,11 +118,60 @@ class _SpawnLockFd:
         return _spawn_lock_handle, (reduction.DupFd(self.fd),)
 
 
-def _worker_main(loader_bytes, connection, lock_handle):
+def _shared_encode(batch):
+    """Describe dense CPU leaves; tensor bytes never enter the metadata pickle."""
+    np, torch = _rng_modules()
+    arrays = []
+    def encode(value):
+        kind = None
+        if torch is not None and isinstance(value, torch.Tensor):
+            if value.device.type != 'cpu' or value.layout != torch.strided:
+                raise ValueError('unsupported_tensor')
+            try: array = value.detach().contiguous().numpy()
+            except (TypeError, RuntimeError) as error: raise ValueError('unsupported_dtype') from error
+            kind = 'torch'
+        elif np is not None and isinstance(value, np.ndarray):
+            if value.dtype.hasobject: raise ValueError('object_array')
+            array = np.ascontiguousarray(value); kind = 'numpy'
+        if kind:
+            offset = sum(a.nbytes for a in arrays)
+            arrays.append(array)
+            return _ArrayRef(kind, array.dtype.str, array.shape, offset)
+        if isinstance(value, dict): return {key: encode(item) for key, item in value.items()}
+        if isinstance(value, list): return [encode(item) for item in value]
+        if isinstance(value, tuple):
+            values = [encode(item) for item in value]
+            return type(value)(*values) if hasattr(value, '_fields') else tuple(values)
+        return value
+    encoded = encode(batch)
+    return encoded, arrays, sum(a.nbytes for a in arrays)
+
+
+class _ArrayRef:
+    def __init__(self, kind, dtype, shape, offset):
+        self.kind, self.dtype, self.shape, self.offset = kind, dtype, shape, offset
+
+
+def _shared_decode(value, buffer):
+    if isinstance(value, _ArrayRef):
+        np, torch = _rng_modules()
+        # Parent-owned copies allow batches to outlive reuse, pause and close.
+        array = np.ndarray(value.shape, dtype=value.dtype, buffer=buffer, offset=value.offset).copy()
+        return torch.from_numpy(array) if value.kind == 'torch' else array
+    if isinstance(value, dict): return {k: _shared_decode(v, buffer) for k, v in value.items()}
+    if isinstance(value, list): return [_shared_decode(v, buffer) for v in value]
+    if isinstance(value, tuple):
+        values = [_shared_decode(v, buffer) for v in value]
+        return type(value)(*values) if hasattr(value, '_fields') else tuple(values)
+    return value
+
+
+def _worker_main(loader_bytes, connection, lock_handle, worker_threads=1):
     """Spawn target; owned duplicate closes normally, without explicit flock unlock."""
     lock_fd = None
     sequence = None
     loader = None
+    shared = None
     try:
         if lock_handle is not None:
             lock_fd = lock_handle.detach()
@@ -131,16 +180,46 @@ def _worker_main(loader_bytes, connection, lock_handle):
             task = connection.recv()
             if task is None:
                 return
-            sequence, seed = task
+            sequence, seed, buffer_info = task
             try:
                 status = 'ok'
                 if loader is None:
                     # Open resources only after inheriting the workflow lock.
                     loader = pickle.loads(loader_bytes)
+                    for name in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS'):
+                        os.environ[name] = str(worker_threads)
+                    _, torch = _rng_modules()
+                    if torch is not None: torch.set_num_threads(worker_threads)
+                    hook = getattr(loader, 'configure_worker_threads', None)
+                    if callable(hook): hook(worker_threads)
                 batch = _generate(loader, seed)
-                # Serialize by value before sending. This also catches serialization
-                # errors here and avoids Torch shared-storage lifetime dependencies.
-                packet = pickle.dumps(('ok', sequence, batch), protocol=pickle.HIGHEST_PROTOCOL)
+                mode, reason, tensor_bytes = 'pipe', None, 0
+                try:
+                    encoded, arrays, tensor_bytes = _shared_encode(batch)
+                    if tensor_bytes:
+                        if buffer_info is None or buffer_info[1] < tensor_bytes:
+                            connection.send_bytes(pickle.dumps(('buffer_request', sequence, tensor_bytes)))
+                            buffer_info, reason = connection.recv()
+                        if buffer_info:
+                            from multiprocessing.shared_memory import SharedMemory
+                            if shared is None or shared.name != buffer_info[0]:
+                                if shared is not None: shared.close()
+                                shared = SharedMemory(name=buffer_info[0])
+                            offset = 0
+                            for array in arrays:
+                                shared.buf[offset:offset+array.nbytes] = memoryview(array).cast('B')
+                                offset += array.nbytes
+                            batch, mode = encoded, 'shared'
+                except (ValueError, OSError) as error:
+                    reason = str(error)
+                observer = getattr(loader, 'observations', None)
+                observations = observer() if callable(observer) else {}
+                _, torch = _rng_modules()
+                observations.update(pid=os.getpid(), worker_threads=worker_threads,
+                                    torch_threads=torch.get_num_threads() if torch is not None else None)
+                payload = dict(batch=batch, mode=mode, fallback_reason=reason,
+                               tensor_bytes=tensor_bytes, worker=observations)
+                packet = pickle.dumps(('ok', sequence, payload), protocol=pickle.HIGHEST_PROTOCOL)
             except StopIteration:
                 status = 'stop'
                 packet = pickle.dumps(('stop', sequence, None))
@@ -156,6 +235,7 @@ def _worker_main(loader_bytes, connection, lock_handle):
         except (OSError, EOFError):
             pass
     finally:
+        if shared is not None: shared.close()
         connection.close()
         if lock_fd is not None:
             os.close(lock_fd)
@@ -165,10 +245,12 @@ def _read_results(connection, results):
     """Keep potentially partial/large pipe reads off the bounded-wait consumer."""
     try:
         while True:
-            packet = pickle.loads(connection.recv_bytes())
-            results.put((connection, packet, time.monotonic()))
+            wire = connection.recv_bytes()
+            packet = pickle.loads(wire)
+            results.put((connection, packet, time.monotonic(), len(wire)))
+            del wire, packet  # Do not retain a full fallback pickle while idle.
     except BaseException as error:
-        results.put((connection, ('disconnected', None, repr(error)), time.monotonic()))
+        results.put((connection, ('disconnected', None, repr(error)), time.monotonic(), 0))
 
 
 def _pin(batch):
@@ -197,15 +279,20 @@ class EpochBatchIterator:
     Each worker executes at most one batch at a time. Results may finish out of
     order but are consumed in sequence order. ``timeout_seconds`` includes child
     startup and generation/transfer for each dispatched batch. A failed/closed
-    iterator owns no live worker children. ``set_epoch`` and ``load_state_dict``
-    discard old prefetch and reopen lazily; ``close`` is idempotent.
+    iterator owns no live worker children. ``pause`` drains/discards speculative
+    batches; reset and restore retain healthy idle workers. ``close`` shuts down
+    owned resources; an explicit later reset may reopen lazily for compatibility.
     """
 
     def __init__(self, loader, *, workers=0, seed=0, epoch=0, rank=0, stage='train',
-                 prefetch=2, timeout_seconds=180, pin_memory=False):
+                 prefetch=2, timeout_seconds=180, pin_memory=False, worker_threads=1,
+                 phase_steps=None, max_shared_bytes=64 * 1024 * 1024):
         self.loader = loader
         self.workers = _integer(workers, 'workers', 0)
         self.prefetch = _integer(prefetch, 'prefetch', 1)
+        self.worker_threads = _integer(worker_threads, 'worker_threads', 1)
+        self.phase_steps = None if phase_steps is None else _integer(phase_steps, 'phase_steps', 0)
+        self.max_shared_bytes = _integer(max_shared_bytes, 'max_shared_bytes', 0)
         self.seed = _integer(seed, 'seed')
         self.epoch = _integer(epoch, 'epoch', 0)
         self.rank = _integer(rank, 'rank', 0)
@@ -225,6 +312,17 @@ class EpochBatchIterator:
         self._ready = {}
         self._results = queue.Queue()
         self._terminal_sequence = None
+        self._paused = False
+        self._buffers = {}
+        self._sequence_slots = {}
+        self._slot_uses = {}
+        self._worker_observations = {}
+        self._stats = dict(shared_batches=0, pipe_batches=0, shared_reuses=0,
+                           tensor_bytes_shared=0, tensor_bytes_pipe=0, pipe_packet_bytes=0,
+                           consumed_batches=0, discarded_batches=0, queue_depth_peak=0)
+        self._fallback_reasons = set()
+        hook = getattr(loader, 'configure_worker_threads', None)
+        if callable(hook): hook(self.worker_threads)
 
     def __iter__(self):
         return self
@@ -248,7 +346,7 @@ class EpochBatchIterator:
                     # Each child reduces this borrowed FD inside its own
                     # Process.start(); no unconsumed parent transfer is created.
                     lock_handle = _SpawnLockFd(descriptors[0]) if descriptors else None
-                    process = ctx.Process(target=_worker_main, args=(loader_bytes, child, lock_handle),
+                    process = ctx.Process(target=_worker_main, args=(loader_bytes, child, lock_handle, self.worker_threads),
                                           name=f'batch-{self.stage}')
                     process.start()
                 except BaseException:
@@ -269,17 +367,24 @@ class EpochBatchIterator:
             raise
 
     def _fill(self):
-        if self._terminal_sequence is not None:
+        if self._paused or self._terminal_sequence is not None:
             return
         for connection, process in self._connections.items():
             if self._next_submit - self._next_index >= self.prefetch:
                 break
+            if self.phase_steps is not None and self._next_submit >= self.phase_steps:
+                break
             if connection in self._pending:
                 continue
             sequence = self._next_submit
+            slot = next(index for index in range(self.prefetch) if index not in self._sequence_slots.values())
+            self._sequence_slots[sequence] = slot
+            self._stats['queue_depth_peak'] = max(self._stats['queue_depth_peak'],len(self._sequence_slots))
             self._pending[connection] = (sequence, time.monotonic())
             try:
-                connection.send((sequence, deterministic_seed(self.seed, self.epoch, self.rank, self.stage, sequence)))
+                buffer = self._buffers.get(slot)
+                connection.send((sequence, deterministic_seed(self.seed, self.epoch, self.rank, self.stage, sequence),
+                                 (buffer.name, buffer.size) if buffer is not None else None))
             except (OSError, EOFError) as error:
                 raise RuntimeError(self._description(process, sequence) + f' dispatch failed: {error}') from error
             self._next_submit += 1
@@ -290,7 +395,7 @@ class EpochBatchIterator:
     def _receive(self):
         while True:
             try:
-                connection, packet, completed = self._results.get_nowait()
+                connection, packet, completed, packet_bytes = self._results.get_nowait()
             except queue.Empty:
                 now = time.monotonic()
                 for connection, (sequence, started) in self._pending.items():
@@ -298,10 +403,32 @@ class EpochBatchIterator:
                         raise TimeoutError(self._description(self._connections[connection], sequence) +
                                            f' exceeded {self.timeout_seconds:g}s')
                 try:
-                    connection, packet, completed = self._results.get(timeout=min(.05, self.timeout_seconds))
+                    connection, packet, completed, packet_bytes = self._results.get(timeout=min(.05, self.timeout_seconds))
                 except queue.Empty:
                     continue
             status, sequence, payload = packet
+            if status == 'buffer_request':
+                if connection not in self._pending or sequence != self._pending[connection][0]:
+                    raise RuntimeError('invalid buffer request sequence')
+                slot = self._sequence_slots[sequence]
+                old = self._buffers.get(slot)
+                used = sum(buffer.size for buffer in self._buffers.values())
+                available = self.max_shared_bytes - used + (old.size if old is not None else 0)
+                reason, info = 'shared_budget', None
+                if old is not None:
+                    # Fixed owned slot capacities avoid transient double allocation
+                    # and mappings retained by idle children after a resize.
+                    reason = 'shared_slot_capacity'
+                elif payload <= available:
+                    try:
+                        from multiprocessing.shared_memory import SharedMemory
+                        buffer = SharedMemory(create=True, size=payload)
+                        self._buffers[slot] = buffer
+                        info, reason = (buffer.name, buffer.size), None
+                    except OSError as error:
+                        reason = f'shared_allocation:{error}'
+                connection.send((info, reason))
+                continue
             if status == 'disconnected':
                 pending = self._pending.get(connection)
                 if pending is None:
@@ -316,6 +443,20 @@ class EpochBatchIterator:
             if completed - pending[1] > self.timeout_seconds:
                 raise TimeoutError(self._description(self._connections[connection], sequence) +
                                    f' exceeded {self.timeout_seconds:g}s')
+            if status == 'ok':
+                mode = payload['mode']
+                self._stats[mode + '_batches'] += 1
+                self._stats['tensor_bytes_' + mode] += payload['tensor_bytes']
+                self._stats['pipe_packet_bytes'] += packet_bytes
+                if mode == 'shared':
+                    slot = self._sequence_slots[sequence]
+                    if self._slot_uses.get(slot,0): self._stats['shared_reuses'] += 1
+                    self._slot_uses[slot] = self._slot_uses.get(slot,0) + 1
+                    seen = self._worker_observations.get(connection, {}).get('shared_batches', 0)
+                    payload['worker']['shared_batches'] = seen + 1
+                elif payload.get('fallback_reason'):
+                    self._fallback_reasons.add(payload['fallback_reason'])
+                self._worker_observations[connection] = payload['worker']
             self._ready[sequence] = (connection, status, payload)
             if status != 'ok':
                 self._terminal_sequence = sequence if self._terminal_sequence is None else min(self._terminal_sequence, sequence)
@@ -324,7 +465,10 @@ class EpochBatchIterator:
     def __next__(self):
         if self._closed:
             raise StopIteration
+        if self.phase_steps is not None and self._next_index >= self.phase_steps:
+            raise StopIteration
         try:
+            self._paused = False
             if not self.workers:
                 started = time.monotonic()
                 batch = _generate(self.loader, deterministic_seed(self.seed, self.epoch, self.rank, self.stage,
@@ -343,9 +487,13 @@ class EpochBatchIterator:
                     raise StopIteration
                 if status == 'error':
                     raise RuntimeError(self._description(self._connections[connection], self._next_index) + '\n' + batch)
+                batch = (_shared_decode(batch['batch'], self._buffers[self._sequence_slots[self._next_index]].buf)
+                         if batch['mode'] == 'shared' else batch['batch'])
+                del self._sequence_slots[self._next_index]
             if self.pin_memory:
                 batch = _pin(batch)
             self._next_index += 1
+            self._stats['consumed_batches'] += 1
             if self.workers:
                 self._fill()
             return batch
@@ -370,22 +518,91 @@ class EpochBatchIterator:
             raise ValueError(f'incomplete batch iterator state: {error}') from error
         if not isinstance(stage, str) or not stage:
             raise ValueError('stage must be a nonempty string')
-        self.close()
+        self.pause()
         self.seed, self.rank, self.stage = seed, rank, stage
         self.set_epoch(epoch, start_index=index)
 
     def set_epoch(self, epoch, start_index=0):
         epoch = _integer(epoch, 'epoch', 0)
         index = _integer(start_index, 'start_index', 0)
-        self.close()
+        self.pause()
         self.epoch = epoch
         self._next_index = self._next_submit = index
         self._closed = False
         self._terminal_sequence = None
-        self._results = queue.Queue()
+
+    def pause(self):
+        """Reach idle within batch timeout, discard prefetch, retain consumed cursor.
+
+        The next ``next()`` resumes automatically. No reader or worker is replaced.
+        On failure every owned worker/buffer is closed before propagating error.
+        """
+        self._paused = True
+        try:
+            while self._pending:
+                self._receive()
+            # Surface speculative worker errors before reporting idle success.
+            for connection, status, payload in self._ready.values():
+                if status == 'error':
+                    raise RuntimeError(self._description(self._connections[connection], 'prefetch') + '\n' + payload)
+            dead = [p for p in self._processes if not p.is_alive()]
+            if dead:
+                raise RuntimeError('batch workers exited while pausing: ' + ', '.join(
+                    f'pid={p.pid} exitcode={p.exitcode}' for p in dead))
+            self._stats['discarded_batches'] += sum(status=='ok' for _,status,_ in self._ready.values())
+            self._ready.clear()
+            self._sequence_slots.clear()
+            self._next_submit = self._next_index
+            self._terminal_sequence = None
+        except BaseException:
+            self.close()
+            raise
+
+    def rewind(self, next_index):
+        """Replay batches prepared by an outer transfer queue but not consumed.
+
+        Caller must discard its outer queue before rewinding. State format v1
+        continues to represent consumed position; outer consumers may override
+        next_index in their own checkpoint snapshot before calling restore.
+        """
+        index = _integer(next_index, 'next_index', 0)
+        if index > self._next_index:
+            raise ValueError('cannot rewind beyond consumed cursor')
+        self.pause()
+        self._next_index = self._next_submit = index
+
+    def set_phase_steps(self, steps):
+        """Drain before changing the absolute phase stop (None means unbounded).
+
+        Reset epoch/cursor first when shortening below the old consumed cursor.
+        Healthy workers and their loader objects remain resident.
+        """
+        steps = None if steps is None else _integer(steps, 'phase_steps', 0)
+        if steps is not None and steps < self._next_index:
+            raise ValueError('phase_steps cannot be below consumed cursor; reset epoch first')
+        self.pause()
+        self.phase_steps = steps
+
+    def observations(self):
+        ready_pipe = sum(payload['tensor_bytes'] for _,status,payload in self._ready.values()
+                         if status=='ok' and payload['mode']=='pipe')
+        return dict(self._stats, worker_threads=self.worker_threads, paused=self._paused,
+                    closed=self._closed, consumed_index=self._next_index,
+                    submitted_index=self._next_submit, phase_steps=self.phase_steps,
+                    pending_batches=len(self._pending), ready_batches=len(self._ready),
+                    prefetch=self.prefetch, transport='shared_memory_with_byte_pipe_fallback',
+                    max_shared_bytes=self.max_shared_bytes,
+                    shared_slots=len(self._buffers),reserved_slots=len(self._sequence_slots),
+                    shared_allocated_bytes=sum(b.size for b in self._buffers.values()),
+                    ready_pipe_tensor_bytes=ready_pipe,
+                    queue_retained_storage_bytes=sum(b.size for b in self._buffers.values())+ready_pipe,
+                    fallback_reasons=sorted(self._fallback_reasons),
+                    worker_pids=[p.pid for p in self._processes],
+                    workers=list(self._worker_observations.values()))
 
     def close(self):
         self._closed = True
+        self._paused = True
         # Do not unlock any flock: each child holds a duplicate of the workflow
         # open-file description until that child actually exits.
         for process in self._processes:
@@ -417,6 +634,13 @@ class EpochBatchIterator:
         self._pending.clear()
         self._ready.clear()
         self._results = queue.Queue()  # Release any unconsumed prefetched batches.
+        for buffer in self._buffers.values():
+            buffer.close()
+            buffer.unlink()
+        self._buffers.clear()
+        self._sequence_slots.clear()
+        self._slot_uses.clear()
+        self._worker_observations.clear()
 
     _finish = close
 
