@@ -32,7 +32,8 @@ class BatchTransfer:
 
     Only pin/copy of already-owned batches runs in a background thread. No more
     than two slots exist, including the outstanding model batch. Caller MUST
-    mark_consumed after a successful step. pause/state discard lookahead and
+    mark_consumed after a completed attempt (including coordinated AMP skip).
+    pause/state discard lookahead and
     rewind CPU source before capturing RNG or changing coordinates.
     """
     def __init__(self, source, device):

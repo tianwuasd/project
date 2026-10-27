@@ -113,8 +113,12 @@ class BaselineNNUNet(nnUNetTrainer):
         return result
 
     def _finite_train_step(self, batch):
-        """Pinned2.8.1 numerical path, with failure before nonfinite optimizer update."""
+        """Pinned AMP backoff; every rank skips together and consumes this attempt."""
         from contextlib import nullcontext
+        self._vista_last_optimizer_step=False
+        for name in ('_vista_update_progress','_vista_epoch_update_progress'):
+            if not hasattr(self,name):setattr(self,name,dict(attempted=0,successful=0,amp_skipped=0))
+            getattr(self,name)['attempted']+=1
         data = batch['data'].to(self.device, non_blocking=True)
         target = batch['target']
         target = [x.to(self.device, non_blocking=True) for x in target] if isinstance(target,list) else target.to(self.device,non_blocking=True)
@@ -122,18 +126,48 @@ class BaselineNNUNet(nnUNetTrainer):
         with torch.autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else nullcontext():
             output = self.network(data)
             loss = self.loss(output, target)
-        if not torch.isfinite(loss).all(): raise FloatingPointError('训练损失出现 NaN/Inf')
+        if not self._all_ranks_finite(torch.isfinite(loss).all()):
+            raise FloatingPointError('训练损失出现 NaN/Inf（任一rank）')
         if self.grad_scaler is not None:
             self.grad_scaler.scale(loss).backward()
             self.grad_scaler.unscale_(self.optimizer)
-            torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12, error_if_nonfinite=True)
-            self.grad_scaler.step(self.optimizer)
-            self.grad_scaler.update()
+            finite=torch.stack([torch.isfinite(p.grad).all() for p in self.network.parameters() if p.grad is not None]).all()
+            if self._all_ranks_finite(finite):
+                # Preserve pinned clipping, including finite gradients whose norm
+                # overflows. GradScaler checks gradients during unscale, not norm.
+                torch.nn.utils.clip_grad_norm_(self.network.parameters(),12,error_if_nonfinite=False)
+                self.grad_scaler.step(self.optimizer)
+                self.grad_scaler.update()
+                self._vista_last_optimizer_step=True
+            else:
+                # Public scaler APIs only. update resets per-optimizer stages;
+                # loading canonical backoff state also resets growth tracking.
+                state=self.grad_scaler.state_dict()
+                if getattr(self,'is_ddp',False):
+                    import torch.distributed as dist
+                    states=[state];dist.broadcast_object_list(states,src=0);state=states[0]
+                state['scale']*=state['backoff_factor'];state['_growth_tracker']=0
+                self.grad_scaler.update(new_scale=state['scale'])
+                self.grad_scaler.load_state_dict(state)
+                self.print_to_log_file(f"AMP overflow: all ranks skipped optimizer update; attempt consumed; scale={state['scale']}")
         else:
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12, error_if_nonfinite=True)
+            finite=torch.stack([torch.isfinite(p.grad).all() for p in self.network.parameters() if p.grad is not None]).all()
+            if not self._all_ranks_finite(finite):raise RuntimeError('non-finite non-AMP gradients on a rank')
+            norm=torch.nn.utils.clip_grad_norm_(self.network.parameters(),12,error_if_nonfinite=False)
+            if not self._all_ranks_finite(torch.isfinite(norm)):raise RuntimeError('non-finite non-AMP gradient norm on a rank')
             self.optimizer.step()
+            self._vista_last_optimizer_step=True
+        counter='successful' if self._vista_last_optimizer_step else 'amp_skipped'
+        for name in ('_vista_update_progress','_vista_epoch_update_progress'):getattr(self,name)[counter]+=1
         return {'loss':loss.detach().cpu().numpy()}
+
+    def _all_ranks_finite(self, finite):
+        flag=finite.to(device=self.device,dtype=torch.int32)
+        if getattr(self,'is_ddp',False):
+            import torch.distributed as dist
+            dist.all_reduce(flag,op=dist.ReduceOp.MIN)
+        return bool(flag.item())
 
     def train_step(self, batch):
         return self._execution_step(batch)
@@ -168,6 +202,8 @@ class BaselineNNUNet(nnUNetTrainer):
                 current_epoch=self.current_epoch+1, init_args=self.my_init_kwargs,
                 trainer_name=self.__class__.__name__,
                 inference_allowed_mirroring_axes=self.inference_allowed_mirroring_axes)
+            checkpoint['vista_update_progress']=dict(getattr(self,'_vista_update_progress',{}))
+            checkpoint['vista_update_progress_origin_known']=getattr(self,'_vista_progress_origin_known',True)
             if distributed_state is not None:
                 checkpoint['vista_rank_states']=distributed_state
             else:
@@ -190,6 +226,8 @@ class BaselineNNUNet(nnUNetTrainer):
     def load_checkpoint(self, filename_or_checkpoint):
         from checkpoint_compat import load_parent_checkpoint
         checkpoint=load_parent_checkpoint(super().load_checkpoint,filename_or_checkpoint,torch)
+        self._vista_update_progress=dict(checkpoint.get('vista_update_progress') or dict(attempted=0,successful=0,amp_skipped=0))
+        self._vista_progress_origin_known=bool(checkpoint.get('vista_update_progress')) and checkpoint.get('vista_update_progress_origin_known',True)
         self._vista_resume_rank_states=checkpoint.get('vista_rank_states')
         if self._vista_resume_rank_states is not None:
             if getattr(self,'_vista_inference_only',False):
@@ -229,6 +267,7 @@ class BaselineNNUNet(nnUNetTrainer):
         self.dataloader_val = TimedIterator(self.dataloader_val, self._vista_timing, 'validation')
 
     def on_epoch_start(self):
+        self._vista_epoch_update_progress=dict(attempted=0,successful=0,amp_skipped=0)
         for name in ['dataloader_train','dataloader_val']:
             loader=getattr(self,name,None)
             if hasattr(loader,'set_epoch'):loader.set_epoch(self.current_epoch)

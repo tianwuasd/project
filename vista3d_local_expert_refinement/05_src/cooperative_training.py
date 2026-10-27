@@ -71,13 +71,15 @@ def run_rank(rank,world_size,args):
         resumed_initial_checkpoint=args.get('checkpoint'),first_epoch=trainer.current_epoch,
         execution=execution)
     sync=(lambda:torch.cuda.synchronize(device)) if device.type=='cuda' else (lambda:None)
-    successful_updates=0;checkpoint_committed=False
+    checkpoint_committed=False
+    def epoch_progress():
+        return dict(getattr(trainer,'_vista_epoch_update_progress',dict(attempted=0,successful=0,amp_skipped=0)))
     try:
         trainer.on_train_start()
         if device.type=='cuda':torch.cuda.reset_peak_memory_stats(device)
         for epoch in range(trainer.current_epoch,trainer.num_epochs):
             trainer.on_epoch_start()
-            successful_updates=0;checkpoint_committed=False
+            checkpoint_committed=False
             train_steps=12 if trial else 250
             validation_steps=2 if trial else 50
             trainer.dataloader_train.set_phase_steps(train_steps)
@@ -91,13 +93,12 @@ def run_rank(rank,world_size,args):
                     measurements.append(timing)
                 else:
                     _,value,timing=measure_step(trainer.dataloader_train,trainer.train_step,lambda:None)
-                successful_updates+=1
                 if feedback:feedback.observe(timing,trainer,dist)
                 outputs.append(value)
                 if rank==0 and (batch_index==0 or (batch_index+1)%5==0 or batch_index+1==train_steps):
                     write_json(output/'progress.rank0.json',dict(status='running',phase='train',
                         epoch=trainer.current_epoch,planned_epochs=250,batch=batch_index+1,total_batches=train_steps,
-                        world_size=world_size,global_batch_size=args['global_batch_size'],updated=time.time()))
+                        world_size=world_size,global_batch_size=args['global_batch_size'],train_updates=epoch_progress(),updated=time.time()))
             trainer.on_train_epoch_end(outputs)
             with torch.no_grad():
                 trainer.on_validation_epoch_start();outputs=[];validation=[]
@@ -110,10 +111,14 @@ def run_rank(rank,world_size,args):
                     if rank==0 and (batch_index==0 or (batch_index+1)%5==0 or batch_index+1==validation_steps):
                         write_json(output/'progress.rank0.json',dict(status='running',phase='validation',
                             epoch=trainer.current_epoch,planned_epochs=250,batch=batch_index+1,total_batches=validation_steps,
-                            world_size=world_size,global_batch_size=args['global_batch_size'],updated=time.time()))
+                            world_size=world_size,global_batch_size=args['global_batch_size'],train_updates=epoch_progress(),updated=time.time()))
                 trainer.on_validation_epoch_end(outputs)
             tick=time.monotonic();trainer.on_epoch_end();checkpoint_seconds=time.monotonic()-tick
             checkpoint_committed=True
+            result['last_epoch_train_updates']=epoch_progress()
+            result['train_updates']=dict(trainer._vista_update_progress)
+            result['train_updates_origin']=('new training' if not args.get('checkpoint') else
+                'checkpoint counters' if getattr(trainer,'_vista_progress_origin_known',False) else 'since legacy checkpoint; prior counts unknown')
             # measure_step returns its borrowed input; do not retain it while
             # measuring post-update fixed allocation after both pools pause.
             _=None
@@ -144,8 +149,15 @@ def run_rank(rank,world_size,args):
                     validation_step_seconds=sum(v['total_seconds'] for v in validation)/2,
                     checkpoint_seconds=checkpoint_seconds,phase_timing=dict(train=stats,validation=summarize_steps(validation)),
                     checkpoint_weights_equal=True,optimizer_state_restored=True,
-                    rng_state_restored=trainer.rng_state_restored,one_resumed_training_step_passed=True,
-                    actual_optimizer_steps=13,checkpoint=str(checkpoint))
+                    rng_state_restored=trainer.rng_state_restored,
+                    one_resumed_training_step_passed=trainer._vista_last_optimizer_step,
+                    attempted_training_steps=train_steps+1,
+                    actual_optimizer_steps=result['last_epoch_train_updates']['successful']+int(trainer._vista_last_optimizer_step),
+                    amp_skipped_training_steps=result['last_epoch_train_updates']['amp_skipped']+int(not trainer._vista_last_optimizer_step),
+                    checkpoint=str(checkpoint))
+                result['train_updates']=dict(trainer._vista_update_progress)
+                if not trainer._vista_last_optimizer_step:
+                    raise RuntimeError('恢复后的AMP更新被跳过；短测缺少成功恢复更新证据')
                 trainer.dataloader_train.pause()
                 result['resume_supply_transfer']=trainer.dataloader_train.observations()
                 break
@@ -184,7 +196,10 @@ def run_rank(rank,world_size,args):
         return result
     except BaseException:
         write_json(output/f'failure-progress.rank{rank}.json',dict(rank=rank,epoch=trainer.current_epoch,
-            successful_train_updates_since_epoch_start=successful_updates,complete_epoch_committed=checkpoint_committed,
+            attempted_train_iterations_since_epoch_start=epoch_progress()['attempted'],
+            successful_train_updates_since_epoch_start=epoch_progress()['successful'],
+            amp_skipped_train_iterations_since_epoch_start=epoch_progress()['amp_skipped'],
+            cumulative_train_updates=dict(getattr(trainer,'_vista_update_progress',{})),complete_epoch_committed=checkpoint_committed,
             discarded_update_scope='restore latest complete checkpoint; failing update may be partial'))
         raise
     finally:

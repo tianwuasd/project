@@ -414,6 +414,9 @@ class ReportingContracts(unittest.TestCase):
             work=Path(temp)
             write_json(work/'00_admin/stage-decisions/assessment_f_B0_1.json',dict(resource_snapshot={'cpu_budget':100},effective_cpu={'total_cpu_slots':90}))
             write_json(work/'00_admin/cpu-case-budget.json',dict(stage='assessment_cpu_tail',cpu_budget=4,total_cpu_slots=4,workers=1,threads_per_worker=4))
+            # Establish chronology explicitly; fast Windows writes can share mtime.
+            os.utime(work/'00_admin/stage-decisions/assessment_f_B0_1.json',(10,10))
+            os.utime(work/'00_admin/cpu-case-budget.json',(20,20))
             text=' '.join(resource_lines(work,dict(current_step='assessment',status='running')))
             self.assertIn('assessment_cpu_tail',text);self.assertIn('已分配 4',text);self.assertNotIn('已分配 90',text)
 

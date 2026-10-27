@@ -1,0 +1,785 @@
+{
+  "schema_version": 2,
+  "panel_version": "0.5.0",
+  "recorded_date": "2026-10-27",
+  "source_base_commit": "0f1baa0858c600662f10840aa203c4ba860c33a3",
+  "publication": {
+    "pushed": false,
+    "deployed": false,
+    "skill_changed": false,
+    "owner": "root subsequent whole-project review and publication"
+  },
+  "scope": "local Windows CPU control and pinned API integration; no real CT or GPU compute",
+  "environment": {
+    "baseline_python": "D:/programtools/anaconda/python.exe",
+    "api_python": "D:/projects/sync-reports/vista-api-runtime-20261027/Scripts/python.exe",
+    "api_python_version": "3.11.15",
+    "torch": "2.12.1+cu126",
+    "nnunetv2": "2.8.1",
+    "PYTHONPATH": "tests;05_src",
+    "TMP": "D:/projects/sync-reports/vista-v2-test-temp",
+    "TEMP": "D:/projects/sync-reports/vista-v2-test-temp",
+    "PYTHONUTF8": "1",
+    "CUDA_VISIBLE_DEVICES": "-1"
+  },
+  "contracts": {
+    "epochs": 250,
+    "train_attempts_per_epoch": 250,
+    "validation_iterations_per_epoch": 50,
+    "automatic_batch_sampling": true,
+    "train_patches_per_epoch": "250 * global_batch",
+    "validation_patches_per_epoch": "50 * global_batch",
+    "normal_amp_skip_consumes_input": true,
+    "all_rank_amp_backoff": true,
+    "oom_group_abort": true,
+    "cpu_fraction": 0.8,
+    "ram_fraction": 0.8,
+    "candidate_ranking": false,
+    "assessment_settings_reused": false
+  },
+  "checks": [
+    {
+      "name": "final release aggregate after concrete fixture fixes",
+      "command": "D:/programtools/anaconda/python.exe -B tests/run_panel_suite.py",
+      "log": "task6-panel-suite-release-green.log",
+      "run": 339,
+      "passed": 295,
+      "skipped": 44,
+      "errors": 0,
+      "failures": 0,
+      "seconds": 85.874,
+      "status": "passed"
+    },
+    {
+      "name": "expanded control suite",
+      "command": "python -B tests/run_panel_suite.py",
+      "log": "task6-panel-suite-final-guarded.log",
+      "run": 339,
+      "passed": 294,
+      "skipped": 44,
+      "errors": 1,
+      "seconds": 84.824,
+      "status": "completed with one stale control fixture error; corrected below"
+    },
+    {
+      "name": "affected control after fixture fix",
+      "command": "python -B -m unittest test_stage_coordinator test_final_integration -v",
+      "log": "task6-affected-control-final.log",
+      "run": 25,
+      "passed": 24,
+      "skipped": 1,
+      "errors": 0,
+      "seconds": 0.401,
+      "status": "passed"
+    },
+    {
+      "name": "CPU execution and initial AMP",
+      "command": "API python -B -m unittest test_amp_updates test_execution_transfer -v",
+      "log": "task6-amp-green.log",
+      "run": 17,
+      "passed": 16,
+      "skipped": 1,
+      "errors": 0,
+      "status": "passed before final counter-origin test refinement"
+    },
+    {
+      "name": "final actual CPU GradScaler/checkpoint",
+      "command": "API python -B -m unittest test_amp_updates -v",
+      "log": "task6-amp-final.log",
+      "run": 2,
+      "passed": 2,
+      "skipped": 0,
+      "errors": 0,
+      "status": "passed; includes pinned official parity and legacy counter origin"
+    },
+    {
+      "name": "asymmetric AMP actual Gloo",
+      "command": "API python -B tests/amp_cpu_gloo_smoke.py --report-file task6-amp-gloo-authorized.json",
+      "status": "passed",
+      "report": "task6-amp-gloo-authorized.json"
+    },
+    {
+      "name": "actual pinned distributed checkpoint",
+      "command": "API python -B tests/nnunet_distributed_checkpoint_api_smoke.py --report-file task6-checkpoint-api.json",
+      "status": "passed",
+      "report": "task6-checkpoint-api.json"
+    },
+    {
+      "name": "actual 2 to 3 UUID membership checkpoint",
+      "command": "API python -B tests/nnunet_membership_checkpoint_api_smoke.py --report-file task6-membership-api.json",
+      "status": "passed",
+      "report": "task6-membership-api.json"
+    },
+    {
+      "name": "source syntax and LF",
+      "status": "passed",
+      "ast_files": 126,
+      "changed_python_lf": true
+    },
+    {
+      "name": "deterministic reporting fixture",
+      "command": "D:/programtools/anaconda/python.exe -B -m unittest test_stage_completion.ReportingContracts -v",
+      "log": "task6-reporting-fixture-final.log",
+      "run": 8,
+      "passed": 8,
+      "skipped": 0,
+      "seconds": 1.194,
+      "status": "passed"
+    }
+  ],
+  "failure_resolution": [
+    {
+      "log": "task6-panel-suite-final-authorized.log",
+      "status": "aborted",
+      "reason": "unguarded legacy runner re-executed in Windows spawned children; verified owned test tree stopped; __main__ guard fixed; subsequent full suite above"
+    },
+    {
+      "log": "task6-panel-suite-final-guarded.log",
+      "reason": "test_stage_coordinator old assessment fixture did not inject new prediction and CPU-tail budgets; nibabel missing in baseline runtime",
+      "resolution": "fixture updated to inject and assert both actual interfaces; affected module passes; production geometry guards unchanged"
+    },
+    {
+      "log": "task6-amp-gloo.log",
+      "reason": "restricted loopback/spawn timed out with empty rank logs",
+      "resolution": "same CPU test passed on existing authorized execution route; no weakened assertions"
+    },
+    {
+      "log": "task6-panel-suite-release-final.log",
+      "run": 339,
+      "passed": 294,
+      "skipped": 44,
+      "failures": 1,
+      "seconds": 85.351,
+      "reason": "back-to-back Windows JSON writes tied mtime in the earlier-GPU/newer-CPU reporting fixture",
+      "resolution": "fixture now sets explicit ordered mtimes; production strict newer rule unchanged; eight affected reporting tests and final339-test aggregate pass"
+    }
+  ],
+  "unchanged_evidence_reused": [
+    {
+      "report": "task2-loader-api.json",
+      "checks": "actual pinned loader parity, inner threads2, persistent PIDs and resume"
+    },
+    {
+      "report": "task2-supply-effect.json",
+      "checks": "synthetic CPU steady wait 0.0719241167s to 0.0097563000s; first batch 0.1615237s to 4.6889438s; not end-to-end throughput"
+    },
+    {
+      "report": "task5-prepare-api.log",
+      "checks": "real synthetic fit fingerprint8/planning/preparation12/reuse/prediction preparation/subset3"
+    },
+    {
+      "report": "task5-leaf-api.log",
+      "checks": "actual Blosc1/3/7 metadata and arrays, affine KDTree metrics"
+    },
+    {
+      "report": "task5-fix1-api.log plus task5-fix1-api-resume.log",
+      "checks": "10 intended API tests passed plus selector error; corrected remaining selector1 passed"
+    }
+  ],
+  "gpu_read_only": {
+    "name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+    "total_mib": 8188,
+    "used_mib": 368,
+    "utilization_percent": 0,
+    "external_pids": [
+      14948,
+      26008
+    ],
+    "process_details": "Insufficient Permissions / N/A",
+    "compute_started": false
+  },
+  "limits": [
+    "No target Linux/CUDA/NCCL or real CT acceptance",
+    "No end-to-end speedup or clinical quality claim",
+    "Target expected Torch2.8.0+cu128 differs from local Torch2.12.1+cu126",
+    "44 control skips: optional CPU API/Torch/Gloo/imaging dependencies, POSIX-only conditions, and unavailable Windows symlink fixture; not passed",
+    "CPU/RAM admission uses labelled estimates; transient peak and external pressure attribution remain unmeasured",
+    "Test counts overlap across runs; do not sum as unique tests"
+  ],
+  "runtime_inventory": [
+    {
+      "path": "04_data/manifests/README.md",
+      "bytes": 812,
+      "sha256": "e4a1636fc0adebc6f9ddb5d0f6fa1cfebac3f96b29e400b61a2e4e935e2d5986"
+    },
+    {
+      "path": "05_src/assessment_policy.py",
+      "bytes": 3843,
+      "sha256": "6df4ffdea7d4a33f3debabfe4be3bdecb2d1185ad0ef75a7f6110a65e301d40e"
+    },
+    {
+      "path": "05_src/assessment_predict.py",
+      "bytes": 6852,
+      "sha256": "f5de4f9f77a90f09eb6511df853a71c194beebd395f2a398a6a442cbadcae3a5"
+    },
+    {
+      "path": "05_src/assessment_prepare.py",
+      "bytes": 5383,
+      "sha256": "7c0d5e7ccee41a73294562e9287782584ea5c7e017c8c71962b8f7a41b395e74"
+    },
+    {
+      "path": "05_src/assessment_run.py",
+      "bytes": 6426,
+      "sha256": "6d1811fefce1f6602be7c5065b052a648b543af12795cb7cc061b1bec0fbc16a"
+    },
+    {
+      "path": "05_src/batch_pool.py",
+      "bytes": 34948,
+      "sha256": "faef7cf10c2813d7db31ef51d4027cfa76f23f6057e2ffcefcb84a0c307f80a9"
+    },
+    {
+      "path": "05_src/batch_transfer.py",
+      "bytes": 9319,
+      "sha256": "a5aa4f09a15ba33c7af955e1ff84998d94a99c5c28f6a295797c53bba5f362b9"
+    },
+    {
+      "path": "05_src/case_execution.py",
+      "bytes": 6263,
+      "sha256": "ad906f7908bdf78a6f995710a74cdca81cb2ecb96286a6afe7fdf5176d221ebf"
+    },
+    {
+      "path": "05_src/checkpoint_compat.py",
+      "bytes": 1039,
+      "sha256": "7917885f7692b952a2200474dd5d30379927dc99967198836f98e06b77bf327b"
+    },
+    {
+      "path": "05_src/checkpoint_rng.py",
+      "bytes": 629,
+      "sha256": "7f26f067369fa6b15a63f99ea39d1a4ddc41f284a64d80e6133f60d0e72c1f12"
+    },
+    {
+      "path": "05_src/cohort.py",
+      "bytes": 4135,
+      "sha256": "6660b6cdc74223eb34f9ff831b65a9e14369d27e40635cbb3f859dc15c11a845"
+    },
+    {
+      "path": "05_src/cooperative_control.py",
+      "bytes": 25453,
+      "sha256": "ecce13671e2a65e5625e8b20a31ba25307b0bc2f60e6fe38c5a476512f16104f"
+    },
+    {
+      "path": "05_src/cooperative_training.py",
+      "bytes": 13400,
+      "sha256": "b5c114a57a305619bc63ce0cec408a81d14c32cde3ece381e5172b9e94099d79"
+    },
+    {
+      "path": "05_src/cpu_case_queue.py",
+      "bytes": 2620,
+      "sha256": "ba01df95ef243a9ab40e5a7126135b8cf7126c8bfde67499db5ca9f54e349ccf"
+    },
+    {
+      "path": "05_src/data_pipeline.py",
+      "bytes": 6316,
+      "sha256": "42aaf510f75bf47cd6e582371a15254459878fd6745cf1512740df90299ec0b9"
+    },
+    {
+      "path": "05_src/ddp_runtime.py",
+      "bytes": 16229,
+      "sha256": "2330787903f1284b455e42eaee1752f66aad9315997962ba6b13a5f08dce6f75"
+    },
+    {
+      "path": "05_src/diagnostic_export.py",
+      "bytes": 4992,
+      "sha256": "aad7ab9f33c1205f46eaf03f3ea64c0252e41d8a4726298767910b89871a1ab6"
+    },
+    {
+      "path": "05_src/evaluation.py",
+      "bytes": 12440,
+      "sha256": "49328415e77a4ce41ff378879f66a7b20ec14925ca27518859e03a0ef4540d44"
+    },
+    {
+      "path": "05_src/evaluation_contract.py",
+      "bytes": 1403,
+      "sha256": "90ebfcca907292eea9886f553263958f6dc2dc27cb1676f94ebe6f0271b0c57a"
+    },
+    {
+      "path": "05_src/evaluation_gpu.py",
+      "bytes": 7511,
+      "sha256": "c3e278060df181d79d5c48ee8596ca2e5789d62d4aa6eb584c93aef7eea5b513"
+    },
+    {
+      "path": "05_src/evaluation_parallel.py",
+      "bytes": 11534,
+      "sha256": "c4115d5216f8e9935e5e1fb2045e6dc2c6cf244f36d99f4add8e92c42bb637e8"
+    },
+    {
+      "path": "05_src/evaluation_phases.py",
+      "bytes": 8071,
+      "sha256": "4ea5c2fb561a8b6fb50538d64705dbd95bea732491bb831592537c8a4f3e18cd"
+    },
+    {
+      "path": "05_src/evaluation_summary.py",
+      "bytes": 5909,
+      "sha256": "b76d22c895b3c71cda8cceba115728b1998f49b9e0a3f2bdd7397398f64af800"
+    },
+    {
+      "path": "05_src/failure_summary.py",
+      "bytes": 2443,
+      "sha256": "e79a5753b518ca64b608982536b998f430f6631b7bec92e0336c22a17fc7c81c"
+    },
+    {
+      "path": "05_src/gpu_budget.py",
+      "bytes": 900,
+      "sha256": "b349a8203261df0940170ff1688b52a43998911df2577c98d67b47b3a3abdf9c"
+    },
+    {
+      "path": "05_src/gpu_devices.py",
+      "bytes": 3128,
+      "sha256": "556b347874cdf23da5e9e9667d9034458aafbb33d73408650460119254e5a420"
+    },
+    {
+      "path": "05_src/gpu_fleet.py",
+      "bytes": 9570,
+      "sha256": "a1ea8329504631ede540c163f8d6acc91803e65f560342f8da7ecd6a5bb91e2c"
+    },
+    {
+      "path": "05_src/gpu_probe.py",
+      "bytes": 2011,
+      "sha256": "47e354ce4df6072029952a2dc9a91884d1bcc93e6178186e8466938d6dee072e"
+    },
+    {
+      "path": "05_src/gpu_queue.py",
+      "bytes": 7748,
+      "sha256": "52fed3a90da3075db55f41c3ccb831cc560ab75bc01c19e167410e1b772fc2b5"
+    },
+    {
+      "path": "05_src/live_resources.py",
+      "bytes": 22512,
+      "sha256": "a47b769961704a1f546b8dbfc75c9bdc96ca96c98f7015bdfe98e10c9b22cead"
+    },
+    {
+      "path": "05_src/metrics.py",
+      "bytes": 1840,
+      "sha256": "6490e043dc51d10cf3acd80aeeb50acb3317f0622b707249ad19a10dc765d14b"
+    },
+    {
+      "path": "05_src/model_catalog.py",
+      "bytes": 2705,
+      "sha256": "22bf4e59d97829d0e95f7bf102959b912bfb834463b6c8bfd05e10b701dafcc1"
+    },
+    {
+      "path": "05_src/nnunet_batches.py",
+      "bytes": 6404,
+      "sha256": "916ded7ccfa9364c32a281b08c39fdf309a50de5afd62aef3cbf4f416ea08a84"
+    },
+    {
+      "path": "05_src/nnunet_loader_adapter.py",
+      "bytes": 3061,
+      "sha256": "0ccce7df4e8b519f3ed90d1ecdd783b60917577745634ff1df5fbb2b019c9c41"
+    },
+    {
+      "path": "05_src/panel_publication/SOURCE.json",
+      "bytes": 1175,
+      "sha256": "4890250eb0cbc5d549cb56151682c1cd736a1306e29e94d379ec4442bee3b67a"
+    },
+    {
+      "path": "05_src/panel_publication/__init__.py",
+      "bytes": 82,
+      "sha256": "2e7dec6c01311fb8c92fdeec22b885ad45377a4f41165dbaa55b9be690a99a07"
+    },
+    {
+      "path": "05_src/panel_publication/code_sync.py",
+      "bytes": 5979,
+      "sha256": "63dbdabf4c397e9e3781a79fe6817872af6c56dcec79a6f29aa55b6dfbbb0a57"
+    },
+    {
+      "path": "05_src/panel_publication/inspection.py",
+      "bytes": 120,
+      "sha256": "0620ab570a6ea08d44813bd594321a4104ddd164056a3932bb795532cf6fab3e"
+    },
+    {
+      "path": "05_src/panel_publication/jobs.py",
+      "bytes": 69,
+      "sha256": "351a6c3a80bf97e8742d3f5e8d3522f267e46c0d9180dc2aba341368203991c4"
+    },
+    {
+      "path": "05_src/panel_publication/launcher.py",
+      "bytes": 176,
+      "sha256": "904bd76a6f9ac113d847690a29093a5588909a6f23409d255e347def342502f4"
+    },
+    {
+      "path": "05_src/panel_publication/network.py",
+      "bytes": 6746,
+      "sha256": "876b0efc4b251ad0e89dde0b887e86f96aa814a6cbfcc859a540cb6559fdea8f"
+    },
+    {
+      "path": "05_src/panel_publication/prompts.py",
+      "bytes": 86,
+      "sha256": "c33e8a8481f2823ae06b91469dbbec6e4b37102810fd999a05a70d3fcd8eb831"
+    },
+    {
+      "path": "05_src/panel_publication/sharing.py",
+      "bytes": 2017,
+      "sha256": "a43272ec87d51ea5620ced7c1f69425598a4cc1b1da231f39971d90f9b002295"
+    },
+    {
+      "path": "05_src/panel_publication/ssh_upload.py",
+      "bytes": 12156,
+      "sha256": "9d8089594ec3ed24ff97faec915d07753c1b7d21c217217cd035c512689eaa11"
+    },
+    {
+      "path": "05_src/panel_publication/updater.py",
+      "bytes": 1843,
+      "sha256": "33077949e7a0af7b6b383a5231aa5406008ffe89b82b79c2d782d4defea88d6a"
+    },
+    {
+      "path": "05_src/panel_publication/upload.py",
+      "bytes": 20354,
+      "sha256": "b157e52f96912104f0f15f2b27bf5b3e949c6f9c24ab4fb4828284aafdd4394e"
+    },
+    {
+      "path": "05_src/persistent_prediction.py",
+      "bytes": 10929,
+      "sha256": "b67831a42e131b693a629030006799d94d503b511e8cc935ac65068afe93636b"
+    },
+    {
+      "path": "05_src/pipeline_catalog.py",
+      "bytes": 19067,
+      "sha256": "fd9f7655e7eb94fc43c3076c507b81a4c8f0b7110ab77028b465ed4a37fd1c28"
+    },
+    {
+      "path": "05_src/preflight_gate.py",
+      "bytes": 6326,
+      "sha256": "1731d0a0ea2f9ee3ddf6d543032efa25da8dba7fad35a8c3a039c2261de240e3"
+    },
+    {
+      "path": "05_src/preparation_identity.py",
+      "bytes": 379,
+      "sha256": "4c7dfd32ca29ae4082328843763d90c99315912d00f0990636562d772729838f"
+    },
+    {
+      "path": "05_src/prepare_nnunet.py",
+      "bytes": 1438,
+      "sha256": "a26fd598b26deb618428f9981a12b9d47ad247a48fa5e5f36fdb638121714edc"
+    },
+    {
+      "path": "05_src/project_trainers.py",
+      "bytes": 18022,
+      "sha256": "baa2e2d861eb6ec86ef8687a17827a229daf091f27e3123b72ba3eb76bce8c64"
+    },
+    {
+      "path": "05_src/rank_affinity.py",
+      "bytes": 4297,
+      "sha256": "49a90e447a478df6f3e869f20ff29c837b68b93338b4b0a7ce8a61ee57b5b91e"
+    },
+    {
+      "path": "05_src/rank_checkpoint.py",
+      "bytes": 2606,
+      "sha256": "6a69fe9b74e0535d82a67e1d6c45b5a463d3f45f6c06dc25c77994a7b4491cc4"
+    },
+    {
+      "path": "05_src/run_smoke_suite.py",
+      "bytes": 2911,
+      "sha256": "1a64ac8c5cea9850f1fdba371f113313212333586ef02da5290106288d783865"
+    },
+    {
+      "path": "05_src/runtime_observations.py",
+      "bytes": 4742,
+      "sha256": "78a2f1046ed73882fe3648cb5be82df7d24b1303716a84bd378fe1138457b5c0"
+    },
+    {
+      "path": "05_src/runtime_setup.py",
+      "bytes": 6250,
+      "sha256": "29e9c74c475f80ab687c2c1c8b9f89064946490d86ce0160973253e0087076ae"
+    },
+    {
+      "path": "05_src/server_data.py",
+      "bytes": 3540,
+      "sha256": "6dc448c16d18e0c150159b028fca930ceb192ef2eee7d36c126a5996fa5b7068"
+    },
+    {
+      "path": "05_src/server_gpu_check.py",
+      "bytes": 436,
+      "sha256": "6a88cca4a3fb7c8b9491faf068b84ed73951dee6dd9d103261d4c13bce6dad7a"
+    },
+    {
+      "path": "05_src/server_launch.py",
+      "bytes": 13851,
+      "sha256": "e24187d5f4df450c6eed9643aeb227c81d468b3a3c897d8d542127726672ee43"
+    },
+    {
+      "path": "05_src/server_prepare.py",
+      "bytes": 10017,
+      "sha256": "73e30dcf1e42065bb046ae2139e54feec5b4c75c32821c1c4139a907bfed30c5"
+    },
+    {
+      "path": "05_src/server_profile.py",
+      "bytes": 1538,
+      "sha256": "3d23d20ed3d77d249ba4499d2015ee29482786f419359697ced2aa73299ee21b"
+    },
+    {
+      "path": "05_src/server_train.py",
+      "bytes": 7767,
+      "sha256": "5c74af822ffa47f12e907398c9eceec7ef019e1584005a6213777492e8733b20"
+    },
+    {
+      "path": "05_src/smoke_train.py",
+      "bytes": 10117,
+      "sha256": "98711ae2b2333171ae143eaa082d9c1d6a55e5fcb0696b12befe32f28f197bd1"
+    },
+    {
+      "path": "05_src/software_smoke.py",
+      "bytes": 1732,
+      "sha256": "94d977083454f1d4fda063743fd32e8db1ce16b866c2c9f55924d864921fcef3"
+    },
+    {
+      "path": "05_src/summarize_smoke.py",
+      "bytes": 2793,
+      "sha256": "9eab51fa9551b738a8245c042f8d37d9ed84f6e5291290f724c78901813dd104"
+    },
+    {
+      "path": "05_src/task_inputs.py",
+      "bytes": 14301,
+      "sha256": "b9b9f8dd3e0daa77c23111f64ca34107929c66f70178d40af055e04bacc16e35"
+    },
+    {
+      "path": "05_src/task_panel.py",
+      "bytes": 43202,
+      "sha256": "953a29da116b2a9a5f9f1493c1cdf9c9535c6faa70700890ccc606aa0aecf8c1"
+    },
+    {
+      "path": "05_src/task_progress.py",
+      "bytes": 11659,
+      "sha256": "f588f68c1fbf916f89aa0cbe25f04204e43a7a62809c1005bfae5db21dcbadd3"
+    },
+    {
+      "path": "05_src/task_queries.py",
+      "bytes": 21475,
+      "sha256": "9c56bd0496c29bdb62ba6624990c549f76b66538d59e5f9dff6d0bcb78883cf2"
+    },
+    {
+      "path": "05_src/task_resources.py",
+      "bytes": 12201,
+      "sha256": "f470c586f472d147434bc1f497ce32a721946a133dae24089cb2f671bbccf03b"
+    },
+    {
+      "path": "05_src/task_runtime.py",
+      "bytes": 18159,
+      "sha256": "8be4f9be9f69b508f8ceb1af42b654269a2fa07f78f687f228fb31271e4f4908"
+    },
+    {
+      "path": "05_src/task_update.py",
+      "bytes": 29193,
+      "sha256": "18bf563f0d758d8acfe83d662e4f5f8a9b9f7ac8e45988ed46af5ee8d9c65934"
+    },
+    {
+      "path": "05_src/task_worker.py",
+      "bytes": 13208,
+      "sha256": "982579f17ce1896b672a1438dd02c05f4c6a1b0fd43ff64711405518afed646f"
+    },
+    {
+      "path": "05_src/training_execution.py",
+      "bytes": 13734,
+      "sha256": "9f66c96401defdd5df453788bb88358d6d01f3e4f63d642e45fcaa7076bfacdb"
+    },
+    {
+      "path": "05_src/training_feedback.py",
+      "bytes": 4255,
+      "sha256": "70ef9c6802a61975dd15c332dba54ab21398e871eb34d562b8cccf49d7b9c922"
+    },
+    {
+      "path": "05_src/training_policy.py",
+      "bytes": 7813,
+      "sha256": "c27634544f4609dcab9105d92d58b933fe8c8adec6e2d779f5f14b58a31634e7"
+    },
+    {
+      "path": "05_src/training_timing.py",
+      "bytes": 3453,
+      "sha256": "e4ebe74f3a8098a867c303a441428de2e5aaed90d9422beeda9882d24e728f4d"
+    },
+    {
+      "path": "06_configs/baseline.json",
+      "bytes": 652,
+      "sha256": "fa5ba70653d745a0fdc3aa75a8637f4eb2344c5321c2eccd17b120a75269ba35"
+    },
+    {
+      "path": "06_configs/environment_server.yml",
+      "bytes": 248,
+      "sha256": "d475ca69b2416151b55dfb39563c78064b0a2c7b54eecf6f122a7e4845772a19"
+    },
+    {
+      "path": "06_configs/evaluation_gpu.json",
+      "bytes": 177,
+      "sha256": "ea6aa9b71f93bb68c428b54d9994bf4c0ce83d1334affd8be3e305c12cb967a0"
+    },
+    {
+      "path": "06_configs/servers/zmic44.json",
+      "bytes": 825,
+      "sha256": "e77f8961a780350da5a38794a69632491ae427b647f08f8045f20b3b6f0746aa"
+    },
+    {
+      "path": "06_configs/training_constraints.txt",
+      "bytes": 178,
+      "sha256": "ff979f29825f64c854421d80ce1d743a07a036a21c439672af700b94e8903fd8"
+    },
+    {
+      "path": "bootstrap_server.sh",
+      "bytes": 4807,
+      "sha256": "c780d244e103d1e6e1f2e01f94281730242b74b0cc506d9351f29a03041a1af4"
+    },
+    {
+      "path": "start_server.sh",
+      "bytes": 608,
+      "sha256": "3c9ee68d0295098d6571841c0bbeca5b8bd3625bfdaf60654e789b06c3d202ed"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-control-red.log",
+      "sha256": "605b4f93b419c5204890921d36c8c05f0bd2f807c6ddc6d7bc3f44d586b1b36d"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-amp-red.log",
+      "sha256": "ae6d729685750ba507f51cd903cb97dd525fef248f500cb314ae2b8fb625951e"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-control-green.log",
+      "sha256": "310d563cc1bb3e3f801da558cbbdaf6175218d78c328f1c99ccc3ff06b8551e4"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-amp-green.log",
+      "sha256": "7842734f1d84562f05111354e9fe35cac5a90d751b1365d28600e58a727da191"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-amp-checkpoint.log",
+      "sha256": "6652fe52ca6280e7b50668575b2d5cd633bf6fee7dff5376c8f67ff66ac53584"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-amp-final.log",
+      "sha256": "c63746cf92dfbe29d5bbd7d1cd3c766c125b1a0a1d7b010a664daf1b075a6169"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-amp-gloo.log",
+      "sha256": "b8eecf82160ebd2f5a47401a420b904f2dd0f7e7e0fdfa8a9d948cf97a3688c7"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-amp-gloo-authorized.json",
+      "sha256": "6d119d426a44dd8e238607d82768deb53f5e7737e112a224c8c3819f5c9af634"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-amp-gloo-authorized.log",
+      "sha256": "a06b49fe0433638ba08fa4c31547e76dec4aed0ec4a22097a896e1fc18e9d739"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-checkpoint-api.json",
+      "sha256": "e910d69c9b3527a8308300adc965b1e64a65b749019274c31ed6a8119545a625"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-checkpoint-api.log",
+      "sha256": "f4a30eb56ffe941767dcaba74dcdfe7c6f0fc920937630554b8113c51884595f"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-membership-api.json",
+      "sha256": "dd2122628da65129a34f54a2f163629bf53d00d12aeb305a56fe0814fa6aa631"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-membership-api.log",
+      "sha256": "8f2d36f136bb086746699fb419ee88629388416db3ee039ff232952b15947b3d"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-panel-suite-final-authorized.log",
+      "sha256": "5dda6a11a90cbfb699bd28c2f90aeda5ef790784b1695d214f2ad1a7052e37bf"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-panel-suite-final-guarded.log",
+      "sha256": "accea94eba87dfb463f0e4362b38527df6fd40bb6504c591047ce5785dd86c5b"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-affected-control-final.log",
+      "sha256": "69ff0079abbbec9ca95e5152e1accff0f66a786acc1fb5b910322a75c10720b4"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-syntax-lf.json",
+      "sha256": "ce8b15a59c12ecf626305cfcd6ae7902292d048d0a2f4f11b560dc4b7c90f9a6"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task2-loader-api.json",
+      "sha256": "f051db1750f26155e4dc3106a39ff30f9cf9352d1eaf932239cad073ae96a063"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task2-supply-effect.json",
+      "sha256": "4218176b56c896d2d4ef6c1ce52dedeb2f656398fc4cff676ad00c3358870d7d"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task5-prepare-api.log",
+      "sha256": "5ade81a883f5c3b93187438ac88d2627ad4c212c11fe58878110ebc6de28d021"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task5-leaf-api.log",
+      "sha256": "a46f7741c880a9c09016fd0f8b39d14f4a455fe006bf38b3335663bfeacf5bed"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task5-fix1-api.log",
+      "sha256": "94b9339b78fa0b0435e0b460c40cefff929efc969a3a0f01a09f2d466aee0148"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task5-fix1-api-resume.log",
+      "sha256": "a8062403248119852191f37cdd16bab3fd751fcf8a9e7ea65f7f7ffc89b4b2ce"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-panel-suite-release-final.log",
+      "sha256": "f66b29b1f8e3b94ccd625673ea30f786e14ca3b710a7630ec1fce4d88d866398"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-reporting-fixture-final.log",
+      "sha256": "97df0b3cbfc5b8c67078a84edb2f37d950698c5ecd3dbccc58e40bc5f2cad661"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-panel-suite-release-green.log",
+      "sha256": "18bc9077ef780b59457bd18bae5f59da81c73b8bd47caab71a21c3870307ab4f"
+    }
+  ],
+  "status": "passed_with_explicit_environment_skips",
+  "skip_groups": {
+    "missing_optional_CPU_Torch_Gloo_pinned_API": 32,
+    "Linux_proc_Bash_flock_or_POSIX_descriptor_requirements": 6,
+    "Windows_symlink_fixture_privilege": 4,
+    "missing_imaging_or_NIfTI_API": 2
+  },
+  "skipped_tests": [
+    "test_child_holds_lock_after_parent_descriptor_closes (test_task_posix.LinuxLifecycleTests.test_child_holds_lock_after_parent_descriptor_closes) ... skipped 'requires actual Linux /proc and flock'",
+    "test_failed_dependency_check_never_marks_ready (test_panel_linux.LinuxPanelTests.test_failed_dependency_check_never_marks_ready) ... skipped 'requires actual Linux /proc, Bash and flock'",
+    "test_installer_signed_marker_reuse_and_legacy_marker_upgrade (test_panel_linux.LinuxPanelTests.test_installer_signed_marker_reuse_and_legacy_marker_upgrade) ... skipped 'requires actual Linux /proc, Bash and flock'",
+    "test_verified_process_tree_includes_child_and_excludes_unrelated (test_panel_linux.LinuxPanelTests.test_verified_process_tree_includes_child_and_excludes_unrelated) ... skipped 'requires actual Linux /proc, Bash and flock'",
+    "test_old_project_compatibility_file_is_not_accepted (test_evaluation_parallel.ParallelQueueTests.test_old_project_compatibility_file_is_not_accepted) ... skipped 'requires imaging dependencies; no model execution'",
+    "test_symlink_job_is_never_moved (test_pipeline_catalog.CatalogTests.test_symlink_job_is_never_moved) ... skipped \"OS does not permit directory symlinks: [WinError 1314] 客户端没有所需的特权。: 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmpm5kyb2v3\\\\\\\\results\\\\\\\\pipeline_v2\\\\\\\\prepare\\\\\\\\job1-source' -> 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmpm5kyb2v3\\\\\\\\results\\\\\\\\pipeline_v2\\\\\\\\prepare\\\\\\\\job1'\"",
+    "test_symlink_process_json_is_never_probed (test_pipeline_catalog.CatalogTests.test_symlink_process_json_is_never_probed) ... skipped \"OS does not permit file symlinks: [WinError 1314] 客户端没有所需的特权。: 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmpu6qv_5fd\\\\\\\\unindexed-foreign.json' -> 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmpu6qv_5fd\\\\\\\\results\\\\\\\\pipeline_v2\\\\\\\\prepare\\\\\\\\job1\\\\\\\\processes\\\\\\\\linked.json'\"",
+    "test_symlink_recycle_directory_is_rejected (test_pipeline_catalog.CatalogTests.test_symlink_recycle_directory_is_rejected) ... skipped \"OS does not permit directory symlinks: [WinError 1314] 客户端没有所需的特权。: 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmp94nwfnrb\\\\\\\\raw' -> 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmp94nwfnrb\\\\\\\\results\\\\\\\\pipeline_v2\\\\\\\\prepare\\\\\\\\.trash'\"",
+    "test_cpu_tensor_batches_survive_pool_close_and_never_seed_cuda (test_batch_pool.BatchPoolTests.test_cpu_tensor_batches_survive_pool_close_and_never_seed_cuda) ... skipped 'optional Torch/NumPy CPU batch test'",
+    "test_each_spawn_child_holds_shared_lock_and_parent_process_group (test_batch_pool.BatchPoolTests.test_each_spawn_child_holds_shared_lock_and_parent_process_group) ... skipped 'requires POSIX flock and descriptor inheritance'",
+    "test_registration_failure_before_worker_detach_releases_lock (test_batch_pool.BatchPoolTests.test_registration_failure_before_worker_detach_releases_lock) ... skipped 'requires POSIX flock and descriptor inheritance'",
+    "test_reusable_shared_transport_and_bounded_pipe_fallback (test_batch_pool.BatchPoolTests.test_reusable_shared_transport_and_bounded_pipe_fallback) ... skipped 'tensor runtime'",
+    "test_shared_allocation_failure_and_larger_batch_have_explicit_pipe_fallback (test_batch_pool.BatchPoolTests.test_shared_allocation_failure_and_larger_batch_have_explicit_pipe_fallback) ... skipped 'tensor runtime'",
+    "test_actual_cuda_transfer_optional (test_execution_transfer.TransferTests.test_actual_cuda_transfer_optional) ... skipped 'requires pinned API runtime'",
+    "test_compile_accepts_equal_stochastic_routes_without_state_change (test_execution_transfer.TransferTests.test_compile_accepts_equal_stochastic_routes_without_state_change) ... skipped 'requires pinned API runtime'",
+    "test_compile_rejects_biased_nonfinite_structure_and_gradient_outputs (test_execution_transfer.TransferTests.test_compile_rejects_biased_nonfinite_structure_and_gradient_outputs) ... skipped 'requires pinned API runtime'",
+    "test_eager_loss_weights_including_ddp_last_scale (test_execution_transfer.TransferTests.test_eager_loss_weights_including_ddp_last_scale) ... skipped 'requires pinned API runtime'",
+    "test_finite_training_matches_pinned_and_rejects_bad_gradient_before_update (test_execution_transfer.TransferTests.test_finite_training_matches_pinned_and_rejects_bad_gradient_before_update) ... skipped 'requires pinned API runtime'",
+    "test_initialized_optimizer_memory_facts_count_actual_storage (test_execution_transfer.TransferTests.test_initialized_optimizer_memory_facts_count_actual_storage) ... skipped 'requires pinned API runtime'",
+    "test_modes_and_compile_lazy_failure_restore (test_execution_transfer.TransferTests.test_modes_and_compile_lazy_failure_restore) ... skipped 'requires pinned API runtime'",
+    "test_phase_limit_pause_and_global_rng_unchanged (test_execution_transfer.TransferTests.test_phase_limit_pause_and_global_rng_unchanged) ... skipped 'requires pinned API runtime'",
+    "test_prepare_does_not_consume_and_checkpoint_replays (test_execution_transfer.TransferTests.test_prepare_does_not_consume_and_checkpoint_replays) ... skipped 'requires pinned API runtime'",
+    "test_real_worker_prefetch_rewinds_without_restarting_workers (test_execution_transfer.TransferTests.test_real_worker_prefetch_rewinds_without_restarting_workers) ... skipped 'requires pinned API runtime'",
+    "test_single_atomic_save_and_failed_replace_preserves_old_generation (test_execution_transfer.TransferTests.test_single_atomic_save_and_failed_replace_preserves_old_generation) ... skipped 'requires pinned API runtime'",
+    "test_sync_batchnorm_cannot_enter_local_preflight_collective (test_execution_transfer.TransferTests.test_sync_batchnorm_cannot_enter_local_preflight_collective) ... skipped 'requires pinned API runtime'",
+    "test_two_slots_reuse_events_and_bounded_lookahead_control (test_execution_transfer.TransferTests.test_two_slots_reuse_events_and_bounded_lookahead_control) ... skipped 'requires pinned API runtime'",
+    "test_cpu_rng_roundtrip_without_cuda (test_ddp_runtime.DistributedTests.test_cpu_rng_roundtrip_without_cuda) ... skipped 'requires CPU Torch/Gloo; no dependency installed by test'",
+    "test_cuda_rng_api_only_uses_requested_current_rank (test_ddp_runtime.DistributedTests.test_cuda_rng_api_only_uses_requested_current_rank) ... skipped 'requires CPU Torch/Gloo; no dependency installed by test'",
+    "test_explicit_and_environment_lock_fds_reach_windows_or_posix_children (test_ddp_runtime.DistributedTests.test_explicit_and_environment_lock_fds_reach_windows_or_posix_children) ... skipped 'requires CPU Torch/Gloo; no dependency installed by test'",
+    "test_failure_and_abrupt_exit_clean_siblings (test_ddp_runtime.DistributedTests.test_failure_and_abrupt_exit_clean_siblings) ... skipped 'requires CPU Torch/Gloo; no dependency installed by test'",
+    "test_fresh_invocations_logs_map_registry_and_parent_cuda (test_ddp_runtime.DistributedTests.test_fresh_invocations_logs_map_registry_and_parent_cuda) ... skipped 'requires CPU Torch/Gloo; no dependency installed by test'",
+    "test_gather_requires_initialized_group (test_ddp_runtime.DistributedTests.test_gather_requires_initialized_group) ... skipped 'requires CPU Torch/Gloo; no dependency installed by test'",
+    "test_inherited_flock_survives_parent_fd_close_and_failed_spawn (test_ddp_runtime.DistributedTests.test_inherited_flock_survives_parent_fd_close_and_failed_spawn) ... skipped 'requires CPU Torch/Gloo; no dependency installed by test'",
+    "test_missing_partial_and_stale_success_are_rejected (test_ddp_runtime.DistributedTests.test_missing_partial_and_stale_success_are_rejected) ... skipped 'requires CPU Torch/Gloo; no dependency installed by test'",
+    "test_real_gloo_supports_log_path_with_spaces_chinese_and_percent (test_ddp_runtime.DistributedTests.test_real_gloo_supports_log_path_with_spaces_chinese_and_percent) ... skipped 'requires CPU Torch/Gloo; no dependency installed by test'",
+    "test_real_gloo_supports_spaces_and_literal_percent_in_log_path (test_ddp_runtime.DistributedTests.test_real_gloo_supports_spaces_and_literal_percent_in_log_path) ... skipped 'requires CPU Torch/Gloo; no dependency installed by test'",
+    "test_real_gradient_loss_optimizer_and_all_rank_rng_resume (test_ddp_runtime.DistributedTests.test_real_gradient_loss_optimizer_and_all_rank_rng_resume) ... skipped 'requires CPU Torch/Gloo; no dependency installed by test'",
+    "test_second_spawn_failure_cleans_first_rank (test_ddp_runtime.DistributedTests.test_second_spawn_failure_cleans_first_rank) ... skipped 'requires CPU Torch/Gloo; no dependency installed by test'",
+    "test_signal_cancellation_cleans_all_ranks (test_ddp_runtime.DistributedTests.test_signal_cancellation_cleans_all_ranks) ... skipped 'requires CPU Torch/Gloo; no dependency installed by test'",
+    "test_timeout_cleans_all_ranks (test_ddp_runtime.DistributedTests.test_timeout_cleans_all_ranks) ... skipped 'requires CPU Torch/Gloo; no dependency installed by test'",
+    "test_windows_reduction_failure_reaps_already_created_os_child (test_ddp_runtime.DistributedTests.test_windows_reduction_failure_reaps_already_created_os_child) ... skipped 'requires CPU Torch/Gloo; no dependency installed by test'",
+    "test_real_workers_reconfigure_preserves_model_consumed_cursor (test_stage_coordinator.ReplayReconfigurationTests.test_real_workers_reconfigure_preserves_model_consumed_cursor) ... skipped 'optional actual CPU Torch integration'",
+    "test_secret_key_block_and_symlink_are_rejected_or_removed (test_stage_completion.DiagnosticExport.test_secret_key_block_and_symlink_are_rejected_or_removed) ... skipped 'host does not permit creating symlink fixture'",
+    "test_real_headers_only_admission_and_truncated_logits_rejected (test_stage_completion.TailGeometryTests.test_real_headers_only_admission_and_truncated_logits_rejected) ... skipped 'actual NIfTI API runtime required'"
+  ]
+}

@@ -123,8 +123,12 @@ def main():
         assert report["optimizer_state_restored"]
         resumed_step = restored.train_step(batch)
         assert np.isfinite(resumed_step["loss"]).all(), "恢复后的训练步骤失败"
-        report["one_resumed_training_step_passed"] = True
-        report["actual_optimizer_steps_including_resume"] = args.steps + 1
+        report["one_resumed_training_step_passed"] = restored._vista_last_optimizer_step
+        report['train_updates']=dict(restored._vista_update_progress)
+        report["actual_optimizer_steps_including_resume"] = restored._vista_update_progress['successful']
+        report['attempted_training_steps_including_resume']=restored._vista_update_progress['attempted']
+        if not restored._vista_last_optimizer_step:
+            raise RuntimeError('恢复后的AMP更新被跳过；短测缺少成功恢复更新证据')
         del batch
         if args.predict:
             case_id = split["val"][0]

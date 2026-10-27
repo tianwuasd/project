@@ -74,6 +74,9 @@ def model_lines(work):
             progress=read_optional(base/'progress.rank0.json')
             if progress and status=='running':
                 lines.append(f"  当前轮{progress['epoch']+1}/{progress['planned_epochs']}，{progress['phase']}批次{progress['batch']}/{progress['total_batches']}；更新时间{datetime.fromtimestamp(progress['updated'],timezone.utc).isoformat(timespec='seconds')}")
+                updates=progress.get('train_updates')
+                if updates:
+                    lines.append(f"  本轮训练尝试{updates['attempted']}，成功参数更新{updates['successful']}，AMP溢出跳过{updates['amp_skipped']}（仍计入尝试与采样）。")
     for path in sorted((work / '07_experiments/formal').glob('*/run.json')):
         value = read_optional(path)
         if not value:
@@ -223,7 +226,10 @@ def log_sources(job,runtime=None):
     candidates += [('step:'+p.stem, '步骤 / '+p.stem, p) for p in sorted((job/'logs').glob('*.log'))]
     candidates += [('model:'+p.parent.name, '模型 / '+p.parent.name, p) for p in sorted((work/'07_experiments/formal').glob('*/training.log'))]
     for area, name in [('07_experiments/queue_logs','训练队列'), ('08_results/evaluation/queue_logs','预测队列')]:
-        candidates += [(area+':'+p.stem, name+' / '+p.stem, p) for p in sorted((work/area).rglob('*.log'))[-20:]]
+        for p in sorted((work/area).rglob('*.log'))[-20:]:
+            relative=p.relative_to(work/area)
+            key=p.stem if len(relative.parts)==1 else relative.as_posix()
+            candidates.append((area+':'+key,name+' / '+relative.as_posix(),p))
     for area,name in [('00_admin/preflight','正式尺寸预检'),('00_admin/preparation_logs','预处理病例'),('09_reports','短测套件')]:
         candidates += [(area+':'+str(p.relative_to(work/area)),name+' / '+str(p.relative_to(work/area)),p) for p in sorted((work/area).rglob('*.log'))]
     candidates += [('smoke:'+str(p.relative_to(work/'07_experiments')),'完整尺寸短测 / '+p.parent.name+' / '+p.name,p) for root in sorted((work/'07_experiments').glob('smoke_*')) for p in root.glob('*.log')]

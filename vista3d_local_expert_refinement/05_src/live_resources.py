@@ -239,6 +239,11 @@ def _rank_setting(cpu, ram, batch, need, rank, shared, private_bytes=None):
     limit=maximum
     while limit and build(limit,val)[1]+batch*(1+bool(val))>ram:limit-=1
     workers=min(need,limit)
+    # Reconsider the supported two-thread leaf after RAM fixes the actual W.
+    # Never trade away workers; keep feedback's limit valid for this thread size.
+    if workers and main+workers*2<=cpu:
+        thread=2
+        limit=min(limit,(cpu-main)//thread)
     resident,base,q,vq,total=build(workers,val)
     return dict(rank=rank,cpu_share=cpu,main_threads=main,worker_threads=thread,
         train_workers=workers,val_workers=val,val_worker_threads=vt,prefetch=q,val_prefetch=vq,

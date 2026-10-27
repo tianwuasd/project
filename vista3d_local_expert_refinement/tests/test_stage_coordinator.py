@@ -179,8 +179,11 @@ class CoordinatorBehaviorTests(unittest.TestCase):
             fleet=Mock(path=root/'leases');fleet.start.return_value=fleet
             chosen=dict(gpu_uuids=['GPU-0'],output='synthetic',effective_cpu={})
             def predict(*args,**kwargs):write_json(root/'09_reports/assessment_prediction_f_B0.json',dict(status='passed'))
-            with patch('assessment_prepare.prepare',return_value=dict(prediction_ids=['case'])),patch('runtime_observations.collect'),patch('gpu_fleet.GPUFleet',return_value=fleet),patch.object(control,'tune',return_value=chosen),patch.object(control,'identity',return_value={}),patch('task_worker.run_child',side_effect=predict):
+            budget=dict(workers=1,threads_per_worker=1)
+            with patch('assessment_prepare.prepare',return_value=dict(prediction_ids=['case'])),patch('runtime_observations.collect'),patch('gpu_fleet.GPUFleet',return_value=fleet),patch.object(control,'tune',return_value=chosen),patch.object(control,'identity',return_value={}),patch('task_worker.run_child',side_effect=predict),patch('task_resources.prediction_budget',return_value=budget) as gpu_budget,patch('task_resources.cpu_tail_budget',return_value=budget) as cpu_budget:
                 report=assessment_run.run(plan)
+            gpu_budget.assert_called_once_with(root,[dict(fold='f',case_id='case')],1)
+            cpu_budget.assert_called_once_with(root,[dict(fold='f',method='B0',case_id='case')],assessment=True)
             self.assertEqual(report['function_status'],'passed');self.assertIsNone(report['resource_recommendation'])
             self.assertEqual(report['effect_status'],'insufficient_long_window_evidence')
             self.assertFalse((runtime/'optimization').exists());fleet.close.assert_called_once()
