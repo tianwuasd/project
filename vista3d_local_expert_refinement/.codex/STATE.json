@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Complete integration checks and broad project review/publication; only then Skill v1/v2.",
+  "next_action": "Root final whole-project review/integration/publication, then Skill v1/v2 source review/install/publication.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -363,7 +363,7 @@
     "code_review_release_gate": "approved at ef99141; no open Critical/Important findings"
   },
   "resource_policy_design": {
-    "status": "approved_implementation_final_integration",
+    "status": "implemented_locally_validated_whole_review_pending",
     "date": "2026-10-27",
     "spec": "docs/superpowers/specs/2026-10-27-stage-resource-policy-design.md",
     "user_confirmed": {
@@ -402,7 +402,7 @@
     ]
   },
   "stage_resource_v2": {
-    "status": "implementing",
+    "status": "project_whole_review_pending",
     "plan": "docs/superpowers/plans/2026-10-27-stage-resource-v2.md",
     "completed": [
       {
@@ -439,12 +439,34 @@
         "scope": "fresh preparation/leaf threads, persistent inference, geometry-aware CPUtail admission/release, causal errors, current UI and local diagnosticZIP",
         "review": "spec_pass_quality_approved_after_three_integration_fixes",
         "tests": "focused62pass1skip;actualCPU12source/3assessment/Blosc/KDTree/readerpass;fix4pass+related36pass1skip+11APIpass;finalaggregateTask6"
+      },
+      {
+        "task": 6,
+        "commit": "eced626",
+        "scope": "coordinated AMP backoff/real update counters, joint RAM/CPU worker threads, unique logs, spawn-safe final runner, panel0.5.0 and85file runtime inventory",
+        "review": "spec_pass_quality_approved",
+        "tests": "final339run295pass44classifiedskip0fail;actualCPUAMP/Gloo/checkpoint/2to3membershippassed"
       }
     ],
-    "current": "Task6 integration, AMP overflow recovery, joint CPU/RAM allocation, final verification and project release",
+    "current": "Root whole-project review, preserve upstream CT0.23.0, then publish; Skill7 afterward",
     "skill_modified_this_implementation": false,
     "server_deployed": false,
     "local_gpu_compute": false,
-    "running_cpu_budget_scope": "retain stage-entry allocation within running feedback; refresh after rank exits for stage/membership/recovery, extra external capacity/pressure not attributed mid-epoch"
+    "running_cpu_budget_scope": "retain stage-entry allocation within running feedback; refresh after rank exits for stage/membership/recovery, extra external capacity/pressure not attributed mid-epoch",
+    "panel_version": "0.5.0",
+    "validation": "docs/STAGE_RESOURCE_V2_VALIDATION.json",
+    "final_control_tests": {
+      "total": 339,
+      "passed": 295,
+      "skipped": 44,
+      "errors": 0,
+      "failures": 0
+    },
+    "target_acceptance_pending": [
+      "Linux cgroup/NUMA/process and real SHM",
+      "CUDA full-size capacity/transfer/compile/AMP",
+      "NCCL membership",
+      "real CT quality/throughput"
+    ]
   }
 }
