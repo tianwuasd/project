@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Finish and review nontraining stage and UI integration; then full project verification/release, only afterward Skill v1/v2.",
+  "next_action": "Complete integration checks and broad project review/publication; only then Skill v1/v2.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -318,13 +318,13 @@
       "CT acceleration parity audit"
     ],
     "epoch_change_requires_explicit_user_approval": true,
-    "epoch_approval": "pending",
+    "epoch_approval": "approved_keep_original_budget",
     "current_epoch_budget": 250,
     "design": "docs/superpowers/specs/2026-10-26-cooperative-training-design.md",
     "design_status": "independent stage v2 implemented and locally validated; target GPU acceptance pending; verify live GitHub main for publication",
     "performance_timing_draft": "5 timing tests and 13 existing inner-contract tests passed; 4 changed modules parsed; no server acceptance",
     "batch_budget_status": "user explicitly permits automatic global batch growth with sampling changes in preview/logs; 250 epochs and 250 train/50 validation updates remain fixed",
-    "skill_update": "explicitly deferred by latest user instruction; do not edit/install/publish skill",
+    "skill_update": "authorized only after project code/tests/review; preserve v1 and create full VISTA v2",
     "full_assessment_required": true,
     "formal_blocks": [
       "prepare",
@@ -363,7 +363,7 @@
     "code_review_release_gate": "approved at ef99141; no open Critical/Important findings"
   },
   "resource_policy_design": {
-    "status": "proposal_not_implemented",
+    "status": "approved_implementation_final_integration",
     "date": "2026-10-27",
     "spec": "docs/superpowers/specs/2026-10-27-stage-resource-policy-design.md",
     "user_confirmed": {
@@ -372,15 +372,12 @@
       "cpu_processes_and_threads_may_increase": true,
       "assessment_is_observation_not_formal_resource_selection": true,
       "formal_stages_recompute_from_live_resources": true,
-      "skill_updates_deferred": true,
+      "skill_updates_deferred": false,
       "cpu_budget_fraction": 0.8,
-      "cpu_budget_basis": "current permitted and available CPU budget, recomputed per stage"
+      "cpu_budget_basis": "current permitted and available CPU budget, recomputed per stage",
+      "project_code_and_tests_before_skill": true
     },
-    "proposed_defaults_not_yet_approved": [
-      "80_percent_current_available_ram",
-      "runtime_supply_wait_thresholds",
-      "adapter_specific_worker_thread_defaults"
-    ],
+    "proposed_defaults_not_yet_approved": [],
     "received_assessment_scope": {
       "source": "user_provided_report",
       "single_gpu": true,
@@ -393,11 +390,16 @@
       "functional_flow_reported_passed": true,
       "multi_gpu_target_validation": false
     },
-    "validation_boundary": "Design only. Single-GPU source-subset user report does not prove full formal-training throughput, optimality or multi-GPU acceptance.",
+    "validation_boundary": "Local implementation and CPU-library/synthetic/lifecycle evidence; target Linux CUDA/NCCL and real-data performance remain pending.",
     "builder_check": "nothing important left; design feasibility only",
     "wholeheart_algorithm_detail": "section 13 added; proposed, not implemented",
     "gpu_execution_proposal": "AMP retained; controlled compile/cuDNN high-performance mode subject to loss-contract, correctness and recovery validation",
-    "wholeheart_algorithm_builder_check": "nothing important left; design only, not implementation or throughput validation"
+    "wholeheart_algorithm_builder_check": "nothing important left; design only, not implementation or throughput validation",
+    "approved_engineering_defaults": [
+      "80_percent_current_available_ram",
+      "runtime_supply_wait_thresholds",
+      "adapter_specific_worker_thread_defaults"
+    ]
   },
   "stage_resource_v2": {
     "status": "implementing",
@@ -430,9 +432,16 @@
         "scope": "fresh direct all-ready capacity, typed group recovery, cursor-safe rolling CPU feedback, safe actual SHM, true native-thread affinity, independent assessment statuses",
         "review": "spec_pass_quality_approved_after_asymmetric_supply_signal_fix",
         "tests": "focused109pass3skip;control198pass8skip;actual2rankGloo40updates and1to2workers/replay/failurecleanup;fix4pass"
+      },
+      {
+        "task": 5,
+        "commit": "3f33cd2a849fffb722eb2ba573f6eacdad619253",
+        "scope": "fresh preparation/leaf threads, persistent inference, geometry-aware CPUtail admission/release, causal errors, current UI and local diagnosticZIP",
+        "review": "spec_pass_quality_approved_after_three_integration_fixes",
+        "tests": "focused62pass1skip;actualCPU12source/3assessment/Blosc/KDTree/readerpass;fix4pass+related36pass1skip+11APIpass;finalaggregateTask6"
       }
     ],
-    "current": "Task5 preparation, persistent prediction, CPU-tail sequencing, truthful UI and local diagnostics export",
+    "current": "Task6 integration, AMP overflow recovery, joint CPU/RAM allocation, final verification and project release",
     "skill_modified_this_implementation": false,
     "server_deployed": false,
     "local_gpu_compute": false,
