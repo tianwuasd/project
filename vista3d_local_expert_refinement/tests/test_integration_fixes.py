@@ -139,6 +139,9 @@ class TopologyAndRegroupTests(unittest.TestCase):
         helper=patch.dict(sys.modules,{'server_train':Mock(select_checkpoint=Mock(),archive_uncheckpointed=Mock())})
         helper.start();self.addCleanup(helper.stop)
 
+        admission=patch.object(control,'admit',side_effect=lambda g:(list(g),{u:20*2**30 for u in g},[]))
+        admission.start();self.addCleanup(admission.stop)
+
     def workspace(self,temp):
         root=Path(temp)
         write_json(root/'04_data/manifests/splits_v1.json',dict(folds={'ct_holdG':dict(dataset_id=813)}))
@@ -155,7 +158,7 @@ class TopologyAndRegroupTests(unittest.TestCase):
             measured_training_steps=10,total_cpu_slots=resource['total_cpu_slots'],effective_cpu=resource,
             train_patches_per_epoch=500*len(gpus),reference_train_patches_per_epoch=500,peak_reserved_gib=20)
 
-    def test_initial_second_trial_refreshes_ready_cards_but_explicit_regroup_stays_frozen(self):
+    def test_stage_group_is_frozen_until_full_epoch_membership_boundary(self):
         snapshot=dict(cpu_slots=16,available_memory_bytes=100*2**30,shared_memory_available_bytes=100*2**30)
         for explicit in [False,True]:
             with self.subTest(explicit=explicit),tempfile.TemporaryDirectory() as temp:
@@ -167,10 +170,9 @@ class TopologyAndRegroupTests(unittest.TestCase):
                      patch.object(control,'topology',side_effect=lambda g:[['same','24576','driver'] for _ in g]),\
                      patch.object(control,'release_devices'),contextlib.redirect_stdout(io.StringIO()):
                     chosen=control.tune(root,'ct_holdG','B0','assessment',['GPU-0'] if explicit else None)
-                self.assertEqual(len(calls),2)
-                self.assertEqual(len(calls[1]),1 if explicit else 3)
-                self.assertEqual(available.call_count,0 if explicit else 2)
-                self.assertEqual({r['world_size'] for r in chosen['measurement_coverage']},{1} if explicit else {1,3})
+                self.assertEqual(calls,[['GPU-0']])
+                self.assertEqual(available.call_count,0 if explicit else 1)
+                self.assertFalse(chosen['resource_receipt_reusable'])
 
     def test_receipt_one_card_requires_bounded_test_before_first_three_card_formal_epoch(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -200,7 +202,7 @@ class TopologyAndRegroupTests(unittest.TestCase):
             self.assertTrue(control.coverage_matches(coverage,['replacement-A','replacement-B','replacement-C']))
             self.assertFalse(control.coverage_matches(coverage,['replacement-A']))
 
-    def test_covered_current_topology_reuses_known_smaller_winner_without_retuning(self):
+    def test_covered_old_receipt_never_bypasses_fresh_formal_configuration(self):
         with tempfile.TemporaryDirectory() as temp:
             root=self.workspace(temp);runtime=root/'runtime';groups=[]
             report=root/'assessment.json';write_json(report,dict(status='passed'))
@@ -225,18 +227,18 @@ class TopologyAndRegroupTests(unittest.TestCase):
                  patch.object(control,'devices',return_value=['new-A','new-B','new-C']),\
                  patch.object(control,'topology',side_effect=lambda g:[['same','24576','driver'] for _ in g]),\
                  patch('evaluation_gpu.query',return_value=[[g,'same','24576','driver'] for g in ['new-A','new-B','new-C']]),\
-                 patch.object(control,'tune') as tune,patch.object(control,'release_devices') as release,\
+                 patch.object(control,'tune',return_value=self.measurement(['new-A','new-B','new-C'],dict(total_cpu_slots=3))) as tune,patch.object(control,'release_devices') as release,\
                  patch.object(control.threading,'Thread',Watch),patch.object(control.threading,'Event',Event),\
                  patch('ddp_runtime.launch_ranks',side_effect=launch),contextlib.redirect_stdout(io.StringIO()):
                 control.train(root,'ct_holdG','B0')
-            tune.assert_not_called();self.assertEqual(groups,[['new-A']])
-            self.assertIn({'new-B','new-C'},[set(call.args[0]) for call in release.call_args_list])
+            tune.assert_called_once();self.assertEqual(groups,[['new-A','new-B','new-C']])
+            release.assert_not_called()
 
-    def test_faster_smaller_regroup_releases_and_refuses_all_unused_members(self):
+    def test_regroup_keeps_all_ready_cards_without_a_speed_comparison(self):
         with tempfile.TemporaryDirectory() as temp:
             root=self.workspace(temp);requests=[];groups=[];tunes=[]
             initial=self.measurement(['GPU-0','GPU-1'],dict(total_cpu_slots=2),5)
-            smaller=self.measurement(['GPU-0'],dict(total_cpu_slots=1),1)
+            smaller=self.measurement(['GPU-0','GPU-1','GPU-2'],dict(total_cpu_slots=3),9)
             class Watch:
                 def __init__(self,target,**kwargs):self.target=target
                 def start(self):self.target()
@@ -257,9 +259,9 @@ class TopologyAndRegroupTests(unittest.TestCase):
                  patch.object(control.threading,'Thread',Watch),patch.object(control.threading,'Event',Event),\
                  contextlib.redirect_stdout(io.StringIO()):
                 control.train(root,'ct_holdG','B0')
-            self.assertEqual(groups,[['GPU-0','GPU-1'],['GPU-0']])
+            self.assertEqual(groups,[['GPU-0','GPU-1'],['GPU-0','GPU-1','GPU-2']])
             self.assertEqual(requests,[['GPU-0','GPU-1','GPU-2'],None])
-            self.assertIn({'GPU-1','GPU-2'},[set(c.args[0]) for c in release.call_args_list])
+            release.assert_not_called()
 
 
 class DiscoveryLifecycleTests(unittest.TestCase):

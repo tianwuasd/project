@@ -30,7 +30,7 @@ def release_devices(uuids,*,wait=False,final=False):
         write_json(request_path,
             dict(id=request_id,generation=generation,gpu_uuids=list(uuids),final=final,
                 reason='GPU phase complete; discovery suspended for this invocation' if final else
-                    'measured configuration did not benefit or exceeds capacity; retry after10minutes'))
+                    'actual pressure, fault or incompatible capacity; retry after10minutes'))
         if wait:
             from task_runtime import alive
             deadline=time.monotonic()+30
@@ -99,23 +99,17 @@ def equivalent_devices(available,hardware):
     return result
 
 
-def trial(work,fold,method,gpus,local_batch,resource,run_kind,*,output=None,checkpoint=None):
+def trial(work,fold,method,gpus,local_batch,resource,run_kind,*,output=None,checkpoint=None,execution=None):
     from ddp_runtime import launch_ranks
     from runtime_observations import event,failure
     work=Path(work)
-    from evaluation_gpu import snapshot,idle_reason
-    current={row['uuid']:row for row in snapshot()}
-    settings=dict(min_free_mib=6000,max_utilization_percent=10,
-                  planner_gpu_memory_gib=float(os.environ.get('WHOLE_HEART_GPU_MEMORY','20')))
-    for uuid in gpus:
-        if uuid not in current:raise ValueError('实际GPU已不可见：'+uuid)
-        reason=idle_reason(current[uuid],settings)
-        if reason:raise ValueError('启动前GPU复核失败 '+uuid+'：'+reason)
+    ready,_,excluded=admit(gpus)
+    if ready!=list(gpus):raise ResourceAdmissionError(excluded)
     output=Path(output) if output else work/f'07_experiments/tuning/{fold}_{method}_{time.time_ns()}'
     output.mkdir(parents=True,exist_ok=False)
     args=dict(workspace=str(work),fold=fold,method=method,gpu_uuids=list(gpus),
         global_batch_size=local_batch*len(gpus),resource=resource,run_kind=run_kind,
-        operation='trial',output=str(output),checkpoint=checkpoint)
+        operation='trial',output=str(output),checkpoint=checkpoint,execution=execution or dict(mode='performance',compile=True))
     event(work,'tuning.started',configuration=args,output=str(output))
     try:
         records=launch_ranks('cooperative_training:run_rank',args,gpus,output/'ranks',timeout_seconds=600,
@@ -132,55 +126,183 @@ def trial(work,fold,method,gpus,local_batch,resource,run_kind,*,output=None,chec
         raise
 
 
-def tune(work,fold,method,run_kind,gpus=None):
+class ResourceAdmissionError(RuntimeError):
+    def __init__(self, exclusions):
+        super().__init__('GPU admission changed: '+str(exclusions))
+        self.exclusions=exclusions
+
+
+def admit(gpus):
+    """Fresh external PID/visibility/capacity check, only after old ranks exit."""
+    from evaluation_gpu import snapshot,allowed_ids,idle_reason
+    rows=snapshot()
+    settings=dict(allowed_gpus=None,min_free_mib=6000,max_utilization_percent=10,
+                  planner_gpu_memory_gib=float(os.environ.get('WHOLE_HEART_GPU_MEMORY','20')))
+    allowed=allowed_ids(rows,settings);by_uuid={r['uuid']:r for r in rows}
+    ready=[];usable={};excluded=[]
+    for uuid in gpus:
+        row=by_uuid.get(uuid)
+        reason=('outside inherited visibility' if uuid not in allowed else
+                'GPU no longer visible' if row is None else idle_reason(row,settings))
+        if reason:excluded.append(dict(gpu_uuid=uuid,reason=reason));continue
+        ready.append(uuid)
+        usable[uuid]=max(0,min(int(settings['planner_gpu_memory_gib']*2**30),int(row['free_mib']*2**20-max(2*2**30,.1*row['total_mib']*2**20))))
+    return ready,usable,excluded
+
+
+class StageCapacityError(ValueError):
+    def __init__(self,policy):
+        super().__init__('; '.join(policy['reasons']));self.policy=policy
+
+
+def stage_config(snapshot,patch,local_batch,world,observed=None):
+    import math
+    from live_resources import training_policy
+    from batch_pool import shared_free_bytes
+    # Unknown source/augmentation uses a labelled conservative prior. A natural
+    # capacity run replaces payload bytes with actual data + all DS targets.
+    payload=(observed or {}).get('payload_bytes_per_sample')
+    batch=math.ceil(payload*local_batch) if payload else math.prod(patch)*local_batch*64
+    private=max(2*math.prod(patch)*local_batch*64,math.ceil((observed or {}).get('private_bytes_per_sample',0)*local_batch))
+    snapshot=dict(snapshot,worker_private_bytes=private)
+    result=training_policy(snapshot,world,batch,history=dict(batch_wait_seconds=5.04,compute_seconds=.77))
+    if result['status']=='blocked':raise StageCapacityError(result)
+    result.update(batch_bytes=batch,world_size=world,local_batch_size=local_batch,
+                  global_batch_size=local_batch*world,allocation_snapshot=snapshot,
+                  original_cpu_affinity=snapshot.get('cpu_ids',snapshot.get('affinity_cpus',[])),
+                  memory_components=dict(payload_bytes_per_batch=batch,
+                      private_augmentation_bytes_per_worker=private,
+                      mapped_source_bytes=snapshot.get('source_shared_bytes',0),
+                      main_and_pinned_bytes_per_rank=3*batch,
+                      estimate_scope='observed payload; private=max(coarse patch prior, observed private resident scaled by batch)' if payload else
+                          'unknown coarse patch voxels x64; not a measured RAM fact',
+                      worker_private_observation_bytes_per_sample=(observed or {}).get('private_bytes_per_sample')),
+                  demand_evidence='historical A=5.04 D=0.77 estimate, not current measurement')
+    free=shared_free_bytes();remaining=free
+    for row in result['rank_settings']:
+        row['batch_bytes']=batch
+        for queue,key in [('prefetch','max_shared_bytes'),('val_prefetch','val_max_shared_bytes')]:
+            request=row[queue]*batch
+            # Windows has no /dev/shm gate; Linux unknown fails safely inside
+            # allocator. Dividing here bounds the sum of both resident pools.
+            cap=request if remaining is None else min(request,max(0,remaining))
+            row[key]=cap
+            if remaining is not None:remaining-=cap
+    result['shared_transport_budget_bytes']=sum(r['max_shared_bytes']+r['val_max_shared_bytes'] for r in result['rank_settings'])
+    result['shared_memory_available_bytes']=free
+    result['transport']='shared_memory_with_bounded_byte_pipe_fallback'
+    result['estimated_shm_bytes']=result['shared_transport_budget_bytes']
+    return result
+
+
+def observed_payload(result):
+    sizes=[];private=[]
+    for row in result.get('rank_results',[]):
+        for obs in row.get('supply_transfer',{}).values():
+            size=obs.get('source',{}).get('peak_payload_bytes',0)
+            local=row.get('local_batch_size',result['local_batch_size'])
+            if size:sizes.append(size/local)
+            for worker in obs.get('source',{}).get('workers',[]):
+                if worker.get('worker_private_bytes') is not None:private.append(worker['worker_private_bytes']/local)
+    return dict(payload_bytes_per_sample=max(sizes),private_bytes_per_sample=max(private,default=0)) if sizes else None
+
+
+def infer_batch(result,usable):
+    from training_execution import capacity_batch
+    proven=result['local_batch_size'];ranks=[]
+    for row in result.get('rank_results',[]):
+        facts=row.get('memory_facts',{});uuid=row.get('gpu_uuid')
+        if uuid not in usable:continue
+        ranks.append(dict(gpu_uuid=uuid,**capacity_batch(proven_batch=proven,usable_bytes=usable[uuid],
+            fixed_bytes=facts.get('fixed_bytes'),peak_allocated_bytes=facts.get('peak_allocated_bytes'),
+            peak_reserved_bytes=facts.get('peak_reserved_bytes'),optimizer_initialized=facts.get('optimizer_initialized',False))))
+    complete=len(ranks)==len(usable) and bool(ranks)
+    return dict(local_batch_size=min(r['candidate_batch'] for r in ranks) if complete else proven,
+                ranks=ranks,status='inferred_requires_validation' if complete else 'unknown_keeps_proven',
+                usable_scope='min(frozen planner budget, fresh free minus one reservation max(2GiB,10% physical VRAM))')
+
+
+def tune(work,fold,method,run_kind,gpus=None,*,max_local_batch=None,execution=None,reduction_budget=3):
+    """Compatibility entry: one direct policy, capacity observation and confirmation."""
     from task_resources import probe
-    from training_policy import cpu_candidates,select_trial
-    work=Path(work);requested=gpus is not None;gpus=list(gpus if requested else devices())
+    from runtime_observations import event
+    work=Path(work)
     split=read_json(work/'04_data/manifests/splits_v1.json')['folds'][fold]
-    plan=read_json(work/f"04_data/derived/nnUNet_preprocessed/Dataset{split['dataset_id']:03d}_{fold}/WholeheartBaselinePlans.json")
-    config=plan['configurations']['3d_fullres'];reference=config['batch_size'];patch=config['patch_size']
-    snapshot=probe();excess=gpus[max(1,snapshot['cpu_slots']):]
-    release_devices(excess)
-    gpus=gpus[:max(1,snapshot['cpu_slots'])]
-    baseline=cpu_candidates(snapshot,patch,reference,1)[0]
-    print(f'测量1/最多2：1卡，每卡batch={reference}，完整尺寸2步预热+10步测量、验证和恢复。',flush=True)
-    first=trial(work,fold,method,gpus[:1],reference,baseline,run_kind)
-    trials=[first];failures=[]
-    # Keep the explicit regroup bounded/frozen. At initial startup additional
-    # keepers may finish initialization during the baseline's twelve steps.
-    if not requested:
-        gpus=list(dict.fromkeys(gpus+devices(False)))
-        snapshot=probe()
-        release_devices(gpus[max(1,snapshot['cpu_slots']):])
-        gpus=gpus[:max(1,snapshot['cpu_slots'])]
-    # Keep time bounded: one baseline and one evidence-guided joint candidate.
-    # The first real peak bounds batch growth; free VRAM is not all activations.
-    used=max(first.get('peak_reserved_gib',20),first.get('peak_allocated_gib',20))
-    budget=float(os.environ.get('WHOLE_HEART_GPU_MEMORY','20'))
-    local=max(1,min(reference*2,int(reference*budget/max(used,1)*.8)))
-    world=len(gpus)
-    candidates=cpu_candidates(snapshot,patch,local*world,world)
-    resource=candidates[-1] if candidates else None
-    if resource and (world>1 or local!=reference or resource!=baseline):
-        print(f'测量2/最多2：{world}卡协同，每卡batch={local}；主线程/增强worker按总CPU、RAM和共享内存限额。',flush=True)
-        try:trials.append(trial(work,fold,method,gpus,local,resource,run_kind,checkpoint=first.get('checkpoint')))
-        except Exception as error:failures.append(dict(error=str(error),gpus=gpus,local_batch=local))
-    chosen=select_trial(trials,global_batch=None)
-    chosen=dict(chosen,reference_global_batch_size=reference,
-        sampling_ratio=chosen['global_batch_size']/reference,
-        train_patches_per_epoch=chosen['global_batch_size']*250,
+    prep=work/f"04_data/derived/nnUNet_preprocessed/Dataset{split['dataset_id']:03d}_{fold}"
+    config=read_json(prep/'WholeheartBaselinePlans.json')['configurations']['3d_fullres']
+    reference=config['batch_size'];patch=config['patch_size']
+    group=list(gpus if gpus is not None else devices())
+    group,usable,excluded=admit(group)
+    if excluded:release_devices([r['gpu_uuid'] for r in excluded],wait=True)
+    if not group:raise ResourceAdmissionError(excluded)
+    snapshot=probe()
+    # Mapped files counted once globally. Missing/compressed source is explicit.
+    mapped=sum(p.stat().st_size for p in prep.rglob('*.npy') if p.is_file())
+    snapshot=dict(snapshot,source_shared_bytes=mapped)
+    local=max_local_batch if max_local_batch is not None else reference
+    execution=dict(execution or dict(mode='performance',compile=True))
+    reductions=0;eager_retried=False;observed=None;inference=None;phase='observe'
+    attempts=[]
+    while True:
+        while True:
+            try:resource=stage_config(snapshot,patch,local,len(group),observed);break
+            except StageCapacityError as error:
+                if error.policy['cpu_budget']>=len(group) and local>1:
+                    if reductions>=reduction_budget:raise
+                    reductions+=1;local=max(1,local//2);phase='confirm'
+                    attempts.append(dict(status='capacity_reduced',classification='predicted_host_ram',local_batch_size=local))
+                    continue
+                if len(group)<=1:raise
+                removed=group.pop()
+                excluded.append(dict(gpu_uuid=removed,reason='CPU/RAM group capacity: '+str(error)))
+                release_devices([removed],wait=True)
+                usable.pop(removed,None)
+
+        event(work,'stage.decision',decision_schema_version=2,stage=run_kind,phase=phase,gpu_uuids=group,
+              exclusions=excluded,resource=resource,local_batch_size=local,receipt_reused=False)
+        try:
+            result=trial(work,fold,method,group,local,resource,run_kind,execution=execution)
+        except Exception as error:
+            category=getattr(error,'classification','noncapacity')
+            attempts.append(dict(phase=phase,local_batch_size=local,status='failed',classification=category,error=str(error)))
+            event(work,'capacity.failure',decision_schema_version=2,attempt=attempts[-1])
+            if category=='compile_retry' and not eager_retried:
+                eager_retried=True;execution['compile']=False
+            elif category=='gpu_oom' and local>1 and reductions<reduction_budget:
+                reductions+=1;local=max(1,local//2);phase='confirm'
+            else:raise
+            # Whole old group has exited. Recheck other users and own-free CPU.
+            ready,usable,new_excluded=admit(group)
+            if new_excluded:release_devices([r['gpu_uuid'] for r in new_excluded],wait=True)
+            excluded+=new_excluded;group=ready
+            if not group:raise ResourceAdmissionError(excluded) from error
+            snapshot=dict(probe(),source_shared_bytes=mapped)
+            continue
+        attempts.append(dict(phase=phase,local_batch_size=local,status='passed',output=result.get('output')))
+        if phase=='observe' and max_local_batch is None:
+            ready,usable,new_excluded=admit(group)
+            if ready!=group:raise ResourceAdmissionError(new_excluded)
+            inference=infer_batch(result,usable);candidate=inference['local_batch_size']
+            observed=observed_payload(result)
+            if candidate!=local or observed is not None:
+                local=candidate;phase='confirm'
+                # Prior trial process/CPU pools exited before this new snapshot.
+                snapshot=dict(probe(),source_shared_bytes=mapped)
+                continue
+        break
+    chosen=dict(result,schema_version=2,decision_kind='fresh_stage_capacity',gpu_uuids=group,
+        world_size=len(group),global_batch_size=local*len(group),local_batch_size=local,
+        effective_cpu=resource,execution_request=execution,resource_receipt_reusable=False,
+        resource_snapshot=snapshot,capacity_inference=inference,capacity_attempts=attempts,
+        capacity_reductions=reductions,eager_retried=eager_retried,
+        excluded_gpus=excluded,reference_global_batch_size=reference,
+        sampling_ratio=local*len(group)/reference,train_patches_per_epoch=local*len(group)*250,
         reference_train_patches_per_epoch=reference*250,
-        formal_budget=dict(epochs=250,train_iterations=250,validation_iterations=50))
-    chosen['tested_gpu_uuids']=gpus
-    chosen['selected_hardware']=topology(chosen['gpu_uuids'])
-    chosen['measurement_coverage']=[dict(status='passed',world_size=t['world_size'],
-        hardware=topology(t['gpu_uuids']),gpu_uuids=t['gpu_uuids'],
-        local_batch_size=t['local_batch_size'],global_batch_size=t['global_batch_size'],
-        effective_cpu=t['effective_cpu']) for t in trials]
-    write_json(work/f'00_admin/optimization/{fold}_{method}.json',dict(status='passed',chosen=chosen,
-        candidates=trials,failed_candidates=failures,resource_snapshot=snapshot,
-        measurement_coverage=chosen['measurement_coverage'],
-        scope='bounded joint search, not a global optimum; no convergence/quality claim'))
+        formal_budget=dict(epochs=250,train_iterations=250,validation_iterations=50),
+        function_status='passed',effect_status='insufficient_long_window_evidence',
+        performance_sufficiency='short 12 train/2 validation capacity and recovery proof; not sustained throughput evidence')
+    write_json(work/f'00_admin/stage-decisions/{run_kind}_{fold}_{method}_{time.time_ns()}.json',chosen)
+    event(work,'stage.capacity_passed',decision_schema_version=2,stage=run_kind,configuration=chosen)
     return chosen
 
 
@@ -188,11 +310,9 @@ def train(work,fold,method,resume=False):
     from ddp_runtime import launch_ranks
     from runtime_observations import event
     from task_resources import probe
-    from training_policy import receipt_compatibility
     from server_train import select_checkpoint,archive_uncheckpointed
     work=Path(work);out=work/f'07_experiments/formal/{fold}_{method}_seed0'
     record=out/'run.json'
-    optimization_identity=identity(work,fold,method)
     split=read_json(work/'04_data/manifests/splits_v1.json')['folds'][fold]
     prep=work/f"04_data/derived/nnUNet_preprocessed/Dataset{split['dataset_id']:03d}_{fold}"
     expected=dict(fold=fold,method=method,seed=0,plan_sha256=digest(prep/'WholeheartBaselinePlans.json'),
@@ -214,35 +334,14 @@ def train(work,fold,method,resume=False):
             # Keep the failure scene and restart only this model from seed0.
             restarted_from=archive_uncheckpointed(out)
             previous=None
-    recommendation=Path(os.environ['VISTA_RUNTIME'])/f'optimization/{fold}_{method}.json'
-    chosen=None
-    if recommendation.exists():
-        receipt=read_json(recommendation)
-        reasons=receipt_compatibility(receipt,optimization_identity,probe())
-        try:
-            if digest(receipt['assessment_report'])!=receipt['assessment_sha256']:
-                reasons.append('原测评报告摘要不一致')
-        except (OSError,KeyError):reasons.append('原测评报告不可核验')
-        available=devices()
-        covered=coverage_matches(receipt.get('measurement_coverage',[]),available) if not reasons else False
-        if not reasons and not covered:reasons.append('当前可用硬件拓扑没有成功测量记录，首次正式轮前有界重测')
-        selected=receipt['chosen'].get('selected_hardware',[])
-        replacement=equivalent_devices(available,selected) if not reasons and len(selected)==receipt['chosen']['world_size'] else None
-        if not reasons and not replacement:reasons.append('选优配置缺少匹配的实测硬件，首次正式轮前有界重测')
-        if not reasons and receipt['chosen']['world_size']<=len(available):
-            chosen=dict(receipt['chosen'],gpu_uuids=replacement,tested_gpu_uuids=available)
-            event(work,'recommendation.reused',source=str(recommendation),configuration=chosen)
-        else:event(work,'recommendation.rejected',reasons=reasons or ['实际可用卡数不足，需按当前组重测'])
-    if chosen is None:chosen=tune(work,fold,method,'formal')
-    initial_unused=set(chosen.get('tested_gpu_uuids',[]))-set(chosen['gpu_uuids'])
-    release_devices(initial_unused)
+    chosen=tune(work,fold,method,'formal')
     report=previous or dict(signature=expected,history=[],formal_training=True,split=split)
     if restarted_from:report['restarted_from_archive']=restarted_from
     report.update(status='running',planned_epochs=250,effective_cpu=chosen['effective_cpu'],
         budget=dict(epochs=250,train_iterations=250,validation_iterations=50))
     out.mkdir(parents=True,exist_ok=True)
     request=out/'regroup-request.json';request.unlink(missing_ok=True)
-    refused={uuid:time.monotonic()+600 for uuid in initial_unused}
+    oom_reductions=chosen.get('capacity_reductions',0);eager_retried=chosen.get('eager_retried',False)
     try:
         while True:
             group=chosen['gpu_uuids'];stop=threading.Event()
@@ -250,7 +349,7 @@ def train(work,fold,method,resume=False):
                 while not stop.wait(1):
                     try:
                         current=devices(False)
-                        additions=[g for g in current if g not in group and time.monotonic()>refused.get(g,0)]
+                        additions=[g for g in current if g not in group]
                         if additions:
                             write_json(request,dict(gpu_uuids=group+additions,requested=time.time(),
                                 reason='new idle GPU held; join only after complete-epoch checkpoint'))
@@ -261,36 +360,56 @@ def train(work,fold,method,resume=False):
             args=dict(workspace=str(work),fold=fold,method=method,gpu_uuids=group,
                 global_batch_size=chosen['global_batch_size'],resource=chosen['effective_cpu'],
                 run_kind='formal',operation='train',output=str(out),checkpoint=checkpoint,
-                regroup_request=str(request))
+                regroup_request=str(request),execution=chosen.get('execution_request',dict(mode='performance',compile=True)))
             report['history'].append(dict(started=time.strftime('%Y-%m-%d %H:%M:%S'),configuration=chosen,checkpoint=checkpoint))
             write_json(record,report)
             print(f"协同训练：{len(group)}卡，全局batch={chosen['global_batch_size']}；每轮{chosen['train_patches_per_epoch']} patches（原{chosen['reference_train_patches_per_epoch']}）；250轮×250训练/50验证。",flush=True)
             try:
+                ready,_,exclusions=admit(group)
+                if ready!=group:raise ResourceAdmissionError(exclusions)
                 values=launch_ranks('cooperative_training:run_rank',args,group,out/'ranks',
                     timeout_seconds=30*24*3600,init_timeout_seconds=120)
+            except Exception as error:
+                category=getattr(error,'classification','noncapacity')
+                # The supervisor reaps every old rank before returning an error.
+                allowed=(category=='gpu_oom' and chosen['local_batch_size']>1 and oom_reductions<3
+                         or category=='compile_retry' and not eager_retried
+                         or isinstance(error,ResourceAdmissionError))
+                if not allowed:raise
+                if category=='gpu_oom':oom_reductions+=1
+                if category=='compile_retry':eager_retried=True
+                try:checkpoint=str(select_checkpoint(out/'fold_0'))
+                except FileNotFoundError:checkpoint=None
+                event(work,'group.recovery',decision_schema_version=2,classification=category,error=str(error),
+                      checkpoint=checkpoint,discarded_uncommitted_updates='all since last complete-epoch checkpoint',
+                      restart='checkpoint' if checkpoint else 'fresh seed0',rank_failures=getattr(error,'failures',[]))
+                stop.set();watch.join(timeout=3)
+                if isinstance(error,ResourceAdmissionError):
+                    release_devices([r['gpu_uuid'] for r in error.exclusions],wait=True)
+                execution=dict(args['execution'])
+                if eager_retried:execution['compile']=False
+                local=max(1,chosen['local_batch_size']//2) if category=='gpu_oom' else chosen['local_batch_size']
+                chosen=tune(work,fold,method,'formal',max_local_batch=local,execution=execution,reduction_budget=3-oom_reductions)
+                oom_reductions+=chosen.get('capacity_reductions',0)
+                continue
             finally:stop.set();watch.join(timeout=3)
             result=values[0]['result'];checkpoint=result['checkpoint']
             report['initial_weight_sha256']=result['initial_weight_sha256']
             report['history'][-1].update(ended=time.strftime('%Y-%m-%d %H:%M:%S'),result=result)
             if result['status']=='completed':
                 report.update(status='completed',completed_epochs=result['next_epoch']);break
-            requested=read_json(request)['gpu_uuids'];request.unlink(missing_ok=True)
-            try:
-                candidate=tune(work,fold,method,'formal',requested)
-                # A new group must improve the measured fixed-update epoch cost
-                # (within5% prefer more samples/s) before disturbing the old group.
-                from training_policy import select_trial
-                winner=select_trial([chosen,candidate],global_batch=None)
-                if winner is candidate:chosen=candidate
-            except Exception as error:
-                event(work,'regroup.rejected',error=str(error),retained_checkpoint=checkpoint)
-            # Reconcile every outcome, including a faster candidate with fewer
-            # ranks. Old members discarded by that winner are unused as well.
-            unused=(set(requested)|set(devices(False))|set(chosen.get('tested_gpu_uuids',[])))-set(chosen['gpu_uuids'])
-            for uuid in unused:refused[uuid]=time.monotonic()+600
-            release_devices(unused)
-            event(work,'regroup.committed',next_configuration=chosen,checkpoint=checkpoint,
-                rng_scope='existing UUID RNG retained; new UUID deterministic stream at next complete epoch; batch sampling may change')
+            request.unlink(missing_ok=True)
+            # Every ready compatible card joins; no speed contest or smaller winner.
+            chosen=tune(work,fold,method,'formal',devices(),execution=chosen.get('execution_request'))
+            oom_reductions=chosen.get('capacity_reductions',0)
+            eager_retried=chosen.get('eager_retried',False)
+            if result.get('pending_cpu_resource') and chosen['gpu_uuids']==group:
+                from live_resources import feedback_policy
+                adjustment=feedback_policy(chosen['effective_cpu'],result.get('feedback_windows',[]),chosen['effective_cpu'])
+                chosen['effective_cpu']=adjustment['settings']
+                event(work,'cpu.full_epoch_reconfiguration',decision_schema_version=2,decision=adjustment,checkpoint=checkpoint)
+            event(work,'regroup.committed',decision_schema_version=2,next_configuration=chosen,checkpoint=checkpoint,
+                rng_scope='existing UUID RNG retained; new UUID deterministic stream at next complete epoch; sampling may change')
     except BaseException as error:
         report.update(status='interrupted' if isinstance(error,KeyboardInterrupt) else 'failed',error=str(error));raise
     finally:write_json(record,report)

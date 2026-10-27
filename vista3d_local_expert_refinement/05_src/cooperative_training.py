@@ -42,6 +42,7 @@ def run_rank(rank,world_size,args):
     device=torch.device('cuda',rank) if dist.get_backend()=='nccl' else torch.device('cpu')
     trainer=trainer_class(method)(plans,'3d_fullres',0,load_json(prep/'dataset.json'),device=device)
     trainer._vista_resource_config=dict(resource)
+    trainer._vista_gpu_uuids=args['gpu_uuids']
     trainer._vista_run_kind=args['run_kind']
     trainer._vista_world_size=world_size
     trainer._vista_global_batch=args['global_batch_size']
@@ -60,6 +61,8 @@ def run_rank(rank,world_size,args):
     if trainer.num_epochs!=250 or trainer.num_iterations_per_epoch!=250 or trainer.num_val_iterations_per_epoch!=50:
         raise ValueError('正式CT预算与获准250轮×250训练/50验证不符')
     trial=args.get('operation')=='trial'
+    from training_feedback import RollingFeedback
+    feedback=RollingFeedback(resource,rank,world_size,output) if not trial else None
     started=time.monotonic()
     result=dict(status='running',rank=rank,gpu_uuid=args['gpu_uuids'][rank],world_size=world_size,global_batch_size=args['global_batch_size'],
         local_batch_size=trainer.batch_size,resource=resource,run_kind=args['run_kind'],
@@ -68,22 +71,28 @@ def run_rank(rank,world_size,args):
         resumed_initial_checkpoint=args.get('checkpoint'),first_epoch=trainer.current_epoch,
         execution=execution)
     sync=(lambda:torch.cuda.synchronize(device)) if device.type=='cuda' else (lambda:None)
+    successful_updates=0;checkpoint_committed=False
     try:
         trainer.on_train_start()
         if device.type=='cuda':torch.cuda.reset_peak_memory_stats(device)
         for epoch in range(trainer.current_epoch,trainer.num_epochs):
             trainer.on_epoch_start()
+            successful_updates=0;checkpoint_committed=False
             train_steps=12 if trial else 250
             validation_steps=2 if trial else 50
             trainer.dataloader_train.set_phase_steps(train_steps)
             trainer.dataloader_val.set_phase_steps(validation_steps)
             trainer.on_train_epoch_start()
+            if feedback:feedback.reset()
             outputs=[];measurements=[]
             for batch_index in range(train_steps):
                 if trial:
                     _,value,timing=measure_step(trainer.dataloader_train,trainer.train_step,sync)
                     measurements.append(timing)
-                else:value=trainer.train_step(next(trainer.dataloader_train))
+                else:
+                    _,value,timing=measure_step(trainer.dataloader_train,trainer.train_step,lambda:None)
+                successful_updates+=1
+                if feedback:feedback.observe(timing,trainer,dist)
                 outputs.append(value)
                 if rank==0 and (batch_index==0 or (batch_index+1)%5==0 or batch_index+1==train_steps):
                     write_json(output/'progress.rank0.json',dict(status='running',phase='train',
@@ -104,6 +113,7 @@ def run_rank(rank,world_size,args):
                             world_size=world_size,global_batch_size=args['global_batch_size'],updated=time.time()))
                 trainer.on_validation_epoch_end(outputs)
             tick=time.monotonic();trainer.on_epoch_end();checkpoint_seconds=time.monotonic()-tick
+            checkpoint_committed=True
             # measure_step returns its borrowed input; do not retain it while
             # measuring post-update fixed allocation after both pools pause.
             _=None
@@ -139,14 +149,17 @@ def run_rank(rank,world_size,args):
                 trainer.dataloader_train.pause()
                 result['resume_supply_transfer']=trainer.dataloader_train.observations()
                 break
+            result['resource']=feedback.resource
+            result['feedback_windows']=feedback.windows
+            pending_cpu=feedback.epoch_boundary(trainer)
             # Every rank observes one rank0 decision at the same completed epoch.
-            request=[False]
+            request=[bool(pending_cpu)]
             if rank==0 and args.get('regroup_request'):
                 path=Path(args['regroup_request'])
-                if path.exists():request[0]=load_json(path).get('gpu_uuids')!=args['gpu_uuids']
+                if path.exists():request[0]=request[0] or load_json(path).get('gpu_uuids')!=args['gpu_uuids']
             dist.broadcast_object_list(request,src=0)
             if request[0] and trainer.current_epoch<trainer.num_epochs:
-                result.update(status='regroup',next_epoch=trainer.current_epoch,
+                result.update(status='regroup',next_epoch=trainer.current_epoch,pending_cpu_resource=pending_cpu,
                     checkpoint=str(output/'fold_0/checkpoint_latest.pth'))
                 break
         else:
@@ -169,6 +182,11 @@ def run_rank(rank,world_size,args):
         result['rank_results']=all_results if rank==0 else []
         if rank==0:write_json(output/'result.json',result)
         return result
+    except BaseException:
+        write_json(output/f'failure-progress.rank{rank}.json',dict(rank=rank,epoch=trainer.current_epoch,
+            successful_train_updates_since_epoch_start=successful_updates,complete_epoch_committed=checkpoint_committed,
+            discarded_update_scope='restore latest complete checkpoint; failing update may be partial'))
+        raise
     finally:
         close_loaders(trainer)
         limiter.restore_original_limits()

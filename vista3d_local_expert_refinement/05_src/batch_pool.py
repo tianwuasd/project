@@ -35,6 +35,47 @@ import traceback
 _OPTIONAL_RNG_MODULES = None
 
 
+def private_memory_bytes():
+    """Linux private resident snapshot; shared source pages are not multiplied."""
+    if not sys.platform.startswith('linux'): return None
+    try:
+        from pathlib import Path
+        rows=Path('/proc/self/smaps_rollup').read_text().splitlines()
+        return sum(int(line.split()[1])*1024 for line in rows if line.startswith(('Private_Clean:','Private_Dirty:')))
+    except (OSError,ValueError): return None
+
+
+def shared_free_bytes():
+    """Actual POSIX transport capacity, not host RAM; Windows has no /dev/shm."""
+    if not sys.platform.startswith('linux'): return None
+    try:
+        stat = os.statvfs('/dev/shm')
+        return stat.f_bavail * stat.f_frsize
+    except OSError: return None
+
+
+def allocate_shared(size):
+    """Reserve owned pages before child write; never risk a catchless SIGBUS."""
+    free = shared_free_bytes()
+    if free is not None and size > free:
+        raise OSError('shared_live_capacity')
+    linux = sys.platform.startswith('linux')
+    if linux and (free is None or not hasattr(os, 'posix_fallocate')):
+        raise OSError('shared_safe_reservation_unavailable')
+    from multiprocessing.shared_memory import SharedMemory
+    segment = SharedMemory(create=True, size=size)
+    try:
+        if linux:
+            # fallocate is atomic with respect to ENOSPC races across all ranks,
+            # pools and unrelated users. Unsupported tmpfs also falls back.
+            os.posix_fallocate(segment._fd, 0, size)
+        return segment
+    except BaseException:
+        segment.close()
+        segment.unlink()
+        raise
+
+
 def deterministic_seed(seed, epoch, rank, stage, sequence):
     """Stable 64-bit seed; never use Python's process-randomized hash()."""
     coordinates = json.dumps([int(seed), int(epoch), int(rank), str(stage), int(sequence)],
@@ -226,7 +267,7 @@ def _worker_main(loader_bytes, connection, lock_handle, worker_threads=1):
                 observer = getattr(loader, 'observations', None)
                 observations = observer() if callable(observer) else {}
                 _, torch = _rng_modules()
-                observations.update(pid=os.getpid(), worker_threads=worker_threads,
+                observations.update(pid=os.getpid(), worker_private_bytes=private_memory_bytes(), worker_threads=worker_threads,
                                     torch_threads=torch.get_num_threads() if torch is not None else None)
                 payload = dict(batch=batch, mode=mode, fallback_reason=reason,
                                tensor_bytes=tensor_bytes, worker=observations)
@@ -330,7 +371,7 @@ class EpochBatchIterator:
         self._worker_observations = {}
         self._stats = dict(shared_batches=0, pipe_batches=0, shared_reuses=0,
                            tensor_bytes_shared=0, tensor_bytes_pipe=0, pipe_packet_bytes=0,
-                           consumed_batches=0, discarded_batches=0, queue_depth_peak=0)
+                           consumed_batches=0, discarded_batches=0, queue_depth_peak=0, peak_payload_bytes=0)
         self._fallback_reasons = set()
         hook = getattr(loader, 'configure_worker_threads', None)
         if callable(hook): hook(self.worker_threads)
@@ -432,8 +473,7 @@ class EpochBatchIterator:
                     reason = 'shared_slot_capacity'
                 elif payload <= available:
                     try:
-                        from multiprocessing.shared_memory import SharedMemory
-                        buffer = SharedMemory(create=True, size=payload)
+                        buffer = allocate_shared(payload)
                         self._buffers[slot] = buffer
                         info, reason = (buffer.name, buffer.size), None
                     except OSError as error:
@@ -456,6 +496,7 @@ class EpochBatchIterator:
                                    f' exceeded {self.timeout_seconds:g}s')
             if status == 'ok':
                 mode = payload['mode']
+                self._stats['peak_payload_bytes'] = max(self._stats['peak_payload_bytes'], payload['tensor_bytes'])
                 self._stats[mode + '_batches'] += 1
                 self._stats['tensor_bytes_' + mode] += payload['tensor_bytes']
                 self._stats['pipe_packet_bytes'] += packet_bytes
@@ -501,6 +542,11 @@ class EpochBatchIterator:
                 batch = (_shared_decode(batch['batch'], self._buffers[self._sequence_slots[self._next_index]].buf)
                          if batch['mode'] == 'shared' else batch['batch'])
                 del self._sequence_slots[self._next_index]
+            if not self.workers:
+                try:
+                    _,_,size=_shared_encode(batch)
+                    self._stats['peak_payload_bytes']=max(self._stats['peak_payload_bytes'],size)
+                except ValueError:pass
             if self.pin_memory:
                 batch = _pin(batch)
             self._next_index += 1
@@ -593,6 +639,23 @@ class EpochBatchIterator:
             raise ValueError('phase_steps cannot be below consumed cursor; reset epoch first')
         self.pause()
         self.phase_steps = steps
+
+    def reconfigure(self, *, workers, worker_threads, prefetch, max_shared_bytes):
+        """Rebuild only a replayable source after outer consumer has rewound."""
+        if not getattr(self.loader, 'replayable', False):
+            raise ValueError('source does not support batch-boundary reconfiguration')
+        self.pause()
+        state = self.state_dict()
+        self.close()
+        self.workers = _integer(workers, 'workers', 0)
+        self.worker_threads = _integer(worker_threads, 'worker_threads', 1)
+        self.prefetch = _integer(prefetch, 'prefetch', 1)
+        self.max_shared_bytes = _integer(max_shared_bytes, 'max_shared_bytes', 0)
+        hook = getattr(self.loader, 'configure_worker_threads', None)
+        if callable(hook): hook(self.worker_threads)
+        self._next_index = self._next_submit = state['next_index']
+        self._closed = False
+        self._paused = True
 
     def observations(self):
         ready_pipe = sum(payload['tensor_bytes'] for _,status,payload in self._ready.values()

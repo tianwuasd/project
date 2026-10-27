@@ -3,6 +3,7 @@ import json
 
 
 class NNUNetBatchSource:
+    replayable = True
     def __init__(self,spec):
         self.spec=json.loads(json.dumps(spec))
         self._loader=None
@@ -103,7 +104,7 @@ def build_loaders(trainer,resource):
         outputs.append(EpochBatchIterator(source,workers=workers,seed=0,epoch=trainer.current_epoch,
             rank=rank,stage=stage,prefetch=prefetch,
             worker_threads=threads,phase_steps=int(steps),
-            max_shared_bytes=int(resource.get('max_shared_bytes',prefetch*batch_bytes if workers else 0)),
+            max_shared_bytes=int(resource.get('val_max_shared_bytes' if stage=='validation' else 'max_shared_bytes',prefetch*batch_bytes if workers else 0)),
             timeout_seconds=resource.get('batch_timeout_seconds',180),pin_memory=False))
     return tuple(outputs)
 

@@ -176,6 +176,10 @@ class BatchTransfer:
         if next_index > self.consumed: raise ValueError('cannot advance consumed cursor')
         self.pause(); self.source.rewind(next_index); self.consumed = next_index
 
+    def reconfigure(self, **settings):
+        self.pause()
+        self.source.reconfigure(**settings)
+
     def observations(self):
         return dict(self.stats,consumed_index=self.consumed,prepared_unconsumed=len(self.queue)+(self.active is not None),
                     pinned_bytes=self._slot_bytes('host'), device_input_bytes=self._slot_bytes('data') if self.cuda else 0,

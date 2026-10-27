@@ -22,6 +22,33 @@ import traceback
 import uuid
 
 
+def classify_failure(error):
+    """Typed causes only: message text is never evidence of GPU capacity."""
+    chain=[];current=error
+    while current is not None and id(current) not in {id(e) for e in chain}:
+        chain.append(current);current=current.__cause__ or current.__context__
+    torch=sys.modules.get('torch')
+    oom=getattr(getattr(torch,'cuda',None),'OutOfMemoryError',())
+    if oom and any(isinstance(e,oom) for e in chain): category='gpu_oom'
+    elif any(isinstance(e,MemoryError) for e in chain): category='cpu_memory'
+    elif (type(error).__name__=='EagerRetryRequired' and error.__cause__ is not None
+          and any(type(e).__name__ in {'BackendCompilerFailed','InductorError','Unsupported','InvalidBackend'}
+                  or type(e).__module__.startswith(('torch._dynamo','torch._inductor')) for e in chain[1:])):
+        category='compile_retry'
+    else: category='noncapacity'
+    return dict(classification=category,error_type=type(error).__name__,message=str(error),
+                causes=[dict(type=type(e).__name__,module=type(e).__module__,message=str(e)) for e in chain])
+
+
+class RankGroupFailure(RuntimeError):
+    def __init__(self, message, failures):
+        super().__init__(message)
+        self.failures=failures
+        classes={f.get('classification') for f in failures}
+        self.classification=('gpu_oom' if 'gpu_oom' in classes else
+                             'compile_retry' if classes and classes <= {'compile_retry'} else 'noncapacity')
+
+
 class _WindowsSpawnProcess(mp.context.SpawnProcess):
     @staticmethod
     def _Popen(process_obj):
@@ -130,9 +157,10 @@ def _rank_main(target, arguments, selected, invocation, rank, backend,
         _write_record(log_dir / 'result.json', dict(
             invocation_id=invocation.name, rank=rank, world_size=world_size,
             gpu_uuid=selected[rank], pid=os.getpid(), log_dir=str(log_dir), result=result))
-    except BaseException:
+    except BaseException as error:
         diagnostic = traceback.format_exc()
         (log_dir / 'traceback.txt').write_text(diagnostic, encoding='utf-8')
+        _write_record(log_dir / 'failure.json', dict(classify_failure(error), rank=rank, gpu_uuid=selected[rank], invocation_id=invocation.name))
         print(diagnostic, file=sys.stderr, flush=True)
         # Do not enter another distributed collective after a local failure.
         raise
@@ -250,8 +278,14 @@ def launch_ranks(target, arguments, gpu_uuids, log_dir, *, backend='nccl',
                 raise KeyboardInterrupt(f'distributed invocation cancelled: {invocation}')
             failures = [(rank, p.exitcode) for rank, p in enumerate(processes)
                         if p.exitcode not in (None, 0)]
-            if failures:
-                raise RuntimeError(f'distributed rank failure {failures}; logs: {invocation}')
+            published=list(invocation.glob('rank-*/failure.json'))
+            if failures or published:
+                records=[]
+                for r in range(len(processes)):
+                    path=invocation / f'rank-{r}' / 'failure.json'
+                    if path.exists():records.append(json.loads(path.read_text(encoding='utf-8')))
+                if not records:records=[dict(classification='noncapacity',reason='no structured rank failure')]
+                raise RankGroupFailure(f'distributed rank failure {failures}; logs: {invocation}',records)
             if all(p.exitcode == 0 for p in processes):
                 return [_read_result(p, invocation, rank, selected) for rank, p in enumerate(processes)]
             if time.monotonic() - started >= timeout_seconds:

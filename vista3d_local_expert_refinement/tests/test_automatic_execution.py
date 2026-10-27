@@ -17,6 +17,10 @@ import rank_affinity
 
 
 class AutomaticExecutionTests(unittest.TestCase):
+    def setUp(self):
+        helper=patch.object(control,'admit',side_effect=lambda g:(list(g),{u:20*2**30 for u in g},[]))
+        helper.start();self.addCleanup(helper.stop)
+
     def workspace(self,tmp):
         root=Path(tmp)
         write_json(root/'04_data/manifests/splits_v1.json',dict(folds={'ct_holdG':dict(dataset_id=813)}))
@@ -28,13 +32,16 @@ class AutomaticExecutionTests(unittest.TestCase):
         return dict(status='passed',world_size=len(gpus),gpu_uuids=gpus,global_batch_size=local*len(gpus),
             local_batch_size=local,measured_training_steps=10,median_step_seconds=seconds,
             validation_step_seconds=.3,peak_allocated_gib=12,peak_reserved_gib=13,
-            effective_cpu=resource,total_cpu_slots=resource['total_cpu_slots'])
+            effective_cpu=resource,total_cpu_slots=resource['total_cpu_slots'],rank_results=[dict(gpu_uuid=g,
+                memory_facts=dict(fixed_bytes=4*2**30,peak_allocated_bytes=(4+4*local)*2**30,peak_reserved_bytes=19*2**30,optimizer_initialized=True)) for g in gpus])
 
     def run_tuning(self,root,fail=False):
         called=[]
         def measure(work,fold,method,gpus,local,resource,kind,**kwargs):
             called.append((gpus,local,resource,kind))
-            if len(called)>1 and fail:raise RuntimeError('simulated group OOM')
+            if len(called)==2 and fail:
+                from ddp_runtime import RankGroupFailure
+                raise RankGroupFailure('simulated group OOM',[dict(classification='gpu_oom')])
             return self.measurement(gpus,local,resource,4 if len(called)==1 else 3)
         snapshot=dict(cpu_slots=128,available_memory_bytes=200*2**30,shared_memory_available_bytes=100*2**30)
         with patch('task_resources.probe',return_value=snapshot),patch.object(control,'trial',side_effect=measure),\
@@ -54,14 +61,14 @@ class AutomaticExecutionTests(unittest.TestCase):
             self.assertEqual(chosen['formal_budget'],dict(epochs=250,train_iterations=250,validation_iterations=50))
             self.assertLessEqual(chosen['effective_cpu']['total_cpu_slots'],128)
 
-    def test_failed_large_group_keeps_successful_reference_and_evidence(self):
+    def test_gpu_oom_reduces_batch_and_retains_all_compatible_ranks(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=self.workspace(tmp);chosen,called=self.run_tuning(root,True)
-            self.assertEqual(chosen['world_size'],1)
-            record=read_json(root/'00_admin/optimization/ct_holdG_B0.json')
-            self.assertIn('OOM',record['failed_candidates'][0]['error'])
-            self.assertEqual(len(record['candidates']),1)
-            self.assertEqual([r['world_size'] for r in record['measurement_coverage']],[1])
+            self.assertEqual(chosen['world_size'],8)
+            self.assertEqual(chosen['local_batch_size'],2)
+            self.assertEqual(len(called),3)
+            self.assertEqual(chosen['capacity_attempts'][1]['classification'],'gpu_oom')
+            self.assertEqual(chosen['capacity_reductions'],1)
 
     def test_interruption_is_not_a_successful_fallback(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -13,7 +13,7 @@ def run(plan):
     from runtime_observations import collect,event,failure
     from task_worker import run_child
     work=Path(plan['workspace']);started=time.monotonic()
-    report=dict(schema_version=1,status='running',job_kind='assessment',formal_training=False,
+    report=dict(schema_version=2,status='running',job_kind='assessment',formal_training=False,
         started=time.time(),stages=[],models=[],formal_budget_unchanged=plan['formal_budget'],
         limits=plan['assessment_budget'])
     target=work/'09_reports/assessment.json'
@@ -36,10 +36,9 @@ def run(plan):
                 os.environ['VISTA_GPU_LEASES']=str(fleet.path)
                 fleet.devices(wait=True)
             for method in plan['methods']:
-                stage('完整尺寸协同训练、调优与检查点恢复','running',fold=fold,model=method)
+                stage('完整尺寸协同训练、容量验证与检查点恢复','running',fold=fold,model=method)
                 chosen=tune(work,fold,method,'assessment')
-                release_devices(set(chosen.get('tested_gpu_uuids',[]))-set(chosen['gpu_uuids']))
-                stage('完整尺寸协同训练、调优与检查点恢复','passed',chosen=chosen)
+                stage('完整尺寸协同训练、容量验证与检查点恢复','passed',chosen=chosen)
                 case=scope['prediction_ids'][0]
                 env=os.environ.copy();env['CUDA_VISIBLE_DEVICES']=chosen['gpu_uuids'][0]
                 logfile=work/f'09_reports/assessment_prediction_{fold}_{method}.log'
@@ -58,20 +57,14 @@ def run(plan):
             acceptance_scope='this real-data source subset and measured GPU groups; not all possible hardware/configurations',
             missing_evidence='diagnostics/missing-evidence.json',logs='diagnostics/events;07_experiments/tuning/*/ranks')
         write_json(target,report)
-        # Commit recommendations only after every phase has passed. Failed or
-        # partial assessment never grants a successful formal-training receipt.
-        for model in report['models']:
-            chosen=model['chosen'];resource=chosen['effective_cpu']
-            receipt=dict(status='passed',committed=True,created_at=time.time(),ttl_seconds=7*24*3600,
-                identity=model['identity'],chosen=chosen,assessment_report=str(target),assessment_sha256=digest(target),
-                measurement_coverage=chosen['measurement_coverage'],
-                required_cpu_slots=resource['total_cpu_slots'],required_ram_bytes=resource['estimated_ram_bytes'],
-                required_shm_bytes=resource['estimated_shm_bytes'])
-            write_json(Path(plan['runtime'])/f"optimization/{model['fold']}_{model['method']}.json",receipt)
+        report.update(function_status='passed',effect_status='insufficient_long_window_evidence',
+                      resource_recommendation=None,resource_receipt_reusable=False,
+                      performance_sufficiency='short functional/capacity observation; formal stages independently probe current resources')
+        write_json(target,report)
         print(f'完整测评完成。独立报告：{target}；训练权重不会用于正式任务。',flush=True)
         return report
     except BaseException as error:
-        report.update(status='interrupted' if isinstance(error,KeyboardInterrupt) else 'failed',
+        report.update(function_status='failed',effect_status='not_evaluated',status='interrupted' if isinstance(error,KeyboardInterrupt) else 'failed',
             error=str(error),seconds=time.monotonic()-started)
         failure(work,'assessment',error,plan=plan)
         raise

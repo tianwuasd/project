@@ -217,7 +217,8 @@ def case_policy(snapshot, case_count, bytes_per_case, supported_threads=4):
         capacity_status=status,reasons=reasons,missing_evidence=list(snapshot.get('missing_evidence',[])),estimated_bytes_per_case=bytes_per_case)
 
 
-def _rank_setting(cpu, ram, batch, need, rank, shared):
+def _rank_setting(cpu, ram, batch, need, rank, shared, private_bytes=None):
+    private_bytes=max(2*batch,int(private_bytes or 0))
     main=min(4,cpu)
     thread=2 if cpu>=main+need*2 else 1
     if cpu<main+need:main=max(1,cpu-need)
@@ -226,7 +227,7 @@ def _rank_setting(cpu, ram, batch, need, rank, shared):
     # Both pools remain resident; private/temporary=2 batches per worker,
     # plus separate bounded prefetch queues and two pinned batches per rank.
     def build(workers, validation):
-        resident=(workers+validation)*2*batch
+        resident=(workers+validation)*private_bytes
         base=shared+resident+3*batch
         free=max(0,ram-base) if ram is not None else 0
         q=min(2*workers,max(0,free-int(bool(validation))*batch)//batch) if workers else 0
@@ -244,7 +245,7 @@ def _rank_setting(cpu, ram, batch, need, rank, shared):
         train_cpu_slots=main+workers*thread,val_cpu_slots=main+val*vt,
         total_cpu_slots=main+max(workers*thread,val*vt),resident_pool_bytes=resident,
         estimated_ram_bytes=total,memory_budget_bytes=ram,source_shared_bytes=shared,
-        train_worker_limit=limit,requested_train_workers=need,base_memory_bytes=base)
+        train_worker_limit=limit,requested_train_workers=need,base_memory_bytes=base,worker_private_bytes=private_bytes)
 
 
 def training_policy(snapshot, rank_count, batch_bytes, history=None):
@@ -265,7 +266,7 @@ def training_policy(snapshot, rank_count, batch_bytes, history=None):
         for rank in range(rank_count):
             share=cpu//rank_count+(rank<cpu%rank_count)
             ram=(memory-shared)//rank_count if memory is not None else None
-            settings=_rank_setting(share,ram,batch,need,rank,0)
+            settings=_rank_setting(share,ram,batch,need,rank,0,snapshot.get('worker_private_bytes'))
             ranks.append(settings)
             if settings['train_workers']<need:reasons.append(f'rank {rank}: worker demand bounded by CPU/RAM capacity')
         if any(r.startswith('unknown') for r in reasons):status='bounded_fallback'
@@ -314,11 +315,12 @@ def feedback_policy(settings, windows, capacity):
             if rank_ram is not None:
                 # Capacity includes both resident pools and at least one queued
                 # batch per live pool; prefetch can grow only within the remainder.
-                bound=max(0,(rank_ram-(2*old['val_workers']+3+1+bool(old['val_workers']))*batch)//(2*batch))
+                private=old.get('worker_private_bytes',2*batch)
+                bound=max(0,(rank_ram-old['val_workers']*private-(3+1+bool(old['val_workers']))*batch)//private)
                 target=min(target,bound)
             candidate=copy.deepcopy(old);candidate['train_workers']=max(old['train_workers'],target)
             delta=candidate['train_workers']-old['train_workers']
-            candidate['resident_pool_bytes']+=delta*2*batch
+            candidate['resident_pool_bytes']+=delta*old.get('worker_private_bytes',2*batch)
             candidate['base_memory_bytes']=candidate['resident_pool_bytes']+3*batch
             free=max(0,rank_ram-candidate['base_memory_bytes']) if rank_ram is not None else 0
             candidate['prefetch']=min(2*candidate['train_workers'],max(0,free-bool(old['val_workers'])*batch)//batch)
