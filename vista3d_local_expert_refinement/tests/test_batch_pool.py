@@ -127,6 +127,19 @@ class VariableTensorLoader(TensorLoader):
         return torch.ones(4 if self.calls==1 else 1024)
 
 
+class StructuredArrayLoader(RandomLoader):
+    def __next__(self):
+        import numpy as np
+        return np.array([(3,1.25),(7,2.5)],dtype=[('label','<i4'),('value','<f4')])
+
+
+class DefaultDictArrayLoader(RandomLoader):
+    def __next__(self):
+        from collections import defaultdict
+        import numpy as np
+        return defaultdict(int,data=np.array([1,2,3],dtype=np.int32))
+
+
 class PinBatch:
     def pin_memory(self):
         self.pinned_pid = os.getpid()
@@ -370,6 +383,38 @@ class BatchPoolTests(unittest.TestCase):
             self.assertIn('shared_slot_capacity',iterator.observations()['fallback_reasons'])
             self.assertEqual(iterator.observations()['shared_allocated_bytes'],16)
         finally:iterator.close()
+
+    @unittest.skipUnless(importlib.util.find_spec('numpy'), 'NumPy runtime')
+    def test_structured_numpy_fields_and_values_survive_transport(self):
+        import numpy as np
+        for budget in (4096,0):
+            iterator=EpochBatchIterator(StructuredArrayLoader(),workers=1,prefetch=1,
+                phase_steps=1,max_shared_bytes=budget,timeout_seconds=30)
+            try:
+                batch=next(iterator)
+                self.assertEqual(batch.dtype.names,('label','value'))
+                np.testing.assert_array_equal(batch['label'],[3,7])
+                np.testing.assert_array_equal(batch['value'],[1.25,2.5])
+                self.assertEqual(iterator.observations()['pipe_batches'],1)
+                self.assertIn('structured_or_subarray_dtype',iterator.observations()['fallback_reasons'])
+            finally:iterator.close()
+
+    @unittest.skipUnless(importlib.util.find_spec('numpy'), 'NumPy runtime')
+    def test_defaultdict_factory_and_missing_key_survive_transport(self):
+        from collections import defaultdict
+        import numpy as np
+        for budget in (4096,0):
+            iterator=EpochBatchIterator(DefaultDictArrayLoader(),workers=1,prefetch=1,
+                phase_steps=1,max_shared_bytes=budget,timeout_seconds=30)
+            try:
+                batch=next(iterator)
+                self.assertIsInstance(batch,defaultdict)
+                self.assertIs(batch.default_factory,int)
+                self.assertEqual(batch['missing'],0)
+                np.testing.assert_array_equal(batch['data'],[1,2,3])
+                self.assertEqual(iterator.observations()['pipe_batches'],1)
+                self.assertIn('unsupported_container_subclass',iterator.observations()['fallback_reasons'])
+            finally:iterator.close()
 
     def test_pause_timeout_closes_all_owned_workers(self):
         warm=[deterministic_seed(0,0,0,'train',0)]

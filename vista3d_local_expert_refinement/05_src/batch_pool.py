@@ -132,11 +132,22 @@ def _shared_encode(batch):
             kind = 'torch'
         elif np is not None and isinstance(value, np.ndarray):
             if value.dtype.hasobject: raise ValueError('object_array')
+            # dtype.str drops structured field names/layout (and subarray
+            # information). Keep those values lossless through byte-pipe pickle.
+            if value.dtype.fields is not None or value.dtype.subdtype is not None:
+                raise ValueError('structured_or_subarray_dtype')
+            if value.dtype.metadata is not None:
+                raise ValueError('dtype_metadata')
             array = np.ascontiguousarray(value); kind = 'numpy'
         if kind:
             offset = sum(a.nbytes for a in arrays)
             arrays.append(array)
             return _ArrayRef(kind, array.dtype.str, array.shape, offset)
+        named_tuple = isinstance(value, tuple) and isinstance(getattr(value, '_fields', None), tuple)
+        if isinstance(value, (dict, list, tuple)) and type(value) not in (dict, list, tuple) and not named_tuple:
+            # Built-in reconstruction loses defaultdict factories and other
+            # subclass behavior. Only namedtuple has an explicit decoder here.
+            raise ValueError('unsupported_container_subclass')
         if isinstance(value, dict): return {key: encode(item) for key, item in value.items()}
         if isinstance(value, list): return [encode(item) for item in value]
         if isinstance(value, tuple):
