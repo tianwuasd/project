@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Complete actual persistent loader/inner-thread/transport integration, then GPU execution and coordinator; project tests/review before Skill v1/v2.",
+  "next_action": "Integrate applied execution modes, two-slot transfer and correct consumed checkpoint position; then direct cooperative coordinator and prepare/predict/diagnostics. Skill still untouched.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -409,9 +409,16 @@
         "scope": "live facts/direct CPU80 RAM80 policy and legacy wrappers",
         "review": "spec_pass_quality_approved",
         "tests": "live11,policy8,related13+14;control206run198passed8skipped"
+      },
+      {
+        "task": 2,
+        "commit": "322c653d1b0fdf22769b8e93644f8eb7597065cd",
+        "scope": "persistent deterministic supply, actual inner Torch/native threads, bounded totalQ reusable buffers and losslessfallback",
+        "review": "spec_pass_quality_approved_after_2_transport_fixes",
+        "tests": "actualAPI29run27pass2POSIXskip+phase1/config3;control198pass8skip;actualpinnedAPIandCPUsyntheticeffect"
       }
     ],
-    "current": "Task2 persistent deterministic loading and actual worker threads",
+    "current": "Task3 controlled GPU execution, transfer and atomic checkpoints",
     "skill_modified_this_implementation": false,
     "server_deployed": false,
     "local_gpu_compute": false
