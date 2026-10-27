@@ -56,7 +56,10 @@ def main():
         observed['cpu_budget']=min(4,observed['cpu_budget'])
         if observed['cpu_budget']<1:raise RuntimeError('no currently permitted CPU budget for local smoke')
         with patch.object(DatasetFingerprintExtractor,'__init__',small_sample),patch('task_resources.probe',return_value=observed):
-            prepare('ct_holdG',2)
+            try:prepare('ct_holdG',2)
+            except BaseException:
+                for path in (work/'00_admin/preparation_logs').rglob('*.log'):print(path.name,path.read_text(encoding='utf-8')[-3500:])
+                raise
         with patch('server_prepare.export_fold', side_effect=AssertionError('completed cache must be reused')):
             prepare('ct_holdG',2)
         prep=work/'04_data/derived/nnUNet_preprocessed/Dataset813_ct_holdG'

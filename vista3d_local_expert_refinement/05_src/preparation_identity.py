@@ -2,7 +2,7 @@
 from pathlib import Path
 from server_data import digest
 
-FILES=('server_prepare.py','data_pipeline.py','prepare_nnunet.py','case_execution.py')
+FILES=('server_prepare.py','data_pipeline.py','prepare_nnunet.py','case_execution.py','read_admission.py','case_memory.py','cpu_case_queue.py')
 
 
 def current(directory=None):

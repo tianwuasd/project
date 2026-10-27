@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "panel_version": "0.5.0",
-  "recorded_date": "2026-10-27",
-  "source_base_commit": "0f1baa0858c600662f10840aa203c4ba860c33a3",
+  "recorded_date": "2026-10-28",
+  "source_base_commit": "21e0f13a8980615610a7c00ba50a48e8a8f88520",
   "publication": {
     "pushed": false,
     "deployed": false,
@@ -39,6 +39,88 @@
   },
   "checks": [
     {
+      "name": "final unified review fix aggregate",
+      "command": "D:/programtools/anaconda/python.exe -B tests/run_panel_suite.py",
+      "log": "final-fixes-panel-final-green.log",
+      "run": 354,
+      "passed": 307,
+      "skipped": 47,
+      "errors": 0,
+      "failures": 0,
+      "seconds": 86.406,
+      "status": "passed"
+    },
+    {
+      "name": "affected final control regressions",
+      "command": "python -B -m unittest test_final_resource_fixes test_stage_completion test_live_resources test_nnunet_batches -v",
+      "log": "final-fixes-control-green.log",
+      "run": 51,
+      "passed": 48,
+      "skipped": 3,
+      "errors": 0,
+      "failures": 0,
+      "seconds": 3.43,
+      "status": "passed"
+    },
+    {
+      "name": "actual CPU affected loader and feedback regressions",
+      "command": "api-python -B -m unittest test_final_loader_api test_final_resource_fixes test_stage_coordinator test_live_resources test_nnunet_batches -v",
+      "log": "final-fixes-focused-api-green.log",
+      "run": 48,
+      "passed": 47,
+      "skipped": 1,
+      "errors": 0,
+      "failures": 0,
+      "seconds": 14.164,
+      "status": "passed"
+    },
+    {
+      "name": "actual CPU parallel export including injected late failure",
+      "command": "api-python -B -m unittest test_final_export_api test_final_loader_api test_final_resource_fixes test_stage_completion test_stage_coordinator test_live_resources test_nnunet_batches -v",
+      "log": "final-fixes-focused-api-2.log",
+      "status": "export test passed; aggregate had separate NumPy equality fixture error corrected in focused-api-green"
+    },
+    {
+      "name": "real synthetic full preparation API after read/export repair",
+      "command": "api-python -B tests/stage_prepare_api_smoke.py",
+      "log": "final-fixes-prepare-api-2.log",
+      "status": "passed",
+      "checks": [
+        "parallel source export",
+        "fit fingerprint8",
+        "official planning",
+        "preprocessing12",
+        "strict cache reuse",
+        "CPU prediction preparation",
+        "assessment subset3",
+        "CUDA uninitialized"
+      ]
+    },
+    {
+      "name": "real loader parity with active one-slot read gate",
+      "command": "api-python -B tests/nnunet_loader_api_smoke.py --report-file final-fixes-loader-api.json",
+      "report": "final-fixes-loader-api.json",
+      "status": "passed"
+    },
+    {
+      "name": "actual CPU Gloo checkpoint and replay",
+      "command": "api-python -B tests/nnunet_distributed_checkpoint_api_smoke.py --report-file final-fixes-checkpoint-api.json",
+      "report": "final-fixes-checkpoint-api.json",
+      "status": "passed"
+    },
+    {
+      "name": "temporary control durable failure log fix",
+      "command": "python -B -m unittest test_final_resource_fixes.PredictionFailureLog test_stage_completion.PredictionLifecycle -v",
+      "log": "final-fixes-log-path-green.log",
+      "run": 6,
+      "passed": 6,
+      "skipped": 0,
+      "errors": 0,
+      "failures": 0,
+      "seconds": 0.666,
+      "status": "passed"
+    },
+    {
       "name": "final release aggregate after concrete fixture fixes",
       "command": "D:/programtools/anaconda/python.exe -B tests/run_panel_suite.py",
       "log": "task6-panel-suite-release-green.log",
@@ -48,7 +130,8 @@
       "errors": 0,
       "failures": 0,
       "seconds": 85.874,
-      "status": "passed"
+      "status": "passed",
+      "superseded_by": "final unified review fix aggregate; original result preserved"
     },
     {
       "name": "expanded control suite",
@@ -157,7 +240,8 @@
   "unchanged_evidence_reused": [
     {
       "report": "task2-loader-api.json",
-      "checks": "actual pinned loader parity, inner threads2, persistent PIDs and resume"
+      "checks": "actual pinned loader parity, inner threads2, persistent PIDs and resume",
+      "superseded_for_changed_paths": "final-fixes-loader-api.json and final-fixes-prepare-api-2.log"
     },
     {
       "report": "task2-supply-effect.json",
@@ -165,7 +249,8 @@
     },
     {
       "report": "task5-prepare-api.log",
-      "checks": "real synthetic fit fingerprint8/planning/preparation12/reuse/prediction preparation/subset3"
+      "checks": "real synthetic fit fingerprint8/planning/preparation12/reuse/prediction preparation/subset3",
+      "superseded_for_changed_paths": "final-fixes-loader-api.json and final-fixes-prepare-api-2.log"
     },
     {
       "report": "task5-leaf-api.log",
@@ -192,9 +277,10 @@
     "No target Linux/CUDA/NCCL or real CT acceptance",
     "No end-to-end speedup or clinical quality claim",
     "Target expected Torch2.8.0+cu128 differs from local Torch2.12.1+cu126",
-    "44 control skips: optional CPU API/Torch/Gloo/imaging dependencies, POSIX-only conditions, and unavailable Windows symlink fixture; not passed",
-    "CPU/RAM admission uses labelled estimates; transient peak and external pressure attribution remain unmeasured",
-    "Test counts overlap across runs; do not sum as unique tests"
+    "Test counts overlap across runs; do not sum as unique tests",
+    "47 final control skips:36 optional CPU API/Torch/Gloo/imaging dependencies,7 POSIX-only,4 Windows symlink fixtures (see exact skipped_tests rather than infer pass)",
+    "CPU/RAM header priors consume compatible completed process RSS floors; incremental/private transient peaks remain unmeasured",
+    "Temporary read gates and prediction control messages use configured TMP; actual server filesystem locality is not measured"
   ],
   "runtime_inventory": [
     {
@@ -214,8 +300,8 @@
     },
     {
       "path": "05_src/assessment_prepare.py",
-      "bytes": 5383,
-      "sha256": "7c0d5e7ccee41a73294562e9287782584ea5c7e017c8c71962b8f7a41b395e74"
+      "bytes": 5464,
+      "sha256": "1cc1e6978519d63199792d8c525a0e5528893c09e0da556cdffbe12fe8d9900f"
     },
     {
       "path": "05_src/assessment_run.py",
@@ -234,8 +320,13 @@
     },
     {
       "path": "05_src/case_execution.py",
-      "bytes": 6263,
-      "sha256": "ad906f7908bdf78a6f995710a74cdca81cb2ecb96286a6afe7fdf5176d221ebf"
+      "bytes": 6934,
+      "sha256": "71ea0785aae08ce99a4f3b3384c228f6e285b3b03d29cc62153d34e59fb5896e"
+    },
+    {
+      "path": "05_src/case_memory.py",
+      "bytes": 1777,
+      "sha256": "b07c7fef3dc23dd27ebd4337bcb9b0f8fb77c394d71242e4b23c96fd202498bb"
     },
     {
       "path": "05_src/checkpoint_compat.py",
@@ -264,13 +355,13 @@
     },
     {
       "path": "05_src/cpu_case_queue.py",
-      "bytes": 2620,
-      "sha256": "ba01df95ef243a9ab40e5a7126135b8cf7126c8bfde67499db5ca9f54e349ccf"
+      "bytes": 3235,
+      "sha256": "267bcbcac7eafc61d59bf2d01ad1a635c4a372998720ada5aeca8f1b10660f11"
     },
     {
       "path": "05_src/data_pipeline.py",
-      "bytes": 6316,
-      "sha256": "42aaf510f75bf47cd6e582371a15254459878fd6745cf1512740df90299ec0b9"
+      "bytes": 7646,
+      "sha256": "c588b2288243911d634744af945b7ae183f856e2a2dfe719369ece72917e084b"
     },
     {
       "path": "05_src/ddp_runtime.py",
@@ -304,8 +395,8 @@
     },
     {
       "path": "05_src/evaluation_phases.py",
-      "bytes": 8071,
-      "sha256": "4ea5c2fb561a8b6fb50538d64705dbd95bea732491bb831592537c8a4f3e18cd"
+      "bytes": 8137,
+      "sha256": "f6a8513cddddec7226711e905de25ec54f90b5f774a65b54e5a0e0d9e476cdbd"
     },
     {
       "path": "05_src/evaluation_summary.py",
@@ -344,8 +435,8 @@
     },
     {
       "path": "05_src/live_resources.py",
-      "bytes": 22512,
-      "sha256": "a47b769961704a1f546b8dbfc75c9bdc96ca96c98f7015bdfe98e10c9b22cead"
+      "bytes": 24082,
+      "sha256": "d039a109bb60aa7a72503f43cefaf32e1dbc58c75bd831897088d3fb02c4d9bd"
     },
     {
       "path": "05_src/metrics.py",
@@ -359,13 +450,13 @@
     },
     {
       "path": "05_src/nnunet_batches.py",
-      "bytes": 6404,
-      "sha256": "916ded7ccfa9364c32a281b08c39fdf309a50de5afd62aef3cbf4f416ea08a84"
+      "bytes": 6843,
+      "sha256": "225219ee64a8113bfbd67d3de5f23d262faf237d9a9b74c392975c8c99ed6fc7"
     },
     {
       "path": "05_src/nnunet_loader_adapter.py",
-      "bytes": 3061,
-      "sha256": "0ccce7df4e8b519f3ed90d1ecdd783b60917577745634ff1df5fbb2b019c9c41"
+      "bytes": 3333,
+      "sha256": "91d8d8d3cc1c48685351626921fc291dd6ec45966ad619badaca3ea55adc7b41"
     },
     {
       "path": "05_src/panel_publication/SOURCE.json",
@@ -429,8 +520,8 @@
     },
     {
       "path": "05_src/persistent_prediction.py",
-      "bytes": 10929,
-      "sha256": "b67831a42e131b693a629030006799d94d503b511e8cc935ac65068afe93636b"
+      "bytes": 14167,
+      "sha256": "d0ccf8604b05bfd75e4de8feaace1eab90da5665f41be77dadd50b97d8d90d83"
     },
     {
       "path": "05_src/pipeline_catalog.py",
@@ -444,8 +535,8 @@
     },
     {
       "path": "05_src/preparation_identity.py",
-      "bytes": 379,
-      "sha256": "4c7dfd32ca29ae4082328843763d90c99315912d00f0990636562d772729838f"
+      "bytes": 436,
+      "sha256": "737bc35f3ed318262d80e820f702535a290405ede3376ce474c98facfffb6bc0"
     },
     {
       "path": "05_src/prepare_nnunet.py",
@@ -466,6 +557,11 @@
       "path": "05_src/rank_checkpoint.py",
       "bytes": 2606,
       "sha256": "6a69fe9b74e0535d82a67e1d6c45b5a463d3f45f6c06dc25c77994a7b4491cc4"
+    },
+    {
+      "path": "05_src/read_admission.py",
+      "bytes": 3979,
+      "sha256": "c22f0ddb03382b580bd2f25da37c5f0c43e7e0ababc9c6599b4b70e013b60883"
     },
     {
       "path": "05_src/run_smoke_suite.py",
@@ -499,8 +595,8 @@
     },
     {
       "path": "05_src/server_prepare.py",
-      "bytes": 10017,
-      "sha256": "73e30dcf1e42065bb046ae2139e54feec5b4c75c32821c1c4139a907bfed30c5"
+      "bytes": 10098,
+      "sha256": "783f67547b6247359469ce8159a1920fe0abb73f3cbadc11b5e79528a114c637"
     },
     {
       "path": "05_src/server_profile.py",
@@ -549,8 +645,8 @@
     },
     {
       "path": "05_src/task_resources.py",
-      "bytes": 12201,
-      "sha256": "f470c586f472d147434bc1f497ce32a721946a133dae24089cb2f671bbccf03b"
+      "bytes": 12620,
+      "sha256": "8634892fbebb945966b3e51f3eb8a48c4ccfb63b3e5117d4c07777d8e0460074"
     },
     {
       "path": "05_src/task_runtime.py",
@@ -574,8 +670,8 @@
     },
     {
       "path": "05_src/training_feedback.py",
-      "bytes": 4255,
-      "sha256": "70ef9c6802a61975dd15c332dba54ab21398e871eb34d562b8cccf49d7b9c922"
+      "bytes": 5502,
+      "sha256": "6a515bc4f1c7c7f14940b21d25d2c5773a3f32041ad663bafc44b50808db23d6"
     },
     {
       "path": "05_src/training_policy.py",
@@ -727,14 +823,97 @@
     {
       "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\task6-panel-suite-release-green.log",
       "sha256": "18bc9077ef780b59457bd18bae5f59da81c73b8bd47caab71a21c3870307ab4f"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-checkpoint-api.json",
+      "sha256": "0c16b85244209454d9829768db0b98777a13e448b3d14aa8c4749ab5f741a19c"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-checkpoint-api.log",
+      "sha256": "4596100e02000da17f43714576bffc79a3013ffc47caf391d9147e50d342a2b7"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-control-green.log",
+      "sha256": "6162d58f449f951626f71ee1369594269b3a5f577b75cdf0d7dd214f55f14227"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-focused-1.log",
+      "sha256": "abb5e8919740d62f7d188579309f9ae1fd605e7a2707cd1374b7efe9809c66ce"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-focused-2.log",
+      "sha256": "630d84343cc0038bd0fba0e9e33fc63f34c33730fed88cb10a9bc9c7d14c0a5a"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-focused-3.log",
+      "sha256": "a6d0decbff4a1e5661c7e4b2ca2ed68a18c084cf2dacf1aed37b699ce95d7ad3"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-focused-4.log",
+      "sha256": "aefc9e8d7c9385fba55c783e046ee5feb21ef75e7df195a7863835298e593dfc"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-focused-api-2.log",
+      "sha256": "664593d41cabf65f1749ffb995aaf3a3b3d5621b5c7f6566766f9b32c820f6c9"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-focused-api-green.log",
+      "sha256": "080614fdc151677bbdd9e7f2138dad4c1b1e126d28a88dc50b2fc1314da152d4"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-focused-api.log",
+      "sha256": "46ac3872cc16fa85e4507dd4e4d4897acce4a39c0dec7022528e0aef99821c93"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-loader-api.json",
+      "sha256": "80dba432c2db05c3eb504ec3874436318fddf0f7053a43faf7807715ecb27276"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-loader-api.log",
+      "sha256": "fcf21c4d5e8cc44d9d7a1b00da4b96c7efd4340f3da4d98d25e0808bae0150fd"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-log-path-green.log",
+      "sha256": "d5e55f193d8d1a7070b277aefa3db01cac292d0ff729d0367f7349ce440bef95"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-log-path-red.log",
+      "sha256": "77e707e4ea1bd66f78aaefa372d4614ed50a10454f2a5bf70387cde737a94b19"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-panel-final-green.log",
+      "sha256": "289807322d9e7f23299cb33e3f63e3c1d8a24953cfd2b89ba4b395cc9af71971"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-panel-suite.log",
+      "sha256": "411ac261956cd0e06d2d0d50f66abffaa3afe545d120e5dd94609c17bc7a8bc1"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-prepare-api-2.log",
+      "sha256": "738f4783cb4c54f7ec6d860da2e40001e957d01bb3cb86f3497c4668978e05ca"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-prepare-api.log",
+      "sha256": "5a5e5ca7acff5c8733d0d88b45ca30b8996ff82ff008197d3742873a01c04b34"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-red.log",
+      "sha256": "5ed8b22f872f10b46d76d29993416fcbd7fb5a8013b9b3af7a969d623b288ceb"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\final-fixes-syntax-lf.json",
+      "sha256": "f340bce00693e52ce308a8736f5238de77c60c859aa71cd1394b839932e776b5"
+    },
+    {
+      "path": "D:\\projects\\sync-reports\\vista-v2-evidence\\local-posix-availability.json",
+      "sha256": "a817980f40ad805cd1b3cf10ceef941d62de3f0e2f15ff4babc23b061cef468e"
     }
   ],
   "status": "passed_with_explicit_environment_skips",
   "skip_groups": {
-    "missing_optional_CPU_Torch_Gloo_pinned_API": 32,
-    "Linux_proc_Bash_flock_or_POSIX_descriptor_requirements": 6,
-    "Windows_symlink_fixture_privilege": 4,
-    "missing_imaging_or_NIfTI_API": 2
+    "missing_optional_CPU_Torch_Gloo_pinned_API_or_imaging": 36,
+    "Linux_proc_Bash_flock_or_POSIX_descriptor_requirements": 7,
+    "Windows_symlink_fixture_privilege": 4
   },
   "skipped_tests": [
     "test_child_holds_lock_after_parent_descriptor_closes (test_task_posix.LinuxLifecycleTests.test_child_holds_lock_after_parent_descriptor_closes) ... skipped 'requires actual Linux /proc and flock'",
@@ -742,9 +921,9 @@
     "test_installer_signed_marker_reuse_and_legacy_marker_upgrade (test_panel_linux.LinuxPanelTests.test_installer_signed_marker_reuse_and_legacy_marker_upgrade) ... skipped 'requires actual Linux /proc, Bash and flock'",
     "test_verified_process_tree_includes_child_and_excludes_unrelated (test_panel_linux.LinuxPanelTests.test_verified_process_tree_includes_child_and_excludes_unrelated) ... skipped 'requires actual Linux /proc, Bash and flock'",
     "test_old_project_compatibility_file_is_not_accepted (test_evaluation_parallel.ParallelQueueTests.test_old_project_compatibility_file_is_not_accepted) ... skipped 'requires imaging dependencies; no model execution'",
-    "test_symlink_job_is_never_moved (test_pipeline_catalog.CatalogTests.test_symlink_job_is_never_moved) ... skipped \"OS does not permit directory symlinks: [WinError 1314] 客户端没有所需的特权。: 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmpm5kyb2v3\\\\\\\\results\\\\\\\\pipeline_v2\\\\\\\\prepare\\\\\\\\job1-source' -> 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmpm5kyb2v3\\\\\\\\results\\\\\\\\pipeline_v2\\\\\\\\prepare\\\\\\\\job1'\"",
-    "test_symlink_process_json_is_never_probed (test_pipeline_catalog.CatalogTests.test_symlink_process_json_is_never_probed) ... skipped \"OS does not permit file symlinks: [WinError 1314] 客户端没有所需的特权。: 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmpu6qv_5fd\\\\\\\\unindexed-foreign.json' -> 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmpu6qv_5fd\\\\\\\\results\\\\\\\\pipeline_v2\\\\\\\\prepare\\\\\\\\job1\\\\\\\\processes\\\\\\\\linked.json'\"",
-    "test_symlink_recycle_directory_is_rejected (test_pipeline_catalog.CatalogTests.test_symlink_recycle_directory_is_rejected) ... skipped \"OS does not permit directory symlinks: [WinError 1314] 客户端没有所需的特权。: 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmp94nwfnrb\\\\\\\\raw' -> 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmp94nwfnrb\\\\\\\\results\\\\\\\\pipeline_v2\\\\\\\\prepare\\\\\\\\.trash'\"",
+    "test_symlink_job_is_never_moved (test_pipeline_catalog.CatalogTests.test_symlink_job_is_never_moved) ... skipped \"OS does not permit directory symlinks: [WinError 1314] 客户端没有所需的特权。: 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmpzwho2o4x\\\\\\\\results\\\\\\\\pipeline_v2\\\\\\\\prepare\\\\\\\\job1-source' -> 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmpzwho2o4x\\\\\\\\results\\\\\\\\pipeline_v2\\\\\\\\prepare\\\\\\\\job1'\"",
+    "test_symlink_process_json_is_never_probed (test_pipeline_catalog.CatalogTests.test_symlink_process_json_is_never_probed) ... skipped \"OS does not permit file symlinks: [WinError 1314] 客户端没有所需的特权。: 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmp9ubyd4zt\\\\\\\\unindexed-foreign.json' -> 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmp9ubyd4zt\\\\\\\\results\\\\\\\\pipeline_v2\\\\\\\\prepare\\\\\\\\job1\\\\\\\\processes\\\\\\\\linked.json'\"",
+    "test_symlink_recycle_directory_is_rejected (test_pipeline_catalog.CatalogTests.test_symlink_recycle_directory_is_rejected) ... skipped \"OS does not permit directory symlinks: [WinError 1314] 客户端没有所需的特权。: 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmpgcz_a_s4\\\\\\\\raw' -> 'D:\\\\\\\\projects\\\\\\\\sync-reports\\\\\\\\vista-v2-test-temp\\\\\\\\tmpgcz_a_s4\\\\\\\\results\\\\\\\\pipeline_v2\\\\\\\\prepare\\\\\\\\.trash'\"",
     "test_cpu_tensor_batches_survive_pool_close_and_never_seed_cuda (test_batch_pool.BatchPoolTests.test_cpu_tensor_batches_survive_pool_close_and_never_seed_cuda) ... skipped 'optional Torch/NumPy CPU batch test'",
     "test_each_spawn_child_holds_shared_lock_and_parent_process_group (test_batch_pool.BatchPoolTests.test_each_spawn_child_holds_shared_lock_and_parent_process_group) ... skipped 'requires POSIX flock and descriptor inheritance'",
     "test_registration_failure_before_worker_detach_releases_lock (test_batch_pool.BatchPoolTests.test_registration_failure_before_worker_detach_releases_lock) ... skipped 'requires POSIX flock and descriptor inheritance'",
@@ -780,6 +959,78 @@
     "test_windows_reduction_failure_reaps_already_created_os_child (test_ddp_runtime.DistributedTests.test_windows_reduction_failure_reaps_already_created_os_child) ... skipped 'requires CPU Torch/Gloo; no dependency installed by test'",
     "test_real_workers_reconfigure_preserves_model_consumed_cursor (test_stage_coordinator.ReplayReconfigurationTests.test_real_workers_reconfigure_preserves_model_consumed_cursor) ... skipped 'optional actual CPU Torch integration'",
     "test_secret_key_block_and_symlink_are_rejected_or_removed (test_stage_completion.DiagnosticExport.test_secret_key_block_and_symlink_are_rejected_or_removed) ... skipped 'host does not permit creating symlink fixture'",
-    "test_real_headers_only_admission_and_truncated_logits_rejected (test_stage_completion.TailGeometryTests.test_real_headers_only_admission_and_truncated_logits_rejected) ... skipped 'actual NIfTI API runtime required'"
-  ]
+    "test_real_headers_only_admission_and_truncated_logits_rejected (test_stage_completion.TailGeometryTests.test_real_headers_only_admission_and_truncated_logits_rejected) ... skipped 'actual NIfTI API runtime required'",
+    "test_preparation_inherits_lock_and_registered_identity_survives_gpu_death (test_final_resource_fixes.OwnedWriters.test_preparation_inherits_lock_and_registered_identity_survives_gpu_death) ... skipped 'requires actual Linux /proc and flock'",
+    "test_parallel_export_preserves_pixels_hashes_split_and_partial_commits (test_final_export_api.ParallelSourceExport.test_parallel_export_preserves_pixels_hashes_split_and_partial_commits) ... skipped 'requires actual NIfTI CPU runtime'",
+    "test_actual_lazy_slices_hold_slot_and_transforms_release_it (test_final_loader_api.LazyBloscAdmission.test_actual_lazy_slices_hold_slot_and_transforms_release_it) ... skipped 'requires pinned nnU-Net CPU API'"
+  ],
+  "previous_source_base_commit": "0f1baa0858c600662f10840aa203c4ba860c33a3",
+  "final_fix_wave": {
+    "findings": {
+      "P2-1": "queue directly owns and registers preparation writer; pass_fds; cleanup independent of dead GPU leader",
+      "P2-2": "actual reader/copy/hash/lazy patch boundaries use local OS-lock slots; observed host PSI action applied; causal storage/IPC remains unknown",
+      "P2-3": "compatible completed RSS high-water conservatively raises header prior and active reservations; stale/incompatible rejected",
+      "P3-1": "bounded per-case export with unchanged source/pixel/hash/split/partial commit contracts"
+    },
+    "memory_scope": "whole process lifetime RSS high-water, never incremental/private; 10 percent floor margin; geometry/stage/implementation match; max age24h",
+    "read_scope": "CPU preparation/fingerprint/export/prediction gates per queue; training gate per rank, shared by its train/validation loaders; actual lazy Blosc crop reads admitted; transforms outside slots",
+    "control_location": "configured system TMP; default local temporary storage, no verified universal mount-type claim",
+    "lifecycle_proof": "actual Windows direct children and writer cessation passed; Linux identity/flock test present but conditional skipped; no WSL installed",
+    "remaining_limits": [
+      "initial simultaneous cases still use header estimates before any natural completion",
+      "RSS includes imports/shared pages and is a conservative floor, not proof of a transient peak bound",
+      "host PSI does not establish storage versus IPC causal attribution",
+      "managed uninterruptible writers may exit slowly; their inherited lock must remain held",
+      "no real CT/Linux CUDA/NCCL throughput acceptance"
+    ],
+    "final_aggregate": {
+      "run": 354,
+      "passed": 307,
+      "skipped": 47,
+      "seconds": 86.406,
+      "log": "final-fixes-panel-final-green.log"
+    },
+    "historical_iterations": [
+      {
+        "log": "final-fixes-red.log",
+        "result": "5 tests:1 failure,4 missing-API errors before implementation"
+      },
+      {
+        "log": "final-fixes-focused-1.log",
+        "result": "aborted at obsolete nested-pool fixture; no aggregate"
+      },
+      {
+        "log": "final-fixes-focused-2.log",
+        "result": "setup UTF-8 read failed; unchanged obsolete fixture run interrupted; no aggregate"
+      },
+      {
+        "log": "final-fixes-focused-3.log",
+        "result": "63 tests:1 old policy fixture failure,3 skips"
+      },
+      {
+        "log": "final-fixes-focused-4.log",
+        "result": "68 tests:1 old policy fixture failure,4 skips"
+      },
+      {
+        "log": "final-fixes-prepare-api.log",
+        "result": "first actual preparation child failed; original fixture did not retain child traceback, cause unavailable; do not attribute to a guessed resource issue"
+      },
+      {
+        "log": "final-fixes-focused-api.log",
+        "result": "70 tests: duplicate image hash fixture error,2 skips"
+      },
+      {
+        "log": "final-fixes-focused-api-2.log",
+        "result": "74 tests: NumPy keys equality fixture error,2 skips; parallel export passed"
+      },
+      {
+        "log": "final-fixes-panel-suite.log",
+        "result": "353 tests:306 passed,47 skipped; later durable log path defect found in self-review"
+      },
+      {
+        "log": "final-fixes-log-path-red.log",
+        "result": "1 failing regression for actual durable failure log path; fixed before final aggregate"
+      }
+    ]
+  }
 }

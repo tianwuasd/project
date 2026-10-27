@@ -302,8 +302,15 @@ def feedback_policy(settings, windows, capacity):
         row['memory_budget_bytes']=capacity['rank_settings'][rank]['memory_budget_bytes']
     recent=windows[-2:]
     eligible=len(recent)==2 and all(w.get('steps',0)>=20 and w.get('seconds',0)>=30 for w in recent)
-    if eligible and any(w.get('bottleneck') in ('storage','ipc') for w in recent):
-        action='limit_reads';reasons.append('storage/IPC bottleneck; preserve compute and limit new read/prefetch admission')
+    if eligible and any((w.get('io_pressure') or {}).get('avg10',0)>=10 for w in recent):
+        action='limit_reads';reasons.append('observed host I/O pressure; causal storage/IPC classification unavailable; retain compute pools and reduce speculative submissions')
+        for row in result['rank_settings']:
+            row['read_concurrency']=min(2,max(1,row['train_workers'],row['val_workers']))
+            row['read_admission_scope']='per-rank actual case open/decompression and lazy patch reads; transforms outside slots'
+            row['prefetch']=min(row['prefetch'],max(1,row['train_workers']))
+            row['val_prefetch']=min(row['val_prefetch'],max(1,row['val_workers']))
+            row['estimated_ram_bytes']=row['base_memory_bytes']+(row['prefetch']+row['val_prefetch'])*result['batch_bytes']
+        result['estimated_ram_bytes']=result.get('source_shared_bytes',0)+sum(r['estimated_ram_bytes'] for r in result['rank_settings'])
     elif eligible and all(w.get('wait_fraction',0)>.2 for w in recent):
         cpu=capacity['cpu_budget'];ram=capacity.get('memory_budget_bytes');ranks=settings['rank_count']
         targets=[]
@@ -324,6 +331,7 @@ def feedback_policy(settings, windows, capacity):
                 bound=max(0,(rank_ram-old['val_workers']*private-(3+1+bool(old['val_workers']))*batch)//private)
                 target=min(target,bound)
             candidate=copy.deepcopy(old);candidate['train_workers']=max(old['train_workers'],target)
+            candidate['read_concurrency']=max(1,candidate['train_workers'],candidate['val_workers'])
             delta=candidate['train_workers']-old['train_workers']
             candidate['resident_pool_bytes']+=delta*old.get('worker_private_bytes',2*batch)
             candidate['base_memory_bytes']=candidate['resident_pool_bytes']+3*batch
@@ -339,5 +347,11 @@ def feedback_policy(settings, windows, capacity):
                 result['rank_settings'][rank]=candidate;result['estimated_ram_bytes']=proposed;action='expand'
         result['total_cpu_slots']=sum(r['total_cpu_slots'] for r in result['rank_settings'])
         if action=='expand':reasons.append('two valid high-wait windows; bounded worker expansion at replay-safe boundary')
+    if action=='limit_reads' and result['rank_settings']==settings['rank_settings']:
+        action='keep';reasons.append('pressure admission already applied; preserve resident pools')
+    if (action=='keep' and eligible and all(w.get('io_pressure') is not None and w['io_pressure'].get('avg10',0)<10 for w in recent)
+            and any(r.get('read_concurrency',max(1,r['train_workers'],r['val_workers']))<max(1,r['train_workers'],r['val_workers']) for r in result['rank_settings'])):
+        action='restore_reads';reasons.append('two pressure-clear windows; restore reads within retained compute allocation')
+        for row in result['rank_settings']:row['read_concurrency']=max(1,row['train_workers'],row['val_workers'])
     if not reasons:reasons.append('retain allocation absent sustained wait, real pressure, fault or degradation')
     return dict(action=action,settings=result,reasons=reasons,boundary='replay_safe_batch_or_full_epoch')

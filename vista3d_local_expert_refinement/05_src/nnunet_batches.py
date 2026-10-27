@@ -65,6 +65,9 @@ class NNUNetBatchSource:
             initial=config.patch_size
         dataset_cls=infer_dataset_class(s['folder'])
         dataset=dataset_cls(s['folder'],identifiers=s['ids'],folder_with_segs_from_previous_stage=None)
+        from read_admission import admitted_call
+        load=dataset.load_case
+        dataset.load_case=lambda *a,**k:admitted_call(load,*a,**k)
         self._loader=configured_loader_class()(dataset,s['local_batch'],initial,config.patch_size,labels,
             oversample_foreground_percent=s['oversample'],sampling_probabilities=None,pad_sides=None,
             transforms=transforms,probabilistic_oversampling=s['probabilistic_oversampling'],
@@ -72,8 +75,10 @@ class NNUNetBatchSource:
         self.reseed(self._seed)
 
     def __next__(self):
-        if self._loader is None:self._build()
-        return next(self._loader)
+        from read_admission import gate_scope
+        with gate_scope(self.spec.get('read_gate')):
+            if self._loader is None:self._build()
+            return next(self._loader)
 
 
 def build_loaders(trainer,resource):
@@ -93,6 +98,8 @@ def build_loaders(trainer,resource):
     batch_bytes=int(resource.get('batch_bytes',0))
     resource=resource['rank_settings'][rank] if 'rank_settings' in resource else resource
     batch_bytes=int(resource.get('batch_bytes',batch_bytes))
+    from read_admission import create_gate
+    base['read_gate']=str(create_gate(resource.get('read_concurrency',max(1,resource.get('train_workers',1),resource.get('val_workers',1)))))
     for stage,ids,key,legacy,threadkey,prefetchkey,steps in [
         ('train',train_ids,'train_workers','augmentation_workers','worker_threads','prefetch',trainer.num_iterations_per_epoch),
         ('validation',val_ids,'val_workers','validation_workers','val_worker_threads','val_prefetch',trainer.num_val_iterations_per_epoch)]:

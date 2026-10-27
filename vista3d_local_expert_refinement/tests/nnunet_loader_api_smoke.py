@@ -42,7 +42,8 @@ def main():
                 use_mask_for_norm=[False],architecture={'network_class_name':
                 'dynamic_network_architectures.architectures.unet.PlainConvUNet',
                 'arch_kwargs':{},'_kw_requires_import':[]})})
-        base=dict(plans=plans,dataset_json=dataset,configuration='3d_fullres',folder=str(folder),
+        from read_admission import create_gate
+        base=dict(read_gate=str(create_gate(1)),plans=plans,dataset_json=dataset,configuration='3d_fullres',folder=str(folder),
             local_batch=2,oversample=.5,probabilistic_oversampling=False,rotation=[-.2,.2],
             dummy_2d=False,initial_patch=[20,20,20],mirror_axes=[0,1,2],
             deep_supervision=[[1.,1.,1.],[.5,.5,.5]],ids=['case0','case1'])

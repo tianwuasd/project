@@ -10,7 +10,8 @@ def slowest_window(rows):
     supply=max(rows,key=lambda r:r['wait_fraction'])
     # DDP can make a healthy peer's total wall time slightly longer while it
     # waits for the rank whose data supply stalled. Preserve that supply signal.
-    return dict(slow,wait_fraction=supply['wait_fraction'],slowest_wall_rank=slow['rank'],
+    pressure=max((r.get('io_pressure') or {}).get('avg10',0) for r in rows)
+    return dict(slow,wait_fraction=supply['wait_fraction'],io_pressure={'avg10':pressure} if any(r.get('io_pressure') is not None for r in rows) else None,slowest_wall_rank=slow['rank'],
                 supply_wait_rank=supply['rank'],rank_windows=rows,
                 selection='maximum rank supply wait fraction; slowest wall metadata retained')
 
@@ -24,6 +25,14 @@ def apply_pools(trainer,resource,rank):
     row=resource['rank_settings'][rank]
     loaders=[trainer.dataloader_train,trainer.dataloader_val]
     if not all(getattr(getattr(source_pool(l),'loader',source_pool(l)),'replayable',False) for l in loaders):return False
+    from read_admission import create_gate,update_gate
+    sources=[getattr(source_pool(loader),'loader',source_pool(loader)) for loader in loaders]
+    for source in sources:
+        if hasattr(source,'spec'):
+            gate=source.spec.get('read_gate')
+            limit=row.get('read_concurrency',max(1,row['train_workers'],row['val_workers']))
+            if gate:update_gate(gate,limit)
+            else:source.spec['read_gate']=str(create_gate(limit))
     # Both outer wrappers rewind to model consumption before inner pool close.
     for loader in loaders:loader.pause()
     from rank_affinity import bind
@@ -51,7 +60,14 @@ class RollingFeedback:
         self.steps+=1;self.wait+=timing['batch_wait_seconds']
         if self.steps%20:return
         seconds=self.clock()-self.started
-        local=dict(rank=self.rank,steps=self.steps,seconds=seconds,wait_fraction=self.wait/max(seconds,1e-9))
+        pressure=None
+        try:
+            raw=Path('/proc/pressure/io').read_text().splitlines()[0]
+            pressure={k:float(v) for k,v in (item.split('=') for item in raw.split()[1:])}
+        except (OSError,ValueError,IndexError):pass
+        local=dict(rank=self.rank,steps=self.steps,seconds=seconds,wait_fraction=self.wait/max(seconds,1e-9),
+            io_pressure=pressure,pressure_scope='host PSI; not attribution to this loader',
+            bottleneck='unknown',classification_status='storage/IPC causal classification unavailable')
         rows=[None]*self.world
         # Every rank reaches exactly the same update boundary. A failed worker
         # raises locally; the parent supervisor terminates the blocked peers.
@@ -67,13 +83,15 @@ class RollingFeedback:
             packet[0]['capacity_scope']='retained stage allocation; no own-busy idle/RAM subtraction; extra external capacity unmeasured'
         dist.broadcast_object_list(packet,src=0)
         decision=packet[0]
-        if decision['action'] in ('expand','recover'):
+        decision['requested_settings']=copy.deepcopy(decision['settings'])
+        if decision['action'] in ('expand','recover','limit_reads','restore_reads'):
             applied=apply_pools(trainer,decision['settings'],self.rank)
             if applied is False:self.pending=decision['settings'];decision['applied_boundary']='deferred_full_epoch'
             else:
                 self.resource=decision['settings'];decision['applied_boundary']='replay_safe_batch'
                 decision['affinity']=applied
         else:decision['applied_boundary']='none'
+        decision['applied_settings']=copy.deepcopy(self.resource)
         self.events.append(dict(schema_version=2,epoch=trainer.current_epoch,window=window,decision=decision))
         write_json(self.output/f'feedback.rank{self.rank}.json',self.events)
         self.reset()

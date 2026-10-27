@@ -158,7 +158,7 @@ class LiveResourcesTests(unittest.TestCase):
         self.assertEqual(live.feedback_policy(settings,[],reduced)['action'],'recover')
         quiet=dict(window,wait_fraction=.05)
         self.assertEqual(live.feedback_policy(settings,[quiet,quiet],capacity)['action'],'keep')
-        storage=dict(window,bottleneck='storage')
+        storage=dict(window,io_pressure={'avg10':40})
         self.assertEqual(live.feedback_policy(settings,[storage,storage],capacity)['action'],'limit_reads')
 
 

@@ -41,8 +41,8 @@ def begin_cpu_stage(work,phase):
     from runtime_observations import event
     event(work,'stage.cpu_entry',stage=phase,snapshot=snapshot,policy=policy)
     if policy['workers']<1:raise MemoryError(phase+' capacity: '+policy['capacity_status'])
-    # Export and header inspection are serial. Planning/compression use later
-    # supported-leaf decisions, not this deliberately serial entry setting.
+    # Header entry is serial; export dispatch and supported compute leaves use
+    # their own later fresh bounded decisions.
     os.environ.update(thread_environment(1))
     return snapshot
 
@@ -51,12 +51,16 @@ def case_budget(work,paths,spacing=None,*,maximum=None,phase="prepare",supported
     """Read headers only; bound raw/resampled logits and temporary arrays per case."""
     import nibabel as nib
     paths=list(paths)
-    largest=0
+    largest=0;keys=[]
+    from case_memory import compatibility,corrected_estimate
     for path in paths:
         image=nib.load(str(path));voxels=math.prod(image.shape)
+        keys.append(compatibility(image,spacing,phase))
         if spacing:
             voxels=max(voxels,math.prod(max(1,math.ceil(n*s/t)) for n,s,t in zip(image.shape,image.header.get_zooms(),spacing)))
         largest=max(largest,voxels*128+1024**3)
+    header_prior=largest
+    largest,evidence=corrected_estimate(work,largest,keys)
     from live_resources import case_policy
     snapshot=probe()
     limit=len(paths) if maximum is None else min(len(paths),int(maximum))
@@ -64,7 +68,9 @@ def case_budget(work,paths,spacing=None,*,maximum=None,phase="prepare",supported
     policy=case_policy(snapshot,limit,largest,supported_threads=supported)
     report=dict(snapshot | policy,
                 rule='header raw/resampled voxels *128 +1 GiB; aggregate CPU80%/RAM80%; no fixed case cap')
-    report.update(stage=phase,observed_at=__import__('time').time(),actual_cpu_use=None,
+    report.update(header_prior_bytes=header_prior,memory_feedback=evidence,
+                  memory_evidence_status='compatible completed process high-water floor' if evidence else 'missing compatible completed peak; header prior only',
+                  stage=phase,observed_at=__import__('time').time(),actual_cpu_use=None,
                   resampling_threads=1,resampling_note='SciPy resampling remains single threaded; supported compression/Torch leaves only')
     write_json(Path(work)/'00_admin/cpu-case-budget.json',report)
     from runtime_observations import event

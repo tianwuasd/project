@@ -1,6 +1,7 @@
 """Project-local, fail-closed adapter for nnU-Net 2.8.1's inner thread limit.
 
-Only the literal ``threadpool_limits(limits=1)`` argument is changed. Crop,
+The literal ``threadpool_limits(limits=1)`` argument is changed. The local crop
+call is admitted around actual lazy-array slicing; its implementation, crop,
 oversampling, transforms, dtypes, assembly and RNG operations are upstream code.
 No upstream module or installed file is mutated.
 """
@@ -30,6 +31,9 @@ def configured_loader_class():
                                     attr='worker_threads', ctx=ast.Load())
     ast.fix_missing_locations(tree)
     namespace = dict(vars(data_loader))
+    from read_admission import admitted_call
+    crop=namespace['crop_and_pad_nd']
+    namespace['crop_and_pad_nd']=lambda *a,**k:admitted_call(crop,*a,**k)
     exec(compile(tree, inspect.getsourcefile(upstream) + ':project-thread-adapter', 'exec'), namespace)
     adapted = namespace['generate_train_batch']
 
@@ -55,5 +59,5 @@ def configured_loader_class():
     ConfiguredNNUNetDataLoader.adapter_provenance = dict(
         nnunet_version=version, source_file=inspect.getsourcefile(upstream),
         source_sha256=hashlib.sha256(source.encode()).hexdigest(),
-        operation='single AST substitution: limits=1 -> limits=self.worker_threads; scoped torch threads')
+        operation='single AST thread substitution; scoped torch threads; admitted original crop/lazy slicing, transforms outside read slot')
     return ConfiguredNNUNetDataLoader

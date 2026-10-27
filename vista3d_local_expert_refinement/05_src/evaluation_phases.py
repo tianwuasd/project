@@ -26,7 +26,8 @@ def preprocess_case(work,model,case_id,threads=1):
         prep=Path(work)/f'04_data/derived/nnUNet_preprocessed/Dataset{split["dataset_id"]:03d}_{model["fold"]}'
         manager=PlansManager(read_json(prep/'WholeheartBaselinePlans.json'))
         config=manager.get_configuration('3d_fullres');dataset=read_json(prep/'dataset.json')
-        reader=manager.image_reader_writer_class()
+        from read_admission import AdmittedReader
+        reader=AdmittedReader(manager.image_reader_writer_class())
         case=next(c for c in read_json(Path(work)/'04_data/manifests/case_inventory.json')['cases'] if c['case_id']==case_id)
         started=time.perf_counter();images,properties=reader.read_images([case['image']])
         adapter=PreprocessAdapterFromNpy([images],[None],[properties],[None],manager,dataset,config,

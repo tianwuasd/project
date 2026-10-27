@@ -71,6 +71,39 @@ def validate_geometry(case):
     return image, label, mapped
 
 
+def export_case(root,fold,split,cases,case_id):
+    if case_id not in split['train']+split['val']:raise ValueError('export case outside frozen source scope')
+    out=Path(root)/"04_data/derived/nnUNet_raw"/f"Dataset{split['dataset_id']:03d}_{fold}"
+    case = next(c for c in cases if c["case_id"]==case_id)
+    from read_admission import read_slot
+    with read_slot():image, label, mapped = validate_geometry(case)
+    image_out = out / "imagesTr" / f"{case_id}_0000.nii.gz"
+    copied_ok = False
+    if image_out.exists():
+        with read_slot(),image_out.open("rb") as stream:
+            copied_ok = hashlib.file_digest(stream, "sha256").hexdigest() == case["image_sha256"]
+    if not copied_ok:
+        temporary = image_out.with_name(image_out.name + ".partial")
+        with read_slot():shutil.copyfile(case["image"], temporary)
+        os.replace(temporary, image_out)
+    header = label.header.copy()
+    header.set_data_dtype(np.uint8)
+    converted = nib.Nifti1Image(mapped, label.affine, header)
+    path = out / "labelsTr" / f"{case_id}.nii.gz"
+    temporary = path.with_name(case_id + ".partial.nii.gz")
+    nib.save(converted, temporary)
+    os.replace(temporary, path)
+    with read_slot():
+        restored = nib.load(path);restored_array=np.asanyarray(restored.dataobj)
+    if not np.array_equal(restored_array, mapped) or not np.allclose(restored.affine, image.affine, atol=1e-4, rtol=0):
+        raise ValueError(f"写入后验证失败: {case_id}")
+    record={"case_id": case_id, "shape": list(image.shape), "spacing_mm": list(map(float, image.header.get_zooms())), "geometry_and_label_roundtrip": "passed"}
+    print(f"exported {fold}/{case_id}", flush=True)
+    from server_data import write_json
+    write_json(out/"export_case_records"/f"{case_id}.json",record)
+    return record
+
+
 def export_fold(root, fold, split, cases, resume=False):
     """为每个外层实验建立独立数据集；只复制来源病例。"""
     validate_split(split, cases)
@@ -86,31 +119,16 @@ def export_fold(root, fold, split, cases, resume=False):
     (out / "labelsTr").mkdir(exist_ok=resume)
     save_json(saved_split, split)
     lookup = {c["case_id"]: c for c in cases}
-    records = []
-    for case_id in split["train"] + split["val"]:
-        case = lookup[case_id]
-        image, label, mapped = validate_geometry(case)
-        image_out = out / "imagesTr" / f"{case_id}_0000.nii.gz"
-        copied_ok = False
-        if image_out.exists():
-            with image_out.open("rb") as stream:
-                copied_ok = hashlib.file_digest(stream, "sha256").hexdigest() == case["image_sha256"]
-        if not copied_ok:
-            temporary = image_out.with_name(image_out.name + ".partial")
-            shutil.copyfile(case["image"], temporary)
-            os.replace(temporary, image_out)
-        header = label.header.copy()
-        header.set_data_dtype(np.uint8)
-        converted = nib.Nifti1Image(mapped, label.affine, header)
-        path = out / "labelsTr" / f"{case_id}.nii.gz"
-        temporary = path.with_name(case_id + ".partial.nii.gz")
-        nib.save(converted, temporary)
-        os.replace(temporary, path)
-        restored = nib.load(path)
-        if not np.array_equal(np.asanyarray(restored.dataobj), mapped) or not np.allclose(restored.affine, image.affine, atol=1e-4, rtol=0):
-            raise ValueError(f"写入后验证失败: {case_id}")
-        records.append({"case_id": case_id, "shape": list(image.shape), "spacing_mm": list(map(float, image.header.get_zooms())), "geometry_and_label_roundtrip": "passed"})
-        print(f"exported {fold}/{case_id}", flush=True)
+    from task_resources import case_budget
+    from cpu_case_queue import run
+    import sys
+    ids=split['train']+split['val']
+    paths=[lookup[cid]['image'] for cid in ids]
+    refresh=lambda:case_budget(root,paths,phase='source_export',supported_threads=1)
+    budget=refresh()
+    commands=[(cid,[sys.executable,'-B',str(Path(__file__).resolve()),'--export-case',str(root),fold,cid]) for cid in ids]
+    run(commands,budget['workers'],Path(root)/f'00_admin/export_logs/{fold}',lambda _:None,refresh=refresh)
+    records=[load_json(out/'export_case_records'/f'{cid}.json') for cid in ids]
     save_json(out / "dataset.json", {"channel_names": {"0": "CT" if split["modality"] == "CT" else "MRI"}, "labels": LABELS, "numTraining": len(records), "file_ending": ".nii.gz", "overwrite_image_reader_writer": "NibabelIO"})
     save_json(out / "source_only_split.json", split)
     save_json(root / f"09_reports/{fold}_conversion.json", records)
@@ -120,7 +138,13 @@ def export_fold(root, fold, split, cases, resume=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--export", nargs="*", choices=list(FOLDS), default=[])
+    parser.add_argument("--export-case",nargs=3,metavar=("ROOT","FOLD","CASE"))
     args = parser.parse_args()
+    if args.export_case:
+        root,fold,cid=args.export_case;root=Path(root)
+        export_case(root,fold,load_json(root/"04_data/manifests/splits_v1.json")["folds"][fold],
+            load_json(root/"04_data/manifests/case_inventory.json")["cases"],cid)
+        return
     inventory_path = ROOT / "04_data/manifests/case_inventory.json"
     cases = load_json(inventory_path)["cases"]
     splits = load_json(ROOT / "04_data/manifests/splits_v1.json")["folds"]

@@ -104,7 +104,8 @@ def prepare(fold, gpu_memory):
         extractor.dataset = {i: extractor.dataset[i] for i in split["train"]}
         extractor.dataset_json = dict(extractor.dataset_json, numTraining=len(split["train"]))
         from case_execution import cpu_scope
-        with cpu_scope(1):extractor.run(overwrite_existing=True)
+        from read_admission import fingerprint_admission
+        with cpu_scope(1),fingerprint_admission():extractor.run(overwrite_existing=True)
         write_json(provenance, {"fit_ids": split["train"], "excluded_val": split["val"], "excluded_target": split["target"], "sha256": digest(fingerprint)})
     prov = load_json(provenance)
     if prov["fit_ids"] != split["train"] or prov["sha256"] != digest(fingerprint):

@@ -60,6 +60,8 @@ def fingerprint_workers(work,raw,case_ids):
     from task_resources import case_budget
     budget=case_budget(work,[Path(raw)/'imagesTr'/f'{cid}_0000.nii.gz' for cid in case_ids],phase='fit_fingerprint',supported_threads=1)
     if budget['workers']<1:raise MemoryError('fit fingerprint capacity: '+budget['capacity_status'])
+    from read_admission import create_gate
+    os.environ['VISTA_READ_GATE']=str(create_gate(budget['read_concurrency']))
     return budget['workers']
 
 
@@ -91,7 +93,8 @@ def prepare_one(work,fold,case_id,assessment=False):
     if not output.resolve().is_relative_to(staging.resolve()):raise ValueError('病例写出路径超出暂存目录')
     started=time.monotonic()
     try:
-        with leaf_threads(count) as evidence:
+        from read_admission import reader_scope
+        with leaf_threads(count) as evidence,reader_scope(manager.image_reader_writer_class):
             config.preprocessor_class(verbose=False).run_case_save(str(output),
                 [str(raw/'imagesTr'/f'{case_id}_0000.nii.gz')],str(raw/'labelsTr'/f'{case_id}.nii.gz'),
                 manager,config,read_json(raw/'dataset.json'))
@@ -101,7 +104,13 @@ def prepare_one(work,fold,case_id,assessment=False):
             source=staging/(case_id+suffix);destination=prep/config.data_identifier/(case_id+suffix)
             os.replace(source,destination)
         from task_resources import process_observation
-        evidence.update(process_observation(),seconds=time.monotonic()-started,torch_threads=torch.get_num_threads())
+        import nibabel as nib
+        from case_memory import compatibility
+        evidence.update(process_observation(),seconds=time.monotonic()-started,torch_threads=torch.get_num_threads(),
+            status='completed',observed_at=time.time(),
+            compatibility=compatibility(nib.load(str(raw/'imagesTr'/f'{case_id}_0000.nii.gz')),list(reversed(config.spacing)),
+                'assessment_prepare' if assessment else 'prepare'),
+            output_bytes=sum((prep/config.data_identifier/(case_id+s)).stat().st_size for s in ['.b2nd','_seg.b2nd','.pkl']))
         done=prep/'assessment_case_completion'/f'{case_id}.json' if assessment else prep/'server_case_completion'/config.data_identifier/f'{case_id}.complete.json'
         write_json(done,dict(plan_sha256=digest(plan)))
         write_json(work/f'00_admin/case-observations/{fold}_{case_id}.json',evidence)

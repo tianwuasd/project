@@ -220,10 +220,11 @@ class PredictionLifecycle(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp,patch.dict(os.environ,{},clear=True):
             work=Path(temp);processes=[];completed=set();idle_calls=[]
             class Process:
-                def __init__(self,command,**kwargs):self.directory=Path(command[-2]);self.pid=len(processes);self.returncode=None;processes.append(self)
+                def __init__(self,command,**kwargs):
+                    self.preparation='--prepare' in command;self.directory=Path(command[-3] if self.preparation else command[-2]);self.pid=len(processes);self.returncode=None;processes.append(self)
                 def poll(self):
                     request=self.directory/'request.json'
-                    if request.exists() and (self.pid!=0 or len(processes)>1):
+                    if not self.preparation and request.exists() and (self.pid!=1 or len(processes)>2):
                         row=read_json(request);completed.update(r['case_id'] for r in row['records'])
                         write_json(self.directory/'response.json',{'id':row['id']})
                     return self.returncode
@@ -235,7 +236,7 @@ class PredictionLifecycle(unittest.TestCase):
             records=[dict(fold='f',method='B0',index=0,case_id=c,status='pending') for c in ['a','b']]
             with patch('evaluation_gpu.idle_gpus',side_effect=idle),patch('task_resources.prediction_budget',return_value=dict(workers=2,threads_per_worker=1,cpu_budget=2)),patch('evaluation_contract.cached',side_effect=lambda w,m,c,*args:c in completed),patch.object(resident.subprocess,'Popen',Process),patch.object(resident,'stop_owned_process'),patch.object(resident.time,'sleep'):
                 resident.run(records,[dict(fold='f',method='B0')],'sha',dict(max_gpus=2),work)
-            self.assertEqual(len(processes),2);self.assertEqual(completed,{'a','b'})
+            self.assertEqual(len(processes),4);self.assertEqual(completed,{'a','b'})
 
     def test_twelve_cases_use_all_eight_admitted_workers_and_preserve_partial_failure(self):
         import persistent_prediction as resident
@@ -245,11 +246,11 @@ class PredictionLifecycle(unittest.TestCase):
                 work=Path(temp);completed=set();processes=[];assignments=[]
                 class Process:
                     def __init__(self,command,**kwargs):
-                        self.directory=Path(command[-2]);self.pid=10+len(processes);self.returncode=None;self.sequence=0
+                        self.preparation='--prepare' in command;self.directory=Path(command[-3] if self.preparation else command[-2]);self.pid=10+len(processes);self.returncode=None;self.sequence=0
                         processes.append(self)
                     def poll(self):
                         request=self.directory/'request.json'
-                        if request.exists():
+                        if not self.preparation and request.exists():
                             record=read_json(request)
                             if record['id']!=self.sequence:
                                 self.sequence=record['id'];rows=record['records'];assignments.append((self.pid,[r['case_id'] for r in rows]))
@@ -276,17 +277,11 @@ class PredictionLifecycle(unittest.TestCase):
                     self.assertEqual(len(completed),12)
                     self.assertTrue(all(len(cases)<=2 for _,cases in assignments))
 
-    def test_resident_worker_reuses_model_and_prep_child_hides_cuda(self):
+    def test_resident_worker_reuses_model_and_requests_supervised_prep(self):
         import types
         from server_data import write_json,read_json,digest
         import persistent_prediction as resident
         calls=[];loaded=[]
-        class Future:
-            def result(self):return {'prepared':True}
-        class Pool:
-            def __init__(self,**kw):self.kw=kw
-            def submit(self,fn,*args):calls.append(('prepare',args[2],os.environ['CUDA_VISIBLE_DEVICES']));return Future()
-            def shutdown(self,**kw):calls.append(('closed',))
         with tempfile.TemporaryDirectory() as temp:
             work=Path(temp);directory=work/'session';directory.mkdir()
             checkpoint=work/'checkpoint';checkpoint.write_text('fixture')
@@ -299,19 +294,22 @@ class PredictionLifecycle(unittest.TestCase):
                 self.assertIs(kw['predictor'],predictor);calls.append(('infer',cid))
             def publish(path,value):
                 write_json(path,value)
+                if Path(path).name=='prep-request.json':
+                    calls.append(('prepare',value['case_id']))
+                    write_json(directory/'prep-response.json',dict(id=value['id'],prepared={'prepared':True}))
                 if Path(path).name=='response.json':
                     if value['id']==1:write_json(directory/'request.json',dict(id=2,threads=2,records=[dict(index=0,case_id='c')]))
                     else:write_json(directory/'stop.json',{})
             torch=types.SimpleNamespace(set_num_threads=lambda n:None,cuda=types.SimpleNamespace(empty_cache=lambda:None))
             with patch.dict(os.environ,{'WHOLE_HEART_WORKSPACE':str(work),'CUDA_VISIBLE_DEVICES':'GPU-one'}),                 patch.dict(sys.modules,{'torch':torch,'evaluation':types.SimpleNamespace(make_predictor=make),
                     'evaluation_phases':types.SimpleNamespace(preprocess_case=lambda *a:None,infer=infer),
-                    'prepare_nnunet':types.SimpleNamespace(configure_paths=lambda:None)}),                 patch('concurrent.futures.ProcessPoolExecutor',Pool),patch.object(resident,'write_json',side_effect=publish):
+                    'prepare_nnunet':types.SimpleNamespace(configure_paths=lambda:None)}),                 patch.object(resident,'write_json',side_effect=publish):
                 resident.worker(directory,digest(frozen))
             self.assertEqual(len(loaded),1)
             self.assertEqual([r[1] for r in calls if r[0]=='infer'],['a','b','c'])
-            self.assertEqual(calls[0],('prepare','a',''))
-            self.assertLess(calls.index(('prepare','b','GPU-one')),calls.index(('infer','a')))
-            self.assertEqual(calls[-1],('closed',))
+            self.assertEqual(calls[0],('prepare','a'))
+            self.assertLess(calls.index(('prepare','b')),calls.index(('infer','a')))
+            self.assertNotIn(('closed',),calls)
 
     def test_assessment_releases_unused_then_exits_gpu_before_tail_and_identity_never_waits_after(self):
         from server_data import write_json
