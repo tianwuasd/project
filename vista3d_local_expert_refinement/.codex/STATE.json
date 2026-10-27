@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-26T18:26:49.317285+00:00",
+  "updated_at": "2026-10-27",
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
-  "phase": "independent_stage_panel_implemented_local_validated_target_pending",
+  "phase": "stage_resource_policy_design_pending_user_review",
   "confirmed": {
     "same_source_material": true,
     "source_labeled_ct": true,
@@ -14,7 +14,7 @@
     "expert_role": "local_specialization_and_test_time_advice",
     "primary_role": "global_segmentation_and_selective_refinement",
     "dataset_for_next_plan": "wholeheart",
-    "current_turn_scope": "independent_stage_boards_cooperative_DDP_assessment_and_recovery"
+    "current_turn_scope": "design_reusable_stagewise_live_resource_policy_without_candidate_performance_search"
   },
   "proposed_not_user_fixed": {
     "first_stage_clicks": 1,
@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Verify final review and live GitHub main; when main matches the reviewed release, run server panel a for target assessment. Skill updates remain deferred.",
+  "next_action": "Review the stage resource policy design. After approval implement per-stage live decisions and single-run feedback, replacing candidate performance selection and static assessment-resource reuse. Keep Skill updates deferred.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -361,5 +361,38 @@
     "validation": "docs/SERVER_PANEL_V2_VALIDATION.json",
     "menu_utilities_retained": true,
     "code_review_release_gate": "approved at ef99141; no open Critical/Important findings"
+  },
+  "resource_policy_design": {
+    "status": "proposal_not_implemented",
+    "date": "2026-10-27",
+    "spec": "docs/superpowers/specs/2026-10-27-stage-resource-policy-design.md",
+    "user_confirmed": {
+      "no_candidate_performance_comparison": true,
+      "prefer_resource_headroom_over_underallocation": true,
+      "cpu_processes_and_threads_may_increase": true,
+      "assessment_is_observation_not_formal_resource_selection": true,
+      "formal_stages_recompute_from_live_resources": true,
+      "skill_updates_deferred": true
+    },
+    "proposed_defaults_not_yet_approved": [
+      "90_percent_current_cpu_budget",
+      "80_percent_current_available_ram",
+      "runtime_supply_wait_thresholds",
+      "adapter_specific_worker_thread_defaults"
+    ],
+    "received_assessment_scope": {
+      "source": "user_provided_report",
+      "single_gpu": true,
+      "formal_training": false,
+      "global_batch_size": 2,
+      "cpu_threads": 1,
+      "augmentation_workers": 0,
+      "measured_training_steps": 10,
+      "batch_wait_fraction": 0.8667202111858099,
+      "functional_flow_reported_passed": true,
+      "multi_gpu_target_validation": false
+    },
+    "validation_boundary": "Design only. Single-GPU source-subset user report does not prove full formal-training throughput, optimality or multi-GPU acceptance.",
+    "builder_check": "nothing important left; design feasibility only"
   }
 }
