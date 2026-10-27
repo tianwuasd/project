@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Integrate applied execution modes, two-slot transfer and correct consumed checkpoint position; then direct cooperative coordinator and prepare/predict/diagnostics. Skill still untouched.",
+  "next_action": "Replace candidate/receipt runtime paths; integrate all-device capacity, safe live CPU feedback and actual SHM budget, then prepare/predict/diagnostics. Skill unchanged.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -416,9 +416,16 @@
         "scope": "persistent deterministic supply, actual inner Torch/native threads, bounded totalQ reusable buffers and losslessfallback",
         "review": "spec_pass_quality_approved_after_2_transport_fixes",
         "tests": "actualAPI29run27pass2POSIXskip+phase1/config3;control198pass8skip;actualpinnedAPIandCPUsyntheticeffect"
+      },
+      {
+        "task": 3,
+        "commit": "7ec87a111aa0b78d6f8a154d76f838c4b0e49853",
+        "scope": "controlled execution, compatibility-checked compile, two-slot transfer, model-consumed cursor, one atomic checkpoint write per call, usableU capacity",
+        "review": "spec_pass_quality_approved_after_capacity_and_numeric_guard_fixes",
+        "tests": "focused24pass1CUDA skip;control198pass8skip;fix15pass1CUDA skip;actual2rankGloo5asymmetricfallbacks+checkpointpass;realCPUInductor missingcl fallback"
       }
     ],
-    "current": "Task3 controlled GPU execution, transfer and atomic checkpoints",
+    "current": "Task4 fresh direct cooperative coordinator, runtime feedback and independent assessment",
     "skill_modified_this_implementation": false,
     "server_deployed": false,
     "local_gpu_compute": false
