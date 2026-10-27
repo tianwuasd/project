@@ -190,3 +190,7 @@ GitHub代码发布完成。Linux CI https://github.com/tianwuasd/project/actions
 新增独立板块和保留功能已实现，六项集成审查问题完成修复并通过复审；最终实现头ef99141，取卡生命周期的整体验证问题也已修复并通过复审。最终控制回归206项198通过8条件跳过，无ResourceWarning；14项集成回归通过。实际固定版本读取器完成非立方体坐标/体素/标签/指标验证，CPU Gloo完成2→3进程的权重/优化器/旧UUID随机状态与新UUID种子、下一轮迭代器和更新。另用60例合成影像通过真实清单/导出/8fit规划/3例预处理，48份排除标签故意无效并保持不变。详见docs/SERVER_PANEL_V2_VALIDATION.json。
 
 额外CPU全构造器探针在本机Windows gamma增强原生异常，未计为通过，私有日志保留，正式库/增强方法未绕过；目标Linux Torch2.8 CUDA/NCCL/真实完整尺寸仍待服务器a测评。新任务日志含资源采集、原生故障栈、按rank输出、训练/验证批次、优化理由与缺失证据。发布状态请核对GitHub main及Git历史，不把本机验收记录当作远程部署回执。Skill仍暂缓。
+
+
+## 2026-10-27：批准实施，项目先于Skill
+用户已批准分阶段现场单套资源方案，CPU80%，正式250×250/50不变且自动batch记录采样变化。先修改发布checkout的项目代码并完成本地验证/审查，再更新Skill，旧版保留v1、VISTA整体模板为v2。之前暂缓Skill和仅设计范围已被本次授权覆盖；目标服务器验收仍需真实运行证据。实施计划：docs/superpowers/plans/2026-10-27-stage-resource-v2.md。

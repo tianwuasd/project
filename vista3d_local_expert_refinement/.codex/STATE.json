@@ -4,7 +4,7 @@
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
-  "phase": "stage_resource_policy_design_pending_user_review",
+  "phase": "stage_resource_v2_implementation",
   "confirmed": {
     "same_source_material": true,
     "source_labeled_ct": true,
@@ -14,7 +14,7 @@
     "expert_role": "local_specialization_and_test_time_advice",
     "primary_role": "global_segmentation_and_selective_refinement",
     "dataset_for_next_plan": "wholeheart",
-    "current_turn_scope": "design_reusable_stagewise_live_resource_policy_without_candidate_performance_search"
+    "current_turn_scope": "approved_project_code_and_local_tests_first_then_skill_v1_v2"
   },
   "proposed_not_user_fixed": {
     "first_stage_clicks": 1,
@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Review the stage resource policy design. After approval implement per-stage live decisions and single-run feedback, replacing candidate performance selection and static assessment-resource reuse. Keep Skill updates deferred.",
+  "next_action": "Implement approved v2 project policy CPU80; test/review project first, then update Skill preserving v1 and creating v2.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
