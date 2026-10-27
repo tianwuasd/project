@@ -55,44 +55,137 @@ class BaselineNNUNet(nnUNetTrainer):
         from nnunet_batches import build_loaders
         return build_loaders(self,resource)
 
-    def train_step(self, batch):
+    def _do_i_compile(self):
+        # Upstream uses this flag for both network compilation and Dice weights.
+        # Keep its exact eager loss contract, including DDP's nonzero last weight.
+        # Our explicit network-only compilation is controlled independently.
+        return False
+
+    def _execution_step(self, batch, validation=False):
         from contextlib import nullcontext
+        import time
+        from training_execution import EagerRetryRequired, preflight_compile
+        report = getattr(self, '_vista_execution', None)
+        if report and not validation:
+            # Pause speculative supply before compilation consumes its CPU share.
+            # Keep this already-owned input; pause rewinds only source position.
+            if not report.get('preflight_complete'):
+                loader = getattr(self, 'dataloader_train', None)
+                if hasattr(loader, 'pause'):
+                    # Do not discard the current logical batch: preflight only
+                    # needs worker quiescence, not outer transfer rewind.
+                    source = getattr(loader, 'source', loader)
+                    from batch_transfer import BatchTransfer
+                    if isinstance(source, BatchTransfer): source.quiesce()
+                    elif hasattr(source, 'pause'): source.pause()
+                preflight_compile(self, batch, report)
+                if self.device.type == 'cuda': torch.cuda.reset_peak_memory_stats(self.device)
         timing = getattr(self, '_vista_timing', None)
-        with timing.measure('train_step') if timing else nullcontext():
-            result = super().train_step(batch)
-        if not np.isfinite(result["loss"]).all():
-            raise FloatingPointError("训练损失出现 NaN/Inf，停止并保留此前检查点")
+        phase = 'validation_step' if validation else 'train_step'
+        started, ended = None, None
+        if self.device.type == 'cuda':
+            started = torch.cuda.Event(enable_timing=True)
+            ended = torch.cuda.Event(enable_timing=True)
+            started.record()
+        host_started = time.perf_counter()
+        try:
+            with timing.measure(phase) if timing else nullcontext():
+                result = super().validation_step(batch) if validation else self._finite_train_step(batch)
+        except Exception as error:
+            if report and report.get('compile_applied'):
+                reason = f'{type(error).__name__}: {error}'
+                report['runtime_failure'] = reason
+                self.print_to_log_file('Compiled runtime failed; group abort and eager checkpoint retry required: '+reason)
+                raise EagerRetryRequired(reason) from error
+            raise
+        if not np.isfinite(result['loss']).all():
+            raise FloatingPointError('训练或开发损失出现 NaN/Inf')
+        if report is not None:
+            name = 'validation_step_host_seconds' if validation else 'train_step_host_seconds'
+            report[name] = report.get(name,0.) + time.perf_counter()-host_started
+        if started is not None:
+            ended.record(); ended.synchronize()
+            if report is not None:
+                name = 'validation_compute_seconds' if validation else 'train_compute_seconds'
+                report[name] = report.get(name, 0.) + started.elapsed_time(ended)/1000
+        loader = getattr(self, 'dataloader_val' if validation else 'dataloader_train', None)
+        if hasattr(loader, 'mark_consumed'): loader.mark_consumed()
         return result
+
+    def _finite_train_step(self, batch):
+        """Pinned2.8.1 numerical path, with failure before nonfinite optimizer update."""
+        from contextlib import nullcontext
+        data = batch['data'].to(self.device, non_blocking=True)
+        target = batch['target']
+        target = [x.to(self.device, non_blocking=True) for x in target] if isinstance(target,list) else target.to(self.device,non_blocking=True)
+        self.optimizer.zero_grad(set_to_none=True)
+        with torch.autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else nullcontext():
+            output = self.network(data)
+            loss = self.loss(output, target)
+        if not torch.isfinite(loss).all(): raise FloatingPointError('训练损失出现 NaN/Inf')
+        if self.grad_scaler is not None:
+            self.grad_scaler.scale(loss).backward()
+            self.grad_scaler.unscale_(self.optimizer)
+            torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12, error_if_nonfinite=True)
+            self.grad_scaler.step(self.optimizer)
+            self.grad_scaler.update()
+        else:
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12, error_if_nonfinite=True)
+            self.optimizer.step()
+        return {'loss':loss.detach().cpu().numpy()}
+
+    def train_step(self, batch):
+        return self._execution_step(batch)
 
     def validation_step(self, batch):
-        from contextlib import nullcontext
-        timing = getattr(self, '_vista_timing', None)
-        with timing.measure('validation_step') if timing else nullcontext():
-            result = super().validation_step(batch)
-        if not np.isfinite(result["loss"]).all():
-            raise FloatingPointError("开发集损失出现 NaN/Inf")
-        return result
+        return self._execution_step(batch, validation=True)
 
     def save_checkpoint(self, filename):
-        # 原子替换：写出中断时保留上一份完整检查点。
+        import time
+        started = time.perf_counter()
+        if self.disable_checkpointing:
+            if self.local_rank == 0: self.print_to_log_file('No checkpoint written, checkpointing is disabled')
+            return
+        # Quiesce outer pin/copy AND CPU queues before RNG capture.
+        for name in ('dataloader_train', 'dataloader_val'):
+            loader = getattr(self, name, None)
+            if hasattr(loader, 'pause'): loader.pause()
         temporary = str(filename) + ".tmp"
         distributed_state=None
         if hasattr(self,'_vista_world_size') and not self.disable_checkpointing:
             from rank_checkpoint import capture
             distributed_state=capture(self)
-        super().save_checkpoint(temporary)
         if self.local_rank == 0 and not self.disable_checkpointing:
-            checkpoint=torch.load(temporary,map_location='cpu',weights_only=False)
+            from torch._dynamo import OptimizedModule
+            module = self.network.module if self.is_ddp else self.network
+            if isinstance(module, OptimizedModule): module = module._orig_mod
+            # Exact pinned2.8.1 fields, assembled once before the only save.
+            checkpoint = dict(network_weights=module.state_dict(),
+                optimizer_state=self.optimizer.state_dict(),
+                grad_scaler_state=self.grad_scaler.state_dict() if self.grad_scaler is not None else None,
+                logging=self.logger.get_checkpoint(), _best_ema=self._best_ema,
+                current_epoch=self.current_epoch+1, init_args=self.my_init_kwargs,
+                trainer_name=self.__class__.__name__,
+                inference_allowed_mirroring_axes=self.inference_allowed_mirroring_axes)
             if distributed_state is not None:
                 checkpoint['vista_rank_states']=distributed_state
             else:
                 from checkpoint_rng import capture
                 checkpoint['vista_rng_state']=capture()
-            torch.save(checkpoint,temporary)
-            os.replace(temporary, filename)
+            try:
+                with open(temporary, 'wb') as stream:
+                    torch.save(checkpoint,stream)
+                    stream.flush(); os.fsync(stream.fileno())
+                os.replace(temporary, filename)
+            finally:
+                if os.path.exists(temporary): os.unlink(temporary)
         if distributed_state is not None:
             import torch.distributed as dist
             dist.barrier()
+        report = getattr(self, '_vista_execution', None)
+        if report is not None:
+            report['checkpoint_seconds'] = report.get('checkpoint_seconds',0.) + time.perf_counter()-started
 
     def load_checkpoint(self, filename_or_checkpoint):
         from checkpoint_compat import load_parent_checkpoint
@@ -127,7 +220,11 @@ class BaselineNNUNet(nnUNetTrainer):
             restore(self._vista_resume_rng)
             self._vista_resume_rng=None
         from training_timing import EpochTiming, TimedIterator
+        from batch_transfer import BatchTransfer
         self._vista_timing = EpochTiming()
+        if getattr(self, '_vista_resource_config', None) is not None:
+            self.dataloader_train = BatchTransfer(self.dataloader_train, self.device)
+            self.dataloader_val = BatchTransfer(self.dataloader_val, self.device)
         self.dataloader_train = TimedIterator(self.dataloader_train, self._vista_timing, 'train')
         self.dataloader_val = TimedIterator(self.dataloader_val, self._vista_timing, 'validation')
 
@@ -138,6 +235,16 @@ class BaselineNNUNet(nnUNetTrainer):
         if getattr(self, '_vista_timing', None):
             self._vista_timing.start(self.current_epoch)
         super().on_epoch_start()
+
+    def on_train_epoch_start(self):
+        loader = getattr(self, 'dataloader_val', None)
+        if hasattr(loader, 'pause'): loader.pause()
+        super().on_train_epoch_start()
+
+    def on_validation_epoch_start(self):
+        loader = getattr(self, 'dataloader_train', None)
+        if hasattr(loader, 'pause'): loader.pause()
+        super().on_validation_epoch_start()
 
     def on_epoch_end(self):
         super().on_epoch_end()

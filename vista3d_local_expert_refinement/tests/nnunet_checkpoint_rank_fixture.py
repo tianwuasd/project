@@ -18,6 +18,8 @@ def run(rank,world,args):
     import torch
     import torch.distributed as dist
     from project_trainers import BaselineNNUNet
+    from batch_pool import EpochBatchIterator
+    from batch_transfer import BatchTransfer
     torch.set_num_threads(1)
     # The pinned upstream constructor forces CUDA whenever a group exists.
     # Bypass that constructor only for this explicit CPU checkpoint API test.
@@ -30,21 +32,35 @@ def run(rank,world,args):
     torch.manual_seed(123)
     trainer.network=torch.nn.parallel.DistributedDataParallel(torch.nn.Linear(4,2))
     trainer.optimizer=torch.optim.SGD(trainer.network.parameters(),lr=.02,momentum=.9)
-    trainer.dataloader_train=None;trainer.dataloader_val=None
+    trainer.loss=torch.nn.MSELoss()
+    trainer.dataloader_train=BatchTransfer(EpochBatchIterator(CheckpointBatches(),workers=0,
+        rank=rank,phase_steps=3),trainer.device)
+    trainer.dataloader_val=None
     def step():
         trainer.optimizer.zero_grad()
         x=torch.ones(2,4)*(rank+1)
         loss=trainer.network(x).square().mean();loss.backward();trainer.optimizer.step()
     def draws():return [random.random(),float(np.random.rand()),torch.rand(4).tolist()]
     random.seed(30+rank);np.random.seed(40+rank);torch.manual_seed(50+rank)
-    step()
+    trainer.train_step(next(trainer.dataloader_train))
+    unconsumed=next(trainer.dataloader_train)['data'].clone()
     checkpoint=Path(args['workspace'])/'atomic.pth'
-    trainer.save_checkpoint(str(checkpoint))
+    from unittest.mock import patch
+    with patch.object(torch,'save',wraps=torch.save) as save:
+        trainer.save_checkpoint(str(checkpoint))
+        # Torch object collectives also serialize tensor storages into BytesIO;
+        # count the actual checkpoint file writes, not those transport packets.
+        writes=[call for call in save.call_args_list
+                if getattr(call.args[1],'name',None)==str(checkpoint)+'.tmp']
+        assert len(writes)==(1 if rank==0 else 0)
     expected_rng=draws()
     expected={k:v.clone() for k,v in trainer.network.module.state_dict().items()}
     saved=torch.load(checkpoint,map_location='cpu',weights_only=False)
     assert saved['vista_rank_states']['world_size']==world
     assert len(saved['vista_rank_states']['states'])==world
+    saved_source=saved['vista_rank_states']['states'][rank]['loaders']['dataloader_train']
+    assert saved_source['next_index']==1
+    assert trainer.dataloader_train.source.state_dict()['next_index']==1
     with torch.no_grad():next(trainer.network.parameters()).add_(rank+2)
     trainer.optimizer.state.clear()
     trainer.load_checkpoint(str(checkpoint))
@@ -52,11 +68,59 @@ def run(rank,world,args):
     assert trainer.optimizer.state and expected_rng==draws()
     assert all(torch.equal(expected[k],v) for k,v in trainer.network.module.state_dict().items())
     assert saved['vista_rank_states']['states'][rank]['gpu_uuid']==f'GPU-cpu-test-{rank}'
+    trainer.dataloader_train.load_state_dict(saved_source)
+    replay=next(trainer.dataloader_train)
+    assert torch.equal(unconsumed,replay['data'])
+    trainer.train_step(replay)
+    trainer.dataloader_train.close()
     step()
     assert all(torch.isfinite(p).all() for p in trainer.network.parameters())
     assert not torch.cuda.is_initialized()
     return dict(status='passed',rank=rank,world_size=world,actual_project_checkpoint=True,
-        optimizer_restored=True,rank_rng_equal=True,weights_equal=True,resumed_update=True,cuda_initialized=False)
+        optimizer_restored=True,rank_rng_equal=True,weights_equal=True,resumed_update=True,cuda_initialized=False,
+        atomic_save_calls=1 if rank==0 else 0,logical_source_cursor=1,unconsumed_batch_replayed=True)
+
+
+class CheckpointBatches:
+    def __iter__(self):return self
+    def __next__(self):
+        import torch
+        return dict(data=torch.rand(2,4),target=torch.zeros(2,2))
+
+
+def compile_fallback(rank,world,args):
+    """One lazy compile failure, peer's real autograd, followed by real DDP update."""
+    import types
+    import torch
+    from unittest.mock import patch
+    from training_execution import apply_execution,preflight_compile
+    from checkpoint_rng import capture
+    torch.set_num_threads(1);torch.manual_seed(123)
+    network=torch.nn.parallel.DistributedDataParallel(torch.nn.Linear(4,2))
+    trainer=types.SimpleNamespace(network=network,is_ddp=True,device=torch.device('cpu'),
+        print_to_log_file=lambda *args:None)
+    optimizer=torch.optim.SGD(network.parameters(),lr=.02,momentum=.9)
+    report=apply_execution(torch,{'mode':'performance','compile':True},main_threads=1)
+    state={k:v.clone() for k,v in network.state_dict().items()};rng=capture()
+    def compiler(module,**kwargs):
+        if rank==0:
+            def failure(data):
+                torch.rand(2)
+                raise RuntimeError('asymmetric lazy compile failure')
+            return failure
+        return module
+    with patch.object(torch,'compile',side_effect=compiler):
+        preflight_compile(trainer,dict(data=torch.ones(2,4)),report)
+    assert not report['compile_applied'] and 'rank 0' in report['fallback_reason']
+    assert torch.equal(torch.get_rng_state(),rng['torch'])
+    assert all(torch.equal(network.state_dict()[k],v) for k,v in state.items())
+    assert not optimizer.state and all(p.grad is None for p in network.parameters())
+    optimizer.zero_grad();loss=network(torch.ones(2,4)*(rank+1)).square().mean()
+    loss.backward();optimizer.step()
+    assert optimizer.state and not torch.cuda.is_initialized()
+    return dict(status='passed',rank=rank,asymmetric_failure_group_eager=True,
+        real_ddp_autograd_update=True,preflight_weights_rng_optimizer_preserved=True,
+        cuda_initialized=False,compile_is_injected_control_test=True,execution=report)
 
 
 class MembershipBatches:

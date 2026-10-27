@@ -104,14 +104,15 @@ def build_loaders(trainer,resource):
             rank=rank,stage=stage,prefetch=prefetch,
             worker_threads=threads,phase_steps=int(steps),
             max_shared_bytes=int(resource.get('max_shared_bytes',prefetch*batch_bytes if workers else 0)),
-            timeout_seconds=resource.get('batch_timeout_seconds',180),pin_memory=trainer.device.type=='cuda'))
+            timeout_seconds=resource.get('batch_timeout_seconds',180),pin_memory=False))
     return tuple(outputs)
 
 
 def close_loaders(trainer):
     from batch_pool import EpochBatchIterator
     from training_timing import TimedIterator
+    from batch_transfer import BatchTransfer
     for name in ['dataloader_train','dataloader_val']:
         loader=getattr(trainer,name,None)
         if isinstance(loader,TimedIterator):loader=loader.source
-        if isinstance(loader,EpochBatchIterator):loader.close()
+        if isinstance(loader,(EpochBatchIterator,BatchTransfer)):loader.close()

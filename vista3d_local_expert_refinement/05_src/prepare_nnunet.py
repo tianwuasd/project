@@ -13,7 +13,7 @@ from data_pipeline import ROOT, FOLDS, load_json, save_json
 def configure_paths():
     for key, folder in [("nnUNet_raw", "04_data/derived/nnUNet_raw"), ("nnUNet_preprocessed", "04_data/derived/nnUNet_preprocessed"), ("nnUNet_results", "07_experiments/nnUNet_results")]:
         os.environ[key] = str(ROOT / folder)
-    os.environ["nnUNet_compile"] = "false"
+    os.environ.setdefault("nnUNet_compile", "false")
     os.environ["nnUNet_wandb_enabled"] = "false"
     # nnU-Net's planner also reads this setting as a Torch thread count.
     # Training/prediction entry points separately select serial augmentation (0).
