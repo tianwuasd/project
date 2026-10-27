@@ -191,3 +191,10 @@ DnR 应按本轮取得的 v3（而非历史 v1）描述。DeferredSeg 保留 202
 提交7df1ee3补齐三项P2及并行导出P3：CPU准备由队列监督者直接持有/注册/继承工作流锁并独立清理；本机TMP读槽在实际读取/Blosc惰性切片处执行，增强计算在槽外；host PSI明确不是loader因果，压力动作实际应用，未知原因不阻断原高等待安全扩容；兼容阶段/几何/七文件实现身份的完成病例RSS高水位保守抬高后续prior，并保留活动任务预约；来源导出按病例有界并行与逐例/最终提交。
 最终354项307通过47条件跳过、零失败，真实CPU导出/fit8指纹/12预处理/3测评/复用、Blosc一致性、加载器恢复与双rank检查点通过。87文件库存已两次独立核对。统一修复范围复审四项均ADDRESSED，无新阻断问题；目标Linux flock/NUMA/SHM、CUDA/NCCL/真实CT性能仍未宣称通过。
 同期CT1ad7c64保持不变合入；本地部分克隆的合并附带统计报错后，已离线核对实际成功提交、父版本及VISTA目录一致性，没有重复合并/重置/下载其它项目大文件。发布状态以远端main和Git历史为准，本条不声明服务器已部署。Skill尚未修改；下一阶段先保留v1，再生成并验收完整VISTA v2。
+
+
+## 2026-10-28：VISTA v0.5.0与Skill v2完整交付
+项目main已发布并核对6c0427c；运行代码7df1ee3经整体验证修复复审通过。最终本地控制354项307通过47条件跳过，真实CPU接口/合成数据/双进程恢复证据单列；目标服务器Linux/CUDA/NCCL与真实CT质量/吞吐仍待用户a测评及z诊断，不修改旧冻结任务或自动恢复。
+server-engineering Skill v2已完成RED/GREEN使用场景、最终审查、26项脚本测试25通过1原CT权限跳过、真实autocrlf检出、独立目录生成/校验。v2完整185工程文件覆盖87运行文件；VISTA v1为153文件；已提交旧Skill v1为343文件，681归档源文件均匹配固定Git字节/模式。旧CT0.23生成器及资产保持不变。
+Skill源码已合回D:/projects/codex-skill并发布908e641；已安装到C:/Users/Lenovo/.codex/skills/server-engineering。1037已提交Skill文件的源码/安装版逐字节一致，0删除/0私人状态写入，实际安装路径生成和verify通过。八原稿有精确私有备份及stash16470c11884876685238060078cdc27e5a2a25f8，未用旧稿覆盖新版本。私有安装前备份、原安装343文件快照与完整证据保留D:/projects/sync-reports/vista-v2-evidence。
+入口：D:/projects/codex-skill/server-engineering/references/template-and-code.md；详版/源码导览/GitHub流程分别vista-v2-guide.md、vista-v2-source-map.md、vista-v2-publication.md。历史资源候选/旧receipt仅作v1兼容，不覆盖v2。维护者--legacy-skill对任意新commit仍使用固定CT0.23标签是非阻断后续改进，当前固定d737归档已校验正确；历史0.3.9 ResourceWarning如实保留，不冒充新验证通过。

@@ -4,7 +4,7 @@
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
-  "phase": "stage_resource_v2_project_complete_skill_pending",
+  "phase": "stage_resource_v2_delivered",
   "confirmed": {
     "same_source_material": true,
     "source_labeled_ct": true,
@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Publish project and verify remote ref; only afterward Skill v1 preservation and full VISTA v2 template.",
+  "next_action": "On zmic44 update program, run a assessment and export z diagnostics for target Linux/CUDA/NCCL/real CT acceptance; no old task hotpatch or automatic resume.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -324,7 +324,7 @@
     "design_status": "independent stage v2 implemented and locally validated; target GPU acceptance pending; verify live GitHub main for publication",
     "performance_timing_draft": "5 timing tests and 13 existing inner-contract tests passed; 4 changed modules parsed; no server acceptance",
     "batch_budget_status": "user explicitly permits automatic global batch growth with sampling changes in preview/logs; 250 epochs and 250 train/50 validation updates remain fixed",
-    "skill_update": "authorized only after project code/tests/review; preserve v1 and create full VISTA v2",
+    "skill_update": "completed: full VISTA v2 template and committed v1 archives, source+installed+GitHub verified; legacy CT preserved",
     "full_assessment_required": true,
     "formal_blocks": [
       "prepare",
@@ -402,7 +402,7 @@
     ]
   },
   "stage_resource_v2": {
-    "status": "project_review_passed_skill_pending",
+    "status": "complete_local_engineering_and_skill_delivery",
     "plan": "docs/superpowers/plans/2026-10-27-stage-resource-v2.md",
     "completed": [
       {
@@ -448,8 +448,8 @@
         "tests": "final339run295pass44classifiedskip0fail;actualCPUAMP/Gloo/checkpoint/2to3membershippassed"
       }
     ],
-    "current": "Publish reviewed project, then implement/review/install/publish Skill v1/v2",
-    "skill_modified_this_implementation": false,
+    "current": "Delivered; target server assessment is a separate remaining acceptance boundary",
+    "skill_modified_this_implementation": true,
     "server_deployed": false,
     "local_gpu_compute": false,
     "running_cpu_budget_scope": "retain stage-entry allocation within running feedback; refresh after rank exits for stage/membership/recovery, extra external capacity/pressure not attributed mid-epoch",
@@ -487,6 +487,27 @@
       "reviewed_runtime_commit": "7df1ee32ded3235d3da87f4c2c9ca90967b9a5d3",
       "status_authority": "remote main ref and Git history; deployment separately verified",
       "server_deployed": false
+    },
+    "project_published_commit": "6c0427cd4d338669a2f2a97497073a8b4ada7251",
+    "skill_template": {
+      "generation": "v2",
+      "source_repository": "tianwuasd/codex-skill",
+      "published_commit": "908e641954611bf4dde618e47ce76f7ce35501cc",
+      "reviewed_skill_commit": "bc5fbc2de94b5fbbe93457850fae16b68aad2c35",
+      "source_root": "D:/projects/codex-skill/server-engineering",
+      "installed_root": "C:/Users/Lenovo/.codex/skills/server-engineering",
+      "source_installed_files_equal": 1037,
+      "v2_engineering_files": 185,
+      "vista_v1_files": 153,
+      "legacy_skill_v1_files": 343,
+      "script_tests": {
+        "run": 26,
+        "passed": 25,
+        "skipped": 1
+      },
+      "pressure_red_green": "completed",
+      "private_drafts_preserved": 8,
+      "private_state_overwritten": false
     }
   }
 }
