@@ -15,15 +15,28 @@ class ExecutionPolicyTests(unittest.TestCase):
             configure_for(Path('unused'))()
             self.assertEqual(os.environ['nnUNet_compile'], 'true')
 
-    def test_capacity_one_margin_and_initialized_optimizer(self):
+    def test_capacity_usable_budget_has_no_second_headroom(self):
         from training_execution import capacity_batch
-        facts = dict(proven_batch=2, total_bytes=1000, fixed_bytes=100,
-                     peak_allocated_bytes=300, peak_reserved_bytes=400,
-                     optimizer_initialized=True, slope_bytes=100, margin_fraction=.1)
-        self.assertEqual(capacity_batch(**facts)['candidate_batch'], 7)
-        for slope in (None, 0, -1, float('nan')):
+        facts = dict(proven_batch=2, usable_bytes=20, fixed_bytes=4,
+                     peak_allocated_bytes=8, peak_reserved_bytes=10,
+                     optimizer_initialized=True, slope_bytes=2)
+        self.assertEqual(capacity_batch(**facts)['candidate_batch'], 8)
+        # Allocator reserved is observation, not another deduction from U.
+        self.assertEqual(capacity_batch(**dict(facts,peak_reserved_bytes=18))['candidate_batch'],8)
+        for slope in (0, -1, float('nan')):
             self.assertEqual(capacity_batch(**dict(facts, slope_bytes=slope))['candidate_batch'], 2)
         self.assertEqual(capacity_batch(**dict(facts, optimizer_initialized=False))['candidate_batch'], 2)
+
+    def test_capacity_derives_slope_only_from_reliable_initialized_peak(self):
+        from training_execution import capacity_batch
+        facts=dict(proven_batch=2,usable_bytes=20,fixed_bytes=4,
+            peak_allocated_bytes=8,peak_reserved_bytes=10,optimizer_initialized=True)
+        result=capacity_batch(**facts)
+        self.assertEqual(result['candidate_batch'],8)
+        self.assertEqual(result['slope_bytes'],2)
+        for peak in (None,0,4,float('nan')):
+            self.assertEqual(capacity_batch(**dict(facts,peak_allocated_bytes=peak))['candidate_batch'],2)
+        self.assertEqual(capacity_batch(**dict(facts,evidence_reliable=False))['candidate_batch'],2)
 
 
 try:
@@ -34,6 +47,69 @@ except ImportError:
 
 @unittest.skipIf(torch is None, 'requires pinned API runtime')
 class TransferTests(unittest.TestCase):
+    def compile_compatibility(self, kind):
+        import copy
+        import types
+        import numpy as np
+        import random
+        from training_execution import apply_execution,preflight_compile
+        class Network(torch.nn.Module):
+            def __init__(self):
+                super().__init__();self.linear=torch.nn.Linear(3,2)
+                self.register_buffer('calls',torch.zeros(()))
+            def forward(self,x):
+                self.calls.add_(1)
+                # Each route must start with exactly the same RNG and buffers.
+                return self.linear(x)+torch.rand(())+random.random()+float(np.random.rand())+self.calls
+        class WrongGradient(torch.autograd.Function):
+            @staticmethod
+            def forward(ctx,value):return value.clone()
+            @staticmethod
+            def backward(ctx,gradient):return gradient*2
+        net=Network()
+        optimizer=torch.optim.SGD(net.parameters(),lr=.1,momentum=.9)
+        for parameter in net.parameters():parameter.grad=torch.ones_like(parameter)
+        optimizer.step()
+        trainer=types.SimpleNamespace(network=net,is_ddp=False,device=torch.device('cpu'),print_to_log_file=lambda *a:None)
+        from checkpoint_rng import capture
+        state={k:v.clone() for k,v in net.state_dict().items()}
+        optimizer_before=copy.deepcopy(optimizer.state_dict())
+        grads=[p.grad.clone() for p in net.parameters()]
+        rng=capture();batch={'data':torch.ones(2,3)}
+        def compiler(module,**kwargs):
+            def forward(x):
+                value=module(x)
+                if kind=='bias':return value*2
+                if kind=='nan':return value*float('nan')
+                if kind=='structure':return [value]
+                if kind=='gradient':return WrongGradient.apply(value)
+                return value
+            return forward
+        report=apply_execution(torch,{'compile':True},main_threads=1)
+        with patch.object(torch,'compile',side_effect=compiler):preflight_compile(trainer,batch,report)
+        self.assertEqual(report['compile_applied'],kind=='equal',report)
+        if kind!='equal':
+            self.assertIs(trainer.network,net)
+            self.assertIn('compatibility',report['fallback_reason'])
+        for key,value in state.items():torch.testing.assert_close(net.state_dict()[key],value,rtol=0,atol=0)
+        for parameter,grad in zip(net.parameters(),grads):torch.testing.assert_close(parameter.grad,grad,rtol=0,atol=0)
+        for key,value in optimizer_before['state'].items():
+            torch.testing.assert_close(optimizer.state_dict()['state'][key]['momentum_buffer'],value['momentum_buffer'],rtol=0,atol=0)
+        self.assertEqual(random.getstate(),rng['python'])
+        np.testing.assert_array_equal(np.random.get_state()[1],rng['numpy'][1])
+        self.assertTrue(torch.equal(torch.get_rng_state(),rng['torch']))
+        torch.testing.assert_close(batch['data'],torch.ones(2,3),rtol=0,atol=0)
+        return report
+
+    def test_compile_rejects_biased_nonfinite_structure_and_gradient_outputs(self):
+        for kind in ('bias','nan','structure','gradient'):
+            with self.subTest(kind=kind):self.compile_compatibility(kind)
+
+    def test_compile_accepts_equal_stochastic_routes_without_state_change(self):
+        report=self.compile_compatibility('equal')
+        self.assertTrue(report['compatibility']['passed'])
+        self.assertEqual(report['compatibility']['rtol'],1e-4)
+
     def make(self, steps=4):
         from batch_pool import EpochBatchIterator
         from batch_transfer import BatchTransfer

@@ -100,27 +100,43 @@ def compile_fallback(rank,world,args):
     trainer=types.SimpleNamespace(network=network,is_ddp=True,device=torch.device('cpu'),
         print_to_log_file=lambda *args:None)
     optimizer=torch.optim.SGD(network.parameters(),lr=.02,momentum=.9)
-    report=apply_execution(torch,{'mode':'performance','compile':True},main_threads=1)
     state={k:v.clone() for k,v in network.state_dict().items()};rng=capture()
-    def compiler(module,**kwargs):
-        if rank==0:
-            def failure(data):
-                torch.rand(2)
-                raise RuntimeError('asymmetric lazy compile failure')
-            return failure
-        return module
-    with patch.object(torch,'compile',side_effect=compiler):
-        preflight_compile(trainer,dict(data=torch.ones(2,4)),report)
-    assert not report['compile_applied'] and 'rank 0' in report['fallback_reason']
-    assert torch.equal(torch.get_rng_state(),rng['torch'])
-    assert all(torch.equal(network.state_dict()[k],v) for k,v in state.items())
-    assert not optimizer.state and all(p.grad is None for p in network.parameters())
+    reports=[]
+    class WrongGradient(torch.autograd.Function):
+        @staticmethod
+        def forward(ctx,value):return value.clone()
+        @staticmethod
+        def backward(ctx,gradient):return gradient*2
+    for fault in ('exception','bias','nan','structure','gradient'):
+        report=apply_execution(torch,{'mode':'performance','compile':True},main_threads=1)
+        def compiler(module,**kwargs):
+            if rank==0:
+                def failure(data):
+                    if fault=='exception':
+                        torch.rand(2)
+                        raise RuntimeError('asymmetric lazy compile failure')
+                    value=module(data)
+                    if fault=='bias':return value*2
+                    if fault=='nan':return value*float('nan')
+                    if fault=='structure':return [value]
+                    return WrongGradient.apply(value)
+                return failure
+            return module
+        with patch.object(torch,'compile',side_effect=compiler):
+            preflight_compile(trainer,dict(data=torch.ones(2,4)),report)
+        assert not report['compile_applied'] and 'rank 0' in report['fallback_reason']
+        assert report['compatibility']['local_passed']==(rank==1)
+        assert not report['compatibility']['passed']
+        assert torch.equal(torch.get_rng_state(),rng['torch'])
+        assert all(torch.equal(network.state_dict()[k],v) for k,v in state.items())
+        assert not optimizer.state and all(p.grad is None for p in network.parameters())
+        reports.append(dict(fault=fault,execution=report))
     optimizer.zero_grad();loss=network(torch.ones(2,4)*(rank+1)).square().mean()
     loss.backward();optimizer.step()
     assert optimizer.state and not torch.cuda.is_initialized()
     return dict(status='passed',rank=rank,asymmetric_failure_group_eager=True,
         real_ddp_autograd_update=True,preflight_weights_rng_optimizer_preserved=True,
-        cuda_initialized=False,compile_is_injected_control_test=True,execution=report)
+        cuda_initialized=False,compile_is_injected_control_test=True,compatibility_cases=reports)
 
 
 class MembershipBatches:

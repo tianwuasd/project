@@ -50,6 +50,56 @@ def _leaves(value):
         yield value
 
 
+def _probe_network(network, data, parameters, device_type):
+    """One local autograd graph at a time; only detached CPU references survive."""
+    import torch
+    from contextlib import nullcontext
+    with torch.autocast('cuda') if device_type == 'cuda' else nullcontext():
+        outputs = network(data.clone())
+        scalar = sum(item.float().sum() for item in _leaves(outputs)
+                     if isinstance(item, torch.Tensor) and item.requires_grad)
+    tensors = []
+    def snapshot(value):
+        if isinstance(value, torch.Tensor):
+            cpu = value.detach().to(device='cpu', copy=True)
+            if not torch.isfinite(cpu).all():
+                raise ValueError('compile compatibility: nonfinite output')
+            tensors.append(cpu)
+            return ('tensor', tuple(cpu.shape), str(cpu.dtype))
+        if type(value) in (list, tuple):
+            return (type(value).__name__, tuple(snapshot(item) for item in value))
+        if type(value) is dict:
+            return ('dict', tuple((key,snapshot(item)) for key,item in value.items()))
+        if value is None: return ('none',)
+        raise ValueError('compile compatibility: unsupported output structure')
+    structure = snapshot(outputs)
+    gradients = torch.autograd.grad(scalar, parameters, allow_unused=True)
+    cpu_gradients = []
+    for gradient in gradients:
+        cpu = gradient.detach().to(device='cpu', copy=True) if gradient is not None else None
+        if cpu is not None and not torch.isfinite(cpu).all():
+            raise ValueError('compile compatibility: nonfinite gradient')
+        cpu_gradients.append(cpu)
+    return structure, tensors, cpu_gradients
+
+
+def _compare_probes(reference, actual, *, rtol, atol):
+    import torch
+    if reference[0] != actual[0]:
+        raise ValueError('compile compatibility: output structure/shape/dtype mismatch')
+    for name, expected, observed in (('output',reference[1],actual[1]),
+                                      ('gradient',reference[2],actual[2])):
+        if len(expected) != len(observed):
+            raise ValueError(f'compile compatibility: {name} count mismatch')
+        for index, (left,right) in enumerate(zip(expected,observed)):
+            if left is None or right is None:
+                if left is not right:
+                    raise ValueError(f'compile compatibility: {name}[{index}] None mismatch')
+            elif (left.shape != right.shape or left.dtype != right.dtype
+                  or not torch.allclose(left,right,rtol=rtol,atol=atol,equal_nan=False)):
+                raise ValueError(f'compile compatibility: {name}[{index}] differs from eager (rtol={rtol}, atol={atol})')
+
+
 def preflight_compile(trainer, batch, report):
     """Local network-only forward/backward, NEVER DDP or distributed Dice.
 
@@ -68,6 +118,13 @@ def preflight_compile(trainer, batch, report):
     state = {key: value.detach().cpu().clone() for key, value in eager.state_dict().items()}
     report['compile_snapshot_cpu_bytes'] = sum(v.numel()*v.element_size() for v in state.values())
     old_grads = [p.grad for p in eager.parameters()]
+    # Float16 AMP allows 1% relative / 1e-3 absolute differences; full precision
+    # uses 1e-4 / 1e-5. These are explicit acceptance bounds, not bitwise claims.
+    report['compatibility'] = dict(passed=False, local_passed=False,
+        rtol=1e-2 if trainer.device.type == 'cuda' else 1e-4,
+        atol=1e-3 if trainer.device.type == 'cuda' else 1e-5,
+        reference_storage='detached CPU outputs and parameter gradients',
+        scope='same-input local network outputs and sum-output gradients; eager loss unchanged')
     compiled, error = None, None
     started = time.perf_counter()
     try:
@@ -76,15 +133,17 @@ def preflight_compile(trainer, batch, report):
         # Setting env is insufficient if Inductor config was already imported.
         import torch._inductor.config as config
         with config.patch(compile_threads=report['compile_threads']):
-            compiled = torch.compile(eager, backend='inductor', mode='default')
             data = batch['data'].to(trainer.device, non_blocking=True)
-            from contextlib import nullcontext
-            with torch.autocast('cuda') if trainer.device.type == 'cuda' else nullcontext():
-                outputs = compiled(data)
-                # Compile backward without invoking Dice all-gather or DDP hooks.
-                scalar = sum(item.float().sum() for item in _leaves(outputs)
-                             if isinstance(item, torch.Tensor) and item.requires_grad)
-            torch.autograd.grad(scalar, tuple(eager.parameters()), allow_unused=True)
+            parameters = tuple(p for p in eager.parameters() if p.requires_grad)
+            reference = _probe_network(eager,data,parameters,trainer.device.type)
+            eager.load_state_dict(state); restore(rng)
+            compiled = torch.compile(eager, backend='inductor', mode='default')
+            # Constructor work may consume RNG; both executions start identically.
+            eager.load_state_dict(state); restore(rng)
+            actual = _probe_network(compiled,data,parameters,trainer.device.type)
+            _compare_probes(reference,actual,rtol=report['compatibility']['rtol'],
+                            atol=report['compatibility']['atol'])
+            report['compatibility']['local_passed'] = True
             if trainer.device.type == 'cuda': torch.cuda.synchronize(trainer.device)
     except Exception as failure:
         error = f'{type(failure).__name__}: {failure}'
@@ -108,36 +167,42 @@ def preflight_compile(trainer, batch, report):
     if trainer.is_ddp: trainer.network.module = compiled
     else: trainer.network = compiled
     report['compile_applied'] = True
+    report['compatibility']['passed'] = True
     report['cache_identity']['input_shape'] = list(batch['data'].shape)
     report['cache_identity']['input_dtype'] = str(batch['data'].dtype)
     report['cache_identity']['network'] = type(eager).__qualname__
     trainer.print_to_log_file(f'Network compile local preflight passed; eager loss unchanged; warmup={report["compile_warmup_seconds"]:.3f}s')
 
 
-def capacity_batch(*, proven_batch, total_bytes, fixed_bytes, peak_allocated_bytes,
+def capacity_batch(*, proven_batch, usable_bytes, fixed_bytes, peak_allocated_bytes,
                    peak_reserved_bytes, optimizer_initialized, slope_bytes=None,
-                   margin_fraction=.1):
-    """One reservation margin, never infer an unmeasured activation slope.
+                   evidence_reliable=True):
+    """U is already usable capacity; do not reserve percentage/cache space again.
 
-    fixed_bytes is quiescent allocated storage after optimizer initialization. Reserved
-    minus allocated is allocator slack, counted ONCE alongside fixed storage.
-    A candidate still requires the coordinator's bounded capacity confirmation.
+    Derive (peak-fixed)/proven only from reliable initialized measurements.
+    Reserved memory is observational. Any proposal still needs confirmation.
     """
-    if proven_batch < 1 or not 0 <= margin_fraction < 1: raise ValueError('invalid capacity input')
+    if isinstance(proven_batch,bool) or not isinstance(proven_batch,int) or proven_batch < 1:
+        raise ValueError('invalid proven batch')
     result = dict(candidate_batch=proven_batch, proven_batch=proven_batch,
-                  status='retain_proven', reservation_margin_bytes=None)
-    values = (total_bytes, fixed_bytes, peak_allocated_bytes, peak_reserved_bytes)
-    if not optimizer_initialized:
-        result['reason'] = 'optimizer state not initialized'; return result
-    if (any(v is None or not math.isfinite(v) or v < 0 for v in values)
-            or total_bytes <= 0 or not isinstance(slope_bytes, (int, float))
-            or not math.isfinite(slope_bytes) or slope_bytes <= 0):
+                  status='retain_proven', usable_bytes=usable_bytes,
+                  peak_reserved_bytes=peak_reserved_bytes, slope_bytes=None)
+    if not optimizer_initialized or not evidence_reliable:
+        result['reason'] = 'optimizer uninitialized or evidence unreliable'; return result
+    def valid(value):
+        return isinstance(value,(int,float)) and not isinstance(value,bool) and math.isfinite(value) and value>=0
+    if not all(valid(v) for v in (usable_bytes,fixed_bytes,peak_allocated_bytes)) or usable_bytes<=0:
+        result['reason'] = 'unknown or invalid capacity evidence'; return result
+    if slope_bytes is None:
+        slope_bytes = (peak_allocated_bytes-fixed_bytes)/proven_batch
+        result['slope_source'] = '(peak_allocated_bytes-fixed_bytes)/proven_batch'
+    else:
+        result['slope_source'] = 'supplied measured slope'
+    if not valid(slope_bytes) or slope_bytes<=0:
         result['reason'] = 'unknown or nonpositive capacity/slope'; return result
-    slack = max(0, peak_reserved_bytes - peak_allocated_bytes)
-    margin = total_bytes * margin_fraction
-    candidate = math.floor((total_bytes - margin - fixed_bytes - slack) / slope_bytes)
+    candidate = math.floor((usable_bytes-fixed_bytes)/slope_bytes)
     result.update(candidate_batch=max(proven_batch, candidate),
-                  reservation_margin_bytes=margin, allocator_slack_bytes=slack,
+                  slope_bytes=slope_bytes,
                   status='capacity_candidate', reason='confirmation required; not speed ranking')
     return result
 
