@@ -129,8 +129,8 @@ class PredictionGateTests(unittest.TestCase):
                  patch.object(resources,'probe',side_effect=snapshots),patch.dict(os.environ,{'WHOLE_HEART_CPU_THREADS':'2'}):
                 reports=[resources.prediction_budget(root,[dict(fold='f',case_id='c')],8) for _ in snapshots]
             self.assertEqual(reports[0]['cases'][0]['resampled_shape_plans'],[60,60,20])
-            self.assertEqual(reports[0]['workers'],2)
-            self.assertEqual(reports[1]['workers'],0);self.assertEqual(reports[1]['capacity_status'],'known_insufficient_memory')
+            self.assertEqual(reports[0]['workers'],1)
+            self.assertEqual(reports[1]['workers'],0);self.assertEqual(reports[1]['capacity_status'],'known_insufficient_cpu')
             self.assertEqual(reports[2]['workers'],1);self.assertIn('unknown',reports[2]['capacity_status'])
 
 

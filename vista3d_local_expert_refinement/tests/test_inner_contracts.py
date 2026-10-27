@@ -32,8 +32,10 @@ class InnerContracts(unittest.TestCase):
             limiter.assert_called_once_with(limits=2);torch.set_num_threads.assert_called_once_with(2)
             self.assertEqual(os.environ['OPENBLAS_NUM_THREADS'],'2')
 
-    def test_io_pressure_limits_case_pool_and_pending_models_are_visible(self):
-        self.assertEqual(resources.allocate(dict(cpu_slots=32,available_memory_bytes=128*1024**3,io_pressure={'avg10':20}),3)['cpu_tail_workers'],2)
+    def test_io_pressure_limits_reads_and_pending_models_are_visible(self):
+        allocation=resources.allocate(dict(cpu_slots=32,available_memory_bytes=128*1024**3,io_pressure={'avg10':20}),3)
+        self.assertEqual(allocation['cpu_tail_workers'],25)
+        self.assertEqual(allocation['read_concurrency'],2)
         with tempfile.TemporaryDirectory() as tmp:
             work=Path(tmp)
             write_json(work/'00_admin/model_selection.json',dict(folds=['ct_holdG','ct_holdA'],methods=['B0']))
@@ -48,9 +50,9 @@ class InnerContracts(unittest.TestCase):
             with patch.object(resources,'probe',return_value=snapshot):
                 budget=resources.configure(root/'job',dict(workspace=str(work),gpu_count=5),env)
             self.assertFalse(work.exists())
-            self.assertEqual(budget['parallel_workers'],2)
+            self.assertEqual(budget['parallel_workers'],1)
             self.assertLessEqual(budget['threads_per_worker']*budget['parallel_workers'],3)
-            self.assertEqual(env['WHOLE_HEART_GPU_LIMIT'],'2')
+            self.assertEqual(env['WHOLE_HEART_GPU_LIMIT'],'1')
 
     def test_real_size_gate_reuse_then_recheck_changed_gpu_or_environment(self):
         with tempfile.TemporaryDirectory() as tmp:

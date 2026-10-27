@@ -46,42 +46,32 @@ def distribution(global_batch, gpu_uuids, requested_count=None, *, allow_batch_g
 
 
 def cpu_candidates(snapshot, patch_size, global_batch, world_size=1):
+    """Compatibility name returning exactly one direct configuration (no search)."""
     if (not isinstance(world_size,int) or world_size<1 or isinstance(world_size,bool)
             or not isinstance(global_batch,int) or global_batch<1 or global_batch%world_size):
         raise ValueError('CPU候选需要有效且可均分的全局batch与卡数')
     if len(patch_size)!=3 or any(not isinstance(n,int) or isinstance(n,bool) or n<1 for n in patch_size):
         raise ValueError('需要真实3D patch尺寸')
-    slots = max(1, int(snapshot.get('cpu_slots',1)))
-    if slots < world_size:
-        raise ValueError('CPU配额不足以运行所选卡数的训练进程')
-    ram, shm = snapshot.get('available_memory_bytes'), snapshot.get('shared_memory_available_bytes')
-    pressure = (snapshot.get('io_pressure') or {}).get('avg10',0)
-    # Conservative capacity estimate: data/targets, augmented input and temporary
-    # tensors; it is explicitly not a measured RSS or SHM peak.
-    one_batch = math.prod(patch_size)*(global_batch//world_size)*64
-    candidates=[]
-    for threads, workers in [(1,0),(2,2),(4,4)]:
-        validation = max(1, workers//2) if workers else 0
-        total = world_size*(threads+workers+validation)
-        if total>slots:
-            continue
-        queues = (workers+validation)*2
-        estimated_shm = world_size*queues*one_batch if workers else 0
-        estimated_ram = estimated_shm+world_size*(workers+validation)*one_batch
-        if workers and (ram is None or shm is None or pressure>=10
-                        or estimated_ram>ram*.5 or estimated_shm>shm*.5):
-            continue
-        candidates.append(dict(threads=threads,augmentation_workers=workers,
-            validation_workers=validation,worker_threads=1,prefetch=2,
-            total_cpu_slots=total,estimated_ram_bytes=estimated_ram,
-            estimated_shm_bytes=estimated_shm,world_size=world_size,
-            global_batch_size=global_batch,local_batch_size=global_batch//world_size,
-            estimate_scope='capacity estimate, not measured memory peak',
-            reason='bounded by aggregate rank/main/train/validation CPU, RAM, SHM and I/O pressure'))
-    return candidates
+    from live_resources import training_policy
+    one_batch=math.prod(patch_size)*(global_batch//world_size)*64
+    policy=training_policy(snapshot,world_size,one_batch)
+    if policy['status']=='blocked':
+        raise ValueError('; '.join(policy['reasons']))
+    rank=policy['rank_settings'][0]
+    # Historical callers consume these aliases until their stage integration is
+    # updated. There is exactly one direct configuration, never speed ranking.
+    value=dict(policy,threads=rank['main_threads'],augmentation_workers=rank['train_workers'],
+        validation_workers=rank['val_workers'],worker_threads=rank['worker_threads'],
+        val_worker_threads=rank['val_worker_threads'],prefetch=rank['prefetch'],
+        val_prefetch=rank['val_prefetch'],estimated_shm_bytes=0,world_size=world_size,
+        global_batch_size=global_batch,local_batch_size=global_batch//world_size,
+        estimate_scope='capacity estimate including both resident pools; pipe transport; not measured peak',
+        reason='one direct stage configuration; aggregate active CPU phases and resident RAM bounded')
+    return [value]
 
 
 def select_trial(trials, *, global_batch, tolerance=.05):
+    """Legacy v1 assessment reader; v2 stages must not use speed ranking."""
     if not 0<=tolerance<=.2:
         raise ValueError('选优容差无效')
     valid=[]

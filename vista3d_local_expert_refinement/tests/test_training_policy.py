@@ -55,20 +55,26 @@ class TrainingPolicyTests(unittest.TestCase):
         values = cpu_candidates(snapshot, [160,192,192], 2, 2)
         self.assertTrue(any(v['augmentation_workers'] > 0 for v in values))
         for value in values:
-            self.assertLessEqual(value['total_cpu_slots'], 24)
-            self.assertLessEqual(value['estimated_ram_bytes'], 32*2**30)
+            self.assertLessEqual(value['total_cpu_slots'], 19)
+            self.assertLessEqual(value['estimated_ram_bytes'], 64*2**30*.8)
             self.assertLessEqual(value['estimated_shm_bytes'], 8*2**30)
         tiny = dict(snapshot, cpu_slots=1, shared_memory_available_bytes=64*2**20)
-        self.assertEqual([v['augmentation_workers'] for v in cpu_candidates(tiny,[160,192,192],2,1)], [0])
+        with self.assertRaisesRegex(ValueError,'insufficient'):
+            cpu_candidates(tiny,[160,192,192],2,1)
 
-    def test_unknown_or_pressured_shared_resources_keep_serial_fallback(self):
-        unknown = cpu_candidates(dict(cpu_slots=12), [160,192,192], 2, 1)
-        self.assertTrue(all(v['augmentation_workers']==0 for v in unknown))
-        pressured = cpu_candidates(dict(cpu_slots=24, available_memory_bytes=2**30,
-                                        shared_memory_available_bytes=2**30,
-                                        io_pressure={'avg10':30}),[160,192,192],2,2)
-        self.assertEqual(len(pressured), 1)
-        self.assertEqual(pressured[0]['augmentation_workers'], 0)
+    def test_direct_policy_is_one_configuration_and_pipe_ignores_shm(self):
+        snapshot=dict(cpu_slots=191,available_memory_bytes=256*2**30,
+                      shared_memory_available_bytes=0,io_pressure={'avg10':30})
+        values=cpu_candidates(snapshot,[160,192,192],2,1)
+        self.assertEqual(len(values),1)
+        self.assertEqual(values[0]['augmentation_workers'],16)
+        self.assertEqual(values[0]['worker_threads'],2)
+        self.assertEqual(values[0]['estimated_shm_bytes'],0)
+        self.assertEqual(len(values[0]['rank_settings']),1)
+        unknown=cpu_candidates(dict(cpu_slots=12),[160,192,192],2,1)
+        self.assertEqual(unknown[0]['augmentation_workers'],0)
+        with self.assertRaisesRegex(ValueError,'insufficient'):
+            cpu_candidates(dict(cpu_slots=0),[160,192,192],2,1)
 
     def test_selection_requires_enough_samples_and_comparable_budget(self):
         def trial(seconds, threads=2, **extra):

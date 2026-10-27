@@ -1,69 +1,28 @@
 """Shared CPU/RAM budget from affinity and cgroup; never infer a whole-host quota."""
 import math
 import os
-import time
-import shutil
 from pathlib import Path
 from server_data import write_json,read_json
 
 
 def probe():
-    cpus=len(os.sched_getaffinity(0)) if hasattr(os,'sched_getaffinity') else (os.cpu_count() or 1)
-    quota=None
-    try:
-        limit,period=Path('/sys/fs/cgroup/cpu.max').read_text().split()
-        if limit!='max':quota=float(limit)/float(period)
-    except (OSError,ValueError):
-        try:
-            limit=float(Path('/sys/fs/cgroup/cpu/cpu.cfs_quota_us').read_text())
-            period=float(Path('/sys/fs/cgroup/cpu/cpu.cfs_period_us').read_text())
-            if limit>0:quota=limit/period
-        except (OSError,ValueError):pass
-    if quota is not None:cpus=min(cpus,max(1,math.floor(quota)))
-    available=None
-    try:
-        entries=dict(line.split(':',1) for line in Path('/proc/meminfo').read_text().splitlines())
-        available=int(entries['MemAvailable'].split()[0])*1024
-        cap=Path('/sys/fs/cgroup/memory.max').read_text().strip()
-        used=int(Path('/sys/fs/cgroup/memory.current').read_text())
-        if cap!='max':available=min(available,max(0,int(cap)-used))
-    except (OSError,ValueError,KeyError):pass
-    # Two /proc/stat samples avoid treating other users' busy CPU as free quota.
-    idle_fraction=None
-    try:
-        def sample():
-            return list(map(int,Path('/proc/stat').read_text().splitlines()[0].split()[1:]))
-        first=sample();time.sleep(.2);second=sample()
-        delta=[b-a for a,b in zip(first,second)]
-        idle_fraction=(delta[3]+delta[4])/max(1,sum(delta[:8]))
-    except (OSError,ValueError,IndexError):pass
-    if idle_fraction is not None:cpus=min(cpus,max(1,math.floor(cpus*idle_fraction)))
-    shared=None;io_pressure=None
-    try:shared=shutil.disk_usage('/dev/shm').free
-    except OSError:pass
-    try:
-        first=Path('/proc/pressure/io').read_text().splitlines()[0].split()[1:]
-        io_pressure={key:float(value) for key,value in (item.split('=') for item in first)}
-    except (OSError,ValueError,IndexError):pass
-    return dict(cpu_slots=max(1,cpus),cgroup_cpu_quota=quota,cpu_idle_fraction=idle_fraction,available_memory_bytes=available,
-                shared_memory_available_bytes=shared,io_pressure=io_pressure,
-                load_average=list(os.getloadavg()) if hasattr(os,'getloadavg') else None)
+    """Compatibility wrapper; each invocation collects fresh stage facts."""
+    from live_resources import snapshot
+    return snapshot()
 
 
 def allocate(snapshot, parallel=1):
-    parallel=max(1,int(parallel))
-    slots=max(1,int(snapshot['cpu_slots']))
-    # Independent nnU-Net jobs have two loading pools; retain its serial loader until
-    # measured preflight selects otherwise. Thread totals remain within one budget.
-    parallel=min(parallel,slots)
-    memory=snapshot.get('available_memory_bytes')
-    if memory is not None:parallel=min(parallel,max(1,int(memory)//(4*1024**3)))
-    cpu_workers=min(slots,8)
-    if (snapshot.get('io_pressure') or {}).get('avg10',0)>=10:cpu_workers=min(cpu_workers,2)
-    if memory is not None:cpu_workers=min(cpu_workers,max(1,int(memory)//(4*1024**3)))
-    return dict(snapshot,parallel_workers=parallel,threads_per_worker=max(1,min(4,slots//parallel)),
-                cpu_tail_workers=max(1,cpu_workers),cpu_case_threads=1,nnunet_augmentation_workers=0,
-                selection='affinity/cgroup/CPU-idle/RAM/I-O-pressure bounded initial budget; serial DA avoids SHM pools; not a measured throughput optimum')
+    from live_resources import case_policy
+    capacity=case_policy(snapshot,max(1,int(parallel)),4*1024**3,supported_threads=4)
+    tail=case_policy(snapshot,max(0,int(snapshot.get('cpu_budget',snapshot.get('cpu_slots')) or 1)),
+                     4*1024**3,supported_threads=1)
+    if capacity['workers']<1:
+        raise MemoryError('known insufficient CPU/RAM stage capacity: '+capacity['capacity_status'])
+    return dict(snapshot,parallel_workers=capacity['workers'],threads_per_worker=capacity['threads_per_worker'],
+                cpu_tail_workers=tail['workers'],cpu_case_threads=1,nnunet_augmentation_workers=0,
+                read_concurrency=tail['read_concurrency'],capacity_status=capacity['capacity_status'],
+                reasons=capacity['reasons']+tail['reasons'],
+                selection='fresh direct CPU80%/RAM80% stage policy; I/O read admission separate from compute')
 
 
 def configure(job,plan,env):
@@ -80,18 +39,18 @@ def configure(job,plan,env):
 def case_budget(work,paths,spacing=None):
     """Read headers only; bound raw/resampled logits and temporary arrays per case."""
     import nibabel as nib
+    paths=list(paths)
     largest=0
     for path in paths:
         image=nib.load(str(path));voxels=math.prod(image.shape)
         if spacing:
             voxels=max(voxels,math.prod(max(1,math.ceil(n*s/t)) for n,s,t in zip(image.shape,image.header.get_zooms(),spacing)))
         largest=max(largest,voxels*128+1024**3)
-    snapshot=probe();limit=max(1,min(8,snapshot['cpu_slots'],int(os.environ.get('WHOLE_HEART_CPU_TAIL_WORKERS','1'))))
-    if snapshot.get('available_memory_bytes') is not None:
-        limit=min(limit,max(1,int(snapshot['available_memory_bytes']*.75)//max(1,largest)))
-    if (snapshot.get('io_pressure') or {}).get('avg10',0)>=10:limit=min(limit,2)
-    report=dict(snapshot,workers=limit,threads_per_worker=1,estimated_bytes_per_case=largest,
-                rule='header raw/resampled voxels * 128 + 1 GiB, <=75% available RAM; bounded estimate, not peak measurement')
+    from live_resources import case_policy
+    snapshot=probe()
+    policy=case_policy(snapshot,len(paths),largest,supported_threads=1)
+    report=dict(snapshot | policy,
+                rule='header raw/resampled voxels *128 +1 GiB; aggregate CPU80%/RAM80%; no fixed case cap')
     write_json(Path(work)/'00_admin/cpu-case-budget.json',report)
     return report
 
@@ -123,21 +82,13 @@ def prediction_budget(work,records,maximum):
             raw_spacing=[float(v) for v in image.header.get_zooms()[:3]],planned_spacing=spacing,
             transpose_forward=axes,resampled_shape_plans=resampled,estimated_bytes=estimated,
             spacing_evidence='planned 3d_fullres spacing' if spacing else 'missing; raw-grid estimate only'))
-    snapshot=probe();slots=max(1,int(snapshot['cpu_slots']))
-    threads=max(1,min(slots,int(os.environ.get('WHOLE_HEART_CPU_THREADS','1'))))
-    limit=min(int(maximum),slots//threads)
+    from live_resources import case_policy
+    snapshot=probe()
     largest=max((row['estimated_bytes'] for row in headers),default=0)
-    memory=snapshot.get('available_memory_bytes')
-    status='bounded'
-    if memory is None:
-        limit=min(limit,1);status='unknown_memory_conservative_one_worker'
-    else:
-        limit=min(limit,int(memory*.75)//max(1,largest))
-        if limit<1:status='known_insufficient_memory'
-    if (snapshot.get('io_pressure') or {}).get('avg10',0)>=10:limit=min(limit,2)
-    report=dict(snapshot,workers=max(0,limit),threads_per_worker=threads,
-        estimated_bytes_per_case=largest,cases=headers,capacity_status=status,
-        rule='raw voxels *16 + max(raw,resampled) voxels *128 +1 GiB per process; aggregate <=75% current RAM and CPU threads; I/O pressure cap2; unknown RAM cap1')
+    policy=case_policy(snapshot,min(int(maximum),len(headers)),largest,
+                       supported_threads=max(1,int(os.environ.get('WHOLE_HEART_CPU_THREADS','1'))))
+    report=dict(snapshot | policy,cases=headers,
+        rule='raw voxels *16 + max(raw,resampled) voxels *128 +1 GiB; aggregate CPU80%/RAM80%; separate I/O read admission')
     write_json(work/'00_admin/prediction-host-budget.json',report)
     return report
 
