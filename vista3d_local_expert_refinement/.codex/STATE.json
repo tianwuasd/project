@@ -372,10 +372,11 @@
       "cpu_processes_and_threads_may_increase": true,
       "assessment_is_observation_not_formal_resource_selection": true,
       "formal_stages_recompute_from_live_resources": true,
-      "skill_updates_deferred": true
+      "skill_updates_deferred": true,
+      "cpu_budget_fraction": 0.8,
+      "cpu_budget_basis": "current permitted and available CPU budget, recomputed per stage"
     },
     "proposed_defaults_not_yet_approved": [
-      "90_percent_current_cpu_budget",
       "80_percent_current_available_ram",
       "runtime_supply_wait_thresholds",
       "adapter_specific_worker_thread_defaults"
