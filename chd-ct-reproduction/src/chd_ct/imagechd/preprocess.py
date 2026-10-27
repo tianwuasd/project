@@ -16,6 +16,7 @@ from ..recovery import atomic_path, file_hash, output_lock, read_json, write_jso
 from .cache_reuse import CacheReuseError, changed_fields, inspect_sources, read_cache
 from .common import FORMAT, IGNORE, LABELS, NORMALIZATION, normalize
 from .geometry import resize
+from .methods import LABEL_RESIZE
 from .spacing import (
     RESAMPLED_FORMAT,
     find_spacing_excel,
@@ -160,6 +161,8 @@ def prepare_case(case, image_path, label_path, size, spacing_record=None, target
     }
     if resampling:
         row["resampling"] = resampling
+    if size:
+        row["label_resize"] = LABEL_RESIZE
     return arrays, row
 
 
@@ -224,6 +227,8 @@ def prepare_locked(
         id_policy="explicit_patient_split" if split_file else "filename_as_patient",
     )
     pairs = discover(source, for_prediction)
+    if size:
+        options["label_resize"] = LABEL_RESIZE
     excel = find_spacing_excel(pairs[0][1], spacing_excel, no_resample)
     spacings = read_spacing_excel(excel) if excel else {}
     if excel:

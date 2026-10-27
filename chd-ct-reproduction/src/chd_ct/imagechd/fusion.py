@@ -27,6 +27,9 @@ def refine_with_blood(segmentation, blood):
         raise ValueError("融合输入无效")
     result = segmentation.copy()
     inside = blood == 1
+    # Retain the existing boundary-exclusion interpretation of paper section 4.3.
+    # Its prose does not specify the exact mask; see docs/label-grid-boundaries.md.
+    # Do not silently replace the boundary constraint with boundary preservation.
     result[np.isin(result, BLOOD_IDS) & ~inside] = 0
     available = inside & (result == 0)
     structure = ndi.generate_binary_structure(3, 1)

@@ -10,6 +10,7 @@ from ..models.chd_unet import ARCHITECTURE, GRID_ADAPTER
 from ..recovery import file_hash, read_json
 from .common import LABELS, MODEL_FORMAT, NORMALIZATION, load_case, read_prepared, write_json
 from .config import STAGES, UNAVAILABLE, effective_config, load_config
+from .methods import PROCESSING, require_aligned_cache, require_current_processing
 
 
 @contextmanager
@@ -17,6 +18,7 @@ def training_session(prepared, output, config_path, mode, device, concurrency, r
     from .train import training_rows
 
     directory, data = read_prepared(prepared)
+    require_aligned_cache(data)
     config = load_config(config_path)
     config.pop("fold", None)
     if fold_context is not None:
@@ -36,6 +38,9 @@ def training_session(prepared, output, config_path, mode, device, concurrency, r
     ):
         raise ValueError("论文规模配置需要 GPU 预检；CPU 请使用 --mode smoke 或独立的缩小配置")
     output = Path(output).expanduser().resolve()
+    contract_path = output / "training-contract.json"
+    if contract_path.is_file():
+        require_current_processing(read_json(contract_path))
     report = {
         "status": "running",
         "task": "chd_multistage",
@@ -50,6 +55,7 @@ def training_session(prepared, output, config_path, mode, device, concurrency, r
     collection = {
         "status": "running",
         "format": MODEL_FORMAT,
+        "processing_method": PROCESSING,
         "architecture": ARCHITECTURE,
         "grid_adapter": GRID_ADAPTER,
         "labels": list(LABELS),
@@ -89,6 +95,7 @@ def training_session(prepared, output, config_path, mode, device, concurrency, r
         np.random.seed(config["seed"])
         collection["config"] = config
         contract = dict(
+            processing_method=PROCESSING,
             config=config,
             mode=mode,
             prepared_sha256=collection["prepared_sha256"],
@@ -96,7 +103,6 @@ def training_session(prepared, output, config_path, mode, device, concurrency, r
             recovery_version=1,
             cache_hashes={r["case_id"]: file_hash(directory / r["cache"]) for r in data["cases"]},
         )
-        contract_path = output / "training-contract.json"
         if contract_path.exists() and read_json(contract_path) != contract:
             raise ValueError("训练数据或配置已改变，不能续训")
         if resume and not contract_path.exists() and (output / "models.json").exists():

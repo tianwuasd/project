@@ -21,6 +21,7 @@ from .config import STAGES, build_model, load_config, weights_for
 from .dataset import StageDataset
 from .loading import close_loader, make_loader, settings, start_epoch
 from .losses import masked_loss
+from .methods import PROCESSING
 
 
 def training_rows(data):
@@ -84,6 +85,7 @@ def _train_stage(directory, rows, stage, config, output, mode, manifest_hash, re
     epochs = 1 if maximum else spec["epochs"]
     last_file = output / (stage + ".last.pt")
     contract = dict(
+        processing_method=PROCESSING,
         recovery_version=1,
         stage=stage,
         config=config,
@@ -196,6 +198,7 @@ def _train_stage(directory, rows, stage, config, output, mode, manifest_hash, re
             best = losses["val"]
             record = {
                 "format": MODEL_FORMAT,
+                "processing_method": PROCESSING,
                 "architecture": ARCHITECTURE,
                 "grid_adapter": GRID_ADAPTER,
                 "stage": stage,

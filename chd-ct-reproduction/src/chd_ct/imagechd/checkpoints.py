@@ -9,6 +9,7 @@ from ..models.chd_unet import ARCHITECTURE, GRID_ADAPTER
 from .common import LABELS, MODEL_FORMAT, NORMALIZATION, safe_child
 from .config import STAGES, build_model
 from .folds import CV_MODEL_FORMAT, validate_plan
+from .methods import require_current_processing
 from .train import file_hash
 
 
@@ -22,7 +23,11 @@ def read_collection(directory, allow_smoke=False):
     if record.get("format") == CV_MODEL_FORMAT:
         return read_threefold(directory, record, allow_smoke)
     if record.get("format") != MODEL_FORMAT:
-        raise ValueError("旧版或不支持的模型结构；CHD 论文主干需要重新训练，现有预处理缓存可复用")
+        raise ValueError(
+            "旧版模型与当前标签缩放/细化协议不兼容；请在独立新任务重新训练。"
+            "原生/仅物理重采样缓存可复用，旧尺寸缩放缓存需重新预处理。"
+        )
+    require_current_processing(record)
     if record.get("architecture") != ARCHITECTURE or record.get("grid_adapter") != GRID_ADAPTER:
         raise ValueError("模型主干/网格适配版本不匹配，需要重新训练")
     if (
@@ -46,6 +51,7 @@ def read_collection(directory, allow_smoke=False):
                 checkpoint.get(key) != record.get(key)
                 for key in (
                     "format",
+                    "processing_method",
                     "architecture",
                     "grid_adapter",
                     "labels",
@@ -68,6 +74,7 @@ def read_collection(directory, allow_smoke=False):
 
 
 def read_threefold(directory, record, allow_smoke):
+    require_current_processing(record)
     if record.get("status") != "complete" or set(record.get("folds", {})) != {f"fold_{i}" for i in range(3)}:
         raise ValueError("三折模型未完成或缺少折次")
     if (

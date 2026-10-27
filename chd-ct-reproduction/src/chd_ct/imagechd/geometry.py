@@ -9,7 +9,8 @@ BLOOD_IDS = (1, 2, 3, 4, 6, 7)
 
 def resize(array, shape, labels=False):
     x = torch.as_tensor(np.ascontiguousarray(array), dtype=torch.float32)[None, None]
-    mode = "nearest" if labels else ("trilinear" if array.ndim == 3 else "bilinear")
+    # Match the image's align_corners=False pixel centers without mixing label IDs.
+    mode = "nearest-exact" if labels else ("trilinear" if array.ndim == 3 else "bilinear")
     result = torch.nn.functional.interpolate(
         x, size=tuple(shape), mode=mode, **({} if labels else {"align_corners": False})
     )[0, 0].numpy()

@@ -7,6 +7,7 @@ from ..recovery import file_hash, read_json
 from .common import LABELS, NORMALIZATION, load_case, read_prepared, write_json
 from .config import STAGES, UNAVAILABLE, effective_config, load_config
 from .folds import CV_MODEL_FORMAT, make_plan
+from .methods import PROCESSING, require_aligned_cache, require_current_processing
 
 
 def train_threefold(prepared, output, config_path, mode, device, gpu_ids, resume, gpu_limit, lock_fd):
@@ -14,6 +15,11 @@ def train_threefold(prepared, output, config_path, mode, device, gpu_ids, resume
     from .train import train
 
     directory, data = read_prepared(prepared)
+    require_aligned_cache(data)
+    output = Path(output)
+    contract_path = output / "training-contract.json"
+    if contract_path.is_file():
+        require_current_processing(read_json(contract_path))
     source = load_config(config_path)
     source.pop("fold", None)
     if mode not in {"check", "smoke", "preflight", "train"}:
@@ -29,8 +35,8 @@ def train_threefold(prepared, output, config_path, mode, device, gpu_ids, resume
         rows = training_rows(apply_fold(data, plan["folds"][0]))["train"]
         source = resolve(source, directory, rows, output, gpu_limit or len(gpu_ids or []) or 1, resume)
     config = effective_config(source, mode, device)
-    output = Path(output)
     contract = {
+        "processing_method": PROCESSING,
         "format": CV_MODEL_FORMAT,
         "recovery_version": 1,
         "mode": mode,
@@ -39,7 +45,6 @@ def train_threefold(prepared, output, config_path, mode, device, gpu_ids, resume
         "cache_hashes": {r["case_id"]: file_hash(directory / r["cache"]) for r in data["cases"]},
         "split_plan": plan,
     }
-    contract_path = output / "training-contract.json"
     if contract_path.exists() and read_json(contract_path) != contract:
         raise ValueError("三折训练数据、配置或患者划分改变，不能续训")
     previous = read_json(output / "models.json") if (output / "models.json").is_file() else None
@@ -48,6 +53,7 @@ def train_threefold(prepared, output, config_path, mode, device, gpu_ids, resume
     if mode == "check" and previous:
         raise ValueError("缓存检查请使用独立输出目录")
     collection = {
+        "processing_method": PROCESSING,
         "format": CV_MODEL_FORMAT,
         "architecture": ARCHITECTURE,
         "grid_adapter": GRID_ADAPTER,

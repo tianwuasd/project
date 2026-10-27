@@ -12,8 +12,9 @@ import numpy as np
 from ..recovery import atomic_path, file_hash, output_lock, read_json, write_json
 from .common import load_case, safe_child
 from .geometry import blood_target, bounding_box, resize
+from .methods import LABEL_RESIZE
 
-FORMAT = "imagechd-training-inputs-v1"
+FORMAT = "imagechd-training-inputs-v2"
 
 
 @contextmanager
@@ -57,6 +58,7 @@ def cached_input(root, directory, row, stage, config, max_gib=32, reserve_gib=2)
     blood = stage.startswith("blood")
     identity = {
         "format": FORMAT,
+        "label_resize": LABEL_RESIZE,
         "source": str(source),
         "source_sha256": file_hash(source),
         "source_shape": list(row["cache_shape"]),
