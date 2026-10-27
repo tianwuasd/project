@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Replace candidate/receipt runtime paths; integrate all-device capacity, safe live CPU feedback and actual SHM budget, then prepare/predict/diagnostics. Skill unchanged.",
+  "next_action": "Finish and review nontraining stage and UI integration; then full project verification/release, only afterward Skill v1/v2.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -423,11 +423,19 @@
         "scope": "controlled execution, compatibility-checked compile, two-slot transfer, model-consumed cursor, one atomic checkpoint write per call, usableU capacity",
         "review": "spec_pass_quality_approved_after_capacity_and_numeric_guard_fixes",
         "tests": "focused24pass1CUDA skip;control198pass8skip;fix15pass1CUDA skip;actual2rankGloo5asymmetricfallbacks+checkpointpass;realCPUInductor missingcl fallback"
+      },
+      {
+        "task": 4,
+        "commit": "59ef7c1abda9fc71dd30ca89d1df4df3d31de3cb",
+        "scope": "fresh direct all-ready capacity, typed group recovery, cursor-safe rolling CPU feedback, safe actual SHM, true native-thread affinity, independent assessment statuses",
+        "review": "spec_pass_quality_approved_after_asymmetric_supply_signal_fix",
+        "tests": "focused109pass3skip;control198pass8skip;actual2rankGloo40updates and1to2workers/replay/failurecleanup;fix4pass"
       }
     ],
-    "current": "Task4 fresh direct cooperative coordinator, runtime feedback and independent assessment",
+    "current": "Task5 preparation, persistent prediction, CPU-tail sequencing, truthful UI and local diagnostics export",
     "skill_modified_this_implementation": false,
     "server_deployed": false,
-    "local_gpu_compute": false
+    "local_gpu_compute": false,
+    "running_cpu_budget_scope": "retain stage-entry allocation within running feedback; refresh after rank exits for stage/membership/recovery, extra external capacity/pressure not attributed mid-epoch"
   }
 }
