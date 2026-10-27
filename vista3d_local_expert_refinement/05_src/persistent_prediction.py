@@ -49,7 +49,9 @@ def run(records,models,sha,settings,work):
                     candidates=idle_gpus(settings,candidates=[g for g in devices(False) if g not in active])
                 else:candidates=idle_gpus(settings)
                 for gpu in candidates:
-                    if gpu in active or len(active)>=min(budget['workers'],len(pending),settings['max_gpus']):continue
+                    if gpu in active:continue
+                    idle_workers=sum(not row['assigned'] for row in active.values())
+                    if len(active)>=min(budget['workers'],settings['max_gpus']) or idle_workers>=len(pending):continue
                     directory=root/f'worker{len(active)}';directory.mkdir()
                     log=directory/'worker.log';stream=log.open('w',encoding='utf-8')
                     env=os.environ.copy();env.update(WHOLE_HEART_WORKSPACE=str(work),CUDA_VISIBLE_DEVICES=gpu)

@@ -110,6 +110,67 @@ def prediction_budget(work,records,maximum):
     return report
 
 
+def _logits_header(path):
+    """Read NPY metadata only; do not materialize or map the logits payload."""
+    import numpy as np
+    path=Path(path)
+    with path.open('rb') as stream:
+        version=np.lib.format.read_magic(stream)
+        if version==(1,0):shape,fortran,dtype=np.lib.format.read_array_header_1_0(stream)
+        elif version==(2,0):shape,fortran,dtype=np.lib.format.read_array_header_2_0(stream)
+        else:raise ValueError('unsupported committed logits NPY version: '+str(version))
+        offset=stream.tell()
+    if len(shape)!=4 or any(int(v)<1 for v in shape) or not np.issubdtype(dtype,np.floating):
+        raise ValueError('committed logits must be a floating C,Z,Y,X array')
+    payload=math.prod(shape)*dtype.itemsize
+    if path.stat().st_size<offset+payload:raise ValueError('committed logits payload is truncated: '+str(path))
+    return dict(logits_shape=list(shape),logits_dtype=str(dtype),logits_payload_bytes=payload,
+                logits_header_bytes=offset,fortran_order=bool(fortran))
+
+
+def cpu_tail_budget(work,records,*,assessment=False):
+    """Fresh tail admission from raw/output headers AND committed model-grid logits.
+
+    Content digests remain verified by the actual tail worker before consumption.
+    Admission itself reads only the small commit/NPY/NIfTI headers and file size.
+    The scratch factors remain labelled estimates, not measured transient peaks.
+    """
+    import nibabel as nib
+    from live_resources import case_policy
+    from runtime_observations import event
+    work=Path(work);records=list(records);headers=[]
+    inventory={c['case_id']:c for c in read_json(work/'04_data/manifests/case_inventory.json')['cases']}
+    for record in records:
+        cid=record['case_id'];fold=record['fold'];method=record['method']
+        if assessment:
+            base=work/f'08_results/assessment/{fold}_{method}'
+            commit=base/f'{cid}.gpu.json';saved=read_json(commit);logits=base/f'{cid}.logits.npy'
+            if saved.get('case_id')!=cid or not saved.get('logits_sha256'):
+                raise ValueError('assessment logits are not committed: '+str(commit))
+        else:
+            base=work/f'08_results/evaluation/{fold}_{method}/intermediate'
+            commit=base/f'{cid}.json';saved=read_json(commit);logits=base/f'{cid}.npy'
+            output=saved.get('outputs',{}).get('logits',{})
+            if (saved.get('status')!='completed' or saved.get('signature',{}).get('case_id')!=cid
+                    or not output.get('sha256') or Path(output.get('path','')).resolve()!=logits.resolve()):
+                raise ValueError('formal logits are not committed: '+str(commit))
+        geometry=_logits_header(logits)
+        image=nib.load(str(inventory[cid]['image']));raw=math.prod(image.shape)
+        model=math.prod(geometry['logits_shape'][1:])
+        estimated=geometry['logits_payload_bytes']+128*(raw+model)+1024**3
+        headers.append(dict(fold=fold,method=method,case_id=cid,raw_shape=list(image.shape),
+            logits_path=str(logits),commit_path=str(commit),estimated_bytes=estimated,**geometry))
+    snapshot=probe();largest=max((r['estimated_bytes'] for r in headers),default=0)
+    policy=case_policy(snapshot,len(records),largest,supported_threads=max(1,int(snapshot.get('cpu_budget') or 1)))
+    stage='assessment_cpu_tail' if assessment else 'cpu_tail'
+    report=dict(snapshot | policy,cases=headers,stage=stage,observed_at=__import__('time').time(),actual_cpu_use=None,
+        rule='committed logits bytes +128*(raw/output voxels + model-grid voxels) +1GiB; conservative scratch estimate',
+        geometry_evidence='NIfTI and committed NPY headers/file size only; payload digest checked by tail worker')
+    write_json(work/'00_admin/cpu-case-budget.json',report)
+    event(work,'case.capacity',stage=stage,budget=report)
+    return report
+
+
 def thread_environment(count,env=None):
     """Library-specific NumExpr limit; never a blanket case/CPU budget cap."""
     count=int(count)

@@ -117,7 +117,126 @@ class DiagnosticExport(unittest.TestCase):
             with self.assertRaises(ValueError):export(root/'job',root/'exports')
 
 
+class TailGeometryTests(unittest.TestCase):
+    def setUp(self):
+        # Load before mocked sys.modules scopes so NumPy is not re-imported.
+        import numpy
+
+    @staticmethod
+    def committed_logits(work,cid,assessment=False):
+        import math,struct
+        from server_data import write_json,digest
+        base=work/('08_results/assessment/f_B0' if assessment else '08_results/evaluation/f_B0/intermediate')
+        base.mkdir(parents=True,exist_ok=True)
+        path=base/(cid+'.logits.npy' if assessment else cid+'.npy')
+        shape=(8,64,64,64)
+        header=repr(dict(descr='<f4',fortran_order=False,shape=shape)).encode('ascii')
+        header+=b' '*((64-(10+len(header)+1)%64)%64)+b'\n'
+        with path.open('wb') as stream:
+            stream.write(b'\x93NUMPY\x01\x00'+struct.pack('<H',len(header))+header)
+            stream.truncate(stream.tell()+math.prod(shape)*4)
+        if assessment:write_json(base/(cid+'.gpu.json'),dict(case_id=cid,logits_sha256=digest(path)))
+        else:write_json(base/(cid+'.json'),dict(status='completed',signature={'case_id':cid},outputs={'logits':dict(path=str(path),sha256=digest(path))}))
+        return path
+
+    def test_real_headers_only_admission_and_truncated_logits_rejected(self):
+        try:import nibabel as nib
+        except ImportError:self.skipTest('actual NIfTI API runtime required')
+        import numpy as np
+        from server_data import write_json
+        import task_resources
+        with tempfile.TemporaryDirectory() as temp:
+            work=Path(temp);raw=work/'raw.nii.gz'
+            nib.save(nib.Nifti1Image(np.zeros((4,4,4),dtype=np.int16),np.eye(4)),raw)
+            write_json(work/'04_data/manifests/case_inventory.json',dict(cases=[dict(case_id='a',image=str(raw))]))
+            logits=self.committed_logits(work,'a')
+            with patch.object(np,'load',side_effect=AssertionError('admission must not load payload')),patch.object(nib.arrayproxy.ArrayProxy,'__array__',side_effect=AssertionError('admission must not load NIfTI pixels')),patch.object(task_resources,'probe',return_value=dict(cpu_budget=16,memory_budget_bytes=2**30+20*2**20)):
+                budget=task_resources.cpu_tail_budget(work,[dict(fold='f',method='B0',case_id='a')])
+            self.assertEqual(budget['workers'],0)
+            self.assertEqual(budget['cases'][0]['raw_shape'],[4,4,4])
+            self.assertEqual(budget['cases'][0]['logits_payload_bytes'],8*64**3*4)
+            with logits.open('r+b') as stream:stream.truncate(128)
+            with self.assertRaisesRegex(ValueError,'truncated'):task_resources._logits_header(logits)
+
+    def test_formal_tail_entry_and_dispatch_budget_include_large_model_grid(self):
+        import types
+        from server_data import write_json,read_json
+        import evaluation_parallel as queue
+        import task_resources
+        from unittest.mock import Mock
+        with tempfile.TemporaryDirectory() as temp,patch.dict(os.environ,{},clear=True):
+            work=Path(temp);ids=['a','b']
+            write_json(work/'04_data/manifests/case_inventory.json',dict(cases=[dict(case_id=c,image='raw-'+c) for c in ids]))
+            for cid in ids:self.committed_logits(work,cid)
+            image=types.SimpleNamespace(shape=(4,4,4))
+            facts=dict(cpu_budget=16,memory_budget_bytes=2*2**30+20*2**20)
+            model=dict(fold='f',method='B0',targets=ids)
+            with patch.dict(sys.modules,{'nibabel':types.SimpleNamespace(load=lambda _:image)}),patch.object(task_resources,'probe',return_value=facts),patch('evaluation_contract.cached',side_effect=lambda *args:args[-1]=='gpu'),patch('persistent_prediction.run'),patch('evaluation_summary.summarize'),patch.object(queue,'run_phase') as phase:
+                queue.run_queue([model],'sha',dict(max_gpus=8),work)
+                self.assertEqual(phase.call_args.args[2]['max_gpus'],1)
+            processes=[];peak=[]
+            class Process:
+                def __init__(self,*args,**kwargs):self.pid=len(processes)+1;self.polls=0;processes.append(self);peak.append(sum(p.polls<2 for p in processes))
+                def poll(self):self.polls+=1;return 0 if self.polls>=2 else None
+            records=[dict(fold='f',method='B0',index=0,case_id=c,status='pending') for c in ids]
+            with patch.dict(sys.modules,{'nibabel':types.SimpleNamespace(load=lambda _:image)}),patch.object(task_resources,'probe',return_value=facts),patch.object(queue.subprocess,'Popen',Process),patch.object(queue.time,'sleep'),patch.object(queue.time,'monotonic',side_effect=range(10000)):
+                queue.run_phase(records,'sha',dict(max_gpus=8,retry_seconds=1),work,'cpu')
+            self.assertEqual(max(peak),1)
+            budget=read_json(work/'00_admin/cpu-case-budget.json')
+            self.assertEqual(budget['cases'][0]['logits_shape'],[8,64,64,64])
+            self.assertGreater(budget['estimated_bytes_per_case'],2**30+20*2**20)
+
+    def test_assessment_tail_reprobes_after_exit_and_blocks_large_logits(self):
+        import types
+        import assessment_run
+        import task_resources
+        from server_data import write_json
+        events=[]
+        class Fleet:
+            def __init__(self,job,*args):self.path=Path(job)/'diagnostics/gpu-leases.json'
+            def start(self):return self
+            def devices(self,wait=False):return ['gpu0']
+            def suspend_discovery(self,used):pass
+            def close(self):events.append('released')
+        with tempfile.TemporaryDirectory() as temp:
+            work=Path(temp)/'workspace';write_json(work/'04_data/manifests/case_inventory.json',dict(cases=[dict(case_id='cal',image='raw')]))
+            plan=dict(workspace=str(work),runtime=str(Path(temp)/'runtime'),data='synthetic',gpu_memory=20,folds=['f'],methods=['B0'],formal_budget={},assessment_budget={})
+            def child(command,env,**kwargs):
+                events.append(command[-1])
+                if command[-1]=='gpu':self.committed_logits(work,'cal',True)
+                else:write_json(work/'09_reports/assessment_prediction_f_B0.json',dict(status='passed'))
+            def fresh():
+                self.assertEqual(events[-1],'released');events.append('fresh_tail')
+                return dict(cpu_budget=16,memory_budget_bytes=2**30+20*2**20)
+            with patch('assessment_prepare.prepare',return_value={'prediction_ids':['cal']}),patch('cooperative_control.tune',return_value=dict(gpu_uuids=['gpu0'],output='trial')),patch('cooperative_control.identity',return_value={}),patch('gpu_fleet.GPUFleet',Fleet),patch('task_worker.run_child',side_effect=child),patch('runtime_observations.collect'),patch('task_resources.prediction_budget',return_value=dict(workers=1,threads_per_worker=2)),patch.object(task_resources,'probe',side_effect=fresh),patch.dict(sys.modules,{'nibabel':types.SimpleNamespace(load=lambda _:types.SimpleNamespace(shape=(4,4,4)))}):
+                with self.assertRaisesRegex(MemoryError,'assessment CPU tail capacity'):assessment_run.run(plan)
+            self.assertEqual(events,['gpu','released','fresh_tail'])
+
+
 class PredictionLifecycle(unittest.TestCase):
+    def test_late_second_gpu_receives_one_pending_case_while_first_is_busy(self):
+        import persistent_prediction as resident
+        from server_data import read_json,write_json
+        with tempfile.TemporaryDirectory() as temp,patch.dict(os.environ,{},clear=True):
+            work=Path(temp);processes=[];completed=set();idle_calls=[]
+            class Process:
+                def __init__(self,command,**kwargs):self.directory=Path(command[-2]);self.pid=len(processes);self.returncode=None;processes.append(self)
+                def poll(self):
+                    request=self.directory/'request.json'
+                    if request.exists() and (self.pid!=0 or len(processes)>1):
+                        row=read_json(request);completed.update(r['case_id'] for r in row['records'])
+                        write_json(self.directory/'response.json',{'id':row['id']})
+                    return self.returncode
+                def wait(self,timeout=None):self.returncode=0;return 0
+            def idle(*args,**kwargs):
+                idle_calls.append(1)
+                if len(idle_calls)>3:raise AssertionError('late GPU was blocked while first worker remained busy')
+                return ['gpu0'] if len(idle_calls)==1 else ['gpu1']
+            records=[dict(fold='f',method='B0',index=0,case_id=c,status='pending') for c in ['a','b']]
+            with patch('evaluation_gpu.idle_gpus',side_effect=idle),patch('task_resources.prediction_budget',return_value=dict(workers=2,threads_per_worker=1,cpu_budget=2)),patch('evaluation_contract.cached',side_effect=lambda w,m,c,*args:c in completed),patch.object(resident.subprocess,'Popen',Process),patch.object(resident,'stop_owned_process'),patch.object(resident.time,'sleep'):
+                resident.run(records,[dict(fold='f',method='B0')],'sha',dict(max_gpus=2),work)
+            self.assertEqual(len(processes),2);self.assertEqual(completed,{'a','b'})
+
     def test_twelve_cases_use_all_eight_admitted_workers_and_preserve_partial_failure(self):
         import persistent_prediction as resident
         from server_data import write_json,read_json
@@ -217,7 +336,7 @@ class PredictionLifecycle(unittest.TestCase):
             def tail(*a,**kw):
                 self.assertEqual(events[-1],'exit_all_keepers');events.append('budget_tail')
                 return dict(workers=1,threads_per_worker=2)
-            with patch('assessment_prepare.prepare',return_value={'prediction_ids':['cal']}),                 patch('cooperative_control.tune',return_value=dict(gpu_uuids=['gpu0','gpu1'],output='trial')),                 patch('cooperative_control.identity',side_effect=identity),patch('gpu_fleet.GPUFleet',Fleet),                 patch('task_worker.run_child',side_effect=child),patch('runtime_observations.collect'),                 patch('task_resources.prediction_budget',return_value=dict(workers=1,threads_per_worker=2)),                 patch('task_resources.case_budget',side_effect=tail):
+            with patch('assessment_prepare.prepare',return_value={'prediction_ids':['cal']}),                 patch('cooperative_control.tune',return_value=dict(gpu_uuids=['gpu0','gpu1'],output='trial')),                 patch('cooperative_control.identity',side_effect=identity),patch('gpu_fleet.GPUFleet',Fleet),                 patch('task_worker.run_child',side_effect=child),patch('runtime_observations.collect'),                 patch('task_resources.prediction_budget',return_value=dict(workers=1,threads_per_worker=2)),                 patch('task_resources.cpu_tail_budget',side_effect=tail):
                 report=assessment_run.run(plan)
             self.assertLess(events.index('identity'),events.index(('suspend',['gpu0'])))
             self.assertLess(events.index('gpu'),events.index('exit_all_keepers'))
@@ -313,6 +432,21 @@ class ReportingContracts(unittest.TestCase):
             self.assertIn('已分配 12',text);self.assertNotIn('已分配 16',text)
             self.assertIn('训练 1500/500',text);self.assertIn('验证 300/100',text)
             self.assertIn('实际CPU用量缺少',text)
+
+    def test_rank_cause_survives_newer_generic_wrapper_and_both_paths_remain(self):
+        from failure_summary import summarize
+        from server_data import write_json
+        with tempfile.TemporaryDirectory() as temp:
+            work=Path(temp);rank=work/'07_experiments/tuning/x/ranks/actual/rank-0/failure.json'
+            write_json(rank,dict(message='actual invalid geometry',classification='noncapacity',invocation_id='actual',rank=0))
+            other=work/'07_experiments/tuning/x/ranks/recovered/rank-0/failure.json'
+            write_json(other,dict(message='unrelated recovered OOM',invocation_id='recovered',rank=0))
+            wrapper=work/'diagnostics/failure.json'
+            write_json(wrapper,dict(stage='assessment',error_type='RankGroupFailure',error='distributed rank failure; consult logs',context={'rank_failures':[{'invocation_id':'actual','rank':0}]}))
+            for path,stamp in [(rank,100),(other,150),(wrapper,200)]:os.utime(path,(stamp,stamp))
+            text=summarize(work,RuntimeError('Command exit status 1'),'assessment.log',since=50)
+            self.assertIn('actual invalid geometry',text);self.assertNotIn('unrelated recovered OOM',text)
+            self.assertIn(str(rank),text);self.assertIn(str(wrapper),text);self.assertIn('assessment.log',text)
 
     def test_failure_uses_structured_cause_and_log_path_without_secret(self):
         from failure_summary import summarize

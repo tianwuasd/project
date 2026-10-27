@@ -54,9 +54,8 @@ def run(plan):
                         fold,method,chosen['output'],case,'--phase','gpu'],env,output=stream,timeout=900)
                 fleet.close();fleet=None
                 stage('GPU预测进程退出与全部保留卡释放','passed',fold=fold,model=method)
-                from task_resources import case_budget
-                inventory=read_json(work/'04_data/manifests/case_inventory.json')['cases']
-                budget=case_budget(work,[c['image'] for c in inventory if c['case_id']==case],maximum=1,phase='assessment_cpu_tail')
+                from task_resources import cpu_tail_budget
+                budget=cpu_tail_budget(work,[dict(fold=fold,method=method,case_id=case)],assessment=True)
                 if budget['workers']<1:raise MemoryError('assessment CPU tail capacity: '+budget['capacity_status'])
                 env['CUDA_VISIBLE_DEVICES']='';env.pop('VISTA_GPU_LEASES',None)
                 env.update(thread_environment(budget['threads_per_worker'],env))
@@ -84,7 +83,7 @@ def run(plan):
     except BaseException as error:
         report.update(function_status='failed',effect_status='not_evaluated',status='interrupted' if isinstance(error,KeyboardInterrupt) else 'failed',
             error=str(error),seconds=time.monotonic()-started)
-        failure(work,'assessment',error,plan=plan)
+        failure(work,'assessment',error,plan=plan,rank_failures=getattr(error,'failures',[]))
         raise
     finally:
         try:

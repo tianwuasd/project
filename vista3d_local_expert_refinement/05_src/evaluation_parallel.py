@@ -68,10 +68,8 @@ def run_phase(records, sha, settings, work, phase='gpu'):
                         break
                     threads='1'
                     if phase=='cpu':
-                        from task_resources import case_budget
-                        inventory=read_json(work/'04_data/manifests/case_inventory.json')['cases']
-                        ids={r['case_id'] for r in records}
-                        budget=case_budget(work,[c['image'] for c in inventory if c['case_id'] in ids],phase='cpu_tail')
+                        from task_resources import cpu_tail_budget
+                        budget=cpu_tail_budget(work,list(pending)+[r for _,_,r in active.values()])
                         state['host_budget']=budget
                         occupied=sum(r.get('assigned_threads',1) for _,_,r in active.values())
                         count=min(budget['threads_per_worker'],max(0,budget['cpu_budget']-occupied))
@@ -160,12 +158,13 @@ def run_queue(models,sha,settings,work):
     print('所有GPU病例进程已退出；开始CPU原网格恢复、压缩、LCC与Dice/HD95。',flush=True)
     for r in records:
         r['status']='completed' if cached(work,models[r['index']],r['case_id'],sha,'cpu') else 'pending'
-    from task_resources import case_budget
-    cases=read_json(work/'04_data/manifests/case_inventory.json')['cases'];targets={r['case_id'] for r in records}
-    workers=case_budget(work,[c['image'] for c in cases if c['case_id'] in targets],phase='cpu_tail')['workers']
-    if workers<1 and records:raise MemoryError('CPU tail capacity is zero; GPU results preserved')
-    cpu_settings=dict(settings,max_gpus=workers)
-    run_phase(records,sha,cpu_settings,work,'cpu')
+    pending_tail=[r for r in records if r['status']!='completed']
+    if pending_tail:
+        from task_resources import cpu_tail_budget
+        workers=cpu_tail_budget(work,pending_tail)['workers']
+        if workers<1:raise MemoryError('CPU tail capacity is zero; GPU results preserved')
+        cpu_settings=dict(settings,max_gpus=workers)
+        run_phase(records,sha,cpu_settings,work,'cpu')
     from evaluation_summary import summarize
     summarize(work)
 
