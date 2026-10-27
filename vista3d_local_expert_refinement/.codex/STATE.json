@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-27",
+  "updated_at": "2026-10-28",
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
-  "phase": "stage_resource_v2_implementation",
+  "phase": "stage_resource_v2_project_complete_skill_pending",
   "confirmed": {
     "same_source_material": true,
     "source_labeled_ct": true,
@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Root final whole-project review/integration/publication, then Skill v1/v2 source review/install/publication.",
+  "next_action": "Publish project and verify remote ref; only afterward Skill v1 preservation and full VISTA v2 template.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -363,7 +363,7 @@
     "code_review_release_gate": "approved at ef99141; no open Critical/Important findings"
   },
   "resource_policy_design": {
-    "status": "implemented_locally_validated_whole_review_pending",
+    "status": "implemented_locally_validated_and_reviewed_target_acceptance_pending",
     "date": "2026-10-27",
     "spec": "docs/superpowers/specs/2026-10-27-stage-resource-policy-design.md",
     "user_confirmed": {
@@ -402,7 +402,7 @@
     ]
   },
   "stage_resource_v2": {
-    "status": "project_whole_review_pending",
+    "status": "project_review_passed_skill_pending",
     "plan": "docs/superpowers/plans/2026-10-27-stage-resource-v2.md",
     "completed": [
       {
@@ -448,7 +448,7 @@
         "tests": "final339run295pass44classifiedskip0fail;actualCPUAMP/Gloo/checkpoint/2to3membershippassed"
       }
     ],
-    "current": "Root whole-project review, preserve upstream CT0.23.0, then publish; Skill7 afterward",
+    "current": "Publish reviewed project, then implement/review/install/publish Skill v1/v2",
     "skill_modified_this_implementation": false,
     "server_deployed": false,
     "local_gpu_compute": false,
@@ -456,9 +456,9 @@
     "panel_version": "0.5.0",
     "validation": "docs/STAGE_RESOURCE_V2_VALIDATION.json",
     "final_control_tests": {
-      "total": 339,
-      "passed": 295,
-      "skipped": 44,
+      "total": 354,
+      "passed": 307,
+      "skipped": 47,
       "errors": 0,
       "failures": 0
     },
@@ -467,6 +467,26 @@
       "CUDA full-size capacity/transfer/compile/AMP",
       "NCCL membership",
       "real CT quality/throughput"
-    ]
+    ],
+    "runtime_inventory_files": 87,
+    "final_fix": {
+      "commit": "7df1ee32ded3235d3da87f4c2c9ca90967b9a5d3",
+      "issues": [
+        "owned preparation child lifecycle",
+        "actual IO read admission and actions",
+        "compatible completed peak RAM feedback",
+        "bounded parallel export"
+      ],
+      "review": "all_addressed_no_new_breakage_ready_to_publish",
+      "evidence": "docs/STAGE_RESOURCE_V2_VALIDATION.json"
+    },
+    "preparation_identity_files": 7,
+    "publication": {
+      "repository": "tianwuasd/project",
+      "branch": "main",
+      "reviewed_runtime_commit": "7df1ee32ded3235d3da87f4c2c9ca90967b9a5d3",
+      "status_authority": "remote main ref and Git history; deployment separately verified",
+      "server_deployed": false
+    }
   }
 }

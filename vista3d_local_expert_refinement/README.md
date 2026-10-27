@@ -5,6 +5,7 @@
 用户确认先以 nnU-Net 建立 baseline。默认 A+B→G：8 fit + 4 cal 实际参与监督训练；4 selector、22 U 为后续研究预留。VISTA3D、局部专家与点击修正仍是后续阶段。
 
 - [工程与方法说明](docs/NNUNET_BASELINE.md)：预处理、训练、测试、重要公式、模块和数据边界。
+- [面板 v0.5.0：分阶段资源与运行指南](docs/STAGE_RESOURCE_V2.md)：独立预处理/训练/预测、现场资源决策、完整测评和本地诊断包；目标 GPU 验收边界见验证记录。
 - [服务器面板与命令](docs/SERVER_PANEL.md)：运行 `bash start_server.sh`，命名任务、短测、训练、续跑、查询和更新。
 - [面板 v0.2.0 验证](docs/PANEL_TEMPLATE_VALIDATION.md)：CT 母版适配、环境安装子阶段、持续进度、选择日志和任务进程树。
 - [验证记录](docs/BASELINE_VALIDATION.md)：已测范围与尚需服务器验证的部分。
