@@ -18,6 +18,7 @@ from .config import UNAVAILABLE, build_model
 from .folds import select_members, select_rows
 from .fusion import refine_with_blood, weighted_vote
 from .geometry import bounding_box, resize
+from .methods import PROCESSING, require_aligned_cache
 from .spacing import sample_grid
 from .train import file_hash
 
@@ -202,6 +203,7 @@ def predict_locked(
     if phase not in {"all", "gpu", "cpu"}:
         raise ValueError("无效预测阶段")
     cache, data = read_prepared(prepared)
+    require_aligned_cache(data)
     directory, collection = read_collection(models, allow_smoke)
     plan, fold = collection.get("split_plan"), collection["config"].get("fold")
     requested_split = split
@@ -214,6 +216,7 @@ def predict_locked(
     report = {
         "status": "running",
         "task": "chd_multistage_prediction",
+        "processing_method": PROCESSING,
         "labels": list(LABELS),
         "prepared_sha256": file_hash(cache / "dataset.json"),
         "models_sha256": file_hash(directory / "models.json"),
@@ -229,6 +232,7 @@ def predict_locked(
     }
     contract = {k: report[k] for k in ("prepared_sha256", "models_sha256", "model_mode")}
     contract.update(
+        processing_method=PROCESSING,
         case_ids=[r["case_id"] for r in rows],
         split=split,
         case_id=case_id,
