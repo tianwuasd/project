@@ -47,15 +47,66 @@ def preparation_lines(work, folds=None):
     return lines
 
 
+def resource_lines(work,state):
+    """Current phase settings and actual observations are separate kinds of evidence."""
+    work=Path(work);phase=state.get('current_step');lines=[];decision={};source=None;effective={}
+    paths=[]
+    if phase in {'train','smoke','assessment'}:
+        kind='assessment' if phase=='assessment' else 'formal'
+        paths=list((work/'00_admin/stage-decisions').glob(kind+'_*.json'))
+    if phase=='assessment':
+        cpu_paths=[p for p in [work/'00_admin/cpu-case-budget.json',work/'00_admin/prediction-host-budget.json'] if p.exists()]
+        if cpu_paths:
+            current=max(cpu_paths,key=lambda p:p.stat().st_mtime_ns)
+            if not paths or current.stat().st_mtime_ns>max(p.stat().st_mtime_ns for p in paths):
+                decision=optional(current);source=current;paths=[]
+    if paths:
+        source=max(paths,key=lambda p:p.stat().st_mtime_ns);decision=optional(source)
+        effective=decision.get('effective_cpu',{});budget=decision.get('resource_snapshot',{})
+        # A feedback row is current only if created after this capacity decision.
+        feedback=[]
+        for path in (work/'07_experiments').rglob('feedback.rank*.json'):
+            if path.stat().st_mtime_ns>=source.stat().st_mtime_ns:
+                events=optional(path)
+                if isinstance(events,list):
+                    feedback.extend((path.stat().st_mtime_ns,event) for event in events)
+        for _,event in sorted(feedback,key=lambda item:item[0]):
+            item=event.get('decision',{})
+            if item.get('applied_boundary')=='replay_safe_batch':effective=item.get('settings',effective)
+        if feedback:
+            event=sorted(feedback,key=lambda item:item[0])[-1][1];window=event.get('window',{})
+            lines.append('供数观察：最高等待比例 '+str(window.get('wait_fraction','缺失'))+'；逐rank '+str(window.get('rank_windows',[])))
+        batch=decision.get('global_batch_size');reference=decision.get('reference_global_batch_size')
+        if batch and reference:
+            lines.append(f'采样：训练 {batch*250}/{reference*250}，验证 {batch*50}/{reference*50} patches/轮（当前/参考）；250轮×250训练/50验证。')
+    else:
+        if phase=='predict':
+            queue=optional(work/'08_results/evaluation/status.json');decision=queue.get('host_budget',{})
+        if not decision and phase in {'prepare','predict','assessment'}:decision=optional(work/'00_admin/cpu-case-budget.json')
+        effective=decision;budget=decision
+        source=source or work/'00_admin/cpu-case-budget.json'
+    if not decision:return ['当前阶段资源决策尚未记录；启动预算不作为实际使用量。']
+    assigned=effective.get('total_cpu_slots','缺失');cpu=budget.get('cpu_budget','缺失')
+    try:started=datetime.fromisoformat(state.get('steps',{}).get(phase,{}).get('started',state.get('started'))).timestamp()
+    except (TypeError,ValueError):started=0
+    observed=decision.get('observed_at') or (source.stat().st_mtime if source and source.exists() else 0)
+    label='当前阶段记录' if state.get('status')=='running' and observed>=started else '历史阶段记录（非当前资源）'
+    lines.append(f"{label}：CPU获准 {budget.get('cpu_permitted','缺失')} / 当前可用 {budget.get('cpu_available','缺失')} / 80%预算 {cpu}，已分配 {assigned}；实际CPU用量缺少所属PID时间窗测量。")
+    lines.append('阶段：'+str(decision.get('stage',phase)))
+    lines.append('RAM预算 '+str(budget.get('memory_budget_bytes','缺失'))+' bytes；实际峰值请见病例/rank观察，未观测项不能视作0。')
+    if effective.get('rank_settings'):lines.append('当前已应用供数配置：'+str(effective['rank_settings']))
+    else:lines.append('病例并行 '+str(effective.get('workers','缺失'))+'；每病例支持的叶线程 '+str(effective.get('threads_per_worker','缺失')))
+    lines.append('原因：'+str(effective.get('reasons',[]))+'；缺失证据：'+str(budget.get('missing_evidence',[])))
+    return lines
+
+
 def step_lines(job, plan, work, state):
     steps = state.get('steps', {})
     done = sum(v.get('status') == 'completed' for v in steps.values())
     lines = [f'步骤完成：{done}/{len(steps)}（按步骤数，非总计算量）；本次运行耗时：{duration(state.get("started"), state.get("ended"))}']
     if state.get('current_step') == 'input':
         lines.append('当前前置：校验并复制所选历史输入/缓存；大文件复制期间尚无计算百分比。')
-    budget=optional(Path(job)/'resource-plan.json')
-    if budget:
-        lines.append(f'本轮CPU共享预算：有效核数 {budget.get("cpu_slots")}，并行上限 {budget.get("parallel_workers")}，每worker线程 {budget.get("threads_per_worker")}；CPU尾部 {budget.get("cpu_tail_workers")} 进程。')
+    lines += resource_lines(work,state)
     software=optional(Path(job)/'software-smoke.json')
     if software:lines.append('小尺寸CPU软件检查：'+software.get('status','未知')+'；不代表正式尺寸GPU预检通过。')
     if state.get('current_step') in {'smoke','train'}:

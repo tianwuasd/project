@@ -160,6 +160,8 @@ def result_lines(job, section='summary', detailed=False, runtime=None):
     if plan.get('job_kind')=='assessment':
         result=read_optional(work/'09_reports/assessment.json') or {}
         lines += ['独立工程测评：'+result.get('status','尚未生成')+'；少量来源病例，不代表正式模型效果。',
+                  '功能验证：'+result.get('function_status','未记录')+'；效果证据：'+result.get('effect_status','未记录'),
+                  '资源由各正式阶段现场重算；测评配置不作为推荐。',
                   '完整报告：'+str(work/'09_reports/assessment.json'),
                   '错误与缺失证据：'+str(work/'diagnostics')]
         if section in {'summary','training'}:
@@ -221,11 +223,11 @@ def log_sources(job,runtime=None):
     candidates += [('step:'+p.stem, '步骤 / '+p.stem, p) for p in sorted((job/'logs').glob('*.log'))]
     candidates += [('model:'+p.parent.name, '模型 / '+p.parent.name, p) for p in sorted((work/'07_experiments/formal').glob('*/training.log'))]
     for area, name in [('07_experiments/queue_logs','训练队列'), ('08_results/evaluation/queue_logs','预测队列')]:
-        candidates += [(area+':'+p.stem, name+' / '+p.stem, p) for p in sorted((work/area).glob('*.log'))[-20:]]
+        candidates += [(area+':'+p.stem, name+' / '+p.stem, p) for p in sorted((work/area).rglob('*.log'))[-20:]]
     for area,name in [('00_admin/preflight','正式尺寸预检'),('00_admin/preparation_logs','预处理病例'),('09_reports','短测套件')]:
         candidates += [(area+':'+str(p.relative_to(work/area)),name+' / '+str(p.relative_to(work/area)),p) for p in sorted((work/area).rglob('*.log'))]
     candidates += [('smoke:'+str(p.relative_to(work/'07_experiments')),'完整尺寸短测 / '+p.parent.name+' / '+p.name,p) for root in sorted((work/'07_experiments').glob('smoke_*')) for p in root.glob('*.log')]
-    ranks=list((work/'07_experiments').rglob('rank-*/*.log'))
+    ranks=list((work/'07_experiments').rglob('*.log'))
     ranks=sorted(ranks,key=lambda p:p.stat().st_mtime)[-100:]
     candidates += [('rank:'+str(p.relative_to(work)),'协同进程 / '+str(p.relative_to(work)),p) for p in ranks]
     return [(key, label, p) for key,label,p in candidates if p.is_file()]

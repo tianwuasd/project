@@ -148,12 +148,13 @@ class InnerContracts(unittest.TestCase):
 
     def test_cpu_tail_resume_does_not_query_or_start_gpu(self):
         with tempfile.TemporaryDirectory() as tmp:
+            write_json(Path(tmp)/'04_data/manifests/case_inventory.json',dict(cases=[dict(case_id=c,image='synthetic') for c in ['Case1','Case2']]))
             masks=[];proc=Mock(pid=10);proc.poll.return_value=0
             def start(*a,**k):masks.append(k['env']['CUDA_VISIBLE_DEVICES']);return proc
             model=dict(fold='ct_holdG',method='B0',targets=['Case1','Case2'])
-            with patch('evaluation_contract.cached',side_effect=lambda *args:args[-1]=='gpu'),patch.object(queue,'idle_gpus') as idle,patch.object(queue.subprocess,'Popen',side_effect=start),patch.object(queue.time,'sleep'),patch.object(queue.time,'monotonic',side_effect=range(10000)),patch('evaluation_summary.summarize') as summary:
+            with patch('task_resources.case_budget',return_value=dict(workers=2,threads_per_worker=3,cpu_budget=6)) as fresh,patch('evaluation_contract.cached',side_effect=lambda *args:args[-1]=='gpu'),patch.object(queue,'idle_gpus') as idle,patch.object(queue.subprocess,'Popen',side_effect=start),patch.object(queue.time,'sleep'),patch.object(queue.time,'monotonic',side_effect=range(10000)),patch('evaluation_summary.summarize') as summary:
                 queue.run_queue([model],'sha',dict(max_gpus=2,retry_seconds=1),Path(tmp))
-            idle.assert_not_called();self.assertEqual(masks,['','']);summary.assert_called_once()
+            idle.assert_not_called();self.assertEqual(masks,['','']);summary.assert_called_once();self.assertGreaterEqual(fresh.call_count,3)
 
     def test_intermediate_commit_requires_all_hashes(self):
         with tempfile.TemporaryDirectory() as tmp:

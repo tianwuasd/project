@@ -45,7 +45,7 @@ class StageBoardTests(unittest.TestCase):
             root,profile,args=self.setup_board(tmp);source,old,rows=self.source(root,profile,'prepare')
             with patch.object(server_profile,'load',return_value=profile),\
                  patch.object(pipeline_catalog,'history',return_value=rows),patch.object(panel.jobs,'load_plan',return_value=old),\
-                 patch.object(pipeline_catalog,'resolve',side_effect=lambda r,j:Path(j)),\
+                 patch.object(pipeline_catalog,'resolve',side_effect=lambda r,j:Path(j)),patch('task_inputs.source_compatibility',return_value=None),\
                  patch('builtins.input',side_effect=['1','B0']) as user,contextlib.redirect_stdout(io.StringIO()):
                 config=panel.stage_config(args,{},'train')
             self.assertEqual(user.call_count,2)
@@ -60,7 +60,7 @@ class StageBoardTests(unittest.TestCase):
             root,profile,args=self.setup_board(tmp);source,old,rows=self.source(root,profile,'train')
             with patch.object(server_profile,'load',return_value=profile),\
                  patch.object(pipeline_catalog,'history',return_value=rows),patch.object(panel.jobs,'load_plan',return_value=old),\
-                 patch.object(pipeline_catalog,'resolve',side_effect=lambda r,j:Path(j)),\
+                 patch.object(pipeline_catalog,'resolve',side_effect=lambda r,j:Path(j)),patch('task_inputs.source_compatibility',return_value=None),\
                  patch('builtins.input',side_effect=['1']) as user,contextlib.redirect_stdout(io.StringIO()):
                 config=panel.stage_config(args,{},'predict')
             self.assertEqual(user.call_count,1);self.assertEqual(config['tasks'],['predict'])

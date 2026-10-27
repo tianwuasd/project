@@ -1,5 +1,6 @@
 """Independent few-case preprocessing; full fit-only planning, no target labels."""
 import importlib.metadata
+import sys
 from pathlib import Path
 import time
 
@@ -9,6 +10,8 @@ def prepare(work,fold,gpu_memory):
     from data_pipeline import export_fold
     from prepare_nnunet import configure_paths
     from server_data import read_json,write_json,digest,freeze_source_labels
+    from task_resources import begin_cpu_stage
+    begin_cpu_stage(work,'prepare')
     configure_paths()
     work=Path(work)
     splits=read_json(work/'04_data/manifests/splits_v1.json')['folds']
@@ -37,11 +40,13 @@ def prepare(work,fold,gpu_memory):
         write_json(progress,dict(fold=fold,phase=phase,updated=time.time(),
             elapsed_seconds=time.monotonic()-started,assessment=True,**fields))
     if not fingerprint.exists() or not provenance.exists():
-        update('完整fit来源规划指纹（8例；不含cal/target）')
-        extractor=DatasetFingerprintExtractor(split['dataset_id'],num_processes=1,verbose=False)
+        update('完整fit来源规划指纹（不含cal/target）')
+        from case_execution import fingerprint_workers
+        extractor=DatasetFingerprintExtractor(split['dataset_id'],num_processes=fingerprint_workers(work,raw,split['train']),verbose=False)
         extractor.dataset={cid:extractor.dataset[cid] for cid in split['train']}
         extractor.dataset_json=dict(extractor.dataset_json,numTraining=len(split['train']))
-        extractor.run(overwrite_existing=True)
+        from case_execution import cpu_scope
+        with cpu_scope(1):extractor.run(overwrite_existing=True)
         write_json(provenance,dict(fit_ids=split['train'],excluded_val=split['val'],
             excluded_target=split['target'],sha256=digest(fingerprint)))
     prov=read_json(provenance)
@@ -54,22 +59,27 @@ def prepare(work,fold,gpu_memory):
                                   plans_name='WholeheartBaselinePlans')
         planner.dataset={cid:planner.dataset[cid] for cid in split['train']}
         planner.dataset_json=dict(planner.dataset_json,numTraining=len(split['train']))
-        planner.plan_experiment()
+        from case_execution import cpu_scope,planner_threads
+        with cpu_scope(planner_threads(work,raw,split['train'])):planner.plan_experiment()
     write_json(prep/'splits_final.json',[dict(train=split['train'],val=split['val'])])
     manager=PlansManager(read_json(plan));config=manager.get_configuration('3d_fullres')
     cache=prep/config.data_identifier;cache.mkdir(parents=True,exist_ok=True)
     selected=scope['train_ids']+scope['validation_ids']
     plan_hash=digest(plan)
-    for i,cid in enumerate(selected):
-        update('少量来源病例预处理',completed=i,total=len(selected),active_case=cid)
+    from task_resources import case_budget
+    from cpu_case_queue import run
+    paths=[raw/'imagesTr'/f'{cid}_0000.nii.gz' for cid in selected]
+    refresh=lambda:case_budget(work,paths,list(reversed(config.spacing)),phase='assessment_prepare')
+    budget=refresh();commands=[];finished=[]
+    for cid in selected:
         done=prep/'assessment_case_completion'/f'{cid}.json'
-        if not(done.exists() and read_json(done).get('plan_sha256')==plan_hash
+        if (done.exists() and read_json(done).get('plan_sha256')==plan_hash
                 and all((cache/f'{cid}{suffix}').is_file() for suffix in ['.b2nd','_seg.b2nd','.pkl'])):
-            config.preprocessor_class(verbose=False).run_case_save(str(cache/cid),
-                [str(raw/'imagesTr'/f'{cid}_0000.nii.gz')],str(raw/'labelsTr'/f'{cid}.nii.gz'),
-                manager,config,read_json(raw/'dataset.json'))
-            write_json(done,dict(plan_sha256=plan_hash))
-        print(f'独立测评预处理 {i+1}/{len(selected)}：{cid}',flush=True)
+            finished.append(cid)
+        else:commands.append((cid,[sys.executable,'-B',str(Path(__file__).with_name('case_execution.py')),str(work),fold,cid,'--assessment']))
+    def completed(cid):
+        finished.append(cid);update('少量来源病例预处理',completed=len(finished),total=len(selected))
+    run(commands,budget['workers'],work/f'00_admin/preparation_logs/{fold}',completed,refresh=refresh)
     update('测评预处理完成',completed=len(selected),total=len(selected))
     write_json(work/f'09_reports/{fold}_assessment_preparation.json',dict(status='passed',
         scope=scope,seconds=time.monotonic()-started,plan_sha256=plan_hash,

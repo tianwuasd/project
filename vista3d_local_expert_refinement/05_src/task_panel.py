@@ -74,6 +74,13 @@ def choose_job(runtime, allow_none=False):
 def choose_stage_source(runtime,stage):
     from pipeline_catalog import history
     rows=[r for r in history(runtime) if r.get('stage')==stage and r.get('status')=='completed']
+    from task_inputs import source_compatibility
+    usable=[]
+    for row in rows:
+        reason=source_compatibility(row['directory'])
+        if reason:print(jobs.clean(row['name'])+'：不可作为新版来源；'+reason)
+        else:usable.append(row)
+    rows=usable
     if not rows:
         raise ValueError('没有已完成的新版'+{'prepare':'预处理','train':'训练'}[stage]+'任务；请先完成对应板块。')
     for i,row in enumerate(rows,1):
@@ -396,6 +403,10 @@ def job_menu(runtime, job):
             action = ask('选择', 's')
             if action == '0': return
             if action == 'l': log_menu(runtime, job)
+            elif action == 'z':
+                from diagnostic_export import export
+                path=export(choose_job(runtime),Path(runtime)/'diagnostic-exports')
+                print('诊断包已保存：'+str(path))
             elif action == 'o': result_menu(job,runtime)
             elif action in {'s','m','p'}:
                 view_menu({'s':'status','m':'models','p':'processes'}[action], runtime, job)
@@ -469,6 +480,7 @@ def panel(args, runtime, saved):
         print('1 预处理（来源数据/方法）  2 训练（选择预处理任务/模型）  3 预测（选择训练模型）')
         print('a 完整测评（独立短流程）  r 重启任务  d 删除任务  x 中断任务（保留完整检查点）')
         print('u 更新程序  c GitHub网络设置  w 上传已提交代码  v 上传日志/指标/权重（SSH+Git LFS）')
+        print('z 本地诊断导出（选择任务 → ZIP → 显示路径）')
         print('0/q 退出面板（后台任务继续）；普通输入页 b 返回、q 退出。')
         try:
             action = ask('选择；回车只看状态', 's')
@@ -509,6 +521,10 @@ def panel(args, runtime, saved):
                 selected=copy.copy(args)
                 selected.upload_job=choose_job(runtime);selected.upload_package=None;selected.yes_upload=False
                 run_upload(selected,profile,True)
+            elif action == 'z':
+                from diagnostic_export import export
+                path=export(choose_job(runtime),Path(runtime)/'diagnostic-exports')
+                print('诊断包已保存：'+str(path))
             elif action == 'o':
                 result_menu(choose_job(runtime),runtime)
             elif action in {'a','1','2','3'}:

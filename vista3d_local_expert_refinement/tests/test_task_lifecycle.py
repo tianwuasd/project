@@ -26,7 +26,7 @@ class InputTests(unittest.TestCase):
         prep=source/'04_data/derived/nnUNet_preprocessed/Dataset813_ct_holdG'
         write_json(prep/'WholeheartBaselinePlans.json',{'configurations':{'3d_fullres':{'data_identifier':'cache'}}})
         current=Path(inputs.__file__).parent
-        write_json(prep/'server_preparation_signature.json',{'implementation_sha256':{p:digest(current/p) for p in ['server_prepare.py','data_pipeline.py','prepare_nnunet.py']}})
+        write_json(prep/'server_preparation_signature.json',{'implementation_sha256':__import__('preparation_identity').current(current)})
         for case in ['Case1','Case2']:
             for suffix in ['.b2nd','_seg.b2nd','.pkl']:
                 path=prep/'cache'/(case+suffix);path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'cache')

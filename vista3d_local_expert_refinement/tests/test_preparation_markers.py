@@ -33,7 +33,7 @@ class PreparationMarkerTests(unittest.TestCase):
             write_json(cache / f"{case_id}.complete.json", {"plan_sha256": plan_hash})
         signature = {"source_labels": {}, "split": split, "gpu_memory_gb": 5,
                      "inventory_sha256": digest(root / "04_data/manifests/case_inventory.json"),
-                     "implementation_sha256": {name: digest(Path(prepare.__file__).with_name(name)) for name in ["server_prepare.py", "data_pipeline.py", "prepare_nnunet.py"]},
+                     "implementation_sha256": __import__('preparation_identity').current(),
                      "nnunet_version": importlib.metadata.version("nnunetv2")}
         write_json(prep / "server_preparation_signature.json", signature)
         return prep, cache, split, plan_hash, signature

@@ -27,6 +27,7 @@ def verify_environment(work):
 
 def run_phase(records, sha, settings, work, phase='gpu'):
     records=[dict(r) for r in records]
+    if records and settings['max_gpus']<1:raise MemoryError('CPU case capacity is zero')
     path = work / '08_results/evaluation/status.json'
     logdir = work / '08_results/evaluation/queue_logs'
     logdir.mkdir(parents=True, exist_ok=True)
@@ -65,13 +66,25 @@ def run_phase(records, sha, settings, work, phase='gpu'):
                 for gpu in available:
                     if not pending or terminating[0]:
                         break
-                    threads=None
+                    threads='1'
+                    if phase=='cpu':
+                        from task_resources import case_budget
+                        inventory=read_json(work/'04_data/manifests/case_inventory.json')['cases']
+                        ids={r['case_id'] for r in records}
+                        budget=case_budget(work,[c['image'] for c in inventory if c['case_id'] in ids],phase='cpu_tail')
+                        state['host_budget']=budget
+                        occupied=sum(r.get('assigned_threads',1) for _,_,r in active.values())
+                        count=min(budget['threads_per_worker'],max(0,budget['cpu_budget']-occupied))
+                        if len(active)>=budget['workers'] or count<1:
+                            if not active:raise MemoryError('CPU tail capacity: '+budget['capacity_status'])
+                            break
+                        threads=str(count)
                     if phase=='gpu':
                         budget=prediction_budget(work,list(pending)+[r for _,_,r in active.values()],settings['max_gpus'])
                         state['host_budget']=budget
                         if len(active)>=budget['workers']:
-                            if not active and budget['capacity_status']=='known_insufficient_memory':
-                                raise MemoryError('预测前主机RAM不足以容纳一例原图/重采样/logits估算；未启动GPU病例，请查看 prediction-host-budget.json')
+                            if not active and budget['workers']<1:
+                                raise MemoryError('预测前主机CPU/RAM不足以容纳一例：'+budget['capacity_status']+'；未启动GPU病例，请查看 prediction-host-budget.json')
                             break
                         threads=str(budget['threads_per_worker'])
                     record = pending.popleft()
@@ -79,10 +92,8 @@ def run_phase(records, sha, settings, work, phase='gpu'):
                     env['WHOLE_HEART_WORKSPACE'] = str(work)
                     env['CUDA_VISIBLE_DEVICES'] = gpu if phase=='gpu' else ''
                     env.pop('WHOLE_HEART_GPU_UUIDS', None)
-                    for key in ['OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'NUMEXPR_NUM_THREADS']:
-                        env[key] = threads if phase=='gpu' else '1'
-                    if phase=='gpu':env['WHOLE_HEART_CPU_THREADS']=threads
-                    if phase=='cpu':env['WHOLE_HEART_CPU_THREADS']='1'
+                    from task_resources import thread_environment
+                    env.update(thread_environment(int(threads),env))
                     logfile = logdir / f"{stamp}_{phase}_{record['fold']}_{record['method']}_{record.get('case_id','all')}.log"
                     stream = logfile.open('w', encoding='utf-8')
                     try:
@@ -103,7 +114,7 @@ def run_phase(records, sha, settings, work, phase='gpu'):
                         stream.close()
                         raise
                     active[gpu] = process, stream, record
-                    record.update(status='running', gpu_uuid=gpu, pid=process.pid, log=str(logfile))
+                    record.update(status='running', gpu_uuid=gpu, pid=process.pid, log=str(logfile),assigned_threads=int(threads))
                     record['started_monotonic']=time.monotonic()
                     print(f"开始评价 {record['fold']}/{record['method']}/{record['case_id']}，{gpu}，日志：{logfile}", flush=True)
                 state['status'] = ('running' if phase=='gpu' else 'cpu_tail') if active else 'waiting_for_idle_gpu'
@@ -139,19 +150,20 @@ def run_queue(models,sha,settings,work):
              for i,m in enumerate(models) for c in m['targets']]
     for r in records:
         if cached(work,models[r['index']],r['case_id'],sha,'gpu'):r['status']='completed'
-    run_phase(records,sha,settings,work,'gpu')
-    if os.environ.get('VISTA_GPU_LEASES'):
-        from cooperative_control import release_devices
-        from gpu_fleet import verified_keepers
-        release_devices(verified_keepers(os.environ['VISTA_GPU_LEASES']),wait=True,final=True)
+    from persistent_prediction import run as persistent_run
+    try:persistent_run(records,models,sha,settings,work)
+    finally:
+        if os.environ.get('VISTA_GPU_LEASES'):
+            from cooperative_control import release_devices
+            from gpu_fleet import verified_keepers
+            release_devices(verified_keepers(os.environ['VISTA_GPU_LEASES']),wait=True,final=True)
     print('所有GPU病例进程已退出；开始CPU原网格恢复、压缩、LCC与Dice/HD95。',flush=True)
     for r in records:
         r['status']='completed' if cached(work,models[r['index']],r['case_id'],sha,'cpu') else 'pending'
-    workers=max(1,int(os.environ.get('WHOLE_HEART_CPU_TAIL_WORKERS','1')))
-    if os.environ.get('WHOLE_HEART_MANAGED')=='1':
-        from task_resources import case_budget
-        cases=read_json(work/'04_data/manifests/case_inventory.json')['cases'];targets={r['case_id'] for r in records}
-        workers=case_budget(work,[c['image'] for c in cases if c['case_id'] in targets])['workers']
+    from task_resources import case_budget
+    cases=read_json(work/'04_data/manifests/case_inventory.json')['cases'];targets={r['case_id'] for r in records}
+    workers=case_budget(work,[c['image'] for c in cases if c['case_id'] in targets],phase='cpu_tail')['workers']
+    if workers<1 and records:raise MemoryError('CPU tail capacity is zero; GPU results preserved')
     cpu_settings=dict(settings,max_gpus=workers)
     run_phase(records,sha,cpu_settings,work,'cpu')
     from evaluation_summary import summarize
@@ -178,7 +190,8 @@ def main():
         if args.case not in model['targets']:raise ValueError('病例不在冻结目标范围内')
         import torch
         from task_resources import torch_threads
-        torch_threads(torch)
+        from task_resources import apply_training_cpu
+        limiter=apply_training_cpu(dict(threads=torch_threads(torch)),torch)
         from evaluation_phases import infer,finish
         (infer if args.phase=='gpu' else finish)(ROOT,model,args.case,args.frozen_sha)
         return

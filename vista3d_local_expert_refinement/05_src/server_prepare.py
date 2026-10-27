@@ -41,6 +41,8 @@ def completion_directory(prep, cache, case_ids, plan_hash):
 
 
 def prepare(fold, gpu_memory):
+    from task_resources import begin_cpu_stage
+    begin_cpu_stage(ROOT,'prepare')
     configure_paths()
     import torch
     from nnunetv2.experiment_planning.dataset_fingerprint.fingerprint_extractor import DatasetFingerprintExtractor
@@ -61,7 +63,8 @@ def prepare(fold, gpu_memory):
     name = f"Dataset{split['dataset_id']:03d}_{fold}"
     raw = ROOT / "04_data/derived/nnUNet_raw" / name
     prep = ROOT / "04_data/derived/nnUNet_preprocessed" / name
-    signature = {"source_labels": source_labels, "split": split, "gpu_memory_gb": gpu_memory, "inventory_sha256": digest(ROOT / "04_data/manifests/case_inventory.json"), "implementation_sha256": {name: digest(Path(__file__).with_name(name)) for name in ["server_prepare.py", "data_pipeline.py", "prepare_nnunet.py"]}, "nnunet_version": importlib.metadata.version("nnunetv2")}
+    from preparation_identity import current as preparation_implementation
+    signature = {"source_labels": source_labels, "split": split, "gpu_memory_gb": gpu_memory, "inventory_sha256": digest(ROOT / "04_data/manifests/case_inventory.json"), "implementation_sha256": preparation_implementation(), "nnunet_version": importlib.metadata.version("nnunetv2")}
     marker = prep / "server_preparation_signature.json"
     previous = load_json(marker) if marker.exists() else None
     if previous is not None and not compatible_signature(previous, signature):
@@ -96,10 +99,12 @@ def prepare(fold, gpu_memory):
     provenance = prep / "fingerprint_provenance.json"
     if not fingerprint.exists() or not provenance.exists():
         progress('计算 fit 病例数据指纹')
-        extractor = DatasetFingerprintExtractor(split["dataset_id"], num_processes=1, verbose=False)
+        from case_execution import fingerprint_workers
+        extractor = DatasetFingerprintExtractor(split["dataset_id"], num_processes=fingerprint_workers(ROOT,raw,split["train"]), verbose=False)
         extractor.dataset = {i: extractor.dataset[i] for i in split["train"]}
         extractor.dataset_json = dict(extractor.dataset_json, numTraining=len(split["train"]))
-        extractor.run(overwrite_existing=True)
+        from case_execution import cpu_scope
+        with cpu_scope(1):extractor.run(overwrite_existing=True)
         write_json(provenance, {"fit_ids": split["train"], "excluded_val": split["val"], "excluded_target": split["target"], "sha256": digest(fingerprint)})
     prov = load_json(provenance)
     if prov["fit_ids"] != split["train"] or prov["sha256"] != digest(fingerprint):
@@ -110,7 +115,8 @@ def prepare(fold, gpu_memory):
         planner = ExperimentPlanner(split["dataset_id"], gpu_memory_target_in_gb=gpu_memory, plans_name="WholeheartBaselinePlans")
         planner.dataset = {i: planner.dataset[i] for i in split["train"]}
         planner.dataset_json = dict(planner.dataset_json, numTraining=len(split["train"]))
-        planner.plan_experiment()
+        from case_execution import cpu_scope,planner_threads
+        with cpu_scope(planner_threads(ROOT,raw,split['train'])):planner.plan_experiment()
     write_json(prep / "splits_final.json", [{"train": split["train"], "val": split["val"]}])
     manager = PlansManager(load_json(plans_path))
     config = manager.get_configuration("3d_fullres")
@@ -125,7 +131,8 @@ def prepare(fold, gpu_memory):
     total = len(split['train'])+len(split['val'])
     from task_resources import case_budget
     budget=case_budget(ROOT,[raw/'imagesTr'/f'{i}_0000.nii.gz' for i in split['train']+split['val']],list(reversed(config.spacing)))
-    if budget['workers']>1:
+    if budget['workers']<1:raise MemoryError('prepare capacity: '+budget['capacity_status'])
+    if budget['workers']>=1:
         from cpu_case_queue import run
         commands=[];finished=[]
         for case_id in split['train']+split['val']:
@@ -137,24 +144,12 @@ def prepare(fold, gpu_memory):
             finished.append(case_id);progress('逐病例预处理',completed=len(finished),total=total)
             print(f'{fold} 预处理 {len(finished)}/{total}：{case_id}',flush=True)
         progress('逐病例预处理',completed=len(finished),total=total)
-        run(commands,budget['workers'],ROOT/f'00_admin/preparation_logs/{fold}',completed)
+        run(commands,budget['workers'],ROOT/f'00_admin/preparation_logs/{fold}',completed,
+            refresh=lambda:case_budget(ROOT,[raw/'imagesTr'/f'{i}_0000.nii.gz' for i in split['train']+split['val']],list(reversed(config.spacing))))
         for case_id in split['train']+split['val']:shutil.copyfile(raw/'labelsTr'/f'{case_id}.nii.gz',gt/f'{case_id}.nii.gz')
         write_json(complete,dict(status='passed',seconds=time.perf_counter()-started,source_train=len(split['train']),source_val=len(split['val']),target_used=False,gpu_memory_target_gb=gpu_memory,plan_sha256=plan_hash))
         progress('已完成',completed=total,total=total)
         return
-    for i, case_id in enumerate(split["train"] + split["val"], 1):
-        done = done_dir / f"{case_id}.complete.json"
-        files_ok = all((cache / f"{case_id}{s}").exists() for s in [".b2nd", "_seg.b2nd", ".pkl"])
-        progress('逐病例预处理', completed=i-1, total=total, active_case=case_id)
-        if not (done.exists() and files_ok and load_json(done).get("plan_sha256") == plan_hash):
-            # 使用官方逐病例接口，避免官方整批入口先删除已有缓存目录。
-            processor.run_case_save(str(cache / case_id), [str(raw / "imagesTr" / f"{case_id}_0000.nii.gz")], str(raw / "labelsTr" / f"{case_id}.nii.gz"), manager, config, dataset_json)
-            write_json(done, {"plan_sha256": plan_hash})
-        shutil.copyfile(raw / "labelsTr" / f"{case_id}.nii.gz", gt / f"{case_id}.nii.gz")
-        progress('逐病例预处理', completed=i, total=total)
-        print(f"{fold} 预处理 {i}/{len(split['train'])+len(split['val'])}：{case_id}", flush=True)
-    write_json(complete, {"status": "passed", "seconds": time.perf_counter()-started, "source_train": len(split["train"]), "source_val": len(split["val"]), "target_used": False, "gpu_memory_target_gb": gpu_memory, "plan_sha256": plan_hash})
-    progress('已完成', completed=total, total=total)
 
 
 if __name__ == "__main__":
@@ -164,16 +159,6 @@ if __name__ == "__main__":
     parser.add_argument('--case',help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.case:
-        configure_paths()
-        import torch
-        from task_resources import torch_threads
-        torch_threads(torch)
-        from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
-        split=load_json(ROOT/'04_data/manifests/splits_v1.json')['folds'][args.fold]
-        if args.case not in split['train']+split['val']:raise ValueError('病例不在冻结来源范围')
-        name=f'Dataset{split["dataset_id"]:03d}_{args.fold}'
-        prep=ROOT/'04_data/derived/nnUNet_preprocessed'/name;raw=ROOT/'04_data/derived/nnUNet_raw'/name
-        manager=PlansManager(load_json(prep/'WholeheartBaselinePlans.json'));config=manager.get_configuration('3d_fullres')
-        config.preprocessor_class(verbose=False).run_case_save(str(prep/config.data_identifier/args.case),[str(raw/'imagesTr'/f'{args.case}_0000.nii.gz')],str(raw/'labelsTr'/f'{args.case}.nii.gz'),manager,config,load_json(raw/'dataset.json'))
-        write_json(prep/'server_case_completion'/config.data_identifier/f'{args.case}.complete.json',{'plan_sha256':digest(prep/'WholeheartBaselinePlans.json')})
+        from case_execution import prepare_one
+        prepare_one(ROOT,args.fold,args.case)
     else:prepare(args.fold, args.gpu_memory)

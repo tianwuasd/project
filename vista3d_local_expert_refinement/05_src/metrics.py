@@ -14,7 +14,8 @@ def boundary_points(mask, affine):
     return points @ affine[:3, :3].T + affine[:3, 3]
 
 
-def binary_metrics(prediction, reference, affine):
+def binary_metrics(prediction, reference, affine, threads=1):
+    if int(threads)<1:raise ValueError("metric threads must be positive")
     pred, ref = np.asarray(prediction, dtype=bool), np.asarray(reference, dtype=bool)
     if pred.shape != ref.shape or pred.ndim != 3:
         raise ValueError("指标输入必须在同一个三维网格上")
@@ -28,6 +29,6 @@ def binary_metrics(prediction, reference, affine):
     if not p or not r:
         return {"dice": dice, "hd_mm": float("inf"), "hd95_mm": float("inf"), "status": "one_empty"}
     a, b = boundary_points(pred, affine), boundary_points(ref, affine)
-    ab = cKDTree(b).query(a, workers=1)[0]
-    ba = cKDTree(a).query(b, workers=1)[0]
+    ab = cKDTree(b).query(a, workers=int(threads))[0]
+    ba = cKDTree(a).query(b, workers=int(threads))[0]
     return {"dice": dice, "hd_mm": float(max(ab.max(), ba.max())), "hd95_mm": float(max(np.percentile(ab, 95), np.percentile(ba, 95))), "status": "ok"}

@@ -134,6 +134,13 @@ class GPUFleet:
             print('CPU前置已完成；等待当前分配范围内空闲GPU，1秒重查。',flush=True)
             if self.stop.wait(1):raise InterruptedError('GPU保留组已停止')
 
+    def suspend_discovery(self,used=()):
+        """Keep only useful prediction devices; no timed reacquisition in this phase."""
+        with self.lock:
+            self.discovery_enabled=False
+            self.release_unused(used)
+            self._publish()
+
     def resume_discovery(self):
         """Only an explicitly selected later GPU phase can resume this invocation."""
         with self.lock:

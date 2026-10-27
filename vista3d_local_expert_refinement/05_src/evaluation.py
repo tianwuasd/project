@@ -98,12 +98,12 @@ def largest_components(seg):
     return output
 
 
-def score_case(prediction, reference, affine):
+def score_case(prediction, reference, affine, threads=1):
     classes = {}
     for name, index in LABELS.items():
         if index == 0:
             continue
-        score = binary_metrics(prediction == index, reference == index, affine)
+        score = binary_metrics(prediction == index, reference == index, affine,threads=threads)
         # 标准JSON不支持Infinity，用明确的字符串记录，汇总时还原，绝不丢弃失败病例。
         classes[name] = {k: ('inf' if isinstance(v, float) and math.isinf(v) else v)
                          for k, v in score.items()}

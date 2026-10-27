@@ -227,8 +227,10 @@ def _collect(job, plan, state):
     work=_safe_path(plan['workspace'])
     if not work.is_relative_to(job):
         raise ValueError('任务工作区不在本任务目录内')
-    roots=[job/'logs',job/'receipts',work/'06_configs',work/'09_reports',work/'00_admin/preflight',work/'00_admin/preparation_logs']
-    for name in ['server_config.json','model_selection.json','evaluation_protocol.json','resource-plan.json','cpu-case-budget.json']:
+    roots=[job/'logs',job/'receipts',work/'06_configs',work/'09_reports',work/'00_admin/preflight',work/'00_admin/preparation_logs',job/'diagnostics',work/'diagnostics',
+           work/'00_admin/stage-decisions',work/'00_admin/case-observations',work/'00_admin/preparation_progress',
+           work/'07_experiments/tuning',work/'07_experiments/optimization',work/'08_results/evaluation/queue_logs']
+    for name in ['server_config.json','model_selection.json','evaluation_protocol.json','resource-plan.json','cpu-case-budget.json','prediction-host-budget.json','assessment-progress.json']:
         add(work/'00_admin'/name,'workflow/workspace/00_admin/'+name)
     # Recovery archives and unfinished smoke attempts are historical failure scenes.
     experiments=work/'07_experiments'
@@ -236,12 +238,13 @@ def _collect(job, plan, state):
         record=root/'run.json'
         if not record.is_file() or _json(record).get('status') not in TERMINAL_SUCCESS:continue
         _inactive_artifacts(root);roots.append(root)
-    suffixes={'.json','.csv','.log','.txt','.md','.yaml','.yml','.pt','.pth'}
+    suffixes={'.json','.jsonl','.csv','.log','.txt','.md','.yaml','.yml','.pt','.pth'}
     for root in roots:
         if not root.exists():continue
         root=_safe_path(root)
         for path in sorted(root.rglob('*')):
             _safe_path(path)
+            if path.suffix.lower() in {'.pt','.pth'} and not root.is_relative_to(experiments/'formal'):continue
             if path.is_file() and path.suffix.lower() in suffixes and not any(_blocked(p) for p in path.relative_to(root).parts):
                 add(path,'workflow/'+path.relative_to(job).as_posix())
     return selected

@@ -211,12 +211,18 @@ def execute(job, lock_fd):
         from runtime_observations import failure
         failure(job,state.get('current_step','unknown'),error,workspace=str(work),
             launcher_log=str(job/'launcher.log'),step_log=state.get('steps',{}).get(state.get('current_step'),{}).get('log'))
-        state.update(status='interrupted' if isinstance(error, KeyboardInterrupt) else 'failed', error=str(error), ended=now())
+        from failure_summary import summarize
+        current_step=state.get('current_step');step_log=state.get('steps',{}).get(current_step,{}).get('log')
+        from datetime import datetime
+        try:since=datetime.fromisoformat(state.get('steps',{}).get(current_step,{}).get('started',state.get('started'))).timestamp()
+        except (TypeError,ValueError):since=0
+        human_error=summarize(work,error,step_log or job/'launcher.log',since)
+        state.update(status='interrupted' if isinstance(error, KeyboardInterrupt) else 'failed', error=human_error, ended=now())
         step = state.get('current_step')
         if step == 'installation':
             report_progress(env, None, '环境准备未完成；请在总日志查看错误后续跑。', status=state['status'], error=str(error))
         if step in state['steps'] and state['steps'][step]['status'] != 'completed':
-            state['steps'][step].update(status=state['status'], error=str(error), ended=state['ended'])
+            state['steps'][step].update(status=state['status'], error=human_error, ended=state['ended'])
         raise
     finally:
         try:

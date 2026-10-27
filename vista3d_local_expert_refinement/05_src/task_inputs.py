@@ -71,10 +71,10 @@ def inspect_input(config):
             raise CacheMismatch(f'{fold} 缓存未完整准备')
         prep = work / '04_data/derived/nnUNet_preprocessed' / f"Dataset{splits[fold]['dataset_id']:03d}_{fold}"
         signature = read_json(prep / 'server_preparation_signature.json')
-        current_code = Path(__file__).resolve().parent
-        current_implementation = {name: digest(current_code / name) for name in ['server_prepare.py','data_pipeline.py','prepare_nnunet.py']}
+        from preparation_identity import current
+        current_implementation=current()
         if signature.get('implementation_sha256') != current_implementation:
-            raise CacheMismatch('缓存实现版本不兼容')
+            raise CacheMismatch('来源预处理实现版本与当前程序不兼容；请在1预处理中新建任务，再选择它进行训练/预测。旧任务保持原版本，可原地续跑。')
         plan_file = prep / 'WholeheartBaselinePlans.json'
         if read_json(complete)['plan_sha256'] != digest(plan_file):
             raise CacheMismatch(f'{fold} 计划摘要不符')
@@ -107,6 +107,21 @@ def inspect_input(config):
                     fingerprints[str(path.relative_to(work))]=digest(path)
     return dict(directory=str(source), workspace=str(work), files=fingerprints,evidence=evidence,
                 verification='来源清单/计划/所选权重完整SHA256；缓存大文件存在检查，执行时保留原预处理校验')
+
+
+def source_compatibility(job):
+    """Cheap menu guard. Submission still verifies the complete strict contract."""
+    from task_runtime import load_plan
+    try:
+        plan=load_plan(job);work=Path(plan['workspace'])
+        splits=read_json(work/'04_data/manifests/splits_v1.json')['folds']
+        from preparation_identity import current
+        expected=current()
+        for fold in plan['folds']:
+            signature=read_json(work/f'04_data/derived/nnUNet_preprocessed/Dataset{splits[fold]["dataset_id"]:03d}_{fold}/server_preparation_signature.json')
+            if signature.get('implementation_sha256')!=expected:return '预处理实现版本不兼容，请先新建预处理任务'
+        return None
+    except (OSError,ValueError,KeyError,TypeError):return '缺少完整预处理来源记录，请先完成预处理任务'
 
 
 def copy_input(plan):

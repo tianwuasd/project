@@ -18,6 +18,7 @@ def run(plan):
         limits=plan['assessment_budget'])
     target=work/'09_reports/assessment.json'
     fleet=None
+    previous_lease=os.environ.get('VISTA_GPU_LEASES')
     def stage(name,status,**values):
         report['stages'].append(dict(name=name,status=status,time=time.time(),**values))
         write_json(target,report);write_json(work/'00_admin/assessment-progress.json',report)
@@ -30,25 +31,42 @@ def run(plan):
             stage('数据与预处理','running',fold=fold)
             scope=prepare(work,fold,plan['gpu_memory'])
             stage('数据与预处理','passed',fold=fold,scope=scope)
-            if fleet is None:
+            for method in plan['methods']:
                 from gpu_fleet import GPUFleet
                 fleet=GPUFleet(Path(plan['workspace']).parent,plan['runtime'],plan['gpu_memory']).start()
                 os.environ['VISTA_GPU_LEASES']=str(fleet.path)
                 fleet.devices(wait=True)
-            for method in plan['methods']:
                 stage('完整尺寸协同训练、容量验证与检查点恢复','running',fold=fold,model=method)
                 chosen=tune(work,fold,method,'assessment')
                 stage('完整尺寸协同训练、容量验证与检查点恢复','passed',chosen=chosen)
+                provenance=identity(work,fold,method)  # Must precede final release: identity waits for keepers.
                 case=scope['prediction_ids'][0]
+                fleet.suspend_discovery(chosen['gpu_uuids'][:1])
+                from task_resources import prediction_budget
+                host=prediction_budget(work,[dict(fold=fold,case_id=case)],1)
+                if host['workers']<1:raise MemoryError('assessment predict capacity: '+host['capacity_status'])
                 env=os.environ.copy();env['CUDA_VISIBLE_DEVICES']=chosen['gpu_uuids'][0]
+                from task_resources import thread_environment
+                env.update(thread_environment(host['threads_per_worker'],env))
                 logfile=work/f'09_reports/assessment_prediction_{fold}_{method}.log'
                 with logfile.open('a',encoding='utf-8') as stream:
                     run_child([sys.executable,'-u','-B',str(Path(__file__).with_name('assessment_predict.py')),
-                        fold,method,chosen['output'],case],env,output=stream,timeout=900)
+                        fold,method,chosen['output'],case,'--phase','gpu'],env,output=stream,timeout=900)
+                fleet.close();fleet=None
+                stage('GPU预测进程退出与全部保留卡释放','passed',fold=fold,model=method)
+                from task_resources import case_budget
+                inventory=read_json(work/'04_data/manifests/case_inventory.json')['cases']
+                budget=case_budget(work,[c['image'] for c in inventory if c['case_id']==case],maximum=1,phase='assessment_cpu_tail')
+                if budget['workers']<1:raise MemoryError('assessment CPU tail capacity: '+budget['capacity_status'])
+                env['CUDA_VISIBLE_DEVICES']='';env.pop('VISTA_GPU_LEASES',None)
+                env.update(thread_environment(budget['threads_per_worker'],env))
+                with logfile.open('a',encoding='utf-8') as stream:
+                    run_child([sys.executable,'-u','-B',str(Path(__file__).with_name('assessment_predict.py')),
+                        fold,method,chosen['output'],case,'--phase','cpu'],env,output=stream,timeout=900)
                 prediction=read_json(work/f'09_reports/assessment_prediction_{fold}_{method}.json')
                 if prediction.get('status')!='passed':raise ValueError('测评预测/指标未完成')
                 report['models'].append(dict(fold=fold,method=method,chosen=chosen,
-                    prediction=prediction,identity=identity(work,fold,method)))
+                    prediction=prediction,identity=provenance))
                 stage('原网格预测、评价与写出','passed',fold=fold,model=method,case_id=case,log=str(logfile))
         if fleet:
             fleet.close();fleet=None
@@ -71,7 +89,10 @@ def run(plan):
     finally:
         try:
             if fleet:fleet.close()
-        finally:write_json(target,report)
+        finally:
+            if previous_lease is None:os.environ.pop('VISTA_GPU_LEASES',None)
+            else:os.environ['VISTA_GPU_LEASES']=previous_lease
+            write_json(target,report)
 
 
 if __name__=='__main__':
