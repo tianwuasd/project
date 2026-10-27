@@ -121,6 +121,31 @@ class CoordinatorBehaviorTests(unittest.TestCase):
         self.assertIsNone(slowest_window([dict(rows[0],seconds=29),rows[1]]))
         self.assertIsNone(slowest_window([dict(rows[0],steps=19),rows[1]]))
 
+    def test_asymmetric_supply_wait_survives_nearly_equal_ddp_wall_times(self):
+        from training_feedback import slowest_window
+        from live_resources import feedback_policy
+        resource=training_policy(dict(cpu_budget=160,memory_budget_bytes=100*2**30),2,2**20)
+        self.assertEqual([r['train_workers'] for r in resource['rank_settings']],[16,16])
+        self.assertEqual(resource['limits']['train_workers'],[38,38])
+        rows=[dict(rank=0,steps=20,seconds=31,wait_fraction=.1),
+              dict(rank=1,steps=20,seconds=30.9,wait_fraction=25/30.9)]
+        window=slowest_window(rows)
+        decision=feedback_policy(resource,[window,window],resource)
+        self.assertEqual(decision['action'],'expand')
+        self.assertEqual([r['train_workers'] for r in decision['settings']['rank_settings']],[24,24])
+        self.assertEqual(window['rank'],0)
+        self.assertEqual(window['slowest_wall_rank'],0)
+        self.assertEqual(window['supply_wait_rank'],1)
+        self.assertEqual(window['wait_fraction'],25/30.9)
+        self.assertEqual(window['rank_windows'],rows)
+        low=slowest_window([dict(row,wait_fraction=.1) for row in rows])
+        self.assertEqual(feedback_policy(resource,[low,low],resource)['action'],'keep')
+        for rank in range(2):
+            for invalid in (dict(seconds=29.9),dict(steps=19)):
+                with self.subTest(rank=rank,invalid=invalid):
+                    incomplete=[dict(row,**invalid) if i==rank else row for i,row in enumerate(rows)]
+                    self.assertIsNone(slowest_window(incomplete))
+
     def test_two_windows_apply_cpu_expansion_without_own_busy_probe(self):
         from training_feedback import RollingFeedback
         resource=control.stage_config(dict(cpu_budget=80,memory_budget_bytes=100*2**30),[8,8,8],2,1)

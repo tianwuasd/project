@@ -7,7 +7,12 @@ from pathlib import Path
 def slowest_window(rows):
     if not rows or any(r['steps']<20 or r['seconds']<30 for r in rows):return None
     slow=max(rows,key=lambda r:r['seconds'])
-    return dict(slow,rank_windows=rows,selection='slowest rank wall time')
+    supply=max(rows,key=lambda r:r['wait_fraction'])
+    # DDP can make a healthy peer's total wall time slightly longer while it
+    # waits for the rank whose data supply stalled. Preserve that supply signal.
+    return dict(slow,wait_fraction=supply['wait_fraction'],slowest_wall_rank=slow['rank'],
+                supply_wait_rank=supply['rank'],rank_windows=rows,
+                selection='maximum rank supply wait fraction; slowest wall metadata retained')
 
 
 def source_pool(loader):
