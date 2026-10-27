@@ -393,6 +393,9 @@
       "multi_gpu_target_validation": false
     },
     "validation_boundary": "Design only. Single-GPU source-subset user report does not prove full formal-training throughput, optimality or multi-GPU acceptance.",
-    "builder_check": "nothing important left; design feasibility only"
+    "builder_check": "nothing important left; design feasibility only",
+    "wholeheart_algorithm_detail": "section 13 added; proposed, not implemented",
+    "gpu_execution_proposal": "AMP retained; controlled compile/cuDNN high-performance mode subject to loss-contract, correctness and recovery validation",
+    "wholeheart_algorithm_builder_check": "nothing important left; design only, not implementation or throughput validation"
   }
 }
