@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Implement approved v2 project policy CPU80; test/review project first, then update Skill preserving v1 and creating v2.",
+  "next_action": "Complete actual persistent loader/inner-thread/transport integration, then GPU execution and coordinator; project tests/review before Skill v1/v2.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -398,5 +398,22 @@
     "wholeheart_algorithm_detail": "section 13 added; proposed, not implemented",
     "gpu_execution_proposal": "AMP retained; controlled compile/cuDNN high-performance mode subject to loss-contract, correctness and recovery validation",
     "wholeheart_algorithm_builder_check": "nothing important left; design only, not implementation or throughput validation"
+  },
+  "stage_resource_v2": {
+    "status": "implementing",
+    "plan": "docs/superpowers/plans/2026-10-27-stage-resource-v2.md",
+    "completed": [
+      {
+        "task": 1,
+        "commit": "766a28641aaa0a138dc616cc13b81674730126c0",
+        "scope": "live facts/direct CPU80 RAM80 policy and legacy wrappers",
+        "review": "spec_pass_quality_approved",
+        "tests": "live11,policy8,related13+14;control206run198passed8skipped"
+      }
+    ],
+    "current": "Task2 persistent deterministic loading and actual worker threads",
+    "skill_modified_this_implementation": false,
+    "server_deployed": false,
+    "local_gpu_compute": false
   }
 }
