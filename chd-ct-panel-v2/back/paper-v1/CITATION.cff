@@ -1,0 +1,43 @@
+cff-version: 1.2.0
+message: "If this independent reproduction is useful, cite the original paper. This software is not the authors' implementation."
+title: "CHD CT independent research reproduction"
+type: software
+version: 0.1.0
+authors:
+  - name: "tianwuasd"
+preferred-citation:
+  type: article
+  title: "A clinically applicable AI system for diagnosis of congenital heart diseases based on computed tomography images"
+  authors:
+    - family-names: Xu
+      given-names: Xiaowei
+    - family-names: Jia
+      given-names: Qianjun
+    - family-names: Yuan
+      given-names: Haiyun
+    - family-names: Qiu
+      given-names: Hailong
+    - family-names: Dong
+      given-names: Yuhao
+    - family-names: Xie
+      given-names: Wen
+    - family-names: Yao
+      given-names: Zeyang
+    - family-names: Zhang
+      given-names: Jiawei
+    - family-names: Nie
+      given-names: Zhiqaing
+    - family-names: Li
+      given-names: Xiaomeng
+    - family-names: Shi
+      given-names: Yiyu
+    - family-names: Zou
+      given-names: James Y.
+    - family-names: Huang
+      given-names: Meiping
+    - family-names: Zhuang
+      given-names: Jian
+  journal: Medical Image Analysis
+  volume: "90"
+  year: 2023
+  doi: 10.1016/j.media.2023.102953

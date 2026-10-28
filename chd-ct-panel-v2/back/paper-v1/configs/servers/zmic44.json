@@ -1,0 +1,20 @@
+{
+  "source_note": "zmic44_服务器基础信息_更新版9.22.md",
+  "source_updated": "2026-09-26",
+  "runtime": "/data5/zhougaowei/zhangruichen_workspace/chd_ct_runtime",
+  "results": "/data_nas/zhangruichen/chd_ct_results",
+  "prepared": "/data_nas/zhangruichen/chd_ct_data/imagechd7",
+  "existing_conda": "/data5/zhougaowei/zhangruichen_workspace/project1_runtime/tools/miniforge3/bin/conda",
+  "existing_python_reference": "/data5/zhougaowei/zhangruichen_workspace/project1_runtime/envs/project1_py311/bin/python",
+  "threads": 2,
+  "hardware_snapshot": {
+    "cpu": "2 x AMD EPYC 7742",
+    "physical_cores": 128,
+    "logical_threads": 256,
+    "numa_nodes": 2,
+    "ram_gib": 251,
+    "gpus": "8 x RTX 3090 24 GiB",
+    "driver": "580.173.02"
+  },
+  "note": "Historical snapshot, not live availability. Keep large prepared data/results on NAS. Never modify project1 environment."
+}

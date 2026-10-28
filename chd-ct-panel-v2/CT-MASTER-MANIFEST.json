@@ -1,0 +1,1959 @@
+{
+  "archive": "source.zip",
+  "archive_sha256": "ba96758ec5a1a1555de370070c96d9c7d16750db898f1fe89efb679ce255cb51",
+  "excluded_committed_paths": [
+    ".codex/config.toml",
+    ".codex/maintenance.md",
+    "AGENTS.md",
+    "back/before-cache-selection-20261018/.gitattributes",
+    "back/before-cache-selection-20261018/README.md",
+    "back/before-cache-selection-20261018/docs/server-start.md",
+    "back/before-cache-selection-20261018/manifest.json",
+    "back/before-cache-selection-20261018/pyproject.toml",
+    "back/before-cache-selection-20261018/src/chd_ct/__init__.py",
+    "back/before-cache-selection-20261018/src/chd_ct/imagechd/common.py",
+    "back/before-cache-selection-20261018/src/chd_ct/imagechd/preprocess.py",
+    "back/before-cache-selection-20261018/src/chd_ct/quickstart/commands.py",
+    "back/before-cache-selection-20261018/src/chd_ct/server/imagechd.py",
+    "back/before-cache-selection-20261018/src/chd_ct/server/jobs.py",
+    "back/before-cache-selection-20261018/src/chd_ct/server/launcher.py",
+    "back/before-cache-selection-20261018/src/chd_ct/server/resume.py",
+    "back/before-cache-selection-20261018/src/chd_ct/server/settings.py",
+    "back/before-cache-selection-20261018/src/chd_ct/server/workflow.py",
+    "back/before-cache-selection-20261018/tests/test_server_jobs.py",
+    "back/before-codex-directory-20261018/.gitattributes",
+    "back/before-codex-directory-20261018/AGENTS.md",
+    "back/before-codex-directory-20261018/manifest.json",
+    "back/before-cpu-optimization-20261016/.gitattributes",
+    "back/before-cpu-optimization-20261016/README.md",
+    "back/before-cpu-optimization-20261016/configs/chd.yaml",
+    "back/before-cpu-optimization-20261016/configs/servers/zmic44.json",
+    "back/before-cpu-optimization-20261016/docs/server-start.md",
+    "back/before-cpu-optimization-20261016/manifest.json",
+    "back/before-cpu-optimization-20261016/src/chd_ct/imagechd/config.py",
+    "back/before-cpu-optimization-20261016/src/chd_ct/imagechd/cross_validation.py",
+    "back/before-cpu-optimization-20261016/src/chd_ct/imagechd/dataset.py",
+    "back/before-cpu-optimization-20261016/src/chd_ct/imagechd/train.py",
+    "back/before-cpu-optimization-20261016/src/chd_ct/presets/chd.yaml",
+    "back/before-cross-fold-queue-20261018/.codex/maintenance.md",
+    "back/before-cross-fold-queue-20261018/.gitattributes",
+    "back/before-cross-fold-queue-20261018/AGENTS.md",
+    "back/before-cross-fold-queue-20261018/README.md",
+    "back/before-cross-fold-queue-20261018/docs/server-start.md",
+    "back/before-cross-fold-queue-20261018/manifest.json",
+    "back/before-cross-fold-queue-20261018/pyproject.toml",
+    "back/before-cross-fold-queue-20261018/src/chd_ct/__init__.py",
+    "back/before-cross-fold-queue-20261018/src/chd_ct/imagechd/cross_validation.py",
+    "back/before-cross-fold-queue-20261018/src/chd_ct/imagechd/stage_queue.py",
+    "back/before-cross-fold-queue-20261018/src/chd_ct/imagechd/train.py",
+    "back/before-cross-fold-queue-20261018/src/chd_ct/server/inspection.py",
+    "back/before-cross-fold-queue-20261018/src/chd_ct/server/jobs.py",
+    "back/before-cross-fold-queue-20261018/tests/test_cv_server.py",
+    "back/before-diagnosis-ids-20261021/.codex/maintenance.md",
+    "back/before-diagnosis-ids-20261021/.gitattributes",
+    "back/before-diagnosis-ids-20261021/SNAPSHOT.md",
+    "back/before-diagnosis-ids-20261021/docs/diagnosis.md",
+    "back/before-diagnosis-ids-20261021/docs/server-start.md",
+    "back/before-diagnosis-ids-20261021/manifest.json",
+    "back/before-diagnosis-ids-20261021/pyproject.toml",
+    "back/before-diagnosis-ids-20261021/src/chd_ct/__init__.py",
+    "back/before-diagnosis-ids-20261021/src/chd_ct/diagnosis/classifier.py",
+    "back/before-diagnosis-ids-20261021/src/chd_ct/diagnosis/evaluate.py",
+    "back/before-diagnosis-ids-20261021/src/chd_ct/diagnosis/labels.py",
+    "back/before-diagnosis-ids-20261021/tests/test_diagnosis.py",
+    "back/before-gpu-refresh-20261016/.gitattributes",
+    "back/before-gpu-refresh-20261016/docs/server-start.md",
+    "back/before-gpu-refresh-20261016/manifest.json",
+    "back/before-gpu-refresh-20261016/pyproject.toml",
+    "back/before-gpu-refresh-20261016/src/chd_ct/__init__.py",
+    "back/before-gpu-refresh-20261016/src/chd_ct/imagechd/autotune.py",
+    "back/before-gpu-refresh-20261016/src/chd_ct/imagechd/train.py",
+    "back/before-gpu-refresh-20261016/src/chd_ct/server/imagechd.py",
+    "back/before-gpu-refresh-20261016/src/chd_ct/server/inspection.py",
+    "back/before-gpu-refresh-20261016/src/chd_ct/server/jobs.py",
+    "back/before-gpu-refresh-20261016/src/chd_ct/server/launcher.py",
+    "back/before-gpu-refresh-20261016/src/chd_ct/server/panel.py",
+    "back/before-gpu-refresh-20261016/src/chd_ct/server/resources.py",
+    "back/before-gpu-refresh-20261016/src/chd_ct/server/resume.py",
+    "back/before-gpu-refresh-20261016/tests/test_server_panel.py",
+    "back/before-inference-resources-20261019/.codex/maintenance.md",
+    "back/before-inference-resources-20261019/.gitattributes",
+    "back/before-inference-resources-20261019/AGENTS.md",
+    "back/before-inference-resources-20261019/README.md",
+    "back/before-inference-resources-20261019/docs/recovery.md",
+    "back/before-inference-resources-20261019/docs/server-start.md",
+    "back/before-inference-resources-20261019/manifest.json",
+    "back/before-inference-resources-20261019/pyproject.toml",
+    "back/before-inference-resources-20261019/src/chd_ct/__init__.py",
+    "back/before-inference-resources-20261019/src/chd_ct/diagnosis/features.py",
+    "back/before-inference-resources-20261019/src/chd_ct/imagechd/evaluate.py",
+    "back/before-inference-resources-20261019/src/chd_ct/imagechd/predict.py",
+    "back/before-inference-resources-20261019/src/chd_ct/imagechd/preprocess.py",
+    "back/before-inference-resources-20261019/src/chd_ct/imagechd/test.py",
+    "back/before-inference-resources-20261019/src/chd_ct/quickstart/commands.py",
+    "back/before-inference-resources-20261019/src/chd_ct/server/imagechd.py",
+    "back/before-inference-resources-20261019/src/chd_ct/server/inspection.py",
+    "back/before-inference-resources-20261019/src/chd_ct/server/jobs.py",
+    "back/before-inference-resources-20261019/src/chd_ct/server/panel.py",
+    "back/before-inference-resources-20261019/src/chd_ct/server/resume.py",
+    "back/before-inference-resources-20261019/src/chd_ct/server/settings.py",
+    "back/before-inference-resources-20261019/src/chd_ct/server/workflow.py",
+    "back/before-inference-resources-20261019/tests/test_gpu_hold.py",
+    "back/before-origin-alias-20261018/.gitattributes",
+    "back/before-origin-alias-20261018/README.md",
+    "back/before-origin-alias-20261018/docs/server-start.md",
+    "back/before-origin-alias-20261018/manifest.json",
+    "back/before-origin-alias-20261018/pyproject.toml",
+    "back/before-origin-alias-20261018/src/chd_ct/__init__.py",
+    "back/before-origin-alias-20261018/src/chd_ct/server/updater.py",
+    "back/before-origin-alias-20261018/tests/test_server_update.py",
+    "back/before-panel-update-20261016/.gitattributes",
+    "back/before-panel-update-20261016/README.md",
+    "back/before-panel-update-20261016/docs/server-start.md",
+    "back/before-panel-update-20261016/manifest.json",
+    "back/before-panel-update-20261016/pyproject.toml",
+    "back/before-panel-update-20261016/src/chd_ct/__init__.py",
+    "back/before-panel-update-20261016/src/chd_ct/server/launcher.py",
+    "back/before-panel-update-20261016/src/chd_ct/server/panel.py",
+    "back/before-panel-update-20261016/src/chd_ct/server/workflow.py",
+    "back/before-panel-update-20261016/tests/test_server_jobs.py",
+    "back/before-panel-update-20261016/tests/test_server_panel.py",
+    "back/before-panel-update-20261016/tests/test_server_posix.py",
+    "back/before-paper-alignment-20261013/.gitattributes",
+    "back/before-paper-alignment-20261013/.gitignore",
+    "back/before-paper-alignment-20261013/CITATION.cff",
+    "back/before-paper-alignment-20261013/README.md",
+    "back/before-paper-alignment-20261013/SNAPSHOT.md",
+    "back/before-paper-alignment-20261013/configs/chd-author-unet.yaml",
+    "back/before-paper-alignment-20261013/configs/chd-smoke.yaml",
+    "back/before-paper-alignment-20261013/configs/chd.yaml",
+    "back/before-paper-alignment-20261013/configs/diagnosis-rules.yaml",
+    "back/before-paper-alignment-20261013/configs/servers/zmic44.json",
+    "back/before-paper-alignment-20261013/diagnosis.py",
+    "back/before-paper-alignment-20261013/diagnosis_server.sh",
+    "back/before-paper-alignment-20261013/docs/code-guide.md",
+    "back/before-paper-alignment-20261013/docs/data-guide.md",
+    "back/before-paper-alignment-20261013/docs/diagnosis.md",
+    "back/before-paper-alignment-20261013/docs/imagechd-archive.md",
+    "back/before-paper-alignment-20261013/docs/imagechd-workflow.md",
+    "back/before-paper-alignment-20261013/docs/paper-mapping.md",
+    "back/before-paper-alignment-20261013/docs/quickstart.md",
+    "back/before-paper-alignment-20261013/docs/recovery.md",
+    "back/before-paper-alignment-20261013/docs/server-start.md",
+    "back/before-paper-alignment-20261013/docs/superpowers/plans/2026-10-09-imagechd-main.md",
+    "back/before-paper-alignment-20261013/docs/superpowers/plans/2026-10-09-unet-author-alignment.md",
+    "back/before-paper-alignment-20261013/docs/superpowers/plans/2026-10-10-diagnosis.md",
+    "back/before-paper-alignment-20261013/docs/superpowers/plans/2026-10-10-server-background.md",
+    "back/before-paper-alignment-20261013/docs/superpowers/specs/2026-10-09-imagechd-main.md",
+    "back/before-paper-alignment-20261013/docs/superpowers/specs/2026-10-09-unet-author-alignment.md",
+    "back/before-paper-alignment-20261013/docs/superpowers/specs/2026-10-10-diagnosis-design.md",
+    "back/before-paper-alignment-20261013/docs/unet-source.md",
+    "back/before-paper-alignment-20261013/docs/verification.md",
+    "back/before-paper-alignment-20261013/docs/workflow.md",
+    "back/before-paper-alignment-20261013/evaluate.py",
+    "back/before-paper-alignment-20261013/evaluate_server.sh",
+    "back/before-paper-alignment-20261013/predict.py",
+    "back/before-paper-alignment-20261013/predict_server.sh",
+    "back/before-paper-alignment-20261013/preprocess.py",
+    "back/before-paper-alignment-20261013/preprocess_server.sh",
+    "back/before-paper-alignment-20261013/pyproject.toml",
+    "back/before-paper-alignment-20261013/requirements-tested.txt",
+    "back/before-paper-alignment-20261013/scripts/run_demo.py",
+    "back/before-paper-alignment-20261013/smoke_server.sh",
+    "back/before-paper-alignment-20261013/snapshot.json",
+    "back/before-paper-alignment-20261013/src/chd_ct/__init__.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/__main__.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/cli.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/diagnosis/__init__.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/diagnosis/classifier.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/diagnosis/cli.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/diagnosis/demo.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/diagnosis/evaluate.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/diagnosis/features.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/diagnosis/io.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/diagnosis/labels.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/diagnosis/predict.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/diagnosis/rules.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/__init__.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/augment.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/checkpoints.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/common.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/config.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/dataset.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/demo.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/evaluate.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/fusion.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/geometry.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/losses.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/predict.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/preprocess.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/spacing.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/stage_queue.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/stage_worker.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/test.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/imagechd/train.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/models/__init__.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/models/gate.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/models/grid.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/models/recurrent.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/models/reference/2d-LICENSE",
+    "back/before-paper-alignment-20261013/src/chd_ct/models/reference/2d-README.txt",
+    "back/before-paper-alignment-20261013/src/chd_ct/models/reference/2d-phseg_v5-train.prototxt",
+    "back/before-paper-alignment-20261013/src/chd_ct/models/reference/3d-LICENSE",
+    "back/before-paper-alignment-20261013/src/chd_ct/models/reference/3d-README",
+    "back/before-paper-alignment-20261013/src/chd_ct/models/reference/3dUnet_miccai2016_no_BN.prototxt",
+    "back/before-paper-alignment-20261013/src/chd_ct/models/reference/sources.json",
+    "back/before-paper-alignment-20261013/src/chd_ct/models/unet.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/paths.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/presets/chd-author-unet.yaml",
+    "back/before-paper-alignment-20261013/src/chd_ct/presets/chd-smoke.yaml",
+    "back/before-paper-alignment-20261013/src/chd_ct/presets/chd.yaml",
+    "back/before-paper-alignment-20261013/src/chd_ct/presets/diagnosis-rules.yaml",
+    "back/before-paper-alignment-20261013/src/chd_ct/quickstart/__init__.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/quickstart/commands.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/quickstart/diagnosis.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/quickstart/environment.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/quickstart/wizard.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/recovery.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/server/__init__.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/server/bootstrap.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/server/imagechd.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/server/inspection.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/server/jobs.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/server/launcher.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/server/panel.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/server/resources.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/server/resume.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/server/settings.py",
+    "back/before-paper-alignment-20261013/src/chd_ct/server/workflow.py",
+    "back/before-paper-alignment-20261013/start.bat",
+    "back/before-paper-alignment-20261013/start.py",
+    "back/before-paper-alignment-20261013/start_server.py",
+    "back/before-paper-alignment-20261013/start_server.sh",
+    "back/before-paper-alignment-20261013/test.py",
+    "back/before-paper-alignment-20261013/test_server.sh",
+    "back/before-paper-alignment-20261013/tests/test_author_unet.py",
+    "back/before-paper-alignment-20261013/tests/test_chd_main.py",
+    "back/before-paper-alignment-20261013/tests/test_diagnosis.py",
+    "back/before-paper-alignment-20261013/tests/test_elastic_gpus.py",
+    "back/before-paper-alignment-20261013/tests/test_excel_resampling.py",
+    "back/before-paper-alignment-20261013/tests/test_launchers.py",
+    "back/before-paper-alignment-20261013/tests/test_models.py",
+    "back/before-paper-alignment-20261013/tests/test_recovery.py",
+    "back/before-paper-alignment-20261013/tests/test_server_jobs.py",
+    "back/before-paper-alignment-20261013/tests/test_server_panel.py",
+    "back/before-paper-alignment-20261013/tests/test_server_posix.py",
+    "back/before-paper-alignment-20261013/tests/test_server_workflow.py",
+    "back/before-paper-alignment-20261013/train.py",
+    "back/before-paper-alignment-20261013/train_server.sh",
+    "back/before-result-details-20261024-115302/.gitattributes",
+    "back/before-result-details-20261024-115302/AGENTS.md",
+    "back/before-result-details-20261024-115302/README.md",
+    "back/before-result-details-20261024-115302/docs/server-start.md",
+    "back/before-result-details-20261024-115302/manifest.json",
+    "back/before-result-details-20261024-115302/pyproject.toml",
+    "back/before-result-details-20261024-115302/src/chd_ct/__init__.py",
+    "back/before-result-details-20261024-115302/src/chd_ct/server/results.py",
+    "back/before-result-details-20261024-115302/tests/test_result_viewer.py",
+    "back/before-result-navigation-20261024/.gitattributes",
+    "back/before-result-navigation-20261024/.github/workflows/chd-ct-server.yml",
+    "back/before-result-navigation-20261024/AGENTS.md",
+    "back/before-result-navigation-20261024/README.md",
+    "back/before-result-navigation-20261024/docs/result-details.md",
+    "back/before-result-navigation-20261024/docs/server-start.md",
+    "back/before-result-navigation-20261024/manifest.json",
+    "back/before-result-navigation-20261024/pyproject.toml",
+    "back/before-result-navigation-20261024/src/chd_ct/__init__.py",
+    "back/before-result-navigation-20261024/src/chd_ct/server/inspection.py",
+    "back/before-result-navigation-20261024/src/chd_ct/server/launcher.py",
+    "back/before-result-navigation-20261024/src/chd_ct/server/panel.py",
+    "back/before-result-navigation-20261024/tests/test_result_viewer.py",
+    "back/before-result-viewer-20261019/.codex/maintenance.md",
+    "back/before-result-viewer-20261019/.gitattributes",
+    "back/before-result-viewer-20261019/AGENTS.md",
+    "back/before-result-viewer-20261019/README.md",
+    "back/before-result-viewer-20261019/docs/server-start.md",
+    "back/before-result-viewer-20261019/manifest.json",
+    "back/before-result-viewer-20261019/pyproject.toml",
+    "back/before-result-viewer-20261019/src/chd_ct/__init__.py",
+    "back/before-result-viewer-20261019/src/chd_ct/server/inspection.py",
+    "back/before-result-viewer-20261019/src/chd_ct/server/launcher.py",
+    "back/before-result-viewer-20261019/src/chd_ct/server/panel.py",
+    "back/before-resume-modes-20261021/.codex/maintenance.md",
+    "back/before-resume-modes-20261021/.gitattributes",
+    "back/before-resume-modes-20261021/AGENTS.md",
+    "back/before-resume-modes-20261021/docs/recovery.md",
+    "back/before-resume-modes-20261021/docs/server-start.md",
+    "back/before-resume-modes-20261021/manifest.json",
+    "back/before-resume-modes-20261021/pyproject.toml",
+    "back/before-resume-modes-20261021/src/chd_ct/__init__.py",
+    "back/before-resume-modes-20261021/src/chd_ct/server/extension.py",
+    "back/before-resume-modes-20261021/src/chd_ct/server/launcher.py",
+    "back/before-resume-modes-20261021/src/chd_ct/server/resume.py",
+    "back/before-resume-modes-20261021/src/chd_ct/server/verification.py",
+    "back/before-resume-modes-20261021/tests/test_inference_resources.py",
+    "back/before-resume-modes-20261021/tests/test_recovery.py",
+    "back/before-resume-modes-20261021/tests/test_resume_verification.py",
+    "back/before-resume-modes-20261021/tests/test_workflow_extension.py",
+    "back/before-resume-verification-20261020/.codex/maintenance.md",
+    "back/before-resume-verification-20261020/.gitattributes",
+    "back/before-resume-verification-20261020/docs/recovery.md",
+    "back/before-resume-verification-20261020/docs/server-start.md",
+    "back/before-resume-verification-20261020/manifest.json",
+    "back/before-resume-verification-20261020/pyproject.toml",
+    "back/before-resume-verification-20261020/src/chd_ct/__init__.py",
+    "back/before-resume-verification-20261020/src/chd_ct/server/resume.py",
+    "back/before-task-input-rerun-20261023/.gitattributes",
+    "back/before-task-input-rerun-20261023/AGENTS.md",
+    "back/before-task-input-rerun-20261023/README.md",
+    "back/before-task-input-rerun-20261023/docs/recovery.md",
+    "back/before-task-input-rerun-20261023/docs/server-start.md",
+    "back/before-task-input-rerun-20261023/manifest.json",
+    "back/before-task-input-rerun-20261023/pyproject.toml",
+    "back/before-task-input-rerun-20261023/src/chd_ct/__init__.py",
+    "back/before-task-input-rerun-20261023/src/chd_ct/server/inspection.py",
+    "back/before-task-input-rerun-20261023/src/chd_ct/server/jobs.py",
+    "back/before-task-input-rerun-20261023/src/chd_ct/server/launcher.py",
+    "back/before-task-input-rerun-20261023/src/chd_ct/server/panel.py",
+    "back/before-task-input-rerun-20261023/src/chd_ct/server/results.py",
+    "back/before-task-input-rerun-20261023/src/chd_ct/server/resume.py",
+    "back/before-task-input-rerun-20261023/src/chd_ct/server/resume_checks.py",
+    "back/before-task-input-rerun-20261023/src/chd_ct/server/workflow.py",
+    "back/before-threefold-training-20261015/.gitattributes",
+    "back/before-threefold-training-20261015/.gitignore",
+    "back/before-threefold-training-20261015/CITATION.cff",
+    "back/before-threefold-training-20261015/README.md",
+    "back/before-threefold-training-20261015/SNAPSHOT.md",
+    "back/before-threefold-training-20261015/configs/chd-author-unet.yaml",
+    "back/before-threefold-training-20261015/configs/chd-smoke.yaml",
+    "back/before-threefold-training-20261015/configs/chd.yaml",
+    "back/before-threefold-training-20261015/configs/diagnosis-rules.yaml",
+    "back/before-threefold-training-20261015/configs/servers/zmic44.json",
+    "back/before-threefold-training-20261015/diagnosis.py",
+    "back/before-threefold-training-20261015/diagnosis_server.sh",
+    "back/before-threefold-training-20261015/docs/code-guide.md",
+    "back/before-threefold-training-20261015/docs/data-guide.md",
+    "back/before-threefold-training-20261015/docs/diagnosis.md",
+    "back/before-threefold-training-20261015/docs/imagechd-archive.md",
+    "back/before-threefold-training-20261015/docs/imagechd-workflow.md",
+    "back/before-threefold-training-20261015/docs/paper-mapping.md",
+    "back/before-threefold-training-20261015/docs/quickstart.md",
+    "back/before-threefold-training-20261015/docs/recovery.md",
+    "back/before-threefold-training-20261015/docs/server-start.md",
+    "back/before-threefold-training-20261015/docs/superpowers/plans/2026-10-09-imagechd-main.md",
+    "back/before-threefold-training-20261015/docs/superpowers/plans/2026-10-09-unet-author-alignment.md",
+    "back/before-threefold-training-20261015/docs/superpowers/plans/2026-10-10-diagnosis.md",
+    "back/before-threefold-training-20261015/docs/superpowers/plans/2026-10-10-server-background.md",
+    "back/before-threefold-training-20261015/docs/superpowers/plans/2026-10-15-chd-paper-core.md",
+    "back/before-threefold-training-20261015/docs/superpowers/specs/2026-10-09-imagechd-main.md",
+    "back/before-threefold-training-20261015/docs/superpowers/specs/2026-10-09-unet-author-alignment.md",
+    "back/before-threefold-training-20261015/docs/superpowers/specs/2026-10-10-diagnosis-design.md",
+    "back/before-threefold-training-20261015/docs/unet-source.md",
+    "back/before-threefold-training-20261015/docs/verification.md",
+    "back/before-threefold-training-20261015/docs/workflow.md",
+    "back/before-threefold-training-20261015/evaluate.py",
+    "back/before-threefold-training-20261015/evaluate_server.sh",
+    "back/before-threefold-training-20261015/predict.py",
+    "back/before-threefold-training-20261015/predict_server.sh",
+    "back/before-threefold-training-20261015/preprocess.py",
+    "back/before-threefold-training-20261015/preprocess_server.sh",
+    "back/before-threefold-training-20261015/pyproject.toml",
+    "back/before-threefold-training-20261015/requirements-tested.txt",
+    "back/before-threefold-training-20261015/scripts/run_demo.py",
+    "back/before-threefold-training-20261015/smoke_server.sh",
+    "back/before-threefold-training-20261015/snapshot.json",
+    "back/before-threefold-training-20261015/src/chd_ct/__init__.py",
+    "back/before-threefold-training-20261015/src/chd_ct/__main__.py",
+    "back/before-threefold-training-20261015/src/chd_ct/cli.py",
+    "back/before-threefold-training-20261015/src/chd_ct/diagnosis/__init__.py",
+    "back/before-threefold-training-20261015/src/chd_ct/diagnosis/classifier.py",
+    "back/before-threefold-training-20261015/src/chd_ct/diagnosis/cli.py",
+    "back/before-threefold-training-20261015/src/chd_ct/diagnosis/demo.py",
+    "back/before-threefold-training-20261015/src/chd_ct/diagnosis/evaluate.py",
+    "back/before-threefold-training-20261015/src/chd_ct/diagnosis/features.py",
+    "back/before-threefold-training-20261015/src/chd_ct/diagnosis/io.py",
+    "back/before-threefold-training-20261015/src/chd_ct/diagnosis/labels.py",
+    "back/before-threefold-training-20261015/src/chd_ct/diagnosis/predict.py",
+    "back/before-threefold-training-20261015/src/chd_ct/diagnosis/rules.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/__init__.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/augment.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/checkpoints.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/common.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/config.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/dataset.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/demo.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/evaluate.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/fusion.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/geometry.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/losses.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/predict.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/preprocess.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/spacing.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/stage_queue.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/stage_worker.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/test.py",
+    "back/before-threefold-training-20261015/src/chd_ct/imagechd/train.py",
+    "back/before-threefold-training-20261015/src/chd_ct/models/__init__.py",
+    "back/before-threefold-training-20261015/src/chd_ct/models/chd_unet.py",
+    "back/before-threefold-training-20261015/src/chd_ct/models/gate.py",
+    "back/before-threefold-training-20261015/src/chd_ct/models/grid.py",
+    "back/before-threefold-training-20261015/src/chd_ct/models/recurrent.py",
+    "back/before-threefold-training-20261015/src/chd_ct/models/reference/2d-LICENSE",
+    "back/before-threefold-training-20261015/src/chd_ct/models/reference/2d-README.txt",
+    "back/before-threefold-training-20261015/src/chd_ct/models/reference/2d-phseg_v5-train.prototxt",
+    "back/before-threefold-training-20261015/src/chd_ct/models/reference/3d-LICENSE",
+    "back/before-threefold-training-20261015/src/chd_ct/models/reference/3d-README",
+    "back/before-threefold-training-20261015/src/chd_ct/models/reference/3dUnet_miccai2016_no_BN.prototxt",
+    "back/before-threefold-training-20261015/src/chd_ct/models/reference/sources.json",
+    "back/before-threefold-training-20261015/src/chd_ct/models/unet.py",
+    "back/before-threefold-training-20261015/src/chd_ct/paths.py",
+    "back/before-threefold-training-20261015/src/chd_ct/presets/chd-author-unet.yaml",
+    "back/before-threefold-training-20261015/src/chd_ct/presets/chd-smoke.yaml",
+    "back/before-threefold-training-20261015/src/chd_ct/presets/chd.yaml",
+    "back/before-threefold-training-20261015/src/chd_ct/presets/diagnosis-rules.yaml",
+    "back/before-threefold-training-20261015/src/chd_ct/quickstart/__init__.py",
+    "back/before-threefold-training-20261015/src/chd_ct/quickstart/commands.py",
+    "back/before-threefold-training-20261015/src/chd_ct/quickstart/diagnosis.py",
+    "back/before-threefold-training-20261015/src/chd_ct/quickstart/environment.py",
+    "back/before-threefold-training-20261015/src/chd_ct/quickstart/wizard.py",
+    "back/before-threefold-training-20261015/src/chd_ct/recovery.py",
+    "back/before-threefold-training-20261015/src/chd_ct/server/__init__.py",
+    "back/before-threefold-training-20261015/src/chd_ct/server/bootstrap.py",
+    "back/before-threefold-training-20261015/src/chd_ct/server/imagechd.py",
+    "back/before-threefold-training-20261015/src/chd_ct/server/inspection.py",
+    "back/before-threefold-training-20261015/src/chd_ct/server/jobs.py",
+    "back/before-threefold-training-20261015/src/chd_ct/server/launcher.py",
+    "back/before-threefold-training-20261015/src/chd_ct/server/panel.py",
+    "back/before-threefold-training-20261015/src/chd_ct/server/resources.py",
+    "back/before-threefold-training-20261015/src/chd_ct/server/resume.py",
+    "back/before-threefold-training-20261015/src/chd_ct/server/settings.py",
+    "back/before-threefold-training-20261015/src/chd_ct/server/workflow.py",
+    "back/before-threefold-training-20261015/src/chd_ct_reproduction.egg-info/PKG-INFO",
+    "back/before-threefold-training-20261015/src/chd_ct_reproduction.egg-info/SOURCES.txt",
+    "back/before-threefold-training-20261015/src/chd_ct_reproduction.egg-info/dependency_links.txt",
+    "back/before-threefold-training-20261015/src/chd_ct_reproduction.egg-info/entry_points.txt",
+    "back/before-threefold-training-20261015/src/chd_ct_reproduction.egg-info/requires.txt",
+    "back/before-threefold-training-20261015/src/chd_ct_reproduction.egg-info/top_level.txt",
+    "back/before-threefold-training-20261015/start.bat",
+    "back/before-threefold-training-20261015/start.py",
+    "back/before-threefold-training-20261015/start_server.py",
+    "back/before-threefold-training-20261015/start_server.sh",
+    "back/before-threefold-training-20261015/test.py",
+    "back/before-threefold-training-20261015/test_server.sh",
+    "back/before-threefold-training-20261015/tests/test_author_unet.py",
+    "back/before-threefold-training-20261015/tests/test_chd_main.py",
+    "back/before-threefold-training-20261015/tests/test_chd_paper.py",
+    "back/before-threefold-training-20261015/tests/test_diagnosis.py",
+    "back/before-threefold-training-20261015/tests/test_elastic_gpus.py",
+    "back/before-threefold-training-20261015/tests/test_excel_resampling.py",
+    "back/before-threefold-training-20261015/tests/test_launchers.py",
+    "back/before-threefold-training-20261015/tests/test_models.py",
+    "back/before-threefold-training-20261015/tests/test_recovery.py",
+    "back/before-threefold-training-20261015/tests/test_server_jobs.py",
+    "back/before-threefold-training-20261015/tests/test_server_panel.py",
+    "back/before-threefold-training-20261015/tests/test_server_posix.py",
+    "back/before-threefold-training-20261015/tests/test_server_workflow.py",
+    "back/before-threefold-training-20261015/train.py",
+    "back/before-threefold-training-20261015/train_server.sh",
+    "back/before-workflow-extension-upload-20261020/.codex/maintenance.md",
+    "back/before-workflow-extension-upload-20261020/.gitattributes",
+    "back/before-workflow-extension-upload-20261020/AGENTS.md",
+    "back/before-workflow-extension-upload-20261020/README.md",
+    "back/before-workflow-extension-upload-20261020/docs/recovery.md",
+    "back/before-workflow-extension-upload-20261020/docs/server-start.md",
+    "back/before-workflow-extension-upload-20261020/manifest.json",
+    "back/before-workflow-extension-upload-20261020/pyproject.toml",
+    "back/before-workflow-extension-upload-20261020/src/chd_ct/__init__.py",
+    "back/before-workflow-extension-upload-20261020/src/chd_ct/server/inspection.py",
+    "back/before-workflow-extension-upload-20261020/src/chd_ct/server/jobs.py",
+    "back/before-workflow-extension-upload-20261020/src/chd_ct/server/launcher.py",
+    "back/before-workflow-extension-upload-20261020/src/chd_ct/server/panel.py",
+    "back/before-workflow-extension-upload-20261020/src/chd_ct/server/results.py",
+    "back/before-workflow-extension-upload-20261020/src/chd_ct/server/resume.py",
+    "back/before-workflow-extension-upload-20261020/src/chd_ct/server/updater.py",
+    "back/before-workflow-extension-upload-20261020/src/chd_ct/server/workflow.py",
+    "back/before-workflow-extension-upload-20261020/tests/test_server_panel.py",
+    "back/before-workflow-extension-upload-20261020/tests/test_server_update.py",
+    "back/custom-unet-v1/README.md",
+    "back/custom-unet-v1/chd-paper-scale.yaml",
+    "back/custom-unet-v1/chd-smoke.yaml",
+    "back/custom-unet-v1/chd.yaml",
+    "back/custom-unet-v1/unet.py",
+    "back/preprocess-before-excel-20261013/README.md",
+    "back/preprocess-before-excel-20261013/preprocess.py",
+    "back/preprocess-before-excel-20261013/snapshot.json",
+    "back/preprocess-before-excel-20261013/src/chd_ct/__init__.py",
+    "back/preprocess-before-excel-20261013/src/chd_ct/imagechd/__init__.py",
+    "back/preprocess-before-excel-20261013/src/chd_ct/imagechd/common.py",
+    "back/preprocess-before-excel-20261013/src/chd_ct/imagechd/geometry.py",
+    "back/preprocess-before-excel-20261013/src/chd_ct/imagechd/preprocess.py",
+    "back/preprocess-before-excel-20261013/src/chd_ct/recovery.py",
+    "docs/superpowers/plans/2026-10-09-imagechd-main.md",
+    "docs/superpowers/plans/2026-10-09-unet-author-alignment.md",
+    "docs/superpowers/plans/2026-10-10-diagnosis.md",
+    "docs/superpowers/plans/2026-10-10-server-background.md",
+    "docs/superpowers/plans/2026-10-15-chd-paper-core.md",
+    "docs/superpowers/plans/2026-10-15-threefold-training.md",
+    "docs/superpowers/plans/2026-10-18-cross-fold-queue.md",
+    "docs/superpowers/plans/2026-10-19-inference-resources.md",
+    "docs/superpowers/plans/2026-10-20-resume-verification.md",
+    "docs/superpowers/plans/2026-10-20-workflow-extension-upload.md",
+    "docs/superpowers/plans/2026-10-23-task-input-rerun.md",
+    "docs/superpowers/plans/2026-10-24-result-details.md",
+    "docs/superpowers/plans/2026-10-24-result-navigation.md",
+    "docs/superpowers/specs/2026-10-09-imagechd-main.md",
+    "docs/superpowers/specs/2026-10-09-unet-author-alignment.md",
+    "docs/superpowers/specs/2026-10-10-diagnosis-design.md",
+    "docs/superpowers/specs/2026-10-24-result-details-design.md",
+    "docs/superpowers/specs/2026-10-24-result-navigation-design.md"
+  ],
+  "files": {
+    ".gitattributes": {
+      "mode": "100644",
+      "sha256": "b283cd07466f540c5425ee8dfaf34cf708d41ff001bd74e8b4293bd9fde91fd0",
+      "size": 1350
+    },
+    ".gitignore": {
+      "mode": "100644",
+      "sha256": "add3c1a80f83fd035e2240019c5d3eb2b4f82f7c45eb0a55998390f6a064811b",
+      "size": 227
+    },
+    "CITATION.cff": {
+      "mode": "100644",
+      "sha256": "8ddcdb2b61ed118c9d3c235f9beca753f0d39f06a53546b0301c2a34ae4b8eff",
+      "size": 2136
+    },
+    "README.md": {
+      "mode": "100644",
+      "sha256": "daa6d980ab2a4a0127a6186a9f0f9454616a759c71bea69a49aaceb9bcbd3c21",
+      "size": 15418
+    },
+    "back/README.md": {
+      "mode": "100644",
+      "sha256": "623fa707a4b0bdcb3fd2c4a14e8271f5241be76d33c1243eaa73ebde07a5bc73",
+      "size": 1963
+    },
+    "back/paper-v1/.gitattributes": {
+      "mode": "100644",
+      "sha256": "1d5d71dcc6ccd28ab46a335349ecc74742ca4b81f4fcad212f8d134f70f1f13e",
+      "size": 17
+    },
+    "back/paper-v1/.gitignore": {
+      "mode": "100644",
+      "sha256": "add3c1a80f83fd035e2240019c5d3eb2b4f82f7c45eb0a55998390f6a064811b",
+      "size": 227
+    },
+    "back/paper-v1/ARCHIVE.md": {
+      "mode": "100644",
+      "sha256": "7484d2a9c2324b8b69bc7241ff5ce0fd6a60ab32382c1f16f5f0d1d627a4c325",
+      "size": 356
+    },
+    "back/paper-v1/CITATION.cff": {
+      "mode": "100644",
+      "sha256": "240d6293432874a7d8638edbfb6f885cddea8061d6c4bfc2010e1d0b4bc98983",
+      "size": 1237
+    },
+    "back/paper-v1/README.md": {
+      "mode": "100644",
+      "sha256": "1d91ae7f47b97e3f55023eda68c3d5b15f2bc1321a5cc75275cca84d88d4378f",
+      "size": 10185
+    },
+    "back/paper-v1/configs/imagechd7-smoke.yaml": {
+      "mode": "100644",
+      "sha256": "afaa7817b6308e0e55f7a41a1ebddee44da9a205892c1f3fda3e14ab12d40598",
+      "size": 114
+    },
+    "back/paper-v1/configs/imagechd7.yaml": {
+      "mode": "100644",
+      "sha256": "1c7916bcd2493d7009352ffbe642b25d8d1b5bb2e0cdbf166a2f295bb87e1154",
+      "size": 175
+    },
+    "back/paper-v1/configs/paper.yaml": {
+      "mode": "100644",
+      "sha256": "25244b8725053a8f77594b305695a8bd9de3f90579ffc64a76218844afdcfba0",
+      "size": 829
+    },
+    "back/paper-v1/configs/rules.yaml": {
+      "mode": "100644",
+      "sha256": "8178cb28592ca1c4ac6074bbc08f0db1d97ceb0bd4bf47e2c7f6fbf20c744aa2",
+      "size": 2840
+    },
+    "back/paper-v1/configs/server3090.yaml": {
+      "mode": "100644",
+      "sha256": "32ea244a91182e78912e024a17be0d41279dd6e07e687c334e4f0ed086313af8",
+      "size": 916
+    },
+    "back/paper-v1/configs/servers/zmic44.json": {
+      "mode": "100644",
+      "sha256": "f9a2617915326590f34650f56d53936d79b84ab021d619d05e8e9d730b4f9bda",
+      "size": 891
+    },
+    "back/paper-v1/configs/smoke.yaml": {
+      "mode": "100644",
+      "sha256": "fdd6bcefb32874a7fac9136d84f6f1d8ddfdfff3ffcc950f7b1a1d9aa2880e85",
+      "size": 648
+    },
+    "back/paper-v1/docs/data-guide.md": {
+      "mode": "100644",
+      "sha256": "d1574c78a073b881f42f842547bb5a32dd7ec92b700c2be6b2807595ae8069b3",
+      "size": 2908
+    },
+    "back/paper-v1/docs/design.md": {
+      "mode": "100644",
+      "sha256": "67eeffe5b857bf3930604ddeaacf69a550641bfbed37a35cfed7509aeab55d3a",
+      "size": 2308
+    },
+    "back/paper-v1/docs/imagechd-archive.md": {
+      "mode": "100644",
+      "sha256": "24edf1cd74d2e65215b91beebe1f1eed5404efff78b77f3fb038fae2c4f7bb2a",
+      "size": 5160
+    },
+    "back/paper-v1/docs/imagechd-workflow.md": {
+      "mode": "100644",
+      "sha256": "b76bcd651aee1745fc0ee59c127242c63441a291b42e263135560d21e40e0b69",
+      "size": 7731
+    },
+    "back/paper-v1/docs/implementation-plan.md": {
+      "mode": "100644",
+      "sha256": "2e5a7c29e078268770a0124ca9b7f1b427657d26ca8d49b0dd0401d2b56bacd0",
+      "size": 1961
+    },
+    "back/paper-v1/docs/paper-mapping.md": {
+      "mode": "100644",
+      "sha256": "efe6cee360658476f6bf9a0666712f89bcd508c695fdc6b69690638ee95e9891",
+      "size": 4629
+    },
+    "back/paper-v1/docs/quickstart.md": {
+      "mode": "100644",
+      "sha256": "9df6fb191997d0ae9c9fae8e6970087a78f858097fd3e8199d9e8da3fffda454",
+      "size": 4988
+    },
+    "back/paper-v1/docs/server-start.md": {
+      "mode": "100644",
+      "sha256": "66c3a4494cfcc1611a127bfaa768934fd686d5ac7d75c8a6cf619f8086db8135",
+      "size": 7306
+    },
+    "back/paper-v1/docs/verification.md": {
+      "mode": "100644",
+      "sha256": "3d5e4af2e384a45254336311cdee3c86ea12d0a519c207170b9e6ce11a2a8a41",
+      "size": 6900
+    },
+    "back/paper-v1/predict_imagechd.py": {
+      "mode": "100644",
+      "sha256": "7333c6131671e1560dd671f0a2e55c165ebf7d9653cc7f5ff2a9334a39f4bf57",
+      "size": 501
+    },
+    "back/paper-v1/predict_server.sh": {
+      "mode": "100644",
+      "sha256": "f8774177b51de3ecb056e49e4416d258cd435ee4fae22cbb444b07738110ace1",
+      "size": 164
+    },
+    "back/paper-v1/preprocess_imagechd.py": {
+      "mode": "100644",
+      "sha256": "d3c3b74c707975651c877516a3a57c352f4b1826cce4ebd36aeb3fad195383a1",
+      "size": 507
+    },
+    "back/paper-v1/preprocess_server.sh": {
+      "mode": "100644",
+      "sha256": "67a486d45f4b7856e218fea7236ae13e8016026e6ad7c01ddfec17b2e76b9281",
+      "size": 167
+    },
+    "back/paper-v1/pyproject.toml": {
+      "mode": "100644",
+      "sha256": "afd28d836052c9ed7259220c23fe59d311e9a8136ead3d04276dc8a3f7f4b38f",
+      "size": 716
+    },
+    "back/paper-v1/requirements-tested.txt": {
+      "mode": "100644",
+      "sha256": "b265141486033cbd774de294bd390d6025706dbcbd25e866848237f3c23fbf7f",
+      "size": 262
+    },
+    "back/paper-v1/scripts/run_demo.py": {
+      "mode": "100644",
+      "sha256": "7323dc40b7c30b2cdff604993a4b6f01c3a01e17e752d341fd0bccfffe181008",
+      "size": 1408
+    },
+    "back/paper-v1/src/chd_ct/__init__.py": {
+      "mode": "100644",
+      "sha256": "5cbeeaf56030d64d590f3a55a53cdf4c3e6074547330bb23751408915e7ce14a",
+      "size": 107
+    },
+    "back/paper-v1/src/chd_ct/__main__.py": {
+      "mode": "100644",
+      "sha256": "6d8b7d7846a845059d7a3107143f11131f63c5511d669b44085b15ec5e3d2279",
+      "size": 30
+    },
+    "back/paper-v1/src/chd_ct/cli.py": {
+      "mode": "100644",
+      "sha256": "c90158bc35f6b70f050efc9d9959ca19cce903450bea543a9e90cb4d4394b83b",
+      "size": 6678
+    },
+    "back/paper-v1/src/chd_ct/config.py": {
+      "mode": "100644",
+      "sha256": "014e53d729d812a0577fd6a0cb8a6031bbb7bfe14a4611d3debdfb2086e4a520",
+      "size": 1856
+    },
+    "back/paper-v1/src/chd_ct/data.py": {
+      "mode": "100644",
+      "sha256": "2dc7d481746cd53a613774a9e8bd8b29659535e31e41a51d90fe752a21508ea5",
+      "size": 5788
+    },
+    "back/paper-v1/src/chd_ct/diagnosis/__init__.py": {
+      "mode": "100644",
+      "sha256": "e530962a1788101a1204cc3a2de8d075f1dd59df176482451c677792fe8c8677",
+      "size": 64
+    },
+    "back/paper-v1/src/chd_ct/diagnosis/rules.py": {
+      "mode": "100644",
+      "sha256": "7cbb6639152b36516d396dfbbd0bd6b8ca42f5d2013c2aaf3326a7ca59254164",
+      "size": 2643
+    },
+    "back/paper-v1/src/chd_ct/evaluation.py": {
+      "mode": "100644",
+      "sha256": "f79a14409cad658a7c87071fb54449366a391fe408858112c3a8f1367386b39b",
+      "size": 2456
+    },
+    "back/paper-v1/src/chd_ct/features/__init__.py": {
+      "mode": "100644",
+      "sha256": "3521ec48f510a368e7f594c2511dc926e539641b322df59053f526066c39b876",
+      "size": 70
+    },
+    "back/paper-v1/src/chd_ct/features/anatomy.py": {
+      "mode": "100644",
+      "sha256": "29e681d5aa8f320a53f438a976c6eb2841ba3310c0fc7698b2f6439813d88efa",
+      "size": 4828
+    },
+    "back/paper-v1/src/chd_ct/features/graph.py": {
+      "mode": "100644",
+      "sha256": "e7dd0982435d458be58a19600ecfb72528a6e1a36666201542b77fec544efc2b",
+      "size": 2923
+    },
+    "back/paper-v1/src/chd_ct/imagechd/__init__.py": {
+      "mode": "100644",
+      "sha256": "9c7ac7e8c223b87b7fc048c2229bb3c3cc675c23873b121d4160abe7229f8359",
+      "size": 87
+    },
+    "back/paper-v1/src/chd_ct/imagechd/common.py": {
+      "mode": "100644",
+      "sha256": "2d5e2b17f71917eb4615a1e5813628acbf73c41b74bfc1d0403c9a37fb568d47",
+      "size": 2803
+    },
+    "back/paper-v1/src/chd_ct/imagechd/predict.py": {
+      "mode": "100644",
+      "sha256": "cef90d82de426d5cb233cd438ab9c8aadd97c072b4d98b7a187a7780dbfd194b",
+      "size": 4633
+    },
+    "back/paper-v1/src/chd_ct/imagechd/preprocess.py": {
+      "mode": "100644",
+      "sha256": "9dccf9dd390ba23b2acb24a31d1791d68225068bcf208222911107f2d4bc4c00",
+      "size": 9223
+    },
+    "back/paper-v1/src/chd_ct/imagechd/train.py": {
+      "mode": "100644",
+      "sha256": "23d59867afeacd4fd1467716560a54201be719c6d82edaa4a3ecfcfd45f2b058",
+      "size": 8055
+    },
+    "back/paper-v1/src/chd_ct/inference/__init__.py": {
+      "mode": "100644",
+      "sha256": "c31a660974519d37803dc21cf86abcb30a8a0a9a459967e5cbe23926e915d7cd",
+      "size": 47
+    },
+    "back/paper-v1/src/chd_ct/inference/fusion.py": {
+      "mode": "100644",
+      "sha256": "7f002601f33b1a5f5915027965a738823e2556392e98c02cd79b6d1768518496",
+      "size": 2300
+    },
+    "back/paper-v1/src/chd_ct/inference/pipeline.py": {
+      "mode": "100644",
+      "sha256": "f4233144d009e36a9a9f43851b8bc4e05972176adc46321a558cf8059875fb3b",
+      "size": 7102
+    },
+    "back/paper-v1/src/chd_ct/labels.py": {
+      "mode": "100644",
+      "sha256": "5de258084d8f9870ff3aab9da00deef79a922079e9b3cc02c10ac94ba3d9275b",
+      "size": 621
+    },
+    "back/paper-v1/src/chd_ct/models/__init__.py": {
+      "mode": "100644",
+      "sha256": "ad90887593aef11b4e1c6072834db29b2237576c6debd77afe797d48af8b00ac",
+      "size": 91
+    },
+    "back/paper-v1/src/chd_ct/models/recurrent.py": {
+      "mode": "100644",
+      "sha256": "a39f42811018e747b4139b53e63adda0735dfe0d6a827b8e021c3a5c769182cf",
+      "size": 1969
+    },
+    "back/paper-v1/src/chd_ct/models/unet.py": {
+      "mode": "100644",
+      "sha256": "0790afe4d582937c772d28c7765f7b38565ed4f894ca7ac39d83f3fb9fd27dd1",
+      "size": 3382
+    },
+    "back/paper-v1/src/chd_ct/quickstart/__init__.py": {
+      "mode": "100644",
+      "sha256": "7404243db389c81d95253cbb2b6905afb0b397a1ea09143b61964512809e40fc",
+      "size": 95
+    },
+    "back/paper-v1/src/chd_ct/quickstart/datasets.py": {
+      "mode": "100644",
+      "sha256": "bca4f1356cbca959715beb0b011ff362fcab891a634e5269c2471eaf302f9481",
+      "size": 5158
+    },
+    "back/paper-v1/src/chd_ct/quickstart/environment.py": {
+      "mode": "100644",
+      "sha256": "d905a3fffe741f9d3afef7d02545fd608c02a2f2dfee30f76379f92f528dbdc9",
+      "size": 3507
+    },
+    "back/paper-v1/src/chd_ct/quickstart/wizard.py": {
+      "mode": "100644",
+      "sha256": "ec45cebad52844bb99d46b6b841dd229c6975354332c44fd63480bf43ccf148c",
+      "size": 13756
+    },
+    "back/paper-v1/src/chd_ct/quickstart/worker.py": {
+      "mode": "100644",
+      "sha256": "ed7547efcbbe17c5a87894ce915b8a32848dcac1c98716606a8dd38ab7aff12c",
+      "size": 3954
+    },
+    "back/paper-v1/src/chd_ct/server/__init__.py": {
+      "mode": "100644",
+      "sha256": "22d2dfc91093565917ce7b57e0dd14d3189e47539fe37042cf64d6f243b7334d",
+      "size": 62
+    },
+    "back/paper-v1/src/chd_ct/server/bootstrap.py": {
+      "mode": "100644",
+      "sha256": "d0351d9583248c642516cbc5df55bf61297ee33250e60d13036780aac519a74b",
+      "size": 5302
+    },
+    "back/paper-v1/src/chd_ct/server/imagechd.py": {
+      "mode": "100644",
+      "sha256": "68536684765ae086b56fa926468e1752b274c748c23a50a2275232b32a576a88",
+      "size": 8224
+    },
+    "back/paper-v1/src/chd_ct/server/launcher.py": {
+      "mode": "100644",
+      "sha256": "aba1a8d8889bf5036153be44ce7f85262da1b1740d7864946d752c1d997e7480",
+      "size": 14245
+    },
+    "back/paper-v1/src/chd_ct/server/training.py": {
+      "mode": "100644",
+      "sha256": "2c97ce4b2a6486470fe64db3e7b23a04df638640dd7d8c9286e25e8d2c95c7be",
+      "size": 1259
+    },
+    "back/paper-v1/src/chd_ct/synthetic.py": {
+      "mode": "100644",
+      "sha256": "9c1adf51857734e80113be5b7c272aa598c16a6b0e689221a93a4a0e937f5024",
+      "size": 2347
+    },
+    "back/paper-v1/src/chd_ct/training/__init__.py": {
+      "mode": "100644",
+      "sha256": "41020f9f524d2492a6876e88b1d664e651ff67b9e7d4e22d1cb194046ace5779",
+      "size": 37
+    },
+    "back/paper-v1/src/chd_ct/training/augment.py": {
+      "mode": "100644",
+      "sha256": "e648c4e84cbce3aafef23577a68091b126b3f0556f5ad98d86fe3186605e7542",
+      "size": 1378
+    },
+    "back/paper-v1/src/chd_ct/training/dataset.py": {
+      "mode": "100644",
+      "sha256": "779fbf1e31d114150f6b509eb7d53c1324793ed30efabe64fbbb87e18f2c3917",
+      "size": 2699
+    },
+    "back/paper-v1/src/chd_ct/training/engine.py": {
+      "mode": "100644",
+      "sha256": "524a82372e8b5a10c4fd347d909e6a0bb93ebe13dbb0c6a0b7c09640f4b5c249",
+      "size": 5708
+    },
+    "back/paper-v1/src/chd_ct/training/losses.py": {
+      "mode": "100644",
+      "sha256": "7655b413256db0202ae5db867da1b0301092076e6a01437c0d84cd933a99a777",
+      "size": 703
+    },
+    "back/paper-v1/start.bat": {
+      "mode": "100644",
+      "sha256": "5d590b26ad9041980ebd0c7d870bc7e9ad08792fdd95d590b5ee1cbef745db0d",
+      "size": 580
+    },
+    "back/paper-v1/start.py": {
+      "mode": "100644",
+      "sha256": "405b82c4f1811cbd4902be1d0cb55dd427a848b391dc215a9f6bbd27368dbc46",
+      "size": 834
+    },
+    "back/paper-v1/start_server.py": {
+      "mode": "100644",
+      "sha256": "f9660cb968e6fb345c24633e6b1d044061b1bcb1a3effe5cbb3d20c5296e5217",
+      "size": 424
+    },
+    "back/paper-v1/start_server.sh": {
+      "mode": "100644",
+      "sha256": "1d0e5d89369069a35a9d3beca11b73795324047805ea179052a3a57328c94b9b",
+      "size": 155
+    },
+    "back/paper-v1/tests/test_data.py": {
+      "mode": "100644",
+      "sha256": "a7839a8ddc8509c27c74889f6aa7d06f2c7082ca3c28e74beb0ae616fba2f301",
+      "size": 1720
+    },
+    "back/paper-v1/tests/test_features_diagnosis.py": {
+      "mode": "100644",
+      "sha256": "f7bee90a474d31be52a9879a4b6b9b24742e84e64fa781deeef192a4ead1db95",
+      "size": 2491
+    },
+    "back/paper-v1/tests/test_fusion_metrics.py": {
+      "mode": "100644",
+      "sha256": "9db8ed4544b86827707b04e0dcd4157c68f1a1902297c1e9f27d721ebd424d70",
+      "size": 1357
+    },
+    "back/paper-v1/tests/test_imagechd.py": {
+      "mode": "100644",
+      "sha256": "6a76728889cabecde2c0543ea483b17000178682006bb34be264809b96dbec25",
+      "size": 9390
+    },
+    "back/paper-v1/tests/test_models.py": {
+      "mode": "100644",
+      "sha256": "8784aff3a02018a3b89b17ddf4ab315750f864c85aee6f409874e7e76a397940",
+      "size": 921
+    },
+    "back/paper-v1/tests/test_pipeline.py": {
+      "mode": "100644",
+      "sha256": "7de080ac4efd0848ba7c8e79b13741e32e8b98888882e82317cf1a5615fb8e2c",
+      "size": 2940
+    },
+    "back/paper-v1/tests/test_quickstart.py": {
+      "mode": "100644",
+      "sha256": "0e8b364d39941d99caf06737ecc062ce9aa169f57797ff09ad20fd4b4c2e6b21",
+      "size": 6675
+    },
+    "back/paper-v1/tests/test_server.py": {
+      "mode": "100644",
+      "sha256": "1c964c2c2d4746c7563607c0951d138ff01a03031fc7bed064ec07844177cb2c",
+      "size": 7293
+    },
+    "back/paper-v1/train_imagechd.py": {
+      "mode": "100644",
+      "sha256": "1d95b9567ab42795543af8667ce3872f81ccb9178dc5aeb9f40f0c3c80375920",
+      "size": 497
+    },
+    "back/paper-v1/train_server.sh": {
+      "mode": "100644",
+      "sha256": "6b42616c11c7299d9006ff3d4101a917f44aeeec4555f6d1da6f555a84b58332",
+      "size": 162
+    },
+    "configs/chd-author-unet.yaml": {
+      "mode": "100644",
+      "sha256": "690a33fb5093751cbaa990f3c8e36145fa244d0403de7c5c004d451871cc2a8d",
+      "size": 1042
+    },
+    "configs/chd-cv-smoke.yaml": {
+      "mode": "100644",
+      "sha256": "c83ca51785df40ab89337ad84ac6a426ba9b21064dcecee047121404b8885aec",
+      "size": 1043
+    },
+    "configs/chd-smoke.yaml": {
+      "mode": "100644",
+      "sha256": "ecdd4fbd88b81161681239715eb5df5701e69c4fe61bc5b7499ca8d09dd42002",
+      "size": 1046
+    },
+    "configs/chd.yaml": {
+      "mode": "100644",
+      "sha256": "ea252df2a783e7e3f696efb3bc091b9747783972932423c96bceeb9e3de4f129",
+      "size": 1391
+    },
+    "configs/diagnosis-rules.yaml": {
+      "mode": "100644",
+      "sha256": "1528467d772faf7c2c5ca4101169c56d96a06048abf7504e9898d540b5925c5d",
+      "size": 2956
+    },
+    "configs/servers/zmic44.json": {
+      "mode": "100644",
+      "sha256": "8b4caa00dd34526645f28236d88e0066ad6d457b65b6c23d74bf790aafc915f2",
+      "size": 1130
+    },
+    "diagnosis.py": {
+      "mode": "100644",
+      "sha256": "1dc71af4fc309849318f11b004f75d1695bfaf73ffe4301c5fd6c2b78d0a878d",
+      "size": 402
+    },
+    "diagnosis_server.sh": {
+      "mode": "100644",
+      "sha256": "d6d6e7b83c8cef55daf9f4e4d974b8b5fdd3b5e368ba5cd0226ec44ae0f8d29e",
+      "size": 248
+    },
+    "docs/code-guide.md": {
+      "mode": "100644",
+      "sha256": "b3385ad46f13ee26257bb2ffe7a53744e4a7db8b74c335149dbf94fbf38f7c11",
+      "size": 3704
+    },
+    "docs/data-guide.md": {
+      "mode": "100644",
+      "sha256": "9b625fcf20fc6e66260802c690fd06e42fe6ac42b6622a069ca8bb7174332a18",
+      "size": 1969
+    },
+    "docs/diagnosis.md": {
+      "mode": "100644",
+      "sha256": "d10c21551db2287e4250933d43bb07a8ff5b203463ebaa8f55a54da4ff592720",
+      "size": 12285
+    },
+    "docs/github-network.md": {
+      "mode": "100644",
+      "sha256": "38003405f611bc754d890897bf8c598cc34f7a30ac72ef5e751469983fb6bc1b",
+      "size": 10045
+    },
+    "docs/imagechd-archive.md": {
+      "mode": "100644",
+      "sha256": "7c0fb1d6ef79cdf670354e83445ce7d11fabfea25f72371e825785fdbb827f9f",
+      "size": 5791
+    },
+    "docs/imagechd-workflow.md": {
+      "mode": "100644",
+      "sha256": "3cc5900ee90653057e776f0dd859cc80df0a74633d5f77cba400c78ad5b73cf4",
+      "size": 164
+    },
+    "docs/label-grid-boundaries.md": {
+      "mode": "100644",
+      "sha256": "7562fc5e683cfacc0795c2f93c14727d1e1a9491796eb0e0f6e655ae08beb5c0",
+      "size": 5710
+    },
+    "docs/paper-mapping.md": {
+      "mode": "100644",
+      "sha256": "88bebb3a14fab059876825141c8b4d8062c23d6fc46d27adc421f268c3605ef1",
+      "size": 9477
+    },
+    "docs/quickstart.md": {
+      "mode": "100644",
+      "sha256": "001dfc76990d20f5b04efec5d5665d3953a73952142b0afc8f897bf982ad46fe",
+      "size": 1295
+    },
+    "docs/recovery.md": {
+      "mode": "100644",
+      "sha256": "7d412a400a109b366cc28beb2f98ab6d8eb4f0ba0654cb0e6dc121e218215a59",
+      "size": 15165
+    },
+    "docs/result-details.md": {
+      "mode": "100644",
+      "sha256": "d18a1e7872c0bd1a76f816874535e4e5591c3aec3cdfab09d6c539bffb7185e2",
+      "size": 6713
+    },
+    "docs/results-publishing.md": {
+      "mode": "100644",
+      "sha256": "be2d4e42f50184c69d4ae962752e7156d92144440b37a86f4360c44acae58749",
+      "size": 6537
+    },
+    "docs/roi-refinement-guard.md": {
+      "mode": "100644",
+      "sha256": "89762bf0656b99ac038f6427e73426a9f4aee64439a04edf617633bd4126bf5f",
+      "size": 8012
+    },
+    "docs/server-start.md": {
+      "mode": "100644",
+      "sha256": "7b830cb80563500fcfc57c71f4db2b2a89bbb808f81b129f8899e001abda8ab5",
+      "size": 41908
+    },
+    "docs/unet-source.md": {
+      "mode": "100644",
+      "sha256": "0ce0872020ba2dec9e9811945a50460b556ae4d2ba041f371d046f5c52fe973d",
+      "size": 3747
+    },
+    "docs/validation-result-details.md": {
+      "mode": "100644",
+      "sha256": "b62c94382a145f341932d872c354cd34cefacb8300106e77b4ecf09d874330c0",
+      "size": 3368
+    },
+    "docs/validation-result-navigation.md": {
+      "mode": "100644",
+      "sha256": "2e90a5d490dd486bd7f8de93a7e1a6c7b8288c4f2720d3ddbf19d4bd9097fcbf",
+      "size": 3301
+    },
+    "docs/validation-task-input-rerun.md": {
+      "mode": "100644",
+      "sha256": "4c9577613eeba9ebe006367ca52c14cc59472f5e3f15f86c8dce5c2d2cd84d26",
+      "size": 2511
+    },
+    "docs/verification.md": {
+      "mode": "100644",
+      "sha256": "9726fc7e85b879c5c42be81fa5f7f2bb175cf3556a058f71e105dc04ccdba358",
+      "size": 15982
+    },
+    "docs/workflow.md": {
+      "mode": "100644",
+      "sha256": "5e36c02cd72f735973462dfa147389bc5f30c92fe4068a704a9984d0308667d1",
+      "size": 11079
+    },
+    "evaluate.py": {
+      "mode": "100644",
+      "sha256": "3ed1d888f6cb2c5dbe6ff18eee52c86bb94ef8ec10caae197d72c5b3f1d074d0",
+      "size": 511
+    },
+    "evaluate_server.sh": {
+      "mode": "100644",
+      "sha256": "e9dcb009ac7f311a4ed1d49832bc5b0be5998edac98488e7ff0b1e6fd3b746ba",
+      "size": 165
+    },
+    "predict.py": {
+      "mode": "100644",
+      "sha256": "5f9c445ba0efa34bacf69dc3fb3cefd5a06567e27283d95b0062ed429a06167e",
+      "size": 510
+    },
+    "predict_server.sh": {
+      "mode": "100644",
+      "sha256": "f8774177b51de3ecb056e49e4416d258cd435ee4fae22cbb444b07738110ace1",
+      "size": 164
+    },
+    "preprocess.py": {
+      "mode": "100644",
+      "sha256": "d7f120db89c1385ffb6b58b8620aead5a5e5f6b34880ea4f90a15a3f95eb40e9",
+      "size": 513
+    },
+    "preprocess_server.sh": {
+      "mode": "100644",
+      "sha256": "67a486d45f4b7856e218fea7236ae13e8016026e6ad7c01ddfec17b2e76b9281",
+      "size": 167
+    },
+    "pyproject.toml": {
+      "mode": "100644",
+      "sha256": "4bd9c8cdcb436b36daab9f9b0c13791ff9b3e180107b86267ea7fcd6746bcc6f",
+      "size": 953
+    },
+    "requirements-tested.txt": {
+      "mode": "100644",
+      "sha256": "b265141486033cbd774de294bd390d6025706dbcbd25e866848237f3c23fbf7f",
+      "size": 262
+    },
+    "scripts/run_demo.py": {
+      "mode": "100644",
+      "sha256": "42e03ab144e80f798aa3c501b30c9740ee93ea2b8e0570edc34007cc9357af20",
+      "size": 511
+    },
+    "smoke_server.sh": {
+      "mode": "100644",
+      "sha256": "38461cd4f4207e1e420305a779a243b2e4cebb043291278f250e0174bcb70aef",
+      "size": 175
+    },
+    "src/chd_ct/__init__.py": {
+      "mode": "100644",
+      "sha256": "46e3cfbf6be97b6373e8268a6274f6859fab38f4a5db053735b3c6edcd6d357d",
+      "size": 78
+    },
+    "src/chd_ct/__main__.py": {
+      "mode": "100644",
+      "sha256": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+      "size": 48
+    },
+    "src/chd_ct/cli.py": {
+      "mode": "100644",
+      "sha256": "b74b8d3bc831828d33a7f7b2b689b0a09032441b91b71a71bbb7467f081f8c1e",
+      "size": 169
+    },
+    "src/chd_ct/cpu_runtime.py": {
+      "mode": "100644",
+      "sha256": "2cf5950aa07f3f8eb5a098619ec16bd15751e3094d65470b56f7bee54cf3ae20",
+      "size": 10766
+    },
+    "src/chd_ct/diagnosis/__init__.py": {
+      "mode": "100644",
+      "sha256": "88e393de081aef3549e9a174b0a48caa606582f58c7aae3706f803b1f04a0103",
+      "size": 74
+    },
+    "src/chd_ct/diagnosis/classifier.py": {
+      "mode": "100644",
+      "sha256": "c165c7c1dfd75ea4cc086bf19007f69567778d61e69db8f82cc89260fda7dd47",
+      "size": 10419
+    },
+    "src/chd_ct/diagnosis/cli.py": {
+      "mode": "100644",
+      "sha256": "5beddfb6e276fa15131659fef80dd776e8b2e51db84ef71018b63641f69ffccc",
+      "size": 3324
+    },
+    "src/chd_ct/diagnosis/demo.py": {
+      "mode": "100644",
+      "sha256": "280ac85a6f171fefe6bae2f725223a08163e7eec15ed0cb2ac4f4f7b8b5e5515",
+      "size": 2315
+    },
+    "src/chd_ct/diagnosis/evaluate.py": {
+      "mode": "100644",
+      "sha256": "54c74a644d6767e1bfe2d2a0a2cc7c1022bdf4bfaa598d40818c8d806c579b3b",
+      "size": 5379
+    },
+    "src/chd_ct/diagnosis/features.py": {
+      "mode": "100644",
+      "sha256": "165a1cb9fed96173d37260db2aabf625b8a9c0529080beb8dabe8b6eee3cfbe7",
+      "size": 6484
+    },
+    "src/chd_ct/diagnosis/io.py": {
+      "mode": "100644",
+      "sha256": "9574df31c122727e617e877b7a411873f9d4665f0f8d32f3e8f194b17ab2cfa1",
+      "size": 1872
+    },
+    "src/chd_ct/diagnosis/labels.py": {
+      "mode": "100644",
+      "sha256": "fdc75b40879de0ede5803a5f675bb39e264ea38905539d2c36623328e6e5c539",
+      "size": 8936
+    },
+    "src/chd_ct/diagnosis/predict.py": {
+      "mode": "100644",
+      "sha256": "2b7c6129d3d55526c0aeb997522546635ee79b556d82eb5a6bee20f3c4f51114",
+      "size": 8446
+    },
+    "src/chd_ct/diagnosis/rules.py": {
+      "mode": "100644",
+      "sha256": "6bf8f5a39fc749f61ae757f91d104e1485600bcb040684f1e73ba1cb7b702515",
+      "size": 3361
+    },
+    "src/chd_ct/imagechd/__init__.py": {
+      "mode": "100644",
+      "sha256": "6006c3f8fc3a77ea0c5606174db6922ecfb464e009e03b3e7e51166b25b49bf0",
+      "size": 78
+    },
+    "src/chd_ct/imagechd/augment.py": {
+      "mode": "100644",
+      "sha256": "c5ba385bada0313ae34c2609306edaf58a7432e5bfadcdc07b7183c3605a2ee6",
+      "size": 2239
+    },
+    "src/chd_ct/imagechd/autotune.py": {
+      "mode": "100644",
+      "sha256": "fdfce49444ca4eccb5718af1aa50683b9d4c07a102d6ce7f894e8bbb9f816301",
+      "size": 12337
+    },
+    "src/chd_ct/imagechd/cache_reuse.py": {
+      "mode": "100644",
+      "sha256": "14294a9adb5b03302fcaecad198bdc80029489e19d8f593147afb498d411990d",
+      "size": 4109
+    },
+    "src/chd_ct/imagechd/calibration.py": {
+      "mode": "100644",
+      "sha256": "9d4629f972e0876ea222bae1aff3b94c1bdb2e2e0771a61e1652105b010426d1",
+      "size": 6136
+    },
+    "src/chd_ct/imagechd/checkpoints.py": {
+      "mode": "100644",
+      "sha256": "5da585b69e0a783f86b725f3c8d7fa86c6a9992f729ff1617b2874914210e1f3",
+      "size": 6144
+    },
+    "src/chd_ct/imagechd/common.py": {
+      "mode": "100644",
+      "sha256": "f29873e07ecbebf07c015c0d1469fb75a42df7542574ab94cd55630ca121bbaa",
+      "size": 4893
+    },
+    "src/chd_ct/imagechd/config.py": {
+      "mode": "100644",
+      "sha256": "87edb64807018c45aac32d845bd4edf5083e26ccf6f9342e8424916d60ad1f93",
+      "size": 5335
+    },
+    "src/chd_ct/imagechd/cpu_cache.py": {
+      "mode": "100644",
+      "sha256": "3c1efc9031148914dfa901c0df80562bf0f32f6f85d9fb2ce834220134d163bb",
+      "size": 4494
+    },
+    "src/chd_ct/imagechd/cpu_resources.py": {
+      "mode": "100644",
+      "sha256": "9a4c877b858f1b15fef1659e3a8cb4cdab6fb02142269e5e3227ecb20599a846",
+      "size": 3836
+    },
+    "src/chd_ct/imagechd/cross_fold_queue.py": {
+      "mode": "100644",
+      "sha256": "9b77bd5bde57f7cd1acbc37757772552dd0a395107902664d0574da3437df836",
+      "size": 4675
+    },
+    "src/chd_ct/imagechd/cross_validation.py": {
+      "mode": "100644",
+      "sha256": "022e32a394d264266be5dfcfa079d3e845c16066a3c1a789d3b1a182d336382f",
+      "size": 9301
+    },
+    "src/chd_ct/imagechd/dataset.py": {
+      "mode": "100644",
+      "sha256": "d318f72ef70387c8fcb6c47d023736195e468b564f04471619dd9669c4a18a11",
+      "size": 4568
+    },
+    "src/chd_ct/imagechd/demo.py": {
+      "mode": "100644",
+      "sha256": "ced22e2ff28b46d07c7c69425133c8cc93466646e9c569950c915e9698a392b2",
+      "size": 2165
+    },
+    "src/chd_ct/imagechd/evaluate.py": {
+      "mode": "100644",
+      "sha256": "307313adfcd264d74cf221ae122a9deeb12c977f4a9e3d9b30ad7b4caf54afee",
+      "size": 7038
+    },
+    "src/chd_ct/imagechd/folds.py": {
+      "mode": "100644",
+      "sha256": "9c3e2d594ac457469521cbe5c7200e7638ebbd1ca42aa8f1f02ca809cbdceae7",
+      "size": 5524
+    },
+    "src/chd_ct/imagechd/fusion.py": {
+      "mode": "100644",
+      "sha256": "7206e2d2e9d6acc9c59f8c9a946d41958107e32e7df521794fbb5b72fa3b89a4",
+      "size": 1930
+    },
+    "src/chd_ct/imagechd/geometry.py": {
+      "mode": "100644",
+      "sha256": "f830c60bf1cf1c1e65da1ce83bf09e75362ed47229beedc6ce32c163c74afca0",
+      "size": 1446
+    },
+    "src/chd_ct/imagechd/gpu_memory.py": {
+      "mode": "100644",
+      "sha256": "d54a5ab1d19c33d7f5996d60f8dd406356abe44de836ae63e4153dccd2300272",
+      "size": 5503
+    },
+    "src/chd_ct/imagechd/gpu_queue.py": {
+      "mode": "100644",
+      "sha256": "c493e2b396eb06ed08b05ecb2f64846a8d3725cd28bc172a097996cd8018b525",
+      "size": 1950
+    },
+    "src/chd_ct/imagechd/inference_worker.py": {
+      "mode": "100644",
+      "sha256": "5e524c1ee3d467abad7f123c82bd02becf6833ef2a8cb48a800eff1928a4a05a",
+      "size": 491
+    },
+    "src/chd_ct/imagechd/loading.py": {
+      "mode": "100644",
+      "sha256": "5fd0086885bf521af9a747c5bcfb101bd2591eee02f01b20981d9cbf10c2ae14",
+      "size": 4353
+    },
+    "src/chd_ct/imagechd/losses.py": {
+      "mode": "100644",
+      "sha256": "f26d5d2f020c64d67d04c2e14f336290ff5b0a499848c833439e3cfef7d770cd",
+      "size": 943
+    },
+    "src/chd_ct/imagechd/methods.py": {
+      "mode": "100644",
+      "sha256": "be36d18a7e2e6a2d3a140d2a6f3a749ccd12bb43732cd9b379dc018c4ca7ec17",
+      "size": 1523
+    },
+    "src/chd_ct/imagechd/pipeline.py": {
+      "mode": "100644",
+      "sha256": "e93f3d5a99ac3d44955f2ac8d8521c9c6244b446a4ba446ce6a848d854d03ecb",
+      "size": 906
+    },
+    "src/chd_ct/imagechd/postprocessing.py": {
+      "mode": "100644",
+      "sha256": "2069039ba6dcdf5edaa003b158323ca59c5541f4f5b069c8b46e7b76ed939574",
+      "size": 4690
+    },
+    "src/chd_ct/imagechd/predict.py": {
+      "mode": "100644",
+      "sha256": "961fa05877f8ef52357d5ce07d8ebceeb5c3863fff92fa0536352aaccdc6c6f7",
+      "size": 23783
+    },
+    "src/chd_ct/imagechd/preprocess.py": {
+      "mode": "100644",
+      "sha256": "7d5d53a2f49f187ddb9d590317bfacedc2438c2ef8dc948918483181a8379037",
+      "size": 20894
+    },
+    "src/chd_ct/imagechd/roi_inputs.py": {
+      "mode": "100644",
+      "sha256": "87045e890674a64407e5df59b162bf38553d68479ecd0a5a713f22ddc592603c",
+      "size": 5441
+    },
+    "src/chd_ct/imagechd/spacing.py": {
+      "mode": "100644",
+      "sha256": "54919c5402b85f15e17bb95fa92f931049bbec82f6c969f4957a757d70e09b72",
+      "size": 5055
+    },
+    "src/chd_ct/imagechd/stage_queue.py": {
+      "mode": "100644",
+      "sha256": "32ef21cb0f327caf34cbc6561b61b11ba7fa243dde8f5ceedaa317ced624cf2a",
+      "size": 9548
+    },
+    "src/chd_ct/imagechd/stage_worker.py": {
+      "mode": "100644",
+      "sha256": "277916a827637d08ee0fa5b72d6525ec87b94598ecc26d25bcb1cce33ff168ac",
+      "size": 1954
+    },
+    "src/chd_ct/imagechd/test.py": {
+      "mode": "100644",
+      "sha256": "40fdbb5af08e7a025ae3985538c27cfa8cf550f81135c0a764adaa21bb1db579",
+      "size": 3650
+    },
+    "src/chd_ct/imagechd/train.py": {
+      "mode": "100644",
+      "sha256": "1787382f499aaf388b7a1eb3e16292ff12ba88f9d7ed736a43f3c12aaafdae5c",
+      "size": 16707
+    },
+    "src/chd_ct/imagechd/training_session.py": {
+      "mode": "100644",
+      "sha256": "4b7a65b63de45b9e0747997cb46ef33a9585e532c36884ca1cf2446faad72414",
+      "size": 6745
+    },
+    "src/chd_ct/models/__init__.py": {
+      "mode": "100644",
+      "sha256": "747a2b86d6dab85b4a249c3558b65f83b9daea9fd3894d8a65fb28828af75fc8",
+      "size": 251
+    },
+    "src/chd_ct/models/chd_unet.py": {
+      "mode": "100644",
+      "sha256": "bf7d1960a3b773f27ea24c2b385affe8c1270d0885ea463ca997255d2c8fec93",
+      "size": 5452
+    },
+    "src/chd_ct/models/gate.py": {
+      "mode": "100644",
+      "sha256": "af745f8ef148a9f021f86649ad8ad15cefb200f374c02197d9d566e27630e221",
+      "size": 989
+    },
+    "src/chd_ct/models/grid.py": {
+      "mode": "100644",
+      "sha256": "7a45b96094d3fe4938ee178eb1e69f8224a53e9c13f37257616e003878fa9b74",
+      "size": 1684
+    },
+    "src/chd_ct/models/recurrent.py": {
+      "mode": "100644",
+      "sha256": "a39f42811018e747b4139b53e63adda0735dfe0d6a827b8e021c3a5c769182cf",
+      "size": 1969
+    },
+    "src/chd_ct/models/reference/2d-LICENSE": {
+      "mode": "100644",
+      "sha256": "ec5f7272b9c2f6ddd6b7843688d8fa6efaca46b8abef2a8279263b11fe57202f",
+      "size": 2083
+    },
+    "src/chd_ct/models/reference/2d-README.txt": {
+      "mode": "100644",
+      "sha256": "88c9ec30f10d8bc5267f9e81d7a0cebb8b1107c20c8478d39cd67c4922e5e1a4",
+      "size": 1158
+    },
+    "src/chd_ct/models/reference/2d-phseg_v5-train.prototxt": {
+      "mode": "100644",
+      "sha256": "3ea5b1dce77b952a0912523d00b650f1d4bbe88e496fd8a870e3c620d179e567",
+      "size": 9757
+    },
+    "src/chd_ct/models/reference/3d-LICENSE": {
+      "mode": "100644",
+      "sha256": "b6e711e58b3b4d238178c50eb49473c4420f0a0e5ba858fc4eba336b99fd03bc",
+      "size": 2103
+    },
+    "src/chd_ct/models/reference/3d-README": {
+      "mode": "100644",
+      "sha256": "c13c6693619c593306cd406609d6f913ec0f76affe525bd85c3af7a02d260a0c",
+      "size": 7286
+    },
+    "src/chd_ct/models/reference/3dUnet_miccai2016_no_BN.prototxt": {
+      "mode": "100644",
+      "sha256": "8cabcbcab5b5213050239a7035f7f4dde572dee2b54d2952492cfbb2be4b26e3",
+      "size": 10385
+    },
+    "src/chd_ct/models/reference/sources.json": {
+      "mode": "100644",
+      "sha256": "3e6ea68334f8b24a7c4177b5a3cc05a8f241a3adc8180161f13ebc59d1cb7a1d",
+      "size": 1343
+    },
+    "src/chd_ct/models/unet.py": {
+      "mode": "100644",
+      "sha256": "5c31817ee3476be24670f22917898de3d99dd3d70b385199399a571e5ef5921d",
+      "size": 4983
+    },
+    "src/chd_ct/paths.py": {
+      "mode": "100644",
+      "sha256": "a0a1e8d56b4320b8b06f133e37ad821f9edb62acbb22b554cf7197bc9d4a7558",
+      "size": 705
+    },
+    "src/chd_ct/presets/chd-author-unet.yaml": {
+      "mode": "100644",
+      "sha256": "690a33fb5093751cbaa990f3c8e36145fa244d0403de7c5c004d451871cc2a8d",
+      "size": 1042
+    },
+    "src/chd_ct/presets/chd-cv-smoke.yaml": {
+      "mode": "100644",
+      "sha256": "c83ca51785df40ab89337ad84ac6a426ba9b21064dcecee047121404b8885aec",
+      "size": 1043
+    },
+    "src/chd_ct/presets/chd-smoke.yaml": {
+      "mode": "100644",
+      "sha256": "ecdd4fbd88b81161681239715eb5df5701e69c4fe61bc5b7499ca8d09dd42002",
+      "size": 1046
+    },
+    "src/chd_ct/presets/chd.yaml": {
+      "mode": "100644",
+      "sha256": "ea252df2a783e7e3f696efb3bc091b9747783972932423c96bceeb9e3de4f129",
+      "size": 1391
+    },
+    "src/chd_ct/presets/diagnosis-rules.yaml": {
+      "mode": "100644",
+      "sha256": "1528467d772faf7c2c5ca4101169c56d96a06048abf7504e9898d540b5925c5d",
+      "size": 2956
+    },
+    "src/chd_ct/progress.py": {
+      "mode": "100644",
+      "sha256": "f21b47c350e041ce9233046c4015775f20446d029838f9be998d7bf6113f8486",
+      "size": 1272
+    },
+    "src/chd_ct/quickstart/__init__.py": {
+      "mode": "100644",
+      "sha256": "7404243db389c81d95253cbb2b6905afb0b397a1ea09143b61964512809e40fc",
+      "size": 95
+    },
+    "src/chd_ct/quickstart/commands.py": {
+      "mode": "100644",
+      "sha256": "959c6a7e2943806ef46e266d8a62bf673192f79858a08ac7bf42787166f6939c",
+      "size": 6288
+    },
+    "src/chd_ct/quickstart/diagnosis.py": {
+      "mode": "100644",
+      "sha256": "29c95b7c30aa698a437a0e7039066e1020d82d227c5943f7478bb10293b27763",
+      "size": 4094
+    },
+    "src/chd_ct/quickstart/environment.py": {
+      "mode": "100644",
+      "sha256": "dff97238be77cd04edc69884c10fd0906b23d93dbddb3c6fc2cb2f91715c93ac",
+      "size": 3530
+    },
+    "src/chd_ct/quickstart/wizard.py": {
+      "mode": "100644",
+      "sha256": "5fb82d9ccfbcaf24ac58ee2e40590ddef6c058fdc92927bdaa6348dd8aea16dd",
+      "size": 4855
+    },
+    "src/chd_ct/recovery.py": {
+      "mode": "100644",
+      "sha256": "d8f8d821a05ffb12080d5ed1126e595afb7a5f5dc25fca21a63a6023c7c33697",
+      "size": 2516
+    },
+    "src/chd_ct/server/__init__.py": {
+      "mode": "100644",
+      "sha256": "22d2dfc91093565917ce7b57e0dd14d3189e47539fe37042cf64d6f243b7334d",
+      "size": 62
+    },
+    "src/chd_ct/server/bootstrap.py": {
+      "mode": "100644",
+      "sha256": "4eb717af1a52191772782708931034f40519ec9d4d2fde3adc6cc17a4c63d4c8",
+      "size": 5863
+    },
+    "src/chd_ct/server/cache_selection.py": {
+      "mode": "100644",
+      "sha256": "344a170497cc5047673388edfa5af9a6ab133b21099bf3236251f71e169f5d5b",
+      "size": 3252
+    },
+    "src/chd_ct/server/code_sync.py": {
+      "mode": "100644",
+      "sha256": "436bf4f106ad880aedb81076210de7215ce9b649d64f581b2bc567a909be2067",
+      "size": 5830
+    },
+    "src/chd_ct/server/extension.py": {
+      "mode": "100644",
+      "sha256": "687e00389f9d0daddd5178521a751c274c33dc738055e5cdba8ce54e555f0314",
+      "size": 5835
+    },
+    "src/chd_ct/server/gpu_hold.py": {
+      "mode": "100644",
+      "sha256": "2bf11f5cd0d642408f96b1c8843bdc503c9d16937ab61881e84a79bf7f44d7a0",
+      "size": 9136
+    },
+    "src/chd_ct/server/imagechd.py": {
+      "mode": "100644",
+      "sha256": "2be7d8fabaf332af811d4b74122104747a689e3b55a0ef30880b698df553c9be",
+      "size": 10258
+    },
+    "src/chd_ct/server/inference_phases.py": {
+      "mode": "100644",
+      "sha256": "81a1579c582fe1a0c047292dc28147de9818ed1e8f7ddf1f97ae5e16f1cefc34",
+      "size": 3017
+    },
+    "src/chd_ct/server/inspection.py": {
+      "mode": "100644",
+      "sha256": "2c950c951e1b6afcff3c01e0449b93f22fe087af0d8a4a621674f41064e7bb9b",
+      "size": 15250
+    },
+    "src/chd_ct/server/jobs.py": {
+      "mode": "100644",
+      "sha256": "eadb0fc73a5da7c24badc208b6f221c5c37b046595f0877503cbb66638cc5fc9",
+      "size": 19664
+    },
+    "src/chd_ct/server/launcher.py": {
+      "mode": "100644",
+      "sha256": "ac3dc47811ce95537d3b9641992738bb22e82935730d4ae71b18cb30af6154ea",
+      "size": 19384
+    },
+    "src/chd_ct/server/lineage.py": {
+      "mode": "100644",
+      "sha256": "18c02192b84ba2d866771b9a846605211e9e489a7227162279b70ff96360d5a5",
+      "size": 7950
+    },
+    "src/chd_ct/server/log_progress.py": {
+      "mode": "100644",
+      "sha256": "8528cf81033044edda3a1721ad80193badeb21e9463da25c420083ce37d9b375",
+      "size": 4841
+    },
+    "src/chd_ct/server/network.py": {
+      "mode": "100644",
+      "sha256": "6ae3ba98227e3009eb32adac459ece348b54f270d0478e9ec36978ddbef56941",
+      "size": 6749
+    },
+    "src/chd_ct/server/panel.py": {
+      "mode": "100644",
+      "sha256": "cda47491031621ce326fc20bbb8ba5188b19720b733d53f50e4d323337c6bab7",
+      "size": 9893
+    },
+    "src/chd_ct/server/prompts.py": {
+      "mode": "100644",
+      "sha256": "a2d9f2ddaae198b0fcde0895e5935dc3716d5ed16f38883df78073cce6f62376",
+      "size": 365
+    },
+    "src/chd_ct/server/rerun.py": {
+      "mode": "100644",
+      "sha256": "e7043928cf259f9c5e74b071a744039f810d4b7170f9fe1c2b3333e3b1477b32",
+      "size": 8021
+    },
+    "src/chd_ct/server/resources.py": {
+      "mode": "100644",
+      "sha256": "743df7c1b8154cf0aaa716ef895d5ca194d57ecb6ebd620e32859d4be92eaa4b",
+      "size": 1686
+    },
+    "src/chd_ct/server/result_decisions.py": {
+      "mode": "100644",
+      "sha256": "ad9c2e07b3928ddb3665535dffcc9c7e044f663c9ee1040a58d8976bf3a9f12f",
+      "size": 9938
+    },
+    "src/chd_ct/server/result_io.py": {
+      "mode": "100644",
+      "sha256": "e2029835bba5d9da1b85f36e96a6cc9261a61e4246e62f3440dce69769e7605f",
+      "size": 1559
+    },
+    "src/chd_ct/server/result_menu.py": {
+      "mode": "100644",
+      "sha256": "52731b290e2e5cde71e480a21798e3e2cf76425a8a00abfa69a0b1af12779062",
+      "size": 2857
+    },
+    "src/chd_ct/server/result_metrics.py": {
+      "mode": "100644",
+      "sha256": "737241a77bcca33252217764be45f80379c0e96f5115ea213b24b7c56950e84d",
+      "size": 3177
+    },
+    "src/chd_ct/server/result_views.py": {
+      "mode": "100644",
+      "sha256": "1eeaa422a6522cc55f74982f48e35edcf689f4991e8f308f54fe61b18724be47",
+      "size": 15756
+    },
+    "src/chd_ct/server/results.py": {
+      "mode": "100644",
+      "sha256": "97c44f54eab87803b054da534feb29ed67ef35889915dc1898cf93d4c08b480d",
+      "size": 25279
+    },
+    "src/chd_ct/server/resume.py": {
+      "mode": "100644",
+      "sha256": "24706ff1bf0c19c0f0a04b22b9f0699821bcb317dca88afb2db7fae347832cf5",
+      "size": 9524
+    },
+    "src/chd_ct/server/resume_checks.py": {
+      "mode": "100644",
+      "sha256": "5fef036c160963bd30bd1da10ad8c10feb02d2ddf494ca22c14601b99987ea8b",
+      "size": 5792
+    },
+    "src/chd_ct/server/settings.py": {
+      "mode": "100644",
+      "sha256": "81225bf38d295a1630158904a43820726f1494fc018e6e2576749c5ec05b3334",
+      "size": 7476
+    },
+    "src/chd_ct/server/sharing.py": {
+      "mode": "100644",
+      "sha256": "3f373fcc44a306f1327de934c8f66196e8b1fde5b46d8db4e7927cc5ad8b6f07",
+      "size": 2602
+    },
+    "src/chd_ct/server/ssh_upload.py": {
+      "mode": "100644",
+      "sha256": "5d79060afa5260b4989cb7aa566fbf76b325d29e36d4f69d0d7bc9609dab5bf3",
+      "size": 12136
+    },
+    "src/chd_ct/server/update_progress.py": {
+      "mode": "100644",
+      "sha256": "5020e09bffa6f363be8bac680897b5b1fd46403b5a2faf103c28bca2a08c5f28",
+      "size": 7755
+    },
+    "src/chd_ct/server/updater.py": {
+      "mode": "100644",
+      "sha256": "f12621a426f624a6106ad20427fd640ff206fc57ce82c7fbd5d76a8ccee87b18",
+      "size": 18620
+    },
+    "src/chd_ct/server/upload.py": {
+      "mode": "100644",
+      "sha256": "46575729365f6759f55524c742dac3e2daf2d60aa3661e028ab18ebda479b221",
+      "size": 21243
+    },
+    "src/chd_ct/server/verification.py": {
+      "mode": "100644",
+      "sha256": "b4a90c33b3e68a598f92bc5e68bde3d49813fb2fc46590155aa31a0063c9480e",
+      "size": 16873
+    },
+    "src/chd_ct/server/workflow.py": {
+      "mode": "100644",
+      "sha256": "4610ca32ee9cbfe7ad1737700060db5cf3c09e96e446d23a8e07fe0baa7cead6",
+      "size": 10956
+    },
+    "start.bat": {
+      "mode": "100644",
+      "sha256": "5d590b26ad9041980ebd0c7d870bc7e9ad08792fdd95d590b5ee1cbef745db0d",
+      "size": 580
+    },
+    "start.py": {
+      "mode": "100644",
+      "sha256": "405b82c4f1811cbd4902be1d0cb55dd427a848b391dc215a9f6bbd27368dbc46",
+      "size": 834
+    },
+    "start_server.py": {
+      "mode": "100644",
+      "sha256": "f9660cb968e6fb345c24633e6b1d044061b1bcb1a3effe5cbb3d20c5296e5217",
+      "size": 424
+    },
+    "start_server.sh": {
+      "mode": "100644",
+      "sha256": "1d0e5d89369069a35a9d3beca11b73795324047805ea179052a3a57328c94b9b",
+      "size": 155
+    },
+    "test.py": {
+      "mode": "100644",
+      "sha256": "c533e3cb59aa58ef0f0721fd2052d9e5b2f80beb542ef5dbc7ae7048519e95b9",
+      "size": 507
+    },
+    "test_server.sh": {
+      "mode": "100644",
+      "sha256": "8270631b1b0c45da86a720e77358ac749f3950cccffb8e44ad7c27427c46f64e",
+      "size": 161
+    },
+    "tests/test_author_unet.py": {
+      "mode": "100644",
+      "sha256": "5e0e23ddde4007f6187334de2b6e717e7a7a13270e99a8a880937eb76ea73fad",
+      "size": 7851
+    },
+    "tests/test_cache_reuse.py": {
+      "mode": "100644",
+      "sha256": "28446ae56f56e38ae0c244b1bc70f932ca6d5aaf0510a011cbdfc4161f1ea532",
+      "size": 5335
+    },
+    "tests/test_cache_selection.py": {
+      "mode": "100644",
+      "sha256": "14a1751758a96a802298e881fc8e777f3fe72bb569fbccb71de6ff646670ce1e",
+      "size": 8666
+    },
+    "tests/test_chd_main.py": {
+      "mode": "100644",
+      "sha256": "77cbf6cc039085b1e4381da1849d3698724297409555a7842bc372d4fe1f4d3e",
+      "size": 12463
+    },
+    "tests/test_chd_paper.py": {
+      "mode": "100644",
+      "sha256": "8e5ccb8ae5921308fcd31c89e3b223d013d95f885c4cc530ec882ebbfce2cd75",
+      "size": 8113
+    },
+    "tests/test_code_sync.py": {
+      "mode": "100644",
+      "sha256": "8d5f05435e54d35b318ec777569b7dad20029ddae33e82437a8f0329e4d96768",
+      "size": 3895
+    },
+    "tests/test_cpu_loading.py": {
+      "mode": "100644",
+      "sha256": "74b9d51dedd6486f20b069b0789ab59ec79a1db6348298f2827d6aa6b49f36de",
+      "size": 12382
+    },
+    "tests/test_cpu_runtime_posix.py": {
+      "mode": "100644",
+      "sha256": "a4157c61f3a3fb0f2ca4280c2f28104ca2b728ba51d8434851ebddb7e1d321fb",
+      "size": 4063
+    },
+    "tests/test_cross_fold_posix.py": {
+      "mode": "100644",
+      "sha256": "9e972865c6efaf6712fc36415318ec841087f4f1e3b969d23cfeba14838fe52e",
+      "size": 3725
+    },
+    "tests/test_cross_fold_queue.py": {
+      "mode": "100644",
+      "sha256": "161c968b995468d168280726d355144232998b4b3bc4ec1a38ae697cb805c5a2",
+      "size": 4694
+    },
+    "tests/test_cross_fold_training.py": {
+      "mode": "100644",
+      "sha256": "9b3198baf22cd52d8ab06b4144054588fa601cf1b72b41bcfe9d59e1a3e73945",
+      "size": 5437
+    },
+    "tests/test_cross_validation.py": {
+      "mode": "100644",
+      "sha256": "acc35c7d416389e97c3dfb168fe7eeb03b0b251d684142b4407c8c56516d991f",
+      "size": 16924
+    },
+    "tests/test_cv_server.py": {
+      "mode": "100644",
+      "sha256": "9ed162cda48eef923ffa27536b9f1f09cf70287baf6f04ad24e5ea8936f4ff1e",
+      "size": 10832
+    },
+    "tests/test_diagnosis.py": {
+      "mode": "100644",
+      "sha256": "9e4546bebc7f1594bb3c48ec48d56121ddfae9de7bbd394cf58f51ccc276018c",
+      "size": 16142
+    },
+    "tests/test_diagnosis_ids.py": {
+      "mode": "100644",
+      "sha256": "9204f1c4cf81f71d7d41d690311c2469257f2c75ad1f4893c1daf7a1aedebb37",
+      "size": 6308
+    },
+    "tests/test_elastic_gpus.py": {
+      "mode": "100644",
+      "sha256": "fd78aca939ae7de9f372da86790d266955ad9d1a36c1e8134f4c24e9e7d4f461",
+      "size": 11468
+    },
+    "tests/test_excel_resampling.py": {
+      "mode": "100644",
+      "sha256": "575082ecf51dd2ab3ba101b5d5630a74f5f326035b0935c5bd38dd91dd342e5e",
+      "size": 8330
+    },
+    "tests/test_extension_posix.py": {
+      "mode": "100644",
+      "sha256": "639da6ac764afca88ff0f45b7b583866c27e9144e1d6cfdecc8e0a20c25f2d23",
+      "size": 3383
+    },
+    "tests/test_gpu_hold.py": {
+      "mode": "100644",
+      "sha256": "99d9dba67f43e58b4d07e51ecdda4d349772ce8b7107c1266d601b79396b4817",
+      "size": 6741
+    },
+    "tests/test_gpu_hold_posix.py": {
+      "mode": "100644",
+      "sha256": "b9a603d95b051319c68b02b1ef4b0f6ced4c96a9cb3eeed905ed1f439bc3b183",
+      "size": 3857
+    },
+    "tests/test_inference_resources.py": {
+      "mode": "100644",
+      "sha256": "9a0e6f9ecba8ae29d69a07a57b1da59b8ca2f7a4fa702d7e672c05f58510af89",
+      "size": 10500
+    },
+    "tests/test_label_geometry.py": {
+      "mode": "100644",
+      "sha256": "ed02d713963a89d2a449a6179bdbdca365e55681c3b57781a3fed6709559be3d",
+      "size": 7821
+    },
+    "tests/test_launchers.py": {
+      "mode": "100644",
+      "sha256": "c19e6e28126e39d83834009613b86bc4f0930cdf037982c8d2d026a863d4aae2",
+      "size": 8660
+    },
+    "tests/test_models.py": {
+      "mode": "100644",
+      "sha256": "9923ec32ff673ca5db8919d6765182db66bffd0131f655e9afc325cc27449a0b",
+      "size": 924
+    },
+    "tests/test_recovery.py": {
+      "mode": "100644",
+      "sha256": "44e8ac80311020297441952de51444aadfbe8e4d42da32f40773fc9515b55745",
+      "size": 13970
+    },
+    "tests/test_rerun_posix.py": {
+      "mode": "100644",
+      "sha256": "1a525b6fd69c02a5adda3124cf05cbe0638b75a9773940b550cb0a7e57546fa7",
+      "size": 1965
+    },
+    "tests/test_result_navigation.py": {
+      "mode": "100644",
+      "sha256": "6b9e0eb49a083ecf3899ffef3708d5af8e817ed016e86cc83d6a87736d09302b",
+      "size": 10381
+    },
+    "tests/test_result_viewer.py": {
+      "mode": "100644",
+      "sha256": "81df2d90082c7090278d124feb970d1716d01b6288699197a1bb02af145a8606",
+      "size": 26090
+    },
+    "tests/test_resume_modes.py": {
+      "mode": "100644",
+      "sha256": "3ac0539d5ce88087158a43d29ca328f1d0b9c30f1e3b2988501924793ca36871",
+      "size": 6463
+    },
+    "tests/test_resume_verification.py": {
+      "mode": "100644",
+      "sha256": "8099460d3c647741c8692ea2bad1e044a7117915e16bcf38ba2e2515cf24b3ab",
+      "size": 10498
+    },
+    "tests/test_roi_postprocessing_guard.py": {
+      "mode": "100644",
+      "sha256": "8e9b256bf66402cb778aa5b23e3099c0d8e82f1c4b2fc463bdf9c844a4e72be1",
+      "size": 10924
+    },
+    "tests/test_server_jobs.py": {
+      "mode": "100644",
+      "sha256": "dc924e714a7f96c355940d582b8aa162f946c98f2a4ef5ea37f20a96470ab91e",
+      "size": 12391
+    },
+    "tests/test_server_network.py": {
+      "mode": "100644",
+      "sha256": "b85fe49d14242b134eced9da849d85b4e72c5783b7545d4c421adc26c172c986",
+      "size": 11683
+    },
+    "tests/test_server_panel.py": {
+      "mode": "100644",
+      "sha256": "092e5b532a72016228fbcb6febe7671a83bff1e3504e039672c8fce0e1475232",
+      "size": 13159
+    },
+    "tests/test_server_posix.py": {
+      "mode": "100644",
+      "sha256": "800049011e730dea70e00e2a0e46161d42e43d6c6a3dfe6341afcaf46ff72957",
+      "size": 16632
+    },
+    "tests/test_server_update.py": {
+      "mode": "100644",
+      "sha256": "28108b001d38d324aadbcf47abbd244536005d34b8cf9c5f497cfce9cbf572b9",
+      "size": 16541
+    },
+    "tests/test_server_update_posix.py": {
+      "mode": "100644",
+      "sha256": "517bcf3913535238e9708fee08929b569117aca0c3ef9364160c6495cee01b7e",
+      "size": 4651
+    },
+    "tests/test_server_upload.py": {
+      "mode": "100644",
+      "sha256": "b0876a86c8ac87336225727ff8b76a72e802a7c7387fec5dfd24062a221a5454",
+      "size": 10856
+    },
+    "tests/test_server_workflow.py": {
+      "mode": "100644",
+      "sha256": "d2316b4fff53ee0fae4493a8b3af2299bdf6acc50020489b7976e285c8bd3d68",
+      "size": 10422
+    },
+    "tests/test_ssh_upload.py": {
+      "mode": "100644",
+      "sha256": "55deb0dc7d34b4ec667912eeebbb6ab2f0243c6564d8af0e787016a9bbe466f7",
+      "size": 7338
+    },
+    "tests/test_task_lineage.py": {
+      "mode": "100644",
+      "sha256": "732dbf4cf5af8d3a647fa87812c13e9d3010e92b5a2d769c1d03cc4f7cc6b90c",
+      "size": 9809
+    },
+    "tests/test_update_progress.py": {
+      "mode": "100644",
+      "sha256": "9aa1f3fb3c7951a7b9e8731ffa597d5b6a8b782331ed74cddd3eab716b06fe44",
+      "size": 6657
+    },
+    "tests/test_upload_integration.py": {
+      "mode": "100644",
+      "sha256": "c74b95a134b7ba2012c5f08d27578979028a4df0b5c0b4f0ae09268d06f07050",
+      "size": 3923
+    },
+    "tests/test_verification_posix.py": {
+      "mode": "100644",
+      "sha256": "0b6f0ec1ebfb9f78086b7b5a0c4af063c0e1baca61a1351e675e66af68b6b847",
+      "size": 3474
+    },
+    "tests/test_workflow_extension.py": {
+      "mode": "100644",
+      "sha256": "a051f03c1e314f0e757978ff6b6631212d4a737e0145eb2da5ba69ddcbca3d55",
+      "size": 11800
+    },
+    "train.py": {
+      "mode": "100644",
+      "sha256": "af01bdd3e1f4d699567a9c54b0f3a2a61f2487a21d5765e708bd31fbfff7cd1a",
+      "size": 508
+    },
+    "train_server.sh": {
+      "mode": "100644",
+      "sha256": "6b42616c11c7299d9006ff3d4101a917f44aeeec4555f6d1da6f555a84b58332",
+      "size": 162
+    }
+  },
+  "not_bundled": [
+    "Git history",
+    "working-tree changes",
+    "patient data",
+    "model weights",
+    "runtime",
+    "credentials",
+    "installed dependencies"
+  ],
+  "schema_version": 1,
+  "selection": "Active source, configs, entrypoints, tests, user docs and required paper-v1 archive.",
+  "source": {
+    "commit": "b7c6881bd7fdff7d5935d772c2d6c001e653bf9f",
+    "repository": "https://github.com/tianwuasd/project",
+    "subdirectory": "chd-ct-reproduction",
+    "version": "0.24.0"
+  }
+}
