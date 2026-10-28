@@ -103,7 +103,7 @@ def trial(work,fold,method,gpus,local_batch,resource,run_kind,*,output=None,chec
     from ddp_runtime import launch_ranks
     from runtime_observations import event,failure
     work=Path(work)
-    ready,_,excluded=admit(gpus)
+    ready,_,excluded=settled_admit(gpus,work,'before_capacity')
     if ready!=list(gpus):raise ResourceAdmissionError(excluded)
     output=Path(output) if output else work/f'07_experiments/tuning/{fold}_{method}_{time.time_ns()}'
     output.mkdir(parents=True,exist_ok=False)
@@ -127,6 +127,7 @@ def trial(work,fold,method,gpus,local_batch,resource,run_kind,*,output=None,chec
 
 
 class ResourceAdmissionError(RuntimeError):
+    classification='gpu_admission_changed'
     def __init__(self, exclusions):
         super().__init__('GPU admission changed: '+str(exclusions))
         self.exclusions=exclusions
@@ -144,10 +145,69 @@ def admit(gpus):
         row=by_uuid.get(uuid)
         reason=('outside inherited visibility' if uuid not in allowed else
                 'GPU no longer visible' if row is None else idle_reason(row,settings))
-        if reason:excluded.append(dict(gpu_uuid=uuid,reason=reason));continue
+        if reason:
+            code=('visibility' if uuid not in allowed else 'missing_device' if row is None else
+                  'external_process' if row['busy'] else
+                  'utilization' if row['utilization']>settings['max_utilization_percent'] else 'memory')
+            excluded.append(dict(gpu_uuid=uuid,reason=reason,reason_code=code,observation=row))
+            continue
         ready.append(uuid)
         usable[uuid]=max(0,min(int(settings['planner_gpu_memory_gib']*2**30),int(row['free_mib']*2**20-max(2*2**30,.1*row['total_mib']*2**20))))
     return ready,usable,excluded
+
+
+def settled_admit(gpus,work,context,*,max_wait_seconds=10):
+    """Wait out sampled utilization/free-memory lag after all old ranks exited.
+
+    No threshold is relaxed. An external PID/visibility loss returns immediately;
+    after a transient rejection two consecutive full-group passes are required.
+    """
+    from runtime_observations import event
+    group=list(gpus);started=time.monotonic();stable=0;waited=False
+    while True:
+        ready,usable,excluded=admit(group)
+        elapsed=time.monotonic()-started
+        event(work,'gpu.admission_sample',context=context,requested_gpus=group,
+              admitted_gpus=ready,usable_bytes=usable,exclusions=excluded,
+              elapsed_seconds=elapsed,max_wait_seconds=max_wait_seconds,
+              rule='unchanged visibility/external-PID/utilization/memory guards')
+        if any(r.get('reason_code') not in {'utilization','memory'} for r in excluded):
+            return ready,usable,excluded
+        if ready==group:
+            stable+=1
+            if elapsed<=max_wait_seconds and (not waited or stable>=2):return ready,usable,excluded
+        else:
+            stable=0;waited=True
+        if elapsed>=max_wait_seconds:
+            if ready==group:
+                excluded=[dict(gpu_uuid=g,reason='监测超出复查窗口或未在窗口内取得连续两次通过的显卡样本',
+                               reason_code='stability_pending') for g in group]
+                ready=[];usable={}
+            event(work,'gpu.admission_timeout',context=context,exclusions=excluded,elapsed_seconds=elapsed)
+            return ready,usable,excluded
+        print(f'显卡阶段切换复查：{elapsed:.0f}/{max_wait_seconds}秒；'
+              f'通过{len(ready)}/{len(group)}；等待利用率采样/显存释放稳定，阈值保持不变。',flush=True)
+        time.sleep(min(1,max_wait_seconds-elapsed))
+
+
+def ready_group(work,gpus=None):
+    """Discard genuinely unavailable leases; wait for a freshly safe group."""
+    from runtime_observations import event
+    group=list(gpus or devices());history=[]
+    while True:
+        ready,usable,excluded=settled_admit(group,work,'group_selection')
+        if not excluded:return ready,usable,history
+        hard=[r for r in excluded if r.get('reason_code') not in {'utilization','memory','stability_pending'}]
+        dropped=hard or excluded
+        release_devices([r['gpu_uuid'] for r in dropped],wait=True)
+        history.extend(dropped)
+        event(work,'gpu.admission_reselect',released=dropped,remaining_gpus=ready,
+              action='only own keepers released; no external process is signalled')
+        remaining=[g for g in group if g not in {r['gpu_uuid'] for r in dropped}]
+        if remaining and set(remaining)==set(ready):return ready,usable,history
+        if remaining:group=remaining;continue
+        print('当前卡组已不可用；等待其他获准空闲显卡，1秒探测继续。',flush=True)
+        group=list(devices())
 
 
 class StageCapacityError(ValueError):
@@ -232,16 +292,14 @@ def tune(work,fold,method,run_kind,gpus=None,*,max_local_batch=None,execution=No
     config=read_json(prep/'WholeheartBaselinePlans.json')['configurations']['3d_fullres']
     reference=config['batch_size'];patch=config['patch_size']
     group=list(gpus if gpus is not None else devices())
-    group,usable,excluded=admit(group)
-    if excluded:release_devices([r['gpu_uuid'] for r in excluded],wait=True)
-    if not group:raise ResourceAdmissionError(excluded)
+    group,usable,excluded=ready_group(work,group)
     snapshot=probe()
     # Mapped files counted once globally. Missing/compressed source is explicit.
     mapped=sum(p.stat().st_size for p in prep.rglob('*.npy') if p.is_file())
     snapshot=dict(snapshot,source_shared_bytes=mapped)
     local=max_local_batch if max_local_batch is not None else reference
     execution=dict(execution or dict(mode='performance',compile=True))
-    reductions=0;eager_retried=False;observed=None;inference=None;phase='observe'
+    reductions=0;eager_retried=False;observed=None;inference=None;phase='observe';admission_restarts=0
     attempts=[]
     while True:
         while True:
@@ -262,26 +320,40 @@ def tune(work,fold,method,run_kind,gpus=None,*,max_local_batch=None,execution=No
               exclusions=excluded,resource=resource,local_batch_size=local,receipt_reused=False)
         try:
             result=trial(work,fold,method,group,local,resource,run_kind,execution=execution)
+            # launch_ranks reaped all ranks, but nvidia-smi may still report the
+            # just-finished sample window. Recheck before accepting capacity.
+            ready,new_usable,new_excluded=settled_admit(group,work,'after_capacity')
+            if ready!=group:raise ResourceAdmissionError(new_excluded)
+            usable=new_usable
         except Exception as error:
             category=getattr(error,'classification','noncapacity')
             attempts.append(dict(phase=phase,local_batch_size=local,status='failed',classification=category,error=str(error)))
             event(work,'capacity.failure',decision_schema_version=2,attempt=attempts[-1])
+            if isinstance(error,ResourceAdmissionError):
+                admission_restarts+=1
+                event(work,'capacity.admission_changed',restart=admission_restarts,
+                      max_restarts=3,exclusions=error.exclusions,
+                      discarded='capacity trial only; formal training has not consumed these updates')
+                if admission_restarts>3:raise
+                excluded.extend(error.exclusions)
+                group,usable,changed=ready_group(work,group)
+                excluded.extend(changed)
+                snapshot=dict(probe(),source_shared_bytes=mapped)
+                local=max_local_batch if max_local_batch is not None else reference
+                observed=None;inference=None;phase='observe'
+                continue
             if category=='compile_retry' and not eager_retried:
                 eager_retried=True;execution['compile']=False
             elif category=='gpu_oom' and local>1 and reductions<reduction_budget:
                 reductions+=1;local=max(1,local//2);phase='confirm'
             else:raise
             # Whole old group has exited. Recheck other users and own-free CPU.
-            ready,usable,new_excluded=admit(group)
-            if new_excluded:release_devices([r['gpu_uuid'] for r in new_excluded],wait=True)
-            excluded+=new_excluded;group=ready
-            if not group:raise ResourceAdmissionError(excluded) from error
+            group,usable,new_excluded=ready_group(work,group)
+            excluded+=new_excluded
             snapshot=dict(probe(),source_shared_bytes=mapped)
             continue
         attempts.append(dict(phase=phase,local_batch_size=local,status='passed',output=result.get('output')))
         if phase=='observe' and max_local_batch is None:
-            ready,usable,new_excluded=admit(group)
-            if ready!=group:raise ResourceAdmissionError(new_excluded)
             inference=infer_batch(result,usable);candidate=inference['local_batch_size']
             observed=observed_payload(result)
             if candidate!=local or observed is not None:
@@ -294,7 +366,7 @@ def tune(work,fold,method,run_kind,gpus=None,*,max_local_batch=None,execution=No
         world_size=len(group),global_batch_size=local*len(group),local_batch_size=local,
         effective_cpu=resource,execution_request=execution,resource_receipt_reusable=False,
         resource_snapshot=snapshot,capacity_inference=inference,capacity_attempts=attempts,
-        capacity_reductions=reductions,eager_retried=eager_retried,
+        capacity_reductions=reductions,eager_retried=eager_retried,admission_restarts=admission_restarts,
         excluded_gpus=excluded,reference_global_batch_size=reference,
         sampling_ratio=local*len(group)/reference,train_patches_per_epoch=local*len(group)*250,
         reference_train_patches_per_epoch=reference*250,
@@ -342,6 +414,7 @@ def train(work,fold,method,resume=False):
     out.mkdir(parents=True,exist_ok=True)
     request=out/'regroup-request.json';request.unlink(missing_ok=True)
     oom_reductions=chosen.get('capacity_reductions',0);eager_retried=chosen.get('eager_retried',False)
+    admission_failures=0
     try:
         while True:
             group=chosen['gpu_uuids'];stop=threading.Event()
@@ -365,7 +438,7 @@ def train(work,fold,method,resume=False):
             write_json(record,report)
             print(f"协同训练：{len(group)}卡，全局batch={chosen['global_batch_size']}；每轮{chosen['train_patches_per_epoch']} patches（原{chosen['reference_train_patches_per_epoch']}）；250轮×250训练/50验证。",flush=True)
             try:
-                ready,_,exclusions=admit(group)
+                ready,_,exclusions=settled_admit(group,work,'before_formal_training')
                 if ready!=group:raise ResourceAdmissionError(exclusions)
                 values=launch_ranks('cooperative_training:run_rank',args,group,out/'ranks',
                     timeout_seconds=30*24*3600,init_timeout_seconds=120)
@@ -376,6 +449,12 @@ def train(work,fold,method,resume=False):
                          or category=='compile_retry' and not eager_retried
                          or isinstance(error,ResourceAdmissionError))
                 if not allowed:raise
+                if isinstance(error,ResourceAdmissionError):
+                    admission_failures+=1
+                    if admission_failures>3:
+                        event(work,'gpu.admission_recovery_exhausted',consecutive_failures=admission_failures,
+                              max_restarts=3,exclusions=error.exclusions)
+                        raise
                 if category=='gpu_oom':oom_reductions+=1
                 if category=='compile_retry':eager_retried=True
                 try:checkpoint=str(select_checkpoint(out/'fold_0'))
@@ -384,8 +463,9 @@ def train(work,fold,method,resume=False):
                       checkpoint=checkpoint,discarded_uncommitted_updates='all since last complete-epoch checkpoint',
                       restart='checkpoint' if checkpoint else 'fresh seed0',rank_failures=getattr(error,'failures',[]))
                 stop.set();watch.join(timeout=3)
-                if isinstance(error,ResourceAdmissionError):
-                    release_devices([r['gpu_uuid'] for r in error.exclusions],wait=True)
+                # tune/ready_group performs a fresh sample and releases hard
+                # exclusions first; never release every UUID from a stale mixed
+                # PID + utilization reading here.
                 execution=dict(args['execution'])
                 if eager_retried:execution['compile']=False
                 local=max(1,chosen['local_batch_size']//2) if category=='gpu_oom' else chosen['local_batch_size']
@@ -394,6 +474,7 @@ def train(work,fold,method,resume=False):
                 continue
             finally:stop.set();watch.join(timeout=3)
             result=values[0]['result'];checkpoint=result['checkpoint']
+            admission_failures=0
             report['initial_weight_sha256']=result['initial_weight_sha256']
             report['history'][-1].update(ended=time.strftime('%Y-%m-%d %H:%M:%S'),result=result)
             if result['status']=='completed':

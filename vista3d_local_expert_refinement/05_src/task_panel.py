@@ -14,7 +14,7 @@ import task_runtime as jobs
 from task_queries import query, follow, result_lines, read_optional, log_sources
 from task_progress import STATES
 
-PANEL_VERSION = '0.5.1'
+PANEL_VERSION = '0.5.2'
 
 
 class Back(Exception):

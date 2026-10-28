@@ -9,7 +9,7 @@ def main():
     for pattern in ('test_task*.py', 'test_panel*.py', 'test_environment*.py', 'test_install_routes.py',
                 'test_private_update.py', 'test_update_download.py', 'test_update_scope.py', 'test_append_authorization.py', 'test_cohort.py',
                 'test_baseline_contract.py','test_strict_panel.py','test_publication.py',
-                'test_inner_contracts.py','test_evaluation_parallel.py','test_checkpoint_compat.py','test_gpu_memory.py',
+                'test_inner_contracts.py','test_evaluation_parallel.py','test_checkpoint_compat.py','test_gpu_memory.py','test_gpu_admission.py',
                 'test_planner_threads.py','test_training_timing.py','test_training_policy.py',
                 'test_runtime_observations.py','test_assessment_policy.py','test_simple_panel.py',
                 'test_automatic_execution.py','test_stage_boards.py','test_pipeline_catalog.py','test_integration_fixes.py',

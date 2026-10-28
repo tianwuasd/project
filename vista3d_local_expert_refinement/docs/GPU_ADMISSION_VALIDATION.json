@@ -1,0 +1,492 @@
+{
+  "schema_version": 1,
+  "panel_version": "0.5.2",
+  "recorded_date": "2026-10-28",
+  "source_base_commit": "4221c35e7a55a3a3a9c456b9fd66c6b18fc3bcc5",
+  "status": "passed",
+  "scope": "local CPU/control and synthetic GPU-monitor sequences; no live GPU/target server invocation",
+  "full_control_suite": {
+    "run": 384,
+    "passed": 335,
+    "skipped": 49,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 88.152,
+    "log_sha256": "2e24017a5bad3deaae40f5ef29f5dd3fd28cc468145bbd0300d2fa7d79319c88"
+  },
+  "focused_admission_tests": {
+    "run": 15,
+    "passed": 15
+  },
+  "independent_review": "baseline reproduced; mixed sample release and slow-query deadline corrected; no remaining blocking findings",
+  "runtime_inventory": [
+    {
+      "path": "04_data/manifests/README.md",
+      "bytes": 812,
+      "sha256": "e4a1636fc0adebc6f9ddb5d0f6fa1cfebac3f96b29e400b61a2e4e935e2d5986"
+    },
+    {
+      "path": "05_src/assessment_policy.py",
+      "bytes": 3843,
+      "sha256": "6df4ffdea7d4a33f3debabfe4be3bdecb2d1185ad0ef75a7f6110a65e301d40e"
+    },
+    {
+      "path": "05_src/assessment_predict.py",
+      "bytes": 6852,
+      "sha256": "f5de4f9f77a90f09eb6511df853a71c194beebd395f2a398a6a442cbadcae3a5"
+    },
+    {
+      "path": "05_src/assessment_prepare.py",
+      "bytes": 5464,
+      "sha256": "1cc1e6978519d63199792d8c525a0e5528893c09e0da556cdffbe12fe8d9900f"
+    },
+    {
+      "path": "05_src/assessment_run.py",
+      "bytes": 6426,
+      "sha256": "6d1811fefce1f6602be7c5065b052a648b543af12795cb7cc061b1bec0fbc16a"
+    },
+    {
+      "path": "05_src/batch_pool.py",
+      "bytes": 34948,
+      "sha256": "faef7cf10c2813d7db31ef51d4027cfa76f23f6057e2ffcefcb84a0c307f80a9"
+    },
+    {
+      "path": "05_src/batch_transfer.py",
+      "bytes": 9319,
+      "sha256": "a5aa4f09a15ba33c7af955e1ff84998d94a99c5c28f6a295797c53bba5f362b9"
+    },
+    {
+      "path": "05_src/case_execution.py",
+      "bytes": 6934,
+      "sha256": "71ea0785aae08ce99a4f3b3384c228f6e285b3b03d29cc62153d34e59fb5896e"
+    },
+    {
+      "path": "05_src/case_memory.py",
+      "bytes": 1777,
+      "sha256": "b07c7fef3dc23dd27ebd4337bcb9b0f8fb77c394d71242e4b23c96fd202498bb"
+    },
+    {
+      "path": "05_src/checkpoint_compat.py",
+      "bytes": 1039,
+      "sha256": "7917885f7692b952a2200474dd5d30379927dc99967198836f98e06b77bf327b"
+    },
+    {
+      "path": "05_src/checkpoint_rng.py",
+      "bytes": 629,
+      "sha256": "7f26f067369fa6b15a63f99ea39d1a4ddc41f284a64d80e6133f60d0e72c1f12"
+    },
+    {
+      "path": "05_src/cohort.py",
+      "bytes": 4135,
+      "sha256": "6660b6cdc74223eb34f9ff831b65a9e14369d27e40635cbb3f859dc15c11a845"
+    },
+    {
+      "path": "05_src/cooperative_control.py",
+      "bytes": 30118,
+      "sha256": "008af2ab927e80e4a027a28df54023fd117c151262f7fedf4e44475723eb746e"
+    },
+    {
+      "path": "05_src/cooperative_training.py",
+      "bytes": 13400,
+      "sha256": "b5c114a57a305619bc63ce0cec408a81d14c32cde3ece381e5172b9e94099d79"
+    },
+    {
+      "path": "05_src/cpu_case_queue.py",
+      "bytes": 3235,
+      "sha256": "267bcbcac7eafc61d59bf2d01ad1a635c4a372998720ada5aeca8f1b10660f11"
+    },
+    {
+      "path": "05_src/data_pipeline.py",
+      "bytes": 7646,
+      "sha256": "c588b2288243911d634744af945b7ae183f856e2a2dfe719369ece72917e084b"
+    },
+    {
+      "path": "05_src/ddp_runtime.py",
+      "bytes": 16229,
+      "sha256": "2330787903f1284b455e42eaee1752f66aad9315997962ba6b13a5f08dce6f75"
+    },
+    {
+      "path": "05_src/diagnostic_export.py",
+      "bytes": 4992,
+      "sha256": "aad7ab9f33c1205f46eaf03f3ea64c0252e41d8a4726298767910b89871a1ab6"
+    },
+    {
+      "path": "05_src/evaluation.py",
+      "bytes": 12440,
+      "sha256": "49328415e77a4ce41ff378879f66a7b20ec14925ca27518859e03a0ef4540d44"
+    },
+    {
+      "path": "05_src/evaluation_contract.py",
+      "bytes": 1403,
+      "sha256": "90ebfcca907292eea9886f553263958f6dc2dc27cb1676f94ebe6f0271b0c57a"
+    },
+    {
+      "path": "05_src/evaluation_gpu.py",
+      "bytes": 7511,
+      "sha256": "c3e278060df181d79d5c48ee8596ca2e5789d62d4aa6eb584c93aef7eea5b513"
+    },
+    {
+      "path": "05_src/evaluation_parallel.py",
+      "bytes": 11534,
+      "sha256": "c4115d5216f8e9935e5e1fb2045e6dc2c6cf244f36d99f4add8e92c42bb637e8"
+    },
+    {
+      "path": "05_src/evaluation_phases.py",
+      "bytes": 8137,
+      "sha256": "f6a8513cddddec7226711e905de25ec54f90b5f774a65b54e5a0e0d9e476cdbd"
+    },
+    {
+      "path": "05_src/evaluation_summary.py",
+      "bytes": 5909,
+      "sha256": "b76d22c895b3c71cda8cceba115728b1998f49b9e0a3f2bdd7397398f64af800"
+    },
+    {
+      "path": "05_src/failure_summary.py",
+      "bytes": 2443,
+      "sha256": "e79a5753b518ca64b608982536b998f430f6631b7bec92e0336c22a17fc7c81c"
+    },
+    {
+      "path": "05_src/gpu_budget.py",
+      "bytes": 900,
+      "sha256": "b349a8203261df0940170ff1688b52a43998911df2577c98d67b47b3a3abdf9c"
+    },
+    {
+      "path": "05_src/gpu_devices.py",
+      "bytes": 3128,
+      "sha256": "556b347874cdf23da5e9e9667d9034458aafbb33d73408650460119254e5a420"
+    },
+    {
+      "path": "05_src/gpu_fleet.py",
+      "bytes": 9570,
+      "sha256": "a1ea8329504631ede540c163f8d6acc91803e65f560342f8da7ecd6a5bb91e2c"
+    },
+    {
+      "path": "05_src/gpu_probe.py",
+      "bytes": 2011,
+      "sha256": "47e354ce4df6072029952a2dc9a91884d1bcc93e6178186e8466938d6dee072e"
+    },
+    {
+      "path": "05_src/gpu_queue.py",
+      "bytes": 7748,
+      "sha256": "52fed3a90da3075db55f41c3ccb831cc560ab75bc01c19e167410e1b772fc2b5"
+    },
+    {
+      "path": "05_src/live_resources.py",
+      "bytes": 24082,
+      "sha256": "d039a109bb60aa7a72503f43cefaf32e1dbc58c75bd831897088d3fb02c4d9bd"
+    },
+    {
+      "path": "05_src/metrics.py",
+      "bytes": 1840,
+      "sha256": "6490e043dc51d10cf3acd80aeeb50acb3317f0622b707249ad19a10dc765d14b"
+    },
+    {
+      "path": "05_src/model_catalog.py",
+      "bytes": 2705,
+      "sha256": "22bf4e59d97829d0e95f7bf102959b912bfb834463b6c8bfd05e10b701dafcc1"
+    },
+    {
+      "path": "05_src/nnunet_batches.py",
+      "bytes": 6843,
+      "sha256": "225219ee64a8113bfbd67d3de5f23d262faf237d9a9b74c392975c8c99ed6fc7"
+    },
+    {
+      "path": "05_src/nnunet_loader_adapter.py",
+      "bytes": 3333,
+      "sha256": "91d8d8d3cc1c48685351626921fc291dd6ec45966ad619badaca3ea55adc7b41"
+    },
+    {
+      "path": "05_src/panel_publication/SOURCE.json",
+      "bytes": 1175,
+      "sha256": "4890250eb0cbc5d549cb56151682c1cd736a1306e29e94d379ec4442bee3b67a"
+    },
+    {
+      "path": "05_src/panel_publication/__init__.py",
+      "bytes": 82,
+      "sha256": "2e7dec6c01311fb8c92fdeec22b885ad45377a4f41165dbaa55b9be690a99a07"
+    },
+    {
+      "path": "05_src/panel_publication/code_sync.py",
+      "bytes": 5979,
+      "sha256": "63dbdabf4c397e9e3781a79fe6817872af6c56dcec79a6f29aa55b6dfbbb0a57"
+    },
+    {
+      "path": "05_src/panel_publication/inspection.py",
+      "bytes": 120,
+      "sha256": "0620ab570a6ea08d44813bd594321a4104ddd164056a3932bb795532cf6fab3e"
+    },
+    {
+      "path": "05_src/panel_publication/jobs.py",
+      "bytes": 69,
+      "sha256": "351a6c3a80bf97e8742d3f5e8d3522f267e46c0d9180dc2aba341368203991c4"
+    },
+    {
+      "path": "05_src/panel_publication/launcher.py",
+      "bytes": 176,
+      "sha256": "904bd76a6f9ac113d847690a29093a5588909a6f23409d255e347def342502f4"
+    },
+    {
+      "path": "05_src/panel_publication/network.py",
+      "bytes": 6779,
+      "sha256": "8b959a315c1c91858da52f3d7845447c0360d87c9a06f4161c49be5fc2845dce"
+    },
+    {
+      "path": "05_src/panel_publication/prompts.py",
+      "bytes": 86,
+      "sha256": "c33e8a8481f2823ae06b91469dbbec6e4b37102810fd999a05a70d3fcd8eb831"
+    },
+    {
+      "path": "05_src/panel_publication/sharing.py",
+      "bytes": 2017,
+      "sha256": "a43272ec87d51ea5620ced7c1f69425598a4cc1b1da231f39971d90f9b002295"
+    },
+    {
+      "path": "05_src/panel_publication/ssh_upload.py",
+      "bytes": 12156,
+      "sha256": "9d8089594ec3ed24ff97faec915d07753c1b7d21c217217cd035c512689eaa11"
+    },
+    {
+      "path": "05_src/panel_publication/updater.py",
+      "bytes": 1843,
+      "sha256": "33077949e7a0af7b6b383a5231aa5406008ffe89b82b79c2d782d4defea88d6a"
+    },
+    {
+      "path": "05_src/panel_publication/upload.py",
+      "bytes": 20354,
+      "sha256": "b157e52f96912104f0f15f2b27bf5b3e949c6f9c24ab4fb4828284aafdd4394e"
+    },
+    {
+      "path": "05_src/persistent_prediction.py",
+      "bytes": 14167,
+      "sha256": "d0ccf8604b05bfd75e4de8feaace1eab90da5665f41be77dadd50b97d8d90d83"
+    },
+    {
+      "path": "05_src/pipeline_catalog.py",
+      "bytes": 19067,
+      "sha256": "fd9f7655e7eb94fc43c3076c507b81a4c8f0b7110ab77028b465ed4a37fd1c28"
+    },
+    {
+      "path": "05_src/preflight_gate.py",
+      "bytes": 6326,
+      "sha256": "1731d0a0ea2f9ee3ddf6d543032efa25da8dba7fad35a8c3a039c2261de240e3"
+    },
+    {
+      "path": "05_src/preparation_identity.py",
+      "bytes": 436,
+      "sha256": "737bc35f3ed318262d80e820f702535a290405ede3376ce474c98facfffb6bc0"
+    },
+    {
+      "path": "05_src/prepare_nnunet.py",
+      "bytes": 1438,
+      "sha256": "a26fd598b26deb618428f9981a12b9d47ad247a48fa5e5f36fdb638121714edc"
+    },
+    {
+      "path": "05_src/project_trainers.py",
+      "bytes": 18022,
+      "sha256": "baa2e2d861eb6ec86ef8687a17827a229daf091f27e3123b72ba3eb76bce8c64"
+    },
+    {
+      "path": "05_src/rank_affinity.py",
+      "bytes": 4297,
+      "sha256": "49a90e447a478df6f3e869f20ff29c837b68b93338b4b0a7ce8a61ee57b5b91e"
+    },
+    {
+      "path": "05_src/rank_checkpoint.py",
+      "bytes": 2606,
+      "sha256": "6a69fe9b74e0535d82a67e1d6c45b5a463d3f45f6c06dc25c77994a7b4491cc4"
+    },
+    {
+      "path": "05_src/read_admission.py",
+      "bytes": 3979,
+      "sha256": "c22f0ddb03382b580bd2f25da37c5f0c43e7e0ababc9c6599b4b70e013b60883"
+    },
+    {
+      "path": "05_src/run_smoke_suite.py",
+      "bytes": 2911,
+      "sha256": "1a64ac8c5cea9850f1fdba371f113313212333586ef02da5290106288d783865"
+    },
+    {
+      "path": "05_src/runtime_observations.py",
+      "bytes": 4742,
+      "sha256": "78a2f1046ed73882fe3648cb5be82df7d24b1303716a84bd378fe1138457b5c0"
+    },
+    {
+      "path": "05_src/runtime_setup.py",
+      "bytes": 14325,
+      "sha256": "fdd7d013e2f190a2b31f9f7adab821da09138884e24a941e5cf24c50b07b142d"
+    },
+    {
+      "path": "05_src/server_data.py",
+      "bytes": 3540,
+      "sha256": "6dc448c16d18e0c150159b028fca930ceb192ef2eee7d36c126a5996fa5b7068"
+    },
+    {
+      "path": "05_src/server_gpu_check.py",
+      "bytes": 436,
+      "sha256": "6a88cca4a3fb7c8b9491faf068b84ed73951dee6dd9d103261d4c13bce6dad7a"
+    },
+    {
+      "path": "05_src/server_launch.py",
+      "bytes": 13851,
+      "sha256": "e24187d5f4df450c6eed9643aeb227c81d468b3a3c897d8d542127726672ee43"
+    },
+    {
+      "path": "05_src/server_prepare.py",
+      "bytes": 10098,
+      "sha256": "783f67547b6247359469ce8159a1920fe0abb73f3cbadc11b5e79528a114c637"
+    },
+    {
+      "path": "05_src/server_profile.py",
+      "bytes": 1538,
+      "sha256": "3d23d20ed3d77d249ba4499d2015ee29482786f419359697ced2aa73299ee21b"
+    },
+    {
+      "path": "05_src/server_train.py",
+      "bytes": 7767,
+      "sha256": "5c74af822ffa47f12e907398c9eceec7ef019e1584005a6213777492e8733b20"
+    },
+    {
+      "path": "05_src/smoke_train.py",
+      "bytes": 10117,
+      "sha256": "98711ae2b2333171ae143eaa082d9c1d6a55e5fcb0696b12befe32f28f197bd1"
+    },
+    {
+      "path": "05_src/software_smoke.py",
+      "bytes": 1883,
+      "sha256": "561e4833d69cd1012e9a4182fd638f35d343ebf0d8cf00779d07bd3d0cb699db"
+    },
+    {
+      "path": "05_src/summarize_smoke.py",
+      "bytes": 2793,
+      "sha256": "9eab51fa9551b738a8245c042f8d37d9ed84f6e5291290f724c78901813dd104"
+    },
+    {
+      "path": "05_src/task_inputs.py",
+      "bytes": 14301,
+      "sha256": "b9b9f8dd3e0daa77c23111f64ca34107929c66f70178d40af055e04bacc16e35"
+    },
+    {
+      "path": "05_src/task_panel.py",
+      "bytes": 43292,
+      "sha256": "5d4f686632eb867184001a43561cd9ea939aebbad16d1c465d2e64897d646a3b"
+    },
+    {
+      "path": "05_src/task_progress.py",
+      "bytes": 11659,
+      "sha256": "f588f68c1fbf916f89aa0cbe25f04204e43a7a62809c1005bfae5db21dcbadd3"
+    },
+    {
+      "path": "05_src/task_queries.py",
+      "bytes": 21475,
+      "sha256": "9c56bd0496c29bdb62ba6624990c549f76b66538d59e5f9dff6d0bcb78883cf2"
+    },
+    {
+      "path": "05_src/task_resources.py",
+      "bytes": 12620,
+      "sha256": "8634892fbebb945966b3e51f3eb8a48c4ccfb63b3e5117d4c07777d8e0460074"
+    },
+    {
+      "path": "05_src/task_runtime.py",
+      "bytes": 18159,
+      "sha256": "8be4f9be9f69b508f8ceb1af42b654269a2fa07f78f687f228fb31271e4f4908"
+    },
+    {
+      "path": "05_src/task_update.py",
+      "bytes": 29193,
+      "sha256": "18bf563f0d758d8acfe83d662e4f5f8a9b9f7ac8e45988ed46af5ee8d9c65934"
+    },
+    {
+      "path": "05_src/task_worker.py",
+      "bytes": 13208,
+      "sha256": "982579f17ce1896b672a1438dd02c05f4c6a1b0fd43ff64711405518afed646f"
+    },
+    {
+      "path": "05_src/training_execution.py",
+      "bytes": 13734,
+      "sha256": "9f66c96401defdd5df453788bb88358d6d01f3e4f63d642e45fcaa7076bfacdb"
+    },
+    {
+      "path": "05_src/training_feedback.py",
+      "bytes": 5502,
+      "sha256": "6a515bc4f1c7c7f14940b21d25d2c5773a3f32041ad663bafc44b50808db23d6"
+    },
+    {
+      "path": "05_src/training_policy.py",
+      "bytes": 7813,
+      "sha256": "c27634544f4609dcab9105d92d58b933fe8c8adec6e2d779f5f14b58a31634e7"
+    },
+    {
+      "path": "05_src/training_timing.py",
+      "bytes": 3453,
+      "sha256": "e4ebe74f3a8098a867c303a441428de2e5aaed90d9422beeda9882d24e728f4d"
+    },
+    {
+      "path": "06_configs/baseline.json",
+      "bytes": 652,
+      "sha256": "fa5ba70653d745a0fdc3aa75a8637f4eb2344c5321c2eccd17b120a75269ba35"
+    },
+    {
+      "path": "06_configs/environment_server.yml",
+      "bytes": 259,
+      "sha256": "469f3e329b26c2af5dd97545d6547cb07ed0e981652f0a743a9bc40f47a563d3"
+    },
+    {
+      "path": "06_configs/evaluation_gpu.json",
+      "bytes": 177,
+      "sha256": "ea6aa9b71f93bb68c428b54d9994bf4c0ce83d1334affd8be3e305c12cb967a0"
+    },
+    {
+      "path": "06_configs/servers/zmic44.json",
+      "bytes": 825,
+      "sha256": "e77f8961a780350da5a38794a69632491ae427b647f08f8045f20b3b6f0746aa"
+    },
+    {
+      "path": "06_configs/training_constraints.txt",
+      "bytes": 178,
+      "sha256": "ff979f29825f64c854421d80ce1d743a07a036a21c439672af700b94e8903fd8"
+    },
+    {
+      "path": "bootstrap_server.sh",
+      "bytes": 5313,
+      "sha256": "c7907f8d27d50da2a2b2452d1f893e9c3addbea6183ee5a473c8b2ab1446e12c"
+    },
+    {
+      "path": "start_server.sh",
+      "bytes": 608,
+      "sha256": "3c9ee68d0295098d6571841c0bbeca5b8bd3625bfdaf60654e789b06c3d202ed"
+    }
+  ],
+  "unchanged": {
+    "preparation_identity_files": [
+      "server_prepare.py",
+      "data_pipeline.py",
+      "prepare_nnunet.py",
+      "case_execution.py",
+      "read_admission.py",
+      "case_memory.py",
+      "cpu_case_queue.py"
+    ],
+    "dependency_specifications": true,
+    "training_budget": "250 epochs x250 training attempts/50 validation iterations",
+    "external_pid_and_visibility_guards": true,
+    "utilization_threshold_percent": 10
+  },
+  "new_behavior": {
+    "settle_window_seconds": 10,
+    "stable_passes_after_transient_rejection": 2,
+    "group_rebuild_limit": 3,
+    "formal_consecutive_admission_rebuild_limit": 3,
+    "events": [
+      "gpu.admission_sample",
+      "gpu.admission_timeout",
+      "gpu.admission_reselect",
+      "capacity.admission_changed",
+      "gpu.admission_recovery_exhausted"
+    ]
+  },
+  "evidence_limits": [
+    "GPU utilization sampling lag is a reproducible explanation, not proof of the exact server cause",
+    "No external process terminated; no CUDA/NCCL/real CT or throughput acceptance",
+    "0.5.0/0.5.1 validation JSON remains historical; this file provides current runtime hashes"
+  ]
+}

@@ -523,5 +523,13 @@
     "old_failed_jobs": "retain frozen code/environment records; create new preparation after repair",
     "skill_update": "after project publication",
     "target_installation_verified": false
+  },
+  "gpu_admission_hotfix": {
+    "panel_version": "0.5.2",
+    "verification": "local 384run/335pass/49skip; admission15/15; target pending",
+    "validation": "docs/GPU_ADMISSION_VALIDATION.json",
+    "preprocessing_and_environment_unchanged": true,
+    "failed_jobs": "retain frozen snapshot; create new training with compatible preparation",
+    "skill_update": "same verified source after project publication"
   }
 }
