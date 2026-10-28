@@ -114,10 +114,35 @@ def fake_cuda(monkeypatch, free_gib=24):
     monkeypatch.setattr(cuda, "set_per_process_memory_fraction", set_fraction)
     monkeypatch.setattr(cuda, "reset_peak_memory_stats", lambda *_: None)
     monkeypatch.setattr(cuda, "memory_allocated", lambda *_: gpu_memory.GIB)
+    monkeypatch.setattr(cuda, "memory_reserved", lambda *_: 2 * gpu_memory.GIB)
     monkeypatch.setattr(cuda, "max_memory_allocated", lambda *_: gpu_memory.GIB)
     monkeypatch.setattr(cuda, "max_memory_reserved", lambda *_: 2 * gpu_memory.GIB)
     monkeypatch.setattr(gpu_memory, "foreign_processes", lambda _: [])
     return state
+
+
+def test_soft_budget_allows_reserve_use_and_warns_once(monkeypatch, tmp_path, capsys):
+    state = fake_cuda(monkeypatch, 23)
+    state["fraction"] = 0.7
+    path = tmp_path / "soft.json"
+    with gpu_memory.gpu_budget("cuda", path, {}) as guard:
+        assert state["fraction"] == 1.0
+        assert guard.limit == int(18.4 * gpu_memory.GIB)
+        # Cached blocks also count toward allocator capacity, not just tensors.
+        state["free"] = 3 * gpu_memory.GIB
+        monkeypatch.setattr(gpu_memory.torch.cuda, "memory_allocated", lambda *_: 19 * gpu_memory.GIB)
+        monkeypatch.setattr(gpu_memory.torch.cuda, "memory_reserved", lambda *_: 20 * gpu_memory.GIB)
+        guard.check()
+        guard.check()
+        record = read_json(path)
+        assert record["budget_mode"] == "soft"
+        assert record["soft_budget_exceeded"] is True
+        assert record["first_exceeded_reserved_bytes"] == 20 * gpu_memory.GIB
+        assert capsys.readouterr().out.count("[gpu-memory] 超过软预算 ") == 1
+        state["free"] = 100
+        with pytest.raises(RuntimeError, match="余量"):
+            guard.check()
+    assert state["fraction"] == 0.7
 
 
 @pytest.mark.parametrize("device, expected", [("cuda", "cuda:2"), (gpu_memory.torch.device("cuda"), "cuda:2"), ("cuda:1", "cuda:1")])
@@ -138,7 +163,7 @@ def test_gpu_budget_without_fraction_getter(monkeypatch, tmp_path):
     state = fake_cuda(monkeypatch)
     monkeypatch.delattr(gpu_memory.torch.cuda, "get_per_process_memory_fraction")
     with gpu_memory.gpu_budget("cuda", tmp_path / "legacy.json", {}):
-        assert state["fraction"] == pytest.approx(0.85)
+        assert state["fraction"] == 1.0
     assert state["devices"] == ["cuda:2", "cuda:2"]
     assert state["fraction"] == 1.0
 
@@ -151,22 +176,39 @@ def test_cpu_budget_never_resolves_cuda(monkeypatch, tmp_path):
     assert not path.exists()
 
 
-def test_gpu_budget_leaves_margin_and_restores_cap(monkeypatch, tmp_path):
+def test_gpu_soft_budget_restores_previous_cap(monkeypatch, tmp_path):
     state = fake_cuda(monkeypatch)
     path = tmp_path / "gpu.json"
     with gpu_memory.gpu_budget("cuda", path, {}) as guard:
-        assert state["fraction"] == pytest.approx(0.85)
+        assert state["fraction"] == 1.0
         guard.check()
     assert state["fraction"] == 1 and state["empty"] == 1
     assert read_json(path)["status"] == "complete"
 
 
 def test_initial_low_memory_is_recorded(monkeypatch, tmp_path):
-    fake_cuda(monkeypatch, 2)
+    fake_cuda(monkeypatch, 0.25)
     with pytest.raises(RuntimeError, match="显存"):
         with gpu_memory.gpu_budget("cuda", tmp_path / "gpu.json", {}):
             pytest.fail("should not start")
     assert read_json(tmp_path / "gpu.json")["status"] == "failed"
+
+
+def test_soft_reserve_is_not_an_initial_admission_limit(monkeypatch, tmp_path):
+    fake_cuda(monkeypatch, 1.5)
+    with gpu_memory.gpu_budget("cuda", tmp_path / "small.json", {}) as guard:
+        assert guard.limit == 0
+        guard.check()
+
+
+def test_old_task_config_uses_80_percent_without_mutating_contract(monkeypatch, tmp_path):
+    fake_cuda(monkeypatch, 23)
+    config = {"gpu_guard": {"fraction": 0.85, "reserve_gib": 2.0, "minimum_free_gib": 0.5}}
+    before = copy.deepcopy(config)
+    with gpu_memory.gpu_budget("cuda", tmp_path / "old.json", config) as guard:
+        assert guard.limit == int(18.4 * gpu_memory.GIB)
+        assert guard.record["soft_fraction"] == 0.8
+    assert config == before
 
 
 def test_foreign_process_and_low_free_stop_without_touching_pid(monkeypatch, tmp_path):

@@ -1,4 +1,4 @@
-"""Per-process allocator budget and bounded fail-fast GPU memory checks."""
+"""Soft GPU planning budget with physical-memory and foreign-process checks."""
 
 import os
 import subprocess
@@ -21,13 +21,10 @@ def check_memory():
         guard.check()
 
 
-def budget_bytes(free, total, fraction=0.85, reserve_gib=2.0):
+def budget_bytes(free, total, fraction=0.8, reserve_gib=2.0):
     if not 0 < fraction < 1 or reserve_gib < 2 or not 0 < free <= total:
         raise ValueError("GPU 显存预算参数无效")
-    budget = min(int(total * fraction), int(free - max(reserve_gib * GIB, free * (1 - fraction))))
-    if budget < GIB:
-        raise RuntimeError("GPU 可用显存不足以保留安全余量；请等待获准空闲卡")
-    return budget
+    return max(0, min(int(total * fraction), int(free - max(reserve_gib * GIB, free * (1 - fraction)))))
 
 
 class MemoryGuard:
@@ -55,18 +52,30 @@ class MemoryGuard:
             "device": str(self.device),
             "initial_free_bytes": free,
             "total_bytes": total,
-            "scope": "PyTorch allocator; not an exclusive GPU reservation",
+            "scope": "Soft planning budget; not an allocator cap or exclusive GPU reservation",
         }
-        self.limit = budget_bytes(free, total, options.get("fraction", 0.85), options.get("reserve_gib", 2.0))
+        # Apply the 80% planning ceiling to old task configs too, without editing
+        # their frozen config/checkpoint contracts. A lower requested target stays.
+        fraction = min(options.get("fraction", 0.8), 0.8)
+        self.limit = budget_bytes(free, total, fraction, options.get("reserve_gib", 2.0))
         self.minimum_free = int(options.get("minimum_free_gib", 0.5) * GIB)
         getter = getattr(torch.cuda, "get_per_process_memory_fraction", None)
         self.previous_fraction = getter(self.device) if getter else 1.0
-        torch.cuda.set_per_process_memory_fraction(self.limit / total, self.device)
+        # Allow use of remaining physical memory, including the planning reserve.
+        torch.cuda.set_per_process_memory_fraction(1.0, self.device)
         torch.cuda.reset_peak_memory_stats(self.device)
-        self.record.update(status="running", budget_bytes=self.limit, minimum_free_bytes=self.minimum_free)
+        self.record.update(
+            status="running", budget_bytes=self.limit, minimum_free_bytes=self.minimum_free,
+            budget_mode="soft", soft_fraction=fraction, allocator_fraction=1.0, soft_budget_exceeded=False,
+        )
         self.check()
         write_json(self.path, self.record)
-        print(f"[gpu-memory] budget={self.limit / GIB:.2f} GiB; free={free / GIB:.2f} GiB", flush=True)
+        print(
+            f"[gpu-memory] soft_budget={self.limit / GIB:.2f} GiB ({fraction:.0%}); "
+            f"free={free / GIB:.2f} GiB; 无人为分配上限，超过软预算可继续；"
+            f"实际空闲低于 {self.minimum_free / GIB:.2f} GiB 停止",
+            flush=True,
+        )
 
     def check(self):
         if not self.enabled:
@@ -78,9 +87,19 @@ class MemoryGuard:
                 self.record["other_processes"] = foreign
                 raise RuntimeError("GPU 出现非本任务计算进程，保护性停止；不终止其他进程")
         free, _ = torch.cuda.mem_get_info(self.device)
-        allocated = torch.cuda.memory_allocated(self.device)
-        if free < self.minimum_free or allocated > self.limit:
-            raise RuntimeError("GPU 显存保护停止：余量不足或本任务超预算；保留最后完整 epoch，不自动改 batch")
+        if free < self.minimum_free:
+            raise RuntimeError("GPU 显存保护停止：实际可用余量不足；保留最后完整 epoch，不自动改 batch")
+        reserved = torch.cuda.memory_reserved(self.device)
+        if reserved > self.limit and not self.record["soft_budget_exceeded"]:
+            self.record.update(
+                soft_budget_exceeded=True, first_exceeded_reserved_bytes=reserved, first_exceeded_free_bytes=free,
+            )
+            write_json(self.path, self.record)
+            print(
+                f"[gpu-memory] 超过软预算 {self.limit / GIB:.2f} GiB，允许继续使用剩余显存；"
+                f"本进程已保留 {reserved / GIB:.2f} GiB，实际空闲 {free / GIB:.2f} GiB",
+                flush=True,
+            )
 
     def finish(self, error=None):
         if not self.enabled:
