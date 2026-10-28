@@ -392,3 +392,26 @@ def test_resume_uses_same_frozen_code_and_original_parameters(tmp_path, monkeypa
     assert seen[0]["frozen_code"] == original["frozen_code"]
     assert seen[0]["frozen_plan_sha256"] == original["frozen_plan_sha256"]
     assert seen[0]["resume_existing"] is True
+
+
+@pytest.mark.parametrize(
+    "script,stage",
+    [
+        ("preprocess", "prepare"),
+        ("train", "train"),
+        ("predict", "predict-all"),
+        ("test", "predict"),
+        ("evaluate", "evaluate"),
+        ("smoke", "assessment"),
+        ("diagnosis", "diagnosis"),
+    ],
+)
+def test_shell_wrapper_uses_supported_v2_stage(script, stage):
+    import shlex
+
+    from chd_ct_v2.panel_v2.panel import parser
+
+    root = Path(__file__).resolve().parents[1]
+    line = (root / (script + "_server.sh")).read_text().splitlines()[-1]
+    options = shlex.split(line)[3:-1]
+    assert parser().parse_args(options).stage == stage

@@ -18,6 +18,7 @@ STAGES = {
     "train": ("train",),
     "predict": ("test",),
     "predict-all": ("predict",),
+    "evaluate": ("evaluate",),
     "diagnosis": (
         "diagnosis-labels",
         "diagnosis-features",
@@ -29,6 +30,7 @@ STAGES = {
     "synthetic": ("demo", "diagnosis-demo"),
 }
 SOURCE = {"train": {"prepare"}, "predict": {"train"}, "predict-all": {"train"}, "diagnosis": {"predict-all"}}
+SOURCE["evaluate"] = {"predict", "predict-all"}
 RAW_OPTIONS = {
     "dataset",
     "config",
@@ -125,7 +127,7 @@ def source_record(values, key, stage):
     paths = {"prepared": str(artifact(plan, "prepared"))}
     if stage in ("predict", "predict-all"):
         paths["models"] = str(artifact(plan, "models"))
-    if stage == "diagnosis":
+    if stage in ("diagnosis", "evaluate"):
         paths["predictions"] = str(artifact(plan, "predictions"))
     return {"id": key, "plan_sha256": file_hash(Path(record["directory"]) / "plan.json"), "paths": paths}
 
@@ -164,7 +166,8 @@ def build(values, profile, stage, name, source=None, options=None):
     args.runtime, args.results = str(roots["runtime"]), str(roots["results"])
     args.name, args.tasks, args.reset_settings = name, ",".join(STAGES[stage]), True
     args.device = options.get(
-        "device", "cpu" if stage in ("environment", "prepare", "diagnosis", "synthetic") else "cuda"
+        "device",
+        "cpu" if stage in ("environment", "prepare", "diagnosis", "evaluate", "synthetic") else "cuda",
     )
     args.mode = "train"
     args.input_job = None

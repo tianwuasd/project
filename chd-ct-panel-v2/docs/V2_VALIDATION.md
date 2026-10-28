@@ -12,6 +12,7 @@ Windows / Python3.11 / Torch2.12.1+cu126；测试强制 `CUDA_VISIBLE_DEVICES=''
 | 整体CT继承测试+V2初版测试 | 582通过、27跳过、5失败；失败为新增夹具路径及沿用旧资源/环境接口的测试。下列定向复验覆盖并修正这5项 |
 | 失败项及受影响入口/来源/加载/文件校验/结果回归 | 106通过、0失败 |
 | 最终V2控制测试与继承恢复/追加底层测试 | 41通过、0失败；包含新增来源必选、失败提交回滚、原快照恢复与原参数校验 |
+| 快捷脚本与最终控制流程复验 | 28通过、0失败；7个server.sh入口改用V2 stage，增加独立重算评估入口 |
 | Ruff 静态检查 | 通过；逐字节复用的上游live_resources模块不进行格式改写 |
 | 标准库入口 --help | 通过；查询不需要训练依赖 |
 | V1目录 | Git差异为空；新增内容均位于chd-ct-panel-v2 |
@@ -31,3 +32,5 @@ Windows / Python3.11 / Torch2.12.1+cu126；测试强制 `CUDA_VISIBLE_DEVICES=''
 ## 离线核验
 
 `python3 scripts/verify_v2.py` 核对当前源码逐文件SHA256，失败即报告差异。`V2_FILE_MANIFEST.json`覆盖本工程，`CT-MASTER-MANIFEST.json`仅表示原CT模板来源。开发时更新源码后，先完成相关验证，再用 `python3 scripts/verify_v2.py --write` 更新清单。
+
+已成功发布独立分支 `codex/ct-panel-v2`；首次发布提交a99f0ba4。发布前后远端main均为4221c35e，未合并或推送main。307个版本控制文件约1.7MiB，全部位于新增V2目录；306个源码文件的Git暂存对象与清单逐一一致（清单自身不参与自校验）。

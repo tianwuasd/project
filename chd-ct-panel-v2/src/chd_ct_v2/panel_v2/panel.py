@@ -178,7 +178,7 @@ def menu(values, profile):
     selected = None
     while True:
         print("\nCT V2 独立任务面板 | CT算法0.24 | 分支 " + BRANCH)
-        print("1 预处理  2 训练  3 测试预测/评估  4 全病例预测  5 诊断  a 独立小规模测评  e 环境")
+        print("1 预处理  2 训练  3 测试预测/评估  4 全病例预测  5 诊断  6 重算评估  a 独立小规模测评  e 环境")
         print("s 进度  g 显卡  m 模型  l 日志  p 我的进程  o 分区结果  h 历史/选择")
         print("r 恢复  k 独立重跑  t 停止  d 回收/恢复  z 本地诊断")
         print("c 网络  u 更新V2  w 上传V2代码  v 上传产物  0/q 退出（后台继续）")
@@ -196,6 +196,7 @@ def menu(values, profile):
                 "3": "predict",
                 "4": "predict-all",
                 "5": "diagnosis",
+                "6": "evaluate",
                 "a": "assessment",
                 "e": "environment",
             }
