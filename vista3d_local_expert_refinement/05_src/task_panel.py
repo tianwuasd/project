@@ -14,7 +14,7 @@ import task_runtime as jobs
 from task_queries import query, follow, result_lines, read_optional, log_sources
 from task_progress import STATES
 
-PANEL_VERSION = '0.5.0'
+PANEL_VERSION = '0.5.1'
 
 
 class Back(Exception):
@@ -479,6 +479,7 @@ def panel(args, runtime, saved):
         print('\ns 任务概览  t 持续进度  g 显卡(1秒刷新)  m 模型 epoch/loss\nl 选择详细日志  p 本任务/我的进程  h 任务列表  o 查看结果')
         print('1 预处理（来源数据/方法）  2 训练（选择预处理任务/模型）  3 预测（选择训练模型）')
         print('a 完整测评（独立短流程）  r 重启任务  d 删除任务  x 中断任务（保留完整检查点）')
+        print('e 独立环境准备/检查（每次计算任务前也会自动执行）')
         print('u 更新程序  c GitHub网络设置  w 上传已提交代码  v 上传日志/指标/权重（SSH+Git LFS）')
         print('z 本地诊断导出（选择任务 → ZIP → 显示路径）')
         print('0/q 退出面板（后台任务继续）；普通输入页 b 返回、q 退出。')

@@ -198,3 +198,8 @@ DnR 应按本轮取得的 v3（而非历史 v1）描述。DeferredSeg 保留 202
 server-engineering Skill v2已完成RED/GREEN使用场景、最终审查、26项脚本测试25通过1原CT权限跳过、真实autocrlf检出、独立目录生成/校验。v2完整185工程文件覆盖87运行文件；VISTA v1为153文件；已提交旧Skill v1为343文件，681归档源文件均匹配固定Git字节/模式。旧CT0.23生成器及资产保持不变。
 Skill源码已合回D:/projects/codex-skill并发布908e641；已安装到C:/Users/Lenovo/.codex/skills/server-engineering。1037已提交Skill文件的源码/安装版逐字节一致，0删除/0私人状态写入，实际安装路径生成和verify通过。八原稿有精确私有备份及stash16470c11884876685238060078cdc27e5a2a25f8，未用旧稿覆盖新版本。私有安装前备份、原安装343文件快照与完整证据保留D:/projects/sync-reports/vista-v2-evidence。
 入口：D:/projects/codex-skill/server-engineering/references/template-and-code.md；详版/源码导览/GitHub流程分别vista-v2-guide.md、vista-v2-source-map.md、vista-v2-publication.md。历史资源候选/旧receipt仅作v1兼容，不覆盖v2。维护者--legacy-skill对任意新commit仍使用固定CT0.23标签是非阻断后续改进，当前固定d737归档已校验正确；历史0.3.9 ResourceWarning如实保留，不冒充新验证通过。
+
+
+## 2026-10-28：环境依赖补丁与直连优先
+
+用户确认环境安装/依赖更新失败后用c代理重试一次，并同步Skill。补声明psutil；ready指纹不能代替实际导入、版本和资源API检查；显示e入口。Conda仅用临时rc且复核生效代理，不修改全局配置；中断不重试。旧任务源码/环境记录不改，失败后新建预处理；保持七文件生产身份。此补丁只经本地控制/配置解析测试，未宣称服务器安装或GPU通过。

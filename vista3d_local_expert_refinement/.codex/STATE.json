@@ -509,5 +509,19 @@
       "private_drafts_preserved": 8,
       "private_state_overwritten": false
     }
+  },
+  "environment_dependency_hotfix": {
+    "panel_version": "0.5.1",
+    "status": "local_checks_passed_pending_publication",
+    "fixes": [
+      "declare psutil",
+      "actual import/resource API checks before data",
+      "visible e menu",
+      "installation direct first and one configured proxy retry"
+    ],
+    "validation": "docs/ENVIRONMENT_CHECK_VALIDATION.json",
+    "old_failed_jobs": "retain frozen code/environment records; create new preparation after repair",
+    "skill_update": "after project publication",
+    "target_installation_verified": false
   }
 }

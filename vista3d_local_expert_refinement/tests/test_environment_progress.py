@@ -30,7 +30,7 @@ class EnvironmentTests(unittest.TestCase):
             env={'WHOLE_HEART_JOB':str(root/'job')}
             response=io.BytesIO(b'x'*20000)
             response.headers={'Content-Length':'20000'}
-            with patch.object(setup.urllib.request,'urlopen',return_value=response):
+            with patch.object(setup,'_open_installer',return_value=response):
                 setup.download_installer(dest, env)
             record=read_json(root/'job/environment.json')
             self.assertEqual(record['downloaded_bytes'],20000)

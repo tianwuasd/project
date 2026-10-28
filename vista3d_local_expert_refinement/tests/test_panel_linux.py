@@ -43,12 +43,19 @@ class LinuxPanelTests(unittest.TestCase):
         conda.write_text('''#!/bin/bash
 set -eu
 printf '%s\\n' "$*" >> "$CALLS"
+if [[ "$1" == config ]]; then
+  "$WHOLE_HEART_CONTROL_PYTHON" -c 'import json,os; print(json.dumps({"proxy_servers":json.load(open(os.environ["CONDARC"]))["proxy_servers"]}))'
+fi
 if [[ "$1" == env ]]; then
   while [[ "$1" != --prefix ]]; do shift; done
   mkdir -p "$2/bin"
   touch "$2/bin/python"; chmod +x "$2/bin/python"
 fi
 if [[ "${FAKE_FAIL_CHECK:-0}" == 1 && "$*" == *'pip check'* ]]; then exit 4; fi
+if [[ "${FAKE_FAIL_IMPORT_ONCE:-0}" == 1 && "$*" == *'--check-dependencies'* && ! -f "$CALLS.import-failed" ]]; then
+  touch "$CALLS.import-failed"; echo "No module named psutil" >&2; exit 5
+fi
+if [[ "${FAKE_FAIL_IMPORT_ALWAYS:-0}" == 1 && "$*" == *'--check-dependencies'* ]]; then exit 5; fi
 ''', encoding='utf-8')
         conda.chmod(0o700)
         env = dict(os.environ, CONDA_EXE=str(conda), WHOLE_HEART_ENV_PREFIX=str(root/'env'),
@@ -85,6 +92,24 @@ if [[ "${FAKE_FAIL_CHECK:-0}" == 1 && "$*" == *'pip check'* ]]; then exit 4; fi
             self.assertFalse((root/'env/.baseline_ready').exists())
             self.assertEqual(read_json(root/'job/environment.json')['status'],'failed')
             self.assertEqual(read_json(root/'job/environment.json')['phase'],'verify')
+
+    def test_matching_marker_does_not_hide_missing_import_and_repairs(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);env=self.fixture(root)
+            self.assertEqual(self.run_setup(env).returncode,0)
+            first=(root/'calls').read_text().count('pip install')
+            result=self.run_setup(dict(env,FAKE_FAIL_IMPORT_ONCE='1'))
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertGreater((root/'calls').read_text().count('pip install'),first)
+            self.assertEqual(read_json(root/'job/environment.json')['status'],'completed')
+
+    def test_broken_import_blocks_installation_completion(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);env=self.fixture(root)
+            result=self.run_setup(dict(env,FAKE_FAIL_IMPORT_ALWAYS='1'))
+            self.assertNotEqual(result.returncode,0)
+            self.assertFalse((root/'env/.baseline_ready').exists())
+            self.assertEqual(read_json(root/'job/environment.json')['status'],'failed')
 
 
 if __name__ == '__main__': unittest.main()

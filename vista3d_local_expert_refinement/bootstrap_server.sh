@@ -4,6 +4,7 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 CONTROL_PYTHON="${WHOLE_HEART_CONTROL_PYTHON:-python3}"
 progress() { "$CONTROL_PYTHON" -B -X utf8 "$SCRIPT_DIR/05_src/runtime_setup.py" "$@"; }
+download_run() { "$CONTROL_PYTHON" -B -X utf8 "$SCRIPT_DIR/05_src/runtime_setup.py" --download "$@"; }
 trap 'progress "" "环境安装失败（第 $LINENO 行），请查看任务总日志。" --status failed || true' ERR
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
@@ -29,6 +30,7 @@ if [[ ! -x "$CONDA_BIN" ]]; then
 fi
 [[ -x "$CONDA_BIN" ]] || { echo "找不到 Conda。请先安装 Miniconda，或设置 CONDA_EXE=/实际路径/bin/conda。" >&2; exit 2; }
 ENV_PREFIX="${WHOLE_HEART_ENV_PREFIX:-$HOME/.local/share/vista3d_baseline_runtime/envs/vista_baseline_py311}"
+export WHOLE_HEART_ENV_PREFIX="$ENV_PREFIX"
 
 # 防止两次启动同时修改环境；训练阶段由 Python 工作区锁保护。
 command -v flock >/dev/null || { echo "缺少 flock，请安装 util-linux。" >&2; exit 2; }
@@ -43,22 +45,31 @@ if [[ ! -x "$ENV_PREFIX/bin/python" ]]; then
     exit 2
   fi
   progress python_env "创建独立 Python 3.11 环境；此阶段可能等待依赖解析和下载。"
-  "$CONDA_BIN" env create --prefix "$ENV_PREFIX" --file "$SCRIPT_DIR/06_configs/environment_server.yml" --yes
+  download_run "$CONDA_BIN" env create --prefix "$ENV_PREFIX" --file "$SCRIPT_DIR/06_configs/environment_server.yml" --yes
   CREATED=1
 fi
 FINGERPRINT="$( { cat "$SCRIPT_DIR/06_configs/environment_server.yml" "$SCRIPT_DIR/06_configs/training_constraints.txt"; printf '%s' 'torch2.8.0+cu128 torchvision0.23.0+cu128 nnunetv2=2.8.1'; } | sha256sum | cut -d' ' -f1)"
-if [[ ! -f "$ENV_PREFIX/.baseline_ready" ]] || [[ "$(cat "$ENV_PREFIX/.baseline_ready")" != "$FINGERPRINT" ]]; then
+READY=0
+if [[ -f "$ENV_PREFIX/.baseline_ready" ]] && [[ "$(cat "$ENV_PREFIX/.baseline_ready")" == "$FINGERPRINT" ]]; then
+  progress verify "已有环境仍需实际导入与资源采集检查；安装凭证不能代替当前检查。"
+  if "$CONDA_BIN" run --no-capture-output --prefix "$ENV_PREFIX" python -B "$SCRIPT_DIR/05_src/runtime_setup.py" --check-dependencies; then
+    READY=1
+  else
+    progress python_env "检测到缺失或损坏依赖，修复本项目独立环境；详情见上述检查输出。"
+  fi
+fi
+if [[ "$READY" == 0 ]]; then
   if [[ "$CREATED" == 0 ]]; then
     progress python_env "依赖配置或旧凭证已变化；更新本项目独立 Conda 环境。"
-    "$CONDA_BIN" env update --prefix "$ENV_PREFIX" --file "$SCRIPT_DIR/06_configs/environment_server.yml"
+    download_run "$CONDA_BIN" env update --prefix "$ENV_PREFIX" --file "$SCRIPT_DIR/06_configs/environment_server.yml"
   fi
   progress pytorch "安装固定 PyTorch / CUDA 运行库；下载明细见总日志，不需要现在分配显卡。"
-  "$CONDA_BIN" run --no-capture-output --prefix "$ENV_PREFIX" python -m pip install torch==2.8.0+cu128 torchvision==0.23.0+cu128 --index-url https://download.pytorch.org/whl/cu128
+  download_run "$CONDA_BIN" run --no-capture-output --prefix "$ENV_PREFIX" python -m pip install torch==2.8.0+cu128 torchvision==0.23.0+cu128 --index-url https://download.pytorch.org/whl/cu128
   progress nnunet "安装 nnU-Net 2.8.1 及训练约束依赖。"
-  "$CONDA_BIN" run --no-capture-output --prefix "$ENV_PREFIX" python -m pip install nnunetv2==2.8.1 threadpoolctl==3.6.0 --index-url https://pypi.org/simple -c "$SCRIPT_DIR/06_configs/training_constraints.txt"
+  download_run "$CONDA_BIN" run --no-capture-output --prefix "$ENV_PREFIX" python -m pip install nnunetv2==2.8.1 threadpoolctl==3.6.0 --index-url https://pypi.org/simple -c "$SCRIPT_DIR/06_configs/training_constraints.txt"
 fi
-progress verify "核验固定依赖版本及 pip 依赖一致性；CPU 检查不申请 GPU。"
-"$CONDA_BIN" run --no-capture-output --prefix "$ENV_PREFIX" python -c "import importlib.metadata as m; expected={'torch':'2.8.0+cu128','torchvision':'0.23.0+cu128','nnunetv2':'2.8.1'}; actual={k:m.version(k) for k in expected}; assert actual==expected, ('依赖版本不符',actual)"
+progress verify "核验固定版本、实际导入、psutil资源采集和pip依赖一致性；CPU检查不申请GPU。"
+"$CONDA_BIN" run --no-capture-output --prefix "$ENV_PREFIX" python -B "$SCRIPT_DIR/05_src/runtime_setup.py" --check-dependencies
 "$CONDA_BIN" run --no-capture-output --prefix "$ENV_PREFIX" python -m pip check
 printf '%s\n' "$FINGERPRINT" > "$ENV_PREFIX/.baseline_ready.pending"
 mv -- "$ENV_PREFIX/.baseline_ready.pending" "$ENV_PREFIX/.baseline_ready"

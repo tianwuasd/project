@@ -11,6 +11,7 @@ dependencies:
   - matplotlib
   - pandas
   - pyyaml
+  - psutil
   - libblas=*=*openblas
   - libcblas=*=*openblas
   - liblapack=*=*openblas
