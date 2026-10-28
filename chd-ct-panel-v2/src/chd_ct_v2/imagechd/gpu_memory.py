@@ -41,6 +41,10 @@ class MemoryGuard:
     def start(self, config):
         if not self.enabled:
             return
+        # Allocator APIs require an index. Resolve in the worker's visible-device
+        # namespace once, so checks and restoration stay on the same GPU.
+        if self.device.index is None:
+            self.device = torch.device("cuda", torch.cuda.current_device())
         options = config.get("gpu_guard", {})
         # Safe only before this stage creates live model tensors, never per batch.
         with torch.cuda.device(self.device):

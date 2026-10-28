@@ -89,19 +89,66 @@ def test_missing_roi_is_rejected_and_bounds_are_checked():
 
 
 def fake_cuda(monkeypatch, free_gib=24):
-    state = {"free": int(free_gib * gpu_memory.GIB), "fraction": 1.0, "empty": 0}
+    state = {"free": int(free_gib * gpu_memory.GIB), "fraction": 1.0, "empty": 0, "current": 2, "devices": []}
     cuda = gpu_memory.torch.cuda
+    monkeypatch.setattr(cuda, "current_device", lambda: state["current"])
+
+    def indexed(device):
+        device = gpu_memory.torch.device(device)
+        if device.index is None:
+            raise ValueError(f"Expected a torch.device with a specified index, but got: {device}")
+        state["devices"].append(str(device))
+
+    def get_fraction(device):
+        indexed(device)
+        return state["fraction"]
+
+    def set_fraction(value, device):
+        indexed(device)
+        state["fraction"] = value
+
     monkeypatch.setattr(cuda, "device", lambda _: nullcontext())
     monkeypatch.setattr(cuda, "empty_cache", lambda: state.update(empty=state["empty"] + 1))
     monkeypatch.setattr(cuda, "mem_get_info", lambda *_: (state["free"], 24 * gpu_memory.GIB))
-    monkeypatch.setattr(cuda, "get_per_process_memory_fraction", lambda *_: state["fraction"])
-    monkeypatch.setattr(cuda, "set_per_process_memory_fraction", lambda v, *_: state.update(fraction=v))
+    monkeypatch.setattr(cuda, "get_per_process_memory_fraction", get_fraction, raising=False)
+    monkeypatch.setattr(cuda, "set_per_process_memory_fraction", set_fraction)
     monkeypatch.setattr(cuda, "reset_peak_memory_stats", lambda *_: None)
     monkeypatch.setattr(cuda, "memory_allocated", lambda *_: gpu_memory.GIB)
     monkeypatch.setattr(cuda, "max_memory_allocated", lambda *_: gpu_memory.GIB)
     monkeypatch.setattr(cuda, "max_memory_reserved", lambda *_: 2 * gpu_memory.GIB)
     monkeypatch.setattr(gpu_memory, "foreign_processes", lambda _: [])
     return state
+
+
+@pytest.mark.parametrize("device, expected", [("cuda", "cuda:2"), (gpu_memory.torch.device("cuda"), "cuda:2"), ("cuda:1", "cuda:1")])
+def test_gpu_budget_resolves_process_local_index_once(monkeypatch, tmp_path, device, expected):
+    state = fake_cuda(monkeypatch)
+    state["fraction"] = 0.7
+    path = tmp_path / "indexed.json"
+    with gpu_memory.gpu_budget(device, path, {}) as guard:
+        assert str(guard.device) == expected
+        state["current"] = 3
+        guard.check()
+    assert state["fraction"] == 0.7
+    assert state["devices"] == [expected, expected, expected]
+    assert read_json(path)["device"] == expected
+
+
+def test_gpu_budget_without_fraction_getter(monkeypatch, tmp_path):
+    state = fake_cuda(monkeypatch)
+    monkeypatch.delattr(gpu_memory.torch.cuda, "get_per_process_memory_fraction")
+    with gpu_memory.gpu_budget("cuda", tmp_path / "legacy.json", {}):
+        assert state["fraction"] == pytest.approx(0.85)
+    assert state["devices"] == ["cuda:2", "cuda:2"]
+    assert state["fraction"] == 1.0
+
+
+def test_cpu_budget_never_resolves_cuda(monkeypatch, tmp_path):
+    monkeypatch.setattr(gpu_memory.torch.cuda, "current_device", lambda: pytest.fail("CPU must not initialize CUDA"))
+    path = tmp_path / "cpu.json"
+    with gpu_memory.gpu_budget("cpu", path, {}) as guard:
+        guard.check()
+    assert not path.exists()
 
 
 def test_gpu_budget_leaves_margin_and_restores_cap(monkeypatch, tmp_path):
