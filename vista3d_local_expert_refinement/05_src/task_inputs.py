@@ -114,6 +114,11 @@ def source_compatibility(job):
     from task_runtime import load_plan
     try:
         plan=load_plan(job);work=Path(plan['workspace'])
+        from cohort import PROJECT_ID
+        from server_data import protocol_hash
+        meta=read_json(work/'00_admin/server_config.json')
+        if meta.get('project_id')!=PROJECT_ID or meta.get('protocol_sha256')!=protocol_hash():
+            return '数据协议不兼容，请先新建全来源CT预处理任务；旧任务保持冻结版本'
         splits=read_json(work/'04_data/manifests/splits_v1.json')['folds']
         from preparation_identity import current
         expected=current()

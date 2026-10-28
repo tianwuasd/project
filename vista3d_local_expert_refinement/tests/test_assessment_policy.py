@@ -39,7 +39,7 @@ class AssessmentPolicyTests(unittest.TestCase):
         self.assertEqual(len(scope['train_ids']),2)
         self.assertEqual(len(scope['validation_ids']),1)
         self.assertEqual(scope['prediction_ids'],scope['validation_ids'])
-        self.assertEqual(len(scope['planning_fit_ids']),8)
+        self.assertEqual(len(scope['planning_fit_ids']),30)
         allowed=set(split['train']+split['val'])
         selected=set(scope['train_ids']+scope['validation_ids'])
         self.assertTrue(selected<=allowed)

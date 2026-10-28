@@ -77,10 +77,10 @@ def main():
             raise
         assert len(scope['train_ids'])==2 and len(scope['validation_ids'])==1
         observations=list((work/'00_admin/case-observations').glob('*.json'))
-        assert len(observations)==12
+        assert len(observations)==38
         assert all(read_json(p)['blosc_calls'] for p in observations)
         import torch
         assert not torch.cuda.is_initialized()
-        print('PASS: real official synthetic fit-only fingerprint8, planning, preprocessing12, reuse, CPU prediction-prep and assessment subset3; scoped actual Blosc evidence and no CUDA.',flush=True)
+        print('PASS: real official synthetic fit-only fingerprint30, planning, preprocessing38, reuse, CPU prediction-prep and assessment subset3; target excluded, actual Blosc evidence and no CUDA.',flush=True)
 
 if __name__=='__main__':main()

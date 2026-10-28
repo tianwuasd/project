@@ -14,7 +14,7 @@ import task_runtime as jobs
 from task_queries import query, follow, result_lines, read_optional, log_sources
 from task_progress import STATES
 
-PANEL_VERSION = '0.5.3'
+PANEL_VERSION = '0.6.0'
 
 
 class Back(Exception):
@@ -346,12 +346,14 @@ def preview_config(config):
     if config['tasks'] != ['environment']:
         print('原始数据：' + config['data'])
         print('模型：' + ', '.join(config['methods']) + '；方向：' + ', '.join(config['folds']))
+        print('数据模式：全部来源监督训练，独立留出目标中心；默认ct_holdG为30训练 / 8验证 / 20测试。')
+        print('采样：nnU-Net原生随机病例/前景取块，不增加每轮逐例必到机制。')
     if config['tasks']==['prepare']:
         print('本次仅CPU预处理；显存预算只用于网络patch/batch规划。')
     elif config.get('gpus'):
         print('获准 GPU：' + ', '.join(config['gpus']) + f"；并发上限：{config['gpu_count']}")
     elif config.get('gpu_policy')=='automatic':
-        print('GPU/CPU：自动探测、测评选优；GPU上限按实际服务器和分配范围，不需要填写卡号。')
+        print('GPU/CPU：自动探测、现场容量配置；GPU上限按实际服务器和分配范围，不需要填写卡号。')
         if set(config['tasks'])&{'train','assessment'}:
             print('batch允许自动调整；正式250轮、每轮250训练/50验证保持，实际采样量将明确记录。')
         elif config['tasks']==['predict']:

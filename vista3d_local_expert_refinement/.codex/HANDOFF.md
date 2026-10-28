@@ -257,3 +257,16 @@ usable=max(0,min(planner,fresh_free-max(4GiB,total*10%)))，不从规划上限�
 详见docs/GPU_MEMORY_RESERVE.md与GPU_MEMORY_RESERVE_VALIDATION.json。没有执行服务器任务，
 没有CUDA/NCCL或真实CT长时验证；旧冻结任务不热修，新训练可复用未改变身份的兼容预处理。
 项目发布完成后才从固定提交重建Skill v2代码/ZIP/清单；v1及同期CT资产保留。
+
+
+## 2026-10-28：全部来源监督训练，保留独立中心测试（0.6.0）
+
+用户最终纠正并要求发布GitHub：保留一个中心独立测试；扩大来源训练病例，取消selector/U预留，
+不增加每例必到机制。默认ct_holdG为30训练/8验证/20 G测试；holdA30/8/20、holdB32/8/18。
+原生病例有放回随机采样/前景取块、250×250/50、CPU/RAM80、多卡与4GiB余量保持。
+cohort与项目身份改变，必须新建预处理和训练，菜单拒绝旧8/4缓存；旧任务仍冻结。
+未发布的“取消测试中心”解释错误已撤回，私有审计留证，不进入当前工程或Skill默认。
+最终本地控制392项343通过49条件跳过；真实CPU合成30fit/38预处理/复用/预测准备与小测通过，
+原生loader API另外验证。原取样与评价7文件相对0.5.3字节不变，所有方向目标ID不变。
+详见docs/FULL_SOURCE_TRAINING.md与FULL_SOURCE_VALIDATION.json；未执行真实病例或服务器GPU。
+项目发布后从精确固定提交重建Skill v2；旧v1及同期CT修改保留。

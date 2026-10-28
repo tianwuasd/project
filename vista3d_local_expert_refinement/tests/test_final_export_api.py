@@ -38,7 +38,7 @@ class ParallelSourceExport(unittest.TestCase):
                 output=export_fold(work,'ct_holdG',split,rows)
             self.assertGreater(max(overlap),1);self.assertLessEqual(max(overlap),4)
             self.assertEqual(read_json(output/'source_only_split.json'),split)
-            self.assertEqual(read_json(output/'dataset.json')['numTraining'],12)
+            self.assertEqual(read_json(output/'dataset.json')['numTraining'],38)
             self.assertEqual([r['case_id'] for r in read_json(work/'09_reports/ct_holdG_conversion.json')],ids)
             for cid in ids:
                 row=next(r for r in rows if r['case_id']==cid)

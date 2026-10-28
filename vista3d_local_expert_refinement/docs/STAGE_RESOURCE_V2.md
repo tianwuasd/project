@@ -1,3 +1,7 @@
+# 0.6.0数据协议补充
+
+资源与恢复机制继续适用；数据范围以[FULL_SOURCE_TRAINING.md](FULL_SOURCE_TRAINING.md)为准：默认30训练/8验证/20独立测试，原生随机取块保持。本文历史fit8/prepare12记录不代表新运行数量，旧验证JSON保留原版本证据。
+
 # 分阶段资源执行 v2（面板 0.5.0）
 
 本版将预处理、协同训练、预测及 CPU 收尾接入各自的现场资源决策。发布代码已经做本地控制与真实 CPU API 验证；这不是目标服务器部署、真实 CT 效果或 CUDA/NCCL 性能验收。机器可读证据和运行文件摘要见 `STAGE_RESOURCE_V2_VALIDATION.json`。

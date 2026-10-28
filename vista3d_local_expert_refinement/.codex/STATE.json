@@ -548,5 +548,20 @@
     "server_deployed": false,
     "real_gpu_validated": false,
     "publishing": "Commit and remote receipt must be verified separately; old frozen jobs unchanged"
+  },
+  "full_source_training_update": {
+    "version": "0.6.0",
+    "updated_at": "2026-10-28",
+    "user_correction": "retain independent test center; expand only sources; native random sampling",
+    "default_split": {
+      "train": 30,
+      "validation": 8,
+      "test": 20
+    },
+    "validation": "docs/FULL_SOURCE_VALIDATION.json",
+    "old_preparation_compatible": false,
+    "server_deployed": false,
+    "real_gpu_validated": false,
+    "publication": "verify remote receipt separately"
   }
 }

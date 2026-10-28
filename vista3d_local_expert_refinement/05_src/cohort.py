@@ -2,7 +2,7 @@
 import hashlib
 from pathlib import Path
 
-PROJECT_ID = 'vista3d_wholeheart_nnunet_v1'
+PROJECT_ID = 'vista3d_wholeheart_nnunet_full_source_v2'
 GROUPS = {'A': 'A ct_train', 'B': 'B ct_train', 'G': 'G ct_train'}
 FOLDS = {'ct_holdA': (811, 'CT', 'A'), 'ct_holdB': (812, 'CT', 'B'), 'ct_holdG': (813, 'CT', 'G')}
 QUARANTINE = {'Case2009', 'Case2017'}
@@ -64,14 +64,15 @@ def make_splits(cases, seed=20260919):
             if group == holdout:
                 parts['target'] += ids
             else:
-                # Fixed per-center development pool; selector/cal disjoint from fit.
-                parts['selector'] += ids[:2]
-                parts['val'] += ids[2:4]
-                parts['train'] += ids[4:8]
-                parts['unlabeled'] += ids[8:]
+                # Use every eligible source case. Keep four validation cases
+                # per source center; preserve the independent target center.
+                parts['val'] += ids[:4]
+                parts['train'] += ids[4:]
         result[fold] = dict(project_id=PROJECT_ID, dataset_id=dataset_id, modality=modality,
-                            holdout=holdout, split_seed=seed, label_budget_baseline=12,
-                            label_budget_research_reserved=16,
+                            holdout=holdout, split_seed=seed,
+                            label_budget_baseline=len(parts['train'])+len(parts['val']),
+                            label_budget_research_reserved=0,
+                            data_protocol='full_source_supervised_v1',evaluation_scope='held_out_center',
                             **{k: sorted(v) for k, v in parts.items()})
         result[fold]['fingerprint_fit_ids'] = result[fold]['train'][:]
     return result
@@ -80,7 +81,7 @@ def make_splits(cases, seed=20260919):
 def validate_split(split, cases):
     fold = f"ct_hold{split['holdout']}"
     if fold not in FOLDS or split != make_splits(cases, split['split_seed'])[fold]:
-        raise ValueError('划分与冻结的少标注协议不一致')
+        raise ValueError('划分与冻结的全来源监督/独立中心测试协议不一致')
 
 
 def label_access_ids(split):

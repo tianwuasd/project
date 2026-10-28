@@ -25,13 +25,14 @@ class CohortTests(unittest.TestCase):
     def test_default_split_has_no_label_or_patient_overlap(self):
         split = make_splits(cases())['ct_holdG']
         self.assertEqual({k: len(split[k]) for k in ['train','val','selector','unlabeled','target']},
-                         {'train':8,'val':4,'selector':4,'unlabeled':22,'target':20})
-        self.assertEqual(len(label_access_ids(split)), 12)
+                         {'train':30,'val':8,'selector':0,'unlabeled':0,'target':20})
+        self.assertEqual(len(label_access_ids(split)), 38)
         self.assertFalse(set(label_access_ids(split)) & set(split['unlabeled']+split['selector']+split['target']))
         self.assertTrue(all(x.startswith('Case7') for x in split['target']))
         self.assertEqual(make_splits(cases()),make_splits(list(reversed(cases()))))
-        for key in ['train','val','selector']:
-            self.assertEqual(sum(x.startswith('Case1') for x in split[key]),len(split[key])//2)
+        self.assertEqual(sum(x.startswith('Case1') for x in split['train']),16)
+        self.assertEqual(sum(x.startswith('Case2') for x in split['train']),14)
+        self.assertEqual(sum(x.startswith('Case1') for x in split['val']),4)
         self.assertNotIn('Case2009',sum([split[k] for k in ['train','val','selector','unlabeled','target']],[]))
 
     def test_duplicate_image_or_patient_requires_audited_grouping(self):
@@ -42,9 +43,9 @@ class CohortTests(unittest.TestCase):
 
     def test_tampered_split_cannot_train_on_hidden_or_target_cases(self):
         split=make_splits(cases())['ct_holdG']
-        for forbidden in ['target','unlabeled','selector']:
+        for forbidden in [split['target'][0],split['val'][0],'Case2009']:
             broken=copy.deepcopy(split)
-            broken['train'][0]=broken[forbidden][0]
+            broken['train'][0]=forbidden
             with self.assertRaises(ValueError):validate_split(broken,cases())
 
     def test_discovery_does_not_read_label_bytes(self):

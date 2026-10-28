@@ -28,7 +28,7 @@ class BaselineContract(unittest.TestCase):
                 split=read_json(work/'04_data/manifests/splits_v1.json')['folds']['ct_holdG']
                 from server_data import freeze_source_labels
                 first=freeze_source_labels(work,'ct_holdG')
-                self.assertEqual(len(first),12)
+                self.assertEqual(len(first),38)
                 self.assertFalse(set(first)&set(split['selector']+split['unlabeled']+split['target']))
                 # Hidden labels can change without being read or affecting source fitting.
                 (data/(split['target'][0]+'.label')).write_bytes(b'not inspected')

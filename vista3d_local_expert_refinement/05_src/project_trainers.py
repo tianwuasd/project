@@ -1,4 +1,4 @@
-"""nnU-Net 官方训练方法；固定少标注划分与训练预算。"""
+"""nnU-Net 官方训练方法；全部来源训练/验证，独立中心测试。"""
 import copy
 import os
 from pathlib import Path
