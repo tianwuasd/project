@@ -120,6 +120,13 @@ def segmentation(job, item, detailed):
     )
     if derived:
         print("缺失摘要由完整的已保存病例数值补算。")
+    stages = mapping(report.get("stage_comparison"))
+    if stages:
+        print("同一评估集合：" + " | ".join(
+            title + " " + number(mapping(stages.get(key)).get("mean_case_foreground_dice"))
+            for key, title in (("vote", "原始投票"), ("limited", "有限补全候选"), ("final", "最终采用"))
+        ))
+        print("候选不等于已采用；规则在训练验证集冻结，当前评估不重新选规则。")
     for fold, metrics, _, computed in fold_details(report, results.LABELS):
         print(
             f"{fold}：{count(metrics.get('cases_evaluated'))} 例 | Dice "

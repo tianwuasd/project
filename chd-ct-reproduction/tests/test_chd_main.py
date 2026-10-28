@@ -249,16 +249,16 @@ def test_parallel_stage_workers_and_independent_test(raw_chd, tmp_path, monkeypa
 
     from chd_ct.imagechd.checkpoints import read_collection
     from chd_ct.imagechd.config import STAGES
+    from chd_ct.imagechd.pipeline import DEPENDENCIES, TASKS
     from chd_ct.imagechd.stage_queue import run_queue
     from chd_ct.imagechd.test import run_test
     from chd_ct.imagechd.train import train
+    from chd_ct.imagechd.training_session import commit_stage, finish_session, training_session
 
     cache, serial, parallel = (tmp_path / n for n in ("prepared", "serial", "parallel"))
     prepare(raw_chd, cache, size=16)
     train(cache, serial, ROOT / "configs/chd-smoke.yaml", mode="smoke", device="cpu")
-    record = json.loads((serial / "models.json").read_text())
     parallel.mkdir()
-    (parallel / "effective-config.json").write_text(json.dumps(record["config"]))
     env = dict(os.environ, PYTHONPATH=str(ROOT / "src"))
 
     def command(stage):
@@ -277,8 +277,19 @@ def test_parallel_stage_workers_and_independent_test(raw_chd, tmp_path, monkeypa
         ]
 
     # Real separate CPU workers exercise scheduling/storage without pretending CUDA was tested.
-    record["stages"] = run_queue(STAGES, ["test-slot-a", "test-slot-b"], parallel, command, env)
-    (parallel / "models.json").write_text(json.dumps(record))
+    with training_session(
+        cache, parallel, ROOT / "configs/chd-smoke.yaml", "smoke", "cpu", 2, False
+    ) as session:
+        run_queue(
+            TASKS,
+            ["test-slot-a", "test-slot-b"],
+            parallel,
+            command,
+            env,
+            dependencies=DEPENDENCIES,
+            on_complete=lambda stage, info: commit_stage(session, stage, info),
+        )
+        finish_session(session)
     assert read_collection(parallel, allow_smoke=True)[1]["status"] == "complete"
     for stage in STAGES:
         left = torch.load(serial / (stage + ".pt"), weights_only=True)["state_dict"]

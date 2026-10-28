@@ -332,6 +332,15 @@ def evaluation(path):
     if derived:
         print("  （旧版清单：缺失汇总字段按已保存的逐病例数值补算，不重新评估影像）")
     metric_table(overall, cases)
+    stages = mapping(report.get("stage_comparison"))
+    if stages:
+        print("\n  后处理阶段对照（同一评估病例；不在这里选择规则）")
+        for key, title in (("vote", "原始投票"), ("limited", "有限补全候选"), ("final", "最终采用")):
+            value = mapping(stages.get(key))
+            if value:
+                print("  " + title + "：" + number(value.get("mean_case_foreground_dice")))
+                stage_cases = [mapping(r.get("stage_comparison")).get(key) for r in cases]
+                metric_table(value, [r for r in stage_cases if isinstance(r, dict)])
     print("  — 表示未记录/不适用，不能据此认定结构不存在；当前算法双方都缺失时为 null。")
     print("  有效病例分母仅在明细完整且该字段均已记录时显示；ignore=255 不参与当前 Dice。")
     details = fold_details(report, LABELS)
@@ -350,6 +359,12 @@ def evaluation(path):
         if members and len(members) != fold.get("cases_evaluated"):
             print(f"  注意：已保存明细 {len(members)} 例，与登记总数不一致；明细不代表完整结果。")
         metric_table(fold, members)
+        for key, title in (("vote", "原始投票"), ("limited", "有限补全候选"), ("final", "最终采用")):
+            stage = mapping(mapping(fold.get("stage_comparison")).get(key))
+            if stage:
+                print("  本折" + title + "：" + number(stage.get("mean_case_foreground_dice")))
+                values = [mapping(r.get("stage_comparison")).get(key) for r in members]
+                metric_table(stage, [r for r in values if isinstance(r, dict)])
         case_metrics(members)
     other = [r for r in cases if fold_index(r) is None] if details else cases
     if other or not details:
@@ -370,6 +385,11 @@ def prediction(path):
     print(f"  预测记录：{state(report.get('status'))} | 清单记录已保存 {len(cases)} 例")
     scope(report, prediction_only=True)
     print("  此部分只列预测产物，不计算 Dice；分割评分见测试/独立评估。")
+    if any(case.get("stage_outputs_format") for case in cases):
+        print("  *_vote.nii.gz：原始投票；*_limited.nii.gz：有限补全候选；*_seg.nii.gz：最终采用。")
+        print("  *_grid.npz 同时保存 vote/limited/blood/prediction，验证规则见模型 postprocessing.json。")
+        full = sum(bool(case.get("full_volume_roi")) for case in cases)
+        print(f"  定位框覆盖全图：{full}/{len(cases)}；保留告警，不使用真值强行缩框。")
     case_list(cases)
     print("  预测目录：" + text(path.parent))
     print("  预测清单：" + text(path))

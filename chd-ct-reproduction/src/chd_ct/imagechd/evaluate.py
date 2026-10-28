@@ -51,6 +51,16 @@ def summarize_cases(rows):
     }
 
 
+def summarize_stages(rows):
+    return {
+        name: summarize_cases(
+            [r["stage_comparison"][name] for r in rows if name in r.get("stage_comparison", {})]
+        )
+        for name in ("vote", "limited", "final")
+        if any(name in r.get("stage_comparison", {}) for r in rows)
+    }
+
+
 def evaluate(prepared, predictions, output, split="auto", inherited_lock_fds=()):
     cache, data = read_prepared(prepared)
     directory = Path(predictions).expanduser().resolve()
@@ -108,8 +118,10 @@ def evaluate(prepared, predictions, output, split="auto", inherited_lock_fds=())
             ]
             if subset:
                 result["folds"][f"fold_{index}"] = summarize_cases(subset)
+                result["folds"][f"fold_{index}"]["stage_comparison"] = summarize_stages(subset)
         protocols = {r["inference_protocol"] for r in result["cases"]}
         result.update(status="passed", protocols=sorted(protocols), **summarize_cases(result["cases"]))
+        result["stage_comparison"] = summarize_stages(result["cases"])
         return result
     except BaseException as error:
         result.update(status="failed", error=str(error))
@@ -134,12 +146,14 @@ def evaluate_case(cache, directory, row, available, plan):
         raise ValueError("预测文件校验失败")
     with np.load(path, allow_pickle=False) as record:
         prediction = record["prediction"]
+        stages = {k: record[k] for k in ("vote", "limited") if k in record}
     _, target = load_case(cache, row)
     return {
         "case_id": row["case_id"],
         "inference_protocol": info.get("inference_protocol", "single_split"),
         "fold_indices": info.get("fold_indices", []),
         **dice_metrics(prediction, target),
+        "stage_comparison": {k: dice_metrics(v, target) for k, v in {**stages, "final": prediction}.items()},
     }
 
 

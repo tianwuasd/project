@@ -9,7 +9,7 @@ from ..recovery import write_json  # noqa: F401
 from .spacing import RESAMPLED_FORMAT, validate_spacing
 
 FORMAT = "imagechd7-v2"
-MODEL_FORMAT = "imagechd7-chd-paper-v4"
+MODEL_FORMAT = "imagechd7-chd-paper-v5"
 LABELS = ("BG", "LV", "RV", "LA", "RA", "MYO", "AO", "PA")
 IGNORE = 255
 NORMALIZATION = {"kind": "per_image_percentile", "low": 1, "high": 99}

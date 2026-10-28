@@ -161,7 +161,9 @@ def test_gpu_phase_then_cpu_resume_without_inference(tmp_path, monkeypatch):
     write_json(models / "models.json", {"fixture": True})
     collection = dict(mode="smoke", prepared_sha256="fixture", config={"threads": 1})
     monkeypatch.setattr(predict, "read_collection", lambda *a: (models, collection))
-    monkeypatch.setattr(predict, "predict_volume", lambda image, *a: (np.zeros(image.shape, np.uint8), {}))
+    monkeypatch.setattr(predict, "predict_volume", lambda image, *a, **kw: (
+        np.zeros(image.shape, np.uint8), {"stage_outputs": {k: np.zeros(image.shape, np.uint8)
+        for k in ("vote", "limited", "blood")}}))
     output = tmp_path / "step/predict"
     result = predict.predict(cache, models, output, phase="gpu", allow_smoke=True)
     assert result["status"] == "pending_cpu" and not list(output.glob("*_seg.nii.gz"))

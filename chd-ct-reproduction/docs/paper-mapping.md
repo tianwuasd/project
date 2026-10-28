@@ -1,5 +1,7 @@
 # CHD 论文核心代码对齐记录
 
+2026-10-28 / 0.24.0 补充：训练 ROI 改用本折定位网络预测框，预测保留原始投票并在验证集选择有限补全与连通区域处理；这是数据适配与验证驱动的研究改动，不是已核实的作者伪代码。新增的两步生长、采纳阈值和显存保护均属本项目设置。框深度改变会影响血池每轮切片数。当前依赖队列、产物和兼容边界以 [0.24.0说明](roi-refinement-guard.md) 为准。
+
 依据：Xu 等，*A clinically applicable AI system for diagnosis of congenital heart diseases based on computed tomography images*，Medical Image Analysis 90 (2023), 102953，DOI https://doi.org/10.1016/j.media.2023.102953。核对了本地全文的第 4.2、4.3、5.1 节、图 4（PDF 第 7 页）和表 3（PDF 第 10 页）。代码更新日期：2026-10-15。
 
 修改前工作区保存在 [before-paper-alignment-20261013](../back/before-paper-alignment-20261013/SNAPSHOT.md)，125 个源代码/配置/测试/文档文件均有 SHA-256，包括尚未提交的 Excel 重采样实现。备份在本次修改前再次核验。

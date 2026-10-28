@@ -131,6 +131,7 @@ def test_training_tensor_cache_uses_a_new_identity(raw_chd, tmp_path, monkeypatc
     data = prepare(raw_chd, tmp_path / "prepared")
     config = load_config(Path(__file__).parents[1] / "configs/chd-smoke.yaml")
     row = data["cases"][0]
+    row = {**row, "predicted_roi": [[0, int(n)] for n in row["cache_shape"]], "roi_sha256": "test-roi-v1"}
     current = cpu_cache.FORMAT
     with monkeypatch.context() as patch:
         patch.setattr(cpu_cache, "FORMAT", "imagechd-training-inputs-v1")
@@ -144,6 +145,13 @@ def test_training_tensor_cache_uses_a_new_identity(raw_chd, tmp_path, monkeypatc
     )
     assert not new["reused"] and new["paths"] != old["paths"]
     assert old_hashes == {k: file_hash(v) for k, v in old["paths"].items()}
+    modified = copy.deepcopy(row)
+    modified["predicted_roi"][0][1] -= 1
+    modified["roi_sha256"] = "test-roi-v2"
+    changed = cpu_cache.cached_input(
+        tmp_path / "inputs", tmp_path / "prepared", modified, "all64", config, max_gib=1, reserve_gib=0
+    )
+    assert changed["paths"] != new["paths"] and not changed["reused"]
 
 
 def test_unversioned_current_model_rejected_without_reading_weights(tmp_path):

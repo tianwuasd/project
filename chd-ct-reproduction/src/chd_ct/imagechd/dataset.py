@@ -7,8 +7,9 @@ import torch
 from torch.utils.data import Dataset
 
 from .common import load_case
-from .geometry import blood_target, bounding_box, resize
+from .geometry import blood_target, resize
 from .loading import settings
+from .roi_inputs import row_roi
 
 
 class StageDataset(Dataset):
@@ -69,7 +70,7 @@ class StageDataset(Dataset):
         if self.key != i:
             image, target = load_case(self.directory, self.rows[i])
             if not self.stage.startswith("crop"):
-                roi = bounding_box((target > 0) & (target < 8), self.config["roi_margin"])
+                roi = row_roi(self.rows[i], image.shape)
                 image, target = image[roi], target[roi]
             if self.stage.startswith("blood"):
                 target = blood_target(target)

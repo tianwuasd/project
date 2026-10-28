@@ -3,7 +3,8 @@
 LABEL_RESIZE = "nearest-exact-pixel-centers-v1"
 PROCESSING = {
     "label_resize": LABEL_RESIZE,
-    "blood_refinement": "exclude-boundary-grow-interior-v1",
+    "blood_refinement": "validation-selected-seed-preserving-v1",
+    "roi": "fold-localizer-predicted-roi-v1",
 }
 
 

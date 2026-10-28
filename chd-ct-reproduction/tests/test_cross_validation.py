@@ -334,7 +334,7 @@ def test_stage_worker_uses_frozen_fold_instead_of_cache_split(tmp_path, monkeypa
         )
         return {"fold": fold["index"]}
 
-    monkeypatch.setattr(stage_worker, "train_stage", stage)
+    monkeypatch.setattr(stage_worker, "execute", stage)
     assert (
         stage_worker.main(
             ["--prepared", str(cache), "--output", str(output), "--stage", "crop64", "--mode", "smoke"]

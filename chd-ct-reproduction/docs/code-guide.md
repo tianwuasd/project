@@ -8,7 +8,8 @@
 | 2 | imagechd/common.py、preprocess.py | 七结构规则、原生/旧缓存、归一化、患者划分 |
 | 3 | imagechd/dataset.py、geometry.py | 全图/区域/切片/序列样本，以及血池边界 |
 | 4 | models/chd_unet.py、recurrent.py | CHD 论文 U-Net、位置关联、双向 ConvLSTM |
-| 5 | imagechd/folds.py、cross_validation.py、train.py、stage_queue.py、stage_worker.py、losses.py | 患者三折、折内六阶段、冻结配置/编码器、最佳权重和恢复 |
+| 5 | imagechd/folds.py、cross_validation.py、train.py、pipeline.py、stage_queue.py、stage_worker.py、losses.py | 患者三折、折内六网络及依赖、冻结配置/编码器、最佳权重和恢复 |
+| 5a | imagechd/roi_inputs.py、calibration.py、postprocessing.py、gpu_memory.py | 预测框来源、验证采纳规则、保留投票及显存保护；见 roi-refinement-guard.md |
 | 6 | imagechd/checkpoints.py | 完整模型集合、权重与数据划分一致性 |
 | 7 | imagechd/predict.py、fusion.py | OOF/三折概率平均、区域定位、投票、血池细化、原空间恢复 |
 | 8 | imagechd/test.py、evaluate.py | 逐折与合并病例评估，不参与模型选择 |

@@ -107,6 +107,20 @@ def training_session(prepared, output, config_path, mode, device, concurrency, r
             raise ValueError("训练数据或配置已改变，不能续训")
         if resume and not contract_path.exists() and (output / "models.json").exists():
             raise ValueError("旧版训练未记录优化器，不能精确续训；请另建训练目录")
+        # Preserve the published digests before rebuilding the running stage list.
+        # A resume must never re-sign a modified ROI/policy as if it were original.
+        if resume and (output / "models.json").is_file():
+            previous = read_json(output / "models.json")
+            for key, name in (("roi", "roi.json"), ("postprocessing", "postprocessing.json")):
+                ref = previous.get(key)
+                if ref:
+                    if (
+                        ref.get("file") != name
+                        or not (output / name).is_file()
+                        or file_hash(output / name) != ref.get("sha256")
+                    ):
+                        raise ValueError("已发布的 ROI/后处理记录改变，拒绝续用：" + key)
+                    collection[key] = ref
         validated = True
         write_json(output / "report.json", report)
         write_json(contract_path, contract)
@@ -129,13 +143,18 @@ def training_session(prepared, output, config_path, mode, device, concurrency, r
 
 
 def commit_stage(session, stage, info):
-    session["collection"]["stages"][stage] = info
+    if stage in {"roi", "calibration"}:
+        session["collection"]["postprocessing" if stage == "calibration" else "roi"] = info
+    else:
+        session["collection"]["stages"][stage] = info
     write_json(session["output"] / "models.json", session["collection"])
 
 
 def finish_session(session):
     collection, report, output = session["collection"], session["report"], session["output"]
     collection["stages"] = {stage: collection["stages"][stage] for stage in STAGES}
+    if not collection.get("roi") or not collection.get("postprocessing"):
+        raise ValueError("定位框或验证后处理未完成，不能发布完整模型")
     collection["status"] = "complete"
     write_json(output / "models.json", collection)
     report.update(status="passed", models=str(output / "models.json"), stages=list(STAGES))

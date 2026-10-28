@@ -33,7 +33,10 @@ def test_mmap_inputs_match_original_and_do_not_repeat_volume_work(raw_chd, tmp_p
     directory = tmp_path / "prepared"
     data = prepare(raw_chd, directory, size=0)
     config = configuration()
-    rows = data["cases"][:2]
+    rows = [
+        {**r, "predicted_roi": [[1, int(n) - 1] for n in r["cache_shape"]], "roi_sha256": "test-predicted"}
+        for r in data["cases"][:2]
+    ]
     original = StageDataset(directory, rows, stage, config)
     cached = StageDataset(directory, rows, stage, config, tmp_path / "inputs")
     assert original.index == cached.index
@@ -230,7 +233,14 @@ def test_actual_spawned_calibration(raw_chd, tmp_path):
         config=config,
         stage="blood_lstm",
         directory=str(directory),
-        rows=training.training_rows(data)["train"][:2],
+        rows=[
+            {
+                **r,
+                "predicted_roi": [[0, int(n)] for n in r["cache_shape"]],
+                "roi_sha256": "cpu-loading-full-volume-benchmark-v1",
+            }
+            for r in training.training_rows(data)["train"][:2]
+        ],
         cache_root=str(tmp_path / "inputs"),
     )
     result = autotune.trial(request, tmp_path / "trial", 45)

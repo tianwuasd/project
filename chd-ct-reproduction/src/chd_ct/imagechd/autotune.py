@@ -171,6 +171,16 @@ def resolve(config, directory, rows, output, concurrency=1, resume=False):
         raise ValueError("续训缺少冻结 CPU 调优记录，不能重新选参")
     if not rows:
         raise ValueError("CPU 调优需要训练病例")
+    # Before localizers exist, benchmark full-volume loading only. Never use a
+    # target-derived ROI or reuse these benchmark tensors as predicted-ROI inputs.
+    rows = [
+        {
+            **r,
+            "predicted_roi": [[0, int(n)] for n in r["cache_shape"]],
+            "roi_sha256": "cpu-loading-full-volume-benchmark-v1",
+        }
+        for r in rows
+    ]
     hardware = resources(concurrency)
     config = copy.deepcopy(config)
     config["data_loading"] = settings(config)
@@ -191,6 +201,7 @@ def resolve(config, directory, rows, output, concurrency=1, resume=False):
     identity = dict(
         requested=requested,
         prepared=data_hash,
+        roi_benchmark="full-volume-v1",
         format=FORMAT,
         cpu=hardware["cpus"],
         concurrency=concurrency,
