@@ -7,6 +7,7 @@ import threading
 import time
 
 from server_data import read_json,write_json,digest
+from gpu_budget import MIN_SAFETY_RESERVE_GIB,SAFETY_RESERVE_FRACTION
 
 
 def release_devices(uuids,*,wait=False,final=False):
@@ -152,7 +153,10 @@ def admit(gpus):
             excluded.append(dict(gpu_uuid=uuid,reason=reason,reason_code=code,observation=row))
             continue
         ready.append(uuid)
-        usable[uuid]=max(0,min(int(settings['planner_gpu_memory_gib']*2**30),int(row['free_mib']*2**20-max(2*2**30,.1*row['total_mib']*2**20))))
+        # Subtract one reserve from current free memory, then apply the planner
+        # ceiling. Do not subtract the reserve from the ceiling a second time.
+        reserve=max(MIN_SAFETY_RESERVE_GIB*2**30,SAFETY_RESERVE_FRACTION*row['total_mib']*2**20)
+        usable[uuid]=max(0,min(int(settings['planner_gpu_memory_gib']*2**30),int(row['free_mib']*2**20-reserve)))
     return ready,usable,excluded
 
 
@@ -279,7 +283,7 @@ def infer_batch(result,usable):
     complete=len(ranks)==len(usable) and bool(ranks)
     return dict(local_batch_size=min(r['candidate_batch'] for r in ranks) if complete else proven,
                 ranks=ranks,status='inferred_requires_validation' if complete else 'unknown_keeps_proven',
-                usable_scope='min(frozen planner budget, fresh free minus one reservation max(2GiB,10% physical VRAM))')
+                usable_scope=f'min(frozen planner budget, fresh free minus one reservation max({MIN_SAFETY_RESERVE_GIB}GiB,{SAFETY_RESERVE_FRACTION:.0%} physical VRAM))')
 
 
 def tune(work,fold,method,run_kind,gpus=None,*,max_local_batch=None,execution=None,reduction_budget=3):
@@ -366,6 +370,9 @@ def tune(work,fold,method,run_kind,gpus=None,*,max_local_batch=None,execution=No
         world_size=len(group),global_batch_size=local*len(group),local_batch_size=local,
         effective_cpu=resource,execution_request=execution,resource_receipt_reusable=False,
         resource_snapshot=snapshot,capacity_inference=inference,capacity_attempts=attempts,
+        gpu_memory_reservation=dict(minimum_gib=MIN_SAFETY_RESERVE_GIB,
+            fraction_of_total=SAFETY_RESERVE_FRACTION,usable_bytes=usable,
+            scope='fresh free minus one reserve, capped by planner budget; not a hard allocator limit'),
         capacity_reductions=reductions,eager_retried=eager_retried,admission_restarts=admission_restarts,
         excluded_gpus=excluded,reference_global_batch_size=reference,
         sampling_ratio=local*len(group)/reference,train_patches_per_epoch=local*len(group)*250,

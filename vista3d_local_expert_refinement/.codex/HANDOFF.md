@@ -245,3 +245,15 @@ GitHub代码发布完成。Linux CI https://github.com/tianwuasd/project/actions
 server-engineering Skill v2已完成RED/GREEN使用场景、最终审查、26项脚本测试25通过1原CT权限跳过、真实autocrlf检出、独立目录生成/校验。v2完整185工程文件覆盖87运行文件；VISTA v1为153文件；已提交旧Skill v1为343文件，681归档源文件均匹配固定Git字节/模式。旧CT0.23生成器及资产保持不变。
 Skill源码已合回D:/projects/codex-skill并发布908e641；已安装到C:/Users/Lenovo/.codex/skills/server-engineering。1037已提交Skill文件的源码/安装版逐字节一致，0删除/0私人状态写入，实际安装路径生成和verify通过。八原稿有精确私有备份及stash16470c11884876685238060078cdc27e5a2a25f8，未用旧稿覆盖新版本。私有安装前备份、原安装343文件快照与完整证据保留D:/projects/sync-reports/vista-v2-evidence。
 入口：D:/projects/codex-skill/server-engineering/references/template-and-code.md；详版/源码导览/GitHub流程分别vista-v2-guide.md、vista-v2-source-map.md、vista-v2-publication.md。历史资源候选/旧receipt仅作v1兼容，不覆盖v2。维护者--legacy-skill对任意新commit仍使用固定CT0.23标签是非阻断后续改进，当前固定d737归档已校验正确；历史0.3.9 ResourceWarning如实保留，不冒充新验证通过。
+
+
+## 2026-10-28：GPU安全余量下限4 GiB（0.5.3）
+
+用户确认把当前协同训练安全余量下限由2改为4 GiB，20 GiB规划上限和较大卡10%规则保留。
+usable=max(0,min(planner,fresh_free-max(4GiB,total*10%)))，不从规划上限再次扣余量。
+阶段决策新增gpu_memory_reservation，包含每卡usable和政策参数；自动batch仍须真实尺寸确认，
+已证明batch保留、OOM整组有界恢复和未知错误停止边界不改，不声称4 GiB硬限制。
+新回归RED为2个预期失败，修复后显存14/14；完整控制388项339通过49条件跳过，零错误。
+详见docs/GPU_MEMORY_RESERVE.md与GPU_MEMORY_RESERVE_VALIDATION.json。没有执行服务器任务，
+没有CUDA/NCCL或真实CT长时验证；旧冻结任务不热修，新训练可复用未改变身份的兼容预处理。
+项目发布完成后才从固定提交重建Skill v2代码/ZIP/清单；v1及同期CT资产保留。

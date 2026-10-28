@@ -531,5 +531,22 @@
     "preprocessing_and_environment_unchanged": true,
     "failed_jobs": "retain frozen snapshot; create new training with compatible preparation",
     "skill_update": "same verified source after project publication"
+  },
+  "gpu_memory_reserve_update": {
+    "version": "0.5.3",
+    "updated_at": "2026-10-28",
+    "user_confirmed_minimum_reserve_gib": 4,
+    "planner_gib": 20,
+    "physical_reserve_fraction": 0.1,
+    "validation": "docs/GPU_MEMORY_RESERVE_VALIDATION.json",
+    "local_tests": {
+      "total": 388,
+      "passed": 339,
+      "skipped": 49
+    },
+    "preparation_identity_changed": false,
+    "server_deployed": false,
+    "real_gpu_validated": false,
+    "publishing": "Commit and remote receipt must be verified separately; old frozen jobs unchanged"
   }
 }

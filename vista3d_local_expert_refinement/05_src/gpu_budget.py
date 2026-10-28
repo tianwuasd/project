@@ -3,6 +3,8 @@ import math
 
 DEFAULT_MEMORY_GIB = 20
 MEMORY_POLICY = 'zmic44-20g-v1'
+MIN_SAFETY_RESERVE_GIB = 4
+SAFETY_RESERVE_FRACTION = .10
 
 
 def required_free_mib(planner_gib,total_mib,minimum_mib=6000):

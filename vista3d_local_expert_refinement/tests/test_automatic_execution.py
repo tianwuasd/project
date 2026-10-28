@@ -59,6 +59,9 @@ class AutomaticExecutionTests(unittest.TestCase):
             self.assertGreater(chosen['sampling_ratio'],1)
             self.assertEqual(chosen['train_patches_per_epoch'],chosen['global_batch_size']*250)
             self.assertEqual(chosen['formal_budget'],dict(epochs=250,train_iterations=250,validation_iterations=50))
+            self.assertEqual(chosen['gpu_memory_reservation']['minimum_gib'],4)
+            self.assertEqual(chosen['gpu_memory_reservation']['fraction_of_total'],.10)
+            self.assertEqual(set(chosen['gpu_memory_reservation']['usable_bytes']),set(chosen['gpu_uuids']))
             self.assertLessEqual(chosen['effective_cpu']['total_cpu_slots'],128)
 
     def test_gpu_oom_reduces_batch_and_retains_all_compatible_ranks(self):

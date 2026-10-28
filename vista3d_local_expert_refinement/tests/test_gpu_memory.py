@@ -12,10 +12,43 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'05_src'))
 import task_panel as panel
 import gpu_devices
 import evaluation_gpu
+import cooperative_control
 from gpu_budget import MEMORY_POLICY, required_free_mib
 
 
 class GPUMemoryTests(unittest.TestCase):
+    def admitted_capacity(self, *, total_gib=24, free_gib=23, planner_gib=20):
+        row=dict(index='0',uuid='GPU-zero',total_mib=total_gib*1024,
+                 free_mib=free_gib*1024,utilization=0,busy=False)
+        with patch.dict(os.environ,{'WHOLE_HEART_GPU_MEMORY':str(planner_gib)},clear=True), \
+             patch.object(evaluation_gpu,'snapshot',return_value=[row]), \
+             patch.object(evaluation_gpu,'allowed_ids',return_value={'GPU-zero'}):
+            ready,usable,excluded=cooperative_control.admit(['GPU-zero'])
+        self.assertEqual(ready,['GPU-zero'])
+        self.assertFalse(excluded)
+        return usable
+
+    def test_capacity_keeps_four_gib_from_actual_free_memory(self):
+        self.assertEqual(self.admitted_capacity()['GPU-zero'],19*2**30)
+        self.assertEqual(self.admitted_capacity(free_gib=21)['GPU-zero'],17*2**30)
+
+    def test_capacity_planner_ceiling_does_not_subtract_reserve_twice(self):
+        self.assertEqual(self.admitted_capacity(free_gib=24)['GPU-zero'],20*2**30)
+        self.assertEqual(self.admitted_capacity(planner_gib=16)['GPU-zero'],16*2**30)
+
+    def test_larger_card_still_reserves_ten_percent(self):
+        usable=self.admitted_capacity(total_gib=64,free_gib=63,planner_gib=60)
+        self.assertEqual(usable['GPU-zero'],int((63-6.4)*2**30))
+
+    def test_batch_inference_uses_four_gib_reserved_capacity(self):
+        usable=self.admitted_capacity()
+        result=dict(local_batch_size=2,rank_results=[dict(gpu_uuid='GPU-zero',
+            memory_facts=dict(fixed_bytes=4*2**30,peak_allocated_bytes=12*2**30,
+                              peak_reserved_bytes=13*2**30,optimizer_initialized=True))])
+        inference=cooperative_control.infer_batch(result,usable)
+        self.assertEqual(inference['local_batch_size'],3)
+        self.assertIn('4GiB',inference['usable_scope'])
+
     def config(self, root, tasks='prepare', source=None, extra=(), saved=None):
         raw=root/'raw';raw.mkdir(exist_ok=True)
         argv=['--profile','zmic44','--runtime',str(root/'runtime'),'--results',str(root/'results'),

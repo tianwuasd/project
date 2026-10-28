@@ -95,7 +95,7 @@ class CoordinatorBehaviorTests(unittest.TestCase):
         rows=[dict(uuid='a',index='0',free_mib=23000,total_mib=24576,busy=False,utilization=0),dict(uuid='b',index='1',free_mib=24000,total_mib=24576,busy=True,utilization=0),dict(uuid='c',index='2',free_mib=24000,total_mib=24576,busy=False,utilization=0)]
         with patch.object(evaluation_gpu,'snapshot',return_value=rows),patch.object(evaluation_gpu,'allowed_ids',return_value={'a','b'}),patch.dict(os.environ,{'WHOLE_HEART_GPU_MEMORY':'20'}):
             group,usable,excluded=control.admit(['a','b','c'])
-        self.assertEqual(group,['a']);self.assertEqual(usable['a'],min(20*2**30,int((23000-2457.6)*2**20)))
+        self.assertEqual(group,['a']);self.assertEqual(usable['a'],int((23000-4096)*2**20))
         self.assertEqual({r['gpu_uuid'] for r in excluded},{'b','c'})
 
     def test_all_rank_cpu_masks_bound_and_physical_core_first(self):
