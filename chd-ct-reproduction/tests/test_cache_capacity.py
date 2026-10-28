@@ -19,7 +19,7 @@ def cache_case(tmp_path, monkeypatch):
     source.mkdir()
     (source / "case.npz").write_bytes(b"unchanged-source")
     row = {"cache": "case.npz", "cache_shape": [2, 2, 2]}
-    config = {"roi_margin": 0, "stages": {"crop64": {"size": 2}},
+    config = {"roi_margin_fraction": 0.15, "stages": {"crop64": {"size": 2}},
               "data_loading": {"cache_max_gib": 32}}
     monkeypatch.setattr(cpu_cache, "prepare_input", lambda *args: (
         np.zeros((2, 2, 2), np.float32), np.ones((2, 2, 2), np.uint8)))

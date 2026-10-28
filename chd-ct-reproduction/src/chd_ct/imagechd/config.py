@@ -46,9 +46,11 @@ def load_config(path):
     if (
         config.get("learning_rate", 0) <= 0
         or config.get("weight_decay", 0) < 0
-        or config.get("roi_margin", -1) < 0
+        or type(config.get("roi_margin_fraction")) not in (int, float)
+        or not 0 <= config["roi_margin_fraction"] <= 1
+        or "roi_margin" in config
     ):
-        raise ValueError("学习率、权重衰减、ROI 边距无效")
+        raise ValueError("学习率、权重衰减或ROI比例边距无效；新版使用roi_margin_fraction，不使用roi_margin")
     if (
         not isinstance(config.get("seed"), int)
         or not isinstance(config.get("threads"), int)

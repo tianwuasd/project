@@ -104,7 +104,7 @@ def cached_input(root, directory, row, stage, config, max_gib=32, reserve_gib=2)
         "source": str(source),
         "source_sha256": file_hash(source),
         "source_shape": list(row["cache_shape"]),
-        "roi_margin": config["roi_margin"],
+        "roi_margin_fraction": config["roi_margin_fraction"],
         "predicted_roi": row.get("predicted_roi") if not stage.startswith("crop") else None,
         "roi_sha256": row.get("roi_sha256") if not stage.startswith("crop") else None,
         "variant": "blood" if blood else stage,
