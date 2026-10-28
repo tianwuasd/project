@@ -18,7 +18,7 @@ roi_margin: 3
 postprocessing:
   max_growth_steps: 2
 gpu_guard:
-  fraction: 0.85
+  fraction: 0.8
   reserve_gib: 2.0
   minimum_free_gib: 0.5
 augment: true
