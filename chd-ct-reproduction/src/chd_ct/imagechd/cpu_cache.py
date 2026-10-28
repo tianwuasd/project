@@ -2,6 +2,8 @@
 
 import hashlib
 import json
+import math
+import os
 import shutil
 import time
 from contextlib import contextmanager
@@ -16,6 +18,43 @@ from .methods import LABEL_RESIZE
 from .roi_inputs import row_roi
 
 FORMAT = "imagechd-training-inputs-v3"
+GIB = 1024**3
+
+
+def cache_used_bytes(root):
+    return sum(p.stat().st_size for p in root.glob("*.npy"))
+
+
+def disk_budget(root, used, reserve_gib):
+    """Recheck writable space under the shared writer lock, not total disk size.
+
+    used + free stays constant as this cache grows, so 80% does not creep
+    towards 100%. Other disk users can reduce it. A known allocation may
+    further bound the pool; filesystem free is not proof of a personal quota.
+    """
+    free = shutil.disk_usage(root).free
+    capacity = used + free
+    allocation = None
+    value = os.environ.get("CHD_CT_CACHE_CAPACITY_GIB")
+    if value is not None:
+        try:
+            amount = float(value)
+            if not math.isfinite(amount) or amount <= 0 or not math.isfinite(amount * GIB):
+                raise ValueError
+            allocation = int(amount * GIB)
+        except ValueError:
+            raise ValueError("CHD_CT_CACHE_CAPACITY_GIB 需要有限正数（缓存可分配总容量，GiB）") from None
+        capacity = min(capacity, allocation)
+    reserve = max(2 * GIB, int(reserve_gib * GIB))
+    return {
+        "policy": "disk-available-80-percent-v1",
+        "used_bytes": used,
+        "free_bytes": free,
+        "allocation_bytes": allocation,
+        "limit_bytes": min(capacity * 4 // 5, max(0, capacity - reserve)),
+        "reserve_bytes": reserve,
+        "quota_scope": "explicit-cache-allocation" if allocation is not None else "filesystem-visible-only",
+    }
 
 
 @contextmanager
@@ -54,6 +93,8 @@ def prepare_input(directory, row, stage, config):
 
 
 def cached_input(root, directory, row, stage, config, max_gib=32, reserve_gib=2):
+    # max_gib is retained for old callers/frozen configs, not enforced. Capacity
+    # policy is operational and must not change tensor identities or contracts.
     root, directory = Path(root).resolve(), Path(directory).resolve()
     source = safe_child(directory, row["cache"])
     blood = stage.startswith("blood")
@@ -90,12 +131,18 @@ def cached_input(root, directory, row, stage, config, max_gib=32, reserve_gib=2)
             return verify()
         image, target = prepare_input(directory, row, stage, config)
         required = image.nbytes + target.nbytes + 1024
-        used = sum(p.stat().st_size for p in root.glob("*.npy"))
+        used = cache_used_bytes(root)
         replaced = sum(p.stat().st_size for p in paths.values() if p.exists())
-        if used - replaced + required > max_gib * 1024**3:
-            raise ValueError("训练输入缓存超过 cache_max_gib；请增加预算或使用独立缓存目录")
-        if shutil.disk_usage(root).free < required + reserve_gib * 1024**3:
-            raise ValueError("训练输入缓存磁盘余量不足，保留空间要求未满足")
+        budget = disk_budget(root, used, reserve_gib)
+        budget.update(legacy_cache_max_gib=max_gib, required_bytes=required, checked_at=time.time())
+        write_json(root / "cache-budget.json", budget)
+        if budget["free_bytes"] < required + budget["reserve_bytes"]:
+            raise ValueError("训练输入缓存磁盘余量不足，至少保留2GiB；已有缓存与检查点保留")
+        if used - replaced + required > budget["limit_bytes"]:
+            raise ValueError(
+                f"训练输入缓存超过当前可分配容量的80%：已用{used / GIB:.2f}GiB，"
+                f"上限{budget['limit_bytes'] / GIB:.2f}GiB；详见 {root / 'cache-budget.json'}"
+            )
         for kind, array in (("image", image), ("target", target)):
             with atomic_path(paths[kind]) as temporary:
                 np.save(temporary, array, allow_pickle=False)
@@ -107,4 +154,4 @@ def cached_input(root, directory, row, stage, config, max_gib=32, reserve_gib=2)
                 "sha256": {kind: file_hash(path) for kind, path in paths.items()},
             },
         )
-        return {"paths": paths, "shape": list(image.shape), "reused": False}
+        return {"paths": paths, "shape": list(image.shape), "reused": False, "budget": budget}

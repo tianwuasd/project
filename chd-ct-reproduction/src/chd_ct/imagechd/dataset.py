@@ -20,6 +20,13 @@ class StageDataset(Dataset):
         self.records, self.maps = [], OrderedDict()
         self.index = []
         options = settings(config)
+        reported_budget = False
+        if cache_root is not None and options["cache"] == "mmap":
+            print(
+                "[input-cache] 动态磁盘额度80%，至少保留2GiB；旧cache_max_gib不再限额；"
+                "已有缓存按原签名复用；文件系统可用空间不代表已核验个人/NAS配额",
+                flush=True,
+            )
         for i, row in enumerate(rows):
             if cache_root is not None and options["cache"] == "mmap":
                 from .cpu_cache import cached_input
@@ -34,6 +41,15 @@ class StageDataset(Dataset):
                     options["cache_reserve_gib"],
                 )
                 self.records.append(record)
+                if record.get("budget") and not reported_budget:
+                    budget = record["budget"]
+                    print(
+                        f"[input-cache] 已用={budget['used_bytes'] / 1024**3:.2f}GiB；"
+                        f"可用={budget['free_bytes'] / 1024**3:.2f}GiB；"
+                        f"当前上限={budget['limit_bytes'] / 1024**3:.2f}GiB；目录={cache_root}",
+                        flush=True,
+                    )
+                    reported_budget = True
                 depth = record["shape"][0] if stage.startswith("blood") else None
                 if depth is not None:
                     self.index.extend((i, z) for z in range(depth))
