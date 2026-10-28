@@ -223,7 +223,7 @@ def test_stage_worker_probes_in_process_and_rejects_unusable_device(tmp_path, mo
     monkeypatch.setattr(stage_worker, "training_rows", lambda *a: {})
     monkeypatch.setattr(stage_worker, "file_hash", lambda *a: "digest")
     trained = []
-    monkeypatch.setattr(stage_worker, "train_stage", lambda *a: trained.append(True) or {"file": "crop64.pt"})
+    monkeypatch.setattr(stage_worker, "execute", lambda *a: trained.append(True) or {"file": "crop64.pt"})
     args = [
         "--prepared",
         str(tmp_path),

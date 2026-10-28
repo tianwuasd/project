@@ -5,17 +5,17 @@ import json
 from pathlib import Path
 
 from .common import read_prepared, write_json
-from .config import STAGES
 from .folds import apply_fold
 from .methods import require_aligned_cache
-from .train import file_hash, train_stage, training_rows
+from .pipeline import TASKS, execute
+from .train import file_hash, training_rows
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prepared", required=True)
     parser.add_argument("--output", required=True)
-    parser.add_argument("--stage", choices=STAGES, required=True)
+    parser.add_argument("--stage", choices=TASKS, required=True)
     parser.add_argument("--mode", choices=["smoke", "preflight", "train"], required=True)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--check-environment", action="store_true")
@@ -35,7 +35,7 @@ def main(argv=None):
     require_aligned_cache(data)
     if config.get("fold") is not None:
         data = apply_fold(data, config["fold"])
-    info = train_stage(
+    info = execute(
         directory,
         training_rows(data),
         args.stage,

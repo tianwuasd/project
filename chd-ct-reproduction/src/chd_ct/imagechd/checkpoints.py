@@ -70,6 +70,16 @@ def read_collection(directory, allow_smoke=False):
             or checkpoint.get("encoder_spec") != record["config"]["stages"]["blood2d"]
         ):
             raise ValueError("循环模型的冻结编码器不匹配")
+        if not stage.startswith("crop") and checkpoint.get("roi_sha256") != record.get("roi", {}).get(
+            "sha256"
+        ):
+            raise ValueError("阶段权重的预测 ROI 来源不匹配")
+    roi = safe_child(directory, record.get("roi", {}).get("file", "roi.json"))
+    if not roi.is_file() or file_hash(roi) != record.get("roi", {}).get("sha256"):
+        raise ValueError("模型预测 ROI 清单缺失或改变")
+    from .calibration import load_policy
+
+    load_policy(directory, record)
     return directory, record
 
 

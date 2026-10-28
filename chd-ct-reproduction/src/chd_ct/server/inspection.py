@@ -231,7 +231,7 @@ def log_paths(job, step="auto", model="all"):
     runs = model_runs(run)
     if model != "all" and runs == [run]:
         return [run / "stage_logs" / f"{model}.log"]
-    models = MODELS if model == "all" else (model,)
+    models = (*MODELS, "roi", "calibration") if model == "all" else (model,)
     paths = [fold / "stage_logs" / f"{m}.log" for fold in runs for m in models]
     existing = [p for p in paths if p.is_file() and p.resolve().is_relative_to(run.resolve())]
     return existing or [output / "server.log"]

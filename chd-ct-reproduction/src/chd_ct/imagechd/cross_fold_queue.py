@@ -6,8 +6,8 @@ from contextlib import ExitStack
 
 from ..recovery import output_lock
 from .common import write_json
-from .config import STAGES
 from .gpu_queue import options
+from .pipeline import DEPENDENCIES, TASKS
 from .stage_queue import run_queue
 from .training_session import commit_stage, finish_session, training_session
 
@@ -49,7 +49,7 @@ def run_folds(
                     fold,
                 )
             )
-        tasks = [f"{key}/{stage}" for key in sessions for stage in STAGES]
+        tasks = [f"{key}/{stage}" for key in sessions for stage in TASKS]
 
         def command_for(task):
             key, stage = task.split("/")
@@ -73,7 +73,7 @@ def run_folds(
             key, stage = task.split("/")
             session = sessions[key]
             commit_stage(session, stage, info)
-            if len(session["collection"]["stages"]) == len(STAGES):
+            if stage == "calibration":
                 finish_session(session)
                 on_fold_complete(session["config"]["fold"])
 
@@ -87,7 +87,7 @@ def run_folds(
             )
             report["current_fold"] = next(iter(report["current_folds"]), None)
             for key in sessions:
-                stages = {stage: state["stages"][f"{key}/{stage}"] for stage in STAGES}
+                stages = {stage: state["stages"][f"{key}/{stage}"] for stage in TASKS}
                 statuses = {item["status"] for item in stages.values()}
                 status = (
                     "complete"
@@ -121,7 +121,11 @@ def run_folds(
             on_complete=completed,
             lock_fds=tuple(descriptors),
             **queue_options,
-            dependencies={f"{key}/blood_lstm": [f"{key}/blood2d"] for key in sessions},
+            dependencies={
+                f"{key}/{task}": [f"{key}/{p}" for p in parents]
+                for key in sessions
+                for task, parents in DEPENDENCIES.items()
+            },
             result_path_for=lambda task: output / (task + ".result.json"),
             log_path_for=lambda task: output
             / task.split("/")[0]

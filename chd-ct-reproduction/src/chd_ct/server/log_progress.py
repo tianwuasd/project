@@ -34,6 +34,17 @@ def show_progress(job, step="auto", model="all"):
             status = "waiting_gpu"
         for folder in model_runs(run_directory(output)):
             config = load(folder / "effective-config.json").get("stages", {})
+            if model in {"all", "server"}:
+                manifest = load(folder / "models.json")
+                for key, title, ref in (
+                    ("roi", "训练/验证定位框", "roi"),
+                    ("calibration", "验证集后处理选择", "postprocessing"),
+                ):
+                    task = f"{folder.name}/{key}" if folder.name.startswith("fold_") else key
+                    saved = queue.get("stages", {}).get(task, {})
+                    state = "已完成" if manifest.get(ref) else saved.get("status", "未完成")
+                    if manifest.get(ref) or saved or manifest.get("processing_method", {}).get("roi"):
+                        print(f"  {folder.name}/{title}：{state}（非 epoch 任务，不计入训练 ETA）")
             for name in MODELS if model in {"all", "server"} else (model,):
                 history = load(folder / f"{name}.history.json", [])
                 if not history and name not in config:

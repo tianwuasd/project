@@ -23,6 +23,16 @@ def load_config(path):
     if config.get("architecture") != ARCHITECTURE:
         raise ValueError("旧配置或主干 architecture 不匹配；请使用当前 configs/chd.yaml")
     validate_settings(config)
+    post = config.setdefault("postprocessing", {"max_growth_steps": 2})
+    if type(post.get("max_growth_steps")) is not int or not 0 <= post["max_growth_steps"] <= 16:
+        raise ValueError("postprocessing.max_growth_steps 需为 0—16 整数")
+    guard = config.setdefault("gpu_guard", {"fraction": 0.85, "reserve_gib": 2.0, "minimum_free_gib": 0.5})
+    if not (
+        0 < guard.get("fraction", 0) < 1
+        and guard.get("reserve_gib", 0) >= 2
+        and 0 < guard.get("minimum_free_gib", 0) <= guard["reserve_gib"]
+    ):
+        raise ValueError("GPU 显存保护配置无效")
     cv = config.setdefault("cross_validation", {"folds": 1, "development_scope": "auto"})
     if (
         not isinstance(cv, dict)

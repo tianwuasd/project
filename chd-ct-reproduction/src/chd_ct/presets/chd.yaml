@@ -15,6 +15,12 @@ data_loading:
   tune_seconds: 180
   progress_seconds: 30
 roi_margin: 3
+postprocessing:
+  max_growth_steps: 2
+gpu_guard:
+  fraction: 0.85
+  reserve_gib: 2.0
+  minimum_free_gib: 0.5
 augment: true
 learning_rate: 0.0002
 weight_decay: 0.0

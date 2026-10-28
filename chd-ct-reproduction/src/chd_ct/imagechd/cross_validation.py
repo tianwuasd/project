@@ -154,7 +154,7 @@ def train_threefold(prepared, output, config_path, mode, device, gpu_ids, resume
 
             report.update(scheduling="cross_fold", current_folds=[])
             write_json(output / "report.json", report)
-            print("三折共享 GPU 队列：独立模型可跨折并行，同折 blood_lstm 等待 blood2d。", flush=True)
+            print("三折共享 GPU 队列：定位网络→本折预测框→解剖/血池网络→验证后处理；就绪任务可跨折并行。", flush=True)
             run_folds(
                 directory,
                 output,

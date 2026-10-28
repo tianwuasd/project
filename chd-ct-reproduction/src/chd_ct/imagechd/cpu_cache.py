@@ -11,10 +11,11 @@ import numpy as np
 
 from ..recovery import atomic_path, file_hash, output_lock, read_json, write_json
 from .common import load_case, safe_child
-from .geometry import blood_target, bounding_box, resize
+from .geometry import blood_target, resize
 from .methods import LABEL_RESIZE
+from .roi_inputs import row_roi
 
-FORMAT = "imagechd-training-inputs-v2"
+FORMAT = "imagechd-training-inputs-v3"
 
 
 @contextmanager
@@ -39,7 +40,7 @@ def cache_lock(root, timeout=600):
 def prepare_input(directory, row, stage, config):
     image, target = load_case(directory, row)
     if not stage.startswith("crop"):
-        roi = bounding_box((target > 0) & (target < 8), config["roi_margin"])
+        roi = row_roi(row, image.shape)
         image, target = image[roi], target[roi]
     if stage.startswith("blood"):
         target = blood_target(target)
@@ -63,6 +64,8 @@ def cached_input(root, directory, row, stage, config, max_gib=32, reserve_gib=2)
         "source_sha256": file_hash(source),
         "source_shape": list(row["cache_shape"]),
         "roi_margin": config["roi_margin"],
+        "predicted_roi": row.get("predicted_roi") if not stage.startswith("crop") else None,
+        "roi_sha256": row.get("roi_sha256") if not stage.startswith("crop") else None,
         "variant": "blood" if blood else stage,
         "size": None if blood else config["stages"][stage]["size"],
     }

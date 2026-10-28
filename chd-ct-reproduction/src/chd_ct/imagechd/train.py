@@ -50,6 +50,10 @@ def train_stage(directory, rows, stage, config, output, mode, manifest_hash, res
 
     torch.set_num_threads(config["threads"])
     stage_seed = config["seed"] + 10000 * config.get("fold", {}).get("index", 0) + STAGES.index(stage)
+    if not stage.startswith("crop"):
+        from .roi_inputs import attach_rois
+
+        rows, _ = attach_rois(directory, rows, config, output)
     loaders = {}
     started = time.perf_counter()
     try:
@@ -57,13 +61,18 @@ def train_stage(directory, rows, stage, config, output, mode, manifest_hash, res
             dataset = StageDataset(directory, selected, stage, config, cache_directory(directory, config))
             loaders[split] = make_loader(dataset, config, stage, split, stage_seed)
         print(f"[input-ready] {stage}: {time.perf_counter() - started:.2f}s", flush=True)
-        return _train_stage(directory, rows, stage, config, output, mode, manifest_hash, resume, loaders)
+        from .gpu_memory import gpu_budget
+
+        with gpu_budget(config["device"], output / (stage + ".gpu-memory.json"), config) as guard:
+            return _train_stage(
+                directory, rows, stage, config, output, mode, manifest_hash, resume, loaders, guard
+            )
     finally:
         for loader in loaders.values():
             close_loader(loader)
 
 
-def _train_stage(directory, rows, stage, config, output, mode, manifest_hash, resume, loaders):
+def _train_stage(directory, rows, stage, config, output, mode, manifest_hash, resume, loaders, guard):
     torch.set_num_threads(config["threads"])
     stage_seed = config["seed"] + 10000 * config.get("fold", {}).get("index", 0) + STAGES.index(stage)
     torch.manual_seed(stage_seed)
@@ -93,6 +102,7 @@ def _train_stage(directory, rows, stage, config, output, mode, manifest_hash, re
         prepared_sha256=manifest_hash,
         architecture=ARCHITECTURE,
         encoder_sha256=file_hash(output / "blood2d.pt") if encoder is not None else None,
+        roi_sha256=rows["train"][0].get("roi_sha256") if not stage.startswith("crop") else None,
     )
     start, best_bytes = 0, None
     timing_path = output / (stage + ".timing.json")
@@ -137,6 +147,9 @@ def _train_stage(directory, rows, stage, config, output, mode, manifest_hash, re
             last_progress = split_start
             steps = min(maximum, len(loader)) if maximum else len(loader)
             for step in range(steps):
+                guard.check()
+                if split == "train":
+                    optimizer.zero_grad(set_to_none=True)
                 before = time.perf_counter()
                 image, target = next(iterator)
                 waiting += time.perf_counter() - before
@@ -154,9 +167,9 @@ def _train_stage(directory, rows, stage, config, output, mode, manifest_hash, re
                     if not torch.isfinite(loss):
                         raise RuntimeError("损失非有限值")
                     if split == "train":
-                        optimizer.zero_grad(set_to_none=True)
                         loss.backward()
                         optimizer.step()
+                guard.check()
                 total += float(loss.detach()) * len(image)
                 count += len(image)
                 # loss.item above synchronizes CUDA; this bucket includes transfer,
@@ -208,6 +221,7 @@ def _train_stage(directory, rows, stage, config, output, mode, manifest_hash, re
                 "spec": spec,
                 "mode": mode,
                 "prepared_sha256": manifest_hash,
+                "roi_sha256": contract["roi_sha256"],
                 "epoch": epoch + 1,
                 "val_loss": best,
                 "state_dict": {k: v.detach().cpu().clone() for k, v in model.state_dict().items()},
@@ -301,6 +315,7 @@ def train_locked(
     inherited_lock_fds=(),
 ):
     from .gpu_queue import options
+    from .pipeline import DEPENDENCIES, TASKS, execute
     from .training_session import commit_stage, finish_session, training_session
 
     queue_options = options(gpu_ids, gpu_limit, device, mode)
@@ -339,17 +354,18 @@ def train_locked(
                 ]
 
             run_queue(
-                STAGES,
+                TASKS,
                 output=output,
                 command_for=command_for,
                 env=os.environ.copy(),
                 on_complete=lambda stage, info: commit_stage(session, stage, info),
                 lock_fds=(*inherited_lock_fds, lock_fd),
                 **queue_options,
+                dependencies=DEPENDENCIES,
             )
         else:
-            for stage in STAGES:
-                info = train_stage(
+            for stage in TASKS:
+                info = execute(
                     directory,
                     rows,
                     stage,
@@ -365,7 +381,7 @@ def train_locked(
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="CHD 六阶段训练：只读取预处理缓存")
+    parser = argparse.ArgumentParser(description="CHD 六网络训练及定位框/验证后处理：只读取预处理缓存")
     parser.add_argument("--prepared", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--config", default=str(config_path("chd.yaml")))

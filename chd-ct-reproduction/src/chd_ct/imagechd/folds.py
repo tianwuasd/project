@@ -2,7 +2,7 @@
 
 import random
 
-CV_MODEL_FORMAT = "imagechd7-threefold-v2"
+CV_MODEL_FORMAT = "imagechd7-threefold-v3"
 SPLITS = ("train", "val", "test")
 
 

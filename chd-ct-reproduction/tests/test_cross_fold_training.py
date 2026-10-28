@@ -7,7 +7,7 @@ import test_chd_main
 
 from chd_ct.imagechd import cross_fold_queue, stage_worker
 from chd_ct.imagechd import train as trainer
-from chd_ct.imagechd.config import STAGES
+from chd_ct.imagechd.pipeline import TASKS
 from chd_ct.imagechd.preprocess import prepare
 from chd_ct.recovery import file_hash, read_json
 
@@ -23,7 +23,7 @@ def install_cpu_dispatch(monkeypatch, *, fail_after=None):
     def dispatch(tasks, **kwargs):
         assert kwargs["gpu_limit"] == 2
         assert len(kwargs["lock_fds"]) == 4  # CV root and all three child locks
-        ordered = sorted(tasks, key=lambda t: (STAGES.index(t.split("/")[1]), t))
+        ordered = sorted(tasks, key=lambda t: (TASKS.index(t.split("/")[1]), t))
         state = dict(
             status="running",
             sampled_at=1,
@@ -76,7 +76,7 @@ def test_cross_fold_coordinator_resumes_partial_folds_and_keeps_frozen_settings(
     report = trainer.train(cache, output, config, resume=True, **args)
     assert report["status"] == "passed" and report["completed_folds"] == 3
     assert report["scheduling"] == "cross_fold" and report["current_folds"] == []
-    assert len(seen) == 18 and all(resumed for _, resumed in seen)
+    assert len(seen) == 24 and all(resumed for _, resumed in seen)
     assert file_hash(checkpoint) == saved
     from chd_ct.imagechd.checkpoints import read_collection
 
@@ -104,6 +104,7 @@ def test_legacy_serial_interruption_can_resume_with_global_queue(tmp_path, monke
     with pytest.raises(KeyboardInterrupt):
         trainer.train(cache, output, config, mode="smoke")
     preserved = (output / "fold_0/models.json").read_bytes()
+    monkeypatch.setattr(trainer, "train_stage", original)
     seen = install_cpu_dispatch(monkeypatch)
     result = trainer.train(
         cache,
@@ -116,6 +117,6 @@ def test_legacy_serial_interruption_can_resume_with_global_queue(tmp_path, monke
         resume=True,
     )
     assert result["completed_folds"] == 3
-    assert len(seen) == 12 and all(not t.startswith("fold_0/") for t, _ in seen)
+    assert len(seen) == 16 and all(not t.startswith("fold_0/") for t, _ in seen)
     assert all(resumed == t.startswith("fold_1/") for t, resumed in seen)
     assert (output / "fold_0/models.json").read_bytes() == preserved
