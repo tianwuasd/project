@@ -173,6 +173,10 @@ def run_install_command(command, env):
             report_progress(env,None,'安装下载线路完成：'+route,network_route=route,network_attempt=attempt)
             return result
         except subprocess.CalledProcessError as error:
+            if error.returncode < 0 or 128 <= error.returncode <= 192:
+                report_progress(env,None,'安装子进程被信号终止；保留退出码，不启动代理重试。',
+                                network_route=route,network_attempt=attempt)
+                raise
             last=error
             report_progress(env,None,f'安装下载线路失败：{route}；退出码{error.returncode}，详细原因见上方安装输出。',
                             network_route=route,network_attempt=attempt)

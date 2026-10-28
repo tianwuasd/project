@@ -59,6 +59,16 @@ class InstallRoutesTests(unittest.TestCase):
                 with self.assertRaises(KeyboardInterrupt):setup.run_install_command(['download'],self.fixture(Path(temp)))
             self.assertEqual(run.call_count,1)
 
+    def test_signal_exit_never_starts_proxy_attempt(self):
+        with tempfile.TemporaryDirectory() as temp:
+            env=self.fixture(Path(temp))
+            for code in (-15,-2,129,130,137,143):
+                with self.subTest(returncode=code), patch.object(setup,'_install_child',
+                        side_effect=subprocess.CalledProcessError(code,['download'])) as run:
+                    with self.assertRaises(subprocess.CalledProcessError):
+                        setup.run_install_command(['download'],env)
+                    self.assertEqual(run.call_count,1)
+
     def test_no_configured_proxy_does_not_reuse_inherited_proxy_or_loop(self):
         with tempfile.TemporaryDirectory() as temp:
             env=dict(WHOLE_HEART_ENV_PREFIX=str(Path(temp)/'envs/test'),

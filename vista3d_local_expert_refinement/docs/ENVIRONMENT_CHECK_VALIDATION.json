@@ -12,14 +12,15 @@
     "failures": 0,
     "errors": 0,
     "log_sha256": "b071480cfed070bb0fdee3f4672f33ae50a7758d5759a1296095352b6c52c44b",
-    "note": "Run before one additional explicit NO_PROXY regression; final route suite 8/8 separately passed."
+    "note": "367-run full suite passed before two additional route regressions; final route suite 9/9 separately passed."
   },
   "focused_checks": {
     "dependency_failure_and_progress": "7/7 passed",
-    "final_direct_and_proxy_routes": "8/8 passed",
+    "final_direct_and_proxy_routes": "9/9 passed, including KeyboardInterrupt, native signal and shell signal exits",
     "bash_syntax": "passed",
     "actual_conda_temporary_route_parsing": "passed for direct and proxy; no installation/network",
-    "preparation_identity": "seven producer files unchanged from 0.5.0"
+    "preparation_identity": "seven producer files unchanged from 0.5.0",
+    "source_environment_contract": "Strict upstream environment records retained; changed dependencies require new preparation, not overwrite."
   },
   "runtime_inventory": [
     {
@@ -229,8 +230,8 @@
     },
     {
       "path": "05_src/panel_publication/network.py",
-      "bytes": 6746,
-      "sha256": "876b0efc4b251ad0e89dde0b887e86f96aa814a6cbfcc859a540cb6559fdea8f"
+      "bytes": 6779,
+      "sha256": "8b959a315c1c91858da52f3d7845447c0360d87c9a06f4161c49be5fc2845dce"
     },
     {
       "path": "05_src/panel_publication/prompts.py",
@@ -314,8 +315,8 @@
     },
     {
       "path": "05_src/runtime_setup.py",
-      "bytes": 14035,
-      "sha256": "b68babc2220bc303643b66ae90b55b233ca73e943b1d57ea897c8236e438e001"
+      "bytes": 14325,
+      "sha256": "fdd7d013e2f190a2b31f9f7adab821da09138884e24a941e5cf24c50b07b142d"
     },
     {
       "path": "05_src/server_data.py",

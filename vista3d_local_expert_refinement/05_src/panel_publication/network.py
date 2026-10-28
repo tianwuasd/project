@@ -122,7 +122,7 @@ def routes(settings):
 
 
 def show(settings):
-    print("GitHub 网络设置（仅用于代码更新、代码上传与结果上传）")
+    print("GitHub与安装回退网络设置（代码更新/上传；环境安装下载直连失败后使用此代理）")
     print("代理：" + (settings["proxy"] or "未显式设置，沿用进程网络环境"))
     print("代码更新线路：" + settings["git_transport"])
     if settings["git_transport"] == "github-ssh":
