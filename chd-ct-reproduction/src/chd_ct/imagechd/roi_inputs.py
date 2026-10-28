@@ -3,12 +3,75 @@
 from pathlib import Path
 
 import numpy as np
+from scipy import ndimage
 
 from ..recovery import file_hash, read_json, write_json
 from .common import load_case
 from .geometry import bounding_box, resize
+from .methods import ROI_METHOD
 
-ROI_METHOD = "fold-localizer-predicted-roi-v1"
+
+def _expanded_box(mask, margin_fraction):
+    box = bounding_box(mask, 0)
+    margins = [int(np.ceil((s.stop - s.start) * margin_fraction)) for s in box]
+    if not mask.any():
+        return box, [0, 0, 0]
+    return tuple(
+        slice(max(0, s.start - m), min(n, s.stop + m))
+        for s, m, n in zip(box, margins, mask.shape)
+    ), margins
+
+
+def roi_from_crops(crops, margin_fraction):
+    """Keep each localizer's largest 26-connected foreground only for ROI geometry."""
+    if type(margin_fraction) not in (int, float) or not 0 <= margin_fraction <= 1:
+        raise ValueError("ROI 比例边距需为0到1的有限数值")
+    if len(crops) != 2 or any(c.ndim != 3 or c.shape != crops[0].shape for c in crops):
+        raise ValueError("ROI 需要两路同形状的三维定位预测")
+    if not crops[0].size:
+        raise ValueError("ROI 定位预测不能为空数组")
+    raw = np.zeros(crops[0].shape, dtype=bool)
+    foreground = np.zeros_like(raw)
+    components = {}
+    for stage, crop in zip(("crop64", "crop128"), crops):
+        mask = crop > 0
+        raw |= mask
+        labeled, count = ndimage.label(mask, structure=np.ones((3, 3, 3), dtype=bool))
+        sizes = np.bincount(labeled.ravel(), minlength=count + 1)
+        sizes[0] = 0
+        total = int(sizes.sum())
+        # argmax chooses the first label on ties: deterministic C-order labeling.
+        kept = int(sizes.max())
+        if count:
+            foreground |= labeled == int(sizes.argmax())
+        components[stage] = {
+            "component_count": int(count),
+            "foreground_voxels": total,
+            "kept_voxels": kept,
+            "removed_voxels": total - kept,
+            "kept_fraction": kept / total if total else 0.0,
+            "largest_tie_count": int(np.count_nonzero(sizes[1:] == kept)) if count else 0,
+        }
+    roi, margins = _expanded_box(foreground, margin_fraction)
+    raw_roi, raw_margins = _expanded_box(raw, margin_fraction)
+    full = all(s.start == 0 and s.stop == n for s, n in zip(roi, foreground.shape))
+    empty = not bool(foreground.any())
+    return roi, {
+        "roi_method": ROI_METHOD,
+        "roi_margin_fraction": margin_fraction,
+        "roi_margin_voxels": margins,
+        "raw_roi_margin_voxels": raw_margins,
+        "roi_connectivity": 26,
+        "roi_components": components,
+        "raw_roi_slices": [[s.start, s.stop] for s in raw_roi],
+        "roi_slices": [[s.start, s.stop] for s in roi],
+        "empty_roi_fallback": empty,
+        "full_volume_roi": full,
+        "roi_volume_fraction": float(np.prod([s.stop - s.start for s in roi]) / foreground.size),
+        "roi_warning": (
+            "两路定位前景均为空，回退全图" if empty else "定位框覆盖全图" if full else None
+        ),
+    }
 
 
 def locate(image, directory, collection, device):
@@ -20,21 +83,8 @@ def locate(image, directory, collection, device):
         )
         for stage in ("crop64", "crop128")
     ]
-    foreground = (crops[0] > 0) | (crops[1] > 0)
-    roi = bounding_box(foreground, collection["config"]["roi_margin"])
-    full = all(s.start == 0 and s.stop == n for s, n in zip(roi, image.shape))
-    return (
-        crops,
-        roi,
-        {
-            "roi_method": ROI_METHOD,
-            "roi_slices": [[s.start, s.stop] for s in roi],
-            "empty_roi_fallback": not bool(foreground.any()),
-            "full_volume_roi": full,
-            "roi_volume_fraction": float(np.prod([s.stop - s.start for s in roi]) / image.size),
-            "roi_warning": "定位框覆盖全图；未使用真值强行缩框" if full else None,
-        },
-    )
+    roi, details = roi_from_crops(crops, collection["config"]["roi_margin_fraction"])
+    return crops, roi, details
 
 
 def row_roi(row, shape):
@@ -55,7 +105,7 @@ def roi_contract(directory, rows, config, output):
         "method": ROI_METHOD,
         "prepared_sha256": file_hash(Path(directory) / "dataset.json"),
         "localizers": {s: file_hash(Path(output) / (s + ".pt")) for s in ("crop64", "crop128")},
-        "roi_margin": config["roi_margin"],
+        "roi_margin_fraction": config["roi_margin_fraction"],
         "fold": config.get("fold"),
         "cases": {
             part: {r["case_id"]: file_hash(Path(directory) / r["cache"]) for r in selected}

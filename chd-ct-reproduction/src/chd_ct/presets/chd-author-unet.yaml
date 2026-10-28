@@ -4,7 +4,7 @@
 profile: author-unet
 seed: 42
 threads: 2
-roi_margin: 3
+roi_margin_fraction: 0.15
 augment: true
 learning_rate: 0.0002
 weight_decay: 0.0

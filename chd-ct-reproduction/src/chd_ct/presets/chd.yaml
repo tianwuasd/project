@@ -14,7 +14,7 @@ data_loading:
   cache_reserve_gib: 2
   tune_seconds: 180
   progress_seconds: 30
-roi_margin: 3
+roi_margin_fraction: 0.15
 postprocessing:
   max_growth_steps: 2
 gpu_guard:

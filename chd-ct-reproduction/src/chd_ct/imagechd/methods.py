@@ -1,17 +1,18 @@
 """Scientific processing identities, independent of model architecture and hardware."""
 
 LABEL_RESIZE = "nearest-exact-pixel-centers-v1"
+ROI_METHOD = "fold-localizer-largest-component26-relative-margin-roi-v2"
 PROCESSING = {
     "label_resize": LABEL_RESIZE,
     "blood_refinement": "validation-selected-seed-preserving-v1",
-    "roi": "fold-localizer-predicted-roi-v1",
+    "roi": ROI_METHOD,
 }
 
 
 def require_current_processing(record):
     if record.get("processing_method") != PROCESSING:
         raise ValueError(
-            "模型的标签缩放/血池细化协议不同或未记录；请在独立新任务重新训练。"
+            "模型的标签缩放/血池细化/ROI 协议不同或未记录；请在独立新任务重新训练。"
             "历史结果仍可查看；旧实验使用原冻结代码，不混用新方法。"
         )
 

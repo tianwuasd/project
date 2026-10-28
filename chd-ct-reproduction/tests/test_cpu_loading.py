@@ -68,8 +68,8 @@ def test_cache_identity_integrity_and_budget(raw_chd, tmp_path):
     with pytest.raises(ValueError, match="校验失败"):
         cpu_cache.cached_input(inputs, directory, row, "crop64", config)
     before = file_hash(directory / row["cache"])
-    with pytest.raises(ValueError, match="cache_max_gib"):
-        cpu_cache.cached_input(tmp_path / "tiny", directory, row, "crop64", config, max_gib=1e-9)
+    # Historical fixed ceilings no longer reject writes; no source/config rewrite.
+    cpu_cache.cached_input(tmp_path / "tiny", directory, row, "crop64", config, max_gib=1e-9)
     assert file_hash(directory / row["cache"]) == before
 
 
