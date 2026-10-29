@@ -71,9 +71,9 @@ class CoordinatorBehaviorTests(unittest.TestCase):
             def attempt(w,f,m,g,b,r,k,**kw):calls.append(b);raise errors
             with patch.object(control,'admit',return_value=(['GPU-0'],{'GPU-0':20*2**30},[])),patch('task_resources.probe',return_value=dict(cpu_budget=20,memory_budget_bytes=100*2**30)),patch.object(control,'trial',side_effect=attempt),patch('training_policy.select_trial') as search:
                 with self.assertRaises(RankGroupFailure):control.tune(root,'f','B0','assessment',['GPU-0'])
-            self.assertEqual(calls,[16,8,4,2]);search.assert_not_called()
+            self.assertEqual(calls,[8,4,2,1]);search.assert_not_called()
 
-    def test_eager_recovery_preserves_proven_batch_above_plan_reference(self):
+    def test_legacy_recovery_request_cannot_exceed_new_global_cap(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=self.workspace(Path(tmp));batches=[]
             def attempt(w,f,m,g,b,r,k,**kw):
@@ -81,7 +81,7 @@ class CoordinatorBehaviorTests(unittest.TestCase):
                 return dict(status='passed',local_batch_size=b)
             with patch.object(control,'admit',return_value=(['GPU-0'],{'GPU-0':20*2**30},[])),patch('task_resources.probe',return_value=dict(cpu_budget=20,memory_budget_bytes=100*2**30)),patch.object(control,'trial',side_effect=attempt):
                 result=control.tune(root,'f','B0','formal',['GPU-0'],max_local_batch=32,execution=dict(compile=False))
-            self.assertEqual(batches,[32]);self.assertEqual(result['local_batch_size'],32)
+            self.assertEqual(batches,[8]);self.assertEqual(result['local_batch_size'],8)
 
     def test_noncapacity_error_surfaces_without_retry(self):
         with tempfile.TemporaryDirectory() as tmp:

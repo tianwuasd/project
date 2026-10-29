@@ -47,6 +47,18 @@ except ImportError:
 
 @unittest.skipIf(torch is None, 'requires pinned API runtime')
 class TransferTests(unittest.TestCase):
+    def test_large_half_output_probe_does_not_create_artificial_gradient_overflow(self):
+        from training_execution import _probe_network
+        class Large(torch.nn.Module):
+            def __init__(self):
+                super().__init__();self.weight=torch.nn.Parameter(torch.ones((),dtype=torch.float16))
+            def forward(self,x):return [self.weight.expand(131072),self.weight.expand(262144)]
+        model=Large()
+        _,outputs,gradients=_probe_network(model,torch.ones(1),tuple(model.parameters()),'cpu')
+        self.assertEqual(len(outputs),2)
+        self.assertTrue(torch.isfinite(gradients[0]))
+        self.assertGreater(float(gradients[0]),0)
+
     def compile_compatibility(self, kind):
         import copy
         import types

@@ -56,6 +56,10 @@ def run_rank(rank,world_size,args):
     import json
     trainer.print_to_log_file('Rank execution settings: '+json.dumps(execution,sort_keys=True))
     trainer.initialize()
+    from batch_distribution import layout
+    expected_batches=layout((args['global_batch_size']+world_size-1)//world_size,world_size,
+        global_batch=args['global_batch_size'])
+    if trainer.batch_size!=expected_batches[rank]:raise ValueError('rank batch differs from approved global partition')
     initial_hash=state_hash(trainer.network.module if trainer.is_ddp else trainer.network)
     if args.get('checkpoint'):trainer.load_checkpoint(args['checkpoint'])
     if trainer.num_epochs!=250 or trainer.num_iterations_per_epoch!=250 or trainer.num_val_iterations_per_epoch!=50:
@@ -63,9 +67,13 @@ def run_rank(rank,world_size,args):
     trial=args.get('operation')=='trial'
     from training_feedback import RollingFeedback
     feedback=RollingFeedback(resource,rank,world_size,output) if not trial else None
+    from training_performance import ExpansionGuard
+    guard=ExpansionGuard(args.get('expansion_guard'),args['global_batch_size'])
+    epoch_performance=[]
     started=time.monotonic()
     result=dict(status='running',rank=rank,gpu_uuid=args['gpu_uuids'][rank],world_size=world_size,global_batch_size=args['global_batch_size'],
-        local_batch_size=trainer.batch_size,resource=resource,run_kind=args['run_kind'],
+        local_batch_size=trainer.batch_size,local_batch_sizes=expected_batches,
+        max_global_batch_size=8,resource=resource,run_kind=args['run_kind'],
         patch_size=list(map(int,trainer.configuration_manager.patch_size)),cuda=device.type=='cuda',
         initial_weight_sha256=initial_hash,affinity=affinity,
         resumed_initial_checkpoint=args.get('checkpoint'),first_epoch=trainer.current_epoch,
@@ -78,6 +86,7 @@ def run_rank(rank,world_size,args):
         trainer.on_train_start()
         if device.type=='cuda':torch.cuda.reset_peak_memory_stats(device)
         for epoch in range(trainer.current_epoch,trainer.num_epochs):
+            epoch_started=time.monotonic()
             trainer.on_epoch_start()
             checkpoint_committed=False
             train_steps=12 if trial else 250
@@ -161,17 +170,30 @@ def run_rank(rank,world_size,args):
                 trainer.dataloader_train.pause()
                 result['resume_supply_transfer']=trainer.dataloader_train.observations()
                 break
+            durations=[None]*world_size
+            dist.all_gather_object(durations,time.monotonic()-epoch_started)
+            performance=dict(epoch=epoch,seconds=max(durations),global_batch=args['global_batch_size'],
+                world_size=world_size,rank_seconds=durations,scope='natural full epoch including validation, checkpoint and feedback')
+            epoch_performance.append(performance);epoch_performance=epoch_performance[-8:]
+            result['epoch_performance']=epoch_performance
+            regression=guard.observe(epoch,performance['seconds'])
+            result['expansion_guard']=regression
+            if rank==0:
+                import json
+                with (output/'epoch-performance.jsonl').open('a',encoding='utf-8') as stream:
+                    stream.write(json.dumps(dict(performance,guard=regression),ensure_ascii=False)+'\n')
             result['resource']=feedback.resource
             result['feedback_windows']=feedback.windows
             pending_cpu=feedback.epoch_boundary(trainer)
             # Every rank observes one rank0 decision at the same completed epoch.
-            request=[bool(pending_cpu)]
+            request=[bool(pending_cpu) or regression['rollback']]
             if rank==0 and args.get('regroup_request'):
                 path=Path(args['regroup_request'])
                 if path.exists():request[0]=request[0] or load_json(path).get('gpu_uuids')!=args['gpu_uuids']
             dist.broadcast_object_list(request,src=0)
             if request[0] and trainer.current_epoch<trainer.num_epochs:
                 result.update(status='regroup',next_epoch=trainer.current_epoch,pending_cpu_resource=pending_cpu,
+                    regroup_reason='expansion_regression' if regression['rollback'] else 'membership_or_cpu',
                     checkpoint=str(output/'fold_0/checkpoint_latest.pth'))
                 break
         else:

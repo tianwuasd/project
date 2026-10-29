@@ -233,3 +233,17 @@ cohort与项目身份改变，必须新建预处理和训练，菜单拒绝旧8/
 原生loader API另外验证。原取样与评价7文件相对0.5.3字节不变，所有方向目标ID不变。
 详见docs/FULL_SOURCE_TRAINING.md与FULL_SOURCE_VALIDATION.json；未执行真实病例或服务器GPU。
 项目发布后从精确固定提交重建Skill v2；旧v1及同期CT修改保留。
+
+
+## 2026-10-29：batch上限8与供数修复（0.6.1）
+
+用户审核后确认实施完整优化方案，并要求Skill v2包含现成模板以减少调用token。
+默认global<=8，六卡2/2/1/1/1/1；逐卡CPU/RAM按实际batch分配。不均分CE按样本加权，
+batch Dice收集前先作本地batch求和，原生oversampling与深监督保留。供数worker和队列联合核算，
+训练/验证每个worker至少一个可派发槽；必要时减少闲置验证池。自然扩卡后只在同batch完整epoch
+持续退化时回到原组，并从最新完整checkpoint继续，保留已完成进度；新增卡本阶段延期。
+反馈历史追加、最新快照有界；编译投影不再求和全部logits制造half溢出，有限性/误差检查保留。
+402项控制352通过50跳过，CPU API22通过1跳过，真实CPU Gloo四/六rank梯度与未拆8块一致。
+详见docs/CAPPED_COOPERATIVE_BATCH.md及CAPPED_BATCH_VALIDATION.json；不代表目标CUDA/NCCL或真实CT提速已验收。
+0.6.0准备身份七文件未变，可复用兼容预处理；旧8/4缓存及旧冻结训练不热修。
+Skill须从本项目发布后的精确提交重建完整可读代码/ZIP/清单；v1及CT资产保留。

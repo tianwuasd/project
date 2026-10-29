@@ -70,9 +70,12 @@ def resource_lines(work,state):
                 events=optional(path)
                 if isinstance(events,list):
                     feedback.extend((path.stat().st_mtime_ns,event) for event in events)
+                elif isinstance(events,dict) and events.get('schema_version')==3:
+                    feedback.append((path.stat().st_mtime_ns,events))
         for _,event in sorted(feedback,key=lambda item:item[0]):
             item=event.get('decision',{})
-            if item.get('applied_boundary')=='replay_safe_batch':effective=item.get('settings',effective)
+            if event.get('applied_settings'):effective=event['applied_settings']
+            elif item.get('applied_boundary')=='replay_safe_batch':effective=item.get('settings',effective)
         if feedback:
             event=sorted(feedback,key=lambda item:item[0])[-1][1];window=event.get('window',{})
             lines.append('供数观察：最高等待比例 '+str(window.get('wait_fraction','缺失'))+'；逐rank '+str(window.get('rank_windows',[])))

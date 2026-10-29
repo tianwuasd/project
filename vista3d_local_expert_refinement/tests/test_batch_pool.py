@@ -184,6 +184,19 @@ def delayed_lock_worker(*_args):
 
 
 class BatchPoolTests(unittest.TestCase):
+    def test_joint_ram_queue_budget_dispatches_to_every_reserved_worker(self):
+        from live_resources import _rank_setting
+        row=_rank_setting(23,23*64*2**20,64*2**20,16,0,0)
+        self.assertGreaterEqual(row['prefetch'],row['train_workers'])
+        with tempfile.TemporaryDirectory() as temp:
+            iterator=EpochBatchIterator(RecordedLoader(temp),workers=row['train_workers'],prefetch=row['prefetch'],
+                phase_steps=row['train_workers'],timeout_seconds=20)
+            try:
+                for _ in range(row['train_workers']):next(iterator)
+                pids={int(p.read_text()) for p in Path(temp).iterdir()}
+                self.assertEqual(len(pids),row['train_workers'])
+            finally:iterator.close()
+
     def collect(self, loader, count=8, **settings):
         iterator = EpochBatchIterator(loader, timeout_seconds=20, **settings)
         try:

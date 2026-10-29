@@ -1,5 +1,7 @@
 # 局部专家协同的 VISTA3D 选择性分割修正
 
+当前面板 **0.6.1**：全局batch最多8，新增GPU分担同一批；CPU供数、日志及扩卡退化恢复见[实施说明](docs/CAPPED_COOPERATIVE_BATCH.md)和[验证记录](docs/CAPPED_BATCH_VALIDATION.json)。完整工程可运行 `python -B tools/quick_check.py` 获得简短基础检查结果。
+
 创建日期：2026-10-25。当前已实现 **wholeheart CT 的 nnU-Net 监督基线 B0 与服务器任务面板**。已完成合成数据 CPU 集成验证；尚未进行真实病例 GPU 训练或取得性能指标。
 
 用户确认先以 nnU-Net 建立 baseline。面板0.6.0默认 A+B→G：**30例训练、8例验证、20例G中心独立测试**；来源内部不再预留selector或未标注池，保留nnU-Net原生随机取块。两例既定隔离病例仍排除。数据协议改变，必须新建预处理和训练，旧冻结任务不热修。VISTA3D、局部专家与点击修正仍是后续阶段。

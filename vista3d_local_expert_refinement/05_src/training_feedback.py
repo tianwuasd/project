@@ -1,7 +1,13 @@
 """All-rank rolling supply feedback inside a long epoch; no GPU membership change."""
 import copy
+import json
 import time
 from pathlib import Path
+
+
+def compact_resource(resource):
+    return {key:resource[key] for key in ('schema_version','rank_count','cpu_budget','memory_budget_bytes',
+        'total_cpu_slots','estimated_ram_bytes','rank_settings','local_batch_sizes') if key in resource}
 
 
 def slowest_window(rows):
@@ -52,6 +58,7 @@ class RollingFeedback:
         self.rank=rank;self.world=world;self.output=Path(output);self.clock=clock
         self.windows=[];self.events=[];self.reset()
         self.pending=None
+        self.run_id=f'{time.time_ns()}-{rank}'
 
     def reset(self):
         self.steps=0;self.wait=0;self.started=self.clock()
@@ -75,6 +82,7 @@ class RollingFeedback:
         window=slowest_window(rows)
         if window is None:return
         self.windows.append(window)
+        self.windows=self.windows[-2:]
         from live_resources import feedback_policy
         from server_data import write_json
         packet=[None]
@@ -93,7 +101,20 @@ class RollingFeedback:
         else:decision['applied_boundary']='none'
         decision['applied_settings']=copy.deepcopy(self.resource)
         self.events.append(dict(schema_version=2,epoch=trainer.current_epoch,window=window,decision=decision))
-        write_json(self.output/f'feedback.rank{self.rank}.json',self.events)
+        self.events=self.events[-2:]
+        # The capacity receipt already contains topology and full host probes.
+        # Keep the latest state bounded; append detailed changes once, instead
+        # of rewriting a growing history from every rank on the training path.
+        summary=compact_resource(self.resource)
+        latest=dict(schema_version=3,epoch=trainer.current_epoch,recorded_at=time.time(),run_id=self.run_id,rank=self.rank,window=window,
+            decision={key:decision[key] for key in ('action','reasons','applied_boundary','capacity_scope') if key in decision},
+            applied_settings=summary)
+        if decision['action']!='keep':latest['requested_settings']=compact_resource(decision['requested_settings'])
+        history=copy.deepcopy(latest)
+        if decision['action']=='keep':history.pop('applied_settings')
+        with (self.output/f'feedback.rank{self.rank}.jsonl').open('a',encoding='utf-8') as stream:
+            stream.write(json.dumps(history,ensure_ascii=False,allow_nan=False,separators=(',',':'))+'\n')
+        write_json(self.output/f'feedback.rank{self.rank}.json',latest)
         self.reset()
 
     def epoch_boundary(self,trainer):

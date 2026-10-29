@@ -230,14 +230,21 @@ def _rank_setting(cpu, ram, batch, need, rank, shared, private_bytes=None):
         resident=(workers+validation)*private_bytes
         base=shared+resident+3*batch
         free=max(0,ram-base) if ram is not None else 0
-        q=min(2*workers,max(0,free-int(bool(validation))*batch)//batch) if workers else 0
+        q=min(2*workers,max(0,free-validation*batch)//batch) if workers else 0
         free-=q*batch
         vq=min(2*validation,free//batch) if validation else 0
         return resident,base,q,vq,base+(q+vq)*batch
     if ram is None:maximum=0;val=0;main=1
-    while val and build(0,val)[1]+batch>ram:val-=1
-    limit=maximum
-    while limit and build(limit,val)[1]+batch*(1+bool(val))>ram:limit-=1
+    while val and build(0,val)[1]+val*batch>ram:val-=1
+    def supported(validation):
+        limit=maximum
+        # Reserve both resident pools AND one slot per worker before choosing W.
+        while limit and build(limit,validation)[1]+batch*(limit+validation)>ram:limit-=1
+        return limit
+    # Validation runs in a separate phase. Do not retain four idle validation
+    # processes if that prevents the training pool from getting runnable slots.
+    while val>1 and supported(val)<min(need,maximum):val-=1
+    limit=supported(val)
     workers=min(need,limit)
     # Reconsider the supported two-thread leaf after RAM fixes the actual W.
     # Never trade away workers; keep feedback's limit valid for this thread size.
@@ -255,23 +262,33 @@ def _rank_setting(cpu, ram, batch, need, rank, shared, private_bytes=None):
 
 def training_policy(snapshot, rank_count, batch_bytes, history=None):
     """One direct per-rank configuration; train/validation compute phases alternate."""
-    if isinstance(rank_count,bool) or not isinstance(rank_count,int) or rank_count<1 or batch_bytes<=0:
+    if isinstance(rank_count,bool) or not isinstance(rank_count,int) or rank_count<1:
+        raise ValueError('positive rank count required')
+    batches=list(batch_bytes) if isinstance(batch_bytes,(tuple,list)) else [batch_bytes]*rank_count
+    if (len(batches)!=rank_count or any(isinstance(b,bool) or not isinstance(b,(int,float)) or not math.isfinite(b) or b<=0 for b in batches)):
         raise ValueError('positive rank count and per-rank batch byte estimate required')
-    cpu,memory,reasons=_budgets(snapshot);batch=math.ceil(batch_bytes)
+    batches=[math.ceil(b) for b in batches]
+    cpu,memory,reasons=_budgets(snapshot);batch=max(batches)
     shared=max(0,int(snapshot.get('source_shared_bytes',0)))
     need=16
     if history and history.get('batch_wait_seconds') is not None and history.get('compute_seconds',0)>0:
         need=max(4,4*math.ceil(math.ceil(2*history['batch_wait_seconds']/history['compute_seconds'])/4))
     status='ready'
     if cpu<rank_count:status='blocked';reasons.append('known insufficient CPU budget for one main thread per rank')
-    if memory is not None and memory<rank_count*3*batch+shared:
+    if memory is not None and memory<3*sum(batches)+shared:
         status='blocked';reasons.append('known insufficient RAM for main and pinned batch buffers')
     ranks=[]
     if status!='blocked':
+        from batch_distribution import weighted_shares
+        shares=weighted_shares(cpu,batches,minimum=1)
+        memories=weighted_shares(memory-shared,batches) if memory is not None else [None]*rank_count
+        private=snapshot.get('worker_private_bytes')
+        privates=list(private) if isinstance(private,(tuple,list)) else [private]*rank_count
+        if len(privates)!=rank_count:raise ValueError('one private-memory estimate per rank required')
         for rank in range(rank_count):
-            share=cpu//rank_count+(rank<cpu%rank_count)
-            ram=(memory-shared)//rank_count if memory is not None else None
-            settings=_rank_setting(share,ram,batch,need,rank,0,snapshot.get('worker_private_bytes'))
+            share=shares[rank];ram=memories[rank]
+            settings=_rank_setting(share,ram,batches[rank],need,rank,0,privates[rank])
+            settings['batch_bytes']=batches[rank]
             ranks.append(settings)
             if settings['train_workers']<need:reasons.append(f'rank {rank}: worker demand bounded by CPU/RAM capacity')
         if any(r.startswith('unknown') for r in reasons):status='bounded_fallback'
@@ -298,7 +315,7 @@ def feedback_policy(settings, windows, capacity):
     result['missing_evidence']=list(capacity.get('missing_evidence',[]))
     result['limits']=copy.deepcopy(capacity['limits'])
     for rank,row in enumerate(result['rank_settings']):
-        row['cpu_share']=capacity['cpu_budget']//settings['rank_count']+(rank<capacity['cpu_budget']%settings['rank_count'])
+        row['cpu_share']=capacity['rank_settings'][rank]['cpu_share']
         row['memory_budget_bytes']=capacity['rank_settings'][rank]['memory_budget_bytes']
     recent=windows[-2:]
     eligible=len(recent)==2 and all(w.get('steps',0)>=20 and w.get('seconds',0)>=30 for w in recent)
@@ -309,7 +326,7 @@ def feedback_policy(settings, windows, capacity):
             row['read_admission_scope']='per-rank actual case open/decompression and lazy patch reads; transforms outside slots'
             row['prefetch']=min(row['prefetch'],max(1,row['train_workers']))
             row['val_prefetch']=min(row['val_prefetch'],max(1,row['val_workers']))
-            row['estimated_ram_bytes']=row['base_memory_bytes']+(row['prefetch']+row['val_prefetch'])*result['batch_bytes']
+            row['estimated_ram_bytes']=row['base_memory_bytes']+(row['prefetch']+row['val_prefetch'])*row.get('batch_bytes',result['batch_bytes'])
         result['estimated_ram_bytes']=result.get('source_shared_bytes',0)+sum(r['estimated_ram_bytes'] for r in result['rank_settings'])
     elif eligible and all(w.get('wait_fraction',0)>.2 for w in recent):
         cpu=capacity['cpu_budget'];ram=capacity.get('memory_budget_bytes');ranks=settings['rank_count']
@@ -320,15 +337,15 @@ def feedback_policy(settings, windows, capacity):
         # Rebuild using unchanged per-worker/main settings. Capacity from a newer
         # snapshot cannot authorize more threads than its newly reported budget.
         for rank,(old,target) in enumerate(zip(result['rank_settings'],targets)):
-            share=cpu//ranks+(rank<cpu%ranks)
+            share=capacity['rank_settings'][rank]['cpu_share']
             target=min(target,max(0,(share-old['main_threads'])//old['worker_threads']))
-            batch=settings['batch_bytes']
-            rank_ram=(ram-settings.get('source_shared_bytes',0))//ranks if ram is not None else None
+            batch=old.get('batch_bytes',settings['batch_bytes'])
+            rank_ram=capacity['rank_settings'][rank]['memory_budget_bytes']
             if rank_ram is not None:
                 # Capacity includes both resident pools and at least one queued
                 # batch per live pool; prefetch can grow only within the remainder.
                 private=old.get('worker_private_bytes',2*batch)
-                bound=max(0,(rank_ram-old['val_workers']*private-(3+1+bool(old['val_workers']))*batch)//private)
+                bound=max(0,(rank_ram-old['val_workers']*private-(3+old['val_workers'])*batch)//(private+batch))
                 target=min(target,bound)
             candidate=copy.deepcopy(old);candidate['train_workers']=max(old['train_workers'],target)
             candidate['read_concurrency']=max(1,candidate['train_workers'],candidate['val_workers'])
@@ -336,14 +353,15 @@ def feedback_policy(settings, windows, capacity):
             candidate['resident_pool_bytes']+=delta*old.get('worker_private_bytes',2*batch)
             candidate['base_memory_bytes']=candidate['resident_pool_bytes']+3*batch
             free=max(0,rank_ram-candidate['base_memory_bytes']) if rank_ram is not None else 0
-            candidate['prefetch']=min(2*candidate['train_workers'],max(0,free-bool(old['val_workers'])*batch)//batch)
+            candidate['prefetch']=min(2*candidate['train_workers'],max(0,free-old['val_workers']*batch)//batch)
             free-=candidate['prefetch']*batch
             candidate['val_prefetch']=min(2*old['val_workers'],free//batch)
             candidate['estimated_ram_bytes']=candidate['base_memory_bytes']+(candidate['prefetch']+candidate['val_prefetch'])*batch
             candidate['train_cpu_slots']=old['main_threads']+candidate['train_workers']*old['worker_threads']
             candidate['total_cpu_slots']=max(candidate['train_cpu_slots'],candidate['val_cpu_slots'])
             proposed=result['estimated_ram_bytes']-old['estimated_ram_bytes']+candidate['estimated_ram_bytes']
-            if ram is not None and proposed<=ram and candidate['train_workers']>old['train_workers']:
+            if (ram is not None and proposed<=ram and candidate['train_workers']>old['train_workers']
+                    and candidate['prefetch']>=candidate['train_workers'] and candidate['val_prefetch']>=candidate['val_workers']):
                 result['rank_settings'][rank]=candidate;result['estimated_ram_bytes']=proposed;action='expand'
         result['total_cpu_slots']=sum(r['total_cpu_slots'] for r in result['rank_settings'])
         if action=='expand':reasons.append('two valid high-wait windows; bounded worker expansion at replay-safe boundary')

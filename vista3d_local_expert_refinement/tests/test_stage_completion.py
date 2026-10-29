@@ -433,6 +433,11 @@ class ReportingContracts(unittest.TestCase):
             self.assertIn('已分配 12',text);self.assertNotIn('已分配 16',text)
             self.assertIn('训练 1500/500',text);self.assertIn('验证 300/100',text)
             self.assertIn('实际CPU用量缺少',text)
+            write_json(work/'07_experiments/formal/f_B0/ranks/feedback.rank0.json',dict(schema_version=3,
+                window=dict(wait_fraction=.2),decision=dict(action='keep',applied_boundary='none'),
+                applied_settings={'total_cpu_slots':14,'rank_settings':[{'workers':6}]}))
+            text=' '.join(resource_lines(work,{'current_step':'train','status':'running'}))
+            self.assertIn('已分配 14',text);self.assertNotIn('已分配 12',text)
 
     def test_rank_cause_survives_newer_generic_wrapper_and_both_paths_remain(self):
         from failure_summary import summarize

@@ -56,8 +56,17 @@ def _probe_network(network, data, parameters, device_type):
     from contextlib import nullcontext
     with torch.autocast('cuda') if device_type == 'cuda' else nullcontext():
         outputs = network(data.clone())
-        scalar = sum(item.float().sum() for item in _leaves(outputs)
-                     if isinstance(item, torch.Tensor) and item.requires_grad)
+        # Summing millions of logits can overflow an otherwise healthy AMP
+        # backward. A bounded normalized projection exercises every output
+        # without tiny per-voxel coefficients that underflow in float16.
+        terms=[]
+        for item in _leaves(outputs):
+            if isinstance(item,torch.Tensor) and item.requires_grad and item.numel():
+                flat=item.reshape(-1)
+                index=torch.linspace(0,flat.numel()-1,steps=min(1024,flat.numel()),device=flat.device).long()
+                terms.append(flat[index].float().mean())
+        if not terms:raise ValueError('compile compatibility: no differentiable output')
+        scalar=sum(terms)/len(terms)
     tensors = []
     def snapshot(value):
         if isinstance(value, torch.Tensor):
@@ -124,7 +133,8 @@ def preflight_compile(trainer, batch, report):
         rtol=1e-2 if trainer.device.type == 'cuda' else 1e-4,
         atol=1e-3 if trainer.device.type == 'cuda' else 1e-5,
         reference_storage='detached CPU outputs and parameter gradients',
-        scope='same-input local network outputs and sum-output gradients; eager loss unchanged')
+        scope='same-input full local outputs and normalized sampled-output gradients; eager loss unchanged',
+        gradient_probe='mean of up to 1024 evenly spaced logits per output, averaged over outputs')
     compiled, error = None, None
     started = time.perf_counter()
     try:

@@ -23,12 +23,14 @@ def distribution(global_batch, gpu_uuids, requested_count=None, *, allow_batch_g
     requested = validate_gpu_count(requested_count)
     reference = global_batch
     if allow_batch_growth:
-        world = min(len(devices), requested or len(devices))
+        from batch_distribution import layout,MAX_GLOBAL_BATCH
+        world = min(len(devices), requested or len(devices),MAX_GLOBAL_BATCH)
         local = global_batch if per_device_batch is None else per_device_batch
         if isinstance(local,bool) or not isinstance(local,int) or local<1:
             raise ValueError('每卡batch必须为正整数')
-        global_batch = local*world
-        reason = 'explicitly authorized automatic global batch; epochs/updates unchanged; sampling increase recorded'
+        sizes=layout(local,world)
+        global_batch=sum(sizes);local=max(sizes)
+        reason = 'global batch capped at eight; further ranks partition the same patches; capacity changes recorded'
     else:
         if per_device_batch is not None:
             raise ValueError('改变每卡batch需要明确的自动batch授权')
@@ -36,9 +38,10 @@ def distribution(global_batch, gpu_uuids, requested_count=None, *, allow_batch_g
         # Equal local batches preserve the upstream mean reduction semantics.
         world = max(n for n in range(1, ceiling+1) if global_batch % n == 0)
         local = global_batch//world
+        sizes=[local]*world
         reason = 'preserve global batch and balanced rank losses; no batch multiplication to fill devices'
     return dict(global_batch_size=global_batch, reference_global_batch_size=reference,world_size=world,
-                local_batch_size=local, gpu_uuids=devices[:world],
+                local_batch_size=local,local_batch_sizes=sizes, gpu_uuids=devices[:world],
                 unused_gpu_uuids=devices[world:],
                 reason=reason, sampling_ratio=global_batch/reference,
                 train_patches_per_epoch=global_batch*250, reference_train_patches_per_epoch=reference*250,

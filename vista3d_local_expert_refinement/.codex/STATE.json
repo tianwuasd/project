@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-28",
+  "updated_at": "2026-10-29",
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
-  "phase": "stage_resource_v2_delivered",
+  "phase": "capped_batch_and_supply_repaired_local_acceptance",
   "confirmed": {
     "same_source_material": true,
     "source_labeled_ct": true,
@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "On zmic44 update program, run a assessment and export z diagnostics for target Linux/CUDA/NCCL/real CT acceptance; no old task hotpatch or automatic resume.",
+  "next_action": "Publish fixed project commit, rebuild and install/publish Skill v2 code bundle; then target-server new-task assessment. Compatible 0.6.0 preprocessing may be reused; frozen old jobs/checkpoints not hotpatched.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -323,7 +323,7 @@
     "design": "docs/superpowers/specs/2026-10-26-cooperative-training-design.md",
     "design_status": "independent stage v2 implemented and locally validated; target GPU acceptance pending; verify live GitHub main for publication",
     "performance_timing_draft": "5 timing tests and 13 existing inner-contract tests passed; 4 changed modules parsed; no server acceptance",
-    "batch_budget_status": "user explicitly permits automatic global batch growth with sampling changes in preview/logs; 250 epochs and 250 train/50 validation updates remain fixed",
+    "batch_budget_status": "User confirmed max global batch 8; further GPUs partition same capped work; 250 epochs x250 train attempts/50 validation unchanged.",
     "skill_update": "completed: full VISTA v2 template and committed v1 archives, source+installed+GitHub verified; legacy CT preserved",
     "full_assessment_required": true,
     "formal_blocks": [
@@ -563,5 +563,41 @@
     "server_deployed": false,
     "real_gpu_validated": false,
     "publication": "verify remote receipt separately"
+  },
+  "capped_batch_repair": {
+    "version": "0.6.1",
+    "user_confirmed": true,
+    "max_global_batch": 8,
+    "full_control": {
+      "run": 402,
+      "passed": 352,
+      "skipped": 50,
+      "failures": 0,
+      "errors": 0,
+      "log_sha256": "f903ce8a259f3854b3626e10b8c352bedac2460bf37e7d48fb71e4a09fac108f"
+    },
+    "cpu_api": {
+      "run": 23,
+      "passed": 22,
+      "skipped": 1,
+      "log_sha256": "f765b55c74732f4dcc69703465104c9454695797c9aaec32b63b96f83525bc6c"
+    },
+    "gloo": {
+      "world_sizes": [
+        4,
+        6
+      ],
+      "global_batch": 8,
+      "deep_supervision": true,
+      "max_gradient_error": 1.4901161193847656e-08,
+      "max_update_error": 0.0,
+      "report_sha256": "ac81bda6ca069e89855badc59b82069e13e787ae778010be6969a65d391d19c0",
+      "nccl": false,
+      "real_ct": false
+    },
+    "validation": "docs/CAPPED_BATCH_VALIDATION.json",
+    "server_deployed": false,
+    "target_speed_accepted": false,
+    "publication_authority": "Git commit history and current remote main ref"
   }
 }

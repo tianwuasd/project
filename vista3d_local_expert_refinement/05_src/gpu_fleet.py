@@ -43,6 +43,7 @@ class GPUFleet:
         self._release_seen=None
         self.generation=uuid4().hex
         self.discovery_enabled=True
+        self.deferred_for_stage=set()
 
     def start(self):
         self.thread=threading.Thread(target=self._watch,name='gpu-discovery',daemon=True)
@@ -56,6 +57,7 @@ class GPUFleet:
                 if row['pid']==process.pid and alive(row):rows.append(row)
         write_json(self.path,dict(schema_version=1,updated=time.time(),keepers=rows,
             generation=self.generation,discovery_enabled=self.discovery_enabled,release_ack=self._release_seen,
+            deferred_for_stage=sorted(self.deferred_for_stage),
             policy='physical ∩ allocated/visible ∩ twice-idle; 1s sampling; program leases only',
             error=str(self.error) if self.error else None))
 
@@ -73,6 +75,7 @@ class GPUFleet:
                         command=read_json(request)
                         if command.get('generation')==self.generation and command.get('id')!=self._release_seen:
                             if command.get('final'):self.discovery_enabled=False
+                            if command.get('defer_for_stage'):self.deferred_for_stage.update(command['gpu_uuids'])
                             used=set(self.processes)-set(command['gpu_uuids'])
                             if command.get('final'):used=set()
                             self.release_unused(used)
@@ -88,7 +91,7 @@ class GPUFleet:
                     for row in rows:
                         uuid=row['uuid']
                         capacity=row['total_mib']+64>=self.memory*1024
-                        eligible=(capacity and uuid in permitted and uuid not in self.processes
+                        eligible=(capacity and uuid in permitted and uuid not in self.processes and uuid not in self.deferred_for_stage
                             and time.monotonic()>=self.cooldown.get(uuid,0)
                             and idle_reason(row,settings) is None)
                         stable[uuid]=stable.get(uuid,0)+1 if eligible else 0
@@ -145,6 +148,7 @@ class GPUFleet:
         """Only an explicitly selected later GPU phase can resume this invocation."""
         with self.lock:
             self.discovery_enabled=True
+            self.deferred_for_stage.clear()
             self._publish()
 
     def release_unused(self,used):

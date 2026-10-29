@@ -61,6 +61,14 @@ class BaselineNNUNet(nnUNetTrainer):
         # Our explicit network-only compilation is controlled independently.
         return False
 
+    def _build_loss(self):
+        loss=super()._build_loss()
+        if self.is_ddp and hasattr(self,'_vista_global_batch'):
+            from uneven_batch_loss import configure
+            loss=configure(loss,global_batch=self._vista_global_batch,local_batch=self.batch_size,
+                world_size=self._vista_world_size)
+        return loss
+
     def _execution_step(self, batch, validation=False):
         from contextlib import nullcontext
         import time

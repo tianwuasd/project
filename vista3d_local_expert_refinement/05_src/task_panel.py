@@ -14,7 +14,7 @@ import task_runtime as jobs
 from task_queries import query, follow, result_lines, read_optional, log_sources
 from task_progress import STATES
 
-PANEL_VERSION = '0.6.0'
+PANEL_VERSION = '0.6.1'
 
 
 class Back(Exception):
@@ -355,7 +355,7 @@ def preview_config(config):
     elif config.get('gpu_policy')=='automatic':
         print('GPU/CPU：自动探测、现场容量配置；GPU上限按实际服务器和分配范围，不需要填写卡号。')
         if set(config['tasks'])&{'train','assessment'}:
-            print('batch允许自动调整；正式250轮、每轮250训练/50验证保持，实际采样量将明确记录。')
+            print('全局batch最多8；达到8后新增GPU分担同一批，不增加采样量。容量不足会明确记录降批；250轮×250训练/50验证不变。')
         elif config['tasks']==['predict']:
             print('仅使用所选训练任务的冻结模型预测，按主机容量安排病例并发。')
     else:

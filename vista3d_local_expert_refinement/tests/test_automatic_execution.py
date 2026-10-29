@@ -29,13 +29,15 @@ class AutomaticExecutionTests(unittest.TestCase):
         return root
 
     def measurement(self,gpus,local,resource,seconds=4):
-        return dict(status='passed',world_size=len(gpus),gpu_uuids=gpus,global_batch_size=local*len(gpus),
+        return dict(status='passed',world_size=len(gpus),gpu_uuids=gpus,global_batch_size=resource['global_batch_size'],
             local_batch_size=local,measured_training_steps=10,median_step_seconds=seconds,
             validation_step_seconds=.3,peak_allocated_gib=12,peak_reserved_gib=13,
             effective_cpu=resource,total_cpu_slots=resource['total_cpu_slots'],rank_results=[dict(gpu_uuid=g,
-                memory_facts=dict(fixed_bytes=4*2**30,peak_allocated_bytes=(4+4*local)*2**30,peak_reserved_bytes=19*2**30,optimizer_initialized=True)) for g in gpus])
+                local_batch_size=resource['local_batch_sizes'][i],
+                supply_transfer=dict(train=dict(source=dict(peak_payload_bytes=37074272*resource['local_batch_sizes'][i],workers=[]))),
+            memory_facts=dict(fixed_bytes=4*2**30,peak_allocated_bytes=(4+4*resource['local_batch_sizes'][i])*2**30,peak_reserved_bytes=19*2**30,optimizer_initialized=True)) for i,g in enumerate(gpus)])
 
-    def run_tuning(self,root,fail=False):
+    def run_tuning(self,root,fail=False,world=8):
         called=[]
         def measure(work,fold,method,gpus,local,resource,kind,**kwargs):
             called.append((gpus,local,resource,kind))
@@ -47,7 +49,7 @@ class AutomaticExecutionTests(unittest.TestCase):
         with patch('task_resources.probe',return_value=snapshot),patch.object(control,'trial',side_effect=measure),\
              patch.object(control,'topology',side_effect=lambda g:[['same GPU','24576','driver'] for _ in g]),\
              patch.object(control,'release_devices'),contextlib.redirect_stdout(io.StringIO()):
-            chosen=control.tune(root,'ct_holdG','B0','assessment',[f'GPU-{i}' for i in range(8)])
+            chosen=control.tune(root,'ct_holdG','B0','assessment',[f'GPU-{i}' for i in range(world)])
         return chosen,called
 
     def test_bounded_real_measurement_policy_allows_eight_and_records_sampling(self):
@@ -66,9 +68,9 @@ class AutomaticExecutionTests(unittest.TestCase):
 
     def test_gpu_oom_reduces_batch_and_retains_all_compatible_ranks(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root=self.workspace(tmp);chosen,called=self.run_tuning(root,True)
-            self.assertEqual(chosen['world_size'],8)
-            self.assertEqual(chosen['local_batch_size'],2)
+            root=self.workspace(tmp);chosen,called=self.run_tuning(root,True,world=4)
+            self.assertEqual(chosen['world_size'],4)
+            self.assertEqual(chosen['local_batch_size'],1)
             self.assertEqual(len(called),3)
             self.assertEqual(chosen['capacity_attempts'][1]['classification'],'gpu_oom')
             self.assertEqual(chosen['capacity_reductions'],1)
