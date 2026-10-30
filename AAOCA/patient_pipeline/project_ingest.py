@@ -10,6 +10,32 @@ from patient_pipeline.project_model import digest, issue
 from patient_pipeline.runtime import fatal_io
 
 CLINICAL_PARSER_VERSION = 2
+PDF_VALIDATION_VERSION = 1
+
+
+class PDFInputError(ValueError):
+    def __init__(self, code, message, data):
+        super().__init__(message)
+        import hashlib
+        self.code=code
+        self.details={'size_bytes':len(data),'input_sha256':hashlib.sha256(data).hexdigest()}
+
+
+def validate_pdf_payload(path):
+    """Identify proven absent content, never reject a valid PDF just for being small."""
+    with Path(path).open('rb') as f:data=f.read(4097)
+    if not data:raise PDFInputError('PDF_EMPTY_FILE','PDF文件为0字节，没有页面内容；需重新导出完整原件',data)
+    lines=[line.strip() for line in data.splitlines() if line.strip()]
+    if len(data)<=4096 and lines and re.match(rb'%PDF-\d+\.\d+',lines[0]) and all(
+            line.startswith(b'%') for line in lines):
+        raise PDFInputError('PDF_HEADER_ONLY',f'PDF仅有文件头和注释（{len(data)}字节），没有页面正文；需从原系统重新导出完整原件',data)
+
+
+def clinical_metadata_current(record):
+    if record.get('kind')=='DICOM':return True
+    return record.get('clinical_parser_version')==CLINICAL_PARSER_VERSION and not (
+        record.get('kind')=='PDF' and record.get('read_error') and
+        record.get('pdf_validation_version')!=PDF_VALIDATION_VERSION)
 
 
 def is_sidecar(path):
@@ -47,6 +73,7 @@ def discover(sources, output, control):
 
 def extract_pdf(store,path,key,control):
     import pymupdf
+    validate_pdf_payload(path)
     pages=[];ids=set();low=[]
     with pymupdf.open(path) as doc:
         if doc.needs_pass:raise ValueError('PDF需要密码')
@@ -79,11 +106,12 @@ def ingest(store,sources,control):
         control.progress('headers',n,len(paths),'登记资料并独立检查')
         key=source_key(path);old=store.source(key);before=stamp(path)
         kind={'.pdf':'PDF','.xlsx':'ROSTER'}.get(path.suffix.lower(),'DICOM')
-        current_parser=kind=='DICOM' or (old or {}).get('clinical_parser_version')==CLINICAL_PARSER_VERSION
+        current_parser=clinical_metadata_current(old or {})
         if old and old.get('stamp')==before and current_parser:
             reused+=1;continue
         r={'key':key,'path':str(path),'kind':kind,'stamp':before,'pid':'','issues':[]}
         if kind!='DICOM':r['clinical_parser_version']=CLINICAL_PARSER_VERSION
+        if kind=='PDF':r['pdf_validation_version']=PDF_VALIDATION_VERSION
         if store.get('meta','legacy_adopted'):r['new_since_legacy']=True
         try:
             if kind=='DICOM':r['header']=read_header(path,tolerate_timing=True)
@@ -93,7 +121,8 @@ def ingest(store,sources,control):
         except Exception as exc:
             if fatal_io(exc):raise
             r['read_error']=str(exc);r['pid']=folder_id(path) if kind=='DICOM' else ''
-            r['issues']=[issue(kind+'_READ_FAILED',exc,r['pid'],path)]
+            r['read_error_code']=getattr(exc,'code',kind+'_READ_FAILED')
+            r['issues']=[issue(r['read_error_code'],exc,r['pid'],path,**getattr(exc,'details',{}))]
         # Keep last readable metadata for explicit history, never silently substitute it for a damaged input.
         if old and r.get('read_error'):
             r['previous_header']=old.get('header') or old.get('previous_header')
@@ -115,9 +144,9 @@ def refresh_catalog(store,control):
         if is_sidecar(r['path']):
             store.put('excluded_sources',r['key'],{'reason':'Mac附带文件，不是临床资料','source':r},False)
             store.db.execute('DELETE FROM sources WHERE key=?',(r['key'],));excluded+=1
-        elif r['kind'] in {'PDF','ROSTER'} and not r.get('legacy') and (
-                r.get('clinical_parser_version')!=CLINICAL_PARSER_VERSION) and Path(r['path']).is_file():
-            stale.append(r['path'])
+        elif r['kind'] in {'PDF','ROSTER'} and not r.get('legacy') and Path(r['path']).is_file():
+            if not clinical_metadata_current(r) or stamp(r['path'])!=r.get('stamp'):
+                stale.append(r['path'])
     # Retire only units explicitly removed by this filter; ordinary offline inputs stay active.
     for key,u in list(store.items('units')):
         if u.get('sources') and all(store.get('excluded_sources',s) for s in u['sources']) and not store.unit_sources(key):

@@ -132,5 +132,5 @@ class SupplementalTests(unittest.TestCase):
         s=self.snap();self.assertEqual(s['overview']['PDF']['failed'],1)
         self.assertEqual(s['overview']['PDF']['success'],0)
         self.assertEqual(s['patients'][0]['availability']['PDF'],'已有资料，未成功')
-        self.assertTrue(any(i['code']=='PDF_READ_FAILED' and i['patient_id']=='001' for i in s['issues']))
+        self.assertTrue(any(i['code']=='PDF_HEADER_ONLY' and i['patient_id']=='001' for i in s['issues']))
         self.assertFalse(any(i['code']=='DOCUMENT_UNMATCHED' for i in s['issues']))

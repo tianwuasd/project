@@ -4,6 +4,8 @@ This is the public, non-patient-specific history. Detailed patient mappings and 
 
 ## 2026-10-30: supplemental roster and PDF repairs
 
+Follow-up: empty and header-only PDFs now retain precise byte/hash evidence, remain failed and appear in a patient-linked re-export list. Invalid inputs never receive a content-based identity key, so identical truncated headers from different patients stay separate. Retry detects changed registered clinical files and can accept a complete re-export at the original path. Updating old failed-source diagnostics reuses healthy PDF caches; report-only still does not inspect sources.
+
 Repeated admissions with the same patient identifier/name retain every source row and inpatient alias. Encounter differences no longer block unrelated images or verified documents; identity conflicts remain blocked and clinical classification differences remain explicit warnings without a single aggregate label. Printed PDF identifiers are restricted to their line, while real mixed-patient pages still require review. Append/retry refreshes older online clinical metadata under the project lock, even without new inputs. Mac sidecars are excluded with archived catalog evidence and retired units; original files and history survive. PDF footer/page-count discrepancies produce an export-review warning rather than claiming clinical completeness. Tests use synthetic records only.
 
 ## 2026-10-26: offline archive for partial-clone updates

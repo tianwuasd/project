@@ -21,6 +21,7 @@ LABELS={'PIXEL_INVALID':'像素缺失、为空或长度不符','CT_DIMENSIONS_MI
         'DOCUMENT_UNMATCHED':'PDF患者关联待核实','ROSTER_ID_CONFLICT':'患者主表编号冲突',
         'ROSTER_CLINICAL_REVIEW':'不同就诊记录的临床字段待核对',
         'PDF_EXPORT_REVIEW':'PDF导出页数待核对',
+        'PDF_HEADER_ONLY':'PDF只有文件头，没有页面正文','PDF_EMPTY_FILE':'PDF文件为空',
         'DIRECTORY_ID_CONFLICT':'目录编号与影像内部编号冲突','MODALITY_NOT_CONVERTED':'其他影像类型尚未转换',
         'CT_NOT_PROVIDED':'未提供CT资料','US_NOT_PROVIDED':'未提供超声资料','PDF_NOT_PROVIDED':'未提供PDF资料'}
 
@@ -53,6 +54,7 @@ def family(code):
 
 
 def remedy(code):
+    if code in {'PDF_HEADER_ONLY','PDF_EMPTY_FILE'}:return '从原系统重新导出完整PDF；原路径替换或添加新文件后重试，保留当前缺失依据。'
     if code=='PDF_EXPORT_REVIEW':return '对照原系统核对打印范围、末页与页面裁切；关联成功不代表病历内容完整。'
     if code=='ROSTER_CLINICAL_REVIEW':return '核对各次就诊原始记录；保留不同分型，不自动选取单一诊断标签。'
     if code.endswith('_NOT_PROVIDED'):return '如有资料，后续添加对应文件夹；补充后自动更新。'
@@ -131,6 +133,11 @@ def build_snapshot(store):
         i['family']=family(i['code']);i['remedy']=remedy(i['code'])
         i['id']=digest([i['patient_id'],i['code'],i['source'],i['unit']])[:24];unique[i['id']]=i
     issues=list(unique.values());previous=store.get('meta','last_snapshot',{})
+    names={p['id']:p['name'] for p in patients}
+    pdf_requests=[{'patient_id':i['patient_id'],'name':names.get(i['patient_id'],''),
+        'source':i['source'],'code':i['code'],'size_bytes':i.get('size_bytes',''),
+        'message':i['message'],'action':remedy(i['code']),'unit':i['unit']}
+        for i in issues if i['code'] in {'PDF_HEADER_ONLY','PDF_EMPTY_FILE'}]
     before={i['id']:i for i in previous.get('issues',[])}
     active={i['id']:i for i in issues if i['severity']!='info'}
     snapshot={'generated':now(),'patients':patients,'overview':overview,'raw_sources':raw,'raw_modalities':raw_modalities,
@@ -142,6 +149,7 @@ def build_snapshot(store):
                    'resolved_issues':[v for k,v in before.items() if k not in unique and v.get('severity')!='info']},
         'processing':store.get('meta','last_processing',{}),'ingest':store.get('meta','last_ingest',{}),
         'catalog_refresh':store.get('meta','catalog_refresh',{}),
+        'pdf_reexport_requests':pdf_requests,
         'previous_overview':previous.get('overview',{}),'manual_recoveries':store.get('meta','legacy_manifest',{}).get('manual_recoveries',[])}
     return snapshot
 
@@ -208,6 +216,11 @@ def render(snapshot,store):
         [e(i['patient_id']),e(str(i.get('source') or i.get('unit')).replace('\\','/').rsplit('/',1)[-1]),e(issue_description(i))]
         for i in sorted(us_errors,key=lambda i:(i['patient_id'],i.get('source','')))])
     us_explanation='<section><h2>超声文件：未成功转换与使用限制</h2><p>当前未成功转换 '+str(snapshot['overview']['US']['failed'])+' 个处理单元，具体文件及原因如下。帧时间记录不符合要求时，当前转换器不能按既定规则确认视频时间轴；这不等于已经证明图像像素损坏。像素数据为空则没有可解码的图像内容。</p>'+us_details+'<p>物理标定待核实：'+str(len(us_scale))+' 条提醒，涉及 '+str(len({i['patient_id'] for i in us_scale}))+' 个编号。此提醒本身不等于转换失败；可以查看已成功输出的图像，但用像素距离换算真实组织尺寸前，需要核实区域、单位及比例。提醒条目不与失败文件数相加。</p><p>尚未提供超声资料：'+str(len(us_missing))+' 个编号，属于资料缺失，与已有文件未成功转换分开统计。</p></section>'
+    requests=snapshot.get('pdf_reexport_requests',[])
+    pdf_requests_section=('<section><h2>PDF待补原件</h2><p>以下文件缺少页面内容，姓名关联不能恢复正文。请重新导出完整PDF后重试。</p>'+
+        table(['患者编号','姓名','源文件','文件字节数','具体原因','后续处理'],[[e(i['patient_id']),e(i['name']),
+            e(Path(i['source']).name),e(i['size_bytes']),e(i['message']),e(i['action'])] for i in requests])+
+        '<p>'+link('待补PDF清单.csv','下载待补PDF清单')+'</p></section>') if requests else ''
     history=table(['数据','上次成功','当前成功','变化'],[[k,snapshot['previous_overview'].get(k,{}).get('success','—'),v['success'],
             v['success']-snapshot['previous_overview'].get(k,{}).get('success',v['success'])] for k,v in snapshot['overview'].items()])
     return '''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'''+html.escape(report_title)+'''</title><style>
@@ -216,7 +229,7 @@ body{font-family:"Microsoft YaHei",system-ui,sans-serif;background:#f3f6fa;color
 <div class="cards">{cards}</div><p class="note">三类结果齐全表示有可用 CT、超声和已核实 PDF，并不表示所有序列均成功。PDF 文字提取不足只作备注。失败按原始序列或文件统计，期相输出单独计数。</p>
 <section><h2>表 1 · 原始资料与处理情况</h2>{table(['数据类型 / 统计单位','登记数量','成功 / 失败 / 待处理','原因与保留成果'],overview)}<p>累计输入文件：{e(snapshot['raw_sources'])}。完全相同的副本只处理一次；提醒条目数不等于失败序列数或患者数。</p></section>
 <p>已排除 Mac 附带文件 {snapshot.get('catalog_refresh',{}).get('excluded_total',0)} 个，原文件和登记证据保留；不计为临床资料读取失败。</p>
-{us_explanation}
+{pdf_requests_section}{us_explanation}
 <section><h2>表 2 · 结果分类与患者详情</h2>{categories}<p>“缺”按处理结果判断；下面另列尚未提供、已有但失败、关联待核实。后续补充资料后自动调整分类。</p><input id="search" placeholder="筛选患者编号、姓名、分类或问题"><div id="patients">{table(['编号','姓名','大类 / 小类','CT','超声','PDF','结果'],patientrows)}</div></section>
 {issuesections}<section><h2>本次变化与修复记录</h2>{history}<p>本次新增编号 {snapshot['changed']['new_patients']}；新增提醒 {snapshot['changed']['new_issues']}；已解除提醒 {len(snapshot['changed']['resolved_issues'])}。</p><p>{link('项目数据快照.json','完整快照')} · {link('患者分类表.csv','患者分类表')} · {link('详细问题表.csv','详细问题表')} · {link('处理单元表.csv','各序列/文件输出及修复证据')}</p><p>原始资料未改写。已确认的历史修复 {len(snapshot['manual_recoveries'])} 项保留。失败更新不会覆盖旧的成功成果。</p></section>
 <section><h2>备注（不计错误）</h2><details><summary>{len(notes)} 条备注，包括低文字页与重复副本说明</summary>{table(['编号','备注','原因'],[[e(i['patient_id']),e(i['code']),e(issue_description(i))] for i in notes])}</details></section>
@@ -247,6 +260,8 @@ def publish_project(store,snapshot):
     atomic_text(store.root/'患者分类表.csv',csv_text(snapshot['patients'],['id','name','category','subcategory','counts','availability','folder','aliases']))
     atomic_text(store.root/'详细问题表.csv',csv_text(snapshot['issues'],['family','patient_id','severity','code','message','source','unit','remedy']))
     atomic_text(store.root/'处理单元表.csv',csv_text(units,['key','pid','kind','status','source_count','unique_files','slices','frames','outputs','error','last_attempt','repairs']))
+    atomic_text(store.root/'待补PDF清单.csv',csv_text(snapshot.get('pdf_reexport_requests',[]),
+        ['patient_id','name','source','code','size_bytes','message','action','unit']))
     page=render(snapshot,store)
     atomic_text(store.root/'查看结果.html',page)
     # Historical HTML links are relative to the project root.
