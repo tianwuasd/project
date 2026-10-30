@@ -47,6 +47,36 @@ except ImportError:
 
 @unittest.skipIf(torch is None, 'requires pinned API runtime')
 class TransferTests(unittest.TestCase):
+    def test_reported_full_size_output_probe_stays_in_bounds(self):
+        from training_execution import _probe_network
+        shape=(2,8,128,224,192)
+        class Large(torch.nn.Module):
+            def __init__(self):
+                super().__init__();self.weight=torch.nn.Parameter(torch.ones((),dtype=torch.float16))
+            def forward(self,x):return self.weight.expand(shape)
+        model=Large()
+        _,outputs,gradients=_probe_network(model,torch.ones(1),tuple(model.parameters()),'cpu')
+        self.assertEqual(tuple(outputs[0].shape),shape)
+        torch.testing.assert_close(gradients[0],torch.ones_like(model.weight),rtol=0,atol=0)
+
+    def test_probe_indices_are_integer_bounded_and_default_dtype_independent(self):
+        from training_execution import _projection_indices
+        previous=torch.get_default_dtype()
+        try:
+            for dtype in (torch.float16,torch.float32,torch.float64):
+                torch.set_default_dtype(dtype)
+                for size in (1,2,1023,1024,1025,2**24+2,88080384):
+                    with self.subTest(dtype=dtype,size=size):
+                        index=_projection_indices(size,torch.device('cpu'))
+                        self.assertEqual(index.dtype,torch.int64)
+                        self.assertEqual(index.numel(),min(1024,size))
+                        self.assertEqual(int(index[0]),0)
+                        self.assertEqual(int(index[-1]),size-1)
+                        self.assertTrue(bool((index[1:]>index[:-1]).all()))
+                        selected=torch.ones(1,dtype=torch.float16).expand(size)[index]
+                        self.assertTrue(bool((selected==1).all()))
+        finally:torch.set_default_dtype(previous)
+
     def test_large_half_output_probe_does_not_create_artificial_gradient_overflow(self):
         from training_execution import _probe_network
         class Large(torch.nn.Module):

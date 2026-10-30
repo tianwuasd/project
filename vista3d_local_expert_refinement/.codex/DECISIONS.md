@@ -247,3 +247,7 @@ batch Dice收集前先作本地batch求和，原生oversampling与深监督保�
 详见docs/CAPPED_COOPERATIVE_BATCH.md及CAPPED_BATCH_VALIDATION.json；不代表目标CUDA/NCCL或真实CT提速已验收。
 0.6.0准备身份七文件未变，可复用兼容预处理；旧8/4缓存及旧冻结训练不热修。
 Skill须从本项目发布后的精确提交重建完整可读代码/ZIP/清单；v1及CT资产保留。
+
+## 2026-10-30：真实尺寸编译预检索引修复（0.6.2）
+
+用户要求修复并发布GitHub，使用已有预处理。服务器CUDA IndexKernel越界与CPU同尺寸复现定位到0.6.1浮点linspace端点舍入；改为int64商/余数网格，保留归一化探针及实际训练合同。相关108项104通过4条件跳过，目标CUDA未验收；预处理身份7文件不变，兼容全来源准备可复用。新建训练使用新代码，旧失败任务保持冻结。没有修改Skill归档或其他子项目。

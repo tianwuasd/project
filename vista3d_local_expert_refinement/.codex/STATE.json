@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-29",
+  "updated_at": "2026-10-30",
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
-  "phase": "capped_batch_and_supply_repaired_local_acceptance",
+  "phase": "compile_probe_index_repaired_local_acceptance",
   "confirmed": {
     "same_source_material": true,
     "source_labeled_ct": true,
@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Publish fixed project commit, rebuild and install/publish Skill v2 code bundle; then target-server new-task assessment. Compatible 0.6.0 preprocessing may be reused; frozen old jobs/checkpoints not hotpatched.",
+  "next_action": "Publish 0.6.2 index fix; update the original server panel, create new training using compatible completed full-source preprocessing. Frozen failed jobs retain old code; target CUDA validation pending.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -563,6 +563,20 @@
     "server_deployed": false,
     "real_gpu_validated": false,
     "publication": "verify remote receipt separately"
+  },
+  "compile_probe_index_repair": {
+    "version": "0.6.2",
+    "reported_output_shape": [2, 8, 128, 224, 192],
+    "output_numel": 88080384,
+    "old_index_out_of_bounds_reproduced": true,
+    "index_arithmetic": "int64 quotient and remainder grid",
+    "checks_run": 108,
+    "checks_passed": 104,
+    "checks_skipped": 4,
+    "preprocessing_identity_files_unchanged": 7,
+    "validation": "docs/COMPILE_PROBE_INDEX_FIX.md",
+    "target_cuda_validated": false,
+    "publication_authority": "Git history and verified remote main"
   },
   "capped_batch_repair": {
     "version": "0.6.1",

@@ -50,6 +50,16 @@ def _leaves(value):
         yield value
 
 
+def _projection_indices(numel, device):
+    """Bounded integer grid: float32 endpoints can round past large outputs."""
+    import torch
+    count=min(1024,numel)
+    index=torch.arange(count,dtype=torch.int64,device=device)
+    denominator=max(count-1,1)
+    stride,remainder=divmod(numel-1,denominator)
+    return index*stride+(index*remainder)//denominator
+
+
 def _probe_network(network, data, parameters, device_type):
     """One local autograd graph at a time; only detached CPU references survive."""
     import torch
@@ -63,7 +73,7 @@ def _probe_network(network, data, parameters, device_type):
         for item in _leaves(outputs):
             if isinstance(item,torch.Tensor) and item.requires_grad and item.numel():
                 flat=item.reshape(-1)
-                index=torch.linspace(0,flat.numel()-1,steps=min(1024,flat.numel()),device=flat.device).long()
+                index=_projection_indices(flat.numel(),flat.device)
                 terms.append(flat[index].float().mean())
         if not terms:raise ValueError('compile compatibility: no differentiable output')
         scalar=sum(terms)/len(terms)
