@@ -1,0 +1,3990 @@
+{
+  "scope": "Report measurements from frozen ImageCHD diagnostics; not new independent test results",
+  "date": "2026-10-30",
+  "source_code_commit": "4628cd02a7577ff915dd7d35806e5dd07bcba9db",
+  "source_qc": {
+    "source_cases": 110,
+    "included_cases": 97,
+    "grid_mismatches": [],
+    "nonfinite_images": [],
+    "frozen_image_hash_mismatches": [],
+    "normalization_mismatches": [],
+    "excluded": [
+      {
+        "case": "ct_1003",
+        "missing_labels": [
+          5
+        ]
+      },
+      {
+        "case": "ct_1005",
+        "missing_labels": [
+          5
+        ]
+      },
+      {
+        "case": "ct_1011",
+        "missing_labels": [
+          5
+        ]
+      },
+      {
+        "case": "ct_1013",
+        "missing_labels": [
+          5
+        ]
+      },
+      {
+        "case": "ct_1015",
+        "missing_labels": [
+          5
+        ]
+      },
+      {
+        "case": "ct_1023",
+        "missing_labels": [
+          5
+        ]
+      },
+      {
+        "case": "ct_1063",
+        "missing_labels": [
+          5
+        ]
+      },
+      {
+        "case": "ct_1075",
+        "missing_labels": [
+          5
+        ]
+      },
+      {
+        "case": "ct_1078",
+        "missing_labels": [
+          5
+        ]
+      },
+      {
+        "case": "ct_1105",
+        "missing_labels": [
+          5
+        ]
+      },
+      {
+        "case": "ct_1141",
+        "missing_labels": [
+          5
+        ]
+      },
+      {
+        "case": "ct_1144",
+        "missing_labels": [
+          5
+        ]
+      },
+      {
+        "case": "ct_1161",
+        "missing_labels": [
+          5
+        ]
+      }
+    ],
+    "dominant_mode_over_half": [
+      {
+        "case": "ct_1170",
+        "class": "3",
+        "voxels": 349536,
+        "mean": 2632.7813014968415,
+        "std": 757.1581977215088,
+        "min": 516.0,
+        "max": 3582.0,
+        "mode": 3196,
+        "mode_fraction": 0.6291626613567701,
+        "mode_sample_n": 349536,
+        "mode_exact": true,
+        "at_or_below_P1": 0.0,
+        "at_or_above_P99": 0.6300609951478532
+      },
+      {
+        "case": "ct_1170",
+        "class": "5",
+        "voxels": 923710,
+        "mean": 2431.653972567148,
+        "std": 295.927940558475,
+        "min": 348.0,
+        "max": 3582.0,
+        "mode": 2492,
+        "mode_fraction": 0.9559147351441469,
+        "mode_sample_n": 923710,
+        "mode_exact": true,
+        "at_or_below_P1": 0.0,
+        "at_or_above_P99": 0.0011648677615268862
+      },
+      {
+        "case": "ct_1170",
+        "class": "6",
+        "voxels": 152403,
+        "mean": 2617.65946864563,
+        "std": 685.5529155490049,
+        "min": 1094.0,
+        "max": 3582.0,
+        "mode": 3039,
+        "mode_fraction": 0.7221248925546085,
+        "mode_sample_n": 152403,
+        "mode_exact": true,
+        "at_or_below_P1": 0.0,
+        "at_or_above_P99": 0.0017322493651699769
+      },
+      {
+        "case": "ct_1170",
+        "class": "7",
+        "voxels": 381969,
+        "mean": 3047.8456393058077,
+        "std": 914.0424323819117,
+        "min": 600.0,
+        "max": 3582.0,
+        "mode": 3582,
+        "mode_fraction": 0.7446887051043409,
+        "mode_sample_n": 381969,
+        "mode_exact": true,
+        "at_or_below_P1": 0.0,
+        "at_or_above_P99": 0.7452437239671282
+      }
+    ],
+    "duplicate_image_voxels": [],
+    "duplicate_label_voxels": [],
+    "ROI_training_coverage": {
+      "1": {
+        "mean": 1.0,
+        "min": 1.0,
+        "below_95": []
+      },
+      "2": {
+        "mean": 1.0,
+        "min": 1.0,
+        "below_95": []
+      },
+      "3": {
+        "mean": 0.9987008387968044,
+        "min": 0.984844657741854,
+        "below_95": []
+      },
+      "4": {
+        "mean": 0.998525641835914,
+        "min": 0.9653692920625192,
+        "below_95": []
+      },
+      "5": {
+        "mean": 1.0,
+        "min": 1.0,
+        "below_95": []
+      },
+      "6": {
+        "mean": 0.9922469175151865,
+        "min": 0.8996579876434245,
+        "below_95": [
+          [
+            "ct_1018",
+            0,
+            0.9485435120080358
+          ],
+          [
+            "ct_1029",
+            1,
+            0.9263700683535196
+          ],
+          [
+            "ct_1033",
+            1,
+            0.9285311265751364
+          ],
+          [
+            "ct_1035",
+            1,
+            0.9352964833102462
+          ],
+          [
+            "ct_1053",
+            1,
+            0.9402918569678066
+          ],
+          [
+            "ct_1080",
+            1,
+            0.9393677935524355
+          ],
+          [
+            "ct_1133",
+            1,
+            0.9428455142740857
+          ],
+          [
+            "ct_1145",
+            1,
+            0.8996579876434245
+          ]
+        ]
+      },
+      "7": {
+        "mean": 0.9978902551539028,
+        "min": 0.8604008736990878,
+        "below_95": [
+          [
+            "ct_1117",
+            2,
+            0.8604008736990878
+          ]
+        ]
+      }
+    }
+  },
+  "supervision": [
+    {
+      "fold": 0,
+      "split": "train",
+      "stage": "crop64",
+      "cases": 54,
+      "classes": {
+        "1": {
+          "sum": 64673,
+          "min": 109,
+          "median": 962.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 63127,
+          "min": 111,
+          "median": 973.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 147158,
+          "min": 157,
+          "median": 2257.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 182853,
+          "min": 320,
+          "median": 2725.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 286787,
+          "min": 977,
+          "median": 4694.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 96378,
+          "min": 352,
+          "median": 1401.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 87867,
+          "min": 181,
+          "median": 1208.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 0,
+      "split": "train",
+      "stage": "crop128",
+      "cases": 54,
+      "classes": {
+        "1": {
+          "sum": 513181,
+          "min": 931,
+          "median": 7786.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 503531,
+          "min": 1020,
+          "median": 7632.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 1180904,
+          "min": 1322,
+          "median": 17949.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 1456504,
+          "min": 2570,
+          "median": 20932.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 2293329,
+          "min": 7833,
+          "median": 37624.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 776686,
+          "min": 2792,
+          "median": 11135.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 704261,
+          "min": 1417,
+          "median": 9756.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 0,
+      "split": "train",
+      "stage": "all64",
+      "cases": 54,
+      "classes": {
+        "1": {
+          "sum": 126902,
+          "min": 216,
+          "median": 2044.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 119849,
+          "min": 314,
+          "median": 1891.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 296072,
+          "min": 157,
+          "median": 5560.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 359767,
+          "min": 320,
+          "median": 6159.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 581918,
+          "min": 977,
+          "median": 10821.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 190327,
+          "min": 352,
+          "median": 3157.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 173738,
+          "min": 181,
+          "median": 2763.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 0,
+      "split": "train",
+      "stage": "all128",
+      "cases": 54,
+      "classes": {
+        "1": {
+          "sum": 1013130,
+          "min": 1810,
+          "median": 16400.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 956740,
+          "min": 2491,
+          "median": 15028.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 2379623,
+          "min": 1322,
+          "median": 44660.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 2884736,
+          "min": 2570,
+          "median": 51735.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 4660069,
+          "min": 7833,
+          "median": 86910.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 1525279,
+          "min": 2792,
+          "median": 25137.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 1391763,
+          "min": 1417,
+          "median": 22005.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 0,
+      "split": "val",
+      "stage": "crop64",
+      "cases": 10,
+      "classes": {
+        "1": {
+          "sum": 11125,
+          "min": 426,
+          "median": 745.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 13092,
+          "min": 456,
+          "median": 1221.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 23129,
+          "min": 858,
+          "median": 1880.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 38923,
+          "min": 2145,
+          "median": 3901.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 53902,
+          "min": 3187,
+          "median": 4196.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 17019,
+          "min": 790,
+          "median": 1287.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 15859,
+          "min": 274,
+          "median": 1631.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 0,
+      "split": "val",
+      "stage": "crop128",
+      "cases": 10,
+      "classes": {
+        "1": {
+          "sum": 89139,
+          "min": 3451,
+          "median": 5709.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 104530,
+          "min": 3459,
+          "median": 9555.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 186605,
+          "min": 6963,
+          "median": 15443.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 313145,
+          "min": 17333,
+          "median": 30883.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 426261,
+          "min": 25995,
+          "median": 32974.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 138292,
+          "min": 6184,
+          "median": 10459.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 127446,
+          "min": 2122,
+          "median": 13281.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 0,
+      "split": "val",
+      "stage": "all64",
+      "cases": 10,
+      "classes": {
+        "1": {
+          "sum": 22871,
+          "min": 1022,
+          "median": 1604.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 27535,
+          "min": 1463,
+          "median": 2078.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 46313,
+          "min": 2581,
+          "median": 4462.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 84448,
+          "min": 5037,
+          "median": 7899.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 112179,
+          "min": 7959,
+          "median": 10975.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 34616,
+          "min": 1290,
+          "median": 3171.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 31472,
+          "min": 729,
+          "median": 3868.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 0,
+      "split": "val",
+      "stage": "all128",
+      "cases": 10,
+      "classes": {
+        "1": {
+          "sum": 182344,
+          "min": 8284,
+          "median": 12796.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 219637,
+          "min": 11392,
+          "median": 16721.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 372027,
+          "min": 20547,
+          "median": 36081.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 672918,
+          "min": 40123,
+          "median": 62572.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 892249,
+          "min": 63591,
+          "median": 87203.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 277235,
+          "min": 10239,
+          "median": 25608.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 253004,
+          "min": 5751,
+          "median": 30861.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 1,
+      "split": "train",
+      "stage": "crop64",
+      "cases": 55,
+      "classes": {
+        "1": {
+          "sum": 75602,
+          "min": 109,
+          "median": 920.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 79610,
+          "min": 286,
+          "median": 1091.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 154865,
+          "min": 470,
+          "median": 2530.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 199284,
+          "min": 422,
+          "median": 3128.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 327596,
+          "min": 1041,
+          "median": 5033.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 94301,
+          "min": 586,
+          "median": 1376.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 100534,
+          "min": 435,
+          "median": 1729.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 1,
+      "split": "train",
+      "stage": "crop128",
+      "cases": 55,
+      "classes": {
+        "1": {
+          "sum": 600869,
+          "min": 931,
+          "median": 7397.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 636922,
+          "min": 2265,
+          "median": 8676.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 1240111,
+          "min": 3705,
+          "median": 20323.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 1591006,
+          "min": 3327,
+          "median": 25144.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 2621356,
+          "min": 8236,
+          "median": 40130.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 746632,
+          "min": 4491,
+          "median": 11022.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 805362,
+          "min": 3466,
+          "median": 13755.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 1,
+      "split": "train",
+      "stage": "all64",
+      "cases": 55,
+      "classes": {
+        "1": {
+          "sum": 143206,
+          "min": 320,
+          "median": 1676.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 153507,
+          "min": 395,
+          "median": 2331.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 312278,
+          "min": 470,
+          "median": 5590.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 390293,
+          "min": 422,
+          "median": 7036.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 631698,
+          "min": 1041,
+          "median": 11315.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 180972,
+          "min": 786,
+          "median": 3278.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 201880,
+          "min": 435,
+          "median": 3700.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 1,
+      "split": "train",
+      "stage": "all128",
+      "cases": 55,
+      "classes": {
+        "1": {
+          "sum": 1143179,
+          "min": 2610,
+          "median": 13510.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 1218302,
+          "min": 3247,
+          "median": 18095.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 2498111,
+          "min": 3705,
+          "median": 45100.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 3122290,
+          "min": 3327,
+          "median": 56398.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 5066447,
+          "min": 8236,
+          "median": 89602.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 1444706,
+          "min": 6215,
+          "median": 26308.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 1616235,
+          "min": 3466,
+          "median": 30172.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 1,
+      "split": "val",
+      "stage": "crop64",
+      "cases": 10,
+      "classes": {
+        "1": {
+          "sum": 10800,
+          "min": 257,
+          "median": 925.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 8117,
+          "min": 111,
+          "median": 619.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 21068,
+          "min": 1288,
+          "median": 1888.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 24659,
+          "min": 1651,
+          "median": 2092.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 39353,
+          "min": 2736,
+          "median": 3364.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 14208,
+          "min": 806,
+          "median": 1067.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 8104,
+          "min": 274,
+          "median": 724.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 1,
+      "split": "val",
+      "stage": "crop128",
+      "cases": 10,
+      "classes": {
+        "1": {
+          "sum": 85772,
+          "min": 2013,
+          "median": 7192.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 65798,
+          "min": 1020,
+          "median": 4979.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 170399,
+          "min": 10198,
+          "median": 15885.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 198152,
+          "min": 12803,
+          "median": 16844.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 312628,
+          "min": 21590,
+          "median": 26430.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 113926,
+          "min": 6659,
+          "median": 8954.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 65521,
+          "min": 2122,
+          "median": 5956.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 1,
+      "split": "val",
+      "stage": "all64",
+      "cases": 10,
+      "classes": {
+        "1": {
+          "sum": 28423,
+          "min": 394,
+          "median": 2560.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 20723,
+          "min": 348,
+          "median": 1776.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 55359,
+          "min": 2234,
+          "median": 5007.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 63716,
+          "min": 3479,
+          "median": 5320.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 102383,
+          "min": 4986,
+          "median": 10029.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 35308,
+          "min": 1283,
+          "median": 2834.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 21467,
+          "min": 715,
+          "median": 2194.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 1,
+      "split": "val",
+      "stage": "all128",
+      "cases": 10,
+      "classes": {
+        "1": {
+          "sum": 225810,
+          "min": 3013,
+          "median": 19882.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 167195,
+          "min": 2921,
+          "median": 14209.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 442899,
+          "min": 17929,
+          "median": 40574.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 505260,
+          "min": 27505,
+          "median": 41878.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 817625,
+          "min": 39825,
+          "median": 79516.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 284053,
+          "min": 10303,
+          "median": 22904.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 173523,
+          "min": 5883,
+          "median": 17979.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 2,
+      "split": "train",
+      "stage": "crop64",
+      "cases": 55,
+      "classes": {
+        "1": {
+          "sum": 60505,
+          "min": 216,
+          "median": 944.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 64457,
+          "min": 286,
+          "median": 889.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 144597,
+          "min": 157,
+          "median": 2283.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 180086,
+          "min": 320,
+          "median": 3222.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 285884,
+          "min": 977,
+          "median": 4824.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 106564,
+          "min": 352,
+          "median": 1745.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 86619,
+          "min": 181,
+          "median": 1229.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 2,
+      "split": "train",
+      "stage": "crop128",
+      "cases": 55,
+      "classes": {
+        "1": {
+          "sum": 482740,
+          "min": 1810,
+          "median": 7453.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 514687,
+          "min": 2265,
+          "median": 7052.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 1160045,
+          "min": 1322,
+          "median": 18166.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 1444491,
+          "min": 2570,
+          "median": 26219.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 2285358,
+          "min": 7833,
+          "median": 38735.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 855544,
+          "min": 2792,
+          "median": 13916.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 688658,
+          "min": 1417,
+          "median": 9978.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 2,
+      "split": "train",
+      "stage": "all64",
+      "cases": 55,
+      "classes": {
+        "1": {
+          "sum": 122852,
+          "min": 216,
+          "median": 1889.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 128915,
+          "min": 314,
+          "median": 1732.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 288034,
+          "min": 157,
+          "median": 4853.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 354436,
+          "min": 320,
+          "median": 6107.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 571727,
+          "min": 977,
+          "median": 10778.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 208423,
+          "min": 352,
+          "median": 3721.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 171123,
+          "min": 181,
+          "median": 2667.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 2,
+      "split": "train",
+      "stage": "all128",
+      "cases": 55,
+      "classes": {
+        "1": {
+          "sum": 979937,
+          "min": 1810,
+          "median": 15177.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 1028811,
+          "min": 2491,
+          "median": 14030.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 2311604,
+          "min": 1322,
+          "median": 38784.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 2830789,
+          "min": 2570,
+          "median": 48504.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 4575960,
+          "min": 7833,
+          "median": 86724.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 1668628,
+          "min": 2792,
+          "median": 29178.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 1373463,
+          "min": 1417,
+          "median": 21464.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 2,
+      "split": "val",
+      "stage": "crop64",
+      "cases": 10,
+      "classes": {
+        "1": {
+          "sum": 20905,
+          "min": 462,
+          "median": 1260.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 22923,
+          "min": 533,
+          "median": 1461.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 35235,
+          "min": 1637,
+          "median": 2736.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 38807,
+          "min": 1621,
+          "median": 2820.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 85248,
+          "min": 3601,
+          "median": 4855.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 22214,
+          "min": 554,
+          "median": 2047.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 22591,
+          "min": 850,
+          "median": 1832.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 2,
+      "split": "val",
+      "stage": "crop128",
+      "cases": 10,
+      "classes": {
+        "1": {
+          "sum": 167515,
+          "min": 3721,
+          "median": 10015.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 182872,
+          "min": 4203,
+          "median": 11614.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 281218,
+          "min": 13061,
+          "median": 21589.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 311424,
+          "min": 12686,
+          "median": 22924.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 683600,
+          "min": 28605,
+          "median": 38813.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 176214,
+          "min": 4115,
+          "median": 16437.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 181252,
+          "min": 6833,
+          "median": 14856.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 2,
+      "split": "val",
+      "stage": "all64",
+      "cases": 10,
+      "classes": {
+        "1": {
+          "sum": 33724,
+          "min": 1103,
+          "median": 2859.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 36193,
+          "min": 1433,
+          "median": 3274.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 64066,
+          "min": 4125,
+          "median": 6071.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 70432,
+          "min": 4569,
+          "median": 6483.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 135636,
+          "min": 8845,
+          "median": 11082.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 41550,
+          "min": 1429,
+          "median": 4131.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 40116,
+          "min": 2484,
+          "median": 3487.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    },
+    {
+      "fold": 2,
+      "split": "val",
+      "stage": "all128",
+      "cases": 10,
+      "classes": {
+        "1": {
+          "sum": 271042,
+          "min": 9107,
+          "median": 22782.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "2": {
+          "sum": 287362,
+          "min": 11693,
+          "median": 26092.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "3": {
+          "sum": 509778,
+          "min": 32732,
+          "median": 48330.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "4": {
+          "sum": 567953,
+          "min": 36328,
+          "median": 51991.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "5": {
+          "sum": 1090893,
+          "min": 72194,
+          "median": 89398.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "6": {
+          "sum": 330800,
+          "min": 11645,
+          "median": 32770.0,
+          "zero_cases": [],
+          "below_100_cases": []
+        },
+        "7": {
+          "sum": 321823,
+          "min": 19889,
+          "median": 28079.5,
+          "zero_cases": [],
+          "below_100_cases": []
+        }
+      }
+    }
+  ],
+  "ct1126_vote_trace": {
+    "common_grid": [
+      128,
+      128,
+      128
+    ],
+    "LV_target_voxels": 1810,
+    "correct_LV_by_head": {
+      "crop64": 0,
+      "crop128": 1356,
+      "all64": 0,
+      "all128": 0
+    },
+    "correct_LV_after_vote": 0,
+    "crop128_correct_but_vote_wrong": 1356,
+    "reference_LV_voted_as_classes": [
+      0,
+      0,
+      1780,
+      0,
+      16,
+      14,
+      0,
+      0
+    ]
+  },
+  "hard_cases": {
+    "scope": "Per-network grid. Seen-case models are diagnostic, never OOF performance. Crop inputs identical across folds; fine-stage ROIs may differ.",
+    "cases": [
+      {
+        "case_id": "ct_1051",
+        "shape": [
+          135,
+          135,
+          155
+        ],
+        "heldout_fold": 2,
+        "training_fold": 1,
+        "roles": {
+          "heldout": {
+            "fold": 2,
+            "ROI": [
+              [
+                4,
+                124
+              ],
+              [
+                21,
+                110
+              ],
+              [
+                0,
+                141
+              ]
+            ],
+            "stages": {
+              "crop64": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.0,
+                    "target_voxels": 605,
+                    "predicted_voxels": 1633,
+                    "true_as_class_counts": [
+                      0,
+                      0,
+                      0,
+                      0,
+                      605,
+                      0,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.015344571322202682
+                  },
+                  "7": {
+                    "dice": 0.0,
+                    "target_voxels": 2285,
+                    "predicted_voxels": 0,
+                    "true_as_class_counts": [
+                      767,
+                      0,
+                      0,
+                      538,
+                      356,
+                      0,
+                      624,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.10997453331947327
+                  }
+                },
+                "seconds": 2.047000000020489
+              },
+              "crop128": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.0,
+                    "target_voxels": 4305,
+                    "predicted_voxels": 15605,
+                    "true_as_class_counts": [
+                      0,
+                      0,
+                      0,
+                      120,
+                      4056,
+                      129,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.11609995365142822
+                  },
+                  "7": {
+                    "dice": 0.0,
+                    "target_voxels": 18138,
+                    "predicted_voxels": 0,
+                    "true_as_class_counts": [
+                      5377,
+                      0,
+                      0,
+                      6911,
+                      2395,
+                      24,
+                      3431,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.10800223052501678
+                  }
+                },
+                "seconds": 1.3439999998081475
+              },
+              "all64": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.0,
+                    "target_voxels": 1118,
+                    "predicted_voxels": 3074,
+                    "true_as_class_counts": [
+                      0,
+                      0,
+                      7,
+                      21,
+                      1043,
+                      46,
+                      1,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.008929082192480564
+                  },
+                  "7": {
+                    "dice": 0.0,
+                    "target_voxels": 4234,
+                    "predicted_voxels": 0,
+                    "true_as_class_counts": [
+                      1209,
+                      0,
+                      0,
+                      1401,
+                      801,
+                      4,
+                      819,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.09548325836658478
+                  }
+                },
+                "seconds": 1.2660000000614673
+              },
+              "all128": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.0,
+                    "target_voxels": 8807,
+                    "predicted_voxels": 51920,
+                    "true_as_class_counts": [
+                      0,
+                      0,
+                      0,
+                      0,
+                      8735,
+                      72,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.0021104575134813786
+                  },
+                  "7": {
+                    "dice": 0.17154504002857685,
+                    "target_voxels": 34163,
+                    "predicted_voxels": 13428,
+                    "true_as_class_counts": [
+                      5379,
+                      75,
+                      86,
+                      12547,
+                      9960,
+                      94,
+                      1940,
+                      4082
+                    ],
+                    "mean_probability_on_true_class": 0.11268192529678345
+                  }
+                },
+                "seconds": 1.327999999979511
+              }
+            }
+          },
+          "trained_on_case": {
+            "fold": 1,
+            "ROI": [
+              [
+                3,
+                122
+              ],
+              [
+                21,
+                110
+              ],
+              [
+                0,
+                138
+              ]
+            ],
+            "stages": {
+              "crop64": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.002828854314002829,
+                    "target_voxels": 605,
+                    "predicted_voxels": 809,
+                    "true_as_class_counts": [
+                      0,
+                      2,
+                      0,
+                      53,
+                      497,
+                      53,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.09168831259012222
+                  },
+                  "7": {
+                    "dice": 0.1470758540822235,
+                    "target_voxels": 2285,
+                    "predicted_voxels": 1169,
+                    "true_as_class_counts": [
+                      745,
+                      0,
+                      0,
+                      875,
+                      394,
+                      0,
+                      17,
+                      254
+                    ],
+                    "mean_probability_on_true_class": 0.14573310315608978
+                  }
+                },
+                "seconds": 1.4059999999590218
+              },
+              "crop128": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.12665566605717343,
+                    "target_voxels": 4305,
+                    "predicted_voxels": 18118,
+                    "true_as_class_counts": [
+                      0,
+                      1420,
+                      0,
+                      42,
+                      2484,
+                      359,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.24195048213005066
+                  },
+                  "7": {
+                    "dice": 0.22082252686180068,
+                    "target_voxels": 18138,
+                    "predicted_voxels": 14250,
+                    "true_as_class_counts": [
+                      6593,
+                      0,
+                      10,
+                      5261,
+                      2677,
+                      19,
+                      2,
+                      3576
+                    ],
+                    "mean_probability_on_true_class": 0.15501898527145386
+                  }
+                },
+                "seconds": 1.2349999998696148
+              },
+              "all64": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.6512425021422451,
+                    "target_voxels": 1118,
+                    "predicted_voxels": 1216,
+                    "true_as_class_counts": [
+                      0,
+                      760,
+                      129,
+                      5,
+                      18,
+                      205,
+                      1,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.42951199412345886
+                  },
+                  "7": {
+                    "dice": 0.20706042090970808,
+                    "target_voxels": 4329,
+                    "predicted_voxels": 1563,
+                    "true_as_class_counts": [
+                      1198,
+                      0,
+                      0,
+                      725,
+                      1171,
+                      1,
+                      624,
+                      610
+                    ],
+                    "mean_probability_on_true_class": 0.15581271052360535
+                  }
+                },
+                "seconds": 1.327999999979511
+              },
+              "all128": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.16910006293266205,
+                    "target_voxels": 9122,
+                    "predicted_voxels": 22658,
+                    "true_as_class_counts": [
+                      0,
+                      2687,
+                      4623,
+                      234,
+                      309,
+                      1263,
+                      0,
+                      6
+                    ],
+                    "mean_probability_on_true_class": 0.28473100066185
+                  },
+                  "7": {
+                    "dice": 0.26680162716525657,
+                    "target_voxels": 35242,
+                    "predicted_voxels": 17119,
+                    "true_as_class_counts": [
+                      4630,
+                      0,
+                      0,
+                      14227,
+                      3662,
+                      14,
+                      5724,
+                      6985
+                    ],
+                    "mean_probability_on_true_class": 0.2013600617647171
+                  }
+                },
+                "seconds": 1.25
+              }
+            }
+          }
+        }
+      },
+      {
+        "case_id": "ct_1126",
+        "shape": [
+          470,
+          470,
+          750
+        ],
+        "heldout_fold": 1,
+        "training_fold": 0,
+        "roles": {
+          "heldout": {
+            "fold": 1,
+            "ROI": [
+              [
+                0,
+                470
+              ],
+              [
+                0,
+                470
+              ],
+              [
+                0,
+                750
+              ]
+            ],
+            "stages": {
+              "crop64": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.0,
+                    "target_voxels": 216,
+                    "predicted_voxels": 1316,
+                    "true_as_class_counts": [
+                      15,
+                      0,
+                      0,
+                      109,
+                      88,
+                      0,
+                      4,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.049913760274648666
+                  },
+                  "7": {
+                    "dice": 0.0,
+                    "target_voxels": 181,
+                    "predicted_voxels": 112,
+                    "true_as_class_counts": [
+                      21,
+                      0,
+                      0,
+                      149,
+                      11,
+                      0,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.12241160869598389
+                  }
+                },
+                "seconds": 1.5630000000819564
+              },
+              "crop128": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.6148265699387894,
+                    "target_voxels": 1810,
+                    "predicted_voxels": 2601,
+                    "true_as_class_counts": [
+                      0,
+                      1356,
+                      0,
+                      117,
+                      0,
+                      337,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.7014888525009155
+                  },
+                  "7": {
+                    "dice": 0.00041118843738114085,
+                    "target_voxels": 1417,
+                    "predicted_voxels": 193141,
+                    "true_as_class_counts": [
+                      325,
+                      0,
+                      0,
+                      1052,
+                      0,
+                      0,
+                      0,
+                      40
+                    ],
+                    "mean_probability_on_true_class": 0.1350851207971573
+                  }
+                },
+                "seconds": 1.3900000001303852
+              },
+              "all64": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.0,
+                    "target_voxels": 216,
+                    "predicted_voxels": 181,
+                    "true_as_class_counts": [
+                      0,
+                      0,
+                      214,
+                      0,
+                      0,
+                      2,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.01091937068849802
+                  },
+                  "7": {
+                    "dice": 0.0,
+                    "target_voxels": 181,
+                    "predicted_voxels": 33,
+                    "true_as_class_counts": [
+                      52,
+                      0,
+                      0,
+                      76,
+                      47,
+                      4,
+                      2,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.056810569018125534
+                  }
+                },
+                "seconds": 1.4059999999590218
+              },
+              "all128": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.0,
+                    "target_voxels": 1810,
+                    "predicted_voxels": 1945,
+                    "true_as_class_counts": [
+                      0,
+                      0,
+                      1691,
+                      0,
+                      118,
+                      1,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.0038044839166104794
+                  },
+                  "7": {
+                    "dice": 0.15067750677506775,
+                    "target_voxels": 1417,
+                    "predicted_voxels": 2273,
+                    "true_as_class_counts": [
+                      378,
+                      0,
+                      0,
+                      243,
+                      483,
+                      4,
+                      31,
+                      278
+                    ],
+                    "mean_probability_on_true_class": 0.13898596167564392
+                  }
+                },
+                "seconds": 1.3440000000409782
+              }
+            }
+          },
+          "trained_on_case": {
+            "fold": 0,
+            "ROI": [
+              [
+                0,
+                470
+              ],
+              [
+                0,
+                470
+              ],
+              [
+                0,
+                750
+              ]
+            ],
+            "stages": {
+              "crop64": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.5793780687397708,
+                    "target_voxels": 216,
+                    "predicted_voxels": 395,
+                    "true_as_class_counts": [
+                      0,
+                      177,
+                      0,
+                      6,
+                      0,
+                      33,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.7368053793907166
+                  },
+                  "7": {
+                    "dice": 0.08211143695014662,
+                    "target_voxels": 181,
+                    "predicted_voxels": 501,
+                    "true_as_class_counts": [
+                      67,
+                      0,
+                      0,
+                      82,
+                      2,
+                      2,
+                      0,
+                      28
+                    ],
+                    "mean_probability_on_true_class": 0.15258271992206573
+                  }
+                },
+                "seconds": 1.375
+              },
+              "crop128": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.0,
+                    "target_voxels": 1810,
+                    "predicted_voxels": 250415,
+                    "true_as_class_counts": [
+                      0,
+                      0,
+                      0,
+                      0,
+                      909,
+                      901,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.003764196764677763
+                  },
+                  "7": {
+                    "dice": 0.0,
+                    "target_voxels": 1417,
+                    "predicted_voxels": 0,
+                    "true_as_class_counts": [
+                      608,
+                      38,
+                      0,
+                      565,
+                      188,
+                      6,
+                      12,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.0686708390712738
+                  }
+                },
+                "seconds": 1.4219999997876585
+              },
+              "all64": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.33070866141732286,
+                    "target_voxels": 216,
+                    "predicted_voxels": 1054,
+                    "true_as_class_counts": [
+                      0,
+                      210,
+                      0,
+                      0,
+                      0,
+                      6,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.9378944039344788
+                  },
+                  "7": {
+                    "dice": 0.016107382550335572,
+                    "target_voxels": 181,
+                    "predicted_voxels": 564,
+                    "true_as_class_counts": [
+                      37,
+                      17,
+                      0,
+                      105,
+                      0,
+                      16,
+                      0,
+                      6
+                    ],
+                    "mean_probability_on_true_class": 0.121800996363163
+                  }
+                },
+                "seconds": 1.4059999999590218
+              },
+              "all128": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.0,
+                    "target_voxels": 1810,
+                    "predicted_voxels": 0,
+                    "true_as_class_counts": [
+                      0,
+                      0,
+                      1607,
+                      0,
+                      63,
+                      140,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.052101802080869675
+                  },
+                  "7": {
+                    "dice": 0.06898817345597898,
+                    "target_voxels": 1417,
+                    "predicted_voxels": 1627,
+                    "true_as_class_counts": [
+                      399,
+                      0,
+                      39,
+                      468,
+                      329,
+                      25,
+                      52,
+                      105
+                    ],
+                    "mean_probability_on_true_class": 0.10433263331651688
+                  }
+                },
+                "seconds": 1.4379999998491257
+              }
+            }
+          }
+        }
+      },
+      {
+        "case_id": "ct_1148",
+        "shape": [
+          159,
+          159,
+          155
+        ],
+        "heldout_fold": 2,
+        "training_fold": 0,
+        "roles": {
+          "heldout": {
+            "fold": 2,
+            "ROI": [
+              [
+                40,
+                139
+              ],
+              [
+                26,
+                115
+              ],
+              [
+                0,
+                145
+              ]
+            ],
+            "stages": {
+              "crop64": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.004077471967380225,
+                    "target_voxels": 109,
+                    "predicted_voxels": 872,
+                    "true_as_class_counts": [
+                      0,
+                      2,
+                      0,
+                      87,
+                      0,
+                      20,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.13163231313228607
+                  },
+                  "7": {
+                    "dice": 0.0,
+                    "target_voxels": 1867,
+                    "predicted_voxels": 0,
+                    "true_as_class_counts": [
+                      536,
+                      0,
+                      0,
+                      563,
+                      15,
+                      0,
+                      753,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.1284642070531845
+                  }
+                },
+                "seconds": 1.3900000001303852
+              },
+              "crop128": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.0,
+                    "target_voxels": 931,
+                    "predicted_voxels": 20051,
+                    "true_as_class_counts": [
+                      0,
+                      0,
+                      0,
+                      678,
+                      195,
+                      58,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.07370650768280029
+                  },
+                  "7": {
+                    "dice": 0.0,
+                    "target_voxels": 15345,
+                    "predicted_voxels": 1,
+                    "true_as_class_counts": [
+                      5418,
+                      0,
+                      0,
+                      9267,
+                      33,
+                      0,
+                      627,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.10083365440368652
+                  }
+                },
+                "seconds": 1.2339999999385327
+              },
+              "all64": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.02969938428105759,
+                    "target_voxels": 340,
+                    "predicted_voxels": 2421,
+                    "true_as_class_counts": [
+                      0,
+                      41,
+                      0,
+                      256,
+                      0,
+                      43,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.1808541864156723
+                  },
+                  "7": {
+                    "dice": 0.0,
+                    "target_voxels": 5870,
+                    "predicted_voxels": 0,
+                    "true_as_class_counts": [
+                      1520,
+                      0,
+                      0,
+                      1721,
+                      157,
+                      3,
+                      2469,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.108348049223423
+                  }
+                },
+                "seconds": 1.2810000001918525
+              },
+              "all128": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.004594891848955151,
+                    "target_voxels": 2834,
+                    "predicted_voxels": 38081,
+                    "true_as_class_counts": [
+                      0,
+                      94,
+                      7,
+                      2382,
+                      0,
+                      349,
+                      1,
+                      1
+                    ],
+                    "mean_probability_on_true_class": 0.09223988652229309
+                  },
+                  "7": {
+                    "dice": 0.17300600568960067,
+                    "target_voxels": 46610,
+                    "predicted_voxels": 10336,
+                    "true_as_class_counts": [
+                      10446,
+                      201,
+                      76,
+                      21206,
+                      3790,
+                      65,
+                      5900,
+                      4926
+                    ],
+                    "mean_probability_on_true_class": 0.1312338262796402
+                  }
+                },
+                "seconds": 1.2660000000614673
+              }
+            }
+          },
+          "trained_on_case": {
+            "fold": 0,
+            "ROI": [
+              [
+                40,
+                139
+              ],
+              [
+                26,
+                115
+              ],
+              [
+                0,
+                144
+              ]
+            ],
+            "stages": {
+              "crop64": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.031545741324921134,
+                    "target_voxels": 109,
+                    "predicted_voxels": 842,
+                    "true_as_class_counts": [
+                      0,
+                      15,
+                      0,
+                      88,
+                      0,
+                      6,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.21742437779903412
+                  },
+                  "7": {
+                    "dice": 0.3431180691454664,
+                    "target_voxels": 1867,
+                    "predicted_voxels": 1199,
+                    "true_as_class_counts": [
+                      555,
+                      0,
+                      0,
+                      630,
+                      25,
+                      1,
+                      130,
+                      526
+                    ],
+                    "mean_probability_on_true_class": 0.19630691409111023
+                  }
+                },
+                "seconds": 1.297000000020489
+              },
+              "crop128": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.0036763598011149614,
+                    "target_voxels": 931,
+                    "predicted_voxels": 32254,
+                    "true_as_class_counts": [
+                      0,
+                      61,
+                      0,
+                      504,
+                      15,
+                      351,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.1154685690999031
+                  },
+                  "7": {
+                    "dice": 0.0,
+                    "target_voxels": 15345,
+                    "predicted_voxels": 0,
+                    "true_as_class_counts": [
+                      4764,
+                      1074,
+                      0,
+                      9383,
+                      26,
+                      96,
+                      2,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.09121140092611313
+                  }
+                },
+                "seconds": 1.2659999998286366
+              },
+              "all64": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.1850187265917603,
+                    "target_voxels": 351,
+                    "predicted_voxels": 2319,
+                    "true_as_class_counts": [
+                      0,
+                      247,
+                      0,
+                      77,
+                      0,
+                      27,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.5881320238113403
+                  },
+                  "7": {
+                    "dice": 0.6015169194865811,
+                    "target_voxels": 5915,
+                    "predicted_voxels": 4369,
+                    "true_as_class_counts": [
+                      939,
+                      0,
+                      3,
+                      921,
+                      1,
+                      11,
+                      947,
+                      3093
+                    ],
+                    "mean_probability_on_true_class": 0.33486735820770264
+                  }
+                },
+                "seconds": 1.327999999979511
+              },
+              "all128": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.04004970092755801,
+                    "target_voxels": 2745,
+                    "predicted_voxels": 31862,
+                    "true_as_class_counts": [
+                      0,
+                      693,
+                      721,
+                      920,
+                      0,
+                      408,
+                      3,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.19400468468666077
+                  },
+                  "7": {
+                    "dice": 0.1555998658926082,
+                    "target_voxels": 46692,
+                    "predicted_voxels": 9979,
+                    "true_as_class_counts": [
+                      7768,
+                      0,
+                      5,
+                      10906,
+                      0,
+                      43,
+                      23561,
+                      4409
+                    ],
+                    "mean_probability_on_true_class": 0.20700393617153168
+                  }
+                },
+                "seconds": 1.2339999999385327
+              }
+            }
+          }
+        }
+      },
+      {
+        "case_id": "ct_1170",
+        "shape": [
+          173,
+          173,
+          206
+        ],
+        "heldout_fold": 1,
+        "training_fold": 0,
+        "roles": {
+          "heldout": {
+            "fold": 1,
+            "ROI": [
+              [
+                30,
+                163
+              ],
+              [
+                34,
+                134
+              ],
+              [
+                10,
+                192
+              ]
+            ],
+            "stages": {
+              "crop64": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.10909090909090909,
+                    "target_voxels": 456,
+                    "predicted_voxels": 809,
+                    "true_as_class_counts": [
+                      0,
+                      69,
+                      2,
+                      198,
+                      0,
+                      187,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.21166400611400604
+                  },
+                  "7": {
+                    "dice": 0.35444891980959353,
+                    "target_voxels": 1403,
+                    "predicted_voxels": 1328,
+                    "true_as_class_counts": [
+                      345,
+                      13,
+                      3,
+                      370,
+                      123,
+                      62,
+                      3,
+                      484
+                    ],
+                    "mean_probability_on_true_class": 0.18307523429393768
+                  }
+                },
+                "seconds": 1.452999999979511
+              },
+              "crop128": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.055790363482671176,
+                    "target_voxels": 3817,
+                    "predicted_voxels": 6830,
+                    "true_as_class_counts": [
+                      3,
+                      297,
+                      0,
+                      1562,
+                      272,
+                      1594,
+                      0,
+                      89
+                    ],
+                    "mean_probability_on_true_class": 0.14072154462337494
+                  },
+                  "7": {
+                    "dice": 0.06535759322644569,
+                    "target_voxels": 11095,
+                    "predicted_voxels": 72170,
+                    "true_as_class_counts": [
+                      7213,
+                      0,
+                      8,
+                      655,
+                      18,
+                      462,
+                      18,
+                      2721
+                    ],
+                    "mean_probability_on_true_class": 0.18964676558971405
+                  }
+                },
+                "seconds": 1.2339999999385327
+              },
+              "all64": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.0977634309430482,
+                    "target_voxels": 1262,
+                    "predicted_voxels": 3075,
+                    "true_as_class_counts": [
+                      0,
+                      212,
+                      14,
+                      352,
+                      0,
+                      681,
+                      3,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.14390943944454193
+                  },
+                  "7": {
+                    "dice": 0.19150370869858396,
+                    "target_voxels": 3487,
+                    "predicted_voxels": 962,
+                    "true_as_class_counts": [
+                      694,
+                      17,
+                      1,
+                      502,
+                      93,
+                      90,
+                      1664,
+                      426
+                    ],
+                    "mean_probability_on_true_class": 0.188371941447258
+                  }
+                },
+                "seconds": 1.297000000020489
+              },
+              "all128": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.0341657388261492,
+                    "target_voxels": 9764,
+                    "predicted_voxels": 21671,
+                    "true_as_class_counts": [
+                      0,
+                      537,
+                      333,
+                      1391,
+                      549,
+                      6140,
+                      16,
+                      798
+                    ],
+                    "mean_probability_on_true_class": 0.07111088186502457
+                  },
+                  "7": {
+                    "dice": 0.2471558120362737,
+                    "target_voxels": 28665,
+                    "predicted_voxels": 19855,
+                    "true_as_class_counts": [
+                      10888,
+                      863,
+                      59,
+                      1355,
+                      1243,
+                      2050,
+                      6211,
+                      5996
+                    ],
+                    "mean_probability_on_true_class": 0.17162270843982697
+                  }
+                },
+                "seconds": 1.25
+              }
+            }
+          },
+          "trained_on_case": {
+            "fold": 0,
+            "ROI": [
+              [
+                25,
+                162
+              ],
+              [
+                34,
+                134
+              ],
+              [
+                18,
+                195
+              ]
+            ],
+            "stages": {
+              "crop64": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.19665809768637532,
+                    "target_voxels": 456,
+                    "predicted_voxels": 1100,
+                    "true_as_class_counts": [
+                      0,
+                      153,
+                      0,
+                      230,
+                      0,
+                      73,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.3109671473503113
+                  },
+                  "7": {
+                    "dice": 0.31849203769905754,
+                    "target_voxels": 1403,
+                    "predicted_voxels": 1674,
+                    "true_as_class_counts": [
+                      285,
+                      2,
+                      0,
+                      489,
+                      15,
+                      37,
+                      85,
+                      490
+                    ],
+                    "mean_probability_on_true_class": 0.20203009247779846
+                  }
+                },
+                "seconds": 1.3440000000409782
+              },
+              "crop128": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.014713686642178541,
+                    "target_voxels": 3817,
+                    "predicted_voxels": 92284,
+                    "true_as_class_counts": [
+                      16,
+                      707,
+                      0,
+                      734,
+                      0,
+                      2360,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.19247286021709442
+                  },
+                  "7": {
+                    "dice": 0.0,
+                    "target_voxels": 11095,
+                    "predicted_voxels": 0,
+                    "true_as_class_counts": [
+                      4283,
+                      950,
+                      0,
+                      4894,
+                      181,
+                      631,
+                      156,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.0996265858411789
+                  }
+                },
+                "seconds": 1.25
+              },
+              "all64": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.1361421160194938,
+                    "target_voxels": 1243,
+                    "predicted_voxels": 5118,
+                    "true_as_class_counts": [
+                      0,
+                      433,
+                      5,
+                      24,
+                      47,
+                      734,
+                      0,
+                      0
+                    ],
+                    "mean_probability_on_true_class": 0.3056839108467102
+                  },
+                  "7": {
+                    "dice": 0.4227537168713639,
+                    "target_voxels": 3549,
+                    "predicted_voxels": 5733,
+                    "true_as_class_counts": [
+                      316,
+                      88,
+                      2,
+                      868,
+                      0,
+                      195,
+                      118,
+                      1962
+                    ],
+                    "mean_probability_on_true_class": 0.31920740008354187
+                  }
+                },
+                "seconds": 1.327999999979511
+              },
+              "all128": {
+                "metrics_on_own_grid": {
+                  "1": {
+                    "dice": 0.04020883331228159,
+                    "target_voxels": 9604,
+                    "predicted_voxels": 37898,
+                    "true_as_class_counts": [
+                      0,
+                      955,
+                      466,
+                      621,
+                      88,
+                      7455,
+                      18,
+                      1
+                    ],
+                    "mean_probability_on_true_class": 0.09098940342664719
+                  },
+                  "7": {
+                    "dice": 0.31522179274802137,
+                    "target_voxels": 28368,
+                    "predicted_voxels": 25962,
+                    "true_as_class_counts": [
+                      2412,
+                      84,
+                      745,
+                      7552,
+                      0,
+                      2716,
+                      6296,
+                      8563
+                    ],
+                    "mean_probability_on_true_class": 0.198113813996315
+                  }
+                },
+                "seconds": 1.297000000020489
+              }
+            }
+          }
+        }
+      }
+    ],
+    "status": "complete"
+  },
+  "learning_probes": [
+    {
+      "case_id": "ct_1030",
+      "stage": "all64",
+      "max_updates": 300,
+      "batch": 1,
+      "augmentation": false,
+      "lr_constant": 0.0002,
+      "history": [
+        {
+          "step": 0,
+          "loss": 1.661586046218872,
+          "classes": {
+            "1": {
+              "dice": 0.8838505853930496,
+              "predicted_voxels": 2734,
+              "true_voxels": 2647,
+              "mean_probability_on_true_class": 0.7505204677581787
+            },
+            "2": {
+              "dice": 0.8651064948724692,
+              "predicted_voxels": 1925,
+              "true_voxels": 1878,
+              "mean_probability_on_true_class": 0.7325069904327393
+            },
+            "3": {
+              "dice": 0.805700104074934,
+              "predicted_voxels": 6314,
+              "true_voxels": 6177,
+              "mean_probability_on_true_class": 0.5905846953392029
+            },
+            "4": {
+              "dice": 0.7083333333333334,
+              "predicted_voxels": 9459,
+              "true_voxels": 5277,
+              "mean_probability_on_true_class": 0.8312990665435791
+            },
+            "5": {
+              "dice": 0.8442971690394371,
+              "predicted_voxels": 13306,
+              "true_voxels": 11138,
+              "mean_probability_on_true_class": 0.6921736001968384
+            },
+            "6": {
+              "dice": 0.6958284434012589,
+              "predicted_voxels": 5092,
+              "true_voxels": 4281,
+              "mean_probability_on_true_class": 0.25031906366348267
+            },
+            "7": {
+              "dice": 0.0,
+              "predicted_voxels": 0,
+              "true_voxels": 1330,
+              "mean_probability_on_true_class": 0.10414386540651321
+            }
+          },
+          "elapsed_seconds": 0.9380000000819564
+        },
+        {
+          "step": 50,
+          "loss": 1.2532082796096802,
+          "classes": {
+            "1": {
+              "dice": 0.9292149292149292,
+              "predicted_voxels": 2792,
+              "true_voxels": 2647,
+              "mean_probability_on_true_class": 0.8889111280441284
+            },
+            "2": {
+              "dice": 0.9129979035639413,
+              "predicted_voxels": 1938,
+              "true_voxels": 1878,
+              "mean_probability_on_true_class": 0.8625925779342651
+            },
+            "3": {
+              "dice": 0.8404979012881748,
+              "predicted_voxels": 7641,
+              "true_voxels": 6177,
+              "mean_probability_on_true_class": 0.8090623617172241
+            },
+            "4": {
+              "dice": 0.9137810423224904,
+              "predicted_voxels": 6159,
+              "true_voxels": 5277,
+              "mean_probability_on_true_class": 0.8965954184532166
+            },
+            "5": {
+              "dice": 0.9136015160651219,
+              "predicted_voxels": 12080,
+              "true_voxels": 11138,
+              "mean_probability_on_true_class": 0.8448843955993652
+            },
+            "6": {
+              "dice": 0.8727507811658226,
+              "predicted_voxels": 5000,
+              "true_voxels": 4281,
+              "mean_probability_on_true_class": 0.7835146188735962
+            },
+            "7": {
+              "dice": 0.0,
+              "predicted_voxels": 0,
+              "true_voxels": 1330,
+              "mean_probability_on_true_class": 0.12025366723537445
+            }
+          },
+          "elapsed_seconds": 13.781000000191852
+        },
+        {
+          "step": 100,
+          "loss": 0.9749099016189575,
+          "classes": {
+            "1": {
+              "dice": 0.9470346885490488,
+              "predicted_voxels": 2715,
+              "true_voxels": 2647,
+              "mean_probability_on_true_class": 0.9006792306900024
+            },
+            "2": {
+              "dice": 0.9301968805931987,
+              "predicted_voxels": 2033,
+              "true_voxels": 1878,
+              "mean_probability_on_true_class": 0.9084290862083435
+            },
+            "3": {
+              "dice": 0.9185672858374481,
+              "predicted_voxels": 6582,
+              "true_voxels": 6177,
+              "mean_probability_on_true_class": 0.8618599772453308
+            },
+            "4": {
+              "dice": 0.937938478143551,
+              "predicted_voxels": 5841,
+              "true_voxels": 5277,
+              "mean_probability_on_true_class": 0.92207932472229
+            },
+            "5": {
+              "dice": 0.9464129100157868,
+              "predicted_voxels": 11666,
+              "true_voxels": 11138,
+              "mean_probability_on_true_class": 0.8825759291648865
+            },
+            "6": {
+              "dice": 0.9226006191950464,
+              "predicted_voxels": 4763,
+              "true_voxels": 4281,
+              "mean_probability_on_true_class": 0.8716254830360413
+            },
+            "7": {
+              "dice": 0.7588274483677548,
+              "predicted_voxels": 1672,
+              "true_voxels": 1330,
+              "mean_probability_on_true_class": 0.657061755657196
+            }
+          },
+          "elapsed_seconds": 26.313000000081956
+        },
+        {
+          "step": 150,
+          "loss": 0.7472267150878906,
+          "classes": {
+            "1": {
+              "dice": 0.9323120769504809,
+              "predicted_voxels": 2967,
+              "true_voxels": 2647,
+              "mean_probability_on_true_class": 0.9425634145736694
+            },
+            "2": {
+              "dice": 0.9170586778905669,
+              "predicted_voxels": 2161,
+              "true_voxels": 1878,
+              "mean_probability_on_true_class": 0.9381203651428223
+            },
+            "3": {
+              "dice": 0.9284983874773853,
+              "predicted_voxels": 6536,
+              "true_voxels": 6177,
+              "mean_probability_on_true_class": 0.885103166103363
+            },
+            "4": {
+              "dice": 0.9513205116407473,
+              "predicted_voxels": 5590,
+              "true_voxels": 5277,
+              "mean_probability_on_true_class": 0.9118295311927795
+            },
+            "5": {
+              "dice": 0.936157178488601,
+              "predicted_voxels": 11715,
+              "true_voxels": 11138,
+              "mean_probability_on_true_class": 0.8988082408905029
+            },
+            "6": {
+              "dice": 0.9393263439660942,
+              "predicted_voxels": 4685,
+              "true_voxels": 4281,
+              "mean_probability_on_true_class": 0.9128565788269043
+            },
+            "7": {
+              "dice": 0.8201871657754011,
+              "predicted_voxels": 1662,
+              "true_voxels": 1330,
+              "mean_probability_on_true_class": 0.7876114249229431
+            }
+          },
+          "elapsed_seconds": 38.71900000004098
+        },
+        {
+          "step": 200,
+          "loss": 0.5424774885177612,
+          "classes": {
+            "1": {
+              "dice": 0.9666416791604198,
+              "predicted_voxels": 2689,
+              "true_voxels": 2647,
+              "mean_probability_on_true_class": 0.9213376641273499
+            },
+            "2": {
+              "dice": 0.944516129032258,
+              "predicted_voxels": 1997,
+              "true_voxels": 1878,
+              "mean_probability_on_true_class": 0.9241451621055603
+            },
+            "3": {
+              "dice": 0.9570268979786726,
+              "predicted_voxels": 6389,
+              "true_voxels": 6177,
+              "mean_probability_on_true_class": 0.9152436256408691
+            },
+            "4": {
+              "dice": 0.9686742494872272,
+              "predicted_voxels": 5449,
+              "true_voxels": 5277,
+              "mean_probability_on_true_class": 0.9199628233909607
+            },
+            "5": {
+              "dice": 0.9637892872952634,
+              "predicted_voxels": 11452,
+              "true_voxels": 11138,
+              "mean_probability_on_true_class": 0.9157424569129944
+            },
+            "6": {
+              "dice": 0.9561699258260283,
+              "predicted_voxels": 4617,
+              "true_voxels": 4281,
+              "mean_probability_on_true_class": 0.9427129030227661
+            },
+            "7": {
+              "dice": 0.8991747398636527,
+              "predicted_voxels": 1457,
+              "true_voxels": 1330,
+              "mean_probability_on_true_class": 0.8299533128738403
+            }
+          },
+          "elapsed_seconds": 51.15600000019185
+        },
+        {
+          "step": 250,
+          "loss": 0.3768557012081146,
+          "classes": {
+            "1": {
+              "dice": 0.9746764209341587,
+              "predicted_voxels": 2684,
+              "true_voxels": 2647,
+              "mean_probability_on_true_class": 0.9453898072242737
+            },
+            "2": {
+              "dice": 0.9728867623604466,
+              "predicted_voxels": 1884,
+              "true_voxels": 1878,
+              "mean_probability_on_true_class": 0.9172526001930237
+            },
+            "3": {
+              "dice": 0.969934431472893,
+              "predicted_voxels": 6329,
+              "true_voxels": 6177,
+              "mean_probability_on_true_class": 0.9353070259094238
+            },
+            "4": {
+              "dice": 0.9809381424032891,
+              "predicted_voxels": 5425,
+              "true_voxels": 5277,
+              "mean_probability_on_true_class": 0.9465946555137634
+            },
+            "5": {
+              "dice": 0.9771365149833519,
+              "predicted_voxels": 11387,
+              "true_voxels": 11138,
+              "mean_probability_on_true_class": 0.9415021538734436
+            },
+            "6": {
+              "dice": 0.9885057471264368,
+              "predicted_voxels": 4332,
+              "true_voxels": 4281,
+              "mean_probability_on_true_class": 0.9374614357948303
+            },
+            "7": {
+              "dice": 0.9585185185185185,
+              "predicted_voxels": 1370,
+              "true_voxels": 1330,
+              "mean_probability_on_true_class": 0.8753519058227539
+            }
+          },
+          "elapsed_seconds": 63.59400000004098
+        },
+        {
+          "step": 300,
+          "loss": 0.2573011517524719,
+          "classes": {
+            "1": {
+              "dice": 0.9866565001906215,
+              "predicted_voxels": 2599,
+              "true_voxels": 2647,
+              "mean_probability_on_true_class": 0.9345123767852783
+            },
+            "2": {
+              "dice": 0.9885424993338663,
+              "predicted_voxels": 1875,
+              "true_voxels": 1878,
+              "mean_probability_on_true_class": 0.9258497357368469
+            },
+            "3": {
+              "dice": 0.9888168557536466,
+              "predicted_voxels": 6163,
+              "true_voxels": 6177,
+              "mean_probability_on_true_class": 0.9468346834182739
+            },
+            "4": {
+              "dice": 0.9928139183055976,
+              "predicted_voxels": 5299,
+              "true_voxels": 5277,
+              "mean_probability_on_true_class": 0.9517724514007568
+            },
+            "5": {
+              "dice": 0.9887861323325738,
+              "predicted_voxels": 11245,
+              "true_voxels": 11138,
+              "mean_probability_on_true_class": 0.9595280885696411
+            },
+            "6": {
+              "dice": 0.9978957212999766,
+              "predicted_voxels": 4273,
+              "true_voxels": 4281,
+              "mean_probability_on_true_class": 0.9532971382141113
+            },
+            "7": {
+              "dice": 0.9886706948640483,
+              "predicted_voxels": 1318,
+              "true_voxels": 1330,
+              "mean_probability_on_true_class": 0.9205431342124939
+            }
+          },
+          "elapsed_seconds": 76.04700000002049
+        }
+      ]
+    },
+    {
+      "case_id": "ct_1148",
+      "stage": "all64",
+      "max_updates": 300,
+      "batch": 1,
+      "augmentation": false,
+      "lr_constant": 0.0002,
+      "history": [
+        {
+          "step": 0,
+          "loss": 1.4951767921447754,
+          "classes": {
+            "1": {
+              "dice": 0.1850187265917603,
+              "predicted_voxels": 2319,
+              "target_voxels": 351
+            },
+            "2": {
+              "dice": 0.6459429690368376,
+              "predicted_voxels": 3122,
+              "target_voxels": 5049
+            },
+            "3": {
+              "dice": 0.5624717407686511,
+              "predicted_voxels": 4220,
+              "target_voxels": 2415
+            },
+            "4": {
+              "dice": 0.8760799314119897,
+              "predicted_voxels": 7411,
+              "target_voxels": 7752
+            },
+            "5": {
+              "dice": 0.8054074352234322,
+              "predicted_voxels": 15098,
+              "target_voxels": 11532
+            },
+            "6": {
+              "dice": 0.5345724907063197,
+              "predicted_voxels": 3311,
+              "target_voxels": 2069
+            },
+            "7": {
+              "dice": 0.6015169194865811,
+              "predicted_voxels": 4369,
+              "target_voxels": 5915
+            }
+          },
+          "seconds": 1.0150000001303852
+        },
+        {
+          "step": 50,
+          "loss": 1.0539066791534424,
+          "classes": {
+            "1": {
+              "dice": 0.7960339943342776,
+              "predicted_voxels": 355,
+              "target_voxels": 351
+            },
+            "2": {
+              "dice": 0.9129746835443038,
+              "predicted_voxels": 5063,
+              "target_voxels": 5049
+            },
+            "3": {
+              "dice": 0.8123654862062218,
+              "predicted_voxels": 2696,
+              "target_voxels": 2415
+            },
+            "4": {
+              "dice": 0.9457306908686793,
+              "predicted_voxels": 8445,
+              "target_voxels": 7752
+            },
+            "5": {
+              "dice": 0.9104011330028742,
+              "predicted_voxels": 12475,
+              "target_voxels": 11532
+            },
+            "6": {
+              "dice": 0.8912031907821848,
+              "predicted_voxels": 2444,
+              "target_voxels": 2069
+            },
+            "7": {
+              "dice": 0.8770019218449712,
+              "predicted_voxels": 6573,
+              "target_voxels": 5915
+            }
+          },
+          "seconds": 14.047000000020489
+        },
+        {
+          "step": 100,
+          "loss": 0.8013869524002075,
+          "classes": {
+            "1": {
+              "dice": 0.8252688172043011,
+              "predicted_voxels": 393,
+              "target_voxels": 351
+            },
+            "2": {
+              "dice": 0.9257526444263628,
+              "predicted_voxels": 4783,
+              "target_voxels": 5049
+            },
+            "3": {
+              "dice": 0.8776422764227643,
+              "predicted_voxels": 2505,
+              "target_voxels": 2415
+            },
+            "4": {
+              "dice": 0.9542806484295846,
+              "predicted_voxels": 8040,
+              "target_voxels": 7752
+            },
+            "5": {
+              "dice": 0.9411715759693793,
+              "predicted_voxels": 12504,
+              "target_voxels": 11532
+            },
+            "6": {
+              "dice": 0.9234612764024529,
+              "predicted_voxels": 2334,
+              "target_voxels": 2069
+            },
+            "7": {
+              "dice": 0.9267529043420945,
+              "predicted_voxels": 6222,
+              "target_voxels": 5915
+            }
+          },
+          "seconds": 26.593000000109896
+        },
+        {
+          "step": 150,
+          "loss": 0.5969946384429932,
+          "classes": {
+            "1": {
+              "dice": 0.893387314439946,
+              "predicted_voxels": 390,
+              "target_voxels": 351
+            },
+            "2": {
+              "dice": 0.9515392254220457,
+              "predicted_voxels": 5021,
+              "target_voxels": 5049
+            },
+            "3": {
+              "dice": 0.916310323762981,
+              "predicted_voxels": 2496,
+              "target_voxels": 2415
+            },
+            "4": {
+              "dice": 0.9777919185491568,
+              "predicted_voxels": 7963,
+              "target_voxels": 7752
+            },
+            "5": {
+              "dice": 0.9590233908144101,
+              "predicted_voxels": 11896,
+              "target_voxels": 11532
+            },
+            "6": {
+              "dice": 0.9548206800186306,
+              "predicted_voxels": 2225,
+              "target_voxels": 2069
+            },
+            "7": {
+              "dice": 0.9550429365212999,
+              "predicted_voxels": 5963,
+              "target_voxels": 5915
+            }
+          },
+          "seconds": 39.15599999995902
+        },
+        {
+          "step": 200,
+          "loss": 0.44417470693588257,
+          "classes": {
+            "1": {
+              "dice": 0.9086092715231788,
+              "predicted_voxels": 404,
+              "target_voxels": 351
+            },
+            "2": {
+              "dice": 0.9639585822381521,
+              "predicted_voxels": 4995,
+              "target_voxels": 5049
+            },
+            "3": {
+              "dice": 0.9512344419506223,
+              "predicted_voxels": 2486,
+              "target_voxels": 2415
+            },
+            "4": {
+              "dice": 0.988128088301354,
+              "predicted_voxels": 7831,
+              "target_voxels": 7752
+            },
+            "5": {
+              "dice": 0.970480814677953,
+              "predicted_voxels": 11741,
+              "target_voxels": 11532
+            },
+            "6": {
+              "dice": 0.9778729478943612,
+              "predicted_voxels": 2134,
+              "target_voxels": 2069
+            },
+            "7": {
+              "dice": 0.970541334452371,
+              "predicted_voxels": 6000,
+              "target_voxels": 5915
+            }
+          },
+          "seconds": 51.718000000109896
+        },
+        {
+          "step": 250,
+          "loss": 0.32033348083496094,
+          "classes": {
+            "1": {
+              "dice": 0.9707927677329624,
+              "predicted_voxels": 368,
+              "target_voxels": 351
+            },
+            "2": {
+              "dice": 0.9806400632161201,
+              "predicted_voxels": 5075,
+              "target_voxels": 5049
+            },
+            "3": {
+              "dice": 0.9860967005602822,
+              "predicted_voxels": 2404,
+              "target_voxels": 2415
+            },
+            "4": {
+              "dice": 0.9949232054495213,
+              "predicted_voxels": 7809,
+              "target_voxels": 7752
+            },
+            "5": {
+              "dice": 0.9877260701739168,
+              "predicted_voxels": 11525,
+              "target_voxels": 11532
+            },
+            "6": {
+              "dice": 0.9932627526467758,
+              "predicted_voxels": 2087,
+              "target_voxels": 2069
+            },
+            "7": {
+              "dice": 0.9885661048530533,
+              "predicted_voxels": 5892,
+              "target_voxels": 5915
+            }
+          },
+          "seconds": 64.29700000002049
+        },
+        {
+          "step": 300,
+          "loss": 0.22342979907989502,
+          "classes": {
+            "1": {
+              "dice": 0.9900990099009901,
+              "predicted_voxels": 356,
+              "target_voxels": 351
+            },
+            "2": {
+              "dice": 0.9959442081313681,
+              "predicted_voxels": 5060,
+              "target_voxels": 5049
+            },
+            "3": {
+              "dice": 0.9960572732932144,
+              "predicted_voxels": 2404,
+              "target_voxels": 2415
+            },
+            "4": {
+              "dice": 0.9989044274022041,
+              "predicted_voxels": 7765,
+              "target_voxels": 7752
+            },
+            "5": {
+              "dice": 0.9973566754777484,
+              "predicted_voxels": 11545,
+              "target_voxels": 11532
+            },
+            "6": {
+              "dice": 0.9992751872432954,
+              "predicted_voxels": 2070,
+              "target_voxels": 2069
+            },
+            "7": {
+              "dice": 0.9966130397967824,
+              "predicted_voxels": 5895,
+              "target_voxels": 5915
+            }
+          },
+          "seconds": 76.875
+        }
+      ]
+    },
+    {
+      "case_id": "ct_1170",
+      "stage": "all64",
+      "max_updates": 300,
+      "batch": 1,
+      "augmentation": false,
+      "lr_constant": 0.0002,
+      "history": [
+        {
+          "step": 0,
+          "loss": 1.7272861003875732,
+          "classes": {
+            "1": {
+              "dice": 0.1361421160194938,
+              "predicted_voxels": 5118,
+              "target_voxels": 1243
+            },
+            "2": {
+              "dice": 0.23490579012515472,
+              "predicted_voxels": 3200,
+              "target_voxels": 4071
+            },
+            "3": {
+              "dice": 0.4452545874346822,
+              "predicted_voxels": 5036,
+              "target_voxels": 3193
+            },
+            "4": {
+              "dice": 0.7927336397461151,
+              "predicted_voxels": 9273,
+              "target_voxels": 9003
+            },
+            "5": {
+              "dice": 0.1304881301680448,
+              "predicted_voxels": 10122,
+              "target_voxels": 8623
+            },
+            "6": {
+              "dice": 0.37108284207260317,
+              "predicted_voxels": 1817,
+              "target_voxels": 1406
+            },
+            "7": {
+              "dice": 0.4227537168713639,
+              "predicted_voxels": 5733,
+              "target_voxels": 3549
+            }
+          },
+          "seconds": 0.20399999991059303
+        },
+        {
+          "step": 50,
+          "loss": 1.094403862953186,
+          "classes": {
+            "1": {
+              "dice": 0.9057329742208542,
+              "predicted_voxels": 1356,
+              "target_voxels": 1243
+            },
+            "2": {
+              "dice": 0.8709117938553023,
+              "predicted_voxels": 4001,
+              "target_voxels": 4071
+            },
+            "3": {
+              "dice": 0.794011644025506,
+              "predicted_voxels": 4021,
+              "target_voxels": 3193
+            },
+            "4": {
+              "dice": 0.9563012516184721,
+              "predicted_voxels": 9533,
+              "target_voxels": 9003
+            },
+            "5": {
+              "dice": 0.8774854954092266,
+              "predicted_voxels": 9130,
+              "target_voxels": 8623
+            },
+            "6": {
+              "dice": 0.8010454099967331,
+              "predicted_voxels": 1655,
+              "target_voxels": 1406
+            },
+            "7": {
+              "dice": 0.7832131822863028,
+              "predicted_voxels": 4219,
+              "target_voxels": 3549
+            }
+          },
+          "seconds": 12.828999999910593
+        },
+        {
+          "step": 100,
+          "loss": 0.821251630783081,
+          "classes": {
+            "1": {
+              "dice": 0.9248149590962212,
+              "predicted_voxels": 1324,
+              "target_voxels": 1243
+            },
+            "2": {
+              "dice": 0.8983007862033985,
+              "predicted_voxels": 3815,
+              "target_voxels": 4071
+            },
+            "3": {
+              "dice": 0.8823710073710074,
+              "predicted_voxels": 3319,
+              "target_voxels": 3193
+            },
+            "4": {
+              "dice": 0.9753397632617273,
+              "predicted_voxels": 9245,
+              "target_voxels": 9003
+            },
+            "5": {
+              "dice": 0.9116357504215852,
+              "predicted_voxels": 9167,
+              "target_voxels": 8623
+            },
+            "6": {
+              "dice": 0.8891873740765615,
+              "predicted_voxels": 1572,
+              "target_voxels": 1406
+            },
+            "7": {
+              "dice": 0.8721649484536083,
+              "predicted_voxels": 4211,
+              "target_voxels": 3549
+            }
+          },
+          "seconds": 25.42200000002049
+        },
+        {
+          "step": 150,
+          "loss": 0.6181907653808594,
+          "classes": {
+            "1": {
+              "dice": 0.9054652880354506,
+              "predicted_voxels": 1465,
+              "target_voxels": 1243
+            },
+            "2": {
+              "dice": 0.8989841342312521,
+              "predicted_voxels": 4690,
+              "target_voxels": 4071
+            },
+            "3": {
+              "dice": 0.9249774028321783,
+              "predicted_voxels": 3445,
+              "target_voxels": 3193
+            },
+            "4": {
+              "dice": 0.9807144422529038,
+              "predicted_voxels": 9249,
+              "target_voxels": 9003
+            },
+            "5": {
+              "dice": 0.8974496804634773,
+              "predicted_voxels": 8120,
+              "target_voxels": 8623
+            },
+            "6": {
+              "dice": 0.8980534477070273,
+              "predicted_voxels": 1625,
+              "target_voxels": 1406
+            },
+            "7": {
+              "dice": 0.9285519498227434,
+              "predicted_voxels": 3785,
+              "target_voxels": 3549
+            }
+          },
+          "seconds": 38.0
+        },
+        {
+          "step": 200,
+          "loss": 0.4402097761631012,
+          "classes": {
+            "1": {
+              "dice": 0.9465944272445821,
+              "predicted_voxels": 1341,
+              "target_voxels": 1243
+            },
+            "2": {
+              "dice": 0.9373364893484489,
+              "predicted_voxels": 3956,
+              "target_voxels": 4071
+            },
+            "3": {
+              "dice": 0.9563084470335735,
+              "predicted_voxels": 3330,
+              "target_voxels": 3193
+            },
+            "4": {
+              "dice": 0.9880381456369549,
+              "predicted_voxels": 9138,
+              "target_voxels": 9003
+            },
+            "5": {
+              "dice": 0.9483956144882613,
+              "predicted_voxels": 8798,
+              "target_voxels": 8623
+            },
+            "6": {
+              "dice": 0.960618846694796,
+              "predicted_voxels": 1438,
+              "target_voxels": 1406
+            },
+            "7": {
+              "dice": 0.9619232907170651,
+              "predicted_voxels": 3647,
+              "target_voxels": 3549
+            }
+          },
+          "seconds": 50.562999999849126
+        },
+        {
+          "step": 250,
+          "loss": 0.30815649032592773,
+          "classes": {
+            "1": {
+              "dice": 0.9835407466880771,
+              "predicted_voxels": 1248,
+              "target_voxels": 1243
+            },
+            "2": {
+              "dice": 0.9562180366720718,
+              "predicted_voxels": 3946,
+              "target_voxels": 4071
+            },
+            "3": {
+              "dice": 0.9850606909430439,
+              "predicted_voxels": 3233,
+              "target_voxels": 3193
+            },
+            "4": {
+              "dice": 0.993477059148701,
+              "predicted_voxels": 9087,
+              "target_voxels": 9003
+            },
+            "5": {
+              "dice": 0.9706829156127845,
+              "predicted_voxels": 8773,
+              "target_voxels": 8623
+            },
+            "6": {
+              "dice": 0.9828203292770222,
+              "predicted_voxels": 1388,
+              "target_voxels": 1406
+            },
+            "7": {
+              "dice": 0.9881889763779528,
+              "predicted_voxels": 3563,
+              "target_voxels": 3549
+            }
+          },
+          "seconds": 63.14099999982864
+        },
+        {
+          "step": 300,
+          "loss": 0.20817755162715912,
+          "classes": {
+            "1": {
+              "dice": 0.9951807228915662,
+              "predicted_voxels": 1247,
+              "target_voxels": 1243
+            },
+            "2": {
+              "dice": 0.9794750590869511,
+              "predicted_voxels": 3968,
+              "target_voxels": 4071
+            },
+            "3": {
+              "dice": 0.9951479104711223,
+              "predicted_voxels": 3196,
+              "target_voxels": 3193
+            },
+            "4": {
+              "dice": 0.9977819673949208,
+              "predicted_voxels": 9031,
+              "target_voxels": 9003
+            },
+            "5": {
+              "dice": 0.9877311214791775,
+              "predicted_voxels": 8738,
+              "target_voxels": 8623
+            },
+            "6": {
+              "dice": 0.9932215483410631,
+              "predicted_voxels": 1397,
+              "target_voxels": 1406
+            },
+            "7": {
+              "dice": 0.9963400900900901,
+              "predicted_voxels": 3555,
+              "target_voxels": 3549
+            }
+          },
+          "seconds": 75.73499999986961
+        }
+      ]
+    }
+  ]
+}

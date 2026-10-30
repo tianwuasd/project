@@ -1,0 +1,65 @@
+{
+  "date": "2026-10-30",
+  "package_id": "imagechd-model-data-report-20261030",
+  "destination_repository": "tianwuasd/project",
+  "destination_visibility_verified": "private",
+  "destination_branch": "chd-artifacts/imagechd-model-data-report-20261030",
+  "scope": "Markdown report, 9 scientific report PNG figures, curated measurements and checksums; no raw image volumes, weights, credentials or private run logs",
+  "files": [
+    {
+      "path": "assets/01_failure_map.png",
+      "bytes": 136852,
+      "sha256": "be016d9dfbef8694fd75ea0f4e974936ec65ceac62c6b665b2574110cc751580"
+    },
+    {
+      "path": "assets/02_ct1051_class_confusion.png",
+      "bytes": 354429,
+      "sha256": "634e427d5edf4bed9ae0557ec162b959823f4b850e14c401e45f587879cc3985"
+    },
+    {
+      "path": "assets/03_ct1126_branch_vs_final.png",
+      "bytes": 450552,
+      "sha256": "643c8fd193a25e37589c8d408f1345d992653693c9766f11e5ebe6a1bd954e06"
+    },
+    {
+      "path": "assets/04_ct1126_vote_loss.png",
+      "bytes": 69164,
+      "sha256": "6b0b0eb3b3821a97e06dd54ae20e1aa781f644f2ccf574f2ab11eba9aea09f48"
+    },
+    {
+      "path": "assets/05_ct1004_component_error.png",
+      "bytes": 437192,
+      "sha256": "f894ef13183242aaf0f2e2aee430e945d18cf8f0c616cffe09b816f46ba27b2e"
+    },
+    {
+      "path": "assets/06_component_sizes.png",
+      "bytes": 58448,
+      "sha256": "02720f9f0c9a6f0827d33a4248d097f7761be4e6962cb811a8a49f092a7c9538"
+    },
+    {
+      "path": "assets/07_ct1170_source_intensity.png",
+      "bytes": 136575,
+      "sha256": "2d9d33ac171e5db7a25418650efaa0cee0fdbb43166c9008c4a6752706dda02c"
+    },
+    {
+      "path": "assets/08_single_case_learning.png",
+      "bytes": 111328,
+      "sha256": "99daa11264c3334f1c242c3d4a42c509c78425659034132cb5b9f9f480de2407"
+    },
+    {
+      "path": "assets/09_training_budget.png",
+      "bytes": 56034,
+      "sha256": "957cd883cb95791024eb70310ec8c6f8d46d6e4583e378e3bb6c6a93a9639576"
+    },
+    {
+      "path": "evidence.json",
+      "bytes": 111459,
+      "sha256": "262255a576caa2aef9cd25a7b31b45c9588117bfa218317c67f71ef373277ffe"
+    },
+    {
+      "path": "README.md",
+      "bytes": 18606,
+      "sha256": "ac58f0ec2c4820cdde73c57d928f3d513aeab4868ab151e40b93194c2292c166"
+    }
+  ]
+}
