@@ -2,6 +2,10 @@
 
 This is the public, non-patient-specific history. Detailed patient mappings and local paths belong to the private workspace memory.
 
+## 2026-10-30: supplemental roster and PDF repairs
+
+Repeated admissions with the same patient identifier/name retain every source row and inpatient alias. Encounter differences no longer block unrelated images or verified documents; identity conflicts remain blocked and clinical classification differences remain explicit warnings without a single aggregate label. Printed PDF identifiers are restricted to their line, while real mixed-patient pages still require review. Append/retry refreshes older online clinical metadata under the project lock, even without new inputs. Mac sidecars are excluded with archived catalog evidence and retired units; original files and history survive. PDF footer/page-count discrepancies produce an export-review warning rather than claiming clinical completeness. Tests use synthetic records only.
+
 ## 2026-10-26: offline archive for partial-clone updates
 
 A real partial-clone reproduction showed that git archive implicitly fetched .gitattributes from selected and unrelated repository directories after the explicit code download had completed. Previous synthetic repositories lacked attributes and missed this behavior. Archive now uses working-tree attributes in its dedicated bare cache, disables external attributes and line-ending conversion for that child, and prohibits Git transport. Whitelisted files match raw Git blobs. Incomplete local objects fail without hidden network waits; the previous release remains selected. Regressions include unfetched attributes, export-ignore settings and an unavailable remote during archive. The welcome marker AAOCA-20261026-02 identifies this fix. Numerical preprocessing and independent segmentation are unchanged.

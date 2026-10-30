@@ -9,6 +9,13 @@ from patient_pipeline.imaging import read_header, folder_id
 from patient_pipeline.project_model import digest, issue
 from patient_pipeline.runtime import fatal_io
 
+CLINICAL_PARSER_VERSION = 2
+
+
+def is_sidecar(path):
+    p=Path(path)
+    return p.name.startswith('._') or any(part.casefold()=='__macosx' for part in p.parts)
+
 
 def source_key(path):return os.path.normcase(str(Path(path).resolve()))
 
@@ -24,15 +31,16 @@ def discover(sources, output, control):
         if not root.exists():raise FileNotFoundError(f'本次添加的资料目录不可访问：{root}')
         if root==output or root.is_relative_to(output) or output.is_relative_to(root):
             raise ValueError('输入与输出目录不能相互包含；请选择单独的结果目录。')
+        if is_sidecar(root):continue
         if root.is_file():found.add(root);continue
         def scan_error(exc):raise exc
         for base,dirs,files in os.walk(root,onerror=scan_error,followlinks=False):
             control.checkpoint()
-            dirs[:]=[n for n in dirs if n not in {'.venv','.git','__pycache__'}
+            dirs[:]=[n for n in dirs if n not in {'.venv','.git','__pycache__'} and not is_sidecar(Path(base,n))
                      and not Path(base,n).is_symlink() and not Path(base,n).is_junction()]
             for name in files:
                 p=Path(base,name)
-                if p.suffix.lower() in {'.dcm','.dicom','.pdf','.xlsx'} and not name.startswith('~$'):
+                if p.suffix.lower() in {'.dcm','.dicom','.pdf','.xlsx'} and not name.startswith('~$') and not is_sidecar(p):
                     found.add(p)
     return sorted(found,key=lambda p:str(p).lower())
 
@@ -53,8 +61,15 @@ def extract_pdf(store,path,key,control):
     if not dest.exists():
         dest.write_text('\n\n'.join(f'===== 第 {p["page"]} 页 =====\n{p["text"]}' for p in pages),encoding='utf-8')
     write_json(dest.with_name('pages.json'),{'source':str(path),'sha256':content_hash,'pages':pages})
+    review=[]
+    footer=re.findall(r'第\s*(\d+)\s*/\s*(\d+)\s*[页⻚]',pages[-1]['text']) if pages else []
+    if footer:
+        current,total=map(int,footer[-1])
+        if current==len(pages) and current<total:
+            review.append(issue('PDF_EXPORT_REVIEW',f'PDF实际{len(pages)}页，末页页脚为{current}/{total}；需回源核对导出范围，尚不能确认缺失正文',
+                source=path,severity='warning'))
     return dict(document_ids=sorted(ids),document_name=filename_name(path),pages=len(pages),
-                low_text_pages=low,text_file=rel.as_posix(),sha256=content_hash)
+                low_text_pages=low,text_file=rel.as_posix(),sha256=content_hash,issues=review)
 
 
 def ingest(store,sources,control):
@@ -63,10 +78,12 @@ def ingest(store,sources,control):
     for n,path in enumerate(paths):
         control.progress('headers',n,len(paths),'登记资料并独立检查')
         key=source_key(path);old=store.source(key);before=stamp(path)
-        if old and old.get('stamp')==before:
-            reused+=1;continue
         kind={'.pdf':'PDF','.xlsx':'ROSTER'}.get(path.suffix.lower(),'DICOM')
+        current_parser=kind=='DICOM' or (old or {}).get('clinical_parser_version')==CLINICAL_PARSER_VERSION
+        if old and old.get('stamp')==before and current_parser:
+            reused+=1;continue
         r={'key':key,'path':str(path),'kind':kind,'stamp':before,'pid':'','issues':[]}
+        if kind!='DICOM':r['clinical_parser_version']=CLINICAL_PARSER_VERSION
         if store.get('meta','legacy_adopted'):r['new_since_legacy']=True
         try:
             if kind=='DICOM':r['header']=read_header(path,tolerate_timing=True)
@@ -88,3 +105,26 @@ def ingest(store,sources,control):
     store.commit();control.progress('headers',len(paths),len(paths),'本批次资料登记完成',True)
     result={'files_seen':len(paths),'sources_changed':changed,'sources_reused':reused}
     store.put('meta','last_ingest',result);return result
+
+
+def refresh_catalog(store,control):
+    """Apply parser updates to existing catalogs; preserve excluded rows as evidence."""
+    stale=[];excluded=0
+    for r in list(store.sources()):
+        control.checkpoint()
+        if is_sidecar(r['path']):
+            store.put('excluded_sources',r['key'],{'reason':'Mac附带文件，不是临床资料','source':r},False)
+            store.db.execute('DELETE FROM sources WHERE key=?',(r['key'],));excluded+=1
+        elif r['kind'] in {'PDF','ROSTER'} and not r.get('legacy') and (
+                r.get('clinical_parser_version')!=CLINICAL_PARSER_VERSION) and Path(r['path']).is_file():
+            stale.append(r['path'])
+    # Retire only units explicitly removed by this filter; ordinary offline inputs stay active.
+    for key,u in list(store.items('units')):
+        if u.get('sources') and all(store.get('excluded_sources',s) for s in u['sources']) and not store.unit_sources(key):
+            u.update(retired=True,retired_reason='Mac附带文件，不是临床资料');store.put('units',key,u,False)
+    store.commit()
+    if stale:ingest(store,stale,control)
+    result={'parser_version':CLINICAL_PARSER_VERSION,'metadata_refreshed':len(stale),
+        'newly_excluded':excluded,'excluded_total':sum(1 for _ in store.items('excluded_sources'))}
+    store.put('meta','catalog_refresh',result)
+    return result

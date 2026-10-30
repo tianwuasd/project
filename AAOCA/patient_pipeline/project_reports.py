@@ -19,6 +19,8 @@ LABELS={'PIXEL_INVALID':'像素缺失、为空或长度不符','CT_DIMENSIONS_MI
         'SOP_CONTENT_CONFLICT':'同一影像编号对应不同内容','US_TIMING_INVALID':'超声帧时间记录不符合要求',
         'US_CALIBRATION_REVIEW':'超声物理标定待核实','US_SCALE_UNKNOWN':'超声物理标定待核实',
         'DOCUMENT_UNMATCHED':'PDF患者关联待核实','ROSTER_ID_CONFLICT':'患者主表编号冲突',
+        'ROSTER_CLINICAL_REVIEW':'不同就诊记录的临床字段待核对',
+        'PDF_EXPORT_REVIEW':'PDF导出页数待核对',
         'DIRECTORY_ID_CONFLICT':'目录编号与影像内部编号冲突','MODALITY_NOT_CONVERTED':'其他影像类型尚未转换',
         'CT_NOT_PROVIDED':'未提供CT资料','US_NOT_PROVIDED':'未提供超声资料','PDF_NOT_PROVIDED':'未提供PDF资料'}
 
@@ -44,12 +46,15 @@ def issue_description(item):
 
 
 def family(code):
+    if code=='ROSTER_CLINICAL_REVIEW':return '数据本身'
     if code.endswith('_NOT_PROVIDED'):return '资料缺失'
     if any(word in code for word in ['ROSTER','DIRECTORY_ID','PATIENT_ID','DOCUMENT_UNMATCHED','DOCUMENT_PAGE_ID','ID_RESOLVED','IDENTITY']):return '编号关联'
     return '数据本身'
 
 
 def remedy(code):
+    if code=='PDF_EXPORT_REVIEW':return '对照原系统核对打印范围、末页与页面裁切；关联成功不代表病历内容完整。'
+    if code=='ROSTER_CLINICAL_REVIEW':return '核对各次就诊原始记录；保留不同分型，不自动选取单一诊断标签。'
     if code.endswith('_NOT_PROVIDED'):return '如有资料，后续添加对应文件夹；补充后自动更新。'
     if 'ROSTER' in code:return '核对主表重复行；确认同一患者后导入明确的编号/姓名别名规则。'
     if family(code)=='编号关联':return '核对编号与姓名；可启用唯一姓名匹配，同名多患者保留待核实。'
@@ -90,7 +95,8 @@ def build_snapshot(store):
             'update_failed_kept':sum(u.get('last_attempt',{}).get('status')=='failed' for u in success),
             'failed_reasons':dict(reasons),'patients_success':len({u['pid'] for u in success if u.get('pid')})}
     for u in units:
-        for i in u.get('last_attempt',u).get('issues',[]):issues.append({**i,'unit':u['key'],'kind':u['kind']})
+        for i in u.get('last_attempt',u).get('issues',[]):
+            issues.append({**i,'patient_id':i.get('patient_id') or u.get('pid',''),'unit':u['key'],'kind':u['kind']})
     issues.extend(store.get('meta','registry_issues',[]))
     # Header failures, roster problems or unsupported files are not discarded from the report.
     issues.extend(store.get('meta','legacy_extra_issues',[]))
@@ -117,7 +123,8 @@ def build_snapshot(store):
         presence=tuple(counts[k]>0 for k in ['CT','US','PDF'])
         patients.append({'id':pid,'name':p.get('name',''),'counts':counts,'category':CATEGORIES[presence],
             'subcategory':subcategory(rows),'availability':availability,'folder':store.get('folders',pid,''),
-            'aliases':p.get('aliases',[]),'origin':p.get('origin','legacy')})
+            'aliases':p.get('aliases',[]),'origin':p.get('origin','legacy'),
+            'encounter_count':len(p.get('encounters',[])),'field_variants':p.get('field_variants',{})})
     unique={}
     for i in issues:
         i={**i};i.setdefault('severity','error');i.setdefault('patient_id','');i.setdefault('source','');i.setdefault('unit','')
@@ -134,6 +141,7 @@ def build_snapshot(store):
                    'new_issues':len(set(active)-set(before)),
                    'resolved_issues':[v for k,v in before.items() if k not in unique and v.get('severity')!='info']},
         'processing':store.get('meta','last_processing',{}),'ingest':store.get('meta','last_ingest',{}),
+        'catalog_refresh':store.get('meta','catalog_refresh',{}),
         'previous_overview':previous.get('overview',{}),'manual_recoveries':store.get('meta','legacy_manifest',{}).get('manual_recoveries',[])}
     return snapshot
 
@@ -207,6 +215,7 @@ body{font-family:"Microsoft YaHei",system-ui,sans-serif;background:#f3f6fa;color
 <h1>{e(report_title)}</h1><p>数据统计时间：{e(snapshot['generated'])} · 患者级关联；不代表同次就诊匹配或临床检查完整。</p>
 <div class="cards">{cards}</div><p class="note">三类结果齐全表示有可用 CT、超声和已核实 PDF，并不表示所有序列均成功。PDF 文字提取不足只作备注。失败按原始序列或文件统计，期相输出单独计数。</p>
 <section><h2>表 1 · 原始资料与处理情况</h2>{table(['数据类型 / 统计单位','登记数量','成功 / 失败 / 待处理','原因与保留成果'],overview)}<p>累计输入文件：{e(snapshot['raw_sources'])}。完全相同的副本只处理一次；提醒条目数不等于失败序列数或患者数。</p></section>
+<p>已排除 Mac 附带文件 {snapshot.get('catalog_refresh',{}).get('excluded_total',0)} 个，原文件和登记证据保留；不计为临床资料读取失败。</p>
 {us_explanation}
 <section><h2>表 2 · 结果分类与患者详情</h2>{categories}<p>“缺”按处理结果判断；下面另列尚未提供、已有但失败、关联待核实。后续补充资料后自动调整分类。</p><input id="search" placeholder="筛选患者编号、姓名、分类或问题"><div id="patients">{table(['编号','姓名','大类 / 小类','CT','超声','PDF','结果'],patientrows)}</div></section>
 {issuesections}<section><h2>本次变化与修复记录</h2>{history}<p>本次新增编号 {snapshot['changed']['new_patients']}；新增提醒 {snapshot['changed']['new_issues']}；已解除提醒 {len(snapshot['changed']['resolved_issues'])}。</p><p>{link('项目数据快照.json','完整快照')} · {link('患者分类表.csv','患者分类表')} · {link('详细问题表.csv','详细问题表')} · {link('处理单元表.csv','各序列/文件输出及修复证据')}</p><p>原始资料未改写。已确认的历史修复 {len(snapshot['manual_recoveries'])} 项保留。失败更新不会覆盖旧的成功成果。</p></section>

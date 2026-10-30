@@ -7,7 +7,7 @@ import uuid
 from common import write_json
 from patient_pipeline.project_model import ProjectOptions, now
 from patient_pipeline.project_store import ProjectStore
-from patient_pipeline.project_ingest import ingest
+from patient_pipeline.project_ingest import ingest, refresh_catalog
 from patient_pipeline.project_identity import resolve_identity
 from patient_pipeline.project_process import process_units
 from patient_pipeline.project_reports import build_snapshot, publish_project
@@ -36,6 +36,7 @@ def run_project(sources,output,options=None,control=None):
             store.load_legacy(control=control)
             if options.action!='report':
                 if sources:ingest(store,sources,control)
+                refresh_catalog(store,control)
                 resolve_identity(store,options,control)
                 process_units(store,options,control)
             control.progress('reports',0,1,'更新分类、三类问题和数据一览',True)

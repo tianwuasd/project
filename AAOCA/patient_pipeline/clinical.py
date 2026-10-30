@@ -27,6 +27,51 @@ def normalize_text(text):
 
 ID_COLUMNS=['门诊号','患者编号','患者ID','PatientID','病人ID','病人编号','患者号','病历号']
 NAME_COLUMNS=['姓名','患者姓名','病人姓名','PatientName']
+IDENTITY_FIELDS=['性别','PatientSex','出生日期','出生年月日','生日','PatientBirthDate']
+CLINICAL_FIELDS={'心上','心内','心下','混合','分型','诊断','疾病分型','诊断分型'}
+
+
+def merge_roster_entries(old, entry):
+    """Retain source rows; admission differences are not patient identity conflicts."""
+    def rows(value):
+        return value.get('encounters') or [{'fields':value.get('fields',{}),
+            'source':s} for s in value.get('sources',[])]
+    encounters=[]
+    for row in rows(old)+rows(entry):
+        if row not in encounters:encounters.append(row)
+    same_name=bool(old.get('name') and old.get('name')==entry.get('name'))
+    variants={}
+    for row in encounters:
+        for k,v in row['fields'].items():
+            values=variants.setdefault(k,[])
+            if v not in values:values.append(v)
+    identity_conflict=(not same_name and old.get('name')!=entry.get('name')) or any(
+        len(variants.get(k,[]))>1 for k in IDENTITY_FIELDS)
+    if not same_name and any(len(v)>1 for v in variants.values()):identity_conflict=True
+    old['conflict']=old.get('conflict',False) or entry.get('conflict',False) or (
+        identity_conflict and not old.get('confirmed'))
+    old['aliases']=sorted(set(old.get('aliases',[])+entry.get('aliases',[])))
+    old['sources']=[]
+    for source in [r['source'] for r in encounters]:
+        if source not in old['sources']:old['sources'].append(source)
+    old['encounters']=encounters
+    old['field_variants']={k:v for k,v in variants.items() if len(v)>1}
+    # Ambiguous encounter values never become a single patient-level label.
+    old['fields']={k:v[0] for k,v in variants.items() if len(v)==1}
+    if not old.get('name'):old['name']=entry.get('name','')
+    return old
+
+
+def roster_review_issues(ident, entry, source=''):
+    result=[];variants=entry.get('field_variants',{})
+    if variants and not entry.get('conflict'):
+        result.append({'patient_id':ident,'code':'ROSTER_ENCOUNTER_VARIANTS','source':str(source),
+            'severity':'info','message':'同一编号和姓名保留多条就诊记录；不同字段：'+ '、'.join(sorted(variants))})
+    clinical=sorted(CLINICAL_FIELDS & variants.keys())
+    if clinical:
+        result.append({'patient_id':ident,'code':'ROSTER_CLINICAL_REVIEW','source':str(source),
+            'severity':'warning','message':'不同就诊记录的临床字段存在差异，保留逐行值，未合并为单一标签：'+'、'.join(clinical)})
+    return result
 
 
 def read_roster(paths,control=None):
@@ -65,20 +110,20 @@ def read_roster(paths,control=None):
                             if v and v not in aliases:aliases.append(v)
                         source={'path':str(path),'sheet':sheet.title,'row':row_no}
                         if ident not in roster:
-                            roster[ident]={'name':name,'aliases':aliases,'fields':fields,'sources':[source], 'conflict':False}
+                            roster[ident]={'name':name,'aliases':aliases,'fields':fields,'sources':[source],
+                                'encounters':[{'fields':fields,'source':source}], 'conflict':False}
                         else:
-                            old=roster[ident];old['sources'].append(source)
-                            if old['name']!=name or any(k in old['fields'] and old['fields'][k]!=v for k,v in fields.items()):
-                                old['conflict']=True
+                            old=merge_roster_entries(roster[ident],{'name':name,'aliases':aliases,
+                                'fields':fields,'sources':[source]})
+                            if old['conflict']:
                                 issues.append({'patient_id':ident,'code':'ROSTER_ID_CONFLICT','source':str(path),
                                                'message':'同一编号对应不一致的患者表记录；不自动合并病例。'})
-                            else:
-                                old['fields'].update(fields);old['aliases']=sorted(set(old['aliases']+aliases))
                 if not recognized:issues.append({'code':'ROSTER_SCHEMA_UNKNOWN','source':str(path),'message':'未找到患者编号列；未把此表当作患者主表。'})
             finally:book.close()
         except Exception as exc:
             if fatal_io(exc):raise
             issues.append({'code':'ROSTER_READ_FAILED','source':str(path),'message':str(exc)})
+    for ident,entry in roster.items():issues.extend(roster_review_issues(ident,entry))
     return roster,issues
 
 
@@ -96,7 +141,7 @@ def filename_name(path):
 def document_ids(text,known_aliases=None):
     s=normalize_text(text)
     ids=set(re.findall(r'/(?:EMR|BasicInfo|VisitHistory|DignosisHistory|SurgeryHistory|Medication)/([0-9]+)/',s,re.I))
-    printed=set(re.findall(r'(?:门诊号|⻔诊号|患者编号|Patient\s*ID)\s*[:：]?\s*([A-Za-z0-9][A-Za-z0-9_-]*)',s,re.I))
+    printed=set(re.findall(r'(?:门诊号|⻔诊号|患者编号|Patient[^\S\n]*ID)[^\S\n]*[:：]?[^\S\n]*([A-Za-z0-9][A-Za-z0-9_-]*)',s,re.I))
     # Some exported page edges truncate a printed ID. Ignore a strict prefix
     # only when it is not itself a known patient's alias and a full URL agrees.
     printed={p for p in printed if p in (known_aliases or {}) or not any(v.startswith(p) and len(v)>len(p) for v in ids)}

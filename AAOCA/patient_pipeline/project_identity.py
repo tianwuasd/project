@@ -4,7 +4,7 @@ import copy
 import json
 from pathlib import Path
 
-from patient_pipeline.clinical import normal_id
+from patient_pipeline.clinical import normal_id, merge_roster_entries, roster_review_issues, filename_name
 from repair_policy import name_variants
 from patient_pipeline.project_model import digest, issue, identity_evidence
 
@@ -55,13 +55,7 @@ def resolve_identity(store,options,control):
         for ident,entry in r.get('roster',{}).items():
             entry=copy.deepcopy(entry);entry['origin']='roster'
             if ident in patients:
-                old=patients[ident]
-                if old.get('name') and entry.get('name') and old['name']!=entry['name'] and not old.get('confirmed'):
-                    old['conflict']=True
-                old['aliases']=sorted(set(old.get('aliases',[ident])+entry.get('aliases',[ident])))
-                old.setdefault('sources',[]).extend(entry.get('sources',[]))
-                if not old.get('name'):old['name']=entry.get('name','')
-                old['conflict']=old.get('conflict',False) or entry.get('conflict',False)
+                merge_roster_entries(patients[ident],entry)
             else:patients[ident]=entry
     policy=store.get('meta','identity_policy',{})
     if options.policy_path:
@@ -119,7 +113,8 @@ def resolve_identity(store,options,control):
         h=r.get('header',{});t=h.get('tags',{})
         raw=normal_id(t.get('PatientID')) if r['kind']=='DICOM' else ''
         folder=h.get('folder_patient_id','')
-        name=str(t.get('PatientName') or '') if r['kind']=='DICOM' else r.get('document_name','')
+        name=str(t.get('PatientName') or '') if r['kind']=='DICOM' else (
+            r.get('document_name') or filename_name(r['path']))
         hits=named(name);unique_name=next(iter(hits)) if len(hits)==1 else ''
         id_hits=set()
         declared=[raw] if raw else r.get('document_ids',[])
@@ -169,7 +164,7 @@ def resolve_identity(store,options,control):
         if r['pid'] and patients.get(r['pid'],{}).get('conflict'):
             r['verified']=False;r['identity_issues'].append(issue('ROSTER_ID_CONFLICT','同一主表编号存在不一致记录；需要明确合并规则',r['pid'],r['path']))
         r['match_basis']=basis;r['unit_key']=unit_key(r)
-        if r['verified'] and basis=='唯一姓名匹配':
+        if r['verified'] and basis=='唯一姓名匹配' and not r.get('read_error'):
             store.put('confirmed_links',r['key'],{'pid':r['pid'],'basis':'unique_name',
                 'evidence':identity_evidence(r),'name':name,'declared_ids':declared},False)
         if r['pid']:used.add(r['pid'])
@@ -182,6 +177,7 @@ def resolve_identity(store,options,control):
         p['patient_id']=ident
         store.put('patients',ident,p,commit=False)
         if p.get('conflict'):registry_issues.append(issue('ROSTER_ID_CONFLICT','同一编号的主表记录不一致',ident))
+        registry_issues.extend(roster_review_issues(ident,p))
     store.put('meta','registry_issues',registry_issues,commit=False);store.commit()
     collisions=store.db.execute("SELECT sop FROM sources WHERE sop IS NOT NULL AND sop!='' GROUP BY sop HAVING count(DISTINCT unit_key)>1 OR count(DISTINCT pid)>1").fetchall()
     for (sop,) in collisions:

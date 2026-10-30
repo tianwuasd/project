@@ -13,8 +13,12 @@ from patient_pipeline.runtime import fatal_io
 
 
 def signature(records,options):
-    return digest([VERSION,[(r['key'],r.get('stamp'),r.get('pid'),r.get('verified'),r.get('identity_issues'),
-                             r.get('read_error')) for r in records],options.recover_copies,options.split_phases])
+    values=[]
+    for r in records:
+        value=(r['key'],r.get('stamp'),r.get('pid'),r.get('verified'),r.get('identity_issues'),r.get('read_error'))
+        if r['kind']=='PDF':value+=(r.get('clinical_parser_version'),r.get('issues',[]))
+        values.append(value)
+    return digest([VERSION,values,options.recover_copies,options.split_phases])
 
 
 def available_sources(records,control):
