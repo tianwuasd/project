@@ -1,0 +1,70 @@
+{
+  "local_data_only": true,
+  "scene_count": 8,
+  "scenes": [
+    {
+      "case_id": "ct_1004",
+      "group": "01_后处理严重退化",
+      "bytes": 124305930,
+      "sha256": "525d75cc4da92d838e0240da3c9c1cd7d00efea29d3e801d5e5184103eb4f3eb",
+      "roundtrip_verified": true,
+      "relative_scene": "01_后处理严重退化/ct_1004/ct_1004.mrb"
+    },
+    {
+      "case_id": "ct_1035",
+      "group": "01_后处理严重退化",
+      "bytes": 95273969,
+      "sha256": "142612d481e66dc621f2e97366d6aa0dbdfc5b9c1d28f4620f0c41c427b80db0",
+      "roundtrip_verified": true,
+      "relative_scene": "01_后处理严重退化/ct_1035/ct_1035.mrb"
+    },
+    {
+      "case_id": "ct_1051",
+      "group": "02_类别混淆与学习不足",
+      "bytes": 68725915,
+      "sha256": "3b2b53367e6cd4cfecc62df401bab67ce142a67f5ad113b26096c638084c5316",
+      "roundtrip_verified": true,
+      "relative_scene": "02_类别混淆与学习不足/ct_1051/ct_1051.mrb"
+    },
+    {
+      "case_id": "ct_1148",
+      "group": "02_类别混淆与学习不足",
+      "bytes": 67147003,
+      "sha256": "6e687ab4ab3e1982dbb0e7150ae9042cda38f21f30b6f9c98ae473e832951254",
+      "roundtrip_verified": true,
+      "relative_scene": "02_类别混淆与学习不足/ct_1148/ct_1148.mrb"
+    },
+    {
+      "case_id": "ct_1126",
+      "group": "03_大视野与融合丢失",
+      "bytes": 113847080,
+      "sha256": "3a2c4db0dbab24f679e02977d320cb037c731d6a94756a7cb3cee50336d3ad04",
+      "roundtrip_verified": true,
+      "relative_scene": "03_大视野与融合丢失/ct_1126/ct_1126.mrb"
+    },
+    {
+      "case_id": "ct_1170",
+      "group": "04_源灰度异常",
+      "bytes": 85503161,
+      "sha256": "d712d4142877f4d03fda8023611b058625427e733602498e1a0b6f6ae1d7f708",
+      "roundtrip_verified": true,
+      "relative_scene": "04_源灰度异常/ct_1170/ct_1170.mrb"
+    },
+    {
+      "case_id": "ct_1001",
+      "group": "05_肺动脉分支与融合失败",
+      "bytes": 76984217,
+      "sha256": "d53e4740b717305592cc5ddc5ca4ed93d5b8d8a97c7b8c2559c4e7aff7148931",
+      "roundtrip_verified": true,
+      "relative_scene": "05_肺动脉分支与融合失败/ct_1001/ct_1001.mrb"
+    },
+    {
+      "case_id": "ct_1003",
+      "group": "06_缺失心肌标注",
+      "bytes": 65960410,
+      "sha256": "6884df3139cadf2d5dd60ea1e0e5c5f91fe073cbbdc0567f9c63e7cfe535f2e0",
+      "roundtrip_verified": true,
+      "relative_scene": "06_缺失心肌标注/ct_1003/ct_1003.mrb"
+    }
+  ]
+}

@@ -2,3 +2,4 @@
 *.json -text
 *.txt -text
 reports/imagechd-model-data-report-20261030/assets/*.png filter=lfs diff=lfs merge=lfs -text
+reports/imagechd-abnormal-cases-20261031/assets/*.png filter=lfs diff=lfs merge=lfs -text

@@ -1,0 +1,406 @@
+{
+  "source_pairs": 110,
+  "included_pairs": 97,
+  "excluded_missing_MYO": 13,
+  "evaluation": "97 OOF cases; counts are image/label pairs, not independently verified patient counts",
+  "abnormal_definition": "Research screening of source integrity and prediction failure, not diagnosis of patient disease",
+  "overlapping_groups": true,
+  "classes": {
+    "LV": {
+      "mean_Dice": 0.6582768871405026,
+      "median_Dice": 0.7514841046904076,
+      "zero_Dice_cases": [
+        "ct_1004",
+        "ct_1035",
+        "ct_1047",
+        "ct_1051",
+        "ct_1110",
+        "ct_1126",
+        "ct_1135"
+      ],
+      "below_0_1_cases": [
+        "ct_1004",
+        "ct_1035",
+        "ct_1039",
+        "ct_1047",
+        "ct_1051",
+        "ct_1110",
+        "ct_1116",
+        "ct_1126",
+        "ct_1135",
+        "ct_1148",
+        "ct_1170"
+      ],
+      "empty_prediction_cases": []
+    },
+    "RV": {
+      "mean_Dice": 0.51573618484116,
+      "median_Dice": 0.5168634510509874,
+      "zero_Dice_cases": [],
+      "below_0_1_cases": [
+        "ct_1080"
+      ],
+      "empty_prediction_cases": []
+    },
+    "LA": {
+      "mean_Dice": 0.6293709420339598,
+      "median_Dice": 0.6631085130942169,
+      "zero_Dice_cases": [],
+      "below_0_1_cases": [],
+      "empty_prediction_cases": []
+    },
+    "RA": {
+      "mean_Dice": 0.75149235103193,
+      "median_Dice": 0.788538569287101,
+      "zero_Dice_cases": [],
+      "below_0_1_cases": [
+        "ct_1051"
+      ],
+      "empty_prediction_cases": []
+    },
+    "MYO": {
+      "mean_Dice": 0.7690162981623375,
+      "median_Dice": 0.8109365587994638,
+      "zero_Dice_cases": [],
+      "below_0_1_cases": [
+        "ct_1170"
+      ],
+      "empty_prediction_cases": []
+    },
+    "AO": {
+      "mean_Dice": 0.4306451929209668,
+      "median_Dice": 0.4226584673604541,
+      "zero_Dice_cases": [
+        "ct_1178"
+      ],
+      "below_0_1_cases": [
+        "ct_1021",
+        "ct_1080",
+        "ct_1081",
+        "ct_1116",
+        "ct_1126",
+        "ct_1139",
+        "ct_1178"
+      ],
+      "empty_prediction_cases": []
+    },
+    "PA": {
+      "mean_Dice": 0.1108725244439153,
+      "median_Dice": 0.0631039904542319,
+      "zero_Dice_cases": [
+        "ct_1001",
+        "ct_1004",
+        "ct_1008",
+        "ct_1018",
+        "ct_1019",
+        "ct_1021",
+        "ct_1022",
+        "ct_1024",
+        "ct_1033",
+        "ct_1037",
+        "ct_1039",
+        "ct_1041",
+        "ct_1042",
+        "ct_1047",
+        "ct_1048",
+        "ct_1051",
+        "ct_1053",
+        "ct_1060",
+        "ct_1061",
+        "ct_1064",
+        "ct_1066",
+        "ct_1079",
+        "ct_1080",
+        "ct_1088",
+        "ct_1103",
+        "ct_1111",
+        "ct_1116",
+        "ct_1124",
+        "ct_1125",
+        "ct_1145",
+        "ct_1147",
+        "ct_1148"
+      ],
+      "below_0_1_cases": [
+        "ct_1001",
+        "ct_1004",
+        "ct_1008",
+        "ct_1012",
+        "ct_1018",
+        "ct_1019",
+        "ct_1020",
+        "ct_1021",
+        "ct_1022",
+        "ct_1024",
+        "ct_1033",
+        "ct_1037",
+        "ct_1039",
+        "ct_1041",
+        "ct_1042",
+        "ct_1043",
+        "ct_1044",
+        "ct_1047",
+        "ct_1048",
+        "ct_1050",
+        "ct_1051",
+        "ct_1053",
+        "ct_1054",
+        "ct_1056",
+        "ct_1059",
+        "ct_1060",
+        "ct_1061",
+        "ct_1064",
+        "ct_1066",
+        "ct_1067",
+        "ct_1070",
+        "ct_1072",
+        "ct_1079",
+        "ct_1080",
+        "ct_1081",
+        "ct_1083",
+        "ct_1088",
+        "ct_1092",
+        "ct_1098",
+        "ct_1099",
+        "ct_1103",
+        "ct_1111",
+        "ct_1116",
+        "ct_1117",
+        "ct_1120",
+        "ct_1124",
+        "ct_1125",
+        "ct_1126",
+        "ct_1139",
+        "ct_1145",
+        "ct_1146",
+        "ct_1147",
+        "ct_1148",
+        "ct_1158",
+        "ct_1178"
+      ],
+      "empty_prediction_cases": [
+        "ct_1001",
+        "ct_1004",
+        "ct_1008",
+        "ct_1018",
+        "ct_1019",
+        "ct_1021",
+        "ct_1022",
+        "ct_1024",
+        "ct_1033",
+        "ct_1037",
+        "ct_1041",
+        "ct_1042",
+        "ct_1047",
+        "ct_1051",
+        "ct_1053",
+        "ct_1060",
+        "ct_1061",
+        "ct_1064",
+        "ct_1066",
+        "ct_1079",
+        "ct_1080",
+        "ct_1088",
+        "ct_1103",
+        "ct_1111",
+        "ct_1116",
+        "ct_1124",
+        "ct_1125",
+        "ct_1147",
+        "ct_1148"
+      ]
+    }
+  },
+  "groups": {
+    "01_后处理严重退化": {
+      "all_cases": [
+        "ct_1004",
+        "ct_1035",
+        "ct_1039",
+        "ct_1047",
+        "ct_1110",
+        "ct_1116",
+        "ct_1135"
+      ],
+      "show_cases": [
+        "ct_1004",
+        "ct_1035"
+      ],
+      "meaning": "预测前仍有正确LV重叠，最大区域处理后严重下降"
+    },
+    "02_类别混淆与学习不足": {
+      "all_cases": [
+        "ct_1051",
+        "ct_1148"
+      ],
+      "show_cases": [
+        "ct_1051",
+        "ct_1148"
+      ],
+      "meaning": "LV被判为其他心腔，训练或外折识别差"
+    },
+    "03_大视野与融合丢失": {
+      "all_cases": [
+        "ct_1126"
+      ],
+      "show_cases": [
+        "ct_1126"
+      ],
+      "meaning": "全图压缩且唯一正确分支被加权投票压掉"
+    },
+    "04_源灰度异常": {
+      "all_cases": [
+        "ct_1170"
+      ],
+      "show_cases": [
+        "ct_1170"
+      ],
+      "meaning": "源MYO/PA等区域大片常值，不能由后处理恢复纹理"
+    },
+    "05_肺动脉分支与融合失败": {
+      "all_cases": [
+        "ct_1001",
+        "ct_1004",
+        "ct_1008",
+        "ct_1018",
+        "ct_1019",
+        "ct_1021",
+        "ct_1022",
+        "ct_1024",
+        "ct_1033",
+        "ct_1037",
+        "ct_1039",
+        "ct_1041",
+        "ct_1042",
+        "ct_1047",
+        "ct_1048",
+        "ct_1051",
+        "ct_1053",
+        "ct_1060",
+        "ct_1061",
+        "ct_1064",
+        "ct_1066",
+        "ct_1079",
+        "ct_1080",
+        "ct_1088",
+        "ct_1103",
+        "ct_1111",
+        "ct_1116",
+        "ct_1124",
+        "ct_1125",
+        "ct_1145",
+        "ct_1147",
+        "ct_1148"
+      ],
+      "show_cases": [
+        "ct_1001"
+      ],
+      "meaning": "PA零重叠有不同原因，展示例中只有all128检出，融合丢失"
+    },
+    "06_缺失心肌标注": {
+      "all_cases": [
+        "ct_1003",
+        "ct_1005",
+        "ct_1011",
+        "ct_1013",
+        "ct_1015",
+        "ct_1023",
+        "ct_1063",
+        "ct_1075",
+        "ct_1078",
+        "ct_1105",
+        "ct_1141",
+        "ct_1144",
+        "ct_1161"
+      ],
+      "show_cases": [
+        "ct_1003"
+      ],
+      "meaning": "缺标注不等于解剖结构不存在，该例不在97例评价中"
+    }
+  },
+  "LV_severe_cases": [
+    "ct_1004",
+    "ct_1035",
+    "ct_1039",
+    "ct_1047",
+    "ct_1051",
+    "ct_1110",
+    "ct_1116",
+    "ct_1126",
+    "ct_1135",
+    "ct_1148",
+    "ct_1170"
+  ],
+  "source_extreme_constant_cases": [
+    "ct_1170"
+  ],
+  "display_case_count": 8,
+  "excluded": [
+    {
+      "case_id": "ct_1003",
+      "missing_labels": "5",
+      "reason": "缺少MYO标注，未纳入当前七类监督实验"
+    },
+    {
+      "case_id": "ct_1005",
+      "missing_labels": "5",
+      "reason": "缺少MYO标注，未纳入当前七类监督实验"
+    },
+    {
+      "case_id": "ct_1011",
+      "missing_labels": "5",
+      "reason": "缺少MYO标注，未纳入当前七类监督实验"
+    },
+    {
+      "case_id": "ct_1013",
+      "missing_labels": "5",
+      "reason": "缺少MYO标注，未纳入当前七类监督实验"
+    },
+    {
+      "case_id": "ct_1015",
+      "missing_labels": "5",
+      "reason": "缺少MYO标注，未纳入当前七类监督实验"
+    },
+    {
+      "case_id": "ct_1023",
+      "missing_labels": "5",
+      "reason": "缺少MYO标注，未纳入当前七类监督实验"
+    },
+    {
+      "case_id": "ct_1063",
+      "missing_labels": "5",
+      "reason": "缺少MYO标注，未纳入当前七类监督实验"
+    },
+    {
+      "case_id": "ct_1075",
+      "missing_labels": "5",
+      "reason": "缺少MYO标注，未纳入当前七类监督实验"
+    },
+    {
+      "case_id": "ct_1078",
+      "missing_labels": "5",
+      "reason": "缺少MYO标注，未纳入当前七类监督实验"
+    },
+    {
+      "case_id": "ct_1105",
+      "missing_labels": "5",
+      "reason": "缺少MYO标注，未纳入当前七类监督实验"
+    },
+    {
+      "case_id": "ct_1141",
+      "missing_labels": "5",
+      "reason": "缺少MYO标注，未纳入当前七类监督实验"
+    },
+    {
+      "case_id": "ct_1144",
+      "missing_labels": "5",
+      "reason": "缺少MYO标注，未纳入当前七类监督实验"
+    },
+    {
+      "case_id": "ct_1161",
+      "missing_labels": "5",
+      "reason": "缺少MYO标注，未纳入当前七类监督实验"
+    }
+  ]
+}

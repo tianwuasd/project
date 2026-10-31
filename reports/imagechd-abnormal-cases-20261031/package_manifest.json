@@ -1,0 +1,41 @@
+{
+  "package": "imagechd-abnormal-cases-20261031",
+  "large_scene_data": "local only",
+  "files": [
+    {
+      "path": "13例缺失标注清单.csv",
+      "bytes": 839,
+      "sha256": "c89280d51f9bfe283659bc5d058e66d0c08058b850715ed9f40717ad495a65fa"
+    },
+    {
+      "path": "97例逐例统计.csv",
+      "bytes": 23142,
+      "sha256": "b4ac38f11cbe56161c98d7a1210120d9a49b295e8b6c2df28348ff698bfdd6ee"
+    },
+    {
+      "path": "assets/slicer_ct1126.png",
+      "bytes": 504749,
+      "sha256": "7f8a2a7094258cfd6d9d59f476c632bcdd80f2b5b2e08c789eddba8faba480ba"
+    },
+    {
+      "path": "README.md",
+      "bytes": 9993,
+      "sha256": "77a9477cf4ee2570b1cb47ce928cb0c2fc5bf89b677e0485ac202c444212a32a"
+    },
+    {
+      "path": "场景索引.json",
+      "bytes": 2483,
+      "sha256": "09a5f2287f796b8511d3419cc02605e815d78856a994a58f10e849bc21c04a6a"
+    },
+    {
+      "path": "样本统计与异常分型.json",
+      "bytes": 8964,
+      "sha256": "274f15d0d245f8e09404beca7551c867ea257f6e491039b4bda5bba211bb28ec"
+    },
+    {
+      "path": "预训练权重加载验证.json",
+      "bytes": 1032,
+      "sha256": "af7e3e8c2b2ce77507b4b7a9aaf8dfccfa7747a7f74c526368cd4dd81f316f9c"
+    }
+  ]
+}
