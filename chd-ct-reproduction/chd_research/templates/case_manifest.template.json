@@ -1,4 +1,6 @@
 {
+  "document_status": "discussion_draft",
+  "status_note": "讨论草稿，尚未定稿，不作为正式方案。",
   "template_only": true,
   "patient_key": null,
   "encounter_key": null,

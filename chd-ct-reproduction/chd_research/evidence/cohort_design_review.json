@@ -1,4 +1,6 @@
 {
+  "document_status": "discussion_draft",
+  "status_note": "讨论草稿，尚未定稿，不作为正式方案。",
   "date": "2026-10-30",
   "type": "research_plan_review_not_experiment",
   "target": "CT-only disease-type diagnosis",

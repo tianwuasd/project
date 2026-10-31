@@ -39,7 +39,7 @@
 
 ## 从哪里开始
 
-AAOCA、TAPVC 与 CHD 的术前 CT 病型诊断研究见[研究方案、结构图与筛选协议](chd_research/README.md)。
+AAOCA、TAPVC 与 CHD 的术前 CT 病型诊断资料目前均为**讨论草稿，尚未定稿，不作为正式方案**。见[研究讨论稿、结构图与筛选协议](chd_research/README.md)。
 
 1. 先看 [使用流程](docs/workflow.md)，理解每一步的输入和输出。
 2. 再看 [代码阅读路线](docs/code-guide.md)，依次读预处理、训练、预测。
