@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-30",
+  "type": "research_plan_review_not_experiment",
+  "target": "CT-only disease-type diagnosis",
+  "excluded_target": "surgery indication/recommendation prediction",
+  "rounds": [
+    {
+      "round": 1,
+      "problem": "surgery recommendation confused with label proof",
+      "revision": "per-disease operative evidence vs expert clinical confirmation; matched preoperative CT"
+    },
+    {
+      "round": 2,
+      "problem": "directory classes, unknown negatives, source confounding",
+      "revision": "multi-label valid supervision, verified negatives, patient split, private-only versus joint comparison"
+    },
+    {
+      "round": 3,
+      "problem": "complex stack without causal attribution of improvements",
+      "revision": "B0 then anatomy, concepts, reliability; one main change per round and sealed final test"
+    }
+  ],
+  "reading": [
+    {
+      "id": "medical_6c6dd440caa0",
+      "sha256": "6c6dd440caa031f1ec6c45ee4f5c5f7da5dab89d45cd227ae5a288fa77d78a09",
+      "physical_pages": [
+        3,
+        4
+      ],
+      "scope": "clinical labeling and cohort inclusion passages",
+      "finding": "operative reports, CT reports, discharge summaries and expert review support diagnosis reference; surgical cohort limits generalization",
+      "doi": "10.1016/j.media.2023.102953"
+    },
+    {
+      "url": "https://arxiv.org/abs/2101.10799",
+      "scope": "official abstract and version page",
+      "finding": "110 CT and updated diagnosis info; local dataset mapping still unconfirmed"
+    },
+    {
+      "url": "https://github.com/Tencent/MedicalNet",
+      "scope": "official README",
+      "finding": "3D ResNet-18 pretrained weights listed; not downloaded or benchmarked"
+    },
+    {
+      "url": "https://proceedings.mlr.press/v80/ilse18a.html",
+      "scope": "original publication abstract",
+      "finding": "MIL aggregation candidate; attention is not verified anatomical explanation"
+    }
+  ],
+  "not_done": [
+    "patient enrollment/adjudication",
+    "new implementation code",
+    "training or inference",
+    "performance validation"
+  ],
+  "outputs": [
+    "reports/13_AAOCA_TAPVC_CHD联合研究总方案.md",
+    "diagrams/纯CT病型诊断结构图.md",
+    "protocols/病例证据分级与筛选协议.md"
+  ]
+}

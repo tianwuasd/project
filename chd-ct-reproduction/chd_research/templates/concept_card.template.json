@@ -1,0 +1,27 @@
+{
+  "template_only": true,
+  "concept_id": null,
+  "name": null,
+  "definition": null,
+  "value_type": null,
+  "allowed_values": [],
+  "allowed_modalities": [],
+  "observability_conditions": [],
+  "scope_and_exceptions": [],
+  "source_citations": [],
+  "localization_requirement": null,
+  "measurement_protocol": null,
+  "expert_review_status": "not_reviewed",
+  "case_annotation_fields": [
+    "value",
+    "assertion_state",
+    "observability",
+    "supporting_regions_or_spans",
+    "source_modality",
+    "source_time",
+    "source_dependency_group",
+    "reviewer",
+    "review_status",
+    "annotation_minutes"
+  ]
+}

@@ -39,6 +39,8 @@
 
 ## 从哪里开始
 
+AAOCA、TAPVC 与 CHD 的术前 CT 病型诊断研究见[研究方案、结构图与筛选协议](chd_research/README.md)。
+
 1. 先看 [使用流程](docs/workflow.md)，理解每一步的输入和输出。
 2. 再看 [代码阅读路线](docs/code-guide.md)，依次读预处理、训练、预测。
 3. 诊断模块从 [独立诊断流程](docs/diagnosis.md) 开始；空白疾病单元格按约定默认为阴性，并记录来源。

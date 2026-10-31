@@ -1,0 +1,23 @@
+{
+  "template_only": true,
+  "experiment_id": null,
+  "parent_experiment": null,
+  "hypothesis": null,
+  "changed_factor": null,
+  "data_snapshot_hash": null,
+  "patient_split_hash": null,
+  "concept_and_prior_version": null,
+  "code_version": null,
+  "weight_hash": null,
+  "training_input_patterns": [],
+  "inference_input_patterns": [],
+  "annotation_budget_minutes": null,
+  "primary_endpoint": null,
+  "secondary_endpoints": [],
+  "predefined_go_no_go": null,
+  "calibration_protocol": null,
+  "run_status": "not_started",
+  "actual_metrics": null,
+  "error_cases": [],
+  "next_decision": null
+}

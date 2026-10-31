@@ -1,0 +1,20 @@
+{
+  "template_only": true,
+  "patient_key": null,
+  "encounter_key": null,
+  "index_time": null,
+  "surgical_state": null,
+  "ct_series": [],
+  "us_sources": [],
+  "text_sources": [],
+  "disease_labels": [],
+  "reference_standard_sources": [],
+  "split": null,
+  "duplicate_group": null,
+  "quality_and_exclusion_notes": [],
+  "field_rules": {
+    "text_source": "must include timestamp, permitted role and provenance group",
+    "disease_label": "disease_id, positive/negative/unknown, reference_source, review_status",
+    "unknown": "not mapped to negative"
+  }
+}
