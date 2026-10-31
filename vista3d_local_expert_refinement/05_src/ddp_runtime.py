@@ -133,6 +133,8 @@ def _rank_main(target, arguments, selected, invocation, rank, backend,
                       CUDA_VISIBLE_DEVICES=','.join(selected) if backend == 'nccl' else '',
                       WHOLE_HEART_DDP_INVOCATION=str(invocation),
                       WHOLE_HEART_DDP_LOG_DIR=str(log_dir))
+    from task_runtime import identity
+    os.environ['VISTA_DDP_RANK_OWNER']=json.dumps(dict(pid=os.getpid(),identity=identity(os.getpid())))
     if transferred_lock is not None:
         os.environ['WHOLE_HEART_LOCK_FD'] = str(transferred_lock)
     else:
@@ -140,6 +142,11 @@ def _rank_main(target, arguments, selected, invocation, rank, backend,
         os.environ.pop('WHOLE_HEART_LOCK_FD', None)
     dist = None
     try:
+        if os.name=='posix':
+            # A private group also owns children killed between start/register.
+            os.setsid()
+            _write_record(log_dir/'process-group.json',dict(pid=os.getpid(),identity=identity(os.getpid()),
+                invocation_id=invocation.name,pgid=os.getpgrp(),sid=os.getsid(0)))
         import torch
         import torch.distributed as dist
         if backend == 'nccl':
@@ -172,8 +179,77 @@ def _rank_main(target, arguments, selected, invocation, rank, backend,
         stderr.flush()
 
 
-def _stop_ranks(processes):
+def _registered_workers(invocation,owners):
+    """Only live children registered by this exact invocation and rank identity."""
+    from task_runtime import alive
+    job=os.environ.get('WHOLE_HEART_JOB');result=[]
+    if not job or invocation is None:return result
+    for path in (Path(job)/'processes').glob('*.json'):
+        try:
+            row=json.loads(path.read_text(encoding='utf-8'));owner=row.get('rank_owner') or {}
+            if (str(row.get('role','')).startswith('batch:') and row.get('ddp_invocation')==str(invocation)
+                    and owner.get('identity') and owners.get(owner.get('pid'))==owner.get('identity') and alive(row)):
+                result.append(row)
+        except (OSError,ValueError,TypeError):continue
+    return result
+
+
+def _ownership_identity(pid):
+    """Capture birth identity before reaping, including an already-zombie child."""
+    from task_runtime import identity
+    live=identity(pid)
+    if live is not None:return live
+    if os.name=='posix':
+        try:
+            fields=Path(f'/proc/{pid}/stat').read_text().rsplit(')',1)[1].split()
+            return dict(boot=Path('/proc/sys/kernel/random/boot_id').read_text().strip(),start=fields[19])
+        except (OSError,ValueError,IndexError):pass
+    return None
+
+
+def _owned_groups(invocation,owners):
+    if os.name!='posix' or invocation is None:return []
+    groups=[]
+    for path in Path(invocation).glob('rank-*/process-group.json'):
+        if path.is_symlink():continue
+        try:
+            row=json.loads(path.read_text(encoding='utf-8'));pid=row['pid']
+            if (row.get('invocation_id')==Path(invocation).name and row.get('pgid')==pid and row.get('sid')==pid
+                    and row.get('identity') and owners.get(pid)==row['identity']):groups.append(pid)
+        except (OSError,ValueError,TypeError,KeyError):continue
+    return groups
+
+
+def _group_members(groups):
+    result=[]
+    if not groups:return result
+    for path in Path('/proc').glob('[0-9]*/stat'):
+        try:
+            fields=path.read_text().rsplit(')',1)[1].split()
+            if int(fields[2]) in groups and fields[0] not in {'Z','X'}:result.append(int(path.parent.name))
+        except (OSError,ValueError,IndexError):continue
+    return result
+
+
+def _signal_group(group,signum,owners):
+    current=_ownership_identity(group)
+    if current is not None and current!=owners.get(group):
+        raise RuntimeError('rank group leader PID identity changed; refusing to signal another process')
+    try:os.killpg(group,signum)
+    except ProcessLookupError:pass
+
+
+def _stop_ranks(processes,invocation=None,owners=None):
     """Reap every owned rank before releasing the controller's borrowed lock."""
+    from task_runtime import alive
+    workers=_registered_workers(invocation,owners or {})
+    groups=_owned_groups(invocation,owners or {})
+    for group in groups:
+        _signal_group(group,signal.SIGTERM,owners or {})
+    for row in workers:
+        if alive(row):
+            try:os.kill(row['pid'],signal.SIGTERM)
+            except ProcessLookupError:pass
     for process in processes:
         if process.pid is not None and process.is_alive():
             process.terminate()
@@ -184,10 +260,33 @@ def _stop_ranks(processes):
     for process in processes:
         if process.pid is not None and process.is_alive():
             process.kill()
+    for group in groups:
+        _signal_group(group,signal.SIGKILL,owners or {})
     for process in processes:
         if process.pid is not None:
             # Actual exit, not a kill request, is the lock release boundary.
             process.join()
+    # No rank can publish new groups/children after this point. Include a
+    # handshake that raced with the pre-termination ownership snapshot.
+    late_groups=set(_owned_groups(invocation,owners or {}))-set(groups)
+    for group in late_groups:_signal_group(group,signal.SIGKILL,owners or {})
+    groups=list(set(groups)|late_groups)
+    workers=list({r['pid']:r for r in [*workers,*_registered_workers(invocation,owners or {})]}.values())
+    deadline=time.monotonic()+1
+    while any(alive(r) for r in workers) and time.monotonic()<deadline:time.sleep(.05)
+    for row in workers:
+        if alive(row):
+            try:os.kill(row['pid'],signal.SIGKILL)
+            except ProcessLookupError:pass
+    deadline=time.monotonic()+2
+    while any(alive(r) for r in workers) and time.monotonic()<deadline:time.sleep(.05)
+    if any(alive(r) for r in workers):raise RuntimeError('owned batch workers have not exited; inherited workflow locks remain held')
+    deadline=time.monotonic()+2
+    while _group_members(groups) and time.monotonic()<deadline:time.sleep(.05)
+    if _group_members(groups):raise RuntimeError('owned rank process-group members still alive; memory cleanup/retry refused')
+    if invocation is not None:
+        from memory_guard import cleanup_owned_segments
+        cleanup_owned_segments(invocation,owners or {})
 
 
 def _read_result(process, invocation, rank, selected):
@@ -207,7 +306,7 @@ def _read_result(process, invocation, rank, selected):
 
 
 def launch_ranks(target, arguments, gpu_uuids, log_dir, *, backend='nccl',
-                 timeout_seconds=600, init_timeout_seconds=60, lock_fd=None) -> list[dict]:
+                 timeout_seconds=600, init_timeout_seconds=60, lock_fd=None, memory_guard=None) -> list[dict]:
     """Run a fresh rank per selected UUID and return validated rank envelopes.
 
     ``gloo`` explicitly hides GPUs; its UUID strings are rank identities only.
@@ -241,6 +340,7 @@ def launch_ranks(target, arguments, gpu_uuids, log_dir, *, backend='nccl',
     invocation = Path(log_dir).resolve() / uuid.uuid4().hex
     held_lock = os.dup(lock_fd) if lock_fd is not None else None
     processes, handlers = [], {}
+    owners={}
     cancelled = []
     started = time.monotonic()
     def request_cancel(signum, _frame):
@@ -257,6 +357,7 @@ def launch_ranks(target, arguments, gpu_uuids, log_dir, *, backend='nccl',
         process_type = _WindowsSpawnProcess if os.name == 'nt' else context.Process
         from task_worker import register_child
         for rank in range(len(selected)):
+            if memory_guard:memory_guard.check()
             if cancelled:
                 raise KeyboardInterrupt('distributed invocation cancelled')
             if time.monotonic() - started >= timeout_seconds:
@@ -268,14 +369,17 @@ def launch_ranks(target, arguments, gpu_uuids, log_dir, *, backend='nccl',
             processes.append(process)
             try:
                 process.start()
+                owners[process.pid]=_ownership_identity(process.pid)
             except BaseException:
                 if process.pid is not None:
+                    owners[process.pid]=_ownership_identity(process.pid)
                     register_child(process, 'ddp-rank')
                 raise
             register_child(process, 'ddp-rank')
         while True:
             if cancelled:
                 raise KeyboardInterrupt(f'distributed invocation cancelled: {invocation}')
+            if memory_guard:memory_guard.check()
             failures = [(rank, p.exitcode) for rank, p in enumerate(processes)
                         if p.exitcode not in (None, 0)]
             published=list(invocation.glob('rank-*/failure.json'))
@@ -285,6 +389,10 @@ def launch_ranks(target, arguments, gpu_uuids, log_dir, *, backend='nccl',
                     path=invocation / f'rank-{r}' / 'failure.json'
                     if path.exists():records.append(json.loads(path.read_text(encoding='utf-8')))
                 if not records:records=[dict(classification='noncapacity',reason='no structured rank failure')]
+                _write_record(invocation/'supervisor-failure.json',dict(invocation_id=invocation.name,
+                    exits=[dict(rank=r,pid=processes[r].pid,exit_code=code) for r,code in failures],
+                    rank_failures=records,latest_memory=memory_guard.latest if memory_guard is not None else None,
+                    scope='exit code and observed memory; SIGKILL alone does not establish OOM'))
                 raise RankGroupFailure(f'distributed rank failure {failures}; logs: {invocation}',records)
             if all(p.exitcode == 0 for p in processes):
                 return [_read_result(p, invocation, rank, selected) for rank, p in enumerate(processes)]
@@ -293,7 +401,7 @@ def launch_ranks(target, arguments, gpu_uuids, log_dir, *, backend='nccl',
             time.sleep(.05)
     finally:
         try:
-            _stop_ranks(processes)
+            _stop_ranks(processes,invocation,owners)
         finally:
             for sig, handler in handlers.items():
                 signal.signal(sig, handler)

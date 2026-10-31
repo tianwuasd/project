@@ -1,6 +1,6 @@
 # 局部专家协同的 VISTA3D 选择性分割修正
 
-当前面板 **0.6.2**：修复真实尺寸编译预检的浮点索引越界，已有兼容预处理可复用，见[修复与更新步骤](docs/COMPILE_PROBE_INDEX_FIX.md)。全局batch最多8，新增GPU分担同一批；CPU供数、日志及扩卡退化恢复见[实施说明](docs/CAPPED_COOPERATIVE_BATCH.md)和[验证记录](docs/CAPPED_BATCH_VALIDATION.json)。完整工程可运行 `python -B tools/quick_check.py` 获得简短基础检查结果。
+当前面板 **0.7.0**：用户选择固定全局batch、默认4；训练卡数最多为所选batch与获准可见卡数的较小值，运行中检查主机/cgroup内存并有界缩减供数预算后恢复，见[操作与保护机制](docs/LIVE_MEMORY_BATCH.md)。已有兼容预处理可复用；0.6.2索引修复继续保留。完整工程运行 `python -B tools/quick_check.py` 获得离线基础检查摘要，真实服务器GPU效果须另行验收。
 
 创建日期：2026-10-25。当前已实现 **wholeheart CT 的 nnU-Net 监督基线 B0 与服务器任务面板**。已完成合成数据 CPU 集成验证；尚未进行真实病例 GPU 训练或取得性能指标。
 

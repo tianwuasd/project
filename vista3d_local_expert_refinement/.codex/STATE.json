@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-30",
+  "updated_at": "2026-10-31",
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
-  "phase": "compile_probe_index_repaired_local_acceptance",
+  "phase": "live_memory_fixed_batch_local_acceptance",
   "confirmed": {
     "same_source_material": true,
     "source_labeled_ct": true,
@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Publish 0.6.2 index fix; update the original server panel, create new training using compatible completed full-source preprocessing. Frozen failed jobs retain old code; target CUDA validation pending.",
+  "next_action": "Publish project 0.7.0, rebuild and publish/install Skill v2 from fixed commit; preserve v1/CT. New server training may reuse compatible preprocessing; actual Linux CUDA acceptance pending.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,
@@ -566,7 +566,13 @@
   },
   "compile_probe_index_repair": {
     "version": "0.6.2",
-    "reported_output_shape": [2, 8, 128, 224, 192],
+    "reported_output_shape": [
+      2,
+      8,
+      128,
+      224,
+      192
+    ],
     "output_numel": 88080384,
     "old_index_out_of_bounds_reproduced": true,
     "index_arithmetic": "int64 quotient and remainder grid",
@@ -613,5 +619,53 @@
     "server_deployed": false,
     "target_speed_accepted": false,
     "publication_authority": "Git commit history and current remote main ref"
+  },
+  "live_memory_fixed_batch": {
+    "version": "0.7.0",
+    "date": "2026-10-31",
+    "user_scope": "minimal project patch then Skill v2 only; preserve v1 and CT",
+    "default_global_batch": 4,
+    "fixed_batch": true,
+    "control": {
+      "run": 422,
+      "passed": 369,
+      "skipped": 53,
+      "log_sha256": "c48cd78056cf9d7af07f3ed11a2d4c7a2a0ea201eae72437e2d0be1832d832c1"
+    },
+    "final_boundary": {
+      "run": 45,
+      "passed": 43,
+      "skipped": 2,
+      "log_sha256": "56c9e557b17d10aa231cef38cd870b565b45c7c3dd3e85157ee668cea95445f2"
+    },
+    "ddp_cpu_api": {
+      "run": 22,
+      "passed": 20,
+      "skipped": 2,
+      "log_sha256": "8eecbe9042cee70197c560a2d5e9b8c3d7d80b60ec0dddcb53c01ff4f23edf92"
+    },
+    "quick_check": {
+      "run": 67,
+      "syntax_files": 82,
+      "skipped": 0
+    },
+    "preprocessing_producers_unchanged": 7,
+    "independent_review": "reported lifecycle and retained-budget races fixed and rechecked",
+    "target_linux_process_groups_validated": false,
+    "target_cuda_validated": false,
+    "real_ct_executed": false,
+    "actual_cpu_gloo": {
+      "world_sizes": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "global_batch": 4,
+      "batch_dice": false,
+      "max_gradient_error": 1.4901161193847656e-08,
+      "max_update_error": 0.0,
+      "report_sha256": "6c563b0d476997c38bace28166ead5ba6de9bae59ff934725be4f869e2e4aca2"
+    }
   }
 }

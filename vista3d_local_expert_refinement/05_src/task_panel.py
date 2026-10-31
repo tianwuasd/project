@@ -14,7 +14,7 @@ import task_runtime as jobs
 from task_queries import query, follow, result_lines, read_optional, log_sources
 from task_progress import STATES
 
-PANEL_VERSION = '0.6.2'
+PANEL_VERSION = '0.7.0'
 
 
 class Back(Exception):
@@ -138,6 +138,12 @@ def stage_config(args,saved,stage,interactive=True):
         upstream_jobs=[str(Path(source).resolve())] if source else [],results_base=str(Path(base_results).expanduser().resolve()),
         results=str(Path(base_results).expanduser().resolve()/'pipeline_v2'/stage),
         name={'prepare':'预处理','train':'训练','predict':'预测','assessment':'完整测评'}[stage]+' '+Path(data).name+(' '+','.join(config['methods']) if stage!='prepare' else ''))
+    if stage in {'train','assessment'}:
+        from batch_distribution import validate_global_batch
+        selected=getattr(args,'global_batch',None)
+        if selected is None and interactive:selected=ask('固定全局batch（1/2/4/8等正整数）','4')
+        selected=4 if selected is None else validate_global_batch(selected)
+        config.update(global_batch_size=selected,max_global_batch_size=selected,allow_batch_growth=False)
     if upstream:config['folds']=upstream['folds'][:]
     return jobs.validate_request(config)
 
@@ -355,7 +361,9 @@ def preview_config(config):
     elif config.get('gpu_policy')=='automatic':
         print('GPU/CPU：自动探测、现场容量配置；GPU上限按实际服务器和分配范围，不需要填写卡号。')
         if set(config['tasks'])&{'train','assessment'}:
-            print('全局batch最多8；达到8后新增GPU分担同一批，不增加采样量。容量不足会明确记录降批；250轮×250训练/50验证不变。')
+            from batch_distribution import validate_global_batch
+            selected=validate_global_batch(config.get('global_batch_size',4))
+            print(f"固定全局batch：{selected}；训练GPU卡片最多 {selected} 张（按可见卡数取较小值）。250轮×250训练/50验证不变。")
         elif config['tasks']==['predict']:
             print('仅使用所选训练任务的冻结模型预测，按主机容量安排病例并发。')
     else:
@@ -612,6 +620,7 @@ def make_parser():
     p.add_argument('--gpu-count', type=int)
     p.add_argument('--gpus', '--gpu', dest='gpus')
     p.add_argument('--gpu-memory', type=float)
+    p.add_argument('--global-batch',type=int,help='新训练/测评固定全局batch，正整数，默认4')
     p.add_argument('--foreground', action='store_true')
     p.add_argument('--non-interactive', '--yes-train', dest='non_interactive', action='store_true')
     p.add_argument('--query', choices=['status','gpu','models','logs','processes','history','results'])

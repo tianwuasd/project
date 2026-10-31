@@ -34,7 +34,7 @@ def verified_keepers(path):
 
 
 class GPUFleet:
-    def __init__(self,job,runtime,gpu_memory=20,python=None):
+    def __init__(self,job,runtime,gpu_memory=20,python=None,max_training_gpus=None):
         self.job=Path(job);self.runtime=Path(runtime);self.memory=gpu_memory
         self.path=self.job/'diagnostics/gpu-leases.json'
         self.processes={};self.stop=threading.Event();self.thread=None
@@ -44,6 +44,8 @@ class GPUFleet:
         self.generation=uuid4().hex
         self.discovery_enabled=True
         self.deferred_for_stage=set()
+        from batch_distribution import validate_global_batch
+        self.max_training_gpus=validate_global_batch(max_training_gpus) if max_training_gpus is not None else None
 
     def start(self):
         self.thread=threading.Thread(target=self._watch,name='gpu-discovery',daemon=True)
@@ -91,7 +93,8 @@ class GPUFleet:
                     for row in rows:
                         uuid=row['uuid']
                         capacity=row['total_mib']+64>=self.memory*1024
-                        eligible=(capacity and uuid in permitted and uuid not in self.processes and uuid not in self.deferred_for_stage
+                        eligible=(capacity and (self.max_training_gpus is None or len(self.processes)<self.max_training_gpus)
+                            and uuid in permitted and uuid not in self.processes and uuid not in self.deferred_for_stage
                             and time.monotonic()>=self.cooldown.get(uuid,0)
                             and idle_reason(row,settings) is None)
                         stable[uuid]=stable.get(uuid,0)+1 if eligible else 0

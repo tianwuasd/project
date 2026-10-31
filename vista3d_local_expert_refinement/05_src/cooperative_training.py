@@ -73,7 +73,7 @@ def run_rank(rank,world_size,args):
     started=time.monotonic()
     result=dict(status='running',rank=rank,gpu_uuid=args['gpu_uuids'][rank],world_size=world_size,global_batch_size=args['global_batch_size'],
         local_batch_size=trainer.batch_size,local_batch_sizes=expected_batches,
-        max_global_batch_size=8,resource=resource,run_kind=args['run_kind'],
+        max_global_batch_size=args.get('max_global_batch_size',8),resource=resource,run_kind=args['run_kind'],
         patch_size=list(map(int,trainer.configuration_manager.patch_size)),cuda=device.type=='cuda',
         initial_weight_sha256=initial_hash,affinity=affinity,
         resumed_initial_checkpoint=args.get('checkpoint'),first_epoch=trainer.current_epoch,

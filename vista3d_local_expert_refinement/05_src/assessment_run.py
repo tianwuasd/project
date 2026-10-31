@@ -19,6 +19,8 @@ def run(plan):
     target=work/'09_reports/assessment.json'
     fleet=None
     previous_lease=os.environ.get('VISTA_GPU_LEASES')
+    previous_batch=os.environ.get('WHOLE_HEART_GLOBAL_BATCH')
+    if 'global_batch_size' in plan:os.environ['WHOLE_HEART_GLOBAL_BATCH']=str(plan['global_batch_size'])
     def stage(name,status,**values):
         report['stages'].append(dict(name=name,status=status,time=time.time(),**values))
         write_json(target,report);write_json(work/'00_admin/assessment-progress.json',report)
@@ -33,7 +35,8 @@ def run(plan):
             stage('数据与预处理','passed',fold=fold,scope=scope)
             for method in plan['methods']:
                 from gpu_fleet import GPUFleet
-                fleet=GPUFleet(Path(plan['workspace']).parent,plan['runtime'],plan['gpu_memory']).start()
+                fleet_options=dict(max_training_gpus=plan['global_batch_size']) if 'global_batch_size' in plan else {}
+                fleet=GPUFleet(Path(plan['workspace']).parent,plan['runtime'],plan['gpu_memory'],**fleet_options).start()
                 os.environ['VISTA_GPU_LEASES']=str(fleet.path)
                 fleet.devices(wait=True)
                 stage('完整尺寸协同训练、容量验证与检查点恢复','running',fold=fold,model=method)
@@ -91,6 +94,8 @@ def run(plan):
         finally:
             if previous_lease is None:os.environ.pop('VISTA_GPU_LEASES',None)
             else:os.environ['VISTA_GPU_LEASES']=previous_lease
+            if previous_batch is None:os.environ.pop('WHOLE_HEART_GLOBAL_BATCH',None)
+            else:os.environ['WHOLE_HEART_GLOBAL_BATCH']=previous_batch
             write_json(target,report)
 
 

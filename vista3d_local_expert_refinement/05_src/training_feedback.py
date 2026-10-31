@@ -87,7 +87,12 @@ class RollingFeedback:
         from server_data import write_json
         packet=[None]
         if self.rank==0:
-            packet[0]=feedback_policy(self.resource,self.windows,self.capacity)
+            capacity=self.capacity
+            if self.resource.get('host_memory_guard'):
+                from memory_guard import memory_snapshot
+                capacity=dict(self.capacity,live_memory=memory_snapshot(groups=self.resource['host_memory_guard'].get('groups') or None))
+            packet[0]=feedback_policy(self.resource,self.windows,capacity)
+            if capacity.get('live_memory') is not None:packet[0]['live_memory']=capacity['live_memory']
             packet[0]['capacity_scope']='retained stage allocation; no own-busy idle/RAM subtraction; extra external capacity unmeasured'
         dist.broadcast_object_list(packet,src=0)
         decision=packet[0]
@@ -110,6 +115,7 @@ class RollingFeedback:
             decision={key:decision[key] for key in ('action','reasons','applied_boundary','capacity_scope') if key in decision},
             applied_settings=summary)
         if decision['action']!='keep':latest['requested_settings']=compact_resource(decision['requested_settings'])
+        if decision.get('live_memory') is not None:latest['live_memory']=decision['live_memory']
         history=copy.deepcopy(latest)
         if decision['action']=='keep':history.pop('applied_settings')
         with (self.output/f'feedback.rank{self.rank}.jsonl').open('a',encoding='utf-8') as stream:

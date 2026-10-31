@@ -360,7 +360,13 @@ def feedback_policy(settings, windows, capacity):
             candidate['train_cpu_slots']=old['main_threads']+candidate['train_workers']*old['worker_threads']
             candidate['total_cpu_slots']=max(candidate['train_cpu_slots'],candidate['val_cpu_slots'])
             proposed=result['estimated_ram_bytes']-old['estimated_ram_bytes']+candidate['estimated_ram_bytes']
-            if (ram is not None and proposed<=ram and candidate['train_workers']>old['train_workers']
+            live_ok=True
+            if settings.get('host_memory_guard'):
+                from memory_guard import growth_admitted
+                live_ok=growth_admitted(proposed-settings['estimated_ram_bytes'],settings['host_memory_guard'],capacity.get('live_memory',{}))
+                if not live_ok and 'live RAM headroom blocks worker expansion' not in reasons:
+                    reasons.append('live RAM headroom blocks worker expansion')
+            if (live_ok and ram is not None and proposed<=ram and candidate['train_workers']>old['train_workers']
                     and candidate['prefetch']>=candidate['train_workers'] and candidate['val_prefetch']>=candidate['val_workers']):
                 result['rank_settings'][rank]=candidate;result['estimated_ram_bytes']=proposed;action='expand'
         result['total_cpu_slots']=sum(r['total_cpu_slots'] for r in result['rank_settings'])

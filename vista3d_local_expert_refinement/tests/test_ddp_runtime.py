@@ -77,6 +77,16 @@ class ValidationTests(unittest.TestCase):
 
 @unittest.skipUnless(HAS_TORCH, 'requires CPU Torch/Gloo; no dependency installed by test')
 class DistributedTests(unittest.TestCase):
+    def test_live_memory_guard_interrupts_running_owned_group(self):
+        from memory_guard import HostMemoryPressureError
+        directory=self.directory
+        class Guard:
+            def check(self):
+                if len(list(directory.glob('*.ready')))==2:
+                    raise HostMemoryPressureError(dict(reason='injected after both actual ranks started'))
+        with self.assertRaises(HostMemoryPressureError):
+            self.launch('sleep',str(directory),memory_guard=Guard())
+        self.assertEqual(len(list(directory.glob('*.ready'))),2)
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

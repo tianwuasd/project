@@ -175,6 +175,12 @@ def snapshot(destination):
 
 
 def validate_request(config):
+    if 'global_batch_size' in config:
+        from batch_distribution import validate_global_batch
+        selected=validate_global_batch(config['global_batch_size'])
+        if config.get('max_global_batch_size',selected)!=selected or config.get('allow_batch_growth',False):
+            raise ValueError('固定全局batch与卡数上限必须一致，不能同时自动增批')
+        config=dict(config,global_batch_size=selected,max_global_batch_size=selected,allow_batch_growth=False)
     c = dict(config)
     c['methods'], c['folds'], c['tasks'] = parse_models(c['methods']), parse_folds(c['folds']), parse_tasks(c['tasks'])
     name = str(c.get('name', '')).strip()

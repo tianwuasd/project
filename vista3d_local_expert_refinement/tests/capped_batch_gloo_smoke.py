@@ -10,13 +10,16 @@ sys.path.insert(0,str(ROOT/'05_src'));sys.path.insert(0,str(ROOT/'tests'))
 
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--report-file');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--report-file')
+    parser.add_argument('--global-batch',type=int,default=8)
+    parser.add_argument('--world-sizes',default='4,6')
+    parser.add_argument('--no-batch-dice',action='store_true');args=parser.parse_args()
     from ddp_runtime import launch_ranks
     results=[]
     with tempfile.TemporaryDirectory(prefix='capped_batch_gloo_') as temporary:
-        for world in [4,6]:
+        for world in map(int,args.world_sizes.split(',')):
             ids=[f'GPU-CPU-{n}' for n in range(world)]
-            records=launch_ranks('capped_batch_rank_fixture:compare',{},ids,Path(temporary)/str(world),
+            records=launch_ranks('capped_batch_rank_fixture:compare',dict(global_batch=args.global_batch,batch_dice=not args.no_batch_dice),ids,Path(temporary)/str(world),
                 backend='gloo',timeout_seconds=240,init_timeout_seconds=120)
             results.append([r['result'] for r in records])
     result=dict(status='passed',device='cpu',real_ct=False,nccl=False,groups=results)

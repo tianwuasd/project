@@ -20,7 +20,9 @@ def child_options():
 def register_child(process, role):
     job = os.environ.get('WHOLE_HEART_JOB')
     if job:
-        write_json(Path(job) / f'processes/{process.pid}.json', dict(pid=process.pid, identity=identity(process.pid), role=role))
+        owner=os.environ.get('VISTA_DDP_RANK_OWNER')
+        write_json(Path(job) / f'processes/{process.pid}.json', dict(pid=process.pid, identity=identity(process.pid), role=role,
+            ddp_invocation=os.environ.get('WHOLE_HEART_DDP_INVOCATION'),rank_owner=json.loads(owner) if owner else None))
 
 
 def run_child(command, env, cwd=None, output=None, timeout=None):
@@ -110,6 +112,9 @@ def execute(job, lock_fd):
                WHOLE_HEART_CONTROL_PYTHON=sys.executable,PYTHONFAULTHANDLER='1',
                WHOLE_HEART_WORKSPACE=str(work), WHOLE_HEART_GPU_UUIDS=json.dumps(plan.get('gpus', [])),
                WHOLE_HEART_GPU_LIMIT=str(plan.get('gpu_count', 1)), WHOLE_HEART_GPU_MEMORY=str(plan.get('gpu_memory', 5)))
+    if 'global_batch_size' in plan:
+        from batch_distribution import validate_global_batch
+        env['WHOLE_HEART_GLOBAL_BATCH']=str(validate_global_batch(plan['global_batch_size']))
     if plan.get('gpu_policy')=='automatic':
         env.update(VISTA_GPU_POLICY='automatic',VISTA_RUNTIME=str(plan['runtime']))
     # Retain inherited allocation; only individual compute children narrow CUDA.
@@ -188,8 +193,11 @@ def execute(job, lock_fd):
                 if plan.get('gpu_policy')=='automatic' and step in {'train','predict'}:
                     if fleet is None:
                         from gpu_fleet import GPUFleet
-                        fleet=GPUFleet(job,plan['runtime'],plan['gpu_memory'],python=python).start()
-                    else:fleet.resume_discovery()
+                        cap=plan.get('global_batch_size') if step in {'train','assessment'} else None
+                        fleet=GPUFleet(job,plan['runtime'],plan['gpu_memory'],python=python,max_training_gpus=cap).start()
+                    else:
+                        fleet.max_training_gpus=plan.get('global_batch_size') if step in {'train','assessment'} else None
+                        fleet.resume_discovery()
                     env['VISTA_GPU_LEASES']=str(fleet.path)
                     step_env['VISTA_GPU_LEASES']=str(fleet.path)
                     # Waiting happens only at a GPU stage, after CPU preprocessing.

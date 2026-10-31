@@ -63,7 +63,18 @@ def allocate_shared(size):
     if linux and (free is None or not hasattr(os, 'posix_fallocate')):
         raise OSError('shared_safe_reservation_unavailable')
     from multiprocessing.shared_memory import SharedMemory
-    segment = SharedMemory(create=True, size=size)
+    # Register the intended unique name before creation. A killed rank cannot
+    # unlink its buffers; its supervisor cleans only this invocation's names.
+    invocation=os.environ.get('WHOLE_HEART_DDP_INVOCATION')
+    owner=os.environ.get('VISTA_DDP_RANK_OWNER')
+    if invocation and owner:
+        from pathlib import Path
+        from uuid import uuid4
+        from server_data import write_json
+        name='vista_'+Path(invocation).name+'_'+uuid4().hex
+        write_json(Path(invocation)/'shared-memory'/f'{name}.json',dict(name=name,size=size,rank_owner=json.loads(owner)))
+        segment=SharedMemory(name=name,create=True,size=size)
+    else:segment = SharedMemory(create=True, size=size)
     try:
         if linux:
             # fallocate is atomic with respect to ENOSPC races across all ranks,

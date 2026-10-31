@@ -15,7 +15,7 @@ def main():
         ast.parse(path.read_text(encoding='utf-8'),filename=str(path));syntax+=1
     sys.path[:0]=[str(root/'05_src'),str(root/'tests')]
     suite=unittest.TestSuite()
-    for pattern in ['test_capped_batch.py','test_performance_repair.py','test_training_policy.py',
+    for pattern in ['test_capped_batch.py','test_performance_repair.py','test_training_policy.py','test_memory_guard.py',
                     'test_live_resources.py','test_install_routes.py','test_gpu_memory.py']:
         suite.addTests(unittest.defaultTestLoader.discover(str(root/'tests'),pattern=pattern))
     capture=io.StringIO()
