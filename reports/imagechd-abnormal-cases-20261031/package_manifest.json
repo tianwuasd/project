@@ -19,13 +19,23 @@
     },
     {
       "path": "README.md",
-      "bytes": 9993,
-      "sha256": "77a9477cf4ee2570b1cb47ce928cb0c2fc5bf89b677e0485ac202c444212a32a"
+      "bytes": 10276,
+      "sha256": "2654a2f700bb1a1c22c5e7663cb71fcc871a86a5750abab4108ecc4d2cbccfcc"
     },
     {
       "path": "场景索引.json",
       "bytes": 2483,
       "sha256": "09a5f2287f796b8511d3419cc02605e815d78856a994a58f10e849bc21c04a6a"
+    },
+    {
+      "path": "工程接入验证.json",
+      "bytes": 3090,
+      "sha256": "d25d0542c78f37d836f0cdb665d481e0867d60c33b7c27d68d18f87020d5373a"
+    },
+    {
+      "path": "工程接入验证.md",
+      "bytes": 2596,
+      "sha256": "af56e3ab031dc2185c641ba966f32681228f9f8163f42c8e067ca9dfda3f9e0c"
     },
     {
       "path": "样本统计与异常分型.json",
