@@ -1,0 +1,5 @@
+label,definition,year,count,denominator,share,current_year
+对照方法,仅用于验证多标签分母,all,1,2,0.5,
+对照方法,仅用于验证多标签分母,2023,1,1,1.0,False
+模拟方法,原创兼容性样例的合成标签,all,2,2,1.0,
+模拟方法,原创兼容性样例的合成标签,2023,1,1,1.0,False

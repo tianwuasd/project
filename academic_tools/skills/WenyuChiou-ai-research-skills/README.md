@@ -145,6 +145,16 @@ claude plugin install antigravity-delegate@ai-research-skills
 pip install research-hub-pipeline
 research-hub setup --persona researcher
 research-hub doctor
+```
+
+**Separate live smoke (not installation):**
+
+This is a **live** literature workflow, not an offline install check.
+`--no-nlm` disables NotebookLM only; it does not disable other network calls,
+models, or writes. Complete the [live-run preflight](docs/live-run-preflight.md)
+and obtain the applicable data/cost/write authorization before running:
+
+```bash
 research-hub auto "agent-based modeling" --max-papers 3 --no-nlm
 ```
 
@@ -309,6 +319,11 @@ immediate goal:
 | **Find & compare literature** | `research-hub` + `literature-triage-matrix` |
 | **Write or revise a paper** | `paper-memory-builder` + `academic-writing-skills` |
 | **Manage a research project** | `research-design-helper` + `research-context-compressor` + `zotero-library-curator` |
+
+For literature discovery, start with the search and source-reading capabilities
+actually available in Codex or Claude Code. Zotero, Obsidian and NotebookLM are
+optional, not a required setup detour; follow the existing
+[Stage 1 evidence handoff](docs/pipeline.md#1-discover-literature).
 
 > **Helping others adopt AI for research** (librarian / RA / advisor)?
 > No install needed — share this README plus [docs/install.md](docs/install.md).

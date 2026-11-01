@@ -1,0 +1,1013 @@
+{
+  "source_repository": "https://github.com/tianwuasd/testing_tools.git",
+  "source_branch": "main",
+  "source_subdirectory": "academic_agent/",
+  "source_commit": "922c702f37545051097f3dbeca965c8fce14ab89",
+  "source_tree": "ecd4beaeb7838c2ff2bc8745a0e439d3995dc66e",
+  "checked_at": "2026-11-01T13:46:20.188603+08:00",
+  "files": [
+    {
+      "path": "academic_agent/.gitattributes",
+      "source_blob": "1467bd4c8825072e0c542e7ef134bc2836e646e4",
+      "target_blob": "1467bd4c8825072e0c542e7ef134bc2836e646e4",
+      "source_sha256": "3dbd937d7cd1c03c5d3b23b14feecbd8d22e0202ddf474180318c2dfcca44da0",
+      "target_sha256": "3dbd937d7cd1c03c5d3b23b14feecbd8d22e0202ddf474180318c2dfcca44da0",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/CHANGELOG.md",
+      "source_blob": "04f904968de21e261beb2c176c2ff6cb95b4e0cf",
+      "target_blob": "04f904968de21e261beb2c176c2ff6cb95b4e0cf",
+      "source_sha256": "fbe68cd12196fdfe30f28baa7a6530bd34610a79d47b6a6fd2ec3b8145ecece1",
+      "target_sha256": "fbe68cd12196fdfe30f28baa7a6530bd34610a79d47b6a6fd2ec3b8145ecece1",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/MANIFEST.in",
+      "source_blob": "03f4db348266441e8e23cf40bd10a9803a40ac1d",
+      "target_blob": "03f4db348266441e8e23cf40bd10a9803a40ac1d",
+      "source_sha256": "f8f133b2a39299d43dc1f5f94f272a632feba876c6b6309937286bc857e6ec82",
+      "target_sha256": "f8f133b2a39299d43dc1f5f94f272a632feba876c6b6309937286bc857e6ec82",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/README.md",
+      "source_blob": "7b6a87b168a6ddfde8eaeb1e684dae40b5a83687",
+      "target_blob": "7b6a87b168a6ddfde8eaeb1e684dae40b5a83687",
+      "source_sha256": "55bebb24fd2961b8000ed19c64ce0bbf1c52665aca9a6858ea9634af4224df94",
+      "target_sha256": "55bebb24fd2961b8000ed19c64ce0bbf1c52665aca9a6858ea9634af4224df94",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/architecture.md",
+      "source_blob": "817079d7fff70883601c440754b2753b851f54ef",
+      "target_blob": "817079d7fff70883601c440754b2753b851f54ef",
+      "source_sha256": "a2dd1494f6fb3693e4ac239ca73ea4ee1426de03211a3b5981e2f8780bfa53a9",
+      "target_sha256": "a2dd1494f6fb3693e4ac239ca73ea4ee1426de03211a3b5981e2f8780bfa53a9",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/assessment-acceptance-v0.3.md",
+      "source_blob": "9a1a31b7563da54ce00120d91576c4d8c2346187",
+      "target_blob": "9a1a31b7563da54ce00120d91576c4d8c2346187",
+      "source_sha256": "927cf224d3fc9cc8f2f7eea22f188a142f4a10dd674eb9da9f34fd1feecae382",
+      "target_sha256": "927cf224d3fc9cc8f2f7eea22f188a142f4a10dd674eb9da9f34fd1feecae382",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/design.md",
+      "source_blob": "35d2566ca28d08fa3b2942311889eb2af98f6ea0",
+      "target_blob": "35d2566ca28d08fa3b2942311889eb2af98f6ea0",
+      "source_sha256": "7074594775bd8726f69bbb3cf8404e550bb0a9817963394b35749c46c7d716d5",
+      "target_sha256": "7074594775bd8726f69bbb3cf8404e550bb0a9817963394b35749c46c7d716d5",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/development-plan.md",
+      "source_blob": "e87d765104c4a2c5a5b51538ca23fdd8a88951c2",
+      "target_blob": "e87d765104c4a2c5a5b51538ca23fdd8a88951c2",
+      "source_sha256": "bbf70fa36cdc9429dd3cc8d948c59af80fee6046dcb3bd296b88e19bbfeeb3fa",
+      "target_sha256": "bbf70fa36cdc9429dd3cc8d948c59af80fee6046dcb3bd296b88e19bbfeeb3fa",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/domain-packs.md",
+      "source_blob": "55e084db81a241099114b39c58095613ba144aa0",
+      "target_blob": "55e084db81a241099114b39c58095613ba144aa0",
+      "source_sha256": "b5ca0e7d1cfa285d32bbb88a9dc59c7eb88cedf36025a42097d1baab4a31c2b0",
+      "target_sha256": "b5ca0e7d1cfa285d32bbb88a9dc59c7eb88cedf36025a42097d1baab4a31c2b0",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/extending.md",
+      "source_blob": "a160939e432f3c402a361507bdfcb1a5f7cc66dc",
+      "target_blob": "a160939e432f3c402a361507bdfcb1a5f7cc66dc",
+      "source_sha256": "6b2cb40b6e4406adac54c0556b7f1db5bc2d0c7bf3f61f9b739f5d58ccaa4402",
+      "target_sha256": "6b2cb40b6e4406adac54c0556b7f1db5bc2d0c7bf3f61f9b739f5d58ccaa4402",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/git-flow.md",
+      "source_blob": "13197c1d01db3ce9a777c42425e7b717fb0259c7",
+      "target_blob": "13197c1d01db3ce9a777c42425e7b717fb0259c7",
+      "source_sha256": "b8fedd3835557114fff8446ba54b5bcc0d248cd33fea0b4625b0cd6f1d35558f",
+      "target_sha256": "b8fedd3835557114fff8446ba54b5bcc0d248cd33fea0b4625b0cd6f1d35558f",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/innovation-candidates.md",
+      "source_blob": "8199f3fcdfb94f0e1e38796998cd47f4cbed1ff2",
+      "target_blob": "8199f3fcdfb94f0e1e38796998cd47f4cbed1ff2",
+      "source_sha256": "3f40bca677f9d13edb85f85e0bcc4cd9a761eed82b44be27bfb12a4fd9c69c31",
+      "target_sha256": "3f40bca677f9d13edb85f85e0bcc4cd9a761eed82b44be27bfb12a4fd9c69c31",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/innovation-walkthrough.md",
+      "source_blob": "e2d4a9f83c0a6c6fac9be818d845f329eeb3a9fb",
+      "target_blob": "e2d4a9f83c0a6c6fac9be818d845f329eeb3a9fb",
+      "source_sha256": "7963045271ae43e03931a7455bae9ea657d408e1bb9a533fde6c695df6639965",
+      "target_sha256": "7963045271ae43e03931a7455bae9ea657d408e1bb9a533fde6c695df6639965",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/next-stage-contract-notes.md",
+      "source_blob": "0b70231afd4391a0d941f2d8556e6f1f49ca7a6f",
+      "target_blob": "0b70231afd4391a0d941f2d8556e6f1f49ca7a6f",
+      "source_sha256": "ef8f166d280cefd54c6876757f241a7ef7e1be6f048897ef46a64a0898f2d458",
+      "target_sha256": "ef8f166d280cefd54c6876757f241a7ef7e1be6f048897ef46a64a0898f2d458",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/project-roadmap.md",
+      "source_blob": "af4937a6eabe6a6fa96088cc4460a3d232855abd",
+      "target_blob": "af4937a6eabe6a6fa96088cc4460a3d232855abd",
+      "source_sha256": "c171b7039ddf8e40eec282b7c4ce7e428a3e64d8ae720d15800215eba533692e",
+      "target_sha256": "c171b7039ddf8e40eec282b7c4ce7e428a3e64d8ae720d15800215eba533692e",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/release-0.1.0.md",
+      "source_blob": "bcf41fa5197913faa61d6993612c5273966f0bdf",
+      "target_blob": "bcf41fa5197913faa61d6993612c5273966f0bdf",
+      "source_sha256": "651ec865205d07b4b5c81f883285c3c3ae50c5af8d33375f6ada5d368824a144",
+      "target_sha256": "651ec865205d07b4b5c81f883285c3c3ae50c5af8d33375f6ada5d368824a144",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/release-0.2.0.md",
+      "source_blob": "73b99c9a23ac1921c986f93b84aa474a95038b5b",
+      "target_blob": "73b99c9a23ac1921c986f93b84aa474a95038b5b",
+      "source_sha256": "e22a01b1d2c06360b8db544da9758a26a24f34c11bbcb75be3dc5b8491baaca3",
+      "target_sha256": "e22a01b1d2c06360b8db544da9758a26a24f34c11bbcb75be3dc5b8491baaca3",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/release-0.3.0.md",
+      "source_blob": "c79f54342f40ebdd38fb5838c963299882175dbc",
+      "target_blob": "c79f54342f40ebdd38fb5838c963299882175dbc",
+      "source_sha256": "e172962c05961f0d0cc23a6ea74f163b10df001a894de1a0a195805004e23274",
+      "target_sha256": "e172962c05961f0d0cc23a6ea74f163b10df001a894de1a0a195805004e23274",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/release-0.4.0.md",
+      "source_blob": "1d5f0f6c8d5ceb22486af21d269a3e02bd7b5a4b",
+      "target_blob": "1d5f0f6c8d5ceb22486af21d269a3e02bd7b5a4b",
+      "source_sha256": "cc1c28a4de300e5bec50019868221c9ac01b03968bfd7795175cd7e95a020d0b",
+      "target_sha256": "cc1c28a4de300e5bec50019868221c9ac01b03968bfd7795175cd7e95a020d0b",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/research-artifacts.md",
+      "source_blob": "ed8996b328dfafbce5366aa0011c330a44813a9c",
+      "target_blob": "ed8996b328dfafbce5366aa0011c330a44813a9c",
+      "source_sha256": "ea0e3114ddd1145c59b14446b16f1c8608716c2437348bd92212acbd8828fcba",
+      "target_sha256": "ea0e3114ddd1145c59b14446b16f1c8608716c2437348bd92212acbd8828fcba",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/research-sources.md",
+      "source_blob": "e6f7ef196ab243159295d6a1542606cb7705c59f",
+      "target_blob": "e6f7ef196ab243159295d6a1542606cb7705c59f",
+      "source_sha256": "97c771c90a9736a469b6be2b119d4bd9bed9ccc6c0b04a84bda99a81aa7fb158",
+      "target_sha256": "97c771c90a9736a469b6be2b119d4bd9bed9ccc6c0b04a84bda99a81aa7fb158",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/spec-v0.2.md",
+      "source_blob": "eb9ae2c3958ead40bf04fa741f66e7915ca13a37",
+      "target_blob": "eb9ae2c3958ead40bf04fa741f66e7915ca13a37",
+      "source_sha256": "45582c7994e1fa11111d7471d3d5d59e3d092681439ac393c5eb1d53a8d2e913",
+      "target_sha256": "45582c7994e1fa11111d7471d3d5d59e3d092681439ac393c5eb1d53a8d2e913",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/spec-v0.3.md",
+      "source_blob": "9054a27516e8b0e545cbf73d5bfec00f04bfc9bd",
+      "target_blob": "9054a27516e8b0e545cbf73d5bfec00f04bfc9bd",
+      "source_sha256": "d773ad61e59fec5edcd1339c63085da1f9587dcdc0c20f554cfe73e3a5d62e47",
+      "target_sha256": "d773ad61e59fec5edcd1339c63085da1f9587dcdc0c20f554cfe73e3a5d62e47",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/spec-v0.4.md",
+      "source_blob": "e435827472d183f48f197edf8872c81619797b90",
+      "target_blob": "e435827472d183f48f197edf8872c81619797b90",
+      "source_sha256": "e67c8eafc5875540b1aa527a6eb79f34fe2315e6db709d01fee4b17e6a2a84d1",
+      "target_sha256": "e67c8eafc5875540b1aa527a6eb79f34fe2315e6db709d01fee4b17e6a2a84d1",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/superpowers/plans/2026-09-08-v02-trends-usage.md",
+      "source_blob": "5841433d14b176a915b2a1ed6aa9d5a2899d5064",
+      "target_blob": "5841433d14b176a915b2a1ed6aa9d5a2899d5064",
+      "source_sha256": "7963b35c4cc756f58fbf5a13eadd78fe5ff5fa1ea8193a5a16c5813d27873ede",
+      "target_sha256": "7963b35c4cc756f58fbf5a13eadd78fe5ff5fa1ea8193a5a16c5813d27873ede",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/superpowers/plans/2026-09-09-v03-innovation.md",
+      "source_blob": "9ecda4d2a84b91cda7cfe38f4a4fafbc18854c36",
+      "target_blob": "9ecda4d2a84b91cda7cfe38f4a4fafbc18854c36",
+      "source_sha256": "e0c5e90bb5281ea4199d3a2372deb81aec2e2b0520865106fda8acab78747c6a",
+      "target_sha256": "e0c5e90bb5281ea4199d3a2372deb81aec2e2b0520865106fda8acab78747c6a",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/superpowers/plans/2026-09-09-v04-writing.md",
+      "source_blob": "78fe8baf0f3c40e68ab556e73b775ec7e61b29e6",
+      "target_blob": "35a3a6ac5fd8df1850c693bccaa56b3fab680555",
+      "source_sha256": "f9bb6067bfdba155b1a95884bc099089b732bcf94bfeb46a186c8e2422f472af",
+      "target_sha256": "66cbfeaf0d553cb8ea8f10a8d94c7f897765c0636289836723829d1d06e56e79",
+      "mode": "100644",
+      "personal_workspace_path_redacted": true
+    },
+    {
+      "path": "academic_agent/docs/superpowers/specs/2026-09-09-v04-writing-design.md",
+      "source_blob": "1207447c758d7070db04830c50eb8f828cc58d0d",
+      "target_blob": "1207447c758d7070db04830c50eb8f828cc58d0d",
+      "source_sha256": "bb0d33bdcefb410635081ed46afaf59f72e3a3c343e7193273122c9ee5708c94",
+      "target_sha256": "bb0d33bdcefb410635081ed46afaf59f72e3a3c343e7193273122c9ee5708c94",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/trends.md",
+      "source_blob": "f2498bb3c7a3c20275cb86e52766b01b0ed2b342",
+      "target_blob": "f2498bb3c7a3c20275cb86e52766b01b0ed2b342",
+      "source_sha256": "e129bd00883431b68a77ae8c4700f7188379b2e15d22de5c6aef1e9d99d5c970",
+      "target_sha256": "e129bd00883431b68a77ae8c4700f7188379b2e15d22de5c6aef1e9d99d5c970",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/usage-acceptance-v0.3.md",
+      "source_blob": "b3f0443f43ed7877f0df9485850ccc1b29f4a53b",
+      "target_blob": "b3f0443f43ed7877f0df9485850ccc1b29f4a53b",
+      "source_sha256": "212c8160be64aaf1e05e60835a16c7c340a1cc15f4cdac1cdad589b16309750b",
+      "target_sha256": "212c8160be64aaf1e05e60835a16c7c340a1cc15f4cdac1cdad589b16309750b",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/validation-v0.2.md",
+      "source_blob": "2e4eb5a1b0ddecfdacf69bfcc8f5817bf065773d",
+      "target_blob": "27b2e345c39a4db0e765a5b4b2bb0fbb32ceab43",
+      "source_sha256": "aa066ca4e016c746bf77b638ce2ac18190abf95e272856df91ede4047f770058",
+      "target_sha256": "c22f8754e81147c44cc873963ebd3eff557fb5c8dfe438836379fc4aa78699ea",
+      "mode": "100644",
+      "personal_workspace_path_redacted": true
+    },
+    {
+      "path": "academic_agent/docs/validation-v0.3.md",
+      "source_blob": "f60bdd9a44f6a96675be06816f5d067183d530c1",
+      "target_blob": "43caffe929ff909933a523221aecc23d0e36c0b9",
+      "source_sha256": "64106f66d44c0ca0ab830fa4f8a3b74266aba0c497f5e3310cb153d243c5d830",
+      "target_sha256": "120753ccebd6ebcb239ab751466bf6ff06cfe4d985b0e4405a52c832a15a627c",
+      "mode": "100644",
+      "personal_workspace_path_redacted": true
+    },
+    {
+      "path": "academic_agent/docs/validation-v0.4.md",
+      "source_blob": "db735774a56e73720584db8f7bfecf626b53e260",
+      "target_blob": "fa366d26da4d42e99f837272973925fc1313780b",
+      "source_sha256": "1954e4f6dea9028d95be65f7dab4b09f7c49f5305f27cbbd43e4b0bf6fa105e8",
+      "target_sha256": "546bd45dbc49699dee6e6211d091f3206e1c1796be5a3e74fb9bd68cfe1ad8e0",
+      "mode": "100644",
+      "personal_workspace_path_redacted": true
+    },
+    {
+      "path": "academic_agent/docs/validation.md",
+      "source_blob": "75bcd249a68f89f78de3309013a63d7b05332a8e",
+      "target_blob": "75bcd249a68f89f78de3309013a63d7b05332a8e",
+      "source_sha256": "d965e4197643c78780bcaa63799fdb03661a2ad2448eaa2361cfe7e170f3e252",
+      "target_sha256": "d965e4197643c78780bcaa63799fdb03661a2ad2448eaa2361cfe7e170f3e252",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/writing-contract-notes.md",
+      "source_blob": "b160850fcef77ac1133a0ddee0e1d76efcd8bf37",
+      "target_blob": "b160850fcef77ac1133a0ddee0e1d76efcd8bf37",
+      "source_sha256": "c5f7d0543f31e011ede22c88a8e104b52301ee6b8f14924660acab6451fcf47c",
+      "target_sha256": "c5f7d0543f31e011ede22c88a8e104b52301ee6b8f14924660acab6451fcf47c",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/docs/writing.md",
+      "source_blob": "b6b96d7a7d4fd85a2854e9466ab5dcce92d621ce",
+      "target_blob": "b6b96d7a7d4fd85a2854e9466ab5dcce92d621ce",
+      "source_sha256": "8e38bd628dbd935621b85d580c9fe3776df89a893b71fdf1185d93a8bfcb803b",
+      "target_sha256": "8e38bd628dbd935621b85d580c9fe3776df89a893b71fdf1185d93a8bfcb803b",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/pyproject.toml",
+      "source_blob": "ff870edf7819aa3caf47c27e900b80c283cc4374",
+      "target_blob": "ff870edf7819aa3caf47c27e900b80c283cc4374",
+      "source_sha256": "895b23388f6991f4805109b2766a1edcedbcd494e22bdcae760ba64a6ea295ec",
+      "target_sha256": "895b23388f6991f4805109b2766a1edcedbcd494e22bdcae760ba64a6ea295ec",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/__init__.py",
+      "source_blob": "14fbe5554600cc23177fa12d4080808274af51f9",
+      "target_blob": "14fbe5554600cc23177fa12d4080808274af51f9",
+      "source_sha256": "dfcb8e362ef67e286c3fa72623539c56cf78b1f9753b4cab937236efcfb4f466",
+      "target_sha256": "dfcb8e362ef67e286c3fa72623539c56cf78b1f9753b4cab937236efcfb4f466",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/__main__.py",
+      "source_blob": "eb53e2f31b2f703ad32ef64b8a41faa3e7d18e08",
+      "target_blob": "eb53e2f31b2f703ad32ef64b8a41faa3e7d18e08",
+      "source_sha256": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+      "target_sha256": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/analysis.py",
+      "source_blob": "2ccb99f17b9c0945b10f8f7420e884d45b3bc092",
+      "target_blob": "2ccb99f17b9c0945b10f8f7420e884d45b3bc092",
+      "source_sha256": "70b8c8fd49e4c0436d3c3423618d1d5dd350d46fc0c0a4fe0035e85d0e240ba9",
+      "target_sha256": "70b8c8fd49e4c0436d3c3423618d1d5dd350d46fc0c0a4fe0035e85d0e240ba9",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/backends.py",
+      "source_blob": "903db50b94698b96ef707cbfea18742acf9b370d",
+      "target_blob": "903db50b94698b96ef707cbfea18742acf9b370d",
+      "source_sha256": "b7755602126883c7e4b246b91cb8585a62fb9ee836175264697e80b996c00ace",
+      "target_sha256": "b7755602126883c7e4b246b91cb8585a62fb9ee836175264697e80b996c00ace",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/bibliography.py",
+      "source_blob": "4b384c7ec0c05424235603d264114e824e05ae44",
+      "target_blob": "4b384c7ec0c05424235603d264114e824e05ae44",
+      "source_sha256": "aa2053df51e7c51dfd7826b85806da29a5f08750140aa958407ef41baae3419f",
+      "target_sha256": "aa2053df51e7c51dfd7826b85806da29a5f08750140aa958407ef41baae3419f",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/challenges.py",
+      "source_blob": "56c75e4d67d8bb94d57f5163e656206acda7ae9d",
+      "target_blob": "56c75e4d67d8bb94d57f5163e656206acda7ae9d",
+      "source_sha256": "429c7d8d92f48100c635fca0f7f99c3a4a6bc8f94193cf6ae9f2515664cf5886",
+      "target_sha256": "429c7d8d92f48100c635fca0f7f99c3a4a6bc8f94193cf6ae9f2515664cf5886",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/cli.py",
+      "source_blob": "2c9ea51a8a8808b18e8d70cf92eb9f3f8485e17c",
+      "target_blob": "2c9ea51a8a8808b18e8d70cf92eb9f3f8485e17c",
+      "source_sha256": "8cf1bc063c736d6cac022b2a620c3d6ec9ef9d14b06b34b6524dd6f9290eb685",
+      "target_sha256": "8cf1bc063c736d6cac022b2a620c3d6ec9ef9d14b06b34b6524dd6f9290eb685",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/config.py",
+      "source_blob": "bdb09f16656c3ffaad03486f18beef53a5fbdb6c",
+      "target_blob": "bdb09f16656c3ffaad03486f18beef53a5fbdb6c",
+      "source_sha256": "ac8dbcf5996a6b0daaed7813c0d445b0c169e0b6276414341162d2930782bb69",
+      "target_sha256": "ac8dbcf5996a6b0daaed7813c0d445b0c169e0b6276414341162d2930782bb69",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/demo.py",
+      "source_blob": "403c18d970412bd24371581b320b87980e1bcb90",
+      "target_blob": "403c18d970412bd24371581b320b87980e1bcb90",
+      "source_sha256": "9b29906da3d03881812233db8d8db9498c9135b6246c0a92059bee28269a38ea",
+      "target_sha256": "9b29906da3d03881812233db8d8db9498c9135b6246c0a92059bee28269a38ea",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/demo_innovation.py",
+      "source_blob": "2962c3b71ae05a6ab2d38230a0b4a998582fc504",
+      "target_blob": "2962c3b71ae05a6ab2d38230a0b4a998582fc504",
+      "source_sha256": "d18da352c70afe5d860138a9fc763e587d89097a3658f969275aa7265d06ca2b",
+      "target_sha256": "d18da352c70afe5d860138a9fc763e587d89097a3658f969275aa7265d06ca2b",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/demo_writing.py",
+      "source_blob": "4e8ac8cee8e2f56fb9c933986597fa8fe563c95b",
+      "target_blob": "4e8ac8cee8e2f56fb9c933986597fa8fe563c95b",
+      "source_sha256": "92030912f1ec692b7ee569890bef38371e3b523378d5bc415db1b249d5a79c8c",
+      "target_sha256": "92030912f1ec692b7ee569890bef38371e3b523378d5bc415db1b249d5a79c8c",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/documents.py",
+      "source_blob": "c11fa45ef8351908a62a86aad0c836f03739e4c7",
+      "target_blob": "c11fa45ef8351908a62a86aad0c836f03739e4c7",
+      "source_sha256": "4a0fcd52dde265cb84d2dbf51ee3a699b9c2b08ca07f74ee496dc99af64eb66b",
+      "target_sha256": "4a0fcd52dde265cb84d2dbf51ee3a699b9c2b08ca07f74ee496dc99af64eb66b",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/domain.py",
+      "source_blob": "5e794306df88bae9a3f60df5e5cd915f326c7743",
+      "target_blob": "5e794306df88bae9a3f60df5e5cd915f326c7743",
+      "source_sha256": "ccea5bcf11e6dbc62b4fb6f4b2154e3cd505892dfe96be3f5c2a006b593f5750",
+      "target_sha256": "ccea5bcf11e6dbc62b4fb6f4b2154e3cd505892dfe96be3f5c2a006b593f5750",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/domain_packs/scheduling.json",
+      "source_blob": "a0c7e9249fadea2964a741445cb4102d2b10b30e",
+      "target_blob": "a0c7e9249fadea2964a741445cb4102d2b10b30e",
+      "source_sha256": "1709886491c7309b187d34223d611e3295fe5419f2dcf9ec19f876eb7c56d46d",
+      "target_sha256": "1709886491c7309b187d34223d611e3295fe5419f2dcf9ec19f876eb7c56d46d",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/exports.py",
+      "source_blob": "ab7fd4a1636b907cd8f4fbaa6412c93c19703cc6",
+      "target_blob": "ab7fd4a1636b907cd8f4fbaa6412c93c19703cc6",
+      "source_sha256": "5226da5679d81d85516a0d8c98bf7f84dc71d392528c84239052e42c26f7b9b7",
+      "target_sha256": "5226da5679d81d85516a0d8c98bf7f84dc71d392528c84239052e42c26f7b9b7",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/filesystem.py",
+      "source_blob": "e158adb67354863d5598028d752b36621d75d456",
+      "target_blob": "e158adb67354863d5598028d752b36621d75d456",
+      "source_sha256": "ca7de98347023913f909347443896177c5b5256e5b7b724d1dafc0304ad257c7",
+      "target_sha256": "ca7de98347023913f909347443896177c5b5256e5b7b724d1dafc0304ad257c7",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/guide.py",
+      "source_blob": "f10bab5a44024e2e654a5b1415ba95abcd97c26a",
+      "target_blob": "f10bab5a44024e2e654a5b1415ba95abcd97c26a",
+      "source_sha256": "0898dcf323933c9c10be4fe757a7f0138389aa9acef10f5346e50241e80e554d",
+      "target_sha256": "0898dcf323933c9c10be4fe757a7f0138389aa9acef10f5346e50241e80e554d",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/innovation_analysis.py",
+      "source_blob": "c9bb67acb6098a5254794ff75828b5c5be53d89d",
+      "target_blob": "c9bb67acb6098a5254794ff75828b5c5be53d89d",
+      "source_sha256": "d6847cc89aa4ec13a39b0b75048776a7dcf21ace39a96bdada0ca2ee30602b8a",
+      "target_sha256": "d6847cc89aa4ec13a39b0b75048776a7dcf21ace39a96bdada0ca2ee30602b8a",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/innovation_models.py",
+      "source_blob": "aa6525d4e7986659402d402f9d7f3fb8e828a39d",
+      "target_blob": "aa6525d4e7986659402d402f9d7f3fb8e828a39d",
+      "source_sha256": "8151f13f8a428ee92c0dd0a7735b38890842c997d7294dd96b5aef07a36096e0",
+      "target_sha256": "8151f13f8a428ee92c0dd0a7735b38890842c997d7294dd96b5aef07a36096e0",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/innovations.py",
+      "source_blob": "a0516a97ae46fe3d9ad979a4367e083edd37903a",
+      "target_blob": "a0516a97ae46fe3d9ad979a4367e083edd37903a",
+      "source_sha256": "647acb94b2fe2648c25d8ed002caa99436241a224210321ba5b7113ee4c062af",
+      "target_sha256": "647acb94b2fe2648c25d8ed002caa99436241a224210321ba5b7113ee4c062af",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/models.py",
+      "source_blob": "04b35948382ca792be237178036760f63e961128",
+      "target_blob": "04b35948382ca792be237178036760f63e961128",
+      "source_sha256": "469d7f7e72045685f3176c778eaa6903dbc7105b8d5b2a3893bd17ab59c80fa1",
+      "target_sha256": "469d7f7e72045685f3176c778eaa6903dbc7105b8d5b2a3893bd17ab59c80fa1",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/network.py",
+      "source_blob": "73fb58899fd63eca86bfa623f699cb8a9603cb8f",
+      "target_blob": "73fb58899fd63eca86bfa623f699cb8a9603cb8f",
+      "source_sha256": "e610c812e86861122b8f80e74f102215c4979f9ac4f7ad49e110458a8a68fba2",
+      "target_sha256": "e610c812e86861122b8f80e74f102215c4979f9ac4f7ad49e110458a8a68fba2",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/research_artifacts.py",
+      "source_blob": "a9ad698ba48f879abd515cd7697187c6cede1e45",
+      "target_blob": "a9ad698ba48f879abd515cd7697187c6cede1e45",
+      "source_sha256": "264f857bbda47eb9519f974f01b64d9814c5d885a7f8e4bc2fdaf54d0a8f6923",
+      "target_sha256": "264f857bbda47eb9519f974f01b64d9814c5d885a7f8e4bc2fdaf54d0a8f6923",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/research_context.py",
+      "source_blob": "d33aaf62b0602d1c1c098a64a952d26baa25e394",
+      "target_blob": "d33aaf62b0602d1c1c098a64a952d26baa25e394",
+      "source_sha256": "adfba280532b57966baee3319fa05a46b565408f76da254d860cc268ab850e80",
+      "target_sha256": "adfba280532b57966baee3319fa05a46b565408f76da254d860cc268ab850e80",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/sources.py",
+      "source_blob": "e6e78793133ffad71ef03830bec7b34cae1f9a82",
+      "target_blob": "e6e78793133ffad71ef03830bec7b34cae1f9a82",
+      "source_sha256": "ddc9ed03600daf8c84bcb647cba642634bdedba7f9337530e34323fa3d69a9fe",
+      "target_sha256": "ddc9ed03600daf8c84bcb647cba642634bdedba7f9337530e34323fa3d69a9fe",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/store.py",
+      "source_blob": "82afd462d1e5d6f40a0958a678e50cdd2b3e09d8",
+      "target_blob": "82afd462d1e5d6f40a0958a678e50cdd2b3e09d8",
+      "source_sha256": "b90ff563f7bcf5e0c9fb4faa6a159071491b7062266fcf92f2ebd14d8c84a448",
+      "target_sha256": "b90ff563f7bcf5e0c9fb4faa6a159071491b7062266fcf92f2ebd14d8c84a448",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/trends.py",
+      "source_blob": "afba88612002be7f1fcd385d978dd73e2ee514b7",
+      "target_blob": "afba88612002be7f1fcd385d978dd73e2ee514b7",
+      "source_sha256": "623f476941cff7b4a39e8b9c5da79b517c7157873bc961a2e6935cb4756c29c4",
+      "target_sha256": "623f476941cff7b4a39e8b9c5da79b517c7157873bc961a2e6935cb4756c29c4",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/usage.py",
+      "source_blob": "54da90fa21c82412ae9e0d9ce4aeb41cce279358",
+      "target_blob": "54da90fa21c82412ae9e0d9ce4aeb41cce279358",
+      "source_sha256": "9017468b26cddc8f4052065908529dbf19ef54dc26d06f7d14d72c7915ddabda",
+      "target_sha256": "9017468b26cddc8f4052065908529dbf19ef54dc26d06f7d14d72c7915ddabda",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/workflow.py",
+      "source_blob": "75cc8f73ab1c8dc48741f0bba710f8345abcee18",
+      "target_blob": "75cc8f73ab1c8dc48741f0bba710f8345abcee18",
+      "source_sha256": "cf0fecf457cb02a43a1daec30feb98d89077159a917ca169d86591577bb5e804",
+      "target_sha256": "cf0fecf457cb02a43a1daec30feb98d89077159a917ca169d86591577bb5e804",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/writing.py",
+      "source_blob": "4e89162fa6ad63b673b0b14361a821846f2180c8",
+      "target_blob": "4e89162fa6ad63b673b0b14361a821846f2180c8",
+      "source_sha256": "659d3df62e3c7e6ea5ca3423ee463487f3f707641f7ccd2ca44b233ebdbabced",
+      "target_sha256": "659d3df62e3c7e6ea5ca3423ee463487f3f707641f7ccd2ca44b233ebdbabced",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/writing_analysis.py",
+      "source_blob": "6241a87be6200f94064126c23673953b2b392f3b",
+      "target_blob": "6241a87be6200f94064126c23673953b2b392f3b",
+      "source_sha256": "b46044e8c5f67bf741a50b61a4a385f58f0edd2d5ab85ab978ef8db400da517b",
+      "target_sha256": "b46044e8c5f67bf741a50b61a4a385f58f0edd2d5ab85ab978ef8db400da517b",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/writing_context.py",
+      "source_blob": "25c0a40e6dfc1fe1771c913884f0a8690767b337",
+      "target_blob": "25c0a40e6dfc1fe1771c913884f0a8690767b337",
+      "source_sha256": "4649b0cb7476b5e44d17f58ef6d57e5e7d958f0866087f3461d33c673437e3cc",
+      "target_sha256": "4649b0cb7476b5e44d17f58ef6d57e5e7d958f0866087f3461d33c673437e3cc",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/writing_models.py",
+      "source_blob": "c320def2e493ee7484d3db83a63ca5ba582a484e",
+      "target_blob": "c320def2e493ee7484d3db83a63ca5ba582a484e",
+      "source_sha256": "155e7ab2a7ca4c2326b0412cc24d9a2ecac6828198b8142391b6cdbb532f9308",
+      "target_sha256": "155e7ab2a7ca4c2326b0412cc24d9a2ecac6828198b8142391b6cdbb532f9308",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/writing_revisions.py",
+      "source_blob": "e82c072d98070c288032bccfe952727a9f536483",
+      "target_blob": "e82c072d98070c288032bccfe952727a9f536483",
+      "source_sha256": "7b5e3d5ca15d900b0f3cf8722b44ad7971f93812220296c0ef9531b68d834bd1",
+      "target_sha256": "7b5e3d5ca15d900b0f3cf8722b44ad7971f93812220296c0ef9531b68d834bd1",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/src/academic_agent/writing_usage.py",
+      "source_blob": "248d5cbe0765bd064b813d55196d756953cbe47c",
+      "target_blob": "248d5cbe0765bd064b813d55196d756953cbe47c",
+      "source_sha256": "fa1f7446fc48a8c9fce9baa71f0d73d76dab5c33ef4d072036e2b58e7168c8f0",
+      "target_sha256": "fa1f7446fc48a8c9fce9baa71f0d73d76dab5c33ef4d072036e2b58e7168c8f0",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/fixtures/README.md",
+      "source_blob": "657697c92e8ed21386a3a2eb680a62f6cc20d6cc",
+      "target_blob": "657697c92e8ed21386a3a2eb680a62f6cc20d6cc",
+      "source_sha256": "a25f9298acb2360c9c7fd151b5146fd405c789dd5c5604ac5fc6c790909ed19a",
+      "target_sha256": "a25f9298acb2360c9c7fd151b5146fd405c789dd5c5604ac5fc6c790909ed19a",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/fixtures/trends-0.2.0/annual.csv",
+      "source_blob": "5321056c655d12019ff26336441f73198100b336",
+      "target_blob": "5321056c655d12019ff26336441f73198100b336",
+      "source_sha256": "2cdf0782a72fb57536cee3b43399674a0732aa6089a8afe4cbf3373c181a6e3e",
+      "target_sha256": "2cdf0782a72fb57536cee3b43399674a0732aa6089a8afe4cbf3373c181a6e3e",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/fixtures/trends-0.2.0/computation.json",
+      "source_blob": "f6cfad10d06154b3a974fd097a0169979e1893c9",
+      "target_blob": "f6cfad10d06154b3a974fd097a0169979e1893c9",
+      "source_sha256": "ec1404b8f2c5a15d89aa3a106ac8994e99f068d41b1c81713193b71b17bd0b18",
+      "target_sha256": "ec1404b8f2c5a15d89aa3a106ac8994e99f068d41b1c81713193b71b17bd0b18",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/fixtures/trends-0.2.0/corpus.json",
+      "source_blob": "6b0b7dc85b795e843265cda476eb36d1b72154f8",
+      "target_blob": "6b0b7dc85b795e843265cda476eb36d1b72154f8",
+      "source_sha256": "03e145d844a7e97a08fd0b6d09a2e245de51aa50a87653b908f349d170e9693e",
+      "target_sha256": "03e145d844a7e97a08fd0b6d09a2e245de51aa50a87653b908f349d170e9693e",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/fixtures/trends-0.2.0/labels.csv",
+      "source_blob": "dbe314a3c4b4ea5b69fb0efbecd16eb5305c30b7",
+      "target_blob": "dbe314a3c4b4ea5b69fb0efbecd16eb5305c30b7",
+      "source_sha256": "c8532a4ce7862d894bc591651a56a08026eefb0b4c458de0f03bb5dd2705847f",
+      "target_sha256": "c8532a4ce7862d894bc591651a56a08026eefb0b4c458de0f03bb5dd2705847f",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/fixtures/trends-0.2.0/manifest.json",
+      "source_blob": "21f21a144623580e0148bbcf68a2d7c245716df0",
+      "target_blob": "21f21a144623580e0148bbcf68a2d7c245716df0",
+      "source_sha256": "0e07789ad86b2f8208df6709cd868b98604531bfe2fe9919c7a4d7eb39d5e4c7",
+      "target_sha256": "0e07789ad86b2f8208df6709cd868b98604531bfe2fe9919c7a4d7eb39d5e4c7",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/fixtures/trends-0.2.0/report.md",
+      "source_blob": "d08fedd9caba847e510306025a46dacd34bd5e32",
+      "target_blob": "d08fedd9caba847e510306025a46dacd34bd5e32",
+      "source_sha256": "c73d6c1c2d3d85092a23f23daceaf65b34cf2ddad03ff2b5d9cc5c6c92b6a2d2",
+      "target_sha256": "c73d6c1c2d3d85092a23f23daceaf65b34cf2ddad03ff2b5d9cc5c6c92b6a2d2",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_analysis.py",
+      "source_blob": "84feb73ac79c6d6c420763a346344d622ae264fb",
+      "target_blob": "84feb73ac79c6d6c420763a346344d622ae264fb",
+      "source_sha256": "53a483e8b044d0fbaa319cc79f50f2344d6c973b5b1107466be0408a672ffd6a",
+      "target_sha256": "53a483e8b044d0fbaa319cc79f50f2344d6c973b5b1107466be0408a672ffd6a",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_backends.py",
+      "source_blob": "fa906c718f38a06b962c7dfa48ef11b9286437e1",
+      "target_blob": "fa906c718f38a06b962c7dfa48ef11b9286437e1",
+      "source_sha256": "85b5c27825a5175889ebc429b3f7be8cb51b01130066c9e3d82989020e95fce8",
+      "target_sha256": "85b5c27825a5175889ebc429b3f7be8cb51b01130066c9e3d82989020e95fce8",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_bibliography.py",
+      "source_blob": "0be0c567a70fde173802db370e5f456642668d12",
+      "target_blob": "0be0c567a70fde173802db370e5f456642668d12",
+      "source_sha256": "c1a2af34a9451edcedcf75c4efadc6b40cdca5d404ae4ca3af398f1904c7580d",
+      "target_sha256": "c1a2af34a9451edcedcf75c4efadc6b40cdca5d404ae4ca3af398f1904c7580d",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_challenges.py",
+      "source_blob": "e9769bd221eda06a07e94e272ae983aef08b12f8",
+      "target_blob": "e9769bd221eda06a07e94e272ae983aef08b12f8",
+      "source_sha256": "011bb32ce46baf7988e0ad894cd98705bf0eaca438c475ef82f6a6131727d36e",
+      "target_sha256": "011bb32ce46baf7988e0ad894cd98705bf0eaca438c475ef82f6a6131727d36e",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_cli.py",
+      "source_blob": "8a60faef3a9c8d1a35530f74f49f9df7e23a3146",
+      "target_blob": "8a60faef3a9c8d1a35530f74f49f9df7e23a3146",
+      "source_sha256": "4badd4e994c8cdd9bc325e1afa64437667a7db14bca3761ab4dea454fe500925",
+      "target_sha256": "4badd4e994c8cdd9bc325e1afa64437667a7db14bca3761ab4dea454fe500925",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_documents.py",
+      "source_blob": "34d41c7c17b3e8b6e3d8b1dfc0324e21646cc9d6",
+      "target_blob": "34d41c7c17b3e8b6e3d8b1dfc0324e21646cc9d6",
+      "source_sha256": "62a6708c9a01282b5a4cd61f06115ea16d948745b3c5bdfbfb170a1b5324e582",
+      "target_sha256": "62a6708c9a01282b5a4cd61f06115ea16d948745b3c5bdfbfb170a1b5324e582",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_domain_analysis.py",
+      "source_blob": "c2804eb3e0e1dac02322e4ea4376dfafb4164b9e",
+      "target_blob": "c2804eb3e0e1dac02322e4ea4376dfafb4164b9e",
+      "source_sha256": "7c975ed0a339268875dae65149cd127cd9f465dc80e10011f32c70fe8c409ee3",
+      "target_sha256": "7c975ed0a339268875dae65149cd127cd9f465dc80e10011f32c70fe8c409ee3",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_domain_packs.py",
+      "source_blob": "4f7c4f6a5f09a9703f23148da5eadcca9a66d26e",
+      "target_blob": "4f7c4f6a5f09a9703f23148da5eadcca9a66d26e",
+      "source_sha256": "ab4fdfe01f52ad9cbc78a14d0258b5953ccf06c516822390629d8a72e7c9914e",
+      "target_sha256": "ab4fdfe01f52ad9cbc78a14d0258b5953ccf06c516822390629d8a72e7c9914e",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_innovation_assessment.py",
+      "source_blob": "9074c80843f640bc6082b9fde16f490cd50aed7b",
+      "target_blob": "9074c80843f640bc6082b9fde16f490cd50aed7b",
+      "source_sha256": "2be818dc9c8dc564f617f52dad325983fce902a03ddf855b0b62ff450bd94825",
+      "target_sha256": "2be818dc9c8dc564f617f52dad325983fce902a03ddf855b0b62ff450bd94825",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_innovation_cli.py",
+      "source_blob": "2876d3c0b9d9cf9a415a4c81abf6d4c11b655a34",
+      "target_blob": "2876d3c0b9d9cf9a415a4c81abf6d4c11b655a34",
+      "source_sha256": "493216fb1ff4e18affc105603c8567c72843c9e8a05456176fc599c5e5672d54",
+      "target_sha256": "493216fb1ff4e18affc105603c8567c72843c9e8a05456176fc599c5e5672d54",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_innovation_generation.py",
+      "source_blob": "0e9d4b3ec7a486d28746c5ff6f7f64bbb77b37d5",
+      "target_blob": "0e9d4b3ec7a486d28746c5ff6f7f64bbb77b37d5",
+      "source_sha256": "7ba05517c2bb2840d44be79dae6b4a8dd5dba6f6240ad535bfb284fb0340baf5",
+      "target_sha256": "7ba05517c2bb2840d44be79dae6b4a8dd5dba6f6240ad535bfb284fb0340baf5",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_long_paths.py",
+      "source_blob": "886525dc684ce15ea93eccd4c210bf8b5bb93fd5",
+      "target_blob": "886525dc684ce15ea93eccd4c210bf8b5bb93fd5",
+      "source_sha256": "2c1e4b3790f118ff130e356e8886b33008e987ac237f7d36d2bec4df3e43da87",
+      "target_sha256": "2c1e4b3790f118ff130e356e8886b33008e987ac237f7d36d2bec4df3e43da87",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_models.py",
+      "source_blob": "4eaeff4c0200531934d547e627c408daee24eda0",
+      "target_blob": "4eaeff4c0200531934d547e627c408daee24eda0",
+      "source_sha256": "4f00a98c43049cbcfae895912e75dbff12fa88c098c55c4e70682221aea3bc4b",
+      "target_sha256": "4f00a98c43049cbcfae895912e75dbff12fa88c098c55c4e70682221aea3bc4b",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_privacy.py",
+      "source_blob": "23eb24b075da54252a6e29d883b890e5c425863a",
+      "target_blob": "23eb24b075da54252a6e29d883b890e5c425863a",
+      "source_sha256": "999774ad84e1867c881d6dab2a19d8ceabe93d1dcafbcd9cedcd9175178c4db7",
+      "target_sha256": "999774ad84e1867c881d6dab2a19d8ceabe93d1dcafbcd9cedcd9175178c4db7",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_research_artifacts.py",
+      "source_blob": "6af743b32c51fed9ac9fc66cb721df699ef942dd",
+      "target_blob": "6af743b32c51fed9ac9fc66cb721df699ef942dd",
+      "source_sha256": "d1d1dbe50273784301689c4518d7df8b3a7f548fbc9661e670083db6562ead79",
+      "target_sha256": "d1d1dbe50273784301689c4518d7df8b3a7f548fbc9661e670083db6562ead79",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_research_context.py",
+      "source_blob": "820732d668895ac055b62bbd21b314d8b603a7bd",
+      "target_blob": "820732d668895ac055b62bbd21b314d8b603a7bd",
+      "source_sha256": "c2f8eb633bcc6b40f743bafe45b5e4a7d4d0854b66bf93e764e99518f2e35b34",
+      "target_sha256": "c2f8eb633bcc6b40f743bafe45b5e4a7d4d0854b66bf93e764e99518f2e35b34",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_sources.py",
+      "source_blob": "be92701b6b4fd24ce5339b46af6c318259fe0c2e",
+      "target_blob": "be92701b6b4fd24ce5339b46af6c318259fe0c2e",
+      "source_sha256": "78967fb135e291da739f09ae72ef01cbef75a3c50eb9fb14b21a5bda0d527bd8",
+      "target_sha256": "78967fb135e291da739f09ae72ef01cbef75a3c50eb9fb14b21a5bda0d527bd8",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_store.py",
+      "source_blob": "ce3435fbc82f6ca6cd26ba15376bc283dd42ef94",
+      "target_blob": "ce3435fbc82f6ca6cd26ba15376bc283dd42ef94",
+      "source_sha256": "a4c20f07fab2558dcd41a1cef1f7bdd037b700f78f689206eff6a61c1d117342",
+      "target_sha256": "a4c20f07fab2558dcd41a1cef1f7bdd037b700f78f689206eff6a61c1d117342",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_trend_compatibility.py",
+      "source_blob": "9b2af4c210612e253f1857ba4a7ca7a9b302937b",
+      "target_blob": "9b2af4c210612e253f1857ba4a7ca7a9b302937b",
+      "source_sha256": "85b499c68d5137929b8ca97f7fe4a6129a1fe17d0d5dd9b082e810fcaa7cb504",
+      "target_sha256": "85b499c68d5137929b8ca97f7fe4a6129a1fe17d0d5dd9b082e810fcaa7cb504",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_trends.py",
+      "source_blob": "5d0b81597dd03f1966dfa5e8cfce3feaf959919e",
+      "target_blob": "5d0b81597dd03f1966dfa5e8cfce3feaf959919e",
+      "source_sha256": "1f0e2110f7ecc5182743adafc469d75fb9847486ac1c67f2537cd3c4ce7794a1",
+      "target_sha256": "1f0e2110f7ecc5182743adafc469d75fb9847486ac1c67f2537cd3c4ce7794a1",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_usage.py",
+      "source_blob": "8170cbb58efc1a12897273b2f661846717b9138f",
+      "target_blob": "8170cbb58efc1a12897273b2f661846717b9138f",
+      "source_sha256": "4c9f9be45b0138ab5945a71d5bd264bc3c28950d28b62cc4ee34f3df8b333492",
+      "target_sha256": "4c9f9be45b0138ab5945a71d5bd264bc3c28950d28b62cc4ee34f3df8b333492",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_workflow.py",
+      "source_blob": "2af3f716bccdbfa106caf05fd5dcd999f4418809",
+      "target_blob": "2af3f716bccdbfa106caf05fd5dcd999f4418809",
+      "source_sha256": "b4dde4ebc7923ce147c59412dffb766113f34be9572a355e6d4adf70d61a66a4",
+      "target_sha256": "b4dde4ebc7923ce147c59412dffb766113f34be9572a355e6d4adf70d61a66a4",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_writing_analysis.py",
+      "source_blob": "054fd87538f1a41befa0c4477b22adffde0107fc",
+      "target_blob": "054fd87538f1a41befa0c4477b22adffde0107fc",
+      "source_sha256": "8e25f9ab33613f2ab6bc569a1d819c2f0965cd73b95d1dfb2a8a43381961ee7f",
+      "target_sha256": "8e25f9ab33613f2ab6bc569a1d819c2f0965cd73b95d1dfb2a8a43381961ee7f",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_writing_cli.py",
+      "source_blob": "ccfb93fe270bfd6bb1ebebe79e3660ded69889ea",
+      "target_blob": "ccfb93fe270bfd6bb1ebebe79e3660ded69889ea",
+      "source_sha256": "7070a6258e96e4283271261c2669a01c72bba6e4f6a27e1c7ebabea059fafb87",
+      "target_sha256": "7070a6258e96e4283271261c2669a01c72bba6e4f6a27e1c7ebabea059fafb87",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_writing_context.py",
+      "source_blob": "5acd93cc46873aec164a934450d0d1dc53cb5f28",
+      "target_blob": "5acd93cc46873aec164a934450d0d1dc53cb5f28",
+      "source_sha256": "430244a39098fc52b3ea75736d769dab30cdb2198e8029c2c281ada95e368475",
+      "target_sha256": "430244a39098fc52b3ea75736d769dab30cdb2198e8029c2c281ada95e368475",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_writing_models.py",
+      "source_blob": "5137e0d00edb2d7cfaf95ffe88e328955014a931",
+      "target_blob": "5137e0d00edb2d7cfaf95ffe88e328955014a931",
+      "source_sha256": "c4cdcf257b0d7cb1bc4452c0c555c51b748051518301e62160b4192736185d90",
+      "target_sha256": "c4cdcf257b0d7cb1bc4452c0c555c51b748051518301e62160b4192736185d90",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_writing_revisions.py",
+      "source_blob": "2895c00b471dc95b46a8ff05d93aeeac7bc36554",
+      "target_blob": "2895c00b471dc95b46a8ff05d93aeeac7bc36554",
+      "source_sha256": "c1caf5204b29c069d173b528ce4222a982ad324c08d8be7b8300981eee5d6fe2",
+      "target_sha256": "c1caf5204b29c069d173b528ce4222a982ad324c08d8be7b8300981eee5d6fe2",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_writing_usage.py",
+      "source_blob": "d087d631ec3359ef473bcd56587b0dc281c79be9",
+      "target_blob": "d087d631ec3359ef473bcd56587b0dc281c79be9",
+      "source_sha256": "0a3ae3092e93424366118157bc60bec117a23b088f78a8c91765bc059505f530",
+      "target_sha256": "0a3ae3092e93424366118157bc60bec117a23b088f78a8c91765bc059505f530",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/tests/test_writing_workflow.py",
+      "source_blob": "98907c9594df79676098ccff0e56a13b3db3d1ba",
+      "target_blob": "98907c9594df79676098ccff0e56a13b3db3d1ba",
+      "source_sha256": "4af705126567c871c709c0340ef18ec2d4d5f81d0ae9d9d5d537723638cd7af8",
+      "target_sha256": "4af705126567c871c709c0340ef18ec2d4d5f81d0ae9d9d5d537723638cd7af8",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    },
+    {
+      "path": "academic_agent/uv.lock",
+      "source_blob": "97075907a6202e45b36a34bb5c3e2852125d2706",
+      "target_blob": "97075907a6202e45b36a34bb5c3e2852125d2706",
+      "source_sha256": "07e004f9215fe6f78e94ec67010a5653e6ed109baf671f2e572536a2474cb62f",
+      "target_sha256": "07e004f9215fe6f78e94ec67010a5653e6ed109baf671f2e572536a2474cb62f",
+      "mode": "100644",
+      "personal_workspace_path_redacted": false
+    }
+  ],
+  "excluded": [
+    {
+      "path": "academic_agent/docs/development-ledger.md",
+      "reason": "raw validation output or development progress record"
+    },
+    {
+      "path": "academic_agent/docs/validation/codex-smoke.json",
+      "reason": "raw validation output or development progress record"
+    },
+    {
+      "path": "academic_agent/docs/validation/source-probes.json",
+      "reason": "raw validation output or development progress record"
+    }
+  ],
+  "redacted_documents": [
+    "academic_agent/docs/superpowers/plans/2026-09-09-v04-writing.md",
+    "academic_agent/docs/validation-v0.2.md",
+    "academic_agent/docs/validation-v0.3.md",
+    "academic_agent/docs/validation-v0.4.md"
+  ],
+  "license_note": "No license file or license declaration was found in the source subtree; no new license is assigned.",
+  "validation": "Blob/mode and SHA-256 verification; no downloaded scripts, installation, tests or experiments executed. Original source validation records remain unchanged in testing_tools; published documentation replaces only the machine-specific workspace prefix. Other development branches and worktrees are excluded."
+}

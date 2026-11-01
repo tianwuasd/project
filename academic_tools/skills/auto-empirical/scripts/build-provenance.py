@@ -171,6 +171,13 @@ OVERRIDES: dict[str, dict[str, object]] = {
         "sync": "manual",
         "source_confidence": "high",
     },
+    "74-brycewang-spss-amos-sem": {
+        "source_url": "https://github.com/brycewang-stanford/Auto-Empirical-Research-Skills",
+        "license": "CC-BY-SA-4.0 (repository default)",
+        "origin": "first-party AERS skill",
+        "sync": "manual",
+        "source_confidence": "high",
+    },
     "12-pedrohcgs-claude-code-my-workflow": {
         "source_url": "https://github.com/pedrohcgs/claude-code-my-workflow",
         "source_confidence": "high",
@@ -395,7 +402,7 @@ OVERRIDES: dict[str, dict[str, object]] = {
         "source_confidence": "medium",
     },
     "42-wanshuiyin-ARIS": {
-        "origin": "vendored upstream snapshot. The upstream skills-codex / skills-codex-*-review runtime ports (OpenAI Codex CLI variants of the same skills) remain on disk but are excluded from skill discovery since 2026-07-22 (see scripts/skill_discovery.py). Diverges from upstream in one content detail: the four auto-review-loop SKILL.md files name MiniMax-M3 as the reviewer model, not the upstream MiniMax-M2.7 (PR #69, 2026-08-31). M2.7 was superseded by M3 on 2026-05-31, so the snapshot would otherwise document a model the API no longer serves. Drop this note once upstream carries the same rename.",
+        "origin": "vendored upstream snapshot. The upstream skills-codex / skills-codex-*-review runtime ports (OpenAI Codex CLI variants of the same skills) remain on disk but are excluded from skill discovery since 2026-07-22 (see scripts/skill_discovery.py). Resynced 2026-10-20 to upstream commit 5854b99 (skills/, README.md as README-original.md, LICENSE); no local content edits remain (the earlier MiniMax-M3 rename, PR #69, and argument-hint quoting, PR #53, are both upstream now).",
     },
 }
 

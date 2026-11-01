@@ -47,6 +47,177 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Staged upstream/dependent integration guidance with explicit structural,
   production-boundary, host-loading and research-quality verification limits.
 
+## [1.7.21] - 2026-10-30
+
+### Fixed
+
+- Clarify the bilingual install guide: Hub CLI is needed only for selected
+  operations that invoke its commands, not native Codex or Claude Code
+  literature discovery or reading. Preserve shared research/source-audit rules.
+- Add offline documentation regressions for this conditional prerequisite;
+  these checks do not establish host loading or model behavior.
+
+## [1.7.20] - 2026-10-29
+
+### Fixed
+
+- Align the research-workspace marketplace cache version with Hub 0.5.23.
+  Record only the manifest observation at commit `9cbf601`; this does not
+  advance accepted-source content or establish installed host behavior.
+
+## [1.7.19] - 2026-10-29
+
+### Fixed
+
+- Align the research-workspace marketplace cache version with Hub 0.5.22.
+  Record only the manifest observation at commit `929904b`; this does not
+  advance accepted-source content or establish installed host behavior.
+
+## [1.7.18] - 2026-10-28
+
+### Fixed
+
+- Align research-workspace with accepted upstream plugin 0.5.20 at
+  `773650343f638295f96d0fb53bebf145a30e86c7`; refresh the exact source commit/tree,
+  marketplace cache-buster, current bilingual references and active test guards.
+- Preserve the previous 0.5.18 source-review record intact in history, along
+  with prior verification dates and every other plugin/source identity.
+- Keep all twelve skill identities and artifact contracts unchanged. This
+  catalog-only alignment does not publish a Python wheel, run a research
+  workflow or establish cross-agent functionality beyond the hosts checked.
+
+## [1.7.17] - 2026-10-28
+
+### Fixed
+
+- Align research-workspace with the accepted upstream plugin manifest 0.5.18
+  at `c1ab382e1bc4bfdb1d5df6a230d1ab4509a50d2a`, replacing the stale 0.5.14
+  marketplace version and accepted-source commit/tree. Preserve the default
+  `master` ref, all twelve skill identities and existing artifact contracts.
+- Synchronize current bilingual source references and catalog-version labels;
+  retain historical verification dates and every other plugin/source record.
+- Advance the active source guards and acceptance-history record together,
+  preserving the preceding 0.5.14 review and its evidence as explicit history.
+- Keep version domains separate: research-workspace 0.5.18 is the plugin
+  manifest version, while the Python project remains 1.2.0. This catalog-only
+  correction does not publish or install a Python wheel, invoke a live research
+  workflow, or establish scientific quality.
+
+## [1.7.16] - 2026-10-28
+
+### Changed
+
+- Align academic-writing-skills with accepted release 1.3.24 at
+  `586a5aa5cce3c32eb69629bfc0a631e95867c769` (upstream PR #46), including
+  the preceding 1.3.23 research-identity and concern-closure clarifications.
+- Refresh only the writing plugin version, immutable source commit/tree and
+  bilingual assessment. The result-to-explanation check stays inside the existing
+  reader walkthrough and cold-reader procedure, preserving useful short prose
+  and rejecting invented mechanisms or connector-only repairs.
+- Record verification limits: 347 source tests passed, two Windows symlink
+  privilege skips, 27 bundled checks and a 52-file adapter round-trip. Both
+  versions met the same 32 local criteria in eight fictional paired requests;
+  one anonymous AI reader found no definite obstruction in 16 passages. This is
+  not demonstrated improvement, human validation or universal reliability.
+- Preserve all other accepted-source records and verification dates. Strict
+  live health still reports the pre-existing research-workspace version drift;
+  this scoped writing update is not an all-catalog health pass.
+
+## [1.7.15] - 2026-10-26
+
+### Fixed
+
+- Align Stage 1 catalog discovery entrypoints with the existing Hub protocol:
+  use available native Codex / Claude Code search and reading capabilities,
+  retain source versions, actual reading levels, closest/contrary work and
+  unresolved evidence, and keep storage integrations optional.
+- Correct abstract-only `paper-summarize` output claims: remote unknown outcomes
+  and guarded best-effort local compensation are not atomic cross-system writes.
+- Observe merged Hub `068596fa` plugin 0.5.10 for marketplace cache metadata only;
+  preserve the accepted `7e046383` snapshot and historical verification dates.
+  No canonical skill copy, runtime/host installation or scientific revalidation.
+
+Stage 3a's older auto-selection wording in the pipeline docs is a known separate
+follow-up; this Stage 1-only change does not modify that stage or its behavior.
+
+## [1.7.14] - 2026-10-25
+
+### Changed
+
+- Align antigravity-delegate marketplace metadata and accepted source snapshot
+  with release 0.1.3 at `49d95696b5393b8faaa472d84e999c75ca5cdeff`
+  (upstream PR #3): independent optional `--effort`, alone or with
+  `--model`, including Argon selection; no default, permission or global
+  settings change. Native CLI validates model-specific effort support.
+- Refresh only that source assessment and current bilingual catalog labels.
+  Preserve other accepted identities, historical dates and manifest-only
+  observations. Two pytest tests and 62 synthetic assertions per wrapper passed;
+  native metadata lists Argon, without live generation or renewed reliability proof.
+
+## [1.7.13] - 2026-10-25
+
+### Changed
+
+- Align codex-delegate marketplace metadata and accepted source snapshot with
+  release 0.1.5 at `5592763dcca0cf25cc841c0806d7b328886e8e73` (upstream PRs #14–#15).
+  This collects previously merged patches including optional service-tier
+  pass-through and separates bounded test-session shell startup from unchanged
+  wrapper cases; runtime defaults, routing and permissions do not change.
+- Refresh only the codex-delegate assessment date and bilingual version notes.
+  Retain other accepted source identities, historical dates and manifest-only
+  observations; source checks do not establish live model execution or host loading.
+
+## [1.7.12] - 2026-10-24
+
+### Changed
+
+- Synchronize academic-writing-skills 1.3.22 to accepted source commit
+  `0cd848b402daadb5a21f3a334c8c534b0dd7ce1b`: scoped comment revisions,
+  comparison-layer acceptance, corrected Word selection projection and portable
+  Unicode JSON output. Adapter 1.0.0, state 1.1 and six operations are unchanged.
+- Refresh only the writing source identity/version/date and bilingual assessment.
+  The paired ten-case writing exercise met local criteria in both versions, not
+  demonstrated improvement; scope cases remain proposals, not Word/layout proof.
+  Source tests passed 339 cases with 2 skipped, plus 27 bundled checks.
+- Update catalog version labels to 1.7.12. Preserve other accepted-source pins,
+  historical verification dates and the separate manifest-observation contract.
+
+## [1.7.11] - 2026-10-22
+
+### Fixed
+
+- Separate installation checks from opt-in live smoke runs in bilingual entrypoints;
+  require preflight and applicable data, cost, and write authorization before live work.
+- Clarify that multi-AI plans require Hub CLI only when they call Hub; delegate-only
+  plans still require available leaf/wrapper tools and authorized runtime preflight.
+
+- Align Zotero marketplace metadata to source-manifest version 0.4.0 at
+  `e390313c82e76856a525e87a0ae2d0281499e3ab`, an unpublished source candidate;
+  the latest published Zotero release remains v0.2.0. This is metadata alignment,
+  not a Zotero release or a refresh of accepted-source evidence.
+- Coordinate research-workspace metadata 0.5.6 with its curator install-path
+  correction. Preserve canonical repositories, branch refs, nested Zotero skill
+  paths, and immutable accepted-source snapshots; no skill content is vendored.
+- Include optional sibling Zotero manifests in offline version-drift checks,
+  with deterministic matching, stale-version and absent-sibling regressions.
+  These checks do not establish live host loading or installation.
+- Separate manifest-only cache-version observations from historical accepted
+  source snapshots. Changed metadata requires a matching immutable observation;
+  the accepted-source checker, dates, source tables and content guards remain
+  unchanged. Manifest evidence never promotes source or runtime acceptance.
+
+## [1.7.10] - 2026-10-21
+
+### Changed
+
+- Synchronize academic-writing-skills 1.3.21 at accepted source `aff90bc`.
+  Integrate workflow input/action/output continuity, configuration versus repeated
+  actions, and conditional/diagnostic branches into existing writing guidance.
+- Refresh only that source's immutable commit, tree and plugin-version evidence,
+  plus bilingual current-version labels. Preserve other source identities and
+  historical human verification records. The twelve-case candidate-only batch
+  does not establish comparative improvement or human comprehension.
+
 ## [1.7.9] - 2026-10-19
 
 ### Changed
@@ -1824,7 +1995,19 @@ Pinning `marketplace.json` plugin `ref` to `v0.1.0` is deferred — see
   matching, default-branch ↔ marketplace `ref` matching.
 - `LICENSE` — MIT.
 
-[Unreleased]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.9...HEAD
+[Unreleased]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.21...HEAD
+[1.7.21]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.20...v1.7.21
+[1.7.20]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.19...v1.7.20
+[1.7.19]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.18...v1.7.19
+[1.7.18]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.17...v1.7.18
+[1.7.17]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.16...v1.7.17
+[1.7.16]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.14...v1.7.16
+[1.7.15]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.14...v1.7.15
+[1.7.14]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.13...v1.7.14
+[1.7.13]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.12...v1.7.13
+[1.7.12]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.10...v1.7.12
+[1.7.11]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.10...v1.7.11
+[1.7.10]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.9...v1.7.10
 [1.7.9]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.8...v1.7.9
 [1.7.8]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.7...v1.7.8
 [1.7.7]: https://github.com/WenyuChiou/ai-research-skills/compare/v1.7.6...v1.7.7

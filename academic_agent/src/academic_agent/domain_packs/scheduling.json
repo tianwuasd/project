@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "contract": "writing-domain-1",
+  "name": "scheduling",
+  "version": "1",
+  "terminology": [
+    {"term": "simulated job", "meaning": "A workload unit in a simulation, not a human participant."},
+    {"term": "waiting time", "meaning": "The scheduling delay reported under the paper's stated workload."}
+  ],
+  "search_hints": ["scheduling simulation workload", "arrival pattern baseline waiting time"],
+  "screening_hints": ["Retain papers that report a scheduling workload, metric, or comparator."],
+  "fields": [
+    {"id": "simulated_jobs", "label": "Simulated jobs", "description": "Number of simulated jobs in the reported workload.", "value_type": "number", "unit": "jobs"},
+    {"id": "arrival_pattern", "label": "Arrival pattern", "description": "Reported workload arrival pattern.", "value_type": "text", "unit": null},
+    {"id": "waiting_time", "label": "Waiting time", "description": "Reported waiting-time result with its condition.", "value_type": "text", "unit": null},
+    {"id": "baseline", "label": "Baseline", "description": "Independently reported comparison baseline.", "value_type": "text", "unit": null}
+  ],
+  "comparison_columns": ["simulated_jobs", "arrival_pattern", "waiting_time", "baseline"],
+  "evaluation_criteria": [
+    {"id": "condition_fidelity", "text": "Preserve workload and arrival conditions when comparing values."},
+    {"id": "baseline_provenance", "text": "Do not transfer an unreported baseline between works."},
+    {"id": "simulation_scope", "text": "Do not describe simulated jobs as human participants or observed deployment."}
+  ],
+  "writing_structure": [
+    {"id": "workload_context", "title": "Workload context", "purpose": "Describe each simulated workload and missing conditions."},
+    {"id": "conditional_comparison", "title": "Conditional comparison", "purpose": "Compare waiting-time findings without erasing different conditions."},
+    {"id": "transfer_limits", "title": "Transfer limits", "purpose": "State what the simulations cannot establish about real systems."}
+  ]
+}

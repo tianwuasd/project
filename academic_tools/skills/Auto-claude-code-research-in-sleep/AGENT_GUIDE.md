@@ -27,7 +27,7 @@ acceptance requires actual identities, completed scope, and the applicable gate.
 The two partial overlays are frozen; [migration](skills/skills-codex/README.md#migrate-frozen-partial-overlays)
 preserves existing links and customizations.
 
-**Full catalog**: [`docs/SKILLS_CATALOG.md`](docs/SKILLS_CATALOG.md) — **85 skills**, grouped by role.
+**Full catalog**: [`docs/SKILLS_CATALOG.md`](docs/SKILLS_CATALOG.md) — **87 skills**, grouped by role.
 
 Use [`/lean-formalize`](skills/lean-formalize/SKILL.md) when the user requests Lean work or a substantial mathematical obligation benefits from formal verification. It preserves the original statement, connects the proof, and checks the final declaration and its axioms; ordinary mathematical drafting continues to use `/proof-writer`.
 
@@ -46,6 +46,23 @@ actual model identity, and first-call/continuation rules. The legacy `agy` route
 still uses `gemini-review`; existing frozen Gemini overlay links retain their
 `review*` protocol. No installer change or global configuration write is needed
 to select a reviewer in the complete pack.
+
+**Optional writing workers.** [Model Worker MCP](mcp-servers/model-worker/README.md)
+lets a configured Antigravity, Grok, or Claude Code model read and write draft
+files, then revise them in the same session. Choose writer/model/effort separately
+from the reviewer. The executor establishes facts and integrates the writing;
+without an external writer it writes directly. Both complete skill packs apply
+[HERO and the launch principle](skills/shared-references/writing-principles.md#launch-mindset)
+through planning, drafting, and revision, whoever does the writing.
+
+**Codex Goal Pulse.** When the user starts or resumes a Goal, or the main agent
+takes over an active Goal, read and enable [HERO Goal Pulse](https://github.com/wanshuiyin/HERO-Anti-OverDefense/tree/main/skills/goal-pulse)
+for the current thread by default, without another confirmation. Read the installed
+`${CODEX_HOME:-~/.codex}/skills/goal-pulse/SKILL.md` first; if missing, follow HERO's guide. Follow the
+[Codex setup and thread-binding instructions](skills/skills-codex/README.md#goal-pulse-for-codex-goals).
+This is a main-agent instruction; installing ARIS or ordinary chat does not start
+a timer. HERO owns the implementation; ARIS keeps its existing skill inventory,
+reviewer selection, and writing-worker selection.
 
 ## Common Parameters
 
@@ -195,7 +212,7 @@ Advisory CI lint at `.github/workflows/lint-skills-helpers.yml` flags hardcoded 
 - **Scope limits in every reviewer prompt**: the [`review-scope-limits.md`](skills/shared-references/review-scope-limits.md) block bounds what a reviewer may *propose* (no hashes, no over-defense, no corner-case obsession, not a security product), never what it looks for
 - **Experiment integrity**: executor must NOT judge its own eval code — reviewer audits directly per [`shared-references/experiment-integrity.md`](skills/shared-references/experiment-integrity.md)
 
-The external Codex default is `gpt-6-astra` with two-tier reasoning (deep-audit `ultra` / regular `xhigh`, since 2026-07-10; needs codex-cli ≥ 0.144.1). Capability fallback runs `gpt-5.6-sol` then `gpt-5.5`, both at xhigh; legacy `gpt-5.4` is available as `--- reviewer-model: gpt-5.4`. In a bound Copilot CLI session, `/auto-review-loop` instead defaults to the built-in `rubber-duck` subagent and accepts it only when host events prove the dynamically selected model is from a different family. Oracle Pro tier (`gpt-5.5-pro`) via `--- reviewer: oracle-pro` is a separate routing path.
+The external Codex default is `gpt-6-astra` with two-tier reasoning (deep-audit `ultra` / regular `xhigh`, since 2026-07-10; needs codex-cli ≥ 0.144.1). Capability fallback runs `gpt-6.1-sol`, then `gpt-5.6-sol`, then `gpt-5.5`, all at xhigh; legacy `gpt-5.4` is available as `--- reviewer-model: gpt-5.4`. In a bound Copilot CLI session, `/auto-review-loop` instead defaults to the built-in `rubber-duck` subagent and accepts it only when host events prove the dynamically selected model is from a different family. Oracle Pro tier (`gpt-5.5-pro`) via `--- reviewer: oracle-pro` is a separate routing path.
 
 ## Shared References
 

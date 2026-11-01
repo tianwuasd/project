@@ -1,7 +1,8 @@
 # ARS-Codex
 
-[![Version](https://img.shields.io/badge/version-v3.23.1-blue)](VERSION)
+[![Version](https://img.shields.io/badge/version-v3.24.0-blue)](VERSION)
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey)](https://creativecommons.org/licenses/by-nc/4.0/)
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.20784820-blue)](https://doi.org/10.5281/zenodo.20784820)
 [![Sponsor](https://img.shields.io/badge/sponsor-Buy%20Me%20a%20Coffee-orange?logo=buy-me-a-coffee)](https://buymeacoffee.com/crucify020v)
 
 ARS-Codex 是
@@ -44,7 +45,7 @@ skills/academic-research-suite/
 
 ## 版本控制
 
-此 ARS-Codex 套件版本為 `3.23.1`。倉庫根目錄的 `VERSION` 檔案、
+此 ARS-Codex 套件版本為 `3.24.0`。倉庫根目錄的 `VERSION` 檔案、
 `skills/academic-research-suite/SKILL.md` 的 metadata 版本，
 以及 `skills/academic-research-suite/manifest.json` 的 `adapter_version`
 自 `3.22.0` 起與內嵌 ARS 套件使用相同版號；舊有 `0.1.x` 紀錄保留原版號。
@@ -52,16 +53,15 @@ skills/academic-research-suite/
 
 套件層級的變更摘要記錄在 [`CHANGELOG.md`](CHANGELOG.md) 中。
 
-目前內嵌的 ARS 原始碼對齊 **v3.23.1**：
-`Imbad0202/academic-research-skills@4c5449017f46eb64d112a301d4817d22c7c9f3d9`。
-此修補版修正 `sr-screener` 的 RFC 4180 CSV 匯入，保留上游 write-scope guard
-與 Windows launcher 修補作為未啟用的 Claude hook 參考，並明定訊息中段的
-`[direct-mode]` 不是 escape hatch。上游 Google 驗證模型改推薦
-`gemini-4-argon`（provisional）；`gemini-3.1-pro-preview` 保留上游 validated 標示。
-目前沒有 Gemini smoke script，也未宣稱通過 Codex provider 實測。
-Codex 沒有 `PreToolUse` 寫入圍欄，原生模型策略維持不變。本版沒有新增 workflow。
-確定性工具有合成測試；篩選準確率、prompt 遵循及 Codex 模型成效尚未實測。
-上游 #892 的 Claude smoke 未達驗收，issue 仍開啟。
+目前內嵌的 ARS 原始碼對齊 **v3.24.0**：
+`Imbad0202/academic-research-skills@b34c63f828b3535f403079a4f42bc7955da2f64b`。
+本版在編輯決定信加入兩項僅供參考的附件。建議文獻查核會查詢 Reviewer 2 與
+Reviewer 3 推薦的文獻；因為會連線查詢四個書目索引，在 Codex 中只在使用者要求時執行。
+審查意見查核請一個隔離的 Codex 子 agent 判斷稿件是否與各項審查意見矛盾，
+預設開啟，設定 `ARS_PANEL_CLAIM_CHECK=0` 可關閉。兩項附件都不影響審查決定與
+修訂路線圖，在實際審查上的準確度尚未量測。查核規則修正後，舊查核報告須未滿
+24 小時才算有效；修訂稿從 Stage 5 進入時先執行 Stage 4.5。上游 guard 啟動器與
+啟動提示的修正在 Codex 中仍是未啟用的參考整合。本版沒有新增 workflow，原生模型策略維持不變。
 語言配對目前僅支援 `zh-tw-en`；西班牙文觸發詞不代表已提供西班牙文輸出語系包。
 Claude 模型稽核與插件評估素材保留供參考，不會改變 Codex 模型策略，也不代表已實測 Codex 效能。
 
@@ -93,6 +93,18 @@ codex plugin add ars-codex@ars-codex
 codex plugin marketplace upgrade ars-codex
 codex plugin add ars-codex@ars-codex
 ```
+
+**Windows 更新故障處理：** 若更新失敗後持續產生 `marketplace-upgrade-*`
+目錄，或系統磁碟空間被占滿，請停止重試並開啟
+[本機 marketplace 復原指引（英文）](docs/windows-marketplace-recovery.md)。
+磁碟已滿時，先依指引步驟 1 關閉 Codex 並安全釋出空間。Codex CLI 0.164.0 已納入
+清除殘留暫存目錄的上游修正，接著確認 Codex Desktop 內建的 CLI 版本，較舊就先更新。
+若在 0.164.0 以上版本殘留目錄仍持續累積，再依指引保留可用副本、僅將 ARS 來源切換為
+本機目錄、驗證安裝。切換後請依該指引手動更新，
+不使用 `marketplace upgrade`。僅停用 plugin 並不足夠：Codex 仍可能刷新已設定但停用的
+plugin 檔案。此指引是
+[#43](https://github.com/Imbad0202/academic-research-skills-codex/issues/43)
+的暫時替代方案；該 issue 回報的 Windows `os error 5` 尚未在 0.164.0 上重新測試。
 
 在 Codex Desktop 中，也可以從 **Plugins** 加入此 repo，然後安裝
 **ARS-Codex**：
@@ -315,10 +327,10 @@ ARS 最初是為 Claude Code 撰寫的。在此 Codex 套件中：
 - 如果引用、來源、統計數據或期刊政策無法驗證，Codex 應將其標記為未驗證，
   而非虛構支持內容。
 
-### ARS v3.23.1 功能對等
+### ARS v3.24.0 功能對等
 
-本套件在 Codex 具有對等概念之處，適配上游 ARS `v3.23.1`
-（`4c5449017f46eb64d112a301d4817d22c7c9f3d9`），並記錄模型與 runtime overlay。
+本套件在 Codex 具有對等概念之處，適配上游 ARS `v3.24.0`
+（`b34c63f828b3535f403079a4f42bc7955da2f64b`），並記錄模型與 runtime overlay。
 
 Codex adapter 對書目網路行為採以下明確邊界：
 
@@ -329,6 +341,7 @@ Codex adapter 對書目網路行為採以下明確邊界：
 | Script-backed citation-existence gate | `ars-full` 本身不等於授權；Stage 2.5／4.5 仍以預設 Codex 路徑完成 integrity checkpoint | 使用者明確要求 programmatic verification；之後非 manual reference 會依 cache 行為查 Crossref／OpenAlex／Semantic Scholar，arXiv 僅在有 `arxiv_id` 時執行 |
 | Claim-standing discovery | Stage 2.5／4.5 出現 eligible Claim Registry row 後才可提供 advisory | 另行由使用者要求並完成 plan-bound affirmative consent；使用 v3.21 discovery adapters，而非單篇 resolver clients |
 | Contamination backfill／migration | 不自動執行 | 僅限明確選定的 migration CLI |
+| 審查決定信的建議文獻查核 | 不執行；附件註明查核未執行 | 使用者明確要求後，四個 client 即時查詢，只送出建議文獻的標題與識別碼 |
 
 | 上游 ARS 功能 | Codex 套件行為 |
 |---|---|
@@ -342,6 +355,7 @@ Codex adapter 對書目網路行為採以下明確邊界：
 | Canonical cross-model handoff envelope | Dispatcher 驗證 envelope、取得同意後只傳送 payload，並依封閉的結果路由 contract 執行 |
 | Run ledger 與交接檢查 | 有 passport 檔案時，pipeline prompt 指示呼叫端在本機記錄使用者原話、步驟回條與檔案雜湊；確定性報告檢查壓縮、續跑及子 agent 回傳後的交接，不構成新的授權 |
 | 確定性縮寫檢查 | 呼叫端在本機檢查已儲存的草稿與摘要，明示不完整覆蓋；審查附件僅供參考，不作為決定、修訂路線圖或再審標準的依據 |
+| 審查決定信附件 | 建議文獻查核只在明確要求時執行；審查意見查核交給一個隔離、無工具的子 agent，不在主對話中自行判斷；兩者都不作為決定、修訂路線圖或再審標準的依據 |
 | 指令與資料邊界及路由 | Workflow intake、dispatch 與工具讀取的第三方文字均視為資料；明確請求即使缺少輸入仍留在所選模式，Claude 啟動 hooks 維持不啟用 |
 | 中文 APA 7 引用檢查 | 保留作者縮寫例外與參考文獻作者欄，須有筆畫排序顛倒的證據才建議重排，並區分可見語法錯誤與未驗證的來源主張 |
 | 用途受限的 Codex citation transport | 僅在明確設定、要求並取得同意後，用於窄範圍 citation-integrity 檢查 |

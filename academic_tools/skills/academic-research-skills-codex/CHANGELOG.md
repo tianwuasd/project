@@ -4,6 +4,76 @@ All notable changes to the Codex package are documented here.
 
 ## Unreleased
 
+- Added Windows marketplace recovery guidance for
+  [#43](https://github.com/Imbad0202/academic-research-skills-codex/issues/43),
+  linked from all four READMEs: preserve a working snapshot, replace the ARS Git
+  source with a local marketplace, verify installation, and update or roll back
+  manually. Codex CLI 0.164.0 ships upstream staging-cleanup fixes, so the
+  guide asks users to check the bundled CLI version first. The Windows
+  `os error 5` failure in #43 has not been retested on 0.164.0.
+
+## [3.24.0] - 2026-10-27
+
+### What's Changed
+
+- Synced the tagged ARS v3.24.0 release at
+  `b34c63f828b3535f403079a4f42bc7955da2f64b`, preserving Codex WORKFLOW
+  overlays, the single registered router, and the separately pinned
+  experiment-agent. No new workflow.
+- Review letters gain two advisory attachments before the acronym check.
+  The suggested-reference check looks up the works Reviewer 2 and Reviewer 3
+  recommend. In Codex it runs only on an explicit request, because it calls the
+  four bibliographic resolver clients; otherwise its section says the check did
+  not run. A found record does not show that a work supports the recommendation.
+- The reviewer claim check sends the seat-blind panel findings and the
+  manuscript to one fresh, tool-less native worker of the active Codex model,
+  and lists a contradiction only when the judge's quotation matches the
+  manuscript. It is on by default; `ARS_PANEL_CLAIM_CHECK=0` turns it off.
+  Without an isolated worker it does not run and is never judged inline. The
+  upstream contrast gate passed `gpt-6-astra`, Gemini 4 Argon, and two Claude
+  models; `gpt-6-astra` is the only Codex model it measured.
+  Neither attachment feeds the decision, roadmap, or re-review criteria.
+- Adopted the integrity-rule repairs: a prior report is fresh only under 24
+  hours, also within one session; a revised paper entering at Stage 5 runs
+  Stage 4.5 first; Stage 4' follows Stage 3' only after a Major decision.
+- The held-out #1002 audit dispatcher, the one-process guard launcher, the
+  guard's tool-name notes, and the update-only startup notice are preserved as
+  inactive references. Hermetic tests do not establish live Codex compliance or
+  the checks' accuracy on real reviews.
+- Updated source/version metadata, four-language guidance, runtime contracts,
+  quality gates, boundary content locks, citation metadata, and the
+  materialized plugin mirror.
+
+## [3.23.2] - 2026-10-26
+
+### What's Changed
+
+- Added `CITATION.cff` and a DOI badge in all four READMEs for the Zenodo
+  concept DOI [10.5281/zenodo.20784820](https://doi.org/10.5281/zenodo.20784820).
+  Zenodo reads the citation file for later releases, so their creators follow its
+  author list instead of the GitHub contributor list.
+
+- Synced the tagged ARS v3.23.2 release at
+  `863e1c754f0e97062d271dcb42a9483c9ef34aa9`, preserving Codex WORKFLOW
+  overlays, the single registered router, and the separately pinned
+  experiment-agent. No new workflow.
+- Claim checks at Stage 2.5 and 4.5 use only the manuscript's cited version.
+  Unreadable versions produce `UNVERIFIABLE_ACCESS` and a request for that
+  version's PDF; ambiguous citations also record `VERSION_INCONSISTENT_CITATION`.
+  Evidence rows identify the version, and one source's access limitation does
+  not hide distortion found in another source.
+- Stage 2.5 always runs before Stage 3. A prior verified, fresh report on the
+  current version is context, never a replacement. Missing required inputs
+  block handoff with `HANDOFF_INCOMPLETE`; recommended inputs remain advisory.
+- Adopted Obsidian ISO-date support, rejection of boolean and superscript-digit
+  years, six POSIX-path lint repairs, and the Socratic mentor example that
+  preserves the user's authorship of research questions.
+- Preserved upstream SessionStart user-notice and Pi structured-prompt repairs
+  as inactive reference integrations. Hermetic tests and upstream Claude
+  fixture results do not establish live Codex compliance or Windows execution.
+- Updated source/version metadata, four-language guidance, runtime contracts,
+  boundary content locks, citation metadata, and the materialized plugin mirror.
+
 ## [3.23.1] - 2026-10-16
 
 ### What's Changed

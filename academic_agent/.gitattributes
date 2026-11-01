@@ -1,0 +1,4 @@
+# Frozen artifact hashes must survive Windows/Linux checkouts byte for byte.
+tests/fixtures/trends-0.2.0/* -text
+# The CSV writer intentionally emits RFC-style CRLF records.
+tests/fixtures/trends-0.2.0/*.csv whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

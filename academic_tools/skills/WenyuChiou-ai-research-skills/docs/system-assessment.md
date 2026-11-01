@@ -6,7 +6,7 @@ completed a research project. The catalog remains a registry/routing layer;
 production contracts live in the source repositories.
 
 The academic-writing-skills row and source snapshot were refreshed to upstream
-1.3.20 on 2026-10-19. Since 1.3.9, the writing guidance retains its
+1.3.24 on 2026-10-28. Since 1.3.9, the writing guidance retains its
 sentence-continuity and limitation-triage checks and adds context-sensitive
 noun-chain and cross-disciplinary clarity guidance, an on-demand
 independent-reader guide, and a checklist limited to supplied rubrics, coded
@@ -16,9 +16,12 @@ unchanged while the skill version and file-hash registry are refreshed. The
 source check covers manifest and layout only; live host loading, general
 comprehension, and research quality remain unverified. The zotero-skills row
 and snapshot were refreshed to the reviewed 0.3.1 release on 2026-10-07. The
-codex-delegate row and snapshot were refreshed to 0.1.3, and the
-antigravity-delegate row and snapshot to 0.1.2, on 2026-10-17. Other
-source identities retain the assessment above.
+codex-delegate row and snapshot were refreshed to the accepted 0.1.5 release
+on 2026-10-25; the antigravity-delegate row and snapshot were refreshed to
+accepted release 0.1.3 on 2026-10-25. Other
+source identities retain the assessment above, except research-hub: its 25-path
+bounded source review is dated 2026-10-28. This does not refresh runtime or
+catalog verification dates.
 
 繁中: [system-assessment.zh-TW.md](system-assessment.zh-TW.md)
 
@@ -27,11 +30,11 @@ source identities retain the assessment above.
 | Source | Checked commit | Accepted package / plugin | Contract and verification boundary |
 |---|---|---|---|
 | ai-research-skills | [eee76f8](https://github.com/WenyuChiou/ai-research-skills/tree/eee76f87c3f4fbfe3cf6dcab865a657295985e01) | Catalog 1.7.2 / schema 4 | 17 skills, 5 source plugins; optional harness omitted by the legacy-v3 view; source directory and marketplace URL/ref must resolve the same SKILL.md |
-| research-hub | [7e04638](https://github.com/WenyuChiou/research-hub/tree/7e046383368d85acb8dfbf0d734ecaaae335cf0a) | Python/MCP package 1.2.0 / research-workspace plugin 0.5.4 | 12 skills; native input/provenance/preview; optional source-audit and offline direction-review contracts; explicit human topic choice; strict packet v1 unchanged; installed runtime must be probed |
-| academic-writing-skills | [d438241](https://github.com/WenyuChiou/academic-writing-skills/tree/d438241cc198c7c943fc7b83b19de3645e788c7f) | Plugin 1.3.20; adapter 1.0.0 / state schema 1.1 | Retains scoped clarity, limitations, display-orientation, terminology, context cases, and staged coverage guidance. 1.3.18 adds paragraph-opening extended outlines; 1.3.19 clarifies layered evidence-to-meaning units and all-section bridges without a second checklist or prose ritual. The earlier 1.3.19 paired 18-case synthetic run met 72/72 criteria in both versions, not demonstrated improvement; one additional first-use issue received a separately disclosed feedback correction. 1.3.20 integrates supplementary-reference functions and scope controls; one of ten hypothetical forward cases exposed a review-only over-edit, corrected and rechecked only for that case, without a paired improvement claim. Earlier 8/8 versus 8/8 evidence likewise established no quality or efficiency gain. Supported clients remain named in the README, with no testing badge; graphics are unchanged. Skill identities, entrypoints, and operation signatures are unchanged. Source layout/manifest checked; live host loading, general human comprehension, research quality, and complete terminology coverage are not established |
+| research-hub | [7736503](https://github.com/WenyuChiou/research-hub/tree/773650343f638295f96d0fb53bebf145a30e86c7) | Python/MCP source version 1.2.0 / research-workspace plugin 0.5.20 | 12 skills; accepted manifest and bounded source identity refreshed on 2026-10-28; native input/provenance/preview; optional source-audit and offline direction-review contracts; explicit human topic choice; strict packet v1 unchanged. This catalog alignment does not update the installed Python wheel or establish research quality; installed runtime must be probed |
+| academic-writing-skills | [586a5aa](https://github.com/WenyuChiou/academic-writing-skills/tree/586a5aa5cce3c32eb69629bfc0a631e95867c769) | Plugin 1.3.24; adapter 1.0.0 / state schema 1.1 | Retains scoped clarity, limitations, display-orientation, terminology, context cases, and staged coverage guidance. 1.3.18 adds paragraph-opening extended outlines; 1.3.19 clarifies layered evidence-to-meaning units and all-section bridges without a second checklist or prose ritual. The earlier 1.3.19 paired 18-case synthetic run met 72/72 criteria in both versions, not demonstrated improvement; one additional first-use issue received a separately disclosed feedback correction. 1.3.20 integrates supplementary-reference functions and scope controls; one of ten hypothetical forward cases exposed a review-only over-edit, corrected and rechecked only for that case, without a paired improvement claim. 1.3.21 integrates input/action/output handoffs, initial versus repeated actions, and conditional/diagnostic branches; a single twelve-case hypothetical batch received independent-agent execution and parent assessment, not a paired improvement or human-reader validation. Earlier 8/8 versus 8/8 evidence likewise established no quality or efficiency gain. Supported clients remain named in the README, with no testing badge; graphics are unchanged. 1.3.22 binds current comment selections and clarifies comparison-layer contributions; it corrects lexical/field projection and non-UTF-8 JSON output. The paired ten-case exercise met local criteria in both versions, not demonstrated improvement; sixteen scope proposals are not completed Word edits. Earlier 1.3.22 source verification: 339 passed/2 skipped and 27 bundled checks. 1.3.23 preserves research identity and separates concern closure from edit completion. 1.3.24 makes the result–explanation boundary explicit in the existing walkthrough and cold-reader procedure; clear short prose and inference limits remain protected. Its eight fictional paired requests met 32 local criteria in both versions; one anonymous AI reader found no definite thread-loss boundary in 16 passages, not demonstrated improvement or human validation. Current source verification: 347 passed/2 Windows symlink skips, 27 bundled checks and a 52-file adapter build/extract/check. Skill identities, entrypoints, and operation signatures are unchanged. Source layout/manifest checked; live host loading, general human comprehension, research quality, and complete terminology coverage are not established |
 | zotero-skills | [f5772f8](https://github.com/WenyuChiou/zotero-skills/tree/f5772f8b62410858d41436efe11e85529b5dee8c) | Plugin 0.3.1; latest checked tag 0.2.0 | Nested skill plus root client; attach_pdf now sends a bare filename via upload_attachments(basedir=...), fixing an HTTP 400 that failed every 0.3.0 call; runtime and destructive safeguards unchanged |
-| codex-delegate | [73eb7d8](https://github.com/WenyuChiou/codex-delegate/tree/73eb7d87fe54b54c34f5d40695774f24cb7a59ff) | Plugin 0.1.3 | Bundled Bash/PowerShell wrappers; no built-in default model or reasoning effort (optional `--model` / `--effort`, passed to Codex as `-m` / `-c model_reasoning_effort`); stable brief/result/sentinel adapter; dirty-content observation and sandbox forwarding; independent supervisor acceptance, not a second broker |
-| antigravity-delegate | [6dbe89d](https://github.com/WenyuChiou/antigravity-delegate/tree/6dbe89dde991d4a5c5298014e284ce78e7091fc8) | Claude plugin 0.1.2 | Bounded mechanical lane; optional `--model` pass-through, agy's own default otherwise; capped-log producer completion; minimal Google-native marker distinct from the Claude manifest; live native-host loading unverified |
+| codex-delegate | [5592763](https://github.com/WenyuChiou/codex-delegate/tree/5592763dcca0cf25cc841c0806d7b328886e8e73) | Plugin 0.1.5; release v0.1.5 | Bundled Bash/PowerShell wrappers; no built-in default model, reasoning effort or service tier (optional `--model` / `--effort` / `--service-tier` pass through to Codex); stable brief/result/sentinel adapter; dirty-content observation and sandbox forwarding; independent supervisor acceptance, not a second broker. 0.1.5 separates bounded test-session shell startup from unchanged wrapper cases; runtime/skill payloads are unchanged. Source layout/manifest checked; this snapshot does not establish live model execution, general startup reliability or host loading |
+| antigravity-delegate | [49d9569](https://github.com/WenyuChiou/antigravity-delegate/tree/49d95696b5393b8faaa472d84e999c75ca5cdeff) | Claude plugin 0.1.3; release v0.1.3 | Bounded mechanical lane; independent optional `--model` and `--effort` forwarding, with omitted overrides left to agy; Argon ids listed by agy 1.4.7 metadata, model-specific effort support validated by the native CLI; no global-setting or permission changes; capped-log producer completion; minimal Google-native marker distinct from the Claude manifest. Source checks: 2 pytest tests and 62 synthetic assertions per wrapper; no live generation, account availability, renewed reliability or native-host loading claim |
 
 The machine-readable public-source snapshot is
 [upstream-contracts.json](../test-corpus/integration/upstream-contracts.json).
@@ -57,16 +60,16 @@ adds task/run/baseline/current-candidate evidence review and makes mtime advisor
 Its presets are declarative review contracts, not a Python runtime preset
 engine; this source-doc change does not modify either released wheel.
 
-Research-workspace 0.5.4 retains the optional source-audit profile in accepted
+Research-workspace 0.5.20 retains the optional source-audit profile in accepted
 source, while Python package version remains 1.2.0. A plugin update does not
 replace an installed wheel. Probe `validate_evidence_packet` for `source_audit`
 and `artifact_root` kwargs plus packaged `research-source-audit-1.0.json`, as in
-the [installed-runtime instructions](https://github.com/WenyuChiou/research-hub/blob/7e046383368d85acb8dfbf0d734ecaaae335cf0a/skills/research-hub/references/source-claim-audit.md#optional-executable-source-audit-profile).
+the [installed-runtime instructions](https://github.com/WenyuChiou/research-hub/blob/773650343f638295f96d0fb53bebf145a30e86c7/skills/research-hub/references/source-claim-audit.md#optional-executable-source-audit-profile).
 Missing capability remains unavailable for mechanical audit; retain manual/native
 source review instead of calling unsupported kwargs or relabeling packet-only
 validity. Do not infer that capability from the unchanged version string.
 
-The accepted [direction-review contract](https://github.com/WenyuChiou/research-hub/blob/7e046383368d85acb8dfbf0d734ecaaae335cf0a/docs/direction-review-contract.md)
+The accepted [direction-review contract](https://github.com/WenyuChiou/research-hub/blob/773650343f638295f96d0fb53bebf145a30e86c7/docs/direction-review-contract.md)
 adds optional offline `paper direction-check` over supplied records:
 
 - Bind `candidate_version` and `candidate_sha256` to the complete candidate,
@@ -96,7 +99,7 @@ matched-information comparison, minimum worthwhile gain and the smallest
 answerable version with nonclaims; no fixed one-week prototype establishes
 feasibility. These are source contracts, not a new quality finding: one guidance
 comparison pair was inconclusive, and historical T1 dates/tiers remain unchanged.
-No overall scientific improvement is claimed. Plugin 0.5.4 does not establish
+No overall scientific improvement is claimed. Plugin 0.5.20 does not establish
 that an installed Python wheel exposes this command; inspect its actual CLI
 capability before use and keep the ordinary/manual path if unavailable.
 

@@ -23,6 +23,11 @@ OpenClaw、Windsurf 或通用 API client 也可以載入同一批 `SKILL.md`。
 可攜 `SKILL.md` 指令與可執行 runtime 需求的分界，請看
 [runtime-contract.zh-TW.md](runtime-contract.zh-TW.md)。
 
+原生文獻搜尋與閱讀可使用 host 實際提供且已授權的工具，不需安裝或設定
+Research Hub；請記錄存取情況與實際閱讀證據。若選擇 Hub pipeline，才需
+確認所選操作的 Hub runtime 與相關整合。詳見[原生文獻路線](pipeline.zh-TW.md#1-找文獻)，
+包括可選閱讀頁工具的前提與文字 fallback。
+
 ## 先選安裝路徑
 
 | 使用情境 | 建議路徑 | 驗證方式 |
@@ -133,7 +138,7 @@ research-hub notebooklm login --auto-detect
 research-hub auto "agent-based modeling" --max-papers 3 --no-nlm
 ```
 
-在要求任何 AI host 跑文獻搜尋前，先做 runtime preflight：
+在要求 AI host 執行 Hub 文獻 pipeline 前，先做 Hub runtime preflight：
 `research-hub describe --json`、`research-hub doctor`，再跑上面的
 小型 `auto ... --no-nlm` smoke test。安裝這個 catalog 或複製
 `SKILL.md`，不等於已安裝 Python CLI。
@@ -269,13 +274,20 @@ cp <repo>/skills/literature-triage-matrix/SKILL.md \
 - `notebooklm-brief-verifier` 的 manual fallback 模式任何 host 都能跑。
 - `zotero-skills` 需要 AI host 能呼叫 Zotero local 或 Web API；
   `SKILL.md` 本身只是 routing contract。
-- `research-hub` 與 `research-hub-multi-ai` 不論哪個 AI 讀取 skill，
-  都要先讓 `research-hub-pipeline` Python CLI 在 PATH 上。
+- `research-hub` 僅在所選操作會呼叫 `research-hub` 指令時，才需要
+  PATH 上的 `research-hub-pipeline` Python CLI。使用 Codex 或 Claude Code
+  原生工具搜尋與閱讀文獻，不需要 Hub CLI 或建立 Hub 專案；仍須使用
+  host 可用且已授權的工具，遵守共同研究與來源審核規範。
+- `research-hub-multi-ai` 只有計畫會呼叫 `research-hub` 時，才需要 Hub CLI
+  能力與 `research-hub doctor`。缺少 Hub 時不要產生 Hub 命令；健康的
+  delegate-only 計畫不需 Hub 即可繼續。仍須確認每個指定的 leaf skill 與
+  wrapper 可用、執行其文件規定的 preflight，並在 delegation 前保留適用的
+  資料、費用與寫入授權檢查。
 - `codex-delegate` / `antigravity-delegate` 主要適合 Claude Code 對外
   delegation，處理有邊界的機械性工作；如果你已經在 Codex 或 Antigravity 裡，
   通常直接用目標 skill 即可。
 - 一般 Claude Code-to-Codex 整合，在 runtime 適用時優先使用
   [官方 plugin](https://github.com/openai/codex-plugin-cc)。已接受的 codex-delegate
-  0.1.3 保留給既有 on-disk brief、result/sentinel 與 Bash/PowerShell 的同步 adapter。
+  0.1.5 保留給既有 on-disk brief、result/sentinel 與 Bash/PowerShell 的同步 adapter。
   不另造 broker，也不代表 coding quality 或 total model cost 較好；
   [同條件比較的界線](system-assessment.zh-TW.md#同條件比較與限制) 說明驗證範圍。

@@ -143,6 +143,15 @@ claude plugin install antigravity-delegate@ai-research-skills
 pip install research-hub-pipeline
 research-hub setup --persona researcher
 research-hub doctor
+```
+
+**獨立的 live smoke（非安裝步驟）:**
+
+這是 **live** 文獻工作流程，不是離線安裝檢查。`--no-nlm` 只停用 NotebookLM；
+不會停用其他網路呼叫、模型或寫入。先完成 [live-run preflight](docs/live-run-preflight.zh-TW.md)，
+並取得適用的資料、費用與寫入授權，再執行：
+
+```bash
 research-hub auto "agent-based modeling" --max-papers 3 --no-nlm
 ```
 
@@ -277,6 +286,10 @@ synthesize、design、execute、write、release；read-only 或可逆工作可�
 | **找文獻、比較文獻** | `research-hub` + `literature-triage-matrix` |
 | **寫論文 / 改稿** | `paper-memory-builder` + `academic-writing-skills` |
 | **管理研究專案** | `research-design-helper` + `research-context-compressor` + `zotero-library-curator` |
+
+找文獻時，先用 Codex 或 Claude Code 實際可用的搜尋與原文閱讀能力。
+Zotero、Obsidian、NotebookLM 都是可選整合，不必為此多走設定流程；
+依既有 [Stage 1 證據交接](docs/pipeline.zh-TW.md#1-找文獻) 保留閱讀與來源依據。
 
 > **協助別人用 AI 做研究** (圖書館員 / RA / 指導老師)?
 > 不需要安裝 — 把這份 README + [docs/install.md](docs/install.md) 給他們即可。

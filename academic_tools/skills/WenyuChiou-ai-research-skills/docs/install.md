@@ -15,17 +15,52 @@ Prerequisite: at least one AI host that can read Markdown context. Claude
 Code users get marketplace install and auto-triggering; other hosts need to
 point the model at the relevant `SKILL.md` explicitly.
 
-> **New here?** If you don't have Claude Code, Python, or Zotero
-> working yet, start with [**setup-guide.md**](setup-guide.md) — it
-> walks through runtimes + plugins + Zotero local API end-to-end with
-> verification commands at every step. This page assumes those prereqs
-> are working and focuses on which plugin to install for which
-> workflow.
+> **New here?** Choose your task below first; Python, Zotero, and NotebookLM
+> are not prerequisites for every skill. For the connected literature pipeline,
+> [setup-guide.md](setup-guide.md) walks through runtimes, plugins, and Zotero
+> local API setup. Do not install that whole stack just to revise a paragraph.
 
 For a complete inventory with direct skill links, see
 [skill-directory.md](skill-directory.md).
 For the split between portable `SKILL.md` instructions and executable
 runtime requirements, see [runtime-contract.md](runtime-contract.md).
+
+## Choose your task first
+
+Start with the smallest route that fits your request. Skill links lead to their
+source owner, not to another orchestration layer. Load the referenced resources
+as needed; a single wording edit does not require a whole-project workflow.
+
+| I want to… | Start here | Add only when needed |
+|---|---|---|
+| Compare supplied papers, identify gaps, or plan a study | [literature-triage-matrix], [gap-to-topic], [research-design-helper] | A Markdown-capable host and the relevant material; no Hub Python runtime or connector for guidance alone |
+| Remember my own manuscript's claims and figures | [paper-memory-builder] | Project files or deliberately supplied context; `.paper/claims.yml` and `.paper/figures.yml` are manuscript memory, not summaries of cited papers |
+| Revise manuscript text | [academic-writing-skills] | The requested text and evidence; preserve edit scope and source-owned state |
+| Review without editing | [paper-review] | A review report; review-only does not authorize manuscript edits or release |
+| Manage local projects, artifacts, tasks, and a workspace UI | [Hub workspace guide](https://github.com/WenyuChiou/research-hub/blob/master/docs/workspace-guide.md) | A Hub runtime that actually exposes the workspace commands; catalog installation is not runtime installation |
+| Run manuscript audits in that workspace | [Writing adapter boundary](runtime-contract.md#local-workspace-and-writing-adapter) | An explicitly trusted, verified writing bundle configured in Hub; not required for ordinary skill guidance |
+| Discover or read literature with host tools | [Native literature route](pipeline.md#1-discover-literature) | Use the host’s available, authorized capabilities; Hub is optional. Record access and actual reading evidence. |
+| Use Hub to ingest or summarize literature | [research-hub], [paper-summarize] | Hub runtime plus the connectors/model required by the selected operation; NotebookLM is optional, and `--no-nlm` is still live work |
+| Maintain Zotero records beyond the Hub pipeline | [zotero-skills] | Its API setup and explicit authorization for the exact write; not required for a local manuscript |
+| Delegate a bounded task | [codex-delegate], [antigravity-delegate] | The target CLI and its prerequisites, or a portable handoff; an absent CLI is unavailable, not permission to install another service |
+
+Core local writing does not require NotebookLM or browser automation. A local
+workspace is not a promise that every action is offline: live search and connected
+model execution have separate data, cost, and permission requirements. Follow the
+[runtime evidence distinctions](runtime-contract.md#what-has-actually-been-verified)
+before interpreting an installed plugin as an executable capability.
+
+[literature-triage-matrix]: https://github.com/WenyuChiou/research-hub/blob/master/skills/literature-triage-matrix/SKILL.md
+[gap-to-topic]: https://github.com/WenyuChiou/research-hub/blob/master/skills/gap-to-topic/SKILL.md
+[research-design-helper]: https://github.com/WenyuChiou/research-hub/blob/master/skills/research-design-helper/SKILL.md
+[paper-memory-builder]: https://github.com/WenyuChiou/research-hub/blob/master/skills/paper-memory-builder/SKILL.md
+[academic-writing-skills]: https://github.com/WenyuChiou/academic-writing-skills/blob/main/skills/academic-writing-skills/SKILL.md
+[paper-review]: https://github.com/WenyuChiou/academic-writing-skills/blob/main/skills/paper-review/SKILL.md
+[research-hub]: https://github.com/WenyuChiou/research-hub/blob/master/skills/research-hub/SKILL.md
+[paper-summarize]: https://github.com/WenyuChiou/research-hub/blob/master/skills/paper-summarize/SKILL.md
+[zotero-skills]: https://github.com/WenyuChiou/zotero-skills/blob/master/skills/zotero-skills/SKILL.md
+[codex-delegate]: https://github.com/WenyuChiou/codex-delegate/blob/master/skills/codex-delegate/SKILL.md
+[antigravity-delegate]: https://github.com/WenyuChiou/antigravity-delegate/blob/master/skills/antigravity-delegate/SKILL.md
 
 ## Choose an install path
 
@@ -134,13 +169,14 @@ pip install "research-hub-pipeline[playwright]"
 research-hub notebooklm login --auto-detect
 ```
 
-First smoke test without NotebookLM:
+First **live** smoke test without NotebookLM (only after the
+[live-run preflight](live-run-preflight.md) and authorization for its data/cost):
 
 ```bash
 research-hub auto "agent-based modeling" --max-papers 3 --no-nlm
 ```
 
-Before asking any AI host to run literature discovery, use this runtime
+Before asking an AI host to run the Hub literature pipeline, use this Hub runtime
 preflight: `research-hub describe --json`, `research-hub doctor`, then the
 small `auto ... --no-nlm` smoke test above. Installing this catalog or
 copying a `SKILL.md` file does not install the Python CLI.
@@ -233,7 +269,7 @@ claude plugin install codex-delegate@ai-research-skills
 
 For normal Claude Code-to-Codex integration, prefer the
 [official plugin](https://github.com/openai/codex-plugin-cc) when its runtime
-fits. Accepted codex-delegate 0.1.3 is a minimal synchronous adapter for existing
+fits. Accepted codex-delegate 0.1.5 is a minimal synchronous adapter for existing
 on-disk brief, result/sentinel and Bash/PowerShell workflows. It does not add a
 second broker or establish better coding quality or total model cost; see the
 [comparison boundary](system-assessment.md#comparable-checks-and-limits).
@@ -373,9 +409,16 @@ cp <repo>/skills/literature-triage-matrix/SKILL.md \
 - `notebooklm-brief-verifier` works anywhere in manual-fallback mode.
 - `zotero-skills` needs an AI host that can call Zotero local or Web API
   tools; the `SKILL.md` itself is only the routing contract.
-- `research-hub` and `research-hub-multi-ai` need the
-  `research-hub-pipeline` Python CLI on PATH regardless of which AI host
-  reads the skill.
+- `research-hub` needs the `research-hub-pipeline` Python CLI on PATH
+  only for selected operations that invoke `research-hub` commands. Literature
+  search and reading with Codex or Claude Code native tools do not require
+  the Hub CLI or Hub project setup; follow the shared research and source-audit
+  contracts using the host's available, authorized tools.
+- `research-hub-multi-ai` requires Hub CLI capability and `research-hub doctor`
+  only when the plan calls `research-hub`. If Hub is missing, do not emit Hub
+  commands; healthy delegate-only plans may proceed without Hub. Verify every
+  named leaf skill and wrapper, run its documented preflight, and retain the
+  applicable data/cost/write permission checks before delegation.
 - `codex-delegate` and `antigravity-delegate` are most useful from Claude Code
   delegating bounded mechanical work outward; if you are already inside Codex
   or Antigravity, use the target skill directly.
