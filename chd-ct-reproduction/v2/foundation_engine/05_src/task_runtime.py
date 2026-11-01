@@ -227,7 +227,18 @@ def validate_request(config):
     for key in ['runtime', 'results', 'data']:
         c[key] = str(Path(c[key]).expanduser().resolve())
     raw, runtime, results = (Path(c[k]) for k in ['data', 'runtime', 'results'])
-    if c['tasks'] != ['environment'] and not raw.is_dir():
+    bootstrap=c.get('input_bootstrap')
+    if bootstrap:
+        if (bootstrap.get('protocol')!='imagechd_raw_v1' or bootstrap.get('seed')!=42
+                or Path(bootstrap['output']).expanduser().resolve()!=raw
+                or c['tasks'] not in (['prepare'],['assessment'])):
+            raise ValueError('自动输入描述的目标、阶段或固定三折协议不符')
+        source=Path(bootstrap['raw']).expanduser().resolve()
+        if not source.is_dir():raise ValueError('配置的ImageCHD原始目录不存在')
+        for other in (raw,runtime,results):
+            if source==other or source in other.parents or other in source.parents:
+                raise ValueError('原始数据和输入描述/运行/结果目录必须分开')
+    if c['tasks'] != ['environment'] and not raw.is_dir() and not bootstrap:
         raise ValueError('原始数据目录不存在')
     for left, right in [(raw, runtime), (raw, results), (runtime, results)]:
         if left == right or left in right.parents or right in left.parents:

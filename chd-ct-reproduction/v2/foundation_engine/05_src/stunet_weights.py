@@ -7,6 +7,67 @@ WEIGHT_BYTES = 117497661
 WEIGHT_URL = 'https://huggingface.co/ziyanhuang/STU-Net/resolve/75d046881d0273899b65bf3ef1ee601e9973e7c8/small_ep4k.model'
 
 
+def ensure_weights(path, env=None):
+    """Worker-only download; authenticate before publishing, preserve existing bytes."""
+    import os
+    import tempfile
+    import time
+    import urllib.request
+    from filelock import FileLock
+    from runtime_setup import _install_routes, report_progress
+    env = os.environ.copy() if env is None else dict(env)
+    path = Path(path).expanduser().resolve()
+    def valid(candidate):
+        if candidate.stat().st_size != WEIGHT_BYTES:
+            return False
+        with candidate.open('rb') as stream:
+            return hashlib.file_digest(stream, 'sha256').hexdigest() == WEIGHT_SHA256
+    if path.exists():
+        if not valid(path):
+            raise ValueError('已有作者权重大小/SHA256不符；保留原件，请核查路径')
+        return path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + 900
+    failures = []
+    for route, proxy in _install_routes(env):
+        temporary = None
+        try:
+            report_progress(env, 'pretrained_weights', '核验并准备STU-Net-S作者权重：' + route)
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler(
+                {'http': proxy, 'https': proxy} if proxy else {}))
+            with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:
+                temporary = Path(stream.name)
+                with opener.open(WEIGHT_URL, timeout=20) as response:
+                    received = 0
+                    while True:
+                        if time.monotonic() > deadline:
+                            raise TimeoutError('权重下载超过900秒总预算')
+                        block = response.read(1024 * 1024)
+                        if not block:
+                            break
+                        received += len(block)
+                        if received > WEIGHT_BYTES:
+                            raise ValueError('下载大小超过固定作者权重')
+                        stream.write(block)
+                stream.flush()
+                os.fsync(stream.fileno())
+            if not valid(temporary):
+                raise ValueError('下载权重SHA256/大小不符')
+            with FileLock(str(path) + '.lock', timeout=20):
+                if path.exists():
+                    if not valid(path):
+                        raise ValueError('并发创建的权重不符；保留原件')
+                else:
+                    os.replace(temporary, path)
+            return path
+        except (OSError, ValueError) as error:
+            failures.append(route + ': ' + str(error))
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+    raise RuntimeError('作者权重未就绪，停止而不随机初始化：' + '; '.join(failures))
+
+
 def load_pretrained(network, path):
     import numpy as np
     import torch
@@ -36,3 +97,10 @@ def load_pretrained(network, path):
     return dict(sha256=sha, loaded_tensors=len(expected),
                 loaded_elements=sum(source[k].numel() for k in expected),
                 reset_heads=sorted(missing), all_backbone_tensors_exact=True)
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--ensure', required=True)
+    ensure_weights(parser.parse_args().ensure)

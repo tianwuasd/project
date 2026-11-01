@@ -41,7 +41,34 @@ def require_completed(run):
 
 
 def compatible_evaluation_code(recorded, current):
-    return recorded == current
+    if recorded == current:
+        return True
+    # Exact complete code-map identities, not version labels or skipped hashes.
+    # Audited small fixes accumulate edges, preserving older compatible inputs.
+    import hashlib
+    import json
+    def fingerprint(value):
+        return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+    try:
+        audit=read_json(CODE_ROOT/'06_configs/prediction_code_compatibility.json')
+        if audit.get('schema_version')!=1 or audit.get('scope')!='training-preserving-prediction-upgrade':
+            return False
+        edges=audit['transitions']
+        if not isinstance(edges,list):return False
+        target=fingerprint(current);pending=[fingerprint(recorded)];seen=set()
+        while pending:
+            source=pending.pop()
+            if source in seen:continue
+            seen.add(source)
+            for edge in edges:
+                if edge['source']!=source:continue
+                destination=edge['target']
+                if not isinstance(destination,str) or len(destination)!=64:continue
+                if destination==target:return True
+                pending.append(destination)
+    except (OSError,ValueError,KeyError,TypeError,AttributeError):
+        return False
+    return False
 
 
 def freeze_models():
@@ -65,8 +92,10 @@ def freeze_models():
             from training_identity import training_signature
             require_completed_recipe(run,method)
             expected=training_signature(ROOT,fold,method,global_batch=run['signature']['selected_global_batch_size'])
-            if not compatible_evaluation_code(expected['code_sha256'], code):
+            recorded_code=run['signature']['code_sha256']
+            if not compatible_evaluation_code(recorded_code, code):
                 raise ValueError(f'{fold}/{method} 代码不是相同版本或已审计的评价调度升级版本')
+            expected['code_sha256']=recorded_code
             if run['signature'] != expected or run['split'] != split:
                 raise ValueError(f'{fold}/{method} 训练签名与当前实验不符')
             initial.append(run['initial_weight_sha256'])

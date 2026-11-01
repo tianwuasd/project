@@ -9,7 +9,7 @@ from zipfile import ZipFile
 import numpy as np
 from scipy import ndimage as ndi
 
-EXCEL_NAME = "ct-panel-v2-imagechd_dataset_image_info.xlsx"
+EXCEL_NAME = "imagechd_dataset_image_info.xlsx"
 RESAMPLED_FORMAT = "ct-panel-v2-imagechd7-v3"
 NS = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
 

@@ -22,13 +22,13 @@ class StageBoardTests(unittest.TestCase):
         args=panel.make_parser().parse_args(['--runtime',profile['runtime']])
         return root,profile,args
 
-    def test_preparation_asks_only_source_and_auto_selects_single_method(self):
+    def test_preparation_uses_configured_source_without_path_prompt(self):
         with tempfile.TemporaryDirectory() as tmp:
             root,profile,args=self.setup_board(tmp)
             with patch.object(server_profile,'load',return_value=profile),\
                  patch('builtins.input',side_effect=['']) as user,contextlib.redirect_stdout(io.StringIO()):
                 config=panel.stage_config(args,{},'prepare')
-            self.assertEqual(user.call_count,1)
+            self.assertEqual(user.call_count,0)
             self.assertEqual(config['tasks'],['prepare']);self.assertEqual(config['catalog_schema'],2)
             self.assertEqual(Path(config['results']),root/'results/pipeline_v2/prepare')
             self.assertFalse(config['input_job']);self.assertFalse((root/'runtime').exists())

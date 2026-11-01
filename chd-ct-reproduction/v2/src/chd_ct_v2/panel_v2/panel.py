@@ -152,7 +152,7 @@ def new_task(values, args, profile, interactive=False):
         if args.stage in service.SOURCE:
             args.input_job = select(values, service.SOURCE[args.stage])
         if args.stage in ("prepare", "assessment"):
-            options["dataset"] = ask(f"原始数据目录 [{profile['dataset']}]：") or profile["dataset"]
+            options["dataset"] = args.dataset or profile.get('dataset') or ask('原始数据目录：')
         if args.stage in ("train", "predict", "predict-all", "assessment"):
             options["gpu"] = ask("获准 GPU 编号/UUID [auto]：") or "auto"
             options["gpu_count"] = int(ask("最多同时使用几张 GPU [1]：") or "1")

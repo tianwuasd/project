@@ -1,1 +1,1 @@
-"""CT 0.22.0 publication core adapted to Vista task records and output layout."""
+"""Publication core adapted to isolated ImageCHD V2 STU-Net task records."""

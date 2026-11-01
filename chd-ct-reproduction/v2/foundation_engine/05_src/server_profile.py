@@ -23,6 +23,26 @@ def paths(profile, saved=None, args=None):
             for key in ('runtime','results','data')}
 
 
+def input_location(profile,data):
+    """Keep raw input and private descriptor separate; creation belongs to worker."""
+    data=str(Path(data).expanduser().resolve())
+    if profile.get('raw_data') and data==str(Path(profile['data']).expanduser().resolve()):
+        raw=str(Path(profile['raw_data']).expanduser().resolve())
+        return data,dict(raw=raw,output=data,seed=42,protocol='imagechd_raw_v1'),raw
+    return data,None,data
+
+
+def weight_location(profile,runtime):
+    """Instance-owned defaults follow --runtime; configured external files stay explicit."""
+    value=profile.get('pretrained_weights')
+    if not value:return None
+    path=Path(value).expanduser().resolve()
+    origin=Path(profile['runtime']).expanduser().resolve()
+    try:relative=path.relative_to(origin)
+    except ValueError:return str(path)
+    return str(Path(runtime).expanduser().resolve()/relative)
+
+
 def show(profile, values):
     print(f'服务器配置：{profile["name"]}（目录按记录预填，提交前核对权限与可用空间）')
     print('原始数据：'+str(values['data'] or '尚未填写'))

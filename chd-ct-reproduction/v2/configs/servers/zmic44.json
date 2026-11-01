@@ -4,7 +4,7 @@
   "runtime": "/data5/zhougaowei/zhangruichen_workspace/chd_ct_v2_runtime",
   "results": "/data_nas/zhangruichen/chd_ct_v2_results",
   "prepared": "/data_nas/zhangruichen/chd_ct_v2_prepared",
-  "existing_conda": "",
+  "existing_conda": "/data5/zhougaowei/zhangruichen_workspace/project1_runtime/tools/miniforge3/bin/conda",
   "existing_python_reference": "",
   "threads": 2,
   "hardware_snapshot": {
@@ -21,5 +21,5 @@
   "gpu_count": 1,
   "gpu": "auto",
   "config": "configs/chd.yaml",
-  "dataset_note": "约定默认路径；尚未确认服务器已上传，请按实际位置覆盖。"
+  "dataset_note": "用户2026-11-01确认该原始目录；软件尚未远程核验。"
 }

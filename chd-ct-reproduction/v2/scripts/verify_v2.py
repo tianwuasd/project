@@ -62,7 +62,7 @@ def main():
     if args.write:
         target.write_text(
             json.dumps(
-                {"panel": "2.2.1", "algorithm": "CT 0.24.0 + STU-Net-S", "files": actual,"root_entries":entries}, ensure_ascii=False, indent=2
+                {"panel": "2.2.2", "algorithm": "CT 0.24.0 + STU-Net-S", "files": actual,"root_entries":entries}, ensure_ascii=False, indent=2
             )
             + "\n",
             encoding="utf-8",

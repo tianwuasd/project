@@ -1,12 +1,12 @@
 # 在原目录使用V1和V2
 
-V2 2.2.1直接随main更新到 `chd-ct-reproduction`，无需另建服务器项目或进入平级目录。
+V2 2.2.2直接随main更新到 `chd-ct-reproduction`，无需另建服务器项目或进入平级目录。
 
 在原面板用u→1更新main并退出，然后仍在原目录启动：
 
 ```bash
 bash start_server.sh     # 原V1
-bash start_server_v2.sh  # V2：选择STU-Net或原六路方法
+bash start_server_v2.sh  # V2：先选步骤，再选STU-Net或原六路方法
 ```
 
 ```text
@@ -30,3 +30,5 @@ V1和V2属于同一个项目，统一更新main。V2的u更新整个chd-ct-repro
 训练规则保持2.2.0：官方1000轮、S1 lr0.001/S0 lr0.01、默认global batch4、末轮主评价。数据、预处理、标签、划分、损失和科学训练代码均未因目录整合而改变。旧250轮任务继续使用其冻结版本。
 
 版本核查与测试见[v2/docs/V2_2.2.1_INPLACE.md](v2/docs/V2_2.2.1_INPLACE.md)，科学复核见[v2/docs/STUNET_SCIENTIFIC_AUDIT.md](v2/docs/STUNET_SCIENTIFIC_AUDIT.md)。没有服务器部署或正式训练完成的声明。
+
+2.2.2 使用一个统一流程主菜单，默认路径已配置。STU 首次预处理自动从原始ImageCHD建立私有输入描述，首次S1训练按固定SHA256准备作者权重；菜单和查询无此副作用。最新说明见 [v2/README.md](v2/README.md) 与 [本次核查](v2/docs/V2_2.2.2_AUDIT.md)。

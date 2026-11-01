@@ -5,7 +5,7 @@ from pathlib import Path
 import time
 
 
-def restore_reader_grid(reader,segmentation,properties,original,path):
+def restore_reader_grid(reader,segmentation,properties,original,path,expected_affine=None):
     """Use the selected nnU-Net writer to undo its reader-specific axis order."""
     import nibabel as nib
     import numpy as np
@@ -14,7 +14,8 @@ def restore_reader_grid(reader,segmentation,properties,original,path):
     try:
         reader.write_seg(segmentation,str(temporary),properties)
         restored=nib.load(temporary)
-        if restored.shape!=original.shape or not np.allclose(restored.affine,original.affine,atol=1e-4,rtol=0):
+        expected=original.affine if expected_affine is None else expected_affine
+        if restored.shape!=original.shape or not np.allclose(restored.affine,expected,atol=1e-4,rtol=0):
             raise ValueError('测评推理未正确恢复原图空间')
         result=np.asarray(restored.dataobj).copy()
         del restored
@@ -60,7 +61,8 @@ def predict(work,fold,method,training,case_id,phase='gpu'):
             predictor.manual_initialization(trainer.network,trainer.plans_manager,trainer.configuration_manager,
                 [trainer.network.state_dict()],trainer.dataset_json,trainer.__class__.__name__,trainer.inference_allowed_mirroring_axes)
             reader=trainer.plans_manager.image_reader_writer_class()
-            images,properties=reader.read_images([case['image']])
+            from imagechd_geometry import derived_image
+            images,properties=reader.read_images([str(derived_image(work,case))])
             adapter=PreprocessAdapterFromNpy([images],[None],[properties],[None],trainer.plans_manager,trainer.dataset_json,
                 trainer.configuration_manager,num_threads_in_multithreaded=1,verbose=False)
             data=next(adapter);logits=predictor.predict_logits_from_preprocessed_data(data['data']).cpu().numpy()
@@ -84,12 +86,14 @@ def predict(work,fold,method,training,case_id,phase='gpu'):
         if reference_file.shape!=original.shape or not np.allclose(reference_file.affine,original.affine,atol=1e-4,rtol=0):
             raise ValueError('cal标签与影像空间不一致')
         path=base/f'{case_id}.nii.gz'
-        segmentation=restore_reader_grid(reader,segmentation,properties,original,path)
+        from imagechd_geometry import physical_affine
+        physical=physical_affine(original,case['spacing_mm'])
+        segmentation=restore_reader_grid(reader,segmentation,properties,original,path,expected_affine=physical)
         save_prediction(path,segmentation,original)
         result=dict(status='passed',case_id=case_id,prediction=str(path),prediction_sha256=digest(path),
             checkpoint=str(checkpoint),checkpoint_sha256=digest(checkpoint),seconds=time.monotonic()-started,
             gpu_seconds=saved['seconds'],original_grid_restored=True,protocol=PROTOCOL,cpu_threads=count,
-            metrics=score_case(segmentation,map_labels(np.asanyarray(reference_file.dataobj)),original.affine,threads=count),
+            metrics=score_case(segmentation,map_labels(np.asanyarray(reference_file.dataobj)),physical,threads=count),
             formal_effectiveness_result=False,scope='calibration-case engineering check after bounded short trials; not trained-model efficacy')
         write_json(work/f'09_reports/assessment_prediction_{fold}_{method}.json',result)
         return result

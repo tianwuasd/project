@@ -1,10 +1,10 @@
 {
   "name": "zmic44",
-  "path_source": "New isolated STU-Net method instance under CHD V2; not a server deployment receipt.",
+  "path_source": "User-confirmed raw data 2026-11-01; descriptor generated privately during prepare; not a deployment receipt.",
   "workspace": "/data5/zhougaowei/zhangruichen_workspace",
   "runtime": "/data5/zhougaowei/zhangruichen_workspace/chd_ct_v2_stunet_runtime",
   "results": "/data_nas/zhangruichen/chd_ct_v2_stunet_results",
-  "data": "",
+  "data": "/data_nas/zhangruichen/chd_ct_v2_stunet_inputs",
   "conda": "/data5/zhougaowei/zhangruichen_workspace/project1_runtime/tools/miniforge3/bin/conda",
   "network": {
     "schema_version": 1,
@@ -15,5 +15,7 @@
   "gpu_count": 1,
   "gpu_candidates": "auto",
   "gpu_memory": 20,
-  "gpu_memory_policy": "zmic44-20g-v1"
+  "gpu_memory_policy": "zmic44-20g-v1",
+  "raw_data": "/data_nas/zhangruichen/baidu_import/ImageCHD_dataset",
+  "pretrained_weights": "/data5/zhougaowei/zhangruichen_workspace/chd_ct_v2_stunet_runtime/model_weights/stunet-small/small_ep4k.model"
 }

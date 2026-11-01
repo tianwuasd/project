@@ -14,7 +14,7 @@ import task_runtime as jobs
 from task_queries import query, follow, result_lines, read_optional, log_sources
 from task_progress import STATES
 
-PANEL_VERSION = '2.2.1 (CHD V2 / STU-Net official-code recipe; resource engine 0.7.0)'
+PANEL_VERSION = '2.2.2 (CHD V2 / STU-Net official-code recipe; resource engine 0.7.0)'
 
 
 class Back(Exception):
@@ -95,10 +95,14 @@ def stage_config(args,saved,stage,interactive=True):
     import server_profile
     from assessment_policy import automatic_request,PREPROCESSORS
     from v2_host_identity import checked_path
+    if stage=='environment':
+        selected=copy.copy(args);selected.tasks='environment'
+        return new_config(selected,saved,interactive=False)
     profile=dict(server_profile.load(getattr(args,'profile',None)))
+    weight=server_profile.weight_location(profile,args.runtime or profile['runtime'])
     profile['runtime']=str(checked_path(args.runtime or profile['runtime']))
     base_results=checked_path(getattr(args,'results',None) or saved.get('results_base') or profile['results'])
-    source=None;upstream=None
+    source=None;upstream=None;bootstrap=None
     if stage in {'train','predict'}:
         source=getattr(args,'input_job',None) or (choose_stage_source(profile['runtime'],'prepare' if stage=='train' else 'train') if interactive else None)
         if not source:raise ValueError('请指定已完成的来源任务')
@@ -116,7 +120,7 @@ def stage_config(args,saved,stage,interactive=True):
         print('来源数据：'+data+'；预处理：'+PREPROCESSORS.get(preprocessor,preprocessor))
     else:
         data=getattr(args,'data',None) or saved.get('data') or profile['data']
-        if interactive:data=ask('来源数据目录',data)
+        if interactive and not data:data=ask('来源数据目录',data)
         preprocessor=getattr(args,'preprocessor',None) or 'nnunet_default'
         if len(PREPROCESSORS)>1 and interactive:
             print('预处理：'+'；'.join(f'{key} {label}' for key,label in PREPROCESSORS.items()))
@@ -133,8 +137,14 @@ def stage_config(args,saved,stage,interactive=True):
         if not set(chosen)<=set(allowed_models):raise ValueError('所选模型不属于来源训练任务')
         methods=','.join(chosen)
     data=str(checked_path(data))
-    config=automatic_request(profile,data,methods,preprocessor=preprocessor,
+    request_data=data
+    if stage in {'prepare','assessment'}:
+        data,bootstrap,request_data=server_profile.input_location(profile,data)
+    config=automatic_request(profile,request_data,methods,preprocessor=preprocessor,
         kind='assessment' if stage=='assessment' else 'formal',blocks=stage if stage!='assessment' else 'all')
+    config['data']=data
+    if bootstrap:config['input_bootstrap']=bootstrap
+    if weight:config['pretrained_weights']=weight
     config.update(catalog_schema=2,stage=stage,tasks=[stage],input_job=source,
         formal_training=stage=='train',
         upstream_jobs=[str(Path(source).resolve())] if source else [],results_base=str(Path(base_results).expanduser().resolve()),
@@ -621,7 +631,7 @@ def make_parser():
     p.add_argument('--models', '--methods', dest='models', help='S1 官方预训练微调；S0 同架构随机初始化对照')
     p.add_argument('--preprocessor',choices=['nnunet_default'])
     p.add_argument('--assessment',action='store_true',help='独立少量真实数据完整测评；资源自动选择')
-    p.add_argument('--stage',choices=['prepare','train','predict'],help='独立板块；训练/预测使用 --input-job 选择新版来源')
+    p.add_argument('--stage',choices=['environment','prepare','train','predict'],help='独立板块；训练/预测使用 --input-job 选择新版来源')
     p.add_argument('--legacy-jobs',action='store_true',help=argparse.SUPPRESS)
     p.add_argument('--scope', choices=list(SCOPES))
     p.add_argument('--folds')

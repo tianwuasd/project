@@ -1,4 +1,4 @@
-"""Snapshot finished VISTA3D artifacts for publication through SSH Git and Git LFS.
+"""Snapshot finished ImageCHD STU-Net artifacts through SSH Git and Git LFS.
 
 Only standard-library dependencies are used. The caller must hold the workflow's
 runtime lock throughout preparation/upload and obtain consent after the preview.
@@ -18,6 +18,8 @@ from uuid import uuid4
 
 REPOSITORY = "tianwuasd/project"
 HOST = "github.com"
+PROJECT_ID='chd-ct-panel-v2/stunet'
+ARTIFACT_NAMESPACE='chd-v2-stunet-artifacts'
 CHUNK_BYTES = 1024**3
 MAX_ASSETS = 1000
 COMMAND_TIMEOUT = 60
@@ -53,6 +55,10 @@ FORBIDDEN_PARTS = {
 
 def _now():
     return datetime.now(timezone.utc).isoformat()
+
+
+def artifact_branch(package_id):
+    return ARTIFACT_NAMESPACE+'/'+package_id
 
 
 def _display(value):
@@ -115,6 +121,12 @@ def _finished(job, runtime):
     from . import inspection
 
     job, runtime = _safe_path(job), _safe_path(runtime)
+    from v2_host_identity import check,locations
+    if check(runtime) is None:
+        raise ValueError('产物来源不是已登记的CHD V2 STU-Net运行目录')
+    _,results=locations(runtime)
+    if not job.is_relative_to(results):
+        raise ValueError('产物任务不在本STU-Net实例的结果根目录')
     if os.environ.get('VISTA_CATALOG_VERSION')=='2':
         from pipeline_catalog import resolve
         job=resolve(runtime,job)
@@ -344,8 +356,8 @@ def prepare_upload(job: Path, runtime: Path) -> Path:
                 raise ValueError("打包期间源文件发生变化，请重新打包：" + _display(row["source"]))
         _finished(job, runtime)
         manifest = {
-            "schema_version": 1, "package_id": package_id, "repository": REPOSITORY,
-            "release_tag": "vista3d-artifacts-" + package_id, "created_at": _now(),
+            "schema_version": 1, "package_id": package_id, "repository": REPOSITORY,"project_id":PROJECT_ID,
+            "release_tag": ARTIFACT_NAMESPACE+'-' + package_id, "created_at": _now(),
             "job_directory": str(job), "runtime": str(runtime),
             "name": str(state.get("name") or plan.get("name") or job.name),
             "archive_format": "tar concatenated in asset-name order",
@@ -371,11 +383,12 @@ def _validate_package(package):
     package_id = manifest.get("package_id")
     if (
         manifest.get("schema_version") != 1
+        or manifest.get('project_id')!=PROJECT_ID
         or manifest.get("repository") != REPOSITORY
         or not isinstance(package_id, str)
         or re.fullmatch(r"[0-9]{8}T[0-9]{6}Z-[a-f0-9]{12}", package_id) is None
         or package.name != package_id
-        or manifest.get("release_tag") != "vista3d-artifacts-" + package_id
+        or manifest.get("release_tag") != ARTIFACT_NAMESPACE+'-' + package_id
     ):
         raise ValueError("上传包身份或目标仓库无效，请重新打包")
     for key in ("job_directory", "runtime"):
@@ -420,7 +433,7 @@ def _validate_package(package):
 def show_preview(package: Path) -> None:
     package, manifest, assets = _validate_package(package)
     print(f"\n待上传任务：{_display(manifest['name'])}")
-    print(f"官方目标：https://github.com/{REPOSITORY}/tree/vista3d-artifacts/{manifest['package_id']}")
+    print(f"官方目标：https://github.com/{REPOSITORY}/tree/{artifact_branch(manifest['package_id'])}")
     print("认证：zmic网络设置中的SSH密钥；分卷用Git LFS（需要Git LFS与可用额度，无需gh）。")
     print("将上传日志、配置、指标、最佳和末次模型权重；不包含原始影像、缓存或环境目录。")
     for row in manifest["files"]:

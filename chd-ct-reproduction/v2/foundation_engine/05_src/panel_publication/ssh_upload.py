@@ -16,7 +16,7 @@ from pathlib import Path
 from . import network, upload
 
 ATTRIBUTES = b"artifacts.tar.part* filter=lfs diff=lfs merge=lfs -text\n"
-RESTORE = b"""# VISTA3D artifact snapshot
+RESTORE = b"""# ImageCHD V2 STU-Net artifact snapshot
 
 This branch contains approved logs, configuration, metrics and model weights.
 Archive parts are Git LFS objects. Use Git and Git LFS with the same authorized
@@ -246,12 +246,12 @@ def build_commit(package, manifest, assets):
     git(
         repo,
         "-c",
-        "user.name=VISTA3D artifacts",
+        "user.name=ImageCHD V2 STU-Net artifacts",
         "-c",
-        "user.email=vista3d-artifacts@users.noreply.github.com",
+        "user.email=chd-v2-stunet-artifacts@users.noreply.github.com",
         "commit",
         "-m",
-        "VISTA3D artifact package " + manifest["package_id"],
+        "ImageCHD V2 STU-Net artifact package " + manifest["package_id"],
         commit_date=manifest["created_at"],
     )
     verify_tree(repo, expected)
@@ -266,7 +266,7 @@ def publish(package, manifest, assets):
     if expected != expected_files(package, assets):
         raise ValueError("上传清单发生改变，停止上传")
     verify_tree(repo, expected)
-    branch = "vista3d-artifacts/" + manifest["package_id"]
+    branch = upload.artifact_branch(manifest['package_id'])
     ref = "refs/heads/" + branch
     remote = remote_head(repo, ref)
     if remote is not None and remote != commit:

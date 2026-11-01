@@ -129,7 +129,7 @@ def test_root_bash_and_legacy_entry_forward_arguments(tmp_path):
         result=subprocess.run([shell,str(path),'--help'],cwd=tmp_path,env=env,
             capture_output=True,text=True,encoding='utf-8',timeout=20)
         assert result.returncode==0,result.stderr
-        assert 'CHD V2 2.2.1' in result.stdout
+        assert 'CHD V2 2.2.2' in result.stdout
     old=subprocess.run([sys.executable,str(V1.parent/'chd-ct-panel-v2/start_server.py'),'--help'],
         cwd=tmp_path,capture_output=True,text=True,encoding='utf-8',timeout=20)
     assert old.returncode==0,old.stderr

@@ -152,6 +152,17 @@ def execute(job, lock_fd):
         print('CPU共享预算：'+json.dumps(budget,ensure_ascii=False),flush=True)
         # CPU-only software smoke is separate from actual-size CUDA preflight.
         run_child([str(python),'-B',str(code/'05_src/software_smoke.py'),str(job/'software-smoke.json')],env)
+        if plan.get('input_bootstrap'):
+            source=plan['input_bootstrap']
+            report_progress(env,'input_descriptor','从默认原始目录准备私有ImageCHD输入描述；源影像不改写。')
+            run_child([str(python),'-B',str(code/'05_src/imagechd_input_setup.py'),
+                '--raw',source['raw'],'--output',plan['data'],'--seed',str(source['seed'])],env)
+        if 'S1' in plan.get('methods',[]) and any(t in plan['tasks'] for t in ('train','smoke','assessment')):
+            weight=os.environ.get('IMAGECHD_STUNET_WEIGHTS') or plan.get('pretrained_weights')
+            if weight:
+                env['IMAGECHD_STUNET_WEIGHTS']=str(Path(weight).expanduser())
+                run_child([str(python),'-B',str(code/'05_src/stunet_weights.py'),
+                    '--ensure',env['IMAGECHD_STUNET_WEIGHTS']],env)
         for step in plan['tasks']:
             current = state['steps'][step]
             if current['status'] == 'completed':

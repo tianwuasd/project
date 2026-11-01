@@ -26,7 +26,7 @@ def main():
                 'test_automatic_execution.py','test_stage_boards.py','test_pipeline_catalog.py','test_integration_fixes.py',
                 'test_live_resources.py','test_memory_guard.py','test_capped_batch.py','test_performance_repair.py','test_batch_pool.py','test_nnunet_batches.py','test_execution_transfer.py',
                 'test_ddp_runtime.py','test_stage_coordinator.py','test_stage_completion.py','test_final_integration.py','test_final_resource_fixes.py','test_final_export_api.py','test_final_loader_api.py') if legacy else (
-                'test_imagechd_contract.py','test_stunet_recipe.py','test_environment*.py','test_install_routes.py',
+                'test_imagechd_contract.py','test_stunet_recipe.py','test_skill_adaptation.py','test_input_setup.py','test_prediction_upgrade.py','test_environment*.py','test_install_routes.py',
                 'test_checkpoint_compat.py','test_gpu_memory.py','test_gpu_admission.py',
                 'test_planner_threads.py','test_training_timing.py','test_training_policy.py',
                 'test_runtime_observations.py','test_automatic_execution.py','test_stage_boards.py',
