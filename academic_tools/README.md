@@ -6,7 +6,7 @@
 
 - [科研 Skill 介绍与选型](docs/skill介绍/README.md)
 - [中文详细使用文档](docs/skill文档/README.md)
-- [本次更新记录与版本变化](UPDATE-2026-10-20.md)
+- [本次更新记录与版本变化](UPDATE-2026-11-01.md)
 - [首次完整同步记录](UPDATE-2026-10-19.md)
 - [来源、完整提交号与文件统计](SOURCES.json)
 
