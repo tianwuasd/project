@@ -14,13 +14,26 @@ def allowed(name):
     relative = path.parts[1:]
     if not relative or any(p.startswith(".") for p in relative[:-1]):
         return False
+    # The integrated engine carries its own data/output directory convention.
+    # Inspect that nested scope as strictly as the top-level code project.
+    if relative[0] == "foundation_engine":
+        nested = relative[1:]
+        if not nested:
+            return False
+        if nested[0] == "04_data":
+            return nested == ("04_data", "manifests", "README.md")
+        if nested[0] in {"07_experiments", "08_results", "09_reports", "model_inputs", "model_weights"}:
+            return False
+        if nested[0] in {"data", "results", "runtime", "cache", "uploads", "back"}:
+            return False
     if relative[0] in {"back", "data", "results", "runtime", "cache", "uploads"}:
         return False
     if relative[:2] == ("docs", "superpowers"):
         return False
-    if re.search(r"secret|token|credential|password|id_rsa|id_ed25519|private", path.name, re.I):
+    synthetic_update_test = relative == ("foundation_engine", "tests", "test_private_update.py")
+    if not synthetic_update_test and re.search(r"secret|token|credential|password|id_rsa|id_ed25519|private", path.name, re.I):
         return False
-    return path.name in {".gitignore", ".gitattributes"} or path.suffix in {
+    return relative == ("start_server_v2.cmd",) or path.name in {".gitignore", ".gitattributes"} or path.suffix in {
         ".py",
         ".sh",
         ".bat",

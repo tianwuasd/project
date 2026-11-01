@@ -1,0 +1,82 @@
+{
+  "panel_version": "0.3.7",
+  "checked_at": "2026-10-26T11:27:06.400774+00:00",
+  "server_evidence": {
+    "source": "user-provided server transcript",
+    "bootstrap_blob": "5fdd5be8931151167e1bdc7c4fdc6a93c69bee94",
+    "single_blob_read": "succeeded, 1.64 KiB transfer",
+    "bootstrap_metadata_seconds": 4.9,
+    "updater_object_seconds": 3.6,
+    "runtime_metadata_seconds": 3.6,
+    "official_main": "271df2033a8bdce6f546d8208a6afd92ca73f3b0",
+    "missing_blob": "32a752a87484bbf708009485155e18a301b765da",
+    "missing_blob_path": "05_src/task_update.py",
+    "failed_stage": "missing-object inventory before explicit runtime blob download",
+    "old_release_retained": true,
+    "ssh_repository_reads": "succeeded",
+    "v037_server_acceptance": "pending"
+  },
+  "fix": "Enumerate stored objects with cat-file --batch-all-objects; never probe missing promised IDs to decide what to fetch",
+  "implicit_network_protection": "retained; not disabled as workaround",
+  "control_suite": {
+    "total": 113,
+    "passed": 108,
+    "skipped": 5
+  },
+  "regression": "Real filtered local Git plus injected missing-probe fatal condition; old implementation fails, new implementation passes",
+  "git_versions": [
+    {
+      "git": "git version 2.54.0.windows.1",
+      "missing_probe_returncode": 0,
+      "missing_probe_stdout": "82ba7ede7c092794c75630024afcbb4527c47135 missing",
+      "missing_probe_stderr": "",
+      "local_inventory_returncode": 0,
+      "missing_blob_not_reported_as_local": true
+    },
+    {
+      "git": "git version 2.53.0.windows.3",
+      "missing_probe_returncode": 0,
+      "missing_probe_stdout": "82ba7ede7c092794c75630024afcbb4527c47135 missing",
+      "missing_probe_stderr": "",
+      "local_inventory_returncode": 0,
+      "missing_blob_not_reported_as_local": true
+    }
+  ],
+  "git_version_boundary": "Both available Windows versions return missing rather than reproducing the server fatal; server Git version is not inferred",
+  "actual_github_https_read": {
+    "status": "passed",
+    "transport": "Windows GitHub HTTPS, temporary proxy 7897",
+    "commit": "271df2033a8bdce6f546d8208a6afd92ca73f3b0",
+    "runtime_files": 59,
+    "archive_bytes": 389120,
+    "cached_pack_bytes": 1018287,
+    "user_error_blob_downloaded": true,
+    "release_switched": false,
+    "server_ssh_full_update_verified": false,
+    "real_ct_or_gpu": false
+  },
+  "server_deployed": false,
+  "real_ct_or_gpu": false,
+  "python_ast": {
+    "files": 81,
+    "status": "passed"
+  },
+  "broader_ml_discovery": {
+    "status": "unavailable in this stdlib/control environment",
+    "discovered": 125,
+    "passed": 115,
+    "errors": 5,
+    "skipped": 5,
+    "causes": [
+      "nibabel missing",
+      "scipy missing"
+    ],
+    "boundary": "No ML dependencies installed or real CT/GPU validation attempted for this updater fix"
+  },
+  "final_publication_control_suite": {
+    "entry": "tests/run_panel_suite.py",
+    "total": 113,
+    "passed": 108,
+    "skipped": 5
+  }
+}

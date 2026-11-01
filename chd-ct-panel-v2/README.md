@@ -1,4 +1,70 @@
-# CT V2 独立服务器面板
+# CHD V2 2.1.0：原六路模型与STU-Net-S整合面板
+
+V1保留原样。原CHD V2现增加STU-Net-S方法，统一从新的 `start_server_v2.sh` 打开。启动后选1进入STU-Net-S，选2进入保留的原六路/三折方法。打开和查询不会安装环境或启动训练。
+
+## 两个面板如何调用
+
+| 面板 | 工程/分支 | 启动 |
+|---|---|---|
+| V1 | 原main检出中的chd-ct-reproduction | 原来的 `bash start_server.sh`，完全保留 |
+| V2 2.1.0 | 独立codex/ct-panel-v2检出中的chd-ct-panel-v2 | 新的 `bash start_server_v2.sh` |
+
+V1与V2使用不同检出目录。更新V2不会把原V1检出切到V2分支。V2仍发布在原独立分支，没有合并main；新STU-Net代码已经嵌入本V2，运行不再依赖另一个imagechd-stunet目录。
+
+```bash
+# 在独立V2检出的chd-ct-panel-v2目录
+bash start_server_v2.sh
+# 直接选定方法
+bash start_server_v2.sh --engine stunet
+bash start_server_v2.sh --engine multistage
+# 只看参数/任务，不安装或提交
+bash start_server_v2.sh --help
+bash start_server_v2.sh --engine stunet --query history
+bash start_server_v2.sh --engine multistage --query history
+```
+
+Windows可用 `start_server_v2.cmd` 或 `python start_server_v2.py` 查看面板；正式计算环境的安装/后台管理目标仍为Linux x86_64。原V2 `start_server.sh` 保留作六路方法兼容入口，日常统一使用新脚本。
+
+## V2内的方法与数据
+
+- **STU-Net-S（新方法）**：S1官方预训练微调，S0同架构随机对照；七结构标签顺序保持ImageCHD定义。额外标注编号为ignore=8，模型仍输出背景+七结构共8类。采用作者Excel间距派生副本、单例Z-score、训练子集拟合规划、3D patch及全体积滑窗；不使用原六路硬投票。
+- **原六路方法**：保留CT0.24的六网络、三折、预测ROI及验证后处理合同。没有向它套用STU-Net的优化器、250轮、AMP/DDP等参数；V1的0.25等更新也没有整仓合并到本分支。
+- 两种方法只读源影像可共用；任务索引、缓存、权重、环境、日志和结果按方法隔离。V1或旧独立STU-Net运行目录不能直接接管。原CT V2已登记任务仍按原冻结代码恢复。
+
+## STU-Net-S的使用顺序
+
+选1进入新方法面板后：e准备环境 → 1预处理 → 2训练（默认S1）→ 3外折预测与评价。默认三折；用户选全局batch，默认4，扩卡不增加批量。真实训练前会检查所选模型的实际尺寸和容量。
+
+输入为ImageCHD私有数据描述目录，不是V1缓存。生成方法与权重出处见 [STU-Net输入说明](foundation_engine/README.md)。旧独立工程的**数据描述**可作为只读来源；其缓存、任务或模型不迁入V2。缺少官方权重或SHA/骨干层不符会停止，不静默随机训练。
+
+```bash
+export IMAGECHD_STUNET_WEIGHTS=/your/local/weights/small_ep4k.model
+bash start_server_v2.sh --engine stunet --stage prepare --data-dir /your/private_input_descriptor --models S1 --non-interactive
+bash start_server_v2.sh --engine stunet --stage train --input-job /completed_V2_STU_prepare_job --models S1 --global-batch 4 --non-interactive
+bash start_server_v2.sh --engine stunet --stage predict --input-job /completed_V2_STU_train_job --models S1 --non-interactive
+```
+
+## 路径隔离
+
+| 方法 | 环境/任务登记 | 任务结果 |
+|---|---|---|
+| V1 | 沿用原V1配置 | 沿用原V1配置 |
+| V2原六路 | chd_ct_v2_runtime | chd_ct_v2_results，预处理另在chd_ct_v2_prepared |
+| V2 STU-Net | chd_ct_v2_stunet_runtime | chd_ct_v2_stunet_results，各任务workspace内保存预处理 |
+
+Linux默认路径见各方法server配置；自定义目录必须显式一致，首次使用空目录。整合版STU-Net会写专属身份标记，拒绝已有外来状态、目录重叠、符号链接/联接、不同实例混用。未初始化的查询不写任何目录。两个面板可同时打开；计算仍按获准GPU和外部进程占用准入，不抢占另一面板或其他用户的任务。
+
+## 更新、来源与验证
+
+u/w统一限定原 `codex/ct-panel-v2` 分支及整个chd-ct-panel-v2子树，不使用独立STU-Net的main更新线路。代码更新不热修冻结任务。v仅按明确选择上传产物到独立分支，代码上传会拒绝嵌套私有清单、影像、权重和运行输出。
+
+科学方法与工程模板分开记录：STU-Net资源引擎来自server-engineering Skill v2 / VISTA0.7.0固定提交21ad9e539cb7dbcc6937b7e09064a7261cd2b913；STU-Net源来自imagechd-stunet提交01bf801cd4dc9d8da885283946b8befeaf8d9ec2；原六路算法仍CT0.24。不是把STU-Net称成VISTA foundation。
+
+本轮Skill符合性、冲突修复、检查结果和未验收范围见 [2.1整合核查](docs/V2_2.1_INTEGRATION.md)。没有启动正式三折训练，没有新的外折准确率；本机合成/Gloo验证不能代替服务器Linux/CUDA/NCCL验收。
+
+---
+
+## 原V2六路方法的2.0.x说明（历史与兼容参考）
 
 面板版本 2.0.2，科学流程基于 CT 0.24.0。保留六网络、三折、预测裁剪框、加权投票、验证集决定的后处理以及显存保护。工程参考 server-engineering / VISTA 0.5.1；具体映射和未采用的算法特性见 [模板映射](docs/V2_TEMPLATE_MAP.md)。
 

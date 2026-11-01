@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chd-ct-panel-v2"
-version = "2.0.2"
-description = "ImageCHD primary multi-stage adaptation of Xu et al.; archived paper workflow in back"
+version = "2.1.0"
+description = "CHD V2 integrated panel with isolated STU-Net-S and preserved multistage CT methods"
 requires-python = ">=3.11"
 dependencies = ["numpy>=1.26", "scipy>=1.11", "torch>=2.6", "nibabel>=5.2", "PyYAML>=6", "scikit-image>=0.24", "networkx>=3.2", "scikit-learn>=1.5", "psutil>=5.9"]
 

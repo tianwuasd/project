@@ -1,0 +1,54 @@
+{
+  "panel_version": "0.3.3",
+  "checked_at": "2026-10-26T07:01:23.906780+00:00",
+  "platform": "Windows Python 3.11",
+  "server_evidence": {
+    "source": "user-provided attempts.json and runtime/network.json",
+    "official_head": "f345e372df7d6b5a6e252fff26a3d01cd0638c36",
+    "ref_read": "succeeded",
+    "fetch": "terminated by program total timeout at 45 seconds",
+    "patched_server_acceptance": "pending"
+  },
+  "timing_seconds": {
+    "ssh_connect": 10,
+    "ref_query": 30,
+    "fetch_total": 900,
+    "archive": 180,
+    "progress_poll": 1,
+    "progress_heartbeat": 5,
+    "independent_idle_watchdog": false
+  },
+  "control_suite": {
+    "total": 99,
+    "passed": 94,
+    "skipped": 5,
+    "linux_skipped": 4,
+    "imaging_dependency_skipped": 1
+  },
+  "focused_regressions": {
+    "total": 5,
+    "passed": 5,
+    "cases": [
+      "actual CPU subprocess with stdout/stderr larger than pipe buffer completes",
+      "cumulative partial progress logged and visible before completion without duplicates",
+      "timeout retains partial stderr and reaps child",
+      "interruption propagates after cleanup and final stderr capture",
+      "menu failure records cause and preserves original release pointer"
+    ]
+  },
+  "python_ast": {
+    "files": 76,
+    "status": "passed"
+  },
+  "network_workload_in_tests": false,
+  "real_ct_tested": false,
+  "real_gpu_tested": false,
+  "server_menu_download_validated": false,
+  "linux_ci": "Prior run blocked before execution by account billing/spending limit; not rerun for this patch",
+  "unchanged_contracts": [
+    "20 GiB new-task policy",
+    "model/data/split/training protocol",
+    "official authentication route",
+    "old job source snapshots"
+  ]
+}

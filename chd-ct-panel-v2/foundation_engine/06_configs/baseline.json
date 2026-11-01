@@ -1,0 +1,30 @@
+{
+  "project_id": "imagechd_stunet_s_seven_structure_v1",
+  "default_fold": "imagechd_fold0",
+  "methods": [
+    "S1",
+    "S0"
+  ],
+  "source_fit_by_fold": {
+    "imagechd_fold0": 54,
+    "imagechd_fold1": 55,
+    "imagechd_fold2": 55
+  },
+  "source_cal": 10,
+  "held_out_by_fold": {
+    "imagechd_fold0": 33,
+    "imagechd_fold1": 32,
+    "imagechd_fold2": 32
+  },
+  "data_protocol": "imagechd_frozen_oof_v1",
+  "patient_identity_verified": false,
+  "epochs": 250,
+  "iterations_per_epoch": 250,
+  "validation_iterations_per_epoch": 50,
+  "default_global_batch": 4,
+  "configuration": "3d_fullres",
+  "normalization": "per-image z-score; no assumed HU offset",
+  "pretrained_sha256": "f440f401bf4cac1d1d6f7c4635542ef057193a5f96c0b3c661a6179afeab7be6",
+  "pretrained_head_policy": "reset all target segmentation heads",
+  "evaluation": "OOF; no target-driven selection"
+}

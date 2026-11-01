@@ -1,0 +1,142 @@
+{
+  "date": "2026-11-01",
+  "panel_version": "2.1.0",
+  "branch": "codex/ct-panel-v2",
+  "baseline": "2035ba5cce4972badf8de4c159dab10003737f6c",
+  "source": {
+    "imagechd_stunet": "01bf801cd4dc9d8da885283946b8befeaf8d9ec2",
+    "verified_files": 226,
+    "engineering_template": "21ad9e539cb7dbcc6937b7e09064a7261cd2b913",
+    "resource_engine": "0.7.0",
+    "original_ct_algorithm": "0.24.0"
+  },
+  "root_regression": {
+    "tests": 646,
+    "passed": 619,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 27
+  },
+  "root_regression_note": "Includes the first 12 integration tests; after review, all 18 current integration tests were rerun separately. Counts overlap and must not be added.",
+  "final_integration": {
+    "tests": 18,
+    "passed": 18,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "final_code_upload_regression": {
+    "tests": 7,
+    "passed": 7,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "stu_control_checks": {
+    "status": "passed",
+    "syntax_files": 90,
+    "tests": 67,
+    "skipped": 0,
+    "failures": 0,
+    "errors": 0,
+    "scope": "offline control checks; no real CT, CUDA/NCCL or sustained throughput validation"
+  },
+  "imagechd_contract_tests": {
+    "passed": 7,
+    "failures": 0
+  },
+  "synthetic_gpu": {
+    "status": "passed",
+    "synthetic_only": true,
+    "device": "cuda",
+    "diagnostic_batch": 1,
+    "formal_global_batch_unchanged": 4,
+    "preprocessing": "official nnUNet train-only fingerprint/planning",
+    "fit_ids": [
+      "synthetic_2",
+      "synthetic_4"
+    ],
+    "native_grid_prediction": true,
+    "author_spacing_input": true,
+    "extra_annotation_ignored": true,
+    "loaded_tensors": 120,
+    "optimizer_state_exact": true,
+    "checkpoint_weights_exact": true,
+    "resumed_training_step": true,
+    "initial_step_attempts": 5,
+    "resumed_step_attempts": 1,
+    "momentum_tensors": 128,
+    "train_loss": 3.9955403804779053,
+    "validation_loss": 3.6083438396453857,
+    "original_grid_shapes": [
+      48,
+      48,
+      64
+    ],
+    "seconds": 73.79700000002049,
+    "accuracy_or_formal_batch_capacity_claim": false
+  },
+  "ignore_ddp": {
+    "status": "passed",
+    "backend": "gloo",
+    "ranks": 2,
+    "global_batch": 3,
+    "local_batches": [
+      2,
+      1
+    ],
+    "comparisons": [
+      {
+        "batch_dice": false,
+        "entire_rank_ignored": false,
+        "max_gradient_error": 0.0,
+        "global_loss": 2.220463275909424,
+        "single_batch_loss": 2.220463752746582
+      },
+      {
+        "batch_dice": false,
+        "entire_rank_ignored": true,
+        "max_gradient_error": 0.0,
+        "global_loss": 1.9214879274368286,
+        "single_batch_loss": 1.9214879274368286
+      },
+      {
+        "batch_dice": true,
+        "entire_rank_ignored": false,
+        "max_gradient_error": 0.0,
+        "global_loss": 2.2196264266967773,
+        "single_batch_loss": 2.2196266651153564
+      },
+      {
+        "batch_dice": true,
+        "entire_rank_ignored": true,
+        "max_gradient_error": 0.0,
+        "global_loss": 2.2137067317962646,
+        "single_batch_loss": 2.2137067317962646
+      }
+    ]
+  },
+  "preservation": {
+    "v1_primary_files": 814,
+    "v1_sibling_files": 790,
+    "v1_changed_files": 0,
+    "original_v2_scientific_implementation_unchanged": true
+  },
+  "independent_review": {
+    "status": "no remaining important findings",
+    "fixed_findings": 5,
+    "scope": "Read-only review of host integration, namespace, task registry, lifecycle locks, maintenance and scientific boundaries"
+  },
+  "checks": {
+    "bash_syntax_and_actual_help": "passed",
+    "critical_ruff": "passed",
+    "source_manifest": "verify with scripts/verify_v2.py"
+  },
+  "not_validated": [
+    "Linux process-group execution on the target server",
+    "Linux CUDA/NCCL multi-GPU training",
+    "formal global-batch-4 capacity",
+    "real ImageCHD threefold training and new accuracy",
+    "deployment on the target server"
+  ]
+}

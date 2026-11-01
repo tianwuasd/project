@@ -1,0 +1,82 @@
+{
+  "version": "0.3.9",
+  "checked_at": "2026-10-26T13:18:09.104601+00:00",
+  "ct_source_commit": "88bc9280293e99e7aefea6528f0ddd34ff4f67d1",
+  "ct_progress_embedded_unchanged": true,
+  "ct_progress_sha256": "5020e09bffa6f363be8bac680897b5b1fd46403b5a2faf103c28bca2a08c5f28",
+  "ct_network_child_env_ast_sha256": "41458f63fb4eb817f93a0fddd98efd152ae579f02a0f35c446dcdd56f13248ad",
+  "control_suite": {
+    "total": 117,
+    "passed": 112,
+    "skipped": 5
+  },
+  "historical_lessons": {
+    "ct_thread": "01a15e47-dfc8-7dc1-9529-22cd6748123f",
+    "config": "temporary manual Git settings were not persisted to panel runtime; now show actual runtime route and retain CLI configuration",
+    "main_movement": "normal main movement rejected by strict A==B check; now one official requery plus both ancestry checks",
+    "aaoca_thread": "01a1663e-af70-75d0-96a4-8e4902b58578",
+    "archive": "hidden attribute fetch; preserve offline archive and original blob bytes"
+  },
+  "actual_github_https_read": {
+    "status": "passed",
+    "transport": "Windows GitHub HTTPS, temporary proxy 7897",
+    "commit": "3467fb7e8d5c944407712311f8ec7fbed5f54540",
+    "runtime_files": 59,
+    "archive_bytes": 389120,
+    "cached_pack_bytes": 1019537,
+    "release_switched": false,
+    "server_ssh_full_update_verified": false,
+    "real_ct_or_gpu": false
+  },
+  "actual_legacy_helpers": {
+    "status": "passed",
+    "actual_committed_legacy_helpers": true,
+    "checks": [
+      {
+        "version": "0.3.3",
+        "commit": "d26e1f6f9f1eec031852ed96eb8d83b50656910e",
+        "updater_sha256": "366d96e513b1e8291750468ae1854abe1c58d0117aeffe3c3fc8630b90c0ca7c",
+        "status": "passed",
+        "checkout_unchanged": true
+      },
+      {
+        "version": "0.3.4",
+        "commit": "98e69e3b80a228045cdea602561a7ac72e78f000",
+        "updater_sha256": "366d96e513b1e8291750468ae1854abe1c58d0117aeffe3c3fc8630b90c0ca7c",
+        "status": "passed",
+        "checkout_unchanged": true
+      },
+      {
+        "version": "0.3.5",
+        "commit": "3004172211311b89bbe55c7a8ad4c702dbcd6aa9",
+        "updater_sha256": "366d96e513b1e8291750468ae1854abe1c58d0117aeffe3c3fc8630b90c0ca7c",
+        "status": "passed",
+        "checkout_unchanged": true
+      },
+      {
+        "version": "0.3.8",
+        "commit": "3467fb7e8d5c944407712311f8ec7fbed5f54540",
+        "updater_sha256": "b77076f0c881ed65c594fca3c75bcc682ff4fc7902360c5bc0ffbb65b7babefe",
+        "status": "passed",
+        "checkout_unchanged": true
+      }
+    ],
+    "all_legacy_updater_bytes_identical": false,
+    "network_module": "same stable API; local file transport substituted",
+    "server_linux_ssh": false,
+    "full_legacy_panel_not_executed": true
+  },
+  "unchanged_training_and_data_sha256": {
+    "server_train.py": "5c74af822ffa47f12e907398c9eceec7ef019e1584005a6213777492e8733b20",
+    "project_trainers.py": "23f9b4f9d9bb2b98341e375f42e1197f987543d26a7a043fdb59738efba7f6c3",
+    "cohort.py": "6660b6cdc74223eb34f9ff831b65a9e14369d27e40635cbb3f859dc15c11a845",
+    "data_pipeline.py": "42aaf510f75bf47cd6e582371a15254459878fd6745cf1512740df90299ec0b9",
+    "gpu_queue.py": "ad293111521b24e2f3d00e5205839d2ee6a22e17e6fcbd264b1fdf7b50b310c2",
+    "preflight_gate.py": "38cb161c57b6ba29f4f61914d457f3e73b2b628171640b107b4ac6409d882de1",
+    "server_prepare.py": "7301b8dd638f8499aae06ee85e13b8969ae9b8dbaf27549d326af507ef07f8db",
+    "panel_publication/network.py": "876b0efc4b251ad0e89dde0b887e86f96aa814a6cbfcc859a540cb6559fdea8f"
+  },
+  "server_status": "user reports query did not finish then fetch had no visible counters for 35 seconds; exact current connection cause unconfirmed",
+  "server_ssh_deployed": false,
+  "training_settings_changed": false
+}

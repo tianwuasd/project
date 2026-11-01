@@ -1,0 +1,48 @@
+{
+  "version": "0.7.0",
+  "date": "2026-10-31",
+  "user_scope": "minimal project patch then Skill v2 only; preserve v1 and CT",
+  "default_global_batch": 4,
+  "fixed_batch": true,
+  "control": {
+    "run": 422,
+    "passed": 369,
+    "skipped": 53,
+    "log_sha256": "c48cd78056cf9d7af07f3ed11a2d4c7a2a0ea201eae72437e2d0be1832d832c1"
+  },
+  "final_boundary": {
+    "run": 45,
+    "passed": 43,
+    "skipped": 2,
+    "log_sha256": "56c9e557b17d10aa231cef38cd870b565b45c7c3dd3e85157ee668cea95445f2"
+  },
+  "ddp_cpu_api": {
+    "run": 22,
+    "passed": 20,
+    "skipped": 2,
+    "log_sha256": "8eecbe9042cee70197c560a2d5e9b8c3d7d80b60ec0dddcb53c01ff4f23edf92"
+  },
+  "quick_check": {
+    "run": 67,
+    "syntax_files": 82,
+    "skipped": 0
+  },
+  "preprocessing_producers_unchanged": 7,
+  "independent_review": "reported lifecycle and retained-budget races fixed and rechecked",
+  "target_linux_process_groups_validated": false,
+  "target_cuda_validated": false,
+  "real_ct_executed": false,
+  "actual_cpu_gloo": {
+    "world_sizes": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "global_batch": 4,
+    "batch_dice": false,
+    "max_gradient_error": 1.4901161193847656e-08,
+    "max_update_error": 0.0,
+    "report_sha256": "6c563b0d476997c38bace28166ead5ba6de9bae59ff934725be4f869e2e4aca2"
+  }
+}
