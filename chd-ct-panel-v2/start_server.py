@@ -1,13 +1,8 @@
-"""Linux entry; bootstrap needs only the standard library."""
-
-import sys
+"""Compatibility for the former six-network V2 entry."""
 from pathlib import Path
+import runpy
+import sys
 
-if __name__ == "__main__":
-    for stream in (sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(encoding="utf-8", errors="replace")
-    sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
-    from chd_ct_v2.panel_v2.panel import main
-
-    raise SystemExit(main())
+if __name__=='__main__':
+    sys.argv[1:]=['--engine','multistage',*sys.argv[1:]]
+    runpy.run_path(str(Path(__file__).resolve().parent/'start_server_v2.py'),run_name='__main__')
