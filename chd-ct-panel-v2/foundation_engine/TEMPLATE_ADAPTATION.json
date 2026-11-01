@@ -1,0 +1,12 @@
+{
+  "template_version": "0.7.0",
+  "template_commit": "21ad9e539cb7dbcc6937b7e09064a7261cd2b913",
+  "template_archive_sha256": "7d952bcfb0009d2dc5eda5ece60badb84652b460fd2395fb15680de1e35de814",
+  "template_files_verified_before_adaptation": 212,
+  "architecture_blob": "85587aca5fdf1180dc266a138f3ae97c231875b2",
+  "target": "ImageCHD seven structures; isolated project, not an update of old experiments",
+  "scientific_recipe": "stunet_s_official_code_1000_v1",
+  "upstream_commit": "0652eaf5cafda6bc269942238c3695994f2dc4f0",
+  "user_global_batch_default": 4,
+  "legacy_recipe": "b31b4e1f frozen 250-epoch jobs remain unchanged"
+}

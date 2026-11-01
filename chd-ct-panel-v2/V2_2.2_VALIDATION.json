@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "release": "2.2.0",
+  "date": "2026-11-01",
+  "status": "local_acceptance_passed",
+  "official_reference": "uni-medical/STU-Net@0652eaf5cafda6bc269942238c3695994f2dc4f0",
+  "recipe": {
+    "id": "stunet_s_official_code_1000_v1",
+    "epochs": 1000,
+    "train_attempts_per_epoch": 250,
+    "validation_attempts_per_epoch": 50,
+    "S1_initial_lr": 0.001,
+    "S0_initial_lr": 0.01,
+    "SGD_momentum": 0.99,
+    "nesterov": true,
+    "weight_decay": 3e-05,
+    "poly_exponent": 0.9,
+    "primary_checkpoint": "checkpoint_final.pth",
+    "user_default_global_batch": 4
+  },
+  "tests": {
+    "CT_V2": {
+      "passed": 630,
+      "skipped": 27,
+      "seconds": 658.09
+    },
+    "ImageCHD_scientific_and_control": {
+      "passed": 263,
+      "skipped": 6,
+      "seconds": 291.803
+    },
+    "main_delivery_failure_injection": {
+      "passed": 5,
+      "included_in_CT_V2": true
+    },
+    "resources_quick": {
+      "passed": 67,
+      "included_in_ImageCHD": true
+    },
+    "additional_input_evaluation_recovery": {
+      "passed": 41,
+      "included_in_ImageCHD": true
+    }
+  },
+  "numerical": {
+    "network_class_AST_equal": true,
+    "synchronized_forward_max_error": 0,
+    "synchronized_gradient_max_error": 0,
+    "pretrained_tensors_exact": 120,
+    "output_head_tensors_reinitialized": 10,
+    "parameters_8_classes": 14548344,
+    "ignore_DDP_gradient_comparisons": 4,
+    "ignore_DDP_max_gradient_error": 0
+  },
+  "synthetic_CUDA": {
+    "passed": true,
+    "diagnostic_batch": 1,
+    "official_budget_verified_before_diagnostic": true,
+    "real_optimizer_updates": true,
+    "checkpoint_weights_exact": true,
+    "momentum_tensors_exact": 128,
+    "resumed_update": true,
+    "sliding_window_original_grid": [
+      48,
+      48,
+      64
+    ],
+    "seconds": 111.797
+  },
+  "preservation": {
+    "V1_tree": "7df6839ddd1e21ea1e742b935a0fe49814c1e118",
+    "changed_files_outside_V2": 0,
+    "original_CT_scientific_modules_unchanged": true,
+    "old_250_frozen_jobs_unchanged": true
+  },
+  "independent_review": "no remaining material findings after fixes; final tests run by implementer",
+  "legacy_template": {
+    "baseline": "b31b4e1f",
+    "tests_run": 422,
+    "failures": 19,
+    "errors": 37,
+    "skipped": 56,
+    "acceptance": false,
+    "reason": "legacy data/namespace/publication fixtures and platform assumptions; retained applicable input/evaluation/recovery tests run in current suite"
+  },
+  "limitations": [
+    "no formal ImageCHD training or new accuracy results",
+    "no target-server installation/deployment",
+    "no Linux CUDA/NCCL acceptance",
+    "diagnostic batch1 does not establish formal batch4 capacity",
+    "nnUNet2.8.1 compatibility port and user batch4 are explicit differences from original paper"
+  ]
+}

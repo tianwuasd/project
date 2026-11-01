@@ -1,0 +1,9 @@
+# Seven-structure baseline for a single GPU; not the paper's full diagnostic model.
+size: 96
+base: 16
+levels: 4
+epochs: 100
+batch: 1
+threads: 2
+learning_rate: 0.0002
+seed: 42

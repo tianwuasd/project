@@ -1,0 +1,9 @@
+# CPU software test only.
+size: 16
+base: 2
+levels: 3
+epochs: 1
+batch: 1
+threads: 2
+learning_rate: 0.0002
+seed: 42

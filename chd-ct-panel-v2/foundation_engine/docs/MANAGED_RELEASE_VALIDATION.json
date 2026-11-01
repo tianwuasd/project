@@ -1,0 +1,40 @@
+{
+  "panel_version": "0.3.5",
+  "checked_at": "2026-10-26T09:08:27.584594+00:00",
+  "source_of_failure": "User terminal: new_config rejected runtime with dedicated-directory error before submission",
+  "cause": "Managed code lives at runtime/releases/SHA; generic ancestor guard rejected its runtime",
+  "control_suite": {
+    "total": 107,
+    "passed": 102,
+    "skipped": 5
+  },
+  "python_ast": {
+    "status": "passed",
+    "files": 79
+  },
+  "focused_local_git_integration": {
+    "tests": 2,
+    "status": "passed",
+    "updates": 2,
+    "cache_eviction_recovered": true,
+    "actual_task_snapshot_plan_history_and_last_pointer": true,
+    "worker_launch": "mocked; no training"
+  },
+  "path_contract_tests": {
+    "tests": 3,
+    "status": "passed",
+    "managed_runtime_accepted": true,
+    "unmanaged_ancestors_rejected": true,
+    "data_and_results_protection": true
+  },
+  "unchanged": {
+    "planner_gib": 20,
+    "positive_cpu_planning": true,
+    "serial_training_augmentation": true,
+    "training_protocol": true
+  },
+  "server_deployed": false,
+  "real_server_submission_verified": false,
+  "real_ct_or_gpu_executed": false,
+  "linux_process_boundaries": "not validated on Windows"
+}
