@@ -41,7 +41,34 @@ def require_completed(run):
 
 
 def compatible_evaluation_code(recorded, current):
-    return recorded == current
+    if recorded == current:
+        return True
+    # Exact complete code-map identities, not version labels or skipped hashes.
+    # Audited small fixes accumulate edges, preserving older compatible inputs.
+    import hashlib
+    import json
+    def fingerprint(value):
+        return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+    try:
+        audit=read_json(CODE_ROOT/'06_configs/prediction_code_compatibility.json')
+        if audit.get('schema_version')!=1 or audit.get('scope')!='training-preserving-prediction-upgrade':
+            return False
+        edges=audit['transitions']
+        if not isinstance(edges,list):return False
+        target=fingerprint(current);pending=[fingerprint(recorded)];seen=set()
+        while pending:
+            source=pending.pop()
+            if source in seen:continue
+            seen.add(source)
+            for edge in edges:
+                if edge['source']!=source:continue
+                destination=edge['target']
+                if not isinstance(destination,str) or len(destination)!=64:continue
+                if destination==target:return True
+                pending.append(destination)
+    except (OSError,ValueError,KeyError,TypeError,AttributeError):
+        return False
+    return False
 
 
 def freeze_models():
@@ -67,6 +94,12 @@ def freeze_models():
                             environment_sha256=digest(ROOT / '06_configs/pip_freeze_training.txt'),
                             conda_environment_sha256=digest(ROOT / '06_configs/conda_explicit_training.txt'),
                             code_sha256=run['signature']['code_sha256'])
+            if 'selected_global_batch_size' in run['signature']:
+                batch=run['signature']['selected_global_batch_size']
+                if isinstance(batch,bool) or not isinstance(batch,int) or batch<1:
+                    raise ValueError(f'{fold}/{method} 训练签名的全局batch无效')
+                # Training owns this identity; prediction defaults are unrelated.
+                expected['selected_global_batch_size']=batch
             if not compatible_evaluation_code(expected['code_sha256'], code):
                 raise ValueError(f'{fold}/{method} 代码不是相同版本或已审计的评价调度升级版本')
             if run['signature'] != expected or run['split'] != split:

@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-31",
+  "updated_at": "2026-11-01",
   "timezone": "Asia/Shanghai",
   "project_root": "D:\\code_project\\vista3d_local_expert_refinement",
   "title": "局部专家协同的 VISTA3D 选择性分割修正",
-  "phase": "live_memory_fixed_batch_local_acceptance",
+  "phase": "prediction_signature_compatibility_local_acceptance",
   "confirmed": {
     "same_source_material": true,
     "source_labeled_ct": true,
@@ -61,7 +61,7 @@
     "additional_real_unlabeled_cohort_not_verified",
     "CT-PromptSAM_fulltext"
   ],
-  "next_action": "Publish project 0.7.0, rebuild and publish/install Skill v2 from fixed commit; preserve v1/CT. New server training may reuse compatible preprocessing; actual Linux CUDA acceptance pending.",
+  "next_action": "Publish tested 0.7.1 prediction fix; rebuild, verify, publish and install Skill v2; preserve old training and v1/CT.",
   "app_sidebar_registered": false,
   "remote_repository_created": false,
   "handoff_created": true,

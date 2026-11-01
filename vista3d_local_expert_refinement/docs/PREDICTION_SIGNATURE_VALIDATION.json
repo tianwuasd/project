@@ -1,0 +1,38 @@
+{
+  "version": "0.7.1",
+  "date": "2026-11-01",
+  "control": {
+    "run": 430,
+    "passed": 377,
+    "skipped": 53
+  },
+  "signature_tests": 8,
+  "quick_check": {
+    "tests": 67,
+    "syntax_files": 82,
+    "failures": 0,
+    "errors": 0
+  },
+  "local_pipeline": {
+    "status": "passed",
+    "synthetic_only": true,
+    "acceptance_fixture": true,
+    "formal_budget_changed": false,
+    "old_training_code": "0.7.0",
+    "new_prediction_code": "0.7.1",
+    "global_batch": 4,
+    "train_updates": 2,
+    "validation_steps": 1,
+    "fit_fingerprint_cases": 30,
+    "preprocessed_cases": 38,
+    "source_training_files_unchanged": 9,
+    "checkpoint_reload_equal": true,
+    "hardware": "NVIDIA GeForce RTX 4060 Laptop GPU",
+    "peak_allocated_gib": 0.0694265365600586
+  },
+  "prediction_cases": 1,
+  "target_server_weights_read": false,
+  "target_linux_nccl_validated": false,
+  "training_and_preparation_and_prediction_algorithms_unchanged": true,
+  "control_log_sha256": "7abf2dde351cf1103794107b45a1f4803e927286eb8c87946c8556cfc1fdff9e"
+}

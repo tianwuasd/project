@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "scope": "training-preserving-prediction-upgrade",
+  "transitions": [
+    {
+      "source": "5b86d5104ff534faed456a4597c0c0b4ab6be09ae48c985accf1450ab5131fe4",
+      "target": "f061ec3b910350ea1c84549242a7c00f86728ba39b8f81356844dbeda9c3ad0c",
+      "source_commit": "21ad9e539cb7dbcc6937b7e09064a7261cd2b913",
+      "source_version": "0.7.0",
+      "target_version": "0.7.1",
+      "reason": "Preserve selected_global_batch_size when freezing trained models; prediction metadata and panel version only",
+      "changed_files": {
+        "evaluation.py": {
+          "before": "49328415e77a4ce41ff378879f66a7b20ec14925ca27518859e03a0ef4540d44",
+          "after": "0b4a398e721e0809c99d9b9bab9ddce0239ce12e15ea770516a93ebe9c2b8b9d"
+        },
+        "task_panel.py": {
+          "before": "1cf281951c673e2649cc3b1e1d7965655ef1659ded7d9d5e4cf9013dbb2957db",
+          "after": "ce9aee647aad7521efc767c96f4f8eb04841030479c82c3b51c6d02971a789fe"
+        }
+      }
+    }
+  ]
+}
