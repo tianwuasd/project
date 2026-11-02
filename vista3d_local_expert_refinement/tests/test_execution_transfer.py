@@ -232,6 +232,8 @@ class TransferTests(unittest.TestCase):
         transfer.cuda = True
         transfer.stream = Stream()
         transfer.executor = ThreadPoolExecutor(max_workers=1)
+        # Emulate completed worker results; real serial sources are demand-only.
+        transfer.source.ready=lambda:transfer.source._next_index<4
         pin_threads = []
         def pin(tensor):
             pin_threads.append(threading.get_ident()); return tensor
@@ -377,7 +379,8 @@ class TransferTests(unittest.TestCase):
                 replay['data'].square().sum().backward() if replay['data'].requires_grad else replay['data'].square().sum()
                 transfer.mark_consumed()
                 if transfer.consumed < 3: replay=next(transfer)
-            self.assertEqual(transfer.stats['queue_peak'],2)
+            # Serial RNG-scoped generation is demand-only, even on CUDA.
+            self.assertEqual(transfer.stats['queue_peak'],1)
             self.assertGreater(transfer.stats['copy_seconds'],0)
             with self.assertRaises(StopIteration):next(transfer)
         finally: transfer.close()

@@ -455,11 +455,12 @@ class EpochBatchIterator:
     def _description(self, process, sequence):
         return f'batch worker pid={process.pid} stage={self.stage} sequence={sequence}'
 
-    def _receive(self):
+    def _receive(self, *, block=True):
         while True:
             try:
                 connection, packet, completed, packet_bytes = self._results.get_nowait()
             except queue.Empty:
+                if not block:return False
                 now = time.monotonic()
                 for connection, (sequence, started) in self._pending.items():
                     if now - started >= self.timeout_seconds:
@@ -523,7 +524,20 @@ class EpochBatchIterator:
             self._ready[sequence] = (connection, status, payload)
             if status != 'ok':
                 self._terminal_sequence = sequence if self._terminal_sequence is None else min(self._terminal_sequence, sequence)
-            return
+            return True
+
+    def ready(self):
+        """Poll only already-delivered worker packets; never generate or wait.
+
+        The caller retains all source/RNG ownership. Serial sources cannot
+        promise nonblocking generation, so never speculatively advance them.
+        """
+        if self._closed or self._paused or not self.workers:return False
+        if self.phase_steps is not None and self._next_index>=self.phase_steps:return False
+        while self._next_index not in self._ready:
+            if not self._receive(block=False):return False
+            self._fill()
+        return True
 
     def __next__(self):
         if self._closed:

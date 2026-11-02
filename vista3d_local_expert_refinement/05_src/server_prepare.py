@@ -12,7 +12,11 @@ from server_data import digest, write_json
 
 
 def compatible_signature(previous, current):
-    return previous == current
+    from preparation_identity import compatible
+    if not isinstance(previous,dict) or not isinstance(current,dict):return False
+    other=lambda value:{k:v for k,v in value.items() if k!='implementation_sha256'}
+    return (other(previous)==other(current) and
+            compatible(previous.get('implementation_sha256'),current.get('implementation_sha256')))
 
 
 def completion_directory(prep, cache, case_ids, plan_hash):
@@ -74,7 +78,9 @@ def prepare(fold, gpu_memory):
             raise ValueError("数据准备路径超出工作区")
     if previous is not None and previous != signature:
         # 保存旧签名供追溯，绝不把任意代码改动当成此次兼容迁移。
-        backup = prep / "server_preparation_signature.before_marker_fix.json"
+        import hashlib, json
+        previous_id=hashlib.sha256(json.dumps(previous,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        backup = prep / f"server_preparation_signature.before_{previous_id}.json"
         if backup.exists() and load_json(backup) != previous:
             raise ValueError("旧签名备份冲突，停止迁移")
         write_json(backup, previous)

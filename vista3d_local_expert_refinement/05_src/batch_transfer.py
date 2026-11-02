@@ -94,6 +94,11 @@ class BatchTransfer:
         bound = 2 if self.cuda else 1
         for index in range(bound):
             if self.exhausted or index in self.queue or index == self.active: continue
+            # Never delay an owned batch waiting for a future one. Only a
+            # source with a nonblocking readiness contract may fill lookahead.
+            if self.queue:
+                ready=getattr(self.source,'ready',None)
+                if not callable(ready) or not ready():break
             started = time.perf_counter()
             try: batch = next(self.source)
             except StopIteration:

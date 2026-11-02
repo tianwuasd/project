@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "version": "0.7.2",
+  "date": "2026-11-02",
+  "scope": [
+    "CPU case admission accounting",
+    "Nonblocking ordered batch lookahead",
+    "Exact prior-input compatibility"
+  ],
+  "control": {
+    "run": 446,
+    "passed": 393,
+    "skipped": 53,
+    "failed": 0,
+    "errors": 0,
+    "command": "python -B tests/run_panel_suite.py",
+    "environment": "Windows; Python 3.13; source 05_src on PYTHONPATH; temporary subprocess/Git/link access enabled"
+  },
+  "focused": {
+    "supply_admission": 13,
+    "preparation_upgrade": 3,
+    "prediction_signature": 8,
+    "passed": 24
+  },
+  "quick_check": {
+    "run": 80,
+    "passed": 80,
+    "syntax_files": 82
+  },
+  "actual_transfer_api": {
+    "run": 19,
+    "passed": 19,
+    "skipped": 0,
+    "command": "VISTA_TEST_IDLE_CUDA=1 python -B -m unittest discover -s tests -p test_execution_transfer.py -v",
+    "environment": "Windows; Python 3.11; torch 2.12.1+cu126; idle RTX 4060 Laptop; synthetic tensors"
+  },
+  "evidence": {
+    "red.log": {
+      "sha256": "bef0520323770c199337316edbd691ae71a27729f428e3c66aed635f2ae1f2a6"
+    },
+    "control-verified.log": {
+      "sha256": "c6e42ab0fa72ec72176a9542a5fbb7ff2afe492aa17301eb73923ff43f03e614"
+    },
+    "transfer-cuda.log": {
+      "sha256": "a160e763e480d1f161828af180e8cf88bfd2a5714387a010a2235072845c67ff"
+    }
+  },
+  "prior_attempts": [
+    "RED reproduced original dispatch and lookahead failures.",
+    "Initial control runs lacked subprocess permissions and/or inherited source module path; final run above has the required test environment."
+  ],
+  "compatibility": [
+    "Cumulative exact prediction map edges 0.7.0 -> 0.7.1 -> 0.7.2",
+    "Exact seven-producer preparation edge 0.7.1 -> 0.7.2",
+    "Copied source input bytes and mtimes preserved; unknown maps and other signature differences rejected",
+    "Unfinished tasks retain frozen code"
+  ],
+  "not_validated": [
+    "Target Linux cgroup/process-group/NCCL deployment",
+    "Real CT model quality or server sustained throughput",
+    "Guaranteed CUDA copy/compute overlap on every step"
+  ],
+  "unchanged": [
+    "Training algorithm, sampler, fixed global batch, optimizer",
+    "GPU expansion and compilation policy",
+    "Skill v1 and independent CT assets"
+  ]
+}

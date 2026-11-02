@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "scope": "preprocessing-preserving-scheduling-upgrade",
+  "transitions": [
+    {
+      "source": "e6932d7633ed823da3e0e32b0e1d427a497fa9b7336e6ec5dadb7f858932ba53",
+      "target": "bf36fbafa88b0bfee4027954574c5f289fa3535c952f58552b3f123a24a055b0",
+      "source_commit": "baf4ad21b0af01538211ca295ee607a60bf71994",
+      "source_version": "0.7.1",
+      "target_version": "0.7.2",
+      "reason": "CPU dispatch accounting and nonblocking ordered batch lookahead only; scientific transformations and weights unchanged",
+      "changed_files": {
+        "server_prepare.py": {
+          "before": "783f67547b6247359469ce8159a1920fe0abb73f3cbadc11b5e79528a114c637",
+          "after": "453c6e7b044cf0682621d3651bd414da433407e4f01a08831af030f655941466"
+        },
+        "cpu_case_queue.py": {
+          "before": "267bcbcac7eafc61d59bf2d01ad1a635c4a372998720ada5aeca8f1b10660f11",
+          "after": "ae92fd43776be3aeb85c18c29e52bc9a90343693fd91e93d45303a70555cb785"
+        }
+      }
+    }
+  ]
+}

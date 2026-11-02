@@ -71,9 +71,9 @@ def inspect_input(config):
             raise CacheMismatch(f'{fold} 缓存未完整准备')
         prep = work / '04_data/derived/nnUNet_preprocessed' / f"Dataset{splits[fold]['dataset_id']:03d}_{fold}"
         signature = read_json(prep / 'server_preparation_signature.json')
-        from preparation_identity import current
+        from preparation_identity import current, compatible
         current_implementation=current()
-        if signature.get('implementation_sha256') != current_implementation:
+        if not compatible(signature.get('implementation_sha256'),current_implementation):
             raise CacheMismatch('来源预处理实现版本与当前程序不兼容；请在1预处理中新建任务，再选择它进行训练/预测。旧任务保持原版本，可原地续跑。')
         plan_file = prep / 'WholeheartBaselinePlans.json'
         if read_json(complete)['plan_sha256'] != digest(plan_file):
@@ -120,11 +120,11 @@ def source_compatibility(job):
         if meta.get('project_id')!=PROJECT_ID or meta.get('protocol_sha256')!=protocol_hash():
             return '数据协议不兼容，请先新建全来源CT预处理任务；旧任务保持冻结版本'
         splits=read_json(work/'04_data/manifests/splits_v1.json')['folds']
-        from preparation_identity import current
+        from preparation_identity import current, compatible
         expected=current()
         for fold in plan['folds']:
             signature=read_json(work/f'04_data/derived/nnUNet_preprocessed/Dataset{splits[fold]["dataset_id"]:03d}_{fold}/server_preparation_signature.json')
-            if signature.get('implementation_sha256')!=expected:return '预处理实现版本不兼容，请先新建预处理任务'
+            if not compatible(signature.get('implementation_sha256'),expected):return '预处理实现版本不兼容，请先新建预处理任务'
         return None
     except (OSError,ValueError,KeyError,TypeError):return '缺少完整预处理来源记录，请先完成预处理任务'
 

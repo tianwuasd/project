@@ -19,6 +19,44 @@
           "after": "ce9aee647aad7521efc767c96f4f8eb04841030479c82c3b51c6d02971a789fe"
         }
       }
+    },
+    {
+      "source": "f061ec3b910350ea1c84549242a7c00f86728ba39b8f81356844dbeda9c3ad0c",
+      "target": "004ea8d2f9cd07c5b3b91a83d7f611825c221f963e63bf272297061fd2f603ad",
+      "source_commit": "baf4ad21b0af01538211ca295ee607a60bf71994",
+      "source_version": "0.7.1",
+      "target_version": "0.7.2",
+      "reason": "CPU dispatch accounting and nonblocking ordered batch lookahead only; scientific transformations and weights unchanged",
+      "changed_files": {
+        "batch_pool.py": {
+          "before": "c2874005b6d5adc3dc801a6a200c2f94ca1ecf93dad4afed863625451435f6d9",
+          "after": "1417313e62d62a2891f349cbfdf4510feebc6710b9288283d92acfa44b5e69f8"
+        },
+        "batch_transfer.py": {
+          "before": "a5aa4f09a15ba33c7af955e1ff84998d94a99c5c28f6a295797c53bba5f362b9",
+          "after": "b0ca4fc716edf433f91a934f0297a264730df192c74eaf3207f80ee35a9387a3"
+        },
+        "cpu_case_queue.py": {
+          "before": "267bcbcac7eafc61d59bf2d01ad1a635c4a372998720ada5aeca8f1b10660f11",
+          "after": "ae92fd43776be3aeb85c18c29e52bc9a90343693fd91e93d45303a70555cb785"
+        },
+        "preparation_identity.py": {
+          "before": "737bc35f3ed318262d80e820f702535a290405ede3376ce474c98facfffb6bc0",
+          "after": "c913853daa04fb3607d84977ebafe21c62b2ba270065b2a7a6cddcd633bc86d7"
+        },
+        "server_prepare.py": {
+          "before": "783f67547b6247359469ce8159a1920fe0abb73f3cbadc11b5e79528a114c637",
+          "after": "453c6e7b044cf0682621d3651bd414da433407e4f01a08831af030f655941466"
+        },
+        "task_inputs.py": {
+          "before": "ba6fcc77765d69ea3c1d2524e0aeb2d250fd44a0fe5069bc36cc7373defb7f1d",
+          "after": "b0f186cdc9a0035b8afe01d520363b77ba3aa1e3ac3cf54e6d850777273b62e9"
+        },
+        "task_panel.py": {
+          "before": "ce9aee647aad7521efc767c96f4f8eb04841030479c82c3b51c6d02971a789fe",
+          "after": "4877f924d1deeb9117bc48af18c6c7ec5ae33b30b84d181c4776ea28711ea900"
+        }
+      }
     }
   ]
 }

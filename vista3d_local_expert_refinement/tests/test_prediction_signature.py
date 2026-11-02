@@ -72,12 +72,13 @@ class PredictionSignature(unittest.TestCase):
     def test_same_code_legacy_shape_still_accepted(self):
         self.assertEqual(self.freeze()[0][0]['signature'],self.signature)
 
-    def test_shipped_audit_binds_actual_release_bytes_and_reviewed_two_file_change(self):
+    def test_shipped_audit_binds_actual_release_bytes_and_reviewed_scheduling_change(self):
         current={p.name:digest(p) for p in SRC.glob('*.py')}
         audit=read_json(SRC.parent/'06_configs/prediction_code_compatibility.json')
         edge=audit['transitions'][-1]
-        self.assertEqual(edge['source_version'],'0.7.0')
-        self.assertEqual(set(edge['changed_files']),{'evaluation.py','task_panel.py'})
+        self.assertEqual(edge['source_version'],'0.7.1')
+        self.assertEqual(set(edge['changed_files']),{'cpu_case_queue.py','batch_pool.py','batch_transfer.py',
+            'task_panel.py','preparation_identity.py','task_inputs.py','server_prepare.py'})
         self.assertEqual(edge['target'],fingerprint(current))
         previous=dict(current)
         for name,values in edge['changed_files'].items():

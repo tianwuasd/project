@@ -16,7 +16,7 @@ def main():
     sys.path[:0]=[str(root/'05_src'),str(root/'tests')]
     suite=unittest.TestSuite()
     for pattern in ['test_capped_batch.py','test_performance_repair.py','test_training_policy.py','test_memory_guard.py',
-                    'test_live_resources.py','test_install_routes.py','test_gpu_memory.py']:
+                    'test_live_resources.py','test_install_routes.py','test_gpu_memory.py','test_supply_admission.py']:
         suite.addTests(unittest.defaultTestLoader.discover(str(root/'tests'),pattern=pattern))
     capture=io.StringIO()
     with contextlib.redirect_stdout(capture),contextlib.redirect_stderr(capture):
