@@ -1,8 +1,0 @@
-* text eol=lf
-# Vendored and archival sources retain their recorded original bytes.
-src/chd_ct_v2/models/reference/* -text -whitespace
-src/chd_ct_v2/panel_v2/live_resources.py -text -whitespace
-back/** -text -whitespace
-CT-MASTER-MANIFEST.json -text -whitespace
-
-back/before-inplace-20261101/** -text -whitespace
