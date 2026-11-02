@@ -1,0 +1,1 @@
+"""Read-only input discovery and data analysis."""

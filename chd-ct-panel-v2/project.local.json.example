@@ -1,0 +1,9 @@
+{
+  "raw_root": "/absolute/path/to/ImageCHD_dataset",
+  "descriptor": null,
+  "analysis_python": "/absolute/path/to/validated/python",
+  "output_root": "outputs",
+  "preprocess_output_root": "outputs/preprocessing",
+  "component_cases": [],
+  "snapshot_cases": []
+}

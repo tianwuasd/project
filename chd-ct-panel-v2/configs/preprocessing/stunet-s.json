@@ -1,0 +1,19 @@
+{
+  "name": "stunet-s",
+  "protocol": "imagechd-stunet-s-clean96-ct-v1",
+  "description": "ImageCHD七结构：固定历史角色，排除缺标注及已确认灰度问题，训练集CT统计",
+  "expected_source_pairs": 110,
+  "expected_included": 96,
+  "expected_complete_before_exclusions": 97,
+  "exclude_cases": ["ct_1170"],
+  "ignore_label": 8,
+  "allowed_extra_labels": [8, 10, 12, 13, 14, 15],
+  "spacing_source": "imagechd_author_excel",
+  "spacing_excel_sha256": "f780f0775608ab2bee583371a3e0959ce20d05e75056d44d02ddc5848ec4ec1d",
+  "normalization": "CTNormalization",
+  "foreground_samples_per_case": 200000,
+  "sample_seed": 1234,
+  "split_seed": 42,
+  "compression_patch_hint": [128, 128, 128],
+  "nnunet_version": "2.8.1"
+}

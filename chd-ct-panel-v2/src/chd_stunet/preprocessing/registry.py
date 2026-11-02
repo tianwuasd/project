@@ -1,0 +1,28 @@
+"""Method registry: expose only implemented, versioned scientific contracts.
+
+The CLI/scheduler know no label rules. A future model may register another
+config and adapter here without changing the current method's cache identity.
+"""
+import json
+import importlib
+from ..config import ROOT
+
+CONFIGS = {'stunet-s': ROOT / 'configs/preprocessing/stunet-s.json'}
+ADAPTERS = {'stunet-s':'chd_stunet.preprocessing.stunet_s'}
+
+
+def get_method(name):
+    if name not in CONFIGS:
+        raise ValueError('Unknown preprocessing method: ' + name)
+    return json.loads(CONFIGS[name].read_text(encoding='utf-8'))
+
+
+def list_methods():
+    return [get_method(name) for name in CONFIGS]
+
+
+def get_adapter(name):
+    """Resolve method leaves only when execution begins, not during CLI help."""
+    if name not in CONFIGS or name not in ADAPTERS:
+        raise ValueError('Unknown/unimplemented preprocessing adapter: '+name)
+    return importlib.import_module(ADAPTERS[name])

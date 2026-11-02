@@ -1,0 +1,10 @@
+# Torch CPU is installed separately by setup_env.py; no CUDA/weights required.
+numpy==2.4.4
+scipy==1.17.1
+nibabel==5.4.2
+psutil==7.2.2
+threadpoolctl==3.7.0
+matplotlib==3.11.0
+scikit-image==0.26.0
+blosc2==4.14.1
+nnunetv2==2.8.1

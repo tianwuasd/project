@@ -1,0 +1,1 @@
+"""Run records with a single parent-process writer."""

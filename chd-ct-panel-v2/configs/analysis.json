@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "analysis_protocol": "imagechd-read-only-analysis-v1",
+  "max_workers": 4,
+  "readers": 2,
+  "components": "selected",
+  "policy_note": "Read-only screening, not automatic data repair or cohort selection"
+}

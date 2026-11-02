@@ -1,0 +1,7 @@
+# Exact versions present in the local analysis environment; Linux installation not certified.
+numpy==2.4.4
+scipy==1.17.1
+nibabel==5.4.2
+matplotlib==3.11.0
+psutil==7.2.2
+threadpoolctl==3.7.0

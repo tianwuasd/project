@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chd-stunet"
+version = "0.2.0"
+description = "CHD data analysis and selectable, versioned preprocessing"
+requires-python = ">=3.11"
+dependencies = ["numpy", "scipy", "nibabel", "matplotlib", "psutil", "threadpoolctl"]
+
+[project.optional-dependencies]
+preprocess = ["nnunetv2==2.8.1", "blosc2==4.14.1", "scikit-image==0.26.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,4 @@
+# Keep code bytes stable across Windows/Linux for the SHA256 code manifest.
+* text=auto eol=lf
+# Preserve the audited V2 prefix byte-for-byte, including its separator at EOF.
+src/chd_stunet/_vendor/vista_live_resources.py whitespace=-blank-at-eof

@@ -1,0 +1,8 @@
+project.local.json
+outputs/
+.venv*/
+__pycache__/
+*.pyc
+*.log
+.pytest_cache/
+.ruff_cache/

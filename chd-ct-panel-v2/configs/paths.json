@@ -1,0 +1,10 @@
+{
+  "linux": {
+    "raw_root": "/data_nas/zhangruichen/baidu_import/ImageCHD_dataset",
+    "preprocess_output_root": "/data_nas/zhangruichen/chd_ct_v2_stunet_results/preprocessing",
+    "runtime_root": "/data5/zhougaowei/zhangruichen_workspace/chd_ct_v2_stunet_runtime"
+  },
+  "win32": {
+    "preprocess_output_root": "outputs/preprocessing"
+  }
+}
