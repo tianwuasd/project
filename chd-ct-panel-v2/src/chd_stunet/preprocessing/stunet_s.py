@@ -121,7 +121,10 @@ def bounded_locations(seg, classes_or_regions, seed=1234, verbose=False,
                 positions = np.flatnonzero(np.isin(flat[start:start+block],labs))
                 indices[left:right] = start+positions[offsets[left:right]-seen]
             seen += count
-        result[key] = np.column_stack(np.unravel_index(indices,seg.shape[1:])).astype(np.int32)
+        # nnU-Net 2.8.1 get_bbox indexes selected_voxel[axis + 1]. Its
+        # contract is (channel,z,y,x), not just (z,y,x), even for one channel.
+        coordinates = np.column_stack(np.unravel_index(indices,seg.shape[1:]))
+        result[key] = np.column_stack((np.zeros(k,dtype=np.int32),coordinates)).astype(np.int32)
     return result
 
 
@@ -172,6 +175,7 @@ def preprocess_case(job):
                       geometry_evidence=job['spacing_evidence'],method_protocol=job['method']['protocol'],
                       annotation=annotation,cohort_group=group,roles=job.get('roles',{}),
                       foreground_sampling_class_ids=annotation['annotated_class_ids'],
+                      class_location_coordinate_format='channel_zyx',
                       annotated_area_semantics=('nonignore_region_with_ambiguous_background'
                           if annotation['requires_partial_loss'] else 'nonignore_region'))
     plans = PlansManager(job['plan'])

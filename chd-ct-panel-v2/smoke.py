@@ -1,6 +1,9 @@
 """Two real source pairs through the same read-only analysis pipeline."""
 from pathlib import Path
 import sys
+if __name__=='__mp_main__':
+    import signal
+    signal.signal(signal.SIGINT,signal.SIG_IGN)
 
 sys.path.insert(0,str(Path(__file__).resolve().parent/"src"))
 from chd_stunet.cli import main
@@ -11,12 +14,14 @@ if __name__=="__main__":
     arguments=sys.argv[1:]
     if '--stage' in arguments:
         at=arguments.index('--stage')
-        if at+1>=len(arguments) or arguments[at+1] not in ('analyze','prepare'):
-            raise SystemExit('--stage requires analyze or prepare')
+        if at+1>=len(arguments) or arguments[at+1] not in ('analyze','prepare','train'):
+            raise SystemExit('--stage requires analyze, prepare or train')
         stage=arguments[at+1]
         arguments=arguments[:at]+arguments[at+2:]
     else:
         stage='analyze'
+    if stage=='train':
+        raise SystemExit(main(['train','--smoke',*arguments]))
     if stage=='prepare':
         # Uses the full source audit and full training-only fit. Only the output
         # cases are limited; the native/resampled sizes are never downscaled.

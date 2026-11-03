@@ -5,9 +5,9 @@
 | 方法 | 纳入 | 用途 |
 |---|---|---|
 | `stunet-s` | 96例完整标注主队列 | 保留当前完整监督预处理基线 |
-| `stunet-s-partial` | 同96例主队列＋13例缺MYO辅助池 | 为后续部分监督训练准备数据，尚未实现训练 |
+| `stunet-s-partial` | 同96例主队列＋13例缺MYO辅助池 | 为已接入的部分监督训练准备数据 |
 
-两种方法共享原生nnU-Net变换和V2资源调度，不复制一套算法。新方法协议为`imagechd-stunet-s-main96-aux13-ct-v1`。当前确认的源灰度问题病例继续排除，不做自动纹理修复；其他缺标组合也不会自动放入辅助池。
+两种方法共享原生nnU-Net变换和V2资源调度，不复制一套算法。当前新输出协议为`imagechd-stunet-s-main96-aux13-ct-v2`，修正原生取块所需的四列坐标；旧v1已知生产者缓存可由训练入口只读适配。源灰度问题病例继续排除，不做自动纹理修复；其他缺标组合也不会自动放入辅助池。
 
 ```bash
 python run.py prepare --list-methods
@@ -59,18 +59,18 @@ python run.py prepare --method stunet-s-partial --cohort main --fold 0 --output 
 
 `status=complete`只表示七类编号均存在，不代表已经专家逐层复核。部分标注的pkl另存`cohort_group=auxiliary`和三折`roles`。`foreground_sampling_class_ids`仅列出六个已标类别；MYO没有前景位置。原生nnU-Net的annotated-area坐标在此只能解释为“非ignore存储区域”，不能推断背景已完整标注，`annotated_area_semantics`会明确提示其背景歧义。
 
-## 训练消费合同：本阶段只准备输入
+## 训练消费合同：预处理不自动启动训练
 
 `manifests/training_contract.json`和每折的`training_contract.json`会标明：
 
-- 当前为`preprocessing_only`，`training_implemented=false`。
+- 当前为`preprocessing_only`，新合同标记`training_implemented=true`、`training_executed=false`，可由`run.py train`消费。旧v1合同的false是历史阶段状态，不代表当前训练入口不可用。
 - 辅助数据需要部分监督，不能直接交给忽略病例元数据的完整监督trainer。
 - 对辅助源标签0，后续边际交叉熵须合并`P(背景)+P(MYO)`，Dice也须对应适配；不是只关闭MYO的Dice项。
 - 下游数据加载器须把每例annotation随patch传给损失函数，使用`aux_train`混合采样；此处未选择混合比例或正式训练预算。
 
 各折`splits.json`包含独立的`train`、`val`、`test`、`aux_train`列表。主数据集JSON中的`numTraining=0`仍表示这是预处理产物，并非可以直接启动原生训练的完整数据集计划。
 
-上述边际监督原则依据[Marginal loss原文3.2节](https://arxiv.org/html/2007.03868v1)，以及[COSST方法IV-B–IV-D](https://arxiv.org/html/2304.14030v3)。本工程仅保存相应合同，没有声称复现它们的训练或取得性能收益。
+上述边际监督原则依据[Marginal loss原文3.2节](https://arxiv.org/html/2007.03868v1)，以及[COSST方法IV-B–IV-D](https://arxiv.org/html/2304.14030v3)。本工程已接入相应部分监督loss，未声称完整复现这些论文的训练或取得性能收益；实际入口和验证范围见[训练说明](training-usage.md)。
 
 ## 日志、恢复与资源
 

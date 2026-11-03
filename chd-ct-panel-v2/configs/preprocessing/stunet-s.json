@@ -1,6 +1,6 @@
 {
   "name": "stunet-s",
-  "protocol": "imagechd-stunet-s-clean96-ct-v1",
+  "protocol": "imagechd-stunet-s-clean96-ct-v2",
   "description": "ImageCHD七结构：固定历史角色，排除缺标注及已确认灰度问题，训练集CT统计",
   "expected_source_pairs": 110,
   "expected_included": 96,

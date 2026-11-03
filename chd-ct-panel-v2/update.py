@@ -21,7 +21,7 @@ ROOT=Path(__file__).resolve().parent
 REMOTE='https://api.github.com/repos/tianwuasd/project/contents/chd-ct-panel-v2/'
 ROOT_FILES={'run.py','analyze.py','smoke.py','setup_env.py','preprocess_worker.py','update.py',
             'pyproject.toml','README.md','.gitignore','.gitattributes','requirements-analysis.txt',
-            'requirements-preprocess.txt','project.local.json.example'}
+            'requirements-preprocess.txt','requirements-training.txt','project.local.json.example'}
 
 
 def allowed(name):
@@ -88,11 +88,11 @@ def github_token():
     return None
 
 
-def remote_fetch(name,opener,token):
+def remote_fetch(name,opener,token,ref='main'):
     """Only the official GitHub API receives auth; errors contain no secret."""
     if name!='code-manifest.json' and not allowed(name):
         raise ValueError('Refusing unmanaged remote path: '+name)
-    url=REMOTE+urllib.parse.quote(name,safe='/')+'?ref=main'
+    url=REMOTE+urllib.parse.quote(name,safe='/')+'?'+urllib.parse.urlencode({'ref':ref})
     headers={'Accept':'application/vnd.github.raw+json','User-Agent':'chd-preprocessing-code-updater',
              'X-GitHub-Api-Version':'2022-11-28'}
     if token:
@@ -118,9 +118,10 @@ def main():
     mode.add_argument('--apply',action='store_true')
     parser.add_argument('--proxy',help='temporary proxy for this updater only')
     parser.add_argument('--source',help='offline source directory with code-manifest.json')
+    parser.add_argument('--ref',default='main',help='explicit GitHub branch/tag/commit; default main')
     args=parser.parse_args()
     if not (args.check or args.apply):
-        print(json.dumps(dict(target=str(ROOT),source=args.source or REMOTE,
+        print(json.dumps(dict(target=str(ROOT),source=args.source or REMOTE,ref=args.ref,
             scope='this folder code only; local config, outputs, venv and sibling projects preserved',
             next='--check validates incoming code; --apply installs with backups'),indent=2))
         return 0
@@ -133,7 +134,7 @@ def main():
             if not path.is_relative_to(source):
                 raise ValueError('Source path escapes its root')
             return path.read_bytes()
-        return remote_fetch(name,opener,token)
+        return remote_fetch(name,opener,token,args.ref)
     manifest_bytes=fetch('code-manifest.json')
     manifest=json.loads(manifest_bytes)
     files=validate_manifest(manifest)
@@ -171,6 +172,7 @@ def main():
     work.mkdir(parents=True,exist_ok=True)
     record=dict(action='applied' if args.apply else 'checked',changed_files=changes,
                 source=str(source) if source else REMOTE,backup=str(work/'backup'),
+                ref=args.ref if source is None else None,
                 obsolete_files_removed=False,environment_modified=False)
     (work/'update-result.json').write_text(json.dumps(record,indent=2),encoding='utf-8')
     print(json.dumps(record,indent=2))

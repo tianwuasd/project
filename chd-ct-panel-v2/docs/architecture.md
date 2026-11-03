@@ -1,6 +1,6 @@
 # 结构依据与当前实现
 
-采用engineering-project-reference可裁剪源码结构。业务目前为ImageCHD分析和可选择方法的预处理，当前方法stunet-s；以后训练/预测单独实施和验收。目录名称保留用户指定的chd-ct-panel-v2，目前没有面板。
+采用engineering-project-reference可裁剪源码结构。当前包含ImageCHD分析、按方法选择的预处理，以及STU-Net-S完整/部分监督训练。训练提供同一执行器的短测、正式训练和检查点恢复；全体积预测与评价仍待独立实施和验收。目录名称保留用户指定的chd-ct-panel-v2，目前没有面板。
 
 ## 依据
 
@@ -25,6 +25,15 @@ run.py / smoke.py
         → nnU-Net2.8.1原生裁剪/归一化/重采样
       → fingerprint.py                            train统计与官方spacing
       → observability                             日志/状态/锁/读取准入
+
+    → training/contracts.py / data.py              配方、版本、来源、角色和块加载
+      → training/model.py / weights.py              官方STU骨干和作者权重
+      → training/losses.py                          完整/部分监督与深监督
+      → training/engine.py                          train/validation状态机
+        → acceleration/training_cpu.py              有界供数和已消费游标
+        → training/resources.py                     GPU准入和固定尺寸容量检查
+        → training/checkpoints.py                   原子代次、优化器和RNG恢复
+        → training/code_snapshot.py                 固定运行代码及worker来源核验
 ```
 
 已有分析走analysis_run与data/analysis，不因预处理增加而修改其只读语义。短测与正式流程共用业务实现，根入口只转发参数。查询、方法列表和环境计划不启动训练。
@@ -33,8 +42,8 @@ run.py / smoke.py
 
 方法参数在configs/preprocessing，默认机器路径在configs/paths和私有project.local。CLI显式路径优先，相对路径按源码根，空路径报错。源清单、方法参数、软件版本和生产代码hash约束复用；资源上限不改变科学统计。
 
-分析与预处理输出分开，方法/协议/运行分目录，历史97角色只过滤不重新划分。每折独立拟合train；后续训练还必须单独限定train/val/test标签访问。预处理计划没有STU网络结构或正式训练patch；128³只是压缩块提示。
+分析、预处理与训练输出分开，方法/协议/运行分目录，历史97角色只过滤不重新划分。每折独立拟合train；训练单独限定main train/aux_train及main val，拒绝外折test。预处理计划没有STU网络结构或正式训练patch；其中128³只是压缩块提示，训练128³是独立的显式工程配方。
 
 父进程单写总日志、事件与状态；病例进程写独立日志和结果。每秒资源采样、阶段预算分别记录，不能用CPU槽预算替代实际活动进程。源SHA前后不变，产物逐块回读后才提交完成标记。拒绝不兼容恢复时先保护旧证据。
 
-验收包括合成科学合同、cgroup事实注入、OS锁、真实nnU-Net/Blosc2接口及本地真实输入。实际病例分母见各次输出，不能把几例通过当成全96对三折完成。Linux正式负载、新装服务器环境和GPU训练尚需后续独立验收。
+验收包括合成科学合同、cgroup事实注入、OS锁、真实nnU-Net/Blosc2接口及本地真实输入。训练还检查原生损失数值/梯度、真实单卡短训，以及不同供数进程数下连续/断点恢复的模型、优化器、scaler与RNG一致性。实际病例分母见各次输出，不能把几例通过当成全96对三折完成。Linux正式负载、新装服务器环境、128³/B4容量、全体积预测和分割效果仍须独立验收。

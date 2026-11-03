@@ -203,7 +203,8 @@ def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(
                 roles={r['case_id']:r['roles'] for r in included},patient_level_verified=False))
             # This is a PREPROCESSING artifact, not a ready-made fully supervised
             # nnU-Net dataset. A future trainer must read every case annotation.
-            consumer = dict(schema=1,stage='preprocessing_only',training_implemented=False,
+            consumer = dict(schema=2,stage='preprocessing_only',training_implemented=True,
+                training_executed=False,compatible_training_entry='run.py train',
                 partial_supervision_required=bool(group_counts['auxiliary']),
                 main_fit_only=True,patient_identity_verified=False,
                 required_case_properties=['annotation','cohort_group','roles'],

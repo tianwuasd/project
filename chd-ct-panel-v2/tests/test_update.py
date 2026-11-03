@@ -43,6 +43,8 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(request.full_url,'https://api.github.com/repos/tianwuasd/project/contents/chd-ct-panel-v2/code-manifest.json?ref=main')
         self.assertEqual(request.get_header('Authorization'),'Bearer existing-token')
         self.assertIsNone(NoRedirect().redirect_request(request,None,302,'redirect',{},'https://another.example/code'))
+        remote_fetch('code-manifest.json',opener,'existing-token','codex/example-branch')
+        self.assertTrue(opener.open.call_args.args[0].full_url.endswith('?ref=codex%2Fexample-branch'))
 
     def test_offline_update_preserves_local_config_outputs_and_siblings(self):
         scratch=ROOT/'outputs/tests-tmp';scratch.mkdir(parents=True,exist_ok=True)

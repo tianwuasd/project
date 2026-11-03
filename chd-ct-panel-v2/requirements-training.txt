@@ -1,0 +1,5 @@
+# Torch is installed separately by setup_env.py, in the chosen CPU/CUDA build.
+-r requirements-preprocess.txt
+acvl-utils==0.2.6
+batchgenerators==0.25.5
+batchgeneratorsv2==0.3.6

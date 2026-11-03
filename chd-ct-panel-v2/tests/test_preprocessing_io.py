@@ -31,8 +31,10 @@ class PreprocessingIOTests(unittest.TestCase):
         self.assertEqual(len(locations[1]),2)
         annotated=locations[tuple(groups[-1])]
         self.assertEqual(len(annotated),6)
+        self.assertEqual(annotated.shape[1],4)
         for coord in annotated:
-            self.assertNotEqual(seg[(0,*coord)],8)
+            self.assertEqual(coord[0],0)
+            self.assertNotEqual(seg[tuple(coord)],8)
 
     def test_affine_changes_only_derived_column_lengths(self):
         from chd_stunet.preprocessing.stunet_s import corrected_affine

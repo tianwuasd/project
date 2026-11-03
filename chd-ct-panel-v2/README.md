@@ -1,6 +1,6 @@
-# CHD：数据分析与可选择方法的预处理
+# CHD：数据分析、预处理与STU-Net-S训练
 
-这是独立的代码工程，沿用 `chd-ct-panel-v2` 目录名。按engineering-project-reference逐模块实施，当前提供数据分析、环境部署及可选STU-Net-S预处理；没有面板、训练、预测。
+这是独立的代码工程，沿用`chd-ct-panel-v2`目录名。提供数据分析、环境部署、可选STU-Net-S预处理，以及CPU/单卡STU-Net-S训练；没有面板或全体积预测入口。
 
 ## 开始使用
 
@@ -33,7 +33,15 @@ python run.py prepare --method stunet-s-partial --cohort auxiliary --fold 0
 python run.py prepare --method stunet-s-partial --fold all
 ```
 
-当前仅完成预处理，不能直接把部分标注产物交给普通完整监督损失。每折`training_contract.json`明确后续加载器和损失必须消费的标注合同。
+训练入口已消费这些标注合同，支持完整监督及缺MYO的部分监督；不能把辅助产物交给忽略该合同的普通损失。见[训练使用说明与结构](docs/training-usage.md)。
+
+```bash
+python setup_env.py --check --profile training
+python smoke.py --stage train --output outputs/train-smoke
+python run.py train --fold 0 --output outputs/train-fold0
+```
+
+训练默认使用已保存的预处理run和权重路径；正式1000轮/B4/128³，短测另记64³/B1。默认从main train与aux_train按病例均匀抽样，验证仅main val；正式运行要求完整本折缓存。未通过容量准入不暗降规格。
 
 CPU调度使用skill V2 0.7.2：CPU/RAM80%、至少4GiB主机余量、按重采样体积准入、有界独立病例进程、内层1线程、独立读入闸门、每秒内存监督和逐例恢复。来源与边界见[V2适配](docs/v2-acceleration-provenance.md)。预算不是实际CPU使用量，也没有加速倍数结论。
 
@@ -59,6 +67,7 @@ configs/
   analysis.json                 分析策略
   paths.json                    已确认的服务器默认路径
   preprocessing/*.json         完整标注/部分标注方法协议与科学参数
+  training/stunet-s.json         版本化微调配方与短测覆盖项
 src/chd_stunet/
   cli.py / config.py            阶段、方法选择、路径解析
   data/                         只读统计、配对、作者表解析
@@ -69,9 +78,11 @@ src/chd_stunet/
     fingerprint.py              仅train拟合及官方spacing规则
     stunet_s.py                 审计、变换、写出验证
     run.py                      正式与短测共用监督流程
+  training/                     模型、部分监督loss、取块、训练、原子恢复
   acceleration/
     cpu.py                      既有本地分析策略
     preprocess_cpu.py           V2加权队列、实时准入和恢复
+    training_cpu.py             有界常驻供数、读取限流和确定性消费
   _vendor/                      审计后的V2策略依赖闭包
   observability/                日志、状态、OS锁、读取闸门
   analysis_run.py / reporting.py 分析执行和报告
@@ -80,7 +91,7 @@ tests/                          合成科学合同、I/O、恢复测试
 docs/                           方法、运行、来源、验收范围
 ```
 
-业务与CLI/调度分离，科学方法与机器路径分离。新增方法通过registry和相应适配器接入，不覆盖当前方法的协议和缓存。结构依据见[架构](docs/architecture.md)。后续训练与预测等预处理验收后再实现。
+业务与CLI/调度分离，科学方法与机器路径分离。新增方法通过registry和相应适配器接入，不覆盖当前方法的缓存。新预处理v2修正原生取块所需的四列前景坐标，训练对两份已审计旧生产者提供只读适配。结构依据见[架构](docs/architecture.md)；全体积预测以后单独接入。
 
 ## 更新与交付
 
@@ -92,6 +103,8 @@ python scripts/package_code.py
 ```
 
 更新器只接受本目录代码白名单和SHA清单，先暂存核验，再替换并保留旧文件，不删除未知文件、不更新环境或相邻CHD工程。远程更新从GitHub main读取，私有仓库复用已有GH_TOKEN/GITHUB_TOKEN、Git HTTPS或gh认证，不保存凭据；拒绝携带认证跟随重定向。只有SSH授权时，可先按已有Git方式同步代码目录，再使用 `--source` 离线更新。代码发布与服务器部署、全量预处理分别验证。
+
+训练开发分支为`codex/chd-stunet-training-20261103`，在它尚未合并main期间，可显式`python update.py --ref codex/chd-stunet-training-20261103 --check`，核对后用相同ref执行`--apply`；默认main不会自动切到开发分支。
 
 代码包不包含outputs、影像、权重、虚拟环境、私有配置；真实清单、日志、报告和分析图留在结果目录。
 
