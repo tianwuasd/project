@@ -14,6 +14,7 @@ from ..data.analysis import sha256_file
 from ..observability.locking import read_slot
 from ..observability.runlog import write_json
 from .cohort import map_labels
+from .annotations import make_annotation, validate_resampled_labels, validate_case_roles
 from .fingerprint import sample_foreground
 
 
@@ -53,7 +54,7 @@ def check_source_unchanged(job, before):
 
 
 def audit_case(job):
-    """Inspect every source pair before freezing the clean cohort and fit IDs."""
+    """Inspect every source pair before freezing cohorts and main-train fit IDs."""
     from nnunetv2.preprocessing.cropping.cropping import crop_to_nonzero
     started = time.monotonic()
     data,seg,original,affine,header_spacing,units,before = load_pair(job)
@@ -146,15 +147,33 @@ def preprocess_case(job):
     import torch
     started = time.monotonic()
     torch.set_num_threads(1)
-    torch.set_num_interop_threads(1)
+    # Each owned worker calls this once. The guard also permits repeated
+    # synthetic roundtrips in one process without resetting PyTorch's runtime.
+    if torch.get_num_interop_threads() != 1:
+        torch.set_num_interop_threads(1)
     blosc2.set_nthreads(1)
     data,seg,original,affine,_,_,before = load_pair(job)
     native_counts = {str(k):int((seg==k).sum()) for k in range(9)}
+    native_ids = {k for k in range(9) if native_counts[str(k)]}
+    observed_annotation = make_annotation(set(range(1,8)) - native_ids)
+    annotation = job.get('annotation', observed_annotation)
+    if annotation != observed_annotation:
+        raise ValueError('Native labels differ from audited annotation contract')
+    if annotation['requires_partial_loss']:
+        if (job['method'].get('partial_annotation_policy') != 'missing_myo_only'
+                or annotation['unannotated_class_ids'] != [5] or 'annotation' not in job):
+            raise ValueError('Partial source requires the audited missing-MYO preprocessing protocol')
+    group = job.get('cohort_group', 'auxiliary' if annotation['requires_partial_loss'] else 'main')
+    validate_case_roles(annotation,group,job.get('roles',{}))
     derived_affine = corrected_affine(affine,job['spacing_xyz'])
     properties = dict(nibabel_stuff=dict(original_affine=derived_affine),
                       spacing=job['spacing_xyz'][::-1],source_affine=affine,
                       source_shape_xyz=list(data.shape),source_hashes=before,
-                      geometry_evidence=job['spacing_evidence'],method_protocol=job['method']['protocol'])
+                      geometry_evidence=job['spacing_evidence'],method_protocol=job['method']['protocol'],
+                      annotation=annotation,cohort_group=group,roles=job.get('roles',{}),
+                      foreground_sampling_class_ids=annotation['annotated_class_ids'],
+                      annotated_area_semantics=('nonignore_region_with_ambiguous_background'
+                          if annotation['requires_partial_loss'] else 'nonignore_region'))
     plans = PlansManager(job['plan'])
     config = plans.get_configuration('3d_fullres')
 
@@ -168,11 +187,7 @@ def preprocess_case(job):
     if image.shape != labels.shape or not np.isfinite(image).all():
         raise ValueError('Non-finite or shape-inconsistent preprocessed arrays')
     label_ids = set(map(int,np.unique(labels)))
-    if not label_ids <= set(range(-1,9)):
-        raise ValueError('Non-discrete/unknown output labels')
-    missing = set(range(1,8))-label_ids
-    if missing:
-        raise ValueError('Resampling removed target classes: '+str(sorted(missing)))
+    validate_resampled_labels(native_ids,label_ids,annotation)
     image = image.astype(np.float32,copy=False)
     labels = labels.astype(np.int8,copy=False)
     cid = job['pair']['case_id']
@@ -211,6 +226,7 @@ def preprocess_case(job):
         files[name] = sha256_file(target/name)
     staging.rmdir()
     row = dict(success=True,case_id=cid,source_hashes=before,
+        annotation=annotation,cohort_group=group,roles=job.get('roles',{}),
         shape=list(image.shape),data_dtype=str(image.dtype),seg_dtype=str(labels.dtype),
         output_label_ids=sorted(label_ids),native_label_counts=native_counts,
         resampled_label_counts={str(k):int((labels==k).sum()) for k in sorted(label_ids)},

@@ -7,8 +7,9 @@ import json
 import importlib
 from ..config import ROOT
 
-CONFIGS = {'stunet-s': ROOT / 'configs/preprocessing/stunet-s.json'}
-ADAPTERS = {'stunet-s':'chd_stunet.preprocessing.stunet_s'}
+CONFIGS = {name: ROOT / 'configs/preprocessing' / (name + '.json')
+           for name in ('stunet-s', 'stunet-s-partial')}
+ADAPTERS = {name: 'chd_stunet.preprocessing.stunet_s' for name in CONFIGS}
 
 
 def get_method(name):

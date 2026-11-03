@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
+import tomllib
 from zipfile import ZipFile,ZIP_DEFLATED
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -17,7 +18,8 @@ def main():
         candidates.extend((ROOT/directory).rglob('*'))
     files={p.relative_to(ROOT).as_posix():hashlib.sha256(p.read_bytes()).hexdigest()
            for p in sorted(candidates) if p.is_file() and allowed(p.relative_to(ROOT).as_posix())}
-    manifest=dict(project='chd-ct-panel-v2',version='0.2.0',files=files,
+    version=tomllib.loads((ROOT/'pyproject.toml').read_text(encoding='utf-8'))['project']['version']
+    manifest=dict(project='chd-ct-panel-v2',version=version,files=files,
                   excluded=['outputs','project.local.json','environments','raw images','model weights'],
                   provenance=dict(vista_commit='47016371e8d56a19630585f49c2cc0299259fa34',
                     vista_version='0.7.2',vista_file='live_resources.py prefix before _rank_setting',

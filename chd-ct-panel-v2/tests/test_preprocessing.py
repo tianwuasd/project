@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 class MethodContractTests(unittest.TestCase):
     def test_registry_contains_only_implemented_methods(self):
         from chd_stunet.preprocessing.registry import get_method, list_methods
-        self.assertEqual([m['name'] for m in list_methods()], ['stunet-s'])
+        self.assertEqual([m['name'] for m in list_methods()], ['stunet-s','stunet-s-partial'])
         self.assertEqual(get_method('stunet-s')['expected_included'], 96)
         with self.assertRaises(ValueError):
             get_method('imaginary')
