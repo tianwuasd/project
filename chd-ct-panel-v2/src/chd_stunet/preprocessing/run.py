@@ -76,23 +76,30 @@ def check_resume_before_writing(output, signature, pairs):
                 raise ValueError('Resume intensity sample changed: '+row['case_id'])
 
 
-def cache_valid(foldroot,cid,contract,source_hashes):
+def cache_valid(foldroot,cid,contract,source_hashes,annotation=None):
     path = foldroot/'completion'/f'{cid}.json'
     if not path.is_file():
         return False
     row = json.loads(path.read_text(encoding='utf-8'))
     if row.get('contract') != contract or row.get('source_hashes') != source_hashes:
         return False
+    if annotation is not None and row.get('annotation') != annotation:
+        return False
     return all((foldroot/'data'/name).is_file() and sha256_file(foldroot/'data'/name)==sha
                for name,sha in row.get('file_sha256',{}).items()) and len(row.get('file_sha256',{})) == 3
 
 
 def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(0,1,2),
-                selected_cases=(),limit=None,workers=None,readers=None,resume=False,audit_only=False):
+                selected_cases=(),limit=None,workers=None,readers=None,resume=False,audit_only=False,
+                cohort='all'):
     raw, output = Path(raw_root).resolve(strict=True),Path(output).resolve()
     if not raw.is_dir() or raw==output or output.is_relative_to(raw) or raw.is_relative_to(output):
         raise ValueError('Raw data and derived output must be separate directories')
     method = get_method(method_name)
+    if cohort not in ('all','main','auxiliary'):
+        raise ValueError('Unknown output cohort: '+str(cohort))
+    if cohort=='auxiliary' and not method.get('expected_auxiliary'):
+        raise ValueError('This method has no auxiliary cohort; choose stunet-s-partial')
     discovery = discover_pairs(raw)
     pairs = discovery['pairs']
     if discovery['missing_labels'] or discovery['orphan_labels'] or len(pairs)!=method['expected_source_pairs']:
@@ -119,8 +126,10 @@ def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(
             write_json(output/'signature.json',signature)
             write_json(output/'effective_config.json',dict(method=method,raw_root=str(raw),
                 output=str(output),folds=list(folds),selected_cases=list(selected_cases),limit=limit,
+                output_cohort=cohort,
                 requested_workers=workers,requested_readers=readers,audit_only=audit_only,
-                source_scope='110 pairs audit; 96 clean cohort; historical 97 roles retained'))
+                source_scope=f"110 pairs audit; {method.get('expected_main',96)} main, "
+                    f"{method.get('expected_auxiliary',0)} auxiliary; historical 97 roles retained"))
             for relative in signature['producer_sha256']:
                 target = output/'code'/relative
                 target.parent.mkdir(parents=True,exist_ok=True)
@@ -177,31 +186,54 @@ def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(
                 if evidence.get(cid,{}).get('roles',{}) != row['roles'] and descriptor:
                     raise ValueError('Historical frozen roles differ: '+cid)
             included, excluded = select_cohort(rows,method)
+            group_counts = {group:sum(r['cohort_group']==group for r in included)
+                            for group in ('main','auxiliary')}
             manifest = dict(protocol=method['protocol'],method=method_name,source_pairs=len(rows),
                 included_pairs=len(included),excluded_pairs=len(excluded),patient_identity_verified=False,
+                cohort_counts=group_counts,
                 identity=signature['identity'],cases=included,excluded=excluded,
                 historical_complete_count=len(complete),new_split_generated=False)
             write_json(output/'manifests/imagechd_input.json',manifest)
             write_json(output/'manifests/historical_roles_97.json',roles)
             write_json(output/'manifests/excluded.json',excluded)
+            roles_in_output = ('train','val','test','aux_train')
             fold_counts = {str(f):{role:sum(r['roles'][str(f)]==role for r in included)
-                           for role in ('train','val','test')} for f in range(3)}
+                           for role in roles_in_output} for f in range(3)}
             write_json(output/'manifests/splits.json',dict(folds=fold_counts,
                 roles={r['case_id']:r['roles'] for r in included},patient_level_verified=False))
-            log.event('cohort.ready',f"纳入{len(included)}对，排除{len(excluded)}对；各折保留原角色",fold_counts=fold_counts)
+            # This is a PREPROCESSING artifact, not a ready-made fully supervised
+            # nnU-Net dataset. A future trainer must read every case annotation.
+            consumer = dict(schema=1,stage='preprocessing_only',training_implemented=False,
+                partial_supervision_required=bool(group_counts['auxiliary']),
+                main_fit_only=True,patient_identity_verified=False,
+                required_case_properties=['annotation','cohort_group','roles'],
+                auxiliary_role='aux_train',auxiliary_in_validation_or_test=False,
+                stock_fully_supervised_training_compatible=not bool(group_counts['auxiliary']),
+                partial_loss_requirements=dict(ambiguous_source_label=0,
+                    probability_sum_class_ids=[0,5],preserve_annotated_classes=[1,2,3,4,6,7],
+                    dice_requires_matching_label_merge=True) if group_counts['auxiliary'] else None)
+            write_json(output/'manifests/training_contract.json',consumer)
+            log.event('cohort.ready',f"纳入{len(included)}对：主队列{group_counts['main']}，辅助{group_counts['auxiliary']}；"
+                f"排除{len(excluded)}对；主队列保留原角色，辅助仅aux_train",fold_counts=fold_counts)
             selected = set(selected_cases)
-            if selected-set(r['case_id'] for r in included):
-                raise ValueError('Requested cases outside this clean cohort: '+str(sorted(selected-set(r['case_id'] for r in included))))
-            targets = [r for r in included if not selected or r['case_id'] in selected]
+            output_pool = [r for r in included if cohort=='all' or r['cohort_group']==cohort]
+            if selected-set(r['case_id'] for r in output_pool):
+                raise ValueError('Requested cases outside selected preprocessing cohort: '+str(sorted(selected-set(r['case_id'] for r in output_pool))))
+            targets = [r for r in output_pool if not selected or r['case_id'] in selected]
             if limit:
                 targets = targets[:limit]
-            samples = {r['case_id']:np.load(r['sample_path'],allow_pickle=False) for r in included}
+            # Auxiliary audit samples are retained as evidence, but deliberately
+            # excluded from the main-train fitting input even for --cohort auxiliary.
+            samples = {r['case_id']:np.load(r['sample_path'],allow_pickle=False)
+                       for r in included if r['cohort_group']=='main'}
             processed, reused, failed = 0, 0, []
+            processed_groups = dict(main=0,auxiliary=0)
+            reused_groups = dict(main=0,auxiliary=0)
             dataset = dict(channel_names={'0':'CT'},labels=TARGETS,file_ending='.nii.gz',
                            numTraining=0,description='preprocessing only; roles are in splits.json')
             write_json(output/'dataset.json',dataset)
             for fold in (() if audit_only else folds):
-                log.event('fingerprint.start',f"fold{fold}：仅使用训练角色拟合强度统计与目标spacing")
+                log.event('fingerprint.start',f"fold{fold}：仅使用主队列train拟合强度统计与目标spacing；辅助不参与拟合")
                 fingerprint,plan = make_plan(included,samples,fold,method)
                 foldroot = output/f'fold_{fold}'
                 contract = digest(dict(run=signature['identity'],plan=plan))
@@ -209,19 +241,23 @@ def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(
                 write_json(foldroot/'preprocessing_plan.json',plan)
                 # Deliberately separate train/validation from outer test roles.
                 write_json(foldroot/'splits.json',{role:[r['case_id'] for r in included if r['roles'][str(fold)]==role]
-                           for role in ('train','val','test')})
+                           for role in roles_in_output})
+                write_json(foldroot/'training_contract.json',dict(consumer,fold=fold,
+                    preprocessing_contract=contract,fit_ids=plan['fit_ids']))
                 target_spacing = plan['target_spacing_before_transpose'][::-1]
                 jobs = []
                 for row in targets:
                     cid = row['case_id']
-                    if cache_valid(foldroot,cid,contract,row['source_hashes']):
+                    if cache_valid(foldroot,cid,contract,row['source_hashes'],row['annotation']):
                         reused += 1
+                        reused_groups[row['cohort_group']] += 1
                         continue
                     result_path = foldroot/'results'/f'{cid}.json'
                     task = dict(stage='prepare',pair=row['pair'],method=method,plan=plan,dataset_json=dataset,
                         spacing_xyz=row['spacing_xyz'],spacing_evidence=row['spacing_evidence'],
                         expected_hashes=row['source_hashes'],gate=str(output/'read_gate.json'),
-                        result=str(result_path),foldroot=str(foldroot),contract=contract)
+                        result=str(result_path),foldroot=str(foldroot),contract=contract,
+                        annotation=row['annotation'],cohort_group=row['cohort_group'],roles=row['roles'])
                     taskfile = output/'tasks'/f'fold_{fold}'/f'{cid}.json'
                     write_json(taskfile,task)
                     jobs.append(dict(name=f'fold{fold}_{cid}',task=str(taskfile),result=str(result_path),
@@ -230,24 +266,30 @@ def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(
                     nonlocal processed
                     if result['success']:
                         processed += 1
+                        processed_groups[result['cohort_group']] += 1
                     else:
                         failed.append(dict(name=name,**result))
                 execute_jobs(jobs,output,log,stage_name=f'fold{fold}_prepare',workers=workers,
                              readers=readers,completed=prepared)
             summary = dict(method=method_name,protocol=method['protocol'],source_pairs=len(rows),
                 included_pairs=len(included),excluded_pairs=len(excluded),fold_counts=fold_counts,
+                cohort_counts=group_counts,output_cohort=cohort,
                 audited_reused=reused_audit,requested_folds=list(folds),audit_only=audit_only,
                 requested_case_ids=[r['case_id'] for r in targets],processed_cases=processed,
+                processed_by_cohort=processed_groups,reused_by_cohort=reused_groups,
                 reused_cases=reused,failed_cases=failed,elapsed_seconds=time.monotonic()-started,
-                scope='audit_only' if audit_only else 'selected_real_cases' if len(targets)<len(included) else 'full_clean_cohort',
+                scope='audit_only' if audit_only else 'selected_real_cases' if len(targets)<len(included)
+                    else 'full_main_and_auxiliary_cohort' if group_counts['auxiliary'] else 'full_clean_cohort',
                 model_training_executed=False)
             write_json(output/'summary.json',summary)
             text = (f"# {method_name} 预处理运行\n\n"
                     f"源文件对 {len(rows)}；纳入 {len(included)}；排除 {len(excluded)}。\n\n"
+                    f"主队列 {group_counts['main']}；辅助 {group_counts['auxiliary']}；输出选择 `{cohort}`。\n\n"
                     f"本次新处理 {processed}；复用 {reused}；失败 {len(failed)}；范围 `{summary['scope']}`。\n\n"
-                    "各折拟合病例见 `fold_N/dataset_fingerprint.json` 的 fit_ids；仅 train。"
+                    "各折拟合病例见 `fold_N/dataset_fingerprint.json` 的 fit_ids；仅主队列train。"
                     "原角色与排除理由见 manifests；逐例完整日志见 logs。\n\n"
-                    "预处理完成项是 completion/*.json；未做训练或预测。没有训练精度或加速倍数结论。\n")
+                    "预处理完成项是 completion/*.json；未做训练或预测。部分标注必须读取annotation并使用相应损失，"
+                    "不能直接当作完整标签训练；消费要求见training_contract.json。没有训练精度或加速倍数结论。\n")
             (output/'report.md').write_text(text,encoding='utf-8')
             state = 'failed' if failed else 'completed'
             log.status(state,stage='done',summary=summary)

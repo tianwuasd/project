@@ -36,6 +36,16 @@ class PreprocessingCLI(unittest.TestCase):
              contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(main(['prepare','--list-methods']),0)
 
+    def test_auxiliary_selection_is_forwarded_to_the_shared_pipeline(self):
+        from chd_stunet.cli import main
+        with patch('chd_stunet.cli.read_config',return_value=({},{})), \
+             patch('chd_stunet.cli.prepare_paths',return_value=dict(raw_root=str(ROOT))), \
+             patch('chd_stunet.preprocessing.run.run_prepare',return_value=dict(failed_cases=[])) as run, \
+             contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(main(['prepare','--method','stunet-s-partial','--cohort','auxiliary','--fold','0']),0)
+            self.assertEqual(run.call_args.kwargs['cohort'],'auxiliary')
+            self.assertEqual(run.call_args.kwargs['method_name'],'stunet-s-partial')
+
     def test_updater_refuses_private_data_and_parent_paths(self):
         from update import allowed,validate_manifest
         for path in ('project.local.json','outputs/data.json','../other/run.py','/run.py','src/../../secret.py'):

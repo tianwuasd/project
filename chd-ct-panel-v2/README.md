@@ -1,6 +1,6 @@
 # CHD：数据分析与可选择方法的预处理
 
-这是独立的代码工程，沿用 `chd-ct-panel-v2` 目录名。按engineering-project-reference逐模块实施，当前提供数据分析、环境部署及 `stunet-s` 预处理；没有面板、训练、预测。
+这是独立的代码工程，沿用 `chd-ct-panel-v2` 目录名。按engineering-project-reference逐模块实施，当前提供数据分析、环境部署及可选STU-Net-S预处理；没有面板、训练、预测。
 
 ## 开始使用
 
@@ -23,7 +23,17 @@ python run.py prepare --method stunet-s --fold 0 --output outputs/fold0 --resume
 python run.py status --output outputs/fold0
 ```
 
-当前方法审计110对，按确认规则纳入96对；保留原97对角色。辅助标签仅在衍生数组中映射ignore8，各折只用train拟合统计。短测限制输出病例数，不缩小原图或缩减拟合训练集。方法、协议、运行输出各自分目录。科学规则、部署和完整日志说明见[预处理使用说明](docs/preprocessing-usage.md)。
+`stunet-s`审计110对，按确认规则纳入96对；保留原97对角色。辅助标签仅在衍生数组中映射ignore8，各折只用train拟合统计。短测限制输出病例数，不缩小原图或缩减拟合训练集。方法、协议、运行输出各自分目录。科学规则、部署和完整日志说明见[预处理使用说明](docs/preprocessing-usage.md)。
+
+新增`stunet-s-partial`：保留同一96例主队列，另处理13例缺MYO病例为`aux_train`；源灰度问题病例继续排除。它保存已标类别、缺标类别和背景歧义，供后续部分监督训练消费。新增病例不参与主训练集统计拟合，也不作为验证/测试真值。详见[部分标注预处理](docs/partial-preprocessing.md)。
+
+```bash
+python smoke.py --stage prepare --method stunet-s-partial --output outputs/partial-smoke
+python run.py prepare --method stunet-s-partial --cohort auxiliary --fold 0
+python run.py prepare --method stunet-s-partial --fold all
+```
+
+当前仅完成预处理，不能直接把部分标注产物交给普通完整监督损失。每折`training_contract.json`明确后续加载器和损失必须消费的标注合同。
 
 CPU调度使用skill V2 0.7.2：CPU/RAM80%、至少4GiB主机余量、按重采样体积准入、有界独立病例进程、内层1线程、独立读入闸门、每秒内存监督和逐例恢复。来源与边界见[V2适配](docs/v2-acceleration-provenance.md)。预算不是实际CPU使用量，也没有加速倍数结论。
 
@@ -48,12 +58,13 @@ preprocess_worker.py            调度器启动的CPU病例进程
 configs/
   analysis.json                 分析策略
   paths.json                    已确认的服务器默认路径
-  preprocessing/stunet-s.json   方法协议与科学参数
+  preprocessing/*.json         完整标注/部分标注方法协议与科学参数
 src/chd_stunet/
   cli.py / config.py            阶段、方法选择、路径解析
   data/                         只读统计、配对、作者表解析
   preprocessing/
     registry.py                 已实现方法列表
+    annotations.py              已标/未标类别与背景语义合同
     cohort.py                   方法的标签与历史角色规则
     fingerprint.py              仅train拟合及官方spacing规则
     stunet_s.py                 审计、变换、写出验证

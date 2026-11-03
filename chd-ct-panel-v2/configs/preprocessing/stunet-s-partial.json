@@ -1,0 +1,22 @@
+{
+  "name": "stunet-s-partial",
+  "protocol": "imagechd-stunet-s-main96-aux13-ct-v1",
+  "description": "96例主队列保持原角色；13例缺MYO仅辅助训练，需部分监督损失；未实现训练",
+  "expected_source_pairs": 110,
+  "expected_included": 109,
+  "expected_main": 96,
+  "expected_auxiliary": 13,
+  "expected_complete_before_exclusions": 97,
+  "partial_annotation_policy": "missing_myo_only",
+  "exclude_cases": ["ct_1170"],
+  "ignore_label": 8,
+  "allowed_extra_labels": [8, 10, 12, 13, 14, 15],
+  "spacing_source": "imagechd_author_excel",
+  "spacing_excel_sha256": "f780f0775608ab2bee583371a3e0959ce20d05e75056d44d02ddc5848ec4ec1d",
+  "normalization": "CTNormalization",
+  "foreground_samples_per_case": 200000,
+  "sample_seed": 1234,
+  "split_seed": 42,
+  "compression_patch_hint": [128, 128, 128],
+  "nnunet_version": "2.8.1"
+}

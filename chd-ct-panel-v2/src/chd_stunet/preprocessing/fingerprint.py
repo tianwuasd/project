@@ -18,7 +18,11 @@ def sample_foreground(image, segmentation, count, seed=1234):
 
 
 def fit_statistics(rows, samples, fold):
-    ids = sorted(row['case_id'] for row in rows if row['roles'][str(fold)] == 'train')
+    # Explicit main-group check defends against an auxiliary row accidentally
+    # assigned an ordinary train role. Extra cases must not change this ablation's
+    # clipping statistics, median spacing, or anisotropy decision.
+    ids = sorted(row['case_id'] for row in rows
+                 if row['roles'][str(fold)] == 'train' and row.get('cohort_group', 'main') == 'main')
     if not ids:
         raise ValueError('Empty training subset')
     values = np.concatenate([samples[cid] for cid in ids])
@@ -63,7 +67,8 @@ def make_plan(rows, samples, fold, method):
                   resampling_fn_seg='resample_data_or_seg_to_shape',
                   resampling_fn_seg_kwargs=dict(is_seg=True, order=1, order_z=0, force_separate_z=None),
                   patch_size=method['compression_patch_hint'])
-    plan = dict(schema=1, scope='preprocessing_only', dataset_name='ImageCHD_clean96',
+    dataset_name = 'ImageCHD_main96_aux13' if method.get('expected_auxiliary') else 'ImageCHD_clean96'
+    plan = dict(schema=1, scope='preprocessing_only', dataset_name=dataset_name,
                 plans_name='STUNetSPreprocessing', image_reader_writer='NibabelIO',
                 label_manager='LabelManager', transpose_forward=forward, transpose_backward=backward,
                 foreground_intensity_properties_per_channel={'0':stats},

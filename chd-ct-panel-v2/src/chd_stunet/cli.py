@@ -41,6 +41,8 @@ def main(argv=None):
     prepare.add_argument('--readers',type=positive,help='optional read/decompression limit, separate from compute')
     prepare.add_argument('--fold',nargs='+',choices=['0','1','2','all'],default=['all'])
     prepare.add_argument('--cases',nargs='+',help='preprocess these cases; audit and train-only fitting remain full scope')
+    prepare.add_argument('--cohort',choices=('all','main','auxiliary'),default='all',
+                         help='limit outputs only; auxiliary requires stunet-s-partial; fit always uses main train')
     prepare.add_argument('--limit',type=positive,help='limit output cases only; NEVER fit on a shortened training subset')
     prepare.add_argument('--audit-only',action='store_true')
     prepare.add_argument('--resume',action='store_true')
@@ -93,7 +95,7 @@ def main(argv=None):
             result=run_prepare(raw,output,method_name=args.method,descriptor=descriptor,folds=folds,
                 selected_cases=args.cases or (),limit=args.limit,workers=args.workers,
                 readers=args.readers or public.get('readers',2),
-                resume=args.resume,audit_only=args.audit_only)
+                resume=args.resume,audit_only=args.audit_only,cohort=args.cohort)
         print(json.dumps(dict(output=str(output),**result),ensure_ascii=False,indent=2))
         return 1 if result['failed_cases'] else 0
     raw=resolve_path(args.input or local.get("raw_root"))

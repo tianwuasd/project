@@ -1,6 +1,6 @@
 # 当前阶段：可选择方法的预处理
 
-当前只注册已实现的方法 `stunet-s`。`--method` 选择的是预处理协议，不启动模型、训练或面板。以后增加方法时，在 `configs/preprocessing/` 增加配置、在 registry 注册，并提供相应的审计/拟合/转换实现与测试；已有方法的协议和产物不覆盖。
+当前注册`stunet-s`（96例完整标注）和`stunet-s-partial`（同96例＋13例缺MYO辅助池）。`--method`选择的是预处理协议，不启动模型、训练或面板。部分标注的角色、输出元数据和训练消费边界见[部分标注预处理](partial-preprocessing.md)。以后增加方法时，在`configs/preprocessing/`增加配置、在registry注册，并提供相应的审计/拟合/转换实现与测试；已有方法的科学协议不被新方法覆盖。
 
 ## 上传到服务器后
 
@@ -34,7 +34,7 @@ python run.py status --output outputs/fold0-run
 
 相对输出目录以项目根为准，与当前终端目录无关。不提供 `--output` 时自动在结果根按 方法/协议/时间戳 分目录。`--cases`、`--limit` 仅限制最终输出病例，全部源数据仍接受审计，各折始终使用完整训练角色拟合；短测不会缩小原图尺寸。`--workers`是可选上限，不填时由资源策略决定；CLI默认读取上限2，`--readers`可明确覆盖，CPU计算不受这个读取数限制。
 
-## 本方法的科学规则
+## 完整标注基线stunet-s的科学规则
 
 代码目录更新可运行 `python update.py --check`、`python update.py --apply`。私有仓库使用官方GitHub API，并复用已有Git HTTPS/gh认证或环境中的GH_TOKEN/GITHUB_TOKEN；令牌不写入配置、命令参数或日志，也不跟随重定向。若服务器仅有SSH授权，先通过现有Git方式同步一份代码，然后用 `python update.py --apply --source /已同步的/chd-ct-panel-v2` 更新目标目录。`--proxy`仅作用本次请求，不改全局网络设置。
 
@@ -63,13 +63,14 @@ run/
   signature.json             方法、输入stat、版本、代码hash
   effective_config.json      本次生效路径与输出范围
   code/                      当次实际代码快照
-  manifests/                 96对纳入、排除理由、历史角色、分折
+  manifests/                 主/辅纳入、排除理由、历史角色、分折、消费合同
   audit/cases/               全部源病例检查和源SHA256
   audit/samples/             强度候选样本，拟合时仅取train
   fold_0/                    fold_1/、fold_2/同理
     dataset_fingerprint.json 拟合train IDs、统计和原生空间信息
     preprocessing_plan.json  预处理计划，未冻结网络/训练patch
-    splits.json              train/val/test角色
+    splits.json              train/val/test及独立aux_train角色
+    training_contract.json   本折拟合IDs与下游消费要求；尚未实现训练
     data/                    .b2nd、_seg.b2nd、.pkl
     completion/              完整产物hash，独立于data扫描目录
     results/                 逐例结果或完整错误
