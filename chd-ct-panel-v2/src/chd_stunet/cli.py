@@ -67,13 +67,17 @@ def main(argv=None):
         venv=ROOT/('.venv_preprocess' if args.command=='prepare' else '.venv_analysis')
         candidate=venv/('Scripts/python.exe' if os.name=='nt' else 'bin/python')
         if candidate.is_file():selected_python=str(candidate)
-    if selected_python and Path(selected_python).resolve()!=Path(sys.executable).resolve():
+    # Resolving a Linux venv symlink discards its environment identity. Keep
+    # the invocation path, since the same binary can load different site-packages.
+    if selected_python:selected_python=os.path.abspath(os.path.expanduser(selected_python))
+    if selected_python and os.path.normcase(selected_python)!=os.path.normcase(os.path.abspath(sys.executable)):
         if os.environ.get("CHD_ANALYSIS_REEXEC")=="1":
             raise RuntimeError("Selected interpreter did not match the configured environment")
         if not Path(selected_python).is_file():
-            raise FileNotFoundError("Configured analysis interpreter is unavailable")
+            raise FileNotFoundError("Configured interpreter is unavailable: "+selected_python)
         env=dict(os.environ,CHD_ANALYSIS_REEXEC="1",PYTHONUTF8="1")
         arguments=list(argv) if argv is not None else sys.argv[1:]
+        print("切换执行环境："+selected_python,flush=True)
         return subprocess.call([selected_python,"-u",str(ROOT/"run.py"),*arguments],env=env)
     if args.command=='prepare':
         paths=prepare_paths(local)

@@ -43,6 +43,8 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(request.full_url,'https://api.github.com/repos/tianwuasd/project/contents/chd-ct-panel-v2/code-manifest.json?ref=main')
         self.assertEqual(request.get_header('Authorization'),'Bearer existing-token')
         self.assertIsNone(NoRedirect().redirect_request(request,None,302,'redirect',{},'https://another.example/code'))
+        remote_fetch('code-manifest.json',opener,'existing-token','codex/example-branch')
+        self.assertTrue(opener.open.call_args.args[0].full_url.endswith('?ref=codex%2Fexample-branch'))
 
     def test_offline_update_preserves_local_config_outputs_and_siblings(self):
         scratch=ROOT/'outputs/tests-tmp';scratch.mkdir(parents=True,exist_ok=True)
@@ -61,11 +63,15 @@ class UpdateTests(unittest.TestCase):
             manifest=dict(project='chd-ct-panel-v2',files={'README.md':hashlib.sha256(payload).hexdigest()})
             (source/'code-manifest.json').write_text(json.dumps(manifest),encoding='utf-8')
             command=[sys.executable,str(target/'update.py'),'--source',str(source)]
-            checked=subprocess.run(command+['--check'],capture_output=True,text=True)
+            checked=subprocess.run(command+['--check'],capture_output=True,text=True,encoding='utf-8')
             self.assertEqual(checked.returncode,0,checked.stderr)
             self.assertEqual((target/'README.md').read_text(encoding='utf-8'),'old')
-            applied=subprocess.run(command+['--apply'],capture_output=True,text=True)
+            applied=subprocess.run(command+['--apply'],capture_output=True,text=True,encoding='utf-8')
             self.assertEqual(applied.returncode,0,applied.stderr)
+            self.assertIn('SHA256',applied.stdout)
+            receipts=list((target/'outputs/updates').glob('*/update-result.json'))
+            applied_record=next(json.loads(p.read_text()) for p in receipts if json.loads(p.read_text())['action']=='applied')
+            self.assertIn('SHA256',Path(applied_record['log_path']).read_text(encoding='utf-8'))
             self.assertEqual((target/'README.md').read_bytes(),payload)
             self.assertEqual((target/'project.local.json').read_bytes(),b'private paths')
             self.assertEqual((target/'outputs/keep').read_bytes(),b'original output')
@@ -75,9 +81,10 @@ class UpdateTests(unittest.TestCase):
             (source/'README.md').write_bytes(b'tampered')
             manifest['files']['README.md']=hashlib.sha256(b'next documentation').hexdigest()
             (source/'code-manifest.json').write_text(json.dumps(manifest),encoding='utf-8')
-            rejected=subprocess.run(command+['--apply'],capture_output=True,text=True)
+            rejected=subprocess.run(command+['--apply'],capture_output=True,text=True,encoding='utf-8')
             self.assertNotEqual(rejected.returncode,0)
             self.assertEqual((target/'README.md').read_bytes(),payload)
+            self.assertIn('更新未完成',rejected.stdout)
 
 
 if __name__=='__main__':
