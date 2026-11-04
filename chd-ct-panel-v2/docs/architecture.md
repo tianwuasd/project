@@ -1,6 +1,6 @@
 # 结构依据与当前实现
 
-采用engineering-project-reference可裁剪源码结构。业务目前为ImageCHD分析和可选择方法的预处理，当前方法stunet-s；以后训练/预测单独实施和验收。目录名称保留用户指定的chd-ct-panel-v2，目前没有面板。
+采用engineering-project-reference可裁剪源码结构。业务目前为ImageCHD分析和可选择方法的预处理，当前方法为stunet-s、stunet-s-partial。main只发布预处理，训练/预测单独实施和验收。目录名称保留用户指定的chd-ct-panel-v2，目前没有面板。
 
 ## 依据
 

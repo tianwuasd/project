@@ -31,8 +31,10 @@ class PreprocessingIOTests(unittest.TestCase):
         self.assertEqual(len(locations[1]),2)
         annotated=locations[tuple(groups[-1])]
         self.assertEqual(len(annotated),6)
+        self.assertEqual(annotated.shape[1],4)
         for coord in annotated:
-            self.assertNotEqual(seg[(0,*coord)],8)
+            self.assertEqual(coord[0],0)
+            self.assertNotEqual(seg[tuple(coord)],8)
 
     def test_affine_changes_only_derived_column_lengths(self):
         from chd_stunet.preprocessing.stunet_s import corrected_affine
@@ -41,6 +43,19 @@ class PreprocessingIOTests(unittest.TestCase):
         np.testing.assert_array_equal(original[:3,3],result[:3,3])
         np.testing.assert_allclose(np.linalg.norm(result[:3,:3],axis=0),[.5,.6,.75])
         self.assertEqual(original[1,0],1)
+
+    def test_four_column_locations_work_with_native_foreground_bbox(self):
+        from types import SimpleNamespace
+        from chd_stunet.preprocessing.stunet_s import bounded_locations
+        from nnunetv2.training.dataloading.data_loader import nnUNetDataLoader
+        seg=np.zeros((1,8,10,12),dtype=np.int8)
+        seg[0,4,5,6]=1
+        key=tuple([-1]+list(range(8)))
+        locations=bounded_locations(seg,[1,list(key)])
+        loader=SimpleNamespace(need_to_pad=np.zeros(3,dtype=int),patch_size=np.array([4]*3),
+                               has_ignore=True,annotated_classes_key=key)
+        lower,upper=nnUNetDataLoader.get_bbox(loader,seg.shape[1:],True,locations)
+        self.assertTrue(all(a<=v<b for a,v,b in zip(lower,[4,5,6],upper)))
 
     def test_refused_resume_keeps_every_old_file_byte(self):
         from chd_stunet.preprocessing.run import check_resume_before_writing

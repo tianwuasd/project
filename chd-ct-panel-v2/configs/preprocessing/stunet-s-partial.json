@@ -1,6 +1,6 @@
 {
   "name": "stunet-s-partial",
-  "protocol": "imagechd-stunet-s-main96-aux13-ct-v1",
+  "protocol": "imagechd-stunet-s-main96-aux13-ct-v2",
   "description": "96例主队列保持原角色；13例缺MYO仅辅助训练，需部分监督损失；未实现训练",
   "expected_source_pairs": 110,
   "expected_included": 109,
