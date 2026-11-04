@@ -12,6 +12,8 @@ python setup_env.py --check --profile training
 
 training使用独立`.venv_training`，默认部署Torch2.8.0 CUDA128；CPU环境显式加`--cpu`。已有可信环境可以在`project.local.json`设置`training_python`。预处理环境不被替换；实际包版本写入训练签名，安装成功不等于已通过GPU正式尺寸容量检查。当前本机验收环境以私有报告实际记录为准，不把它说成新装服务器环境。
 
+安装与环境核验自动实时显示子进程输出，并逐行刷新完整日志；开头打印日志路径，每个步骤有开始/结束、退出码与耗时。等待输出超过10秒会提示当前步骤及耗时。可选作者权重校验/下载也有等待反馈，不把等待时间当作下载百分比。完整日志在`outputs/environment/`，不必另开终端手动tail。
+
 作者small_ep4k权重只在显式`--download-weights`时下载，117497661字节、SHA256 `f440f401bf4cac1d1d6f7c4635542ef057193a5f96c0b3c661a6179afeab7be6`；已有错误文件保留并拒绝，不静默随机初始化。可用`--weights`指定已有文件，或保存私有`weights_path`；原始预训练文件在检查点恢复时不再是必需输入。网络代理只作用本次`--proxy`，不改全局设置。
 
 训练读取一份预处理run。默认优先使用私有`training_prepared_root`，其次使用成功prepare保存的`outputs/latest_preprocessing.json`；不会到当前终端目录猜测描述文件。Linux结果根和权重缓存默认沿用既有STU运行根，见`configs/paths.json`。首次没有可用预处理时，先运行prepare，或显式`--prepared`。

@@ -14,6 +14,8 @@ python smoke.py --stage prepare --method stunet-s --output outputs/prepare-smoke
 
 新环境用 `python setup_env.py --install --profile preprocess` 部署到独立 `.venv_preprocess`，后续入口自动选择它。不下载权重、不申请GPU、不修改系统Python。Linux路径默认沿用此前服务器目录；本机路径保存在不入Git的project.local.json。无需历史描述文件，程序自己生成输入清单。
 
+环境部署/检查会立即显示当前配置、解释器和完整日志路径，逐步输出创建环境、安装依赖与API核验的开始、结束、耗时和退出码；子进程输出同时刷新到终端和`outputs/environment/*.log`。连续10秒没有新输出时显示当前步骤及已运行时间，不代表测得了下载进度。失败后停止后续部署步骤，完整日志与失败记录保留，成功核验后才保存解释器配置。
+
 ## 预处理与恢复
 
 ```bash
@@ -103,6 +105,8 @@ python scripts/package_code.py
 ```
 
 更新器只接受本目录代码白名单和SHA清单，先暂存核验，再替换并保留旧文件，不删除未知文件、不更新环境或相邻CHD工程。远程更新从GitHub main读取，私有仓库复用已有GH_TOKEN/GITHUB_TOKEN、Git HTTPS或gh认证，不保存凭据；拒绝携带认证跟随重定向。只有SSH授权时，可先按已有Git方式同步代码目录，再使用 `--source` 离线更新。代码发布与服务器部署、全量预处理分别验证。
+
+`update.py --check/--apply`自动显示授权读取、清单版本、逐文件一致/下载/SHA校验及备份替换进度，长请求每10秒反馈等待状态。完整过程写入`outputs/updates/<时间>/update.log`，成功或失败均有`update-result.json`；终端不显示访问凭据。
 
 训练开发分支为`codex/chd-stunet-training-20261103`，在它尚未合并main期间，可显式`python update.py --ref codex/chd-stunet-training-20261103 --check`，核对后用相同ref执行`--apply`；默认main不会自动切到开发分支。
 
