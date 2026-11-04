@@ -14,6 +14,8 @@ training使用独立`.venv_training`，默认部署Torch2.8.0 CUDA128；CPU环�
 
 安装与环境核验自动实时显示子进程输出，并逐行刷新完整日志；开头打印日志路径，每个步骤有开始/结束、退出码与耗时。等待输出超过10秒会提示当前步骤及耗时。可选作者权重校验/下载也有等待反馈，不把等待时间当作下载百分比。完整日志在`outputs/environment/`，不必另开终端手动tail。
 
+Torch约束同时传入依赖安装步骤，避免先安装2.8后被后续解析替换。`--install`要求最终Torch版本与所选CPU/CUDA构建匹配才保存配置；已有环境`--check`会同时记录实际构建与默认部署差异，原先已验收的不同版本不会被自动降级。Linux解释器切换保留虚拟环境调用路径，不因其与系统Python指向同一二进制而跳过切换。
+
 作者small_ep4k权重只在显式`--download-weights`时下载，117497661字节、SHA256 `f440f401bf4cac1d1d6f7c4635542ef057193a5f96c0b3c661a6179afeab7be6`；已有错误文件保留并拒绝，不静默随机初始化。可用`--weights`指定已有文件，或保存私有`weights_path`；原始预训练文件在检查点恢复时不再是必需输入。网络代理只作用本次`--proxy`，不改全局设置。
 
 训练读取一份预处理run。默认优先使用私有`training_prepared_root`，其次使用成功prepare保存的`outputs/latest_preprocessing.json`；不会到当前终端目录猜测描述文件。Linux结果根和权重缓存默认沿用既有STU运行根，见`configs/paths.json`。首次没有可用预处理时，先运行prepare，或显式`--prepared`。

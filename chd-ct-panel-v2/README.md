@@ -16,6 +16,10 @@ python smoke.py --stage prepare --method stunet-s --output outputs/prepare-smoke
 
 环境部署/检查会立即显示当前配置、解释器和完整日志路径，逐步输出创建环境、安装依赖与API核验的开始、结束、耗时和退出码；子进程输出同时刷新到终端和`outputs/environment/*.log`。连续10秒没有新输出时显示当前步骤及已运行时间，不代表测得了下载进度。失败后停止后续部署步骤，完整日志与失败记录保留，成功核验后才保存解释器配置。
 
+Linux虚拟环境的Python可能链接到系统同一二进制，但环境和依赖不同。CLI按未解符号链接的执行路径切换环境，并保留重复切换保护；不能用`Path.resolve()`后的二进制路径认定两个环境相同。旧版遇到“环境检查通过、业务却缺包”时，可直接用`.venv_preprocess/bin/python smoke.py --stage prepare ...`启动。
+
+部署时Torch版本约束同时进入后续依赖解析，安装结束再核对版本与CPU/CUDA构建，偏离计划则不保存环境配置。对用户已有环境执行`--check`仍检查实际API并明确报告版本差异，不自动重装可信环境；API通过不等于与默认部署版本一致。
+
 ## 预处理与恢复
 
 ```bash

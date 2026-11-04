@@ -176,14 +176,19 @@ def main():
                 commands.append([python,'-m','venv',str(venv)])
             if args.profile in ('preprocess','training'):
                 commands.append([str(vpython),'-m','pip','install','torch==2.8.0','--index-url',torch_index])
-            commands.append([str(vpython),'-m','pip','install','-r',record['requirements']])
+            # Keep the chosen Torch version in the SAME resolver invocation as
+            # the remaining requirements. Installing it first is not a pin:
+            # a later dependency installation can otherwise silently replace it.
+            torch_pin=['torch==2.8.0'] if args.profile in ('preprocess','training') else []
+            commands.append([str(vpython),'-m','pip','install','-r',record['requirements'],*torch_pin])
             record['steps']=[]
             for number,command in enumerate(commands,1):
                 began=time.monotonic()
                 step=dict(command=command,started_at=datetime.now().isoformat())
                 record['steps'].append(step)
                 stream.write(json.dumps(step)+'\n');stream.flush()
-                purpose=('创建隔离环境' if command[1:3]==['-m','venv'] else
+                purpose=('安装项目依赖' if '-r' in command else
+                         '创建隔离环境' if command[1:3]==['-m','venv'] else
                          '安装PyTorch' if any(arg.startswith('torch==') for arg in command) else '安装项目依赖')
                 try:
                     code=run_logged(command,stream,f'[{number}/{len(commands)}] {purpose}',env=env).returncode
@@ -211,10 +216,30 @@ def main():
             code += ";from nnunetv2.preprocessing.preprocessors.default_preprocessor import DefaultPreprocessor;from nnunetv2.training.dataloading.nnunet_dataset import comp_blosc2_params;from nnunetv2.experiment_planning.experiment_planners.default_experiment_planner import ExperimentPlanner;assert m.version('nnunetv2')=='2.8.1';assert hasattr(DefaultPreprocessor,'run_case_npy');print('preprocessing APIs OK; CUDA not requested')"
         if args.profile=='training':
             code += ";from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer;from nnunetv2.training.dataloading.data_loader import nnUNetDataLoader;import torch;assert m.version('nnunetv2')=='2.8.1';assert hasattr(nnUNetTrainer,'get_training_transforms');assert hasattr(nnUNetDataLoader,'get_bbox');print('training APIs OK; CUDA build='+str(torch.version.cuda)+'; no GPU capacity claim')"
+        if args.profile in ('preprocess','training'):
+            code += ";import torch;print(json.dumps({'deployment_torch':{'version':m.version('torch'),'cuda':torch.version.cuda}}))"
         with log_path.open('a',encoding='utf-8') as stream:
             result=run_logged([python,"-X","utf8","-c",code],stream,'检查依赖版本与实际接口',timeout=120)
         record.update(passed=result.returncode==0,actual=result.stdout.strip(),
                       error=result.stdout.strip() if result.returncode else '')
+        if record['passed'] and args.profile in ('preprocess','training'):
+            builds=[]
+            for line in result.stdout.splitlines():
+                try:value=json.loads(line)
+                except (ValueError,TypeError):continue
+                if isinstance(value,dict) and 'deployment_torch' in value:builds.append(value['deployment_torch'])
+            expected_cuda='12.8' if args.profile=='training' and not args.cpu else None
+            observed=builds[-1] if builds else {}
+            matches=(observed.get('version','').split('+')[0]=='2.8.0'
+                     and observed.get('cuda')==expected_cuda and bool(builds))
+            record['deployment_contract']=dict(expected_torch='2.8.0',expected_cuda=expected_cuda,
+                                               observed=observed,matches=matches)
+            if not matches:
+                warning=f'实际Torch构建{observed}与默认部署2.8.0/CUDA={expected_cuda}不同'
+                record['warnings']=[warning]
+                with log_path.open('a',encoding='utf-8') as stream:report(warning,stream)
+                if args.install:
+                    record.update(passed=False,error=warning+'；不保存环境配置，请核对依赖安装日志')
     if args.install and record.get('passed'):
         # Existing private paths stay in place; only this stage's interpreter
         # changes. The CLI will automatically use it in subsequent commands.
@@ -235,6 +260,7 @@ def main():
     print(json.dumps(record,ensure_ascii=False,indent=2))
     message=('环境计划已生成' if record['action']=='plan' else
              '环境部署与检查完成' if args.install and record['passed'] else
+             '软件接口检查通过，但版本与默认部署不同' if record['passed'] and record.get('warnings') else
              '环境检查通过' if record['passed'] else '环境检查失败')
     with log_path.open('a',encoding='utf-8') as stream:report(message+'；记录：'+str(output),stream)
     return 0 if record.get("passed",True) else 1
