@@ -45,6 +45,12 @@ def sequence_seed(seed,phase,epoch,sequence):
 
 def _initialize(loaders,read_gate,versions=None):
     global _LOADERS
+    if os.environ.get('CHD_TRAIN_OWNER_DIR'):
+        import psutil
+        from pathlib import Path
+        write_json(Path(os.environ['CHD_TRAIN_OWNER_DIR'])/f'worker-{os.getpid()}.json',dict(
+            pid=os.getpid(),born=psutil.Process().create_time(),parent_pid=os.getppid(),
+            nonce=os.environ['CHD_TRAIN_NONCE']))
     # The console sends Ctrl+C to the process group. Only the training parent
     # decides the safe checkpoint boundary; workers must finish/cancel on demand.
     signal.signal(signal.SIGINT,signal.SIG_IGN)
@@ -88,7 +94,7 @@ def serial_estimate(settings):
 
 
 class BatchPool:
-    def __init__(self,loaders,settings,output,log,workers=None,bootstrap=None,versions=None):
+    def __init__(self,loaders,settings,output,log,workers=None,bootstrap=None,versions=None,stage=None,read_gate=None):
         self.loaders,self.settings,self.output,self.log=loaders,settings,output,log
         self.requested_workers=workers
         self.bootstrap=bootstrap;self.versions=versions
@@ -96,25 +102,31 @@ class BatchPool:
         self.estimate=worker_estimate(settings,loaders)
         self.serial_estimate=serial_estimate(settings)
         admission_estimate=self.serial_estimate if workers==0 else self.estimate
-        self.stage=policy(snapshot(),[dict(estimate=admission_estimate)]*settings['train_steps_per_epoch'],
+        self.stage=stage if stage is not None else policy(snapshot(),[dict(estimate=admission_estimate)]*settings['train_steps_per_epoch'],
                           workers if workers not in (None,0) else None)
         self.workers=0 if workers==0 else self.stage['workers']
         if self.workers==0 and (self.stage['cpu_budget']<1 or self.stage['memory_budget_bytes']<self.serial_estimate):
             raise MemoryError('Serial supply also requires an admitted CPU slot and real working-set RAM')
         if self.workers<1 and workers!=0:
             raise MemoryError('No CPU/RAM capacity for one training supply worker; inspect resources or explicitly use --workers 0')
-        self.read_gate=str(output/'training_read_gate.json')
+        self.shared_read_gate=read_gate is not None
+        self.read_gate=str(read_gate or output/'training_read_gate.json')
         self._open()
 
     def _open(self):
         self.prefetch=max(1,2*self.workers) if self.workers else 1
-        write_json(self.read_gate,dict(slots=max(1,min(2,self.workers))))
+        if not self.shared_read_gate:write_json(self.read_gate,dict(slots=max(1,min(2,self.workers))))
         for loader in self.loaders.values():loader.read_gate=self.read_gate
         if self.workers:
             self.executor=ProcessPoolExecutor(max_workers=self.workers,mp_context=mp.get_context('spawn'),
                 initializer=_initialize,initargs=(self.loaders,self.read_gate,self.versions))
-        self.log.event('supply.policy',f'CPU供数{self.workers}进程，预取上限{self.prefetch}，读取上限{min(2,max(1,self.workers))}',
-                       workers=self.workers,prefetch=self.prefetch,estimated_worker_bytes=self.estimate,policy=self.stage)
+        import json
+        from pathlib import Path
+        read_limit=json.loads(Path(self.read_gate).read_text(encoding='utf-8'))['slots']
+        scope='全组' if self.shared_read_gate else ''
+        self.log.event('supply.policy',f'CPU供数{self.workers}进程，预取上限{self.prefetch}，{scope}读取上限{read_limit}',
+                       workers=self.workers,prefetch=self.prefetch,read_slots=read_limit,shared_read_gate=self.shared_read_gate,
+                       estimated_worker_bytes=self.estimate,policy=self.stage)
 
     def produce_serial(self,phase,seed):
         began=time.monotonic();result=self.loaders[phase](seed)

@@ -202,11 +202,12 @@ def disable_wall_clock_benchmark(transform):
 
 class PatchSampler:
     """Picklable CPU-only loader; a supplied seed determines the entire batch."""
-    def __init__(self, rows, ids, settings, topology, training=True):
+    def __init__(self, rows, ids, settings, topology, training=True, slots=None):
         self.rows={cid:rows[cid] for cid in ids};self.ids=list(ids)
         self.settings=settings;self.topology=topology;self.training=training
         self._transform=None
         self.read_gate=None
+        self.slots=slots
 
     def __getstate__(self):
         state=dict(self.__dict__);state['_transform']=None
@@ -228,10 +229,21 @@ class PatchSampler:
             self._initial=np.asarray(self.settings['patch_size'])
 
     def __call__(self, seed):
-        from ..acceleration.training_cpu import deterministic_cpu_rng
+        from ..acceleration.training_cpu import deterministic_cpu_rng,sequence_seed
+        if self.slots is not None:
+            # Global slot seeds survive rank/worker changes. Each rank reads
+            # only its own crops; no duplicate full-global-batch augmentation.
+            parts=[]
+            for slot in self.slots:
+                with deterministic_cpu_rng(sequence_seed(seed,'global-slot',0,slot)):
+                    parts.append(self._sample([slot]))
+            return dict(data=np.concatenate([p['data'] for p in parts]),
+                target=[np.concatenate([p['target'][i] for p in parts]) for i in range(len(parts[0]['target']))],
+                available=np.concatenate([p['available'] for p in parts]),
+                cases=[case for p in parts for case in p['cases']])
         with deterministic_cpu_rng(seed):return self._sample()
 
-    def _sample(self):
+    def _sample(self,slots=None):
         import blosc2
         from ..observability.locking import read_slot
         from acvl_utils.cropping_and_padding.bounding_boxes import crop_and_pad_nd
@@ -239,7 +251,7 @@ class PatchSampler:
         if self._transform is None:self._configure()
         batch=[];targets=[];metadata=[];available=[]
         batch_size=self.settings['batch_size']
-        for slot in range(batch_size):
+        for slot in range(batch_size) if slots is None else slots:
             cid=self.ids[np.random.randint(len(self.ids))];row=self.rows[cid]
             force_fg=slot>=round(batch_size*(1-self.settings['oversample_foreground']))
             bbox_state=SimpleNamespace(patch_size=self._initial,

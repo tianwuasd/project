@@ -1,6 +1,6 @@
 # CHD：数据分析、预处理与STU-Net-S训练
 
-这是独立的代码工程，沿用`chd-ct-panel-v2`目录名。提供数据分析、环境部署、可选STU-Net-S预处理，以及CPU/单卡STU-Net-S训练；没有面板或全体积预测入口。
+这是独立的代码工程，沿用`chd-ct-panel-v2`目录名。提供数据分析、环境部署、可选STU-Net-S预处理，以及V2多GPU STU-Net-S训练；没有面板或全体积预测入口。训练开发版与预处理main分别发布，更新时按所需分支选择。
 
 ## 开始使用
 
@@ -44,10 +44,12 @@ python run.py prepare --method stunet-s-partial --fold all
 ```bash
 python setup_env.py --check --profile training
 python smoke.py --stage train --output outputs/train-smoke
-python run.py train --fold 0 --output outputs/train-fold0
+python run.py train --fold 0 --gpus auto --output outputs/train-fold0
 ```
 
 训练默认使用已保存的预处理run和权重路径；正式1000轮/B4/128³，短测另记64³/B1。默认从main train与aux_train按病例均匀抽样，验证仅main val；正式运行要求完整本折缓存。未通过容量准入不暗降规格。
+
+多卡遵循固定全局batch：B4的1/2/3/4卡份额为[4]/[2,2]/[2,1,1]/[1,1,1,1]。`--gpus auto`在获准可见范围内选择空闲卡，`--workers`是全组CPU供数上限。详见[多卡使用、恢复与验收边界](docs/multigpu.md)。
 
 CPU调度使用skill V2 0.7.2：CPU/RAM80%、至少4GiB主机余量、按重采样体积准入、有界独立病例进程、内层1线程、独立读入闸门、每秒内存监督和逐例恢复。来源与边界见[V2适配](docs/v2-acceleration-provenance.md)。预算不是实际CPU使用量，也没有加速倍数结论。
 

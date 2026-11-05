@@ -34,6 +34,13 @@ run.py / smoke.py
         → training/resources.py                     GPU准入和固定尺寸容量检查
         → training/checkpoints.py                   原子代次、优化器和RNG恢复
         → training/code_snapshot.py                 固定运行代码及worker来源核验
+
+    → training/supervisor.py / fleet.py             V2多GPU监督与UUID/PID准入
+      → training/parallel_policy.py                 全组CPU/RAM预算、固定batch布局
+      → training/distributed_engine.py              冻结代码内的rank训练状态机
+        → training/rank_runtime.py / collectives.py 全局partial loss、同步AMP、逐rank RNG
+        → acceleration/training_cpu.py              持久供数、全局槽种子、全组读闸门
+        → training/checkpoints.py                   latest/完整epoch/best/final原子指针
 ```
 
 已有分析走analysis_run与data/analysis，不因预处理增加而修改其只读语义。短测与正式流程共用业务实现，根入口只转发参数。查询、方法列表和环境计划不启动训练。
@@ -45,5 +52,7 @@ run.py / smoke.py
 分析、预处理与训练输出分开，方法/协议/运行分目录，历史97角色只过滤不重新划分。每折独立拟合train；训练单独限定main train/aux_train及main val，拒绝外折test。预处理计划没有STU网络结构或正式训练patch；其中128³只是压缩块提示，训练128³是独立的显式工程配方。
 
 父进程单写总日志、事件与状态；病例进程写独立日志和结果。每秒资源采样、阶段预算分别记录，不能用CPU槽预算替代实际活动进程。源SHA前后不变，产物逐块回读后才提交完成标记。拒绝不兼容恢复时先保护旧证据。
+
+上述单写规则用于预处理。多卡训练的监督器写control日志，rank0写全局进度，每rank写自己的供数/资源记录；成员变化只在完整epoch检查点后重新准入。原engine.py保留CPU/legacy单设备入口。新全局槽RNG协议不冒充旧训练的同一随机轨迹，旧冻结任务保留原来源。
 
 验收包括合成科学合同、cgroup事实注入、OS锁、真实nnU-Net/Blosc2接口及本地真实输入。训练还检查原生损失数值/梯度、真实单卡短训，以及不同供数进程数下连续/断点恢复的模型、优化器、scaler与RNG一致性。实际病例分母见各次输出，不能把几例通过当成全96对三折完成。Linux正式负载、新装服务器环境、128³/B4容量、全体积预测和分割效果仍须独立验收。

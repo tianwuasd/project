@@ -11,3 +11,9 @@
 Windows虚拟环境可能以小型redirector再启动真正Python。项目通过CPython的 `__PYVENV_LAUNCHER__` 机制直接启动基础解释器，同时保留原虚拟环境的sys.executable/sys.prefix；测试核对Popen PID与计算PID相同，确保直接子进程USS、实际RSS和退出清理对应真正计算进程。执行中的worker从本次输出code/快照导入，后续源码更新不混入当前已冻结病例任务。
 
 Linux/cgroup测试使用可注入的proc和祖先cgroup证据，不将Windows成功描述为Linux正式验收。模板的GPU扩卡、固定batch、编译、训练预取机制不属于本次CPU预处理范围。
+
+## 0.5.0训练开发分支新增适配
+
+训练按同版`batch_distribution.py`、`uneven_batch_loss.py`和`training_performance.py`适配固定全局batch、按有效体素加权的partial CE、按标注可用性屏蔽的全局Dice，以及完整epoch扩卡/退化判据。没有直接复制B0无ignore的loss。`training/supervisor.py`与`parallel_policy.py`统一分配全组CPU/RAM，`rank_runtime.py`保存逐rank RNG和独立完整epoch指针；共享读闸门、CPU预取及冻结代码继续复用本工程模块。详见[multigpu.md](multigpu.md)。
+
+这些是新增训练实现，不改既有预处理生产者或宣称全部模板能力已迁入。torch.compile和专用CUDA复制stream未启用；目标Linux/NCCL、正式尺寸和持续吞吐需独立验收。

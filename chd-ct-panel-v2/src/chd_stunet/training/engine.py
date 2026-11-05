@@ -114,7 +114,7 @@ def prune_checkpoints(folder):
     """Keep two recent generations plus best/final pointers, after commit only."""
     generations=sorted(folder.glob('state-*.pt'),key=lambda p:p.stat().st_mtime_ns,reverse=True)
     keep={p.name for p in generations[:2]}
-    for name in ('latest.json','best.json','final.json'):
+    for name in ('latest.json','epoch.json','best.json','final.json'):
         if (folder/name).is_file():keep.add(json.loads((folder/name).read_text(encoding='utf-8'))['file'])
     for path in generations:
         if path.name not in keep:path.unlink()

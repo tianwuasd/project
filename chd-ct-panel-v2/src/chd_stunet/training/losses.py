@@ -8,6 +8,7 @@ With fully annotated inputs this reduces to nnU-Net CE + foreground Dice.
 import torch
 from torch import nn
 from torch.nn import functional as F
+from .collectives import differentiable_sum,sum_detached
 
 
 class PartialDiceCE(nn.Module):
@@ -42,7 +43,7 @@ class PartialDiceCE(nn.Module):
         ambiguous = (target==0)&missing_myo.view(-1,*([1]*(target.ndim-1)))
         merged = torch.logsumexp(logp[:,[0,5]],dim=1)
         ce_voxels = -torch.where(ambiguous,merged,selected)
-        ce = (ce_voxels*valid).sum()/valid.sum().clamp_min(1)
+        ce = differentiable_sum((ce_voxels*valid).sum())/sum_detached(valid.sum()).clamp_min(1)
 
         # Multiplying availability BEFORE spatial/batch sums is essential: a
         # partial case contributes neither MYO TP nor MYO denominator at all.
@@ -57,12 +58,17 @@ class PartialDiceCE(nn.Module):
         active = available & valid.flatten(1).any(1)[:,None]
         if self.batch_dice:
             intersect,predicted,reference = (x.sum(0) for x in (intersect,predicted,reference))
-            active = active.any(0)
+            intersect=differentiable_sum(intersect)
+            predicted=differentiable_sum(predicted)
+            reference=sum_detached(reference)
+            active = sum_detached(active.sum(0))>0
         dice = (2*intersect+self.smooth)/(predicted+reference+self.smooth).clamp_min(1e-8)
         if self.batch_dice:
             dc = -(dice*active).sum()/active.sum().clamp_min(1)
         else:
-            dc = -((dice*active).sum(1)/active.sum(1).clamp_min(1)).mean()
+            local=((dice*active).sum(1)/active.sum(1).clamp_min(1)).sum()
+            count=sum_detached(values.new_tensor(len(values)))
+            dc = -differentiable_sum(local)/count.clamp_min(1)
         return ce,dc
 
     def forward(self, logits, target, available):

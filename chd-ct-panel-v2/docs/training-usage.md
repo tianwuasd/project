@@ -1,6 +1,6 @@
 # STU-Net-S训练：完整监督与部分标注
 
-当前实现CPU/单张可见CUDA卡的STU-Net-S微调。入口仍是`run.py`，不需要面板。多进程CPU供数属于加速；本版没有弹性多GPU训练，不能用torchrun多rank启动。
+当前实现V2固定全局batch的STU-Net-S多GPU微调。入口仍是`run.py`，不需要面板或手工torchrun。监督器负责各rank；CPU和原单设备执行器保留为显式兼容入口。多卡机制、日志及当前验收边界见[多卡说明](multigpu.md)。
 
 ## 环境、作者权重与输入
 
@@ -35,7 +35,7 @@ python run.py train --prepared /预处理run --fold 0 --output /训练结果/fol
 
 短测自动选择一例已有缓存的main train、一例aux（若该方法有辅助池）、一例main val；原角色不变，不借用外折test。需要这些角色的预处理缓存确实存在。也可在`--smoke`下明确给`--train-cases`/`--val-cases`。正式训练必须具备本折全部所选训练和验证产物，不能用短测子集伪装正式队列。
 
-可显式选择`--device cpu`、`--workers 0`串行供数或限制CPU供数进程。`--epochs`、`--train-steps`、`--val-steps`、`--batch-size`、`--patch-size`属于显式配方变化，写入签名；不会因显存不足自动降batch/patch。全局batch在本版就是单卡batch。
+可显式选择`--device cpu`、`--workers 0`串行供数或限制全组CPU供数进程。`--epochs`、`--train-steps`、`--val-steps`、`--batch-size`、`--patch-size`属于显式配方变化，写入签名；不会因显存不足自动降batch/patch。CUDA默认`--gpus auto`，卡数不超过全局batch；用CUDA_VISIBLE_DEVICES限制获准卡范围。`--gpus legacy --device cuda:0`选择原单设备执行器，但旧任务恢复仍须使用旧冻结code入口，不能绕过代码签名。
 
 ## 科学配方与结构
 
@@ -53,6 +53,10 @@ src/chd_stunet/training/
   model.py / weights.py           官方骨干、拓扑、作者权重校验
   losses.py                      部分监督与深监督
   engine.py                      train/validation状态机
+  supervisor.py / fleet.py       多卡监督、UUID/PID准入、epoch边界重组
+  distributed_engine.py          每rank训练/验证与完整epoch提交
+  collectives.py / rank_runtime.py 全局损失、同步AMP、逐rank RNG恢复
+  parallel_policy.py             全组资源预算与扩卡退化判据
   checkpoints.py                 模型/优化器/scaler/RNG原子检查点
   code_snapshot.py               运行代码固定与恢复核验
   feedback.py / resources.py      进度/内存监督/GPU真实尺寸准入
@@ -83,7 +87,7 @@ Dice排除背景和ignore；每例先屏蔽未标类别，再汇总到batch的�
 - 批次种子由seed/阶段/epoch/序号确定。队列peek不算消费，完成训练尝试或验证后才commit；未消费预取重放，worker数变化不改变样本。
 - 每秒记录主机/cgroup余量和本任务进程组RSS。持续压力只缩减本组供数，保留安全检查点，最多3次；缩减预算进入恢复状态。极端外部瞬时OOM不能由采样保证拦住。
 - CUDA只使用可见设备；核对物理UUID和外部compute PID，证据不可解析则拒绝。保留至少4GiB或总显存10%，并以真实固定B/patch前反向及SGD动量预留做容量确认，不更新或消费probe批次。
-- 本版单卡，不包含V2弹性扩卡/NCCL能力或速度提升承诺。CPU供数/异步复制/混合精度与数值训练分别验收。
+- CUDA默认自动多卡；完整epoch边界加入空闲卡，按V2自然轮次判据处理明确退化。CPU供数预算全组只计算一次。未启用torch.compile或专用复制stream；不把非阻塞传输说成已证明持续重叠。NCCL/正式尺寸和实际吞吐单独现场验收。
 
 ## 状态、停止和恢复
 
@@ -99,4 +103,4 @@ python smoke.py --stage train --train-steps 8 --resume --output outputs/resume-s
 
 `checkpoints/latest.json`原子指向独立、校验过的完整代次，保留模型、优化器动量、scaler、RNG、阶段和已消费游标；另有best/final指针，最终轮仍可独立使用。最多保留近期两个及best/final引用的代次。恢复前先核验科学身份、数据和代码快照，拒绝时不改变旧状态或日志。完成最后一轮但收尾写出中断时，可以只恢复final/summary元数据，不申请GPU。
 
-阶段结果保存到`summary.json`、`history.json`和`capacity_probe.json`。本机真实短测、服务器正式128³/B4容量、新装环境和全量模型性能分别报告，不互相替代。
+阶段结果保存到`summary.json`、`history.json`和每rank的`ranks/rank_N/capacity_probe.json`（legacy仍为根目录capacity_probe）。本机真实短测、服务器正式128³/B4容量、新装环境和全量模型性能分别报告，不互相替代。

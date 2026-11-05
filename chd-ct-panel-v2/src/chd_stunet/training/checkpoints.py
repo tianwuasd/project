@@ -31,7 +31,7 @@ def restore_rng(state,device):
     if device.type=='cuda' and state['cuda'] is not None:torch.cuda.set_rng_state(state['cuda'],device)
 
 
-def save_checkpoint(folder,model,optimizer,scaler,state,signature,device):
+def save_checkpoint(folder,model,optimizer,scaler,state,signature,device,distributed=None):
     """Generation files + atomic pointer keep the previous complete commit valid.
 
     Replacing last.pt and its checksum separately has a crash window. Here the
@@ -42,6 +42,7 @@ def save_checkpoint(folder,model,optimizer,scaler,state,signature,device):
     target=folder/generation;temporary=target.with_suffix('.partial')
     payload=dict(schema=1,signature=signature,state=state,model=cpu_tree(model.state_dict()),
         optimizer=cpu_tree(optimizer.state_dict()),scaler=scaler.state_dict(),rng=rng_state(device))
+    if distributed is not None:payload['distributed']=cpu_tree(distributed)
     with temporary.open('wb') as stream:
         torch.save(payload,stream);stream.flush();os.fsync(stream.fileno())
     os.replace(temporary,target)
@@ -51,10 +52,11 @@ def save_checkpoint(folder,model,optimizer,scaler,state,signature,device):
     return pointer
 
 
-def read_checkpoint(folder,signature):
+def read_checkpoint(folder,signature,pointer_name='latest.json'):
     folder=Path(folder)
     import json
-    pointer=json.loads((folder/'latest.json').read_text(encoding='utf-8'))
+    if pointer_name not in ('latest.json','epoch.json'):raise ValueError('Unknown checkpoint pointer role')
+    pointer=json.loads((folder/pointer_name).read_text(encoding='utf-8'))
     name=pointer['file']
     if Path(name).name!=name:raise ValueError('Checkpoint pointer must name a local generation')
     if pointer['signature_identity']!=signature['identity']:raise ValueError('Checkpoint scientific contract differs')

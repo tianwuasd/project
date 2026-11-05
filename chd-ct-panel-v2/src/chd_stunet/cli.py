@@ -23,6 +23,16 @@ def nonnegative(text):
 
 
 def main(argv=None):
+    arguments=list(argv) if argv is not None else sys.argv[1:]
+    if arguments and arguments[0]=='_train-rank':
+        # Frozen, supervisor-only entry. It uses the same interpreter and does
+        # not rediscover machine config or expose internal controls in help.
+        internal=argparse.ArgumentParser()
+        internal.add_argument('--job',required=True)
+        internal.add_argument('--rank',type=nonnegative,required=True)
+        rank_args=internal.parse_args(arguments[1:])
+        from .training.distributed_engine import run_rank
+        run_rank(rank_args.job,rank_args.rank);return 0
     parser=argparse.ArgumentParser(description="CHD: data analysis and selectable preprocessing")
     sub=parser.add_subparsers(dest="command",required=True)
     analyze=sub.add_parser("analyze",help="analyze native data; no repairs or cohort exclusion")
@@ -52,13 +62,16 @@ def main(argv=None):
     prepare.add_argument('--limit',type=positive,help='limit output cases only; NEVER fit on a shortened training subset')
     prepare.add_argument('--audit-only',action='store_true')
     prepare.add_argument('--resume',action='store_true')
-    train=sub.add_parser('train',help='STU-Net-S CPU/single-CUDA fine-tuning with case-specific supervision')
+    train=sub.add_parser('train',help='STU-Net-S V2 fixed-global-batch multi-CUDA fine-tuning')
     train.add_argument('--prepared',help='verified preprocessing run; defaults to saved stage path')
     train.add_argument('--output')
     train.add_argument('--fold',type=int,choices=(0,1,2),default=0)
     train.add_argument('--weights',help='pinned author small_ep4k.model; required only for a new run')
-    train.add_argument('--device',default='cuda:0')
-    train.add_argument('--workers',type=nonnegative,help='CPU supply upper limit; 0 is explicit serial mode')
+    train.add_argument('--device',default='cuda:0',help='cpu, or single-device selection with --gpus legacy; use CUDA_VISIBLE_DEVICES to scope the multi-GPU path')
+    train.add_argument('--gpus',default='auto',help='auto or maximum visible idle GPUs; global batch stays fixed; legacy selects the original single-device engine')
+    train.add_argument('--no-elastic',dest='elastic',action='store_false',help='keep the admitted group fixed for this invocation')
+    train.add_argument('--gpu-wait-seconds',type=nonnegative,default=300)
+    train.add_argument('--workers',type=nonnegative,help='whole-group CPU supply upper limit; 0 is explicit serial mode')
     train.add_argument('--smoke',action='store_true',help='explicit 64-cube/B1 short profile, not a formal experiment')
     train.add_argument('--train-cases',nargs='+')
     train.add_argument('--val-cases',nargs='+')
@@ -87,7 +100,7 @@ def main(argv=None):
         print(json.dumps(dict(project_root=str(ROOT),local_config_present=(ROOT/"project.local.json").is_file(),
             raw_root=local.get("raw_root"),raw_exists=Path(local.get("raw_root","/__missing__")).is_dir(),
             preprocessing_paths=prepare_paths(local),
-            implementation="analysis + selectable preprocessing + STU-Net-S CPU/single-CUDA training; no whole-volume prediction"),ensure_ascii=False,indent=2));return 0
+            implementation="analysis + selectable preprocessing + STU-Net-S V2 multi-GPU training; no whole-volume prediction"),ensure_ascii=False,indent=2));return 0
     selected_python=local.get('training_python') if args.command=='train' else local.get('preprocess_python') if args.command=='prepare' else None
     selected_python=selected_python or local.get('analysis_python')
     if not selected_python:
@@ -118,7 +131,15 @@ def main(argv=None):
         overrides=dict(epochs=args.epochs,train_steps_per_epoch=args.train_steps,
             validation_steps_per_epoch=args.val_steps,batch_size=args.batch_size,patch_size=args.patch_size,
             amp=args.amp,include_auxiliary=args.include_auxiliary,seed=args.seed)
-        result=run_train(prepared,output,fold=args.fold,weights=weights,device=args.device,smoke=args.smoke,
+        implementation=run_train
+        execution=dict(device=args.device)
+        if args.device.startswith('cuda') and args.gpus!='legacy':
+            if args.device not in ('cuda','cuda:0'):
+                raise ValueError('Scope V2 GPUs with CUDA_VISIBLE_DEVICES, or use --gpus legacy with --device')
+            from .training.supervisor import launch
+            implementation=launch
+            execution=dict(gpus=args.gpus,elastic=args.elastic,wait_seconds=args.gpu_wait_seconds)
+        result=implementation(prepared,output,fold=args.fold,weights=weights,smoke=args.smoke,**execution,
             train_cases=args.train_cases or (),val_cases=args.val_cases or (),overrides=overrides,
             workers=args.workers,resume=args.resume,stop_after_steps=args.stop_after_steps,check_only=args.check_only)
         print(json.dumps(dict(output=str(output),**result),ensure_ascii=False,indent=2))
