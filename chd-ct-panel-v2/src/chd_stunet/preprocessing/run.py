@@ -23,6 +23,7 @@ from ..acceleration.preprocess_cpu import execute_jobs,estimate_memory
 from .registry import get_method
 from .cohort import TARGETS,frozen_roles,select_cohort
 from .fingerprint import make_plan
+from .capacity import case_scale
 
 
 def digest(value):
@@ -37,7 +38,7 @@ def producer_sources():
     for directory in ('preprocessing','_vendor','observability'):
         paths.extend((package/directory).glob('*.py'))
     paths.extend([package/'acceleration/preprocess_cpu.py',package/'data/author_excel.py',
-                  package/'data/discovery.py',package/'data/analysis.py'])
+                  package/'data/discovery.py',package/'data/analysis.py',package/'acceleration/scipy_parallel.py'])
     return {p.relative_to(ROOT).as_posix():sha256_file(p) for p in sorted(set(paths))}
 
 
@@ -91,7 +92,7 @@ def cache_valid(foldroot,cid,contract,source_hashes,annotation=None):
 
 def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(0,1,2),
                 selected_cases=(),limit=None,workers=None,readers=None,resume=False,audit_only=False,
-                cohort='all'):
+                cohort='all',case_threads=4):
     raw, output = Path(raw_root).resolve(strict=True),Path(output).resolve()
     if not raw.is_dir() or raw==output or output.is_relative_to(raw) or raw.is_relative_to(output):
         raise ValueError('Raw data and derived output must be separate directories')
@@ -127,7 +128,8 @@ def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(
             write_json(output/'effective_config.json',dict(method=method,raw_root=str(raw),
                 output=str(output),folds=list(folds),selected_cases=list(selected_cases),limit=limit,
                 output_cohort=cohort,
-                requested_workers=workers,requested_readers=readers,audit_only=audit_only,
+                requested_workers=workers,requested_readers=readers,requested_case_threads=case_threads,
+                audit_only=audit_only,
                 source_scope=f"110 pairs audit; {method.get('expected_main',96)} main, "
                     f"{method.get('expected_auxiliary',0)} auxiliary; historical 97 roles retained"))
             for relative in signature['producer_sha256']:
@@ -232,6 +234,7 @@ def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(
             dataset = dict(channel_names={'0':'CT'},labels=TARGETS,file_ending='.nii.gz',
                            numTraining=0,description='preprocessing only; roles are in splits.json')
             write_json(output/'dataset.json',dataset)
+            all_prepare_jobs,capacity = [],[]
             for fold in (() if audit_only else folds):
                 log.event('fingerprint.start',f"fold{fold}：仅使用主队列train拟合强度统计与目标spacing；辅助不参与拟合")
                 fingerprint,plan = make_plan(included,samples,fold,method)
@@ -245,9 +248,11 @@ def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(
                 write_json(foldroot/'training_contract.json',dict(consumer,fold=fold,
                     preprocessing_contract=contract,fit_ids=plan['fit_ids']))
                 target_spacing = plan['target_spacing_before_transpose'][::-1]
-                jobs = []
                 for row in targets:
                     cid = row['case_id']
+                    scale=case_scale(row,plan)
+                    reservation=estimate_memory(row['shape_xyz'],row['spacing_xyz'],target_spacing)
+                    capacity.append(dict(fold=fold,reservation_bytes=reservation,**scale))
                     if cache_valid(foldroot,cid,contract,row['source_hashes'],row['annotation']):
                         reused += 1
                         reused_groups[row['cohort_group']] += 1
@@ -260,17 +265,27 @@ def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(
                         annotation=row['annotation'],cohort_group=row['cohort_group'],roles=row['roles'])
                     taskfile = output/'tasks'/f'fold_{fold}'/f'{cid}.json'
                     write_json(taskfile,task)
-                    jobs.append(dict(name=f'fold{fold}_{cid}',task=str(taskfile),result=str(result_path),
-                        entry=str(output/'code/preprocess_worker.py'),estimate=estimate_memory(row['shape_xyz'],row['spacing_xyz'],target_spacing)))
-                def prepared(name,result):
-                    nonlocal processed
-                    if result['success']:
-                        processed += 1
-                        processed_groups[result['cohort_group']] += 1
-                    else:
-                        failed.append(dict(name=name,**result))
-                execute_jobs(jobs,output,log,stage_name=f'fold{fold}_prepare',workers=workers,
-                             readers=readers,completed=prepared)
+                    all_prepare_jobs.append(dict(name=f'fold{fold}_{cid}',task=str(taskfile),result=str(result_path),
+                        entry=str(output/'code/preprocess_worker.py'),estimate=reservation,work_units=scale['output_voxels']))
+            write_json(output/'capacity_preview.json',dict(scope='audited_crop_prediction',
+                capacity_verified=False,cases=sorted(capacity,key=lambda r:-r['output_voxels'])))
+            if capacity:
+                largest=max(capacity,key=lambda r:r['output_voxels'])
+                log.event('capacity.preview',f"最大目标预测：fold{largest['fold']} {largest['case_id']} "
+                    f"{largest['predicted_transposed_shape']}，{largest['output_voxels']:,}体素，"
+                    f"相对裁剪后放大{largest['expansion_from_crop']:.1f}倍；预留{largest['reservation_bytes']/1024**3:.2f}GiB（非实测占用）",
+                    largest=largest,preview=str(output/'capacity_preview.json'))
+            # Fold-specific statistics and contracts remain independent. Only
+            # scheduling is shared: a slow case cannot hold the next fold idle.
+            def prepared(name,result):
+                nonlocal processed
+                if result['success']:
+                    processed += 1
+                    processed_groups[result['cohort_group']] += 1
+                else:
+                    failed.append(dict(name=name,**result))
+            execute_jobs(all_prepare_jobs,output,log,stage_name='prepare_all_folds',workers=workers,
+                         readers=readers,completed=prepared,case_threads=case_threads)
             summary = dict(method=method_name,protocol=method['protocol'],source_pairs=len(rows),
                 included_pairs=len(included),excluded_pairs=len(excluded),fold_counts=fold_counts,
                 cohort_counts=group_counts,output_cohort=cohort,

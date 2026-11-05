@@ -38,6 +38,8 @@ def main(argv=None):
     prepare.add_argument('--descriptor',help='optional previous descriptor; not required to bootstrap')
     prepare.add_argument('--output',help='explicit run directory; relative paths are anchored to the project')
     prepare.add_argument('--workers',type=positive,help='optional upper limit; CPU/RAM may lower it')
+    prepare.add_argument('--case-threads',type=positive,default=4,
+                         help='requested resampling threads per case (default 4); shares total V2 CPU budget')
     prepare.add_argument('--readers',type=positive,help='optional read/decompression limit, separate from compute')
     prepare.add_argument('--fold',nargs='+',choices=['0','1','2','all'],default=['all'])
     prepare.add_argument('--cases',nargs='+',help='preprocess these cases; audit and train-only fitting remain full scope')
@@ -99,7 +101,7 @@ def main(argv=None):
             result=run_prepare(raw,output,method_name=args.method,descriptor=descriptor,folds=folds,
                 selected_cases=args.cases or (),limit=args.limit,workers=args.workers,
                 readers=args.readers or public.get('readers',2),
-                resume=args.resume,audit_only=args.audit_only,cohort=args.cohort)
+                resume=args.resume,audit_only=args.audit_only,cohort=args.cohort,case_threads=args.case_threads)
         print(json.dumps(dict(output=str(output),**result),ensure_ascii=False,indent=2))
         return 1 if result['failed_cases'] else 0
     raw=resolve_path(args.input or local.get("raw_root"))

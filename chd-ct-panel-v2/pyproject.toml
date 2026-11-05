@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chd-stunet"
-version = "0.3.2"
+version = "0.3.3"
 description = "CHD data analysis and selectable, versioned preprocessing"
 requires-python = ">=3.11"
 dependencies = ["numpy", "scipy", "nibabel", "matplotlib", "psutil", "threadpoolctl"]

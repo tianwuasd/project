@@ -93,7 +93,8 @@ class ResourcePolicyTests(unittest.TestCase):
                 return 0
         with tempfile.TemporaryDirectory(dir=root) as temporary:
             folder=Path(temporary)
-            jobs=[dict(name=f'case{i}',estimate=gib,entry='unused',task=str(i),result=str(folder/f'{i}.json')) for i in range(2)]
+            jobs=[dict(name=f'case{i}',estimate=gib,entry='unused',task=str(folder/f'{i}.task.json'),result=str(folder/f'{i}.json')) for i in range(2)]
+            for job in jobs:write_json(job['task'],dict(result=job['result']))
             def launch(*args,**kwargs):
                 pid=100000+len(spawned)
                 job=jobs[len(spawned)]

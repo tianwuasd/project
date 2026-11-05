@@ -48,10 +48,10 @@ def estimate_memory(shape, spacing, target=None, *, audit=False):
     return int(native*24 + 256*1024**2) if audit else int(max(native,target_voxels)*64 + GIB)
 
 
-def policy(facts, jobs, maximum=None):
+def policy(facts, jobs, maximum=None,case_threads=1):
     count = len(jobs) if maximum is None else min(len(jobs), maximum)
     estimate = min((j['estimate'] for j in jobs), default=0)
-    result = case_policy(facts, count, estimate, supported_threads=1)
+    result = case_policy(facts, count, estimate, supported_threads=case_threads)
     memory = facts.get('available_memory_bytes')
     if memory is not None:
         reserve = max(4*GIB, math.ceil(.2*memory))
@@ -59,7 +59,17 @@ def policy(facts, jobs, maximum=None):
         result['workers'] = min(result['workers'], result['memory_budget_bytes']//max(1,estimate))
     else:
         reserve = None
-    return dict(facts | result, reserve_bytes=reserve, threads_per_worker=1,
+    # Reserve a useful inner-kernel team as well as case parallelism. Smaller
+    # fresh CPU capacity can still admit a smaller team; never multiply the
+    # stage CPU80% budget once per worker.
+    threads=min(case_threads,result['cpu_budget']) if result['workers'] else 0
+    # Keep one smaller final team possible (e.g. six slots -> 4+2), rather
+    # than stranding spare CPU behind an unnecessarily low process ceiling.
+    if threads:result['workers']=min(result['workers'],math.ceil(result['cpu_budget']/threads))
+    result.update(threads_per_worker=threads,
+                  total_cpu_slots=min(result['cpu_budget'],result['workers']*threads),
+                  estimated_ram_bytes=result['workers']*estimate)
+    return dict(facts | result, reserve_bytes=reserve,
                 requested_workers=maximum, source='server-engineering V2 0.7.2 CPU case policy + project weighted queue')
 
 
@@ -111,6 +121,40 @@ def interpreter_command(env):
     return sys.executable
 
 
+def case_activity(item):
+    """Bounded feedback, accepting phase files only from the owned PID/birth.
+
+    CPU seconds and I/O bytes are cumulative OS observations, not a claim that
+    a kernel is stuck or that I/O is the cause. Missing evidence stays visible.
+    A retry may leave its previous phase file; that file must never be shown
+    as progress of the new worker.
+    """
+    result=dict(name=item['name'],pid=item['process'].pid,
+                elapsed_seconds=max(0,time.monotonic()-item['started']),
+                phase='starting_or_no_owned_phase')
+    try:
+        process=psutil.Process(item['process'].pid)
+        if item['process'].poll() is not None or process.create_time()!=item['born']:return result
+        with process.oneshot():
+            result['cpu_seconds']=sum(process.cpu_times()[:2])
+            result['rss_bytes']=process.memory_info().rss
+            try:
+                counters=process.io_counters()
+                result.update(read_bytes=counters.read_bytes,write_bytes=counters.write_bytes)
+            except (psutil.Error,AttributeError):pass
+        path=Path(item['job']['result']).with_suffix('.progress.json')
+        if path.is_file():
+            phase=json.loads(path.read_text(encoding='utf-8'))
+            if phase.get('worker_pid')==process.pid and phase.get('worker_born')==item['born']:
+                result.update(phase=phase.get('stage'),phase_event=phase['event'],
+                              phase_update_age_seconds=max(0,time.time()-phase['time']))
+                for key in ('completed','total','progress_scope'):
+                    if key in phase:result[key]=phase[key]
+    except (psutil.Error,OSError,ValueError,KeyError):
+        result['missing_activity_evidence']=True
+    return result
+
+
 def stop_owned(item):
     """Popen ownership plus process birth must match before any signal."""
     p = item['process']
@@ -130,7 +174,7 @@ def stop_owned(item):
         pass
 
 
-def execute_jobs(jobs, output, log, *, stage_name, workers=None, readers=None, completed=None):
+def execute_jobs(jobs, output, log, *, stage_name, workers=None, readers=None, completed=None,case_threads=1):
     """One supervised subprocess per case, bounded by fresh capacity.
 
     A one-second memory guard preserves the entry reserve. Sustained pressure
@@ -140,10 +184,14 @@ def execute_jobs(jobs, output, log, *, stage_name, workers=None, readers=None, c
     if not jobs:
         return dict(completed=0, reused_only=True)
     output = Path(output)
-    pending = sorted(jobs, key=lambda j:j['estimate'])
-    stage = policy(snapshot(), pending, workers)
+    if type(case_threads) is not int or case_threads<1:raise ValueError('Positive case threads required')
+    # Largest feasible work first with backfill: a large reservation does not
+    # block smaller jobs which fit beside active work. All folds share this
+    # one queue/budget, and each case still commits to its own fold/cache.
+    pending = sorted(jobs,key=lambda j:(-j.get('work_units',j['estimate']),j['name']))
+    stage = policy(snapshot(), pending, workers,case_threads)
     write_json(output/'resources'/f'{stage_name}.json', stage)
-    log.event('resource.stage', f"{stage_name}：预算CPU {stage['cpu_budget']}槽，最多{stage['workers']}个病例进程；内层1线程；读入单独限流", policy=stage)
+    log.event('resource.stage', f"{stage_name}：CPU总预算{stage['cpu_budget']}槽，病例进程上限{stage['workers']}，每例重采样最多{case_threads}线程；可行任务回填", policy=stage)
     if stage['workers'] < 1:
         raise MemoryError('Stage CPU/RAM cannot admit even the smallest case; see resources')
     active, done, recoveries = [], 0, 0
@@ -156,7 +204,7 @@ def execute_jobs(jobs, output, log, *, stage_name, workers=None, readers=None, c
         while pending or active:
             now = time.monotonic()
             if now-last_sample >= 1:
-                fresh = policy(snapshot(), pending or jobs, workers)
+                fresh = policy(snapshot(), pending or jobs, workers,case_threads)
                 used_rss, used_uss = 0, 0
                 for a in active:
                     a['private'] = private_bytes(a)
@@ -175,10 +223,17 @@ def execute_jobs(jobs, output, log, *, stage_name, workers=None, readers=None, c
                 if (fresh.get('io_pressure') or {}).get('avg10',0) >= 10:
                     slots = min(slots,2)
                 write_json(gate, dict(slots=max(1,slots)))
+                activities=[case_activity(a) for a in active]
+                phase_counts={}
+                for activity in activities:
+                    phase=activity['phase'] or 'between_stages'
+                    phase_counts[phase]=phase_counts.get(phase,0)+1
                 record = dict(time=time.time(), stage=stage_name, active=len(active), pending=len(pending),
                               completed=done, free_bytes=free, rss_bytes=used_rss, uss_bytes=used_uss,
                               fresh_cpu_budget=fresh['cpu_budget'], read_slots=max(1,slots),
-                              pressure_samples=pressure, recoveries=recoveries)
+                              pressure_samples=pressure, recoveries=recoveries,phase_counts=phase_counts,
+                              longest_active=sorted(activities,key=lambda a:-a['elapsed_seconds'])[:3])
+                record['reserved_cpu_slots']=sum(a['threads'] for a in active)
                 with (output/'logs/resources.jsonl').open('a',encoding='utf-8') as f:
                     f.write(json.dumps(record)+'\n')
                 log.status('running',stage=stage_name,**{k:v for k,v in record.items() if k!='stage'})
@@ -219,9 +274,10 @@ def execute_jobs(jobs, output, log, *, stage_name, workers=None, readers=None, c
                 # resident RAM. Once its reservation is removed, refresh host/
                 # cgroup headroom too; otherwise an empty queue can falsely
                 # reject the next full-size case using stale pre-exit memory.
-                fresh = policy(snapshot(),pending,workers)
+                fresh = policy(snapshot(),pending,workers,case_threads)
             for job in list(pending):
-                if not admits(stage,fresh,active,job['estimate']):
+                threads=min(case_threads,fresh['cpu_budget'],max(0,stage['cpu_budget']-sum(a['threads'] for a in active)))
+                if threads<1 or not admits(stage,fresh,active,job['estimate'],threads):
                     continue
                 name = job['name']
                 stream = (output/'logs'/f'{name}.log').open('a',encoding='utf-8')
@@ -229,6 +285,10 @@ def execute_jobs(jobs, output, log, *, stage_name, workers=None, readers=None, c
                            OMP_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1',MKL_NUM_THREADS='1',
                            NUMEXPR_NUM_THREADS='1',ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS='1')
                 try:
+                    task_path=Path(job['task'])
+                    task=json.loads(task_path.read_text(encoding='utf-8'))
+                    task['cpu_threads']=threads
+                    write_json(task_path,task)
                     python = interpreter_command(env)
                     p = subprocess.Popen([python,'-u',str(job['entry']),str(job['task'])],
                         env=env,stdout=stream,stderr=subprocess.STDOUT,stdin=subprocess.DEVNULL)
@@ -237,16 +297,19 @@ def execute_jobs(jobs, output, log, *, stage_name, workers=None, readers=None, c
                     stream.close()
                     raise
                 active.append(dict(name=name,process=p,born=born,stream=stream,job=job,
-                                   estimate=job['estimate'],private=0,threads=1))
+                                   estimate=job['estimate'],private=0,threads=threads,started=time.monotonic()))
                 pending.remove(job)
-                log.event('case.start',f"启动 {name}，预留{job['estimate']/GIB:.2f}GiB，PID {p.pid}",pid=p.pid,estimate_bytes=job['estimate'])
+                log.event('case.start',f"启动 {name}，预留{job['estimate']/GIB:.2f}GiB，重采样线程{threads}，PID {p.pid}",pid=p.pid,estimate_bytes=job['estimate'],threads=threads)
                 # The next admission must use fresh facts, not the same free RAM
                 # counted as if the just-launched job had no reservation.
-                fresh = policy(snapshot(),pending or jobs,workers)
+                fresh = policy(snapshot(),pending or jobs,workers,case_threads)
             if pending and not active:
                 raise MemoryError('Remaining full-size cases do not fit current CPU/RAM budget; committed smaller cases preserved')
             if now-last_console >= 20:
-                log.event('stage.heartbeat',f"{stage_name}：已完成{done}/{len(jobs)}，运行{len(active)}，待处理{len(pending)}；可用内存{(fresh.get('available_memory_bytes') or 0)/GIB:.1f}GiB")
+                details=[case_activity(a) for a in active]
+                details.sort(key=lambda a:-a['elapsed_seconds'])
+                phase_text='；'.join(f"{a['name']} {a['phase']} 已运行{a['elapsed_seconds']:.0f}s CPU累计{a.get('cpu_seconds',0):.1f}s" for a in details[:3])
+                log.event('stage.heartbeat',f"{stage_name}：已完成{done}/{len(jobs)}，运行{len(active)}，待处理{len(pending)}；可用内存{(fresh.get('available_memory_bytes') or 0)/GIB:.1f}GiB；{phase_text}",longest_active=details[:3])
                 last_console = now
             if pending or active:
                 time.sleep(.15)
