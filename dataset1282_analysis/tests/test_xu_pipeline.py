@@ -118,3 +118,14 @@ class PipelineRecoveryTests(unittest.TestCase):
         records = {'all128':{'files':{'best.pt':'selected-seed'}}}
         with self.assertRaisesRegex(ValueError,'consumed different all128'):
             pipeline._check_used_weights(stage,self.out,records,self.contract)
+
+    def test_device_aliases_generate_the_same_stage_arguments(self):
+        for device in ('cuda','cuda:0'):
+            args = SimpleNamespace(prepared=self.out/'prepared', output=self.out/'experiment',
+                                   device=device, crop64=None, crop128=None, reviews=None,
+                                   threads=2, technical_subset=True)
+            with (patch('dataset1282_analysis.xu_geometry.PreparedCache'),
+                  patch.object(pipeline,'_contract',return_value={'device':{'device':'cuda:0'}}),
+                  patch.object(pipeline,'_run_locked') as run):
+                pipeline._run(args)
+                self.assertEqual(run.call_args.args[1].device,'cuda:0')

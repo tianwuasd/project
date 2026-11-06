@@ -344,6 +344,8 @@ def _run(args):
     args.prepared, args.output = prepared, out
     cache = PreparedCache(prepared,allow_technical_subset=args.technical_subset)
     contract = _contract(cache,args)
+    # The frozen run and stage receipts must use the same spelling for CUDA aliases.
+    args.device = contract['device']['device']
     out.mkdir(exist_ok=True,parents=True)
     with operation_lock(out,'xu-model-run',out) as owner:
         _run_locked(cache,args,out,owner,contract)
