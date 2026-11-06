@@ -88,6 +88,7 @@ def main(argv=None):
     train.add_argument('--check-only',action='store_true',help='validate inputs/recipe without allocating a GPU')
     train.add_argument('--stop-after-steps',type=positive,help='pause safely at this total train-attempt count; omit on resume')
     train.add_argument('--resume',action='store_true')
+    train.add_argument('--continue-from',help='audit and import an old training run into a NEW output; preserve full progress')
     status=sub.add_parser("status",help="read an existing run status without scientific imports")
     status.add_argument("--output",required=True)
     sub.add_parser("check",help="show configured paths; does not install anything")
@@ -141,6 +142,9 @@ def main(argv=None):
             from .training.supervisor import launch
             implementation=launch
             execution=dict(gpus=args.gpus,elastic=args.elastic,wait_seconds=args.gpu_wait_seconds)
+        if args.continue_from:
+            if implementation==run_train:raise ValueError('--continue-from requires the V2 GPU supervisor')
+            execution['continue_from']=str(resolve_path(args.continue_from))
         result=implementation(prepared,output,fold=args.fold,weights=weights,smoke=args.smoke,**execution,
             train_cases=args.train_cases or (),val_cases=args.val_cases or (),overrides=overrides,
             workers=args.workers,resume=args.resume,stop_after_steps=args.stop_after_steps,check_only=args.check_only)

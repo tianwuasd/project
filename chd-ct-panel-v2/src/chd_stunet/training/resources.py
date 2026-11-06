@@ -8,6 +8,10 @@ from ..acceleration.preprocess_cpu import GIB
 from .checkpoints import rng_state,restore_rng
 
 
+class GPUUnavailable(RuntimeError):
+    """Verified contention/free-memory race; eligible placement may be retried."""
+
+
 def parse_compute_processes(text,uuid,own_pid):
     if re.fullmatch(r'[0-9a-fA-F-]{36}',uuid):uuid='GPU-'+uuid
     if not re.fullmatch(r'GPU-[0-9a-fA-F-]{36}',uuid):
@@ -49,11 +53,11 @@ def admit_device(requested):
         else:evidence='compute PID/UUID evidence unavailable'
     if evidence!='compute-apps by UUID':
         raise RuntimeError('Missing reliable compute-process evidence; use CPU or repair GPU query support')
-    if external:raise RuntimeError('Selected GPU has external compute processes; no process was changed: '+str(external))
+    if external:raise GPUUnavailable('Selected GPU has external compute processes; no process was changed: '+str(external))
     free,total=torch.cuda.mem_get_info(index)
     reserve=max(4*GIB,int(total*.1))
     usable=free-reserve
-    if usable<=0:raise MemoryError('GPU lacks the required 4GiB/10% reserve')
+    if usable<=0:raise GPUUnavailable('GPU lacks the required 4GiB/10% reserve')
     return torch.device('cuda',index),dict(device=f'cuda:{index}',name=properties.name,
         uuid=uuid,free_bytes=free,total_bytes=total,reserve_bytes=reserve,
         usable_bytes=usable,external_compute_evidence=evidence)

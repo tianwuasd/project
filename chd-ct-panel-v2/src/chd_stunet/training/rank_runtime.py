@@ -7,11 +7,11 @@ from .resources import transfer
 from ..observability.runlog import write_json
 
 
-def restore_rank_rng(payload,members,rank,device,seed):
+def restore_rank_rng(payload,members,rank,device,seed,allow_partial=False):
     record=payload.get('distributed')
     if not record:raise ValueError('Missing per-rank RNG/membership checkpoint; use its original frozen entry')
     old=record['members'];boundary=payload['state']['phase']=='train' and payload['state']['step']==0
-    if old!=members and not boundary:
+    if old!=members and not boundary and not allow_partial:
         raise ValueError('Membership may change only at a complete epoch boundary')
     if len(record['rng_by_rank'])!=len(old) or len(set(old))!=len(old):
         raise ValueError('Invalid rank RNG checkpoint inventory')
@@ -21,7 +21,16 @@ def restore_rank_rng(payload,members,rank,device,seed):
         # Deliberate deterministic reseeding at an elastic boundary. This is
         # NOT a claim of bitwise equivalence across member/collective changes.
         import random,numpy as np
-        value=seed+100003*payload['state']['epoch']+rank
+        if allow_partial:
+            # Sampling/augmentation already uses global slot+cursor seeds.
+            # A changed group has no one-to-one rank RNG mapping: derive a
+            # deterministic model RNG from the saved cursor and new members.
+            # Different collective orders need not be bitwise identical.
+            import hashlib,json
+            cursor=payload['state']
+            body=[seed,cursor['epoch'],cursor['phase'],cursor['step'],members,rank]
+            value=int.from_bytes(hashlib.sha256(json.dumps(body).encode()).digest()[:4],'little')
+        else:value=seed+100003*payload['state']['epoch']+rank
         random.seed(value);np.random.seed(value);torch.manual_seed(value)
 
 

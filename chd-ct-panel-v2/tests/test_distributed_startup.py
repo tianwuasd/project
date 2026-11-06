@@ -21,7 +21,8 @@ class StopAtCommunicator(RuntimeError):
 
 class StartupTests(unittest.TestCase):
     def setUp(self):
-        self.temporary=tempfile.TemporaryDirectory()
+        scratch=Path(__file__).resolve().parents[1]/'outputs/tests-tmp';scratch.mkdir(parents=True,exist_ok=True)
+        self.temporary=tempfile.TemporaryDirectory(dir=scratch)
         self.root=Path(self.temporary.name)
 
     def tearDown(self):self.temporary.cleanup()

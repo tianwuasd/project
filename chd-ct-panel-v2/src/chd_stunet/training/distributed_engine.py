@@ -24,18 +24,19 @@ from .model import topology,build_model
 from .weights import WEIGHT_SHA256,load_pretrained
 from .engine import initial_state,validate_state,optimizer_for,prune_checkpoints,repair_best_pointer,summary_from_state
 from .losses import DeepSupervisionLoss
-from .resources import admit_device,capacity_probe
+from .resources import admit_device,capacity_probe,GPUUnavailable
 from .checkpoints import read_checkpoint,restore_checkpoint
 from .code_snapshot import freeze_code
 from .feedback import TrainingLog,MemoryMonitor
 from .parallel_policy import slots_for
 from .collectives import any_rank,all_objects
 from .rank_runtime import restore_rank_rng,commit,train_attempt,validate_attempt
+from .relocation import read_handoff
 
 
 def prepare_contract(prepared,options):
     settings=recipe(options.get('smoke',False),options.get('overrides'))
-    settings.update(execution_protocol='global-slot-rng-v2',supported_world_size=settings['batch_size'],
+    settings.update(execution_protocol='global-slot-rng-v2',membership_policy='step-boundary-v1',supported_world_size=settings['batch_size'],
                     effective_precision='fp16' if settings['amp'] else 'fp32')
     train,val=options.get('train_cases',()),options.get('val_cases',())
     if settings['scope']=='smoke' and not train and not val:
@@ -94,7 +95,7 @@ def run_rank(job_path,rank):
         else:
             state=restore_checkpoint(payload,model,optimizer,scaler,device)
             validate_state(state,settings)
-            restore_rank_rng(payload,members,rank,device,settings['seed'])
+            restore_rank_rng(payload,members,rank,device,settings['seed'],allow_partial=True)
         if rank==0 and payload is not None:repair_best_pointer(output,state)
         # Last zero-weight deep supervision head has intentionally no gradient.
         # find_unused_parameters retains the author's output/DS structure.
@@ -122,12 +123,18 @@ def run_rank(job_path,rank):
         dist.barrier()
         if rank==0:write_json(output/'control/capacity-passed.json',dict(generation=job['generation'],members=members))
         if payload is None:commit(output/'checkpoints',model,optimizer,scaler,state,signature,device,members)
-        epoch_began=time.monotonic();full_epoch=state['phase']=='train' and state['step']==0
+        epoch_began=time.monotonic();full_epoch=state['phase']=='train' and state['step']==0;handoff=None
         while state['epoch']<settings['epochs']:
             stop=(output/'control/stop.json').exists()
             stop_steps=job['options'].get('stop_after_steps')
             stop=stop or (stop_steps is not None and state['attempts']>=stop_steps)
             if any_rank(stop,device):break
+            request=read_handoff(output,job['generation'])
+            if any_rank(request is not None,device):
+                handoff=next(row for row in all_objects(request) if row is not None)
+                log.event('parallel.handoff','GPU占用变化：当前步已完成，保存完整状态后重组',request=handoff,
+                          epoch=state['epoch'],phase=state['phase'],step=state['step'])
+                break
             if any_rank(monitor.error is not None,device):raise RuntimeError('Rank memory monitor failed; evidence in rank logs')
             if any_rank(monitor.pressure.is_set(),device):
                 # Do not save the incomplete epoch. Parent closes this group,
@@ -205,14 +212,17 @@ def run_rank(job_path,rank):
             summary.update(world_size=world,members=members,layout=job['supply']['layout'])
             summary.update(memory_pressure_recoveries=job['pressure_recoveries'],
                            peak_process_group_rss_bytes=None,peak_rank_tree_rss_bytes=rank_peaks)
+            if handoff is not None:summary.update(status='relocating',reason=handoff['reason'])
             write_json(output/'summary.json',summary)
             log.status(summary['status'],stage='done',epoch=state['epoch'],phase=state['phase'],step=state['step'],
                        attempts=state['attempts'],updates=state['updates'],summary=summary)
-            write_json(output/'control/result.json',dict(action=summary['status'],generation=job['generation']))
+            write_json(output/'control/result.json',dict(action='relocate' if handoff else summary['status'],
+                       generation=job['generation'],reason=handoff['reason'] if handoff else None))
     except BaseException as error:
         write_json(output/'control'/f'fatal-{job["generation"]}-{rank}.json',
                    dict(rank=rank,stage=log.context.get('stage'),device=str(device),
-                        error=str(error),traceback=traceback.format_exc()))
+                        error=str(error),error_type=type(error).__name__,uuid=members[rank],
+                        resource_unavailable=isinstance(error,GPUUnavailable),traceback=traceback.format_exc()))
         log.event('training.failed',str(error),rank=rank,traceback=traceback.format_exc())
         log.status('failed',stage='error',error=str(error))
         raise

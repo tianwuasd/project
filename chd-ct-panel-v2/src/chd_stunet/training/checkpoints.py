@@ -37,25 +37,32 @@ def save_checkpoint(folder,model,optimizer,scaler,state,signature,device,distrib
     Replacing last.pt and its checksum separately has a crash window. Here the
     pointer moves only after the new immutable generation and checksum exist.
     """
-    folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
-    generation=f"state-{state['attempts']:09d}-{state['epoch']:04d}-{state['phase']}-{state['step']:04d}-{uuid4().hex[:12]}.pt"
-    target=folder/generation;temporary=target.with_suffix('.partial')
     payload=dict(schema=1,signature=signature,state=state,model=cpu_tree(model.state_dict()),
         optimizer=cpu_tree(optimizer.state_dict()),scaler=scaler.state_dict(),rng=rng_state(device))
     if distributed is not None:payload['distributed']=cpu_tree(distributed)
+    return commit_payload(folder,payload)
+
+
+def commit_payload(folder,payload,pointer_name='latest.json'):
+    """Atomically store a fully verified CPU payload, also used by continuation."""
+    if pointer_name not in ('latest.json','epoch.json','best.json'):raise ValueError('Unknown checkpoint pointer role')
+    state=payload['state'];signature=payload['signature']
+    folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
+    generation=f"state-{state['attempts']:09d}-{state['epoch']:04d}-{state['phase']}-{state['step']:04d}-{uuid4().hex[:12]}.pt"
+    target=folder/generation;temporary=target.with_suffix('.partial')
     with temporary.open('wb') as stream:
         torch.save(payload,stream);stream.flush();os.fsync(stream.fileno())
     os.replace(temporary,target)
     with target.open('rb') as stream:sha=hashlib.file_digest(stream,'sha256').hexdigest()
     pointer=dict(file=generation,sha256=sha,signature_identity=signature['identity'])
-    write_json(folder/'latest.json',pointer)
+    write_json(folder/pointer_name,pointer)
     return pointer
 
 
 def read_checkpoint(folder,signature,pointer_name='latest.json'):
     folder=Path(folder)
     import json
-    if pointer_name not in ('latest.json','epoch.json'):raise ValueError('Unknown checkpoint pointer role')
+    if pointer_name not in ('latest.json','epoch.json','best.json'):raise ValueError('Unknown checkpoint pointer role')
     pointer=json.loads((folder/pointer_name).read_text(encoding='utf-8'))
     name=pointer['file']
     if Path(name).name!=name:raise ValueError('Checkpoint pointer must name a local generation')
