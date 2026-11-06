@@ -3,7 +3,6 @@ import argparse
 from functools import lru_cache
 import json
 from pathlib import Path
-import re
 
 from .contracts import atomic_json, digest, read_json, sha256_file
 from .observability.status import operation_lock
@@ -50,20 +49,8 @@ def roi_book(path, cache, args):
         if path is not None:
             raise ValueError('Localization takes whole volumes')
         return None
-    if path is None:
-        raise ValueError('Run localize first and pass its boxes.json to --boxes')
-    book = read_json(path)
-    qc = read_json(Path(path).parent/'localization_qc.json')
-    if (qc['book_digest'] != digest(book) or set(book['checkpoints']) != {'crop64','crop128'}
-            or not all(re.fullmatch('[0-9a-f]{64}', h) for h in book['checkpoints'].values())):
-        raise ValueError('Predicted box book or locator identity changed')
-    if (book['protocol'] != PROTOCOL or book['request'] != cache.request_digest or
-            book['locator_input'] != input_id(cache,args.supervision) or
-            book['profile'] != args.profile or book['supervision'] != args.supervision):
-        raise ValueError('ROI book is from another experiment')
-    if set(book['boxes']) != set(cache.case_ids('train')) | set(cache.case_ids('development')):
-        raise ValueError('Incomplete predicted ROI book')
-    return book
+    from .xu_roi_workflow import verified_book
+    return verified_book(path, cache, args)
 
 
 def train(cache, args, out):
@@ -76,6 +63,10 @@ def train(cache, args, out):
     if args.profile=='smoke' and not dev_names:
         dev_names = cache.case_ids('development')
 
+    if args.pilot_epochs is not None and (cache.scope != 'technical_subset' or args.profile != 'smoke'):
+        raise ValueError('Pilot epochs require a technical-subset smoke run')
+
+    @lru_cache(maxsize=4 if args.pilot_epochs else 0)
     def load(name, branch):
         shape = (side(branch),)*3
         box = book['boxes'][name] if book is not None else None
@@ -87,41 +78,9 @@ def train(cache, args, out):
     result = train_branch(branch=args.branch, output_dir=out, train_cases=annotations(train_names),
                           validation_cases=annotations(dev_names), load_sample=load,
                           data_identity=input_id(cache,args.supervision,book), profile=args.profile,
-                          supervision=args.supervision, device=args.device, resume=args.resume, seed=args.seed)
+                          supervision=args.supervision, device=args.device, resume=args.resume, seed=args.seed, pilot_epochs=args.pilot_epochs, pilot_width=args.pilot_width)
     return dict(command='train', branch=args.branch, train=len(train_names), validation=len(dev_names),
                 profile=args.profile, supervision=args.supervision, result=result)
-
-
-def localize(cache, args, out):
-    from .xu_geometry import prediction_box
-    destination = out/'boxes.json'
-    if destination.exists():
-        raise ValueError('Use a fresh output directory for a new ROI book')
-    paths = {'crop64':args.crop64, 'crop128':args.crop128}
-    models = {k:frozen_predictor(p,branch=k,profile=args.profile,supervision=args.supervision,
-                                data_identity=input_id(cache,args.supervision),device=args.device)
-              for k,p in paths.items()}
-    boxes = {}
-    full_volume = []
-    names = (*cache.case_ids('train'), *cache.case_ids('development'))
-    for idx,name in enumerate(names,1):
-        predicted = [predict(cache.read_image(name,(side(k),)*3)) for k,(predict,_) in models.items()]
-        shape = cache.geometry(name).cache_shape
-        box = prediction_box(*predicted,shape)
-        boxes[name] = [[int(lo),int(hi)] for lo,hi in box]
-        if all(lo==0 and hi==n for (lo,hi),n in zip(box,shape)):
-            full_volume.append(name)
-        print(f'Localized {idx}/{len(names)}', flush=True)
-    book = dict(protocol=PROTOCOL,profile=args.profile,supervision=args.supervision,
-                locator_input=input_id(cache,args.supervision),request=cache.request_digest,
-                checkpoints={k:sha for k,(_,sha) in models.items()},
-                convention='cache axes; inclusive start, exclusive stop',boxes=boxes)
-    atomic_json(out/'localization_qc.json',
-                dict(cases=len(names),full_volume_cases=full_volume,book_digest=digest(book)))
-    if args.profile=='paper' and len(full_volume)==len(names):
-        raise ValueError('Every predicted crop covers the full volume; review localizers before ROI training')
-    atomic_json(destination,book)
-    return dict(command='localize', cases=len(names),full_volume=len(full_volume),file=str(destination))
 
 
 def evaluate(cache, args, out):
@@ -163,7 +122,7 @@ def evaluate(cache, args, out):
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
     commands=p.add_subparsers(dest='command',required=True)
-    for name in ('inspect','train','localize','evaluate'):
+    for name in ('inspect','train','localize','audit-roi','evaluate'):
         cmd=commands.add_parser(name)
         cmd.add_argument('--prepared',type=Path,required=True,help='Completed hu-marginal run directory')
         cmd.add_argument('--technical-subset',action='store_true',help='Explicitly admit technical acceptance data')
@@ -177,16 +136,30 @@ def main(argv=None):
             cmd.add_argument('--branch',choices=BRANCHES,required=True)
             cmd.add_argument('--boxes',type=Path)
         if name=='train':
+            cmd.add_argument('--pilot-epochs',type=int,help='Longer technical-subset smoke fit, separate from paper training')
+            cmd.add_argument('--pilot-width',type=int,choices=(2,4,8),default=2,help='Initial channels in a technical pilot fit')
             cmd.add_argument('--resume',action='store_true')
             cmd.add_argument('--seed',type=int,default=2023)
         if name=='localize':
+            cmd.add_argument('--padding-percent',type=int,choices=(0,10),default=10,
+                             help='Increase each strict-vote side by this total percent, split across both faces')
             cmd.add_argument('--crop64',type=Path,required=True)
             cmd.add_argument('--crop128',type=Path,required=True)
+        if name=='audit-roi':
+            cmd.add_argument('--candidates',type=Path,required=True)
         if name=='evaluate':
             cmd.add_argument('--checkpoint',type=Path,required=True)
             cmd.add_argument('--save-predictions',action='store_true')
+    from . import xu_targets, xu_blood, xu_fusion
+    extra = (xu_targets, xu_blood, xu_fusion)
+    handlers = {}
+    for module in extra:
+        previous = set(commands.choices)
+        module.register(commands)
+        handlers.update({k:module.run for k in commands.choices.keys()-previous})
     args=p.parse_args(argv)
     from .xu_geometry import PreparedCache
+    from .xu_roi_workflow import localize, audit
     cache=PreparedCache(args.prepared,allow_technical_subset=args.technical_subset)
     if args.command=='inspect':
         result=dict(protocol=PROTOCOL, scope=cache.scope, request=cache.request_digest,
@@ -200,5 +173,5 @@ def main(argv=None):
             raise ValueError('Choose a separate experiment output outside the preprocessing cache')
         out.mkdir(parents=True,exist_ok=True)
         with operation_lock(out,'xu-'+args.command,out):
-            result={'train':train,'localize':localize,'evaluate':evaluate}[args.command](cache,args,out)
+            result={**handlers,'train':train,'localize':localize,'audit-roi':audit,'evaluate':evaluate}[args.command](cache,args,out)
     print(json.dumps(result,ensure_ascii=False,indent=2,default=str))

@@ -11,7 +11,7 @@ from torch.nn import functional as F
 
 from .contracts import atomic_json, digest, sha256_file
 from .training.marginal import marginal_loss
-from .xu_models import branch_spec, build_model
+from .xu_models import BranchSpec, Xu3DSegmenter, branch_spec, build_model
 
 
 def _paper_loss(scores, target):
@@ -172,15 +172,30 @@ def _recover_best(best, state):
         raise ValueError('Best checkpoint differs from committed epoch history')
 
 
+def _training_model(branch, profile, technical_fit):
+    if not technical_fit or technical_fit.get('width', 2) == 2:
+        return build_model(branch, profile)
+    width = technical_fit['width']
+    if profile != 'smoke' or width not in (4, 8):
+        raise ValueError('Invalid technical pilot width')
+    base = branch_spec(branch, profile)
+    return Xu3DSegmenter(BranchSpec(base.side, width, 4, 2*width, 1, technical_fit['epochs']))
+
+
 def train_branch(*, branch, output_dir, train_cases, validation_cases, load_sample,
                  data_identity, profile='paper', supervision='complete', device='cpu',
-                 resume=False, seed=2023):
+                 resume=False, seed=2023, pilot_epochs=None, pilot_width=2):
     """load_sample(case_id, branch) returns aligned image/label cubes on the branch grid.
 
     Callers bind preprocessing, cohort, geometry, and predicted ROI identities in
     data_identity and hold an exclusive output-directory lock for the run.
     """
     spec = branch_spec(branch,profile)
+    if pilot_epochs is not None and (profile != 'smoke' or not 1 <= pilot_epochs <= 500):
+        raise ValueError('Pilot fit requires 1..500 technical-profile epochs')
+    if pilot_width not in (2, 4, 8) or (pilot_width != 2 and pilot_epochs is None):
+        raise ValueError('Pilot width needs an explicitly bounded technical fit')
+    epochs = pilot_epochs or spec.epochs
     train, val = _groups(train_cases), _groups(validation_cases)
     if not train or not val or train.keys() & val.keys():
         raise ValueError('Need nonempty disjoint training and validation IDs')
@@ -205,9 +220,11 @@ def train_branch(*, branch, output_dir, train_cases, validation_cases, load_samp
                     split_digest=digest(dict(train=train,validation=val)), torch_version=str(torch.__version__),
                     source={name:sha256_file(source/name) for name in
                             ('xu_models.py','xu_training.py','training/marginal.py')})
+    if pilot_epochs is not None:
+        contract['technical_fit'] = dict(epochs=epochs, initial_lr=0.002, width=pilot_width)
     with torch.random.fork_rng(devices=[]):
         torch.random.default_generator.manual_seed(seed)
-        model = build_model(branch,profile).to(device)
+        model = _training_model(branch,profile,contract.get('technical_fit')).to(device)
     optimizer = torch.optim.Adam(model.parameters(),lr=learning_rate(0,spec.epochs))
     epoch_start, best_epoch, best_loss, history = 0, -1, float('inf'), []
     if resume:
@@ -220,11 +237,11 @@ def train_branch(*, branch, output_dir, train_cases, validation_cases, load_samp
         epoch_start = state['epoch']+1
         best_epoch,best_loss,history = state['best_epoch'],state['best_loss'],state['history']
         del state
-    for epoch in range(epoch_start,spec.epochs):
+    for epoch in range(epoch_start,epochs):
         ids=sorted(train)
         random.Random(seed+epoch).shuffle(ids)
         rng=torch.Generator(device=device).manual_seed(seed+epoch)
-        lr=learning_rate(epoch,spec.epochs)
+        lr=learning_rate(epoch,epochs) * (10 if pilot_epochs else 1)
         for params in optimizer.param_groups:
             params['lr']=lr
         train_loss=_epoch(model,ids,train,load_sample,branch,device,rng,optimizer)
@@ -240,7 +257,7 @@ def train_branch(*, branch, output_dir, train_cases, validation_cases, load_samp
             _write_best(best,state)
         print(json.dumps(dict(branch=branch,profile=profile,**entry)),flush=True)
     summary=dict(branch=branch,profile=profile,supervision=supervision,train_cases=len(train),
-                 validation_cases=len(val),batch=spec.batch,epochs=spec.epochs,
+                 validation_cases=len(val),batch=spec.batch,epochs=epochs,
                  validation_partial_cases=sum(bool(v) for v in val.values()),best_epoch=best_epoch+1,
                  best_loss=best_loss,history=history,best_checkpoint=str(best),last_checkpoint=str(last),
                  contract_digest=digest(contract))
@@ -260,7 +277,7 @@ def load_predictor(checkpoint, *, branch, profile, data_identity, device='cpu', 
         raise ValueError('Inference requires the validation-selected best checkpoint')
     if c['source']['xu_models.py']!=sha256_file(Path(__file__).with_name('xu_models.py')):
         raise ValueError('Prediction model implementation changed')
-    model=build_model(branch,profile)
+    model=_training_model(branch,profile,c.get('technical_fit'))
     model.load_state_dict(state['model'])
     model.eval().to(device)
     del state

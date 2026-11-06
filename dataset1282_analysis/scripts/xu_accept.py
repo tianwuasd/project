@@ -129,7 +129,8 @@ def paper_step64(cache, name, device):
 def main(args):
     import nibabel as nib
     import torch
-    from dataset1282_analysis.xu_geometry import PreparedCache, prediction_box
+    from dataset1282_analysis.xu_geometry import PreparedCache
+    from dataset1282_analysis.xu_roi import vote_box, coverage, MIN_CLASS_P05
     from dataset1282_analysis.xu_training import load_predictor, train_branch
     from dataset1282_analysis.xu_workflow import input_id
 
@@ -181,11 +182,15 @@ def main(args):
         del infer
 
     geo = cache.geometry(dev_name)
-    cache_box = prediction_box(predictions['crop64'],predictions['crop128'],geo.cache_shape)
+    vote = vote_box(predictions['crop64'], predictions['crop128'], geo)
+    cache_box = vote['box']
+    if not vote['quality']['accepted']:
+        atomic_json(out/'acceptance.json', dict(passed=False, roi=vote, reason=vote['quality']['reason']))
+        raise ValueError(f"Localizers failed the ROI check: {vote['quality']['reason']}")
     native_box = tuple((int(a),int(b)) for a,b in geo.cache_box_to_native(cache_box))
     native_label = cache.read_native_label(dev_name)
     target = native_label > 0
-    roi = tuple(slice(lo,hi) for lo,hi in native_box)
+    roi = tuple(slice(lo,hi) for lo,hi in vote['quality']['native_support'])
     native = nib.load(run/'staged'/dev_name/('image'+cache.staged_extension))
     if native.shape!=target.shape:
         raise ValueError('Source grid mismatch')
@@ -204,7 +209,9 @@ def main(args):
     plans = read_json(ds/'nnUNetPlans.json')
     draw_qc(out/'native-localization.png',native.dataobj,target,geo.spacing_xyz,native_box,
             inputs,plans['transpose_backward'])
-    report=dict(passed=True, kind='real_input_technical_acceptance', prepared_scope=cache.scope,
+    retained = coverage(native_label, {'vote':cache_box}, geo, cache.supervision[dev_name]['present_classes'])['vote']
+    report=dict(passed=all(x >= MIN_CLASS_P05 for x in retained.values()), per_structure_coverage=retained,
+                kind='real_input_technical_acceptance', prepared_scope=cache.scope,
                 fit_cases=list(read_json(run/'fit.json')['fit_cases']), localizer_profile='smoke',
                 train_cases=list(train_cases), development_cases=list(val_cases),
                 development_unknown_classes=val_cases[dev_name], checkpoints=checkpoints,
@@ -220,6 +227,8 @@ def main(args):
         report['full_width_step_capacity'] = paper_step64(cache,train_name,args.device)
     atomic_json(out/'acceptance.json',report)
     print(json.dumps(report,indent=2,ensure_ascii=False),flush=True)
+    if not report['passed']:
+        raise ValueError('Insufficient held-out structure coverage; see acceptance.json')
 
 
 if __name__=='__main__':
