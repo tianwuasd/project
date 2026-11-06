@@ -10,11 +10,11 @@
 PY=/path/to/research/bin/python
 D=/path/to/prepared/RUN/hu-marginal
 O=/path/to/private/experiments/xu-marginal
-GPU=cuda:0
+GPU=auto
 test -s "$D/complete.json" || { echo '请等待预处理完成'; exit 1; }
 "$PY" -c 'import torch; print(torch.__version__, torch.cuda.is_available())'
 mkdir -p "$(dirname "$O")"
-args=(--prepared "$D" --output "$O" --supervision marginal --profile paper --device "$GPU" --threads 4)
+args=(--prepared "$D" --output "$O" --supervision marginal --profile paper --devices "$GPU" --threads 4)
 # 如果有人工核准的起始段端面或内部界面，首次启动时加入并在恢复时沿用：
 # args+=(--reviews /path/to/private/reviewed-planes.json)
 nohup "$PY" -B -u scripts/xu_pipeline.py run "${args[@]}" >"${O}.launcher.log" 2>&1 < /dev/null &
@@ -23,23 +23,32 @@ echo "PID=$!"
 
 边际监督组读取 590 个训练病例与 128 个开发病例，缺标按未知处理。完整标注对照使用单独输出目录，把 `--supervision` 改为 `complete`；该组训练和选权重所用的完整病例为 552 / 122。两组均报告固定开发集上可评价的结构，另列完全标注病例的评价。开发集参与选权重，结果作为开发集指标解释。
 
-## CPU 与 GPU 资源策略
+## 自动使用作业获准的 GPU
 
-有两张已分配的完整物理 GPU 时，使用作业内可见的两个逻辑编号。当前按物理 UUID 核验，MIG 切片不在本版支持范围。64³ 分支用第一张，128³ 分支用第二张，定位、融合和血池也使用第二张。按 64³/128³ 成对并行训练、成对评价。只有两支都提交成功才进入依赖其结果的阶段。主分支的全局 batch 仍为 4，时序分支为 1，每支保留原 FP32、损失和 Adam 更新。当前最大同时运行两支。
-
-先在原调度作业的 Bash 中用全新目录做双卡验收，无需准备患者数据。每张卡按正式规格各做一次更新，检查两张卡的身份和实际执行区间。随后使用相同卡序启动正式任务。目录名仅为示例。
+正式服务器入口默认按作业内可见 GPU 建立资源池。可显式使用 `--devices auto`，或用 `--devices cuda:0,cuda:1,cuda:2` 指定分配到的逻辑卡。Linux 多卡自动模式沿用调度器的 `CUDA_VISIBLE_DEVICES` 或容器限定的可见设备。若调度器未设置可见范围，且整组物理 GPU 均获准，可用 `--devices all-visible` 自动枚举并筛掉忙卡。当前支持有可核验 UUID 的完整物理 GPU，MIG 实例须另行适配。
 
 ```bash
-"$PY" -B scripts/xu_pair_probe.py --devices cuda:0,cuda:1 --threads 4 --wait-seconds 60 --output "${O}-pair-probe"
-args=(--prepared "$D" --output "$O" --supervision marginal --profile paper --devices cuda:0,cuda:1 --threads 4 --wait-seconds 60)
+# 先检查整组 GPU 是否能同时按病例预测，再核验正式 3D batch 的更新与显存。每次用新目录。
+"$PY" -B scripts/xu_fleet_probe.py --devices auto --stage inference --threads 4 --output "${O}-check-inference"
+"$PY" -B scripts/xu_fleet_probe.py --devices auto --stage 3d64 --threads 4 --output "${O}-check64"
+"$PY" -B scripts/xu_fleet_probe.py --devices auto --stage 3d128 --threads 4 --output "${O}-check128"
+# 作业仍在相同的 GPU 分配内时启动正式训练。
+args=(--prepared "$D" --output "$O" --supervision marginal --profile paper --devices auto --threads 4 --wait-seconds 60)
 nohup "$PY" -B -u scripts/xu_pipeline.py run "${args[@]}" >"${O}.launcher.log" 2>&1 < /dev/null &
 ```
 
-- 双卡采用 v2 资源策略。每卡预留总显存的 10% 且至少 4 GiB。程序在新阶段核对获准 GPU 的 UUID、空闲显存和外部计算进程，Linux 上必要证据缺失时拒绝启动。在实际工作进程内再检查并设置 PyTorch 分配器上限。容量短测使用正式形状；启动训练时再次比较当时余量、估算值和已测预留峰值。单卡默认沿用旧版显存预算；共享服务器单卡也可显式加 `--resource-policy v2`。保留作业调度器提供的 `CUDA_VISIBLE_DEVICES`。等待上限可设为 0–300 秒。
-- CPU 数值线程与主机内存按当前系统/作业可用资源分配，两支并发时分摊预算。`--threads 4` 表示每支最多 4 个数值线程。可选 `--prefetch` 允许训练进程提前准备最多一个 CPU 批次；预算不足、来源大小未知时按需读取。`--prefetch-mib` 给出每支的附加内存上限，实际还受可用主存限制。每轮日志记录是否真正开启、CPU 等数据及传输调用耗时。
-- 四路、六路及血池融合在同一运行内复用已核验的分支预测。数据、取框、权重、执行环境、代码身份须匹配。各融合目录保留各自结果及 `prediction-cache.json`，分别列出复用与新算数量。血池从二维编码器训练切换到时序网络时释放冻结编码器的残留梯度。
-- `resources/` 保存阶段准入结果和拒绝原因，`status.json` 的 `active` 给出两个活动进程和各自日志。一个分支失败时，监督进程停止同组活动子进程；已提交的兄弟分支收据在恢复时核验复用。使用相同数据、代码、卡序和执行选项，以及 `--resume`。历史版本已启动的任务继续用原发布包恢复。
-- 双卡物理重叠和正式队列每轮吞吐需在目标服务器分别实测。判断提速时比较相同输入、尺寸、批量和工作量的稳态耗时，同时核对取框和原网格预测。
+| 工作 | 实际分配方法 |
+|---|---|
+| 两个独立的 3D 分支 | 64³、128³ 可同时运行。每个正式分支固定 batch 4，一次更新最多 4 张卡。6 张相近且空闲的卡可分成 3+3，各分支上的样本分布为 2+1+1。8 张可分成 4+4。短批次只派发实际存在的病例。可用卡太少、显存不对称或 CPU/RAM 不够同时训练两支时，分别评估能否顺序执行。 |
+| 单分支多卡更新 | 每卡计算各自样本，按原顺序将结果汇总到主卡，使用原有的完整标签或缺标边际损失及原 Adam 更新。主卡须能承载优化器与汇总结果。 |
+| 血池 | 二维编码器一次 4 张切片，最多 4 张卡。时序输入保持一个病例的七张连续切片，冻结编码器可在最多 7 张卡上提取特征，随后按原顺序运行序列网络。 |
+| 定位、单支评价、四路/六路及血池融合的模型预测 | 冻结模型按病例轮转分配，逐卡驻留预测器。可用卡、待处理病例数与实时主机内存共同决定并发量。例如有 12 张合格卡和足够病例与主存时，这些阶段能使用 12 张。原网格 CPU 收尾、审核与血管图处理使用 CPU。 |
+
+**调度和恢复。** 每个新阶段重新筛选资源。v2 预留每卡总显存的 10% 且至少 4 GiB，核对 UUID、空闲显存、外部计算进程及 CPU/cgroup 证据，实际子进程逐卡复核并设置显存分配器上限。活动分支共享一份 CPU/RAM 预约，已核实的兄弟进程私有内存可抵扣其尚未兑现的预留。阶段内固定工作量与成员；中断后已开始的阶段使用已记录的同一组设备和最新完成的检查点。在下一阶段重新选卡。`assignments/` 记录每阶段的候选、分配、占用或未用的卡及有效工作槽，`resources/` 记录预算，训练日志和推理分片记录可核对逐卡实际工作量。`status.json` 的 `active` 包含进程、设备组及日志。开发数据和缓存版本的变化需用新目录。旧版冻结任务使用原包恢复。
+
+**CPU 和预测复用。** `--threads 4` 为每个活动分支的数值线程上限。显式加 `--prefetch` 可提前读取最多一批，`--prefetch-mib` 给出每支附加内存上限。供数日志记录实际启用、主机等待及传输耗时。三次融合可复用签名一致的分支预测；签名包含数据、取框、权重、环境及实际设备分片，各自的 `prediction-cache.json` 列出命中和新算数量。血池阶段切换会释放冻结参数残留梯度。
+
+`scripts/xu_fleet_probe.py` 在一次资格检查中会分组覆盖可用卡。正式 3D 一批最多 4 例，各组各做一次真实更新；该诊断的总耗时与正式训练每轮吞吐分别测量。只有一张卡的本机可显式选 `--device cuda:0`（独立容量命令用 `--devices cuda:0`）。单卡 Linux 共享运行默认 v2，本机小显存兼容策略可显式传 `--resource-policy legacy`。
 
 ## 阶段与产物
 

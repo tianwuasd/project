@@ -27,13 +27,13 @@ class BranchSchedulingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'dependency order'):
             list(waves(iter([next(stages())]), devices, None))
 
-    def test_allocation_refuses_duplicate_physical_card_and_third_card(self):
+    def test_allocation_refuses_duplicate_physical_cards_and_accepts_more_than_two(self):
         with patch('dataset1282_analysis.xu_dispatch.device_identity') as identify:
             identify.side_effect = lambda name, _: dict(device=name,uuid='one')
             with self.assertRaisesRegex(ValueError,'distinct'):
                 select_devices(None, 'cuda:0,cuda:1', None)
-            with self.assertRaisesRegex(ValueError,'one or two'):
-                select_devices(None, 'cuda:0,cuda:1,cuda:2', None)
+            identify.side_effect = lambda name, _: dict(device=name,uuid=name)
+            self.assertEqual(len(select_devices(None, 'cuda:0,cuda:1,cuda:2', None)),3)
 
     def exercise_processes(self, fail):
         with tempfile.TemporaryDirectory() as tmp:

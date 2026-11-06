@@ -9,6 +9,21 @@ import psutil
 
 from .resources import GIB, budget, snapshot
 
+_applied_group = None
+_applied_host = None
+
+
+def applied_host_budget():
+    """Last successful effective host budget in this worker, never in a forked child."""
+    return _applied_host[1] if _applied_host and _applied_host[0] == os.getpid() else None
+
+
+def require_applied_group(names):
+    """A forked or direct low-level caller cannot inherit a successful GPU admission."""
+    ordered = tuple(str(n) for n in names)
+    if len(ordered) > 1 and _applied_group != (os.getpid(), ordered):
+        raise ResourceUnavailable('This process has not applied allocator limits for its full GPU group')
+
 
 class ResourceUnavailable(RuntimeError):
     """A requested stage cannot be admitted with the current resource evidence."""
@@ -251,9 +266,36 @@ def limit_environment(plan, device):
     return overlay
 
 
+def combined_environment(plan, devices):
+    """Give one worker exactly the freshly admitted devices for this stage."""
+    names = list(devices)
+    if not names or len(set(names)) != len(names) or any(n not in plan['devices'] for n in names):
+        raise ValueError('Stage device list is empty, duplicated or lacks a reservation')
+    overlay = limit_environment(plan,names[0])
+    if len(names) > 1:
+        if 'cpu' in names or plan['policy'] != 'v2':
+            raise ValueError('Distributed stages require v2 CUDA admission on every device')
+        tickets = [json.loads(limit_environment(plan,n)['XU_CUDA_ADMISSION']) for n in names]
+        if any(not t['uuid'] for t in tickets):
+            raise ResourceUnavailable('A visible GPU has no verifiable UUID')
+        overlay['XU_CUDA_ADMISSIONS'] = json.dumps(tickets)
+        overlay['XU_BRANCH_DEVICES'] = json.dumps(names)
+        overlay['XU_HOST_DEMAND_BYTES'] = str(max(plan['devices'][n]['host_demand_bytes'] for n in names))
+    return overlay
+
+
 def apply_env_limit(device):
     """Recheck admission *inside* the worker and install its allocator ceiling."""
+    global _applied_group, _applied_host
+    _applied_group = None
+    _applied_host = None
     ticket = os.environ.get('XU_CUDA_ADMISSION')
+    group = os.environ.get('XU_CUDA_ADMISSIONS')
+    members = os.environ.get('XU_BRANCH_DEVICES')
+    if bool(group) != bool(members) or (group and not ticket):
+        # A single allocated device can also be listed explicitly by callers.
+        if group or not ticket or json.loads(members) != [str(device)]:
+            raise ResourceUnavailable('Missing or unmatched device group admission')
     share = os.environ.get('XU_HOST_BUDGET_BYTES')
     if not ticket and not share:
         return {}
@@ -277,15 +319,37 @@ def apply_env_limit(device):
     if not ticket:
         if str(device) != 'cpu':
             raise ResourceUnavailable('CUDA worker missing GPU admission ticket')
+        _applied_host = (os.getpid(),host)
         return result
     import torch
     spec = json.loads(ticket)
     requested = torch.device(device)
     if requested.type != 'cuda' or requested.index is None or str(requested) != spec['device']:
         raise ResourceUnavailable(f'Expected explicit assigned CUDA device {spec["device"]}, got {device}')
-    # This runs in the real worker. Set its CUDA default before any property or
-    # free-memory query can initialize a context on a different visible card.
-    torch.cuda.set_device(requested)
+    if not group:
+        result.update(_apply_card(device,spec))
+        _applied_host = (os.getpid(),host)
+        return result
+    tickets = json.loads(group)
+    names = json.loads(members)
+    if (not isinstance(tickets,list) or not tickets or tickets[0] != spec or not isinstance(names,list)
+            or [t['device'] for t in tickets] != names or len(set(names)) != len(names)
+            or any(not t['uuid'] or t['policy'] != 'v2' for t in tickets)
+            or len({t['uuid'] for t in tickets}) != len(tickets)):
+        raise ResourceUnavailable('GPU group tickets do not match the allocated stage')
+    try:
+        cards = {t['device']:_apply_card(t['device'],t) for t in tickets}
+    finally:
+        torch.cuda.set_device(requested)
+    _applied_group = (os.getpid(),tuple(names))
+    _applied_host = (os.getpid(),host)
+    return dict(result, **cards[str(requested)], per_device=cards)
+
+
+def _apply_card(device, spec):
+    import torch
+    # Select the card before any property or memory access can initialize a context.
+    torch.cuda.set_device(torch.device(device))
     info = _device_info(device)
     if spec['device'] != info['device'] or spec['uuid'] != info['uuid']:
         raise ResourceUnavailable(f'Allocated CUDA identity changed for {device}')
@@ -296,4 +360,4 @@ def apply_env_limit(device):
         raise ResourceUnavailable(f'CUDA demand {spec["cuda_demand_bytes"]} exceeds fresh budget {limit}')
     torch.cuda.set_per_process_memory_fraction(limit/info['total_bytes'], device)
     info.update(allocator_budget_bytes=limit, cuda_demand_bytes=spec['cuda_demand_bytes'])
-    return dict(result, **info, policy=spec['policy'])
+    return dict(info, policy=spec['policy'])

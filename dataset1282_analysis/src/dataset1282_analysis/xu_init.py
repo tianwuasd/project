@@ -9,6 +9,7 @@ from torch import nn
 from torch.nn import functional as F
 
 from .contracts import atomic_json, digest, sha256_file
+from .xu_distributed import BranchForward
 from .xu_models import Xu3DSegmenter, branch_spec, _conv
 from .xu_targets import TargetStore
 from .xu_supply import BatchSupply, check_gradients
@@ -47,6 +48,7 @@ def _epoch(model, names, cache, targets, book, device, rng=None, optimizer=None,
     training = optimizer is not None
     model.train(training)
     spec = model.spec
+    forward = BranchForward(device, spec.batch, require_all=True)
     loss_sum = 0.
     def prepare(batch):
         images, labels = [], []
@@ -70,7 +72,7 @@ def _epoch(model, names, cache, targets, book, device, rng=None, optimizer=None,
                 x,y = _augment(x,y,rng)
                 optimizer.zero_grad(set_to_none=True)
             with torch.set_grad_enabled(training):
-                loss = _loss(model(x),y)
+                loss = _loss(forward.forward(model, x),y)
             if not torch.isfinite(loss):
                 raise FloatingPointError('Nonfinite proximal loss')
             if training:
@@ -83,6 +85,7 @@ def _epoch(model, names, cache, targets, book, device, rng=None, optimizer=None,
             del pair
     if stats is not None:
         stats.update(supply.stats)
+        stats['distribution'] = forward.stats
     return loss_sum/len(names)
 
 
@@ -91,7 +94,7 @@ def _inference_contract(cache, branch, profile, supervision, book):
     source = Path(__file__).parent
     return dict(protocol=PROTOCOL,branch=branch,profile=profile,supervision=supervision,
                 identity=input_id(cache,supervision,book),classes=['BG','LV','RV','LA','RA','MYO','proximal_AO_PA'],
-                source={s:sha256_file(source/s) for s in ('xu_init.py','xu_models.py','xu_targets.py','xu_training.py','xu_supply.py')})
+                source={s:sha256_file(source/s) for s in ('xu_init.py','xu_models.py','xu_targets.py','xu_training.py','xu_supply.py','xu_distributed.py')})
 
 
 def train_init(cache,args,out):
@@ -115,6 +118,9 @@ def train_init(cache,args,out):
     if args.resume != last.is_file() or (not args.resume and best.exists()):
         raise ValueError('Use a fresh directory or --resume a committed run')
     spec = branch_spec(args.branch.replace('init','all'),args.profile)
+    replicas = BranchForward(device, spec.batch, require_all=True).max_active
+    if replicas > 1:
+        contract['batch_replicas'] = replicas
     if args.profile=='paper' and len(train)<spec.batch:
         raise ValueError('Insufficient eligible patients for the paper batch')
     with torch.random.fork_rng(devices=[]):

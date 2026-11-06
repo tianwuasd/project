@@ -20,6 +20,8 @@ _V1_SOURCE = {
 # d0f2c45a differs here only in retaining unused encoder gradients.
 _PREVIOUS_V2_SOURCE = dict(_V1_SOURCE, **{
     'xu_blood.py':'a3894bdb66686531ac768d8526a0e5d144394210c8847bec647074c300f80bb4'})
+_SINGLE_GPU_V2_SOURCE = {**_PREVIOUS_V2_SOURCE,
+                         'xu_blood.py':'8879aa65a0c59ec0dd698241e783642651adcedc9df0342b1e3b388a64543659'}
 
 
 def register(commands):
@@ -44,7 +46,7 @@ def register(commands):
 
 def _source():
     return {name:sha256_file(Path(__file__).with_name(name)) for name in
-            ('xu_blood.py','xu_blood_grid.py','xu_blood_models.py','xu_geometry.py')}
+            ('xu_blood.py','xu_blood_grid.py','xu_blood_models.py','xu_geometry.py','xu_distributed.py')}
 
 
 def blood_cohort(cache, ids, supervision, store=None):
@@ -78,7 +80,8 @@ def _matches(stored, expected):
     if any(expected['source'][k] != v for k,v in _V1_SOURCE.items() if k != 'xu_blood.py'):
         return False
     if stored.get('method') == 'xu-blood-v2':
-        return stored == dict(expected,source=_PREVIOUS_V2_SOURCE)
+        return any(stored == dict(expected,source=source)
+                   for source in (_SINGLE_GPU_V2_SOURCE,_PREVIOUS_V2_SOURCE))
     if expected['supervision'] != 'marginal' or stored.get('method') != 'xu-blood-v1':
         return False
     legacy = dict(expected, method='xu-blood-v1', source=_V1_SOURCE)
@@ -119,6 +122,45 @@ def _batch(views, centres, temporal, device, augment):
     return images, labels
 
 
+class BloodForward:
+    """Shard independent slices or frozen feature frames; keep each temporal sequence on its primary."""
+    def __init__(self, encoder, device, temporal, batch_size):
+        import torch
+        from .xu_distributed import BranchForward
+        self.encoder = encoder
+        self.temporal = temporal
+        self.distribution = BranchForward(device,7 if temporal else batch_size)
+        if temporal:
+            class Features(torch.nn.Module):
+                def __init__(self, network):
+                    super().__init__()
+                    self.network = network
+
+                def forward(self, frames):
+                    return self.network.features(frames)
+
+            self.features = Features(encoder).eval().requires_grad_(False)
+            if self.distribution.max_active > 1:
+                # Keep the frozen multi-gigabyte slice encoder resident for this
+                # pass over the cohort, rather than broadcasting it per centre.
+                self.distribution.freeze(self.features)
+        else:
+            self.features = None
+
+    def __call__(self, images, sequence):
+        import torch
+        if not self.temporal:
+            return self.distribution.forward(self.encoder,images)
+        with torch.no_grad():
+            if len(self.distribution.stats['assigned_devices']) == 1:
+                frames = [self.distribution.forward(self.features,images[:,i:i+1]) for i in range(7)]
+            else:
+                if images.shape[:2] != (1,7):
+                    raise ValueError('Temporal blood input must retain one ordered seven-frame case')
+                frames = self.distribution.forward(self.features, images.transpose(0,1).contiguous()).split(1)
+        return sequence(frames)
+
+
 def _epoch(cache, store, names, encoder, sequence, device, stage, profile, seed, optimizer=None):
     import torch
     training = optimizer is not None
@@ -130,6 +172,7 @@ def _epoch(cache, store, names, encoder, sequence, device, stage, profile, seed,
     if training:
         rng.shuffle(order)
     batch = 4 if profile=='paper' and not temporal else 1
+    forward = BloodForward(encoder,device,temporal,batch)
     loss_sum, count = 0., 0
     for pos, name in enumerate(order,1):
         views = AxialViews(cache,name,store)
@@ -143,12 +186,7 @@ def _epoch(cache, store, names, encoder, sequence, device, stage, profile, seed,
             if not (labels >= 0).any():
                 continue
             with torch.set_grad_enabled(training):
-                if temporal:
-                    with torch.no_grad():
-                        frames = [encoder.features(images[:,i:i+1]) for i in range(7)]
-                    scores = sequence(frames)
-                else:
-                    scores = encoder(images)
+                scores = forward(images,sequence)
                 loss = _objective(scores,labels)
                 if not torch.isfinite(loss):
                     raise FloatingPointError('Nonfinite blood-pool loss')
@@ -163,6 +201,8 @@ def _epoch(cache, store, names, encoder, sequence, device, stage, profile, seed,
                               cases_completed=pos,total=len(order),slices=count)),flush=True)
     if not count:
         raise ValueError('No supervised blood-pool slices')
+    if len(forward.distribution.stats['assigned_devices']) > 1:
+        print(json.dumps(dict(stage=stage,distribution=forward.distribution.stats)),flush=True)
     return loss_sum/count
 
 

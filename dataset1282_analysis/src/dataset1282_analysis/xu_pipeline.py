@@ -31,7 +31,7 @@ def _sources(technical):
     source = Path(__file__).resolve().parent
     files = [*source.glob('xu_*.py'), source/'training/marginal.py', source/'contracts.py',
              source/'observability/status.py', ROOT/'scripts/xu_seg.py', ROOT/'scripts/xu_pipeline.py']
-    files = [p for p in files if p.name != 'xu_pair_probe.py']  # Standalone hardware diagnostic.
+    files = [p for p in files if p.name not in ('xu_pair_probe.py','xu_inference_probe.py')]  # Diagnostics.
     if technical:
         files = [p for p in files if p.name != 'xu_capacity.py']
     else:
@@ -56,10 +56,10 @@ def _contract(cache, args):
         raise ValueError(f'Prepared cohort differs from the approved dataset1282 fixed split: {counts}')
     devices = select_devices(args.device, args.devices, torch)
     if args.resource_policy is None:
-        args.resource_policy = 'v2' if len(devices) == 2 else 'legacy'
-    if len(devices) == 2 and args.resource_policy != 'v2':
-        raise ValueError('Two-device branch scheduling requires the v2 resource policy')
-    return dict(protocol='xu-model-run-2', prepared=str(cache.run_dir), request=cache.request_digest,
+        args.resource_policy = 'v2' if len(devices) > 1 or os.name == 'posix' else 'legacy'
+    if len(devices) > 1 and args.resource_policy != 'v2':
+        raise ValueError('Multi-device scheduling requires the v2 resource policy')
+    return dict(protocol='xu-model-run-3', fleet=True, prepared=str(cache.run_dir), request=cache.request_digest,
                 artifacts=artifact_identity(cache), scope=cache.scope, counts=counts,
                 implementation=_sources(technical), profile=args.profile, supervision=args.supervision,
                 seed=args.seed, padding_percent=PADDING, device=devices[0], torch=str(torch.__version__),
@@ -107,7 +107,8 @@ def _execute(script, argv, name, out, owner, args):
                    OPENBLAS_NUM_THREADS=str(args.threads))
     args.children.ensure_running()
     for key in ('XU_RESOURCE_POLICY','XU_HOST_BUDGET_BYTES','XU_HOST_DEMAND_BYTES',
-                'XU_WAVE_RESERVATION','XU_CUDA_ADMISSION','XU_PREFETCH','XU_PREFETCH_BYTES'):
+                'XU_WAVE_RESERVATION','XU_CUDA_ADMISSION','XU_CUDA_ADMISSIONS','XU_BRANCH_DEVICES',
+                'XU_PREFETCH','XU_PREFETCH_BYTES'):
         env.pop(key, None)
     env.update(args.overlay)
     command = [sys.executable, '-B', '-u', str(ROOT/'scripts'/script), *map(str, argv)]
@@ -117,7 +118,7 @@ def _execute(script, argv, name, out, owner, args):
         stream.flush()
         child = subprocess.Popen(command, cwd=ROOT, env=env, stdout=stream, stderr=subprocess.STDOUT)
         try:
-            args.children.attach(child, name, args.device, log)
+            args.children.attach(child, name, args.device, log, getattr(args,'assigned_devices',None))
             code = child.wait()
         finally:
             if child.poll() is None:
@@ -192,7 +193,8 @@ def _capacity(stage, checked, out, owner, args):
     else:
         return
     for size in sizes:
-        if (args.device, size) in checked:
+        group = tuple(getattr(args,'assigned_devices',None) or [args.device])
+        if (group, size) in checked:
             continue
         directory = out/'capacity'/f'{size}-{time.time_ns()}'
         try:
@@ -208,7 +210,12 @@ def _capacity(stage, checked, out, owner, args):
         report = read_json(directory/'capacity.json')
         if report.get('state') != 'passed' or report.get('optimizer_steps') != 1:
             raise StageError(f'Capacity check did not complete a training step for {size}: {directory}')
-        checked[args.device, size] = report.get('peak_cuda_reserved_bytes', 0)
+        per_device = report.get('per_device', {})
+        checked[group, size] = {d: values['peak_cuda_reserved_bytes'] for d,values in per_device.items()
+                                if 'peak_cuda_reserved_bytes' in values}
+        checked[group, size].setdefault(args.device, report.get('peak_cuda_reserved_bytes', 0))
+        if len(group)==1:
+            checked[args.device, size] = checked[group,size][args.device]
 
 
 def _result(out, cache, contract, records):
@@ -229,9 +236,9 @@ def _result(out, cache, contract, records):
                 comparisons=comparisons, native_predictions='vessels/cases')
 
 
-def _stage_spec(stage, contract_id):
+def _stage_spec(stage, contract_id, group=None):
     return digest(dict(contract=contract_id, name=stage.name, argv=list(map(str,stage.argv)),
-                       required=list(stage.required), skip=stage.skip_reason))
+                       devices=group, required=list(stage.required), skip=stage.skip_reason))
 
 
 def _run_stage(stage, args, out, owner, contract, contract_id, checked, records, concurrent):
@@ -239,7 +246,7 @@ def _run_stage(stage, args, out, owner, contract, contract_id, checked, records,
     if stage.name not in STAGE_NAMES or stage.name in records or directory.resolve()!=directory:
         raise ValueError('Unsafe or duplicate pipeline stage')
     receipt = out/'receipts'/(stage.name+'.json')
-    spec = _stage_spec(stage, contract_id)
+    spec = _stage_spec(stage, contract_id, getattr(args,'assigned_devices',None))
     if _sources(args.technical_subset) != contract['implementation']:
         raise ValueError('Implementation changed while the pipeline was running')
     if receipt.exists():
@@ -310,7 +317,18 @@ def _run_locked(cache, args, out, owner, contract):
     stage_name = 'setup'
     active = {}
     try:
-        for wave in waves(iter_stages(cache, args, out), getattr(args,'device_names',()), args.stop_after):
+        from .xu_fleet import assign_wave
+        def groups():
+            nonlocal stage_name
+            for candidates in waves(iter_stages(cache,args,out),getattr(args,'device_names',()),args.stop_after):
+                stage_name = candidates[0].name
+                if not contract.get('fleet'):
+                    yield [(stage,None) for stage in candidates]
+                else:
+                    yield from assign_wave(candidates,args,out,cache,children,contract_id)
+        for assigned in groups():
+            members = {stage.name:group for stage,group in assigned}
+            wave = [stage for stage,group in assigned]
             stage_name = wave[0].name
             active = {stage.name: stage for stage in wave}
             runnable = sum(not stage.skip_reason and not (out/'receipts'/(stage.name+'.json')).exists()
@@ -320,6 +338,9 @@ def _run_locked(cache, args, out, owner, contract):
             def worker(stage):
                 branch_args = copy.copy(args)
                 branch_args.children = children
+                branch_args.assigned_devices = members[stage.name]
+                if contract.get('fleet') and (out/'assignments'/(stage.name+'.json')).is_file():
+                    branch_args.inference_worker_bytes = read_json(out/'assignments'/(stage.name+'.json')).get('host_per_inference_case') or 0
                 branch_args.wave_reservation = reservation
                 branch_args.peer_name = next((s.name for s in wave if s.name != stage.name), None)
                 try:
@@ -355,7 +376,7 @@ def _run_locked(cache, args, out, owner, contract):
         if stage_name=='audit-roi' and isinstance(exc,StageError) and qc.is_file() and read_json(qc).get('accepted') is False:
             state = 'roi_rejected'
             if not (out/'rejected-roi.json').exists():
-                atomic_json(out/'rejected-roi.json', dict(spec=_stage_spec(active[stage_name],contract_id),
+                atomic_json(out/'rejected-roi.json', dict(spec=_stage_spec(active[stage_name],contract_id,members[stage_name]),
                                                           qc_sha256=sha256_file(qc)))
         previous = read_json(out/'status.json') if (out/'status.json').exists() else {}
         write_status(out,state=state,stage=stage_name,error=str(exc),finished=list(records),
@@ -407,10 +428,10 @@ def main(argv=None):
     run.add_argument('--profile',choices=('paper','smoke'),default='paper')
     run.add_argument('--technical-subset',action='store_true')
     selection = run.add_mutually_exclusive_group()
-    selection.add_argument('--device', help='One device, default cuda')
-    selection.add_argument('--devices', help='One or two allocated logical devices, e.g. cuda:0,cuda:1')
+    selection.add_argument('--device', help='Select a single CUDA device or CPU instead of the automatic pool')
+    selection.add_argument('--devices', help='auto (default) scans the allocated visible pool, or list cuda:0,cuda:1,...')
     run.add_argument('--resource-policy',choices=('legacy','v2'),
-                     help='Defaults to legacy headroom on one device and v2 on two')
+                     help='Linux and multi-GPU default to v2; a single local Windows GPU defaults to legacy')
     run.add_argument('--wait-seconds',type=int,default=0, help='Bounded wait per resource check, 0 to 300 seconds')
     run.add_argument('--prefetch-mib',type=int,default=4096, help='Maximum additional CPU batch memory per branch (MiB)')
     run.add_argument('--prefetch',action='store_true',

@@ -1,4 +1,5 @@
 import os
+import json
 import subprocess
 import sys
 import unittest
@@ -9,6 +10,32 @@ from dataset1282_analysis.resources import GIB
 
 
 class XuResourceTests(unittest.TestCase):
+    def test_combined_tickets_validate_every_actual_device_and_restore_primary(self):
+        cards = {f'cuda:{i}': dict(self.card,device=f'cuda:{i}', uuid=f'GPU-{i}') for i in range(2)}
+        names = ['cuda:1','cuda:0']
+        with patch.object(r,'_device_info',side_effect=lambda d:cards[str(d)]), patch.object(
+                r,'_compute_pids',return_value=set()):
+            plan = r.stage_resources(names)
+            overlay = r.combined_environment(plan,names)
+            with patch.dict(os.environ,overlay,clear=True), patch('torch.cuda.set_device') as set_card, patch(
+                    'torch.cuda.set_per_process_memory_fraction') as limit:
+                result = r.apply_env_limit(names[0])
+                self.assertEqual(list(result['per_device']),names)
+                self.assertEqual([str(c.args[0]) for c in set_card.call_args_list],names+[names[0]])
+                self.assertEqual([str(c.args[1]) for c in limit.call_args_list],names)
+                r.require_applied_group(names)
+                with self.assertRaises(r.ResourceUnavailable):
+                    r.require_applied_group(list(reversed(names)))
+                with patch.object(r.os,'getpid',return_value=999_999_999):
+                    with self.assertRaises(r.ResourceUnavailable):
+                        r.require_applied_group(names)
+                os.environ['XU_BRANCH_DEVICES'] = json.dumps(list(reversed(names)))
+                with self.assertRaisesRegex(r.ResourceUnavailable,'do not match'):
+                    r.apply_env_limit(names[0])
+            with patch.dict(os.environ,{'XU_BRANCH_DEVICES':json.dumps(names)},clear=True):
+                with self.assertRaises(r.ResourceUnavailable):
+                    r.apply_env_limit(names[0])
+
     def setUp(self):
         self.live = dict(available_memory_bytes=40 * GIB, cpu_available=12.5,
                          cpu_permitted=16, missing_evidence=[], affinity_source='sched_getaffinity',

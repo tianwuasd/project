@@ -68,7 +68,7 @@ tests/                                       仅合成行为测试
 docs/                                        方法、运行、更新与验证说明
 ```
 
-后续阶段可复用配置、日志、病例队列和完成合同。当前有单设备边际损失训练接口，完整科研训练和部分标签全体积评估仍需后续接入。CPU 短测不代表 GPU、多卡或服务器实测。
+Xu 分割入口支持按作业获准的 GPU 池并行分支、拆分固定批次、按病例分发预测，并保留缺标边际监督和原网格评价。单设备也可运行。现场资格检查、逐卡实际工作量及恢复命令见[完整模型运行说明](docs/xu-model-run.md)。
 
 更多内容见 [分析方法](docs/analysis-method.md)、[数据合同](docs/data-contract.md)、[环境部署](docs/environment.md)、[CPU与恢复](docs/running.md)、[代码更新](docs/update.md) 和 [验证记录](docs/validation.md)。
 

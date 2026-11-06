@@ -11,6 +11,7 @@ from torch.nn import functional as F
 
 from .contracts import atomic_json, digest, sha256_file
 from .training.marginal import marginal_loss
+from .xu_distributed import BranchForward
 from .xu_models import BranchSpec, Xu3DSegmenter, branch_spec, build_model
 from .xu_supply import BatchSupply, check_gradients
 
@@ -104,6 +105,7 @@ def _epoch(model, ids, groups, load, branch, device, rng, optimizer=None, stats=
     training = optimizer is not None
     model.train(training)
     batch_size = model.spec.batch
+    forward = BranchForward(device, batch_size, require_all=True)
     loss_sum = 0.
     def prepare(batch):
         xs, ys = [], []
@@ -121,7 +123,7 @@ def _epoch(model, ids, groups, load, branch, device, rng, optimizer=None, stats=
                 images, target = _augment(images, target, rng)
                 optimizer.zero_grad(set_to_none=True)
             with torch.set_grad_enabled(training):
-                loss = branch_loss(model(images), target, [groups[name] for name in batch])
+                loss = branch_loss(forward.forward(model, images), target, [groups[name] for name in batch])
             if not torch.isfinite(loss):
                 raise FloatingPointError('Non-finite branch loss')
             if training:
@@ -135,6 +137,7 @@ def _epoch(model, ids, groups, load, branch, device, rng, optimizer=None, stats=
             del pair
     if stats is not None:
         stats.update(supply.stats)
+        stats['distribution'] = forward.stats
     return loss_sum/len(ids)
 
 
@@ -168,11 +171,19 @@ def _write_best(best, state):
 def _compatible_contract(actual, expected):
     if actual == expected:
         return True
-    # Only the immediately preceding implementations used these exact byte digests.
-    # Preserve old trained weights/resume with all non-source fields checked as usual.
+    # Exact prior single-device versions. Data, split, loss and model fingerprints
+    # still need to match; new multi-device training adds its own replica-count field.
     previous = dict(expected['source'])
     if 'xu_supply.py' not in previous:
         return False
+    if 'xu_distributed.py' in previous:
+        del previous['xu_distributed.py']
+        previous['xu_training.py'] = '91418394469d70b9f5f1e3b16b2bc1309c40303c1c92ee12068343f77382cffc'
+        previous['xu_supply.py'] = 'b66bf7ac0598dd54b33ba0930f26ab21c76daa72b08915eb6e85be1016642841'
+        if 'xu_init.py' in previous:
+            previous['xu_init.py'] = '4127bfc94a5d5d31057f97bb44b84faf60e95d65949b8c43a981df9186359c4e'
+        if actual == dict(expected, source=previous):
+            return True
     del previous['xu_supply.py']
     previous['xu_training.py'] = '2ed34c4688840f93c08992c9c623f4b88fb2b674ec0a259e12e30b3f076a38ed'
     if 'xu_init.py' in previous:
@@ -238,7 +249,10 @@ def train_branch(*, branch, output_dir, train_cases, validation_cases, load_samp
                     data_identity=data_identity, supervision=supervision, seed=seed,
                     split_digest=digest(dict(train=train,validation=val)), torch_version=str(torch.__version__),
                     source={name:sha256_file(source/name) for name in
-                            ('xu_models.py','xu_training.py','xu_supply.py','training/marginal.py')})
+                            ('xu_models.py','xu_training.py','xu_supply.py','xu_distributed.py','training/marginal.py')})
+    replicas = BranchForward(device, spec.batch, require_all=True).max_active
+    if replicas > 1:
+        contract['batch_replicas'] = replicas
     if pilot_epochs is not None:
         contract['technical_fit'] = dict(epochs=epochs, initial_lr=0.002, width=pilot_width)
     with torch.random.fork_rng(devices=[]):

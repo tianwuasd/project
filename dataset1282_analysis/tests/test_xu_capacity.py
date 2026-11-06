@@ -1,4 +1,8 @@
 from pathlib import Path
+from contextlib import ExitStack
+import os
+import json
+from types import SimpleNamespace
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
@@ -11,6 +15,99 @@ from dataset1282_analysis.resources import GIB
 
 
 class CapacityTests(unittest.TestCase):
+    def test_group_probe_demands_whole_layout_and_records_each_peak(self):
+        names = ['cuda:2','cuda:0','cuda:1']
+        stats = {'cuda:2':2,'cuda:0':1,'cuda:1':1}
+        def step(stage,device,supervision,record):
+            record['distribution'] = {'cases_by_device':dict(stats)}
+            return 2.0,0.1
+        limits = dict(policy='v2',host_budget_bytes=24*GIB,per_device={
+            n:{'allocator_budget_bytes':24*GIB} for n in names})
+        with TemporaryDirectory() as out, ExitStack() as m:
+            m.enter_context(patch.object(xu_capacity,'snapshot',return_value={'available_memory_bytes':48*GIB}))
+            m.enter_context(patch.object(xu_capacity,'apply_env_limit',return_value=limits))
+            m.enter_context(patch.object(xu_capacity,'_step_3d',side_effect=step))
+            for key,value in {'is_available':True,'mem_get_info':(40*GIB,48*GIB),
+                    'get_device_name':'test','get_device_properties':SimpleNamespace(uuid='test'),
+                    'set_device':None,'set_per_process_memory_fraction':None,'reset_peak_memory_stats':None,
+                    'max_memory_allocated':GIB}.items():
+                m.enter_context(patch.object(torch.cuda,key,return_value=value))
+            m.enter_context(patch.object(torch.cuda,'max_memory_reserved',side_effect=lambda n:(1+names.index(str(n)))*GIB))
+            verified = xu_capacity.probe('3d128',names[0],'marginal',out,policy='v2')
+            self.assertEqual(verified['state'],'passed',verified.get('reason'))
+            self.assertEqual(verified['peak_cuda_reserved_bytes'],GIB)
+            self.assertEqual([r['peak_cuda_reserved_bytes'] for r in verified['per_device'].values()],
+                             [GIB,2*GIB,3*GIB])
+            stats['cuda:0'] = 0
+            mismatch = xu_capacity.probe('3d128',names[0],'marginal',out,policy='v2')
+            self.assertEqual(mismatch['state'],'failed')
+            self.assertIn('promised stage allocation',mismatch['reason'])
+            limits['per_device']['cuda:1']['allocator_budget_bytes'] = GIB
+            denied = xu_capacity.probe('3d128',names[0],'marginal',out,policy='v2')
+            self.assertEqual(denied['state'],'not_admitted')
+            self.assertEqual(denied['per_device']['cuda:1']['reason'],'below_gpu_budget')
+
+    def test_stage_device_demands_respect_chunks_and_primary_optimizer(self):
+        names = ['cuda:2','cuda:0','cuda:1']
+        spec = xu_capacity.specification('3d128')
+        values = xu_capacity.device_demands('3d128',names,spec)
+        self.assertEqual(list(values),names)
+        self.assertLess(values[names[0]],spec['estimated_working_bytes'])
+        self.assertGreater(values[names[0]],values[names[1]])
+        self.assertEqual(values[names[1]],values[names[2]])
+        more = [f'cuda:{i}' for i in range(8)]
+        blood = xu_capacity.device_demands('blood-encoder',more)
+        self.assertEqual([k for k in blood if blood[k] > 0],more[:4])
+        frames = xu_capacity.device_demands('blood-sequence',more)
+        self.assertEqual([k for k in frames if frames[k] > 0],more[:7])
+        self.assertEqual(xu_capacity.device_demands('3d128',names[:1],spec)[names[0]],
+                         spec['estimated_working_bytes'])
+
+    def test_blood_shards_keep_order_global_loss_and_update(self):
+        from dataset1282_analysis.xu_blood import BloodForward, _objective
+        class Encoder(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.tensor(1.3))
+            def features(self,x):
+                return self.weight*x
+            def forward(self,x):
+                y = self.features(x)
+                return torch.cat([y,-y,.25*y],1)
+        class Sequence(Encoder):
+            def forward(self,frames):
+                return super().forward(sum((i+1)*x/28 for i,x in enumerate(frames)))
+        def slices(model,chunks,devices):
+            return torch.cat([model(x) for x in chunks])
+        def one(temporal,distributed):
+            enc, seq = Encoder(), Sequence()
+            shape = (1,7,8,8) if temporal else (4,1,8,8)
+            x = torch.arange(torch.tensor(shape).prod()).float().reshape(shape)/64
+            y = (torch.arange(len(x)*64).reshape(len(x),8,8)%3).long()
+            y[:,0,:] = -1
+            worker = BloodForward(enc,'cuda:2' if distributed else 'cpu',temporal,4)
+            logits = worker(x,seq)
+            loss = _objective(logits,y)
+            model = seq if temporal else enc
+            opt = torch.optim.Adam(model.parameters(),lr=.002)
+            loss.backward()
+            if temporal:
+                self.assertIsNone(enc.weight.grad)
+            opt.step()
+            return logits.detach(),loss.detach(),model.weight.grad,model.weight.detach(),worker.distribution.stats
+        for temporal in (False,True):
+            with self.subTest(temporal=temporal), patch.dict(os.environ,{},clear=True):
+                reference = one(temporal,False)
+                names = ['cuda:2','cuda:0','cuda:1']
+                with patch.dict(os.environ,{'XU_BRANCH_DEVICES':json.dumps(names)}), patch(
+                        'dataset1282_analysis.xu_resources.require_applied_group'), patch(
+                        'dataset1282_analysis.xu_distributed.BranchForward.freeze'), patch(
+                        'dataset1282_analysis.xu_distributed._replica_forward',side_effect=slices):
+                    actual = one(temporal,True)
+                for left,right in zip(reference[:4],actual[:4]):
+                    torch.testing.assert_close(left,right)
+                self.assertEqual(list(actual[4]['cases_by_device'].values()),
+                                 [3,2,2] if temporal else [2,1,1])
     def test_resource_limits_use_stage_share_and_policy_reserve_once(self):
         spec = xu_capacity.specification('3d128')
         self.assertGreater(spec['estimated_host_bytes'],0)

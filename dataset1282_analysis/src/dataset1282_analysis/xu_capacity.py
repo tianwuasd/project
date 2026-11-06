@@ -46,8 +46,41 @@ def specification(stage):
         else:
             raise ValueError(f'Unsupported paper stage {stage}')
     return dict(shape=shape, trainable_parameters=n, other_resident_parameters=frozen,
+                feature_width=spec.width if stage.startswith('3d') else encoder.width,
                 estimated_host_bytes=max(GIB, 8*(n+frozen)),
                 estimated_working_bytes=working_bytes, dtype='float32', optimizer='Adam')
+
+
+def device_demands(stage, devices, spec=None):
+    """Estimate each process-local replica; one optimizer and the global objective live on primary."""
+    from .xu_distributed import split_sizes
+    names = list(map(str,devices))
+    if not names or len(names) != len(set(names)):
+        raise ValueError('Capacity requires an ordered list of distinct devices')
+    spec = specification(stage) if spec is None else spec
+    shape = spec['shape']
+    temporal = stage == 'blood-sequence'
+    batch = 7 if temporal else shape[0]
+    chunks = split_sizes(batch, min(batch,len(names)))
+    if len(names) == 1:
+        return {names[0]:spec['estimated_working_bytes']}
+    n, frozen = spec['trainable_parameters'], spec['other_resident_parameters']
+    voxels = math.prod(shape[2:])
+    unit = 4 * spec['feature_width'] * voxels
+    demands = dict.fromkeys(names,0)
+    for i,size in enumerate(chunks):
+        if temporal:
+            # Root retains all gathered frames for its single recurrent update.
+            work = (spec['estimated_working_bytes'] + batch*unit if i == 0
+                    else 4*frozen + 7*size*unit)
+        else:
+            classes = 11 if stage.startswith('3d') else 3
+            # Gather all logits and their loss gradient on primary. Auxiliary cards
+            # retain model replicas and local gradients but no resident Adam state.
+            primary = 16*n + 4*frozen + 2*batch*classes*voxels*4
+            work = (primary if i == 0 else 8*n) + 7*size*unit
+        demands[names[i]] = work
+    return demands
 
 
 def admission(spec, host_free, cuda_free=None, *, total=None, policy='legacy',
@@ -74,7 +107,7 @@ def admission(spec, host_free, cuda_free=None, *, total=None, policy='legacy',
     return ('below_host_budget' if host_need > host_budget else None), data
 
 
-def _step_3d(stage, device, supervision):
+def _step_3d(stage, device, supervision, record=None):
     import numpy as np
     import torch
     from .xu_models import build_model
@@ -92,15 +125,18 @@ def _step_3d(stage, device, supervision):
     groups = {name: [10] if supervision == 'marginal' and i % 2 else []
               for i, name in enumerate(names)}
     before = model.head.weight.detach().clone()
+    stats = {}
     loss = _epoch(model, names, groups, lambda name, branch: (image,label), branch, device,
-                  torch.Generator(device=device).manual_seed(2023), optimizer)
+                  torch.Generator(device=device).manual_seed(2023), optimizer, stats=stats)
+    if record is not None:
+        record['distribution'] = stats['distribution']
     return loss, (model.head.weight.detach() - before).abs().max().item()
 
 
-def _step_blood(stage, device):
+def _step_blood(stage, device, record=None):
     import numpy as np
     import torch
-    from .xu_blood import _batch, _objective
+    from .xu_blood import BloodForward, _batch, _objective
     from .xu_blood_models import BloodSequence, SliceUNet
 
     temporal = stage == 'blood-sequence'
@@ -122,12 +158,10 @@ def _step_blood(stage, device):
     optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
     images, target = _batch(Planes(), [3] if temporal else [1,2,3,4], temporal, device, rng)
     before = model.head.weight.detach().clone()
-    if temporal:
-        with torch.no_grad():
-            frames = [encoder.features(images[:,i:i+1]) for i in range(7)]
-        scores = sequence(frames)
-    else:
-        scores = encoder(images)
+    forward = BloodForward(encoder,device,temporal,4)
+    scores = forward(images,sequence)
+    if record is not None:
+        record['distribution'] = forward.distribution.stats
     loss = _objective(scores, target)
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
@@ -145,7 +179,7 @@ def probe(stage, selected_device, supervision, output, policy='legacy'):
                   torch_version=str(torch.__version__))
     atomic_json(file, report)
     device = None
-    measured_cuda = False
+    measured = []
     try:
         device = torch.device(selected_device)
         if device.type not in ('cpu','cuda') or (device.type=='cpu' and device.index is not None):
@@ -156,45 +190,67 @@ def probe(stage, selected_device, supervision, output, policy='legacy'):
         available = snapshot()['available_memory_bytes']
         spec = specification(stage)
         report.update(spec)
-        free = total = None
         if device.type == 'cuda':
             if not torch.cuda.is_available():
                 raise RuntimeError('CUDA unavailable in this Python')
             if device.index is None:
                 device = torch.device('cuda',torch.cuda.current_device())
             torch.cuda.set_device(device)
-            free, total = torch.cuda.mem_get_info(device)
-            report.update(gpu_name=torch.cuda.get_device_name(device), cuda_total_bytes=total,
-                          runtime_cuda=torch.version.cuda)
+            cards = limits.get('per_device',{str(device):limits})
+            work = device_demands(stage,cards,spec)
+            report['per_device'] = {}
+            reason = None
+            for name, limit in cards.items():
+                free, total = torch.cuda.mem_get_info(name)
+                scoped = dict(spec,estimated_working_bytes=work[name])
+                denied, facts = admission(scoped,available,free,total=total,policy=policy,
+                                          host_limit=limits.get('host_budget_bytes'),
+                                          cuda_limit=limit.get('allocator_budget_bytes'))
+                report['per_device'][name] = dict(facts, estimated_working_bytes=work[name],
+                        cuda_total_bytes=total, gpu_name=torch.cuda.get_device_name(name),
+                        uuid=str(getattr(torch.cuda.get_device_properties(name),'uuid','unavailable')))
+                if denied:
+                    reason = reason or denied
+                    report['per_device'][name]['reason'] = denied
+            report.update(report['per_device'][str(device)], runtime_cuda=torch.version.cuda)
+        else:
+            reason, facts = admission(spec, available,host_limit=limits.get('host_budget_bytes'))
+            report.update(facts)
         report['device'] = str(device)
-        reason, facts = admission(spec, available, free, total=total, policy=policy,
-                                  host_limit=limits.get('host_budget_bytes'),
-                                  cuda_limit=limits.get('allocator_budget_bytes'))
-        report.update(facts)
         if reason:
             report.update(state='not_admitted', reason=reason)
         else:
-            if device.type == 'cuda':
-                torch.cuda.set_per_process_memory_fraction(facts['cuda_allocator_budget_bytes']/total,device)
-                torch.cuda.reset_peak_memory_stats(device)
-                measured_cuda = True
+            for name,row in report.get('per_device',{}).items():
+                torch.cuda.set_per_process_memory_fraction(row['cuda_allocator_budget_bytes']/row['cuda_total_bytes'],name)
+                torch.cuda.reset_peak_memory_stats(name)
+                measured.append(name)
             torch.set_num_threads(min(4,torch.get_num_threads()))
             torch.manual_seed(2023)
             report.update(state='running_training_step')
             atomic_json(file,report)
             if stage in ('3d64','3d128'):
-                loss, delta = _step_3d(stage,device,supervision)
+                loss, delta = _step_3d(stage,device,supervision,record=report)
             else:
-                loss, delta = _step_blood(stage,device)
+                loss, delta = _step_blood(stage,device,record=report)
             if not math.isfinite(loss) or not math.isfinite(delta) or delta <= 0:
                 raise FloatingPointError('Expected a finite loss and an actual parameter update')
+            if len(measured) > 1:
+                from .xu_distributed import split_sizes
+                count = 7 if stage == 'blood-sequence' else spec['shape'][0]
+                sizes = split_sizes(count,min(count,len(measured)))
+                expected = dict(zip(measured,sizes+(0,)*(len(measured)-len(sizes))))
+                if report.get('distribution',{}).get('cases_by_device') != expected:
+                    raise RuntimeError('Capacity forward did not use the promised stage allocation')
             report.update(state='passed', optimizer_steps=1, loss=loss, head_max_abs_update=delta)
     except (OSError, ValueError, RuntimeError, MemoryError, FloatingPointError) as error:
         report.update(state='failed', error_type=type(error).__name__, reason=str(error))
     finally:
-        if measured_cuda:
-            report.update(peak_cuda_allocated_bytes=torch.cuda.max_memory_allocated(device),
-                          peak_cuda_reserved_bytes=torch.cuda.max_memory_reserved(device))
+        for name in measured:
+            peaks = dict(peak_cuda_allocated_bytes=torch.cuda.max_memory_allocated(name),
+                         peak_cuda_reserved_bytes=torch.cuda.max_memory_reserved(name))
+            report['per_device'][name].update(peaks)
+            if name == str(device):
+                report.update(peaks)
         report['seconds'] = time.monotonic()-started
         atomic_json(file,report)
     return report

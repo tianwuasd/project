@@ -90,29 +90,37 @@ def evaluate(cache, args, out):
     import nibabel as nib
     import numpy as np
     from .xu_evaluation import class_metrics, summarize
+    from .xu_inference_pool import case_plan, map_cases, record_plan
     if (out/'evaluation.json').exists() or (out/'cases').exists():
         raise ValueError('Evaluation requires a fresh output directory')
     book = roi_book(args.boxes, cache, args)
-    predictor, checkpoint_hash = frozen_predictor(args.checkpoint, branch=args.branch, profile=args.profile, supervision=args.supervision,
-                               data_identity=input_id(cache,args.supervision,book), device=args.device)
+    checkpoint_hash = sha256_file(args.checkpoint)
+    identity = input_id(cache,args.supervision,book)
     (out/'cases').mkdir()
-    by_case = {}
     names = cache.case_ids('development')
-    for idx,name in enumerate(names,1):
-        geo = cache.geometry(name)
-        box = book['boxes'][name] if book is not None else None
-        label = predictor(cache.read_image(name, (side(args.branch),)*3, box))
-        native = geo.restore_label(label,box)
-        # Access the reference only after making the prediction and determining the crop.
-        metrics = class_metrics(cache.read_native_label(name),native,geo.spacing_xyz,cache.supervision[name])
-        by_case[name] = metrics
-        atomic_json(out/'cases'/(name+'.json'),metrics)
-        if args.save_predictions:
-            affine = np.diag([*geo.spacing_xyz,1.])
-            image = nib.Nifti1Image(native,affine)
-            image.header.set_xyzt_units('mm')
-            nib.save(image,out/'cases'/(name+'.nii.gz'))
-        print(f'Evaluated {idx}/{len(names)}',flush=True)
+    plan = case_plan(args.device,names,cache,evaluation=True)
+    record_plan(out,plan)
+    def make_worker(device):
+        predictor, current = frozen_predictor(args.checkpoint, branch=args.branch, profile=args.profile,
+                                supervision=args.supervision,data_identity=identity,device=device)
+        if current != checkpoint_hash:
+            raise ValueError('Evaluation checkpoint changed between inference workers')
+        def process(name):
+            geo = cache.geometry(name)
+            box = book['boxes'][name] if book is not None else None
+            label = predictor(cache.read_image(name, (side(args.branch),)*3, box))
+            native = geo.restore_label(label,box)
+            # The reference is opened only after this patient's prediction.
+            metrics = class_metrics(cache.read_native_label(name),native,geo.spacing_xyz,cache.supervision[name])
+            atomic_json(out/'cases'/(name+'.json'),metrics)
+            if args.save_predictions:
+                image = nib.Nifti1Image(native,np.diag([*geo.spacing_xyz,1.]))
+                image.header.set_xyzt_units('mm')
+                nib.save(image,out/'cases'/(name+'.nii.gz'))
+            print(f'Evaluated {name} on {device}',flush=True)
+            return metrics
+        return process
+    by_case = map_cases(plan,make_worker)
     primary = cache.case_ids('development',complete_only=True)
     report = dict(protocol=PROTOCOL, request=cache.request_digest, branch=args.branch, profile=args.profile,
                   supervision=args.supervision, checkpoint_sha256=checkpoint_hash,

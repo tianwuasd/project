@@ -33,25 +33,34 @@ def _check_identity(payload, cache, args):
 
 def localize(cache, args, out):
     from .xu_workflow import frozen_predictor, side
+    from .xu_inference_pool import case_plan, map_cases, record_plan
     destination = out / 'candidates.json'
     if destination.exists() or (out/'boxes.json').exists():
         raise ValueError('Use a fresh output directory for localization')
     identity = _identity(cache, args)
-    models = {key: frozen_predictor(path, branch=key, profile=args.profile, supervision=args.supervision,
-                                     data_identity=identity['locator_input'], device=args.device)
-              for key, path in [('crop64',args.crop64), ('crop128',args.crop128)]}
-    cases = {}
     roles = _roles(cache)
-    for i, (name, role) in enumerate(roles.items(), 1):
-        predictions = [predict(cache.read_image(name, (side(key),)*3))
-                       for key, (predict, _) in models.items()]
-        item = vote_box(*predictions, cache.geometry(name), args.padding_percent)
-        cases[name] = dict(role=role, **item)
-        print(f"Localize {i}/{len(roles)} {role} {name} "
-              f"fraction={item['quality']['native_fraction']} outcome={item['quality']['reason'] or 'candidate'}",
-              flush=True)
+    plan = case_plan(args.device, roles, cache)
+    record_plan(out,plan)
+    paths = {'crop64':args.crop64,'crop128':args.crop128}
+    hashes = {}
+    def make_worker(device):
+        predictors = {}
+        for key,path in paths.items():
+            predict, fingerprint = frozen_predictor(path, branch=key, profile=args.profile,
+                        supervision=args.supervision, data_identity=identity['locator_input'], device=device)
+            if fingerprint != hashes.setdefault(key,fingerprint):
+                raise ValueError('Locator checkpoint changed between inference workers')
+            predictors[key] = predict
+        def process(name):
+            predictions = [predict(cache.read_image(name, (side(key),)*3)) for key,predict in predictors.items()]
+            item = vote_box(*predictions, cache.geometry(name), args.padding_percent)
+            print(f"Localize {roles[name]} {name} on {device} fraction={item['quality']['native_fraction']} "
+                  f"outcome={item['quality']['reason'] or 'candidate'}", flush=True)
+            return dict(role=roles[name], **item)
+        return process
+    cases = map_cases(plan, make_worker)
     payload = dict(**identity, padding_percent=args.padding_percent,
-                   checkpoints={k:h for k,(_,h) in models.items()}, cases=cases)
+                   checkpoints=hashes, cases=cases)
     atomic_json(destination, dict(payload=payload, sha256=digest(payload)))
     return dict(command='localize', cases=len(cases), candidate_file=str(destination),
                 rejected=sum(not row['quality']['accepted'] for row in cases.values()),

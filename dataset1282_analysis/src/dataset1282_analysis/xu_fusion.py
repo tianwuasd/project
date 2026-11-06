@@ -16,6 +16,7 @@ from scipy import ndimage
 from .contracts import atomic_json, digest, read_json, sha256_file
 from .observability.status import operation_lock
 from .xu_geometry import _box_in, _resize
+from .xu_inference_pool import case_plan, map_cases, record_plan, shard_identity
 
 
 FINE_WEIGHTS = {"crop64": 1, "crop128": 1, "all64": 2, "all128": 2}
@@ -207,7 +208,7 @@ def _open_job(out, identity, resume):
         atomic_json(manifest, identity)
 
 
-def _ensure_branch(cache, args, book, branch, checkpoint, expected, names, dest):
+def _ensure_branch(cache, args, book, branch, checkpoint, expected, names, dest, *, plan):
     from .xu_workflow import frozen_predictor, input_id, side
 
     marker = dest / "complete.json"
@@ -217,51 +218,30 @@ def _ensure_branch(cache, args, book, branch, checkpoint, expected, names, dest)
             raise ValueError("Invalid completed prediction cache")
         return record["files"]
     dest.mkdir(parents=True, exist_ok=True)
-    if branch in INIT:
-        from .xu_init import load_init_predictor
-
-        predict = load_init_predictor(
-            checkpoint,
-            cache=cache,
-            branch=branch,
-            profile=args.profile,
-            supervision=args.supervision,
-            book=book,
-            device=args.device,
-        )
-        if sha256_file(checkpoint) != expected:
-            raise ValueError("Init checkpoint changed during loading")
-    else:
-        data_identity = input_id(
-            cache, args.supervision, None if branch.startswith("crop") else book
-        )
-        predict, consumed = frozen_predictor(
-            checkpoint,
-            branch=branch,
-            profile=args.profile,
-            supervision=args.supervision,
-            device=args.device,
-            data_identity=data_identity,
-        )
+    def make_worker(device):
+        if branch in INIT:
+            from .xu_init import load_init_predictor
+            predict = load_init_predictor(checkpoint,cache=cache,branch=branch,profile=args.profile,
+                                          supervision=args.supervision,book=book,device=device)
+            consumed = sha256_file(checkpoint)
+        else:
+            identity = input_id(cache,args.supervision,None if branch.startswith("crop") else book)
+            predict, consumed = frozen_predictor(checkpoint,branch=branch,profile=args.profile,
+                              supervision=args.supervision,device=device,data_identity=identity)
         if consumed != expected:
-            raise ValueError("Fine checkpoint changed during loading")
-    outputs = {}
-    for i, name in enumerate(names, 1):
-        roi = book["boxes"][name]
-        source = None if branch.startswith("crop") else roi
-        n = side(branch)
-        pred = _labels(
-            predict(cache.read_image(name, (n, n, n), source)),
-            (n, n, n),
-            6 if branch in INIT else 10,
-        )
-        result = grid_prediction(
-            pred, cache.geometry(name).cache_shape, source, roi, (128, 128, 128)
-        )
-        path = dest / (name + ".npy")
-        _atomic_array(path, result)
-        outputs[name] = sha256_file(path)
-        print(f"{branch} predicted {i}/{len(names)}", flush=True)
+            raise ValueError('Branch checkpoint changed during loading')
+        def process(name):
+            roi = book["boxes"][name]
+            source = None if branch.startswith("crop") else roi
+            n = side(branch)
+            pred = _labels(predict(cache.read_image(name,(n,n,n),source)), (n,n,n), 6 if branch in INIT else 10)
+            result = grid_prediction(pred,cache.geometry(name).cache_shape,source,roi,(128,128,128))
+            path = dest/(name+".npy")
+            _atomic_array(path,result)
+            print(f"{branch} predicted {name} on {device}",flush=True)
+            return sha256_file(path)
+        return process
+    outputs = map_cases(plan,make_worker)
     atomic_json(marker, dict(checkpoint=expected, files=outputs))
     return outputs
 
@@ -295,7 +275,9 @@ def _prediction_context(cache, args, names, job):
         cache._artifact(f'process-{name}', f'{cache._folder}/{name}.b2nd')
         geometry[name] = asdict(cache.geometry(name))
     sources = ('xu_fusion.py', 'xu_training.py', 'xu_models.py', 'xu_init.py',
-               'xu_geometry.py', 'xu_workflow.py', 'xu_roi.py', 'xu_roi_workflow.py')
+               'xu_geometry.py', 'xu_workflow.py', 'xu_roi.py', 'xu_roi_workflow.py', 'xu_inference_pool.py')
+    if 'inference_shards' in job:
+        runtime['inference_shards'] = job['inference_shards']
     return dict(protocol='xu-frozen-branch-prediction-1', prepared=job['request'],
                 artifacts=job['cache_artifacts'], boxes=job['boxes'], cases=list(names),
                 geometry=digest(geometry), profile=args.profile, supervision=args.supervision,
@@ -452,6 +434,7 @@ def _fuse(cache, args, out):
 
     book = roi_book(args.boxes, cache, args)
     names = cache.case_ids("development")
+    plan = case_plan(args.device,names,cache,evaluation=args.evaluate)
     paths = {k: getattr(args, k) for k in FINE_WEIGHTS}
     if args.init64 or args.init128:
         if not args.init64 or not args.init128:
@@ -478,6 +461,8 @@ def _fuse(cache, args, out):
         cache_artifacts=artifact_identity(cache),
     )
     shared = getattr(args, 'prediction_cache', None)
+    if len(plan.requested)>1:
+        job['inference_shards'] = shard_identity(plan)
     if shared is not None:
         shared = shared.resolve()
         if any(shared == path or shared in path.parents or path in shared.parents
@@ -494,10 +479,11 @@ def _fuse(cache, args, out):
             file=str(out / "complete.json"),
         )
     dirs = out / "branches"
+    record_plan(out,plan)
     files = {}
     if shared is None:
         for k, p in paths.items():
-            files[k] = _ensure_branch(cache, args, book, k, p, hashes[k], names, dirs/k)
+            files[k] = _ensure_branch(cache, args, book, k, p, hashes[k], names, dirs/k,plan=plan)
     else:
         from functools import partial
         from .xu_workflow import side
@@ -505,34 +491,32 @@ def _fuse(cache, args, out):
         reuse = {}
         for k, p in paths.items():
             identity = dict(context, branch=k, checkpoint=hashes[k], prediction_side=side(k))
-            producer = partial(_ensure_branch, cache, args, book, k, p, hashes[k], names)
+            producer = partial(_ensure_branch, cache, args, book, k, p, hashes[k], names, plan=plan)
             files[k], reuse[k] = _shared_branch(shared, identity, dirs/k, names, producer)
         hits = sum(row['outcome'] == 'hit' for row in reuse.values())
         atomic_json(out/'prediction-cache.json', dict(branches=reuse, hits=hits, misses=len(reuse)-hits))
-    blood_predict = None
-    if args.blood:
-        from .xu_blood import load_blood_predictor
-
-        blood_predict = load_blood_predictor(
-            cache, args.blood, device=args.device, profile=args.profile, supervision=args.supervision
-        )
-        if sha256_file(args.blood) != hashes["blood"]:
-            raise ValueError("Blood checkpoint changed during loading")
-    records = {}
-    for i, name in enumerate(names, 1):
-        geo = cache.geometry(name)
-        roi = book["boxes"][name]
-        pred = {
-            k: _load_array(dirs / k / (name + ".npy"), files[k][name]) for k in paths
-        }
-        small, qc = vote(pred, mapping)
-        if blood_predict is not None:
-            shape = _refine_shape(roi)
-            blood = blood_predict(name, roi, shape)
-            small, details = blood_grow(_resize(small, shape, 0), blood, mapping["MYO"])
-            qc["blood"] = details
-        records[name] = _save_case(out, name, geo, roi, small, qc, cache, args.evaluate)
-        print(f"Fused {i}/{len(names)}", flush=True)
+    def make_fusion_worker(device):
+        blood_predict = None
+        if args.blood:
+            from .xu_blood import load_blood_predictor
+            blood_predict = load_blood_predictor(cache,args.blood,device=device,profile=args.profile,
+                                                 supervision=args.supervision)
+            if sha256_file(args.blood) != hashes['blood']:
+                raise ValueError('Blood checkpoint changed during loading')
+        def process(name):
+            geo, roi = cache.geometry(name), book['boxes'][name]
+            pred = {k:_load_array(dirs/k/(name+'.npy'),files[k][name]) for k in paths}
+            small, qc = vote(pred,mapping)
+            if blood_predict is not None:
+                shape = _refine_shape(roi)
+                blood = blood_predict(name,roi,shape)
+                small, details = blood_grow(_resize(small,shape,0),blood,mapping['MYO'])
+                qc['blood'] = details
+            entry = _save_case(out,name,geo,roi,small,qc,cache,args.evaluate)
+            print(f"Fused {name} on {device}",flush=True)
+            return entry
+        return process
+    records = map_cases(plan,make_fusion_worker)
     return _finish(out, cache, job, records, args.evaluate)
 
 

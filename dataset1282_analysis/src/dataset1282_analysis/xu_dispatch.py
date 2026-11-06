@@ -31,15 +31,28 @@ def device_identity(name, torch):
 
 
 def select_devices(single, multiple, torch):
-    names = [part.strip() for part in multiple.split(',')] if multiple is not None else [single or 'cuda']
-    if not 1 <= len(names) <= 2 or not all(names):
-        raise ValueError('Select one or two visible devices; the largest independent group has two branches')
+    automatic = multiple in ('auto','all-visible') or (multiple is None and single is None)
+    if automatic:
+        count = torch.cuda.device_count()
+        if count < 1:
+            raise ValueError('No visible CUDA devices; select --device cpu for a CPU run')
+        mask = os.environ.get('CUDA_VISIBLE_DEVICES')
+        container_mask = os.environ.get('NVIDIA_VISIBLE_DEVICES','').strip().lower()
+        restricted = bool(mask or container_mask not in ('','all','void','none'))
+        if count > 1 and os.name == 'posix' and not restricted and multiple != 'all-visible':
+            raise ValueError('No explicit GPU allocation mask: specify assigned devices, or --devices all-visible '
+                             'if all visible physical GPUs are allocated to this job')
+        names = [f'cuda:{i}' for i in range(count)]
+    else:
+        names = [part.strip() for part in multiple.split(',')] if multiple is not None else [single]
+    if not all(names):
+        raise ValueError('Expected allocated device names or auto')
     devices = [device_identity(name, torch) for name in names]
-    if len(devices) == 2:
+    if len(devices) > 1:
         if any(row['device'] == 'cpu' or row['uuid'] in ('unavailable', 'None') for row in devices):
-            raise ValueError('Parallel branches need two visible CUDA devices with verifiable UUIDs')
-        if devices[0]['uuid'] == devices[1]['uuid'] or devices[0]['device'] == devices[1]['device']:
-            raise ValueError('Parallel branches need two physically distinct authorized GPU devices')
+            raise ValueError('GPU pooling needs visible CUDA devices with verifiable UUIDs')
+        if len({row['uuid'] for row in devices}) != len(devices):
+            raise ValueError('Select physically distinct authorized GPU devices')
     return devices
 
 
@@ -47,7 +60,7 @@ def waves(stages, devices, stop_after):
     stages = iter(stages)
     for first in stages:
         # Never advance over build-targets until its artifacts have been committed.
-        if len(devices) == 2 and first.name in PAIRS and first.name != stop_after:
+        if len(devices) > 1 and first.name in PAIRS and first.name != stop_after:
             second = next(stages, None)
             if second is None or second.name != PAIRS[first.name]:
                 raise ValueError(f'Unexpected dependency order after {first.name}')
@@ -79,11 +92,12 @@ class Children:
             last = read_json(self.out/'status.json')
             write_status(self.out, state='running', stage=last.get('stage'), log=last.get('log'), active=[])
 
-    def attach(self, child, name, device, log):
+    def attach(self, child, name, device, log, devices=None):
         with self.lock:
             if self.stopping:
                 raise RuntimeError('Another branch has stopped this stage group')
-            self.active[child.pid] = (child, dict(pid=child.pid, stage=name, device=device, log=str(log)))
+            self.active[child.pid] = (child, dict(pid=child.pid, stage=name, device=device,
+                                                  devices=list(devices or [device]), log=str(log)))
             try:
                 self.births[child.pid] = psutil.Process(child.pid).create_time()
             except psutil.Error:
@@ -162,29 +176,33 @@ def reserve_pair(args, out):
 
 
 def plan_stage(stage, args, out, children, concurrent, purpose, checked):
-    from .xu_resources import ResourceUnavailable, limit_environment, stage_resources
-
+    from .xu_resources import ResourceUnavailable, combined_environment, stage_resources
+    from .xu_fleet import INFERENCE, needs_for_width, preflight_sizes
     device = (stage.argv[stage.argv.index('--device') + 1]
               if '--device' in stage.argv and stage.name != 'audit-roi' else 'cpu')
+    group = list(getattr(args,'assigned_devices',None) or [device])
+    if device != group[0]:
+        raise ValueError('Stage primary device differs from its frozen group')
     policy = args.resource_policy
     demand = cuda_demand = 0
+    if device != 'cpu' and stage.name in INFERENCE:
+        demand = getattr(args,'inference_worker_bytes',0) * len(group)
     if args.profile == 'paper' and device.startswith('cuda'):
         from .xu_capacity import specification
-        sizes = ()
-        if stage.name == 'blood':
-            sizes = ('blood-encoder','blood-sequence')
-        elif stage.name in ('crop64','all64','init64','crop128','all128','init128'):
-            sizes = ('3d128' if stage.name.endswith('128') else '3d64',)
+        sizes = preflight_sizes(stage.name)
         for size in sizes:
-            spec = specification(size)
-            demand = max(demand, spec['estimated_host_bytes'])
-            if purpose == 'launch':
-                cuda_demand = max(cuda_demand, spec['estimated_working_bytes'], checked.get((device,size),0))
+            demand = max(demand, specification(size)['estimated_host_bytes'])
+        if purpose == 'launch':
+            cuda_demand = dict(zip(group,needs_for_width(stage.name,len(group),args.profile)))
+            for size in sizes:
+                measured = checked.get((tuple(group),size),{})
+                for card in group:
+                    cuda_demand[card] = max(cuda_demand[card],measured.get(card,0))
     until = time.monotonic() + args.wait_seconds
     while True:
         children.ensure_running()
         try:
-            plan = stage_resources([device], concurrent=concurrent, threads=args.threads, policy=policy,
+            plan = stage_resources(group, concurrent=concurrent, threads=args.threads, policy=policy,
                                    owned_pids=children.pids(), host_demand_bytes=demand,
                                    cuda_demand_bytes=cuda_demand,
                                    wave_reservation=getattr(args, 'wave_reservation', None),
@@ -203,12 +221,12 @@ def plan_stage(stage, args, out, children, concurrent, purpose, checked):
             time.sleep(min(2, max(0, until - time.monotonic())))
             continue
         break
-    overlay = limit_environment(plan, device)
+    overlay = combined_environment(plan, group)
     # The current batch, model and I/O compete with the one optional read-ahead batch.
     prefetch = min(getattr(args, 'prefetch_mib', 4096) * 1024**2,
                    max(0, (plan['host_per_stage_bytes'] - demand) // 4))
     overlay.update(XU_PREFETCH='1' if args.prefetch and prefetch else '0', XU_PREFETCH_BYTES=str(prefetch))
     path = out/'resources'/f'{stage.name}-{purpose}-{time.time_ns()}.json'
-    atomic_json(path, dict(stage=stage.name, purpose=purpose, device=device, concurrent=concurrent,
+    atomic_json(path, dict(stage=stage.name, purpose=purpose, device=device, devices=group, concurrent=concurrent,
                            requested_threads=args.threads, prefetch_budget_bytes=prefetch, plan=plan))
     return device, overlay
