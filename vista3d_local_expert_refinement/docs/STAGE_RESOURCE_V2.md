@@ -48,13 +48,21 @@ Task6 修复前基线完整控制套件：**339 项，295 通过、44 条件跳�
 
 ```powershell
 $env:PYTHONPATH='tests;05_src'
-$env:TMP='D:/projects/sync-reports/vista-v2-test-temp'; $env:TEMP=$env:TMP
+$workRoot = 'D:/projects/back'
+$run = 'vista-v2-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff')
+$scratch = Join-Path $workRoot "t17/$run"
+$reportDir = Join-Path $workRoot "sync-reports/$run"
+$apiPython = Join-Path $workRoot 'sync-reports/vista-api-runtime-20261027/Scripts/python.exe'
+if (-not (Test-Path -LiteralPath $apiPython -PathType Leaf)) { throw "找不到复核环境 $apiPython" }
+New-Item -ItemType Directory -Path $scratch, $reportDir -ErrorAction Stop | Out-Null
+$env:TMP = $scratch
+$env:TEMP = $scratch
 $env:PYTHONUTF8='1'; $env:CUDA_VISIBLE_DEVICES='-1'
 & 'D:/programtools/anaconda/python.exe' -B tests/run_panel_suite.py
-& 'D:/projects/sync-reports/vista-api-runtime-20261027/Scripts/python.exe' -B -m unittest test_amp_updates test_execution_transfer -v
-& 'D:/projects/sync-reports/vista-api-runtime-20261027/Scripts/python.exe' -B tests/amp_cpu_gloo_smoke.py --report-file 'D:/projects/sync-reports/vista-v2-evidence/task6-amp-gloo-authorized.json'
-& 'D:/projects/sync-reports/vista-api-runtime-20261027/Scripts/python.exe' -B tests/nnunet_distributed_checkpoint_api_smoke.py --report-file 'D:/projects/sync-reports/vista-v2-evidence/task6-checkpoint-api.json'
-& 'D:/projects/sync-reports/vista-api-runtime-20261027/Scripts/python.exe' -B tests/nnunet_membership_checkpoint_api_smoke.py --report-file 'D:/projects/sync-reports/vista-v2-evidence/task6-membership-api.json'
+& $apiPython -B -m unittest test_amp_updates test_execution_transfer -v
+& $apiPython -B tests/amp_cpu_gloo_smoke.py --report-file (Join-Path $reportDir 'task6-amp-gloo-authorized.json')
+& $apiPython -B tests/nnunet_distributed_checkpoint_api_smoke.py --report-file (Join-Path $reportDir 'task6-checkpoint-api.json')
+& $apiPython -B tests/nnunet_membership_checkpoint_api_smoke.py --report-file (Join-Path $reportDir 'task6-membership-api.json')
 ```
 
 Gloo、本地 Git 与子进程测试需要原已授权的本机执行权限；受限执行的空日志超时保留为环境失败证据，不通过弱化断言或放宽路径保护修复。所有本地 API 均仅 CPU 合成数据；上述命令不是服务器正式训练指令。

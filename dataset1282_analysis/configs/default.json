@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "data_root": null,
+  "metadata_excel": null,
+  "metadata_sheet": "dicom2nii_info",
+  "work_root": null,
+  "environment": null,
+  "cpu_fraction": 0.8,
+  "ram_fraction": 0.8,
+  "reserve_gib": 4,
+  "read_concurrency": 2,
+  "max_workers": 2,
+  "chunk_slices": 8,
+  "percentile_samples": 100000,
+  "connectivity": 1,
+  "max_label_values": 128,
+  "visual_examples": 24,
+  "resource_wait_seconds": 60,
+  "protocol": "dataset1282-audit-v1"
+}

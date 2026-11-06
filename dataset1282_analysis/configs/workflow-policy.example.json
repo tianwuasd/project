@@ -1,0 +1,33 @@
+{
+  "status": "example_only_replace_with_reviewed_private_policy",
+  "patient_aliases": [],
+  "excluded_cases": [],
+  "HU_policy": {
+    "status": "HU_by_project_assumption",
+    "additional_scale": 1,
+    "additional_offset": 0,
+    "calibration_verified": false
+  },
+  "label_mapping": {
+    "renumber_voxels": false,
+    "provider_dictionary_verified": false,
+    "values": {
+      "0": "background",
+      "1": "left_ventricle",
+      "2": "right_ventricle",
+      "3": "left_atrium",
+      "4": "right_atrium",
+      "5": "aorta",
+      "6": "pulmonary_artery",
+      "7": "myocardium",
+      "8": "superior_vena_cava",
+      "9": "inferior_vena_cava",
+      "10": "pulmonary_veins"
+    }
+  },
+  "partial_supervision": {
+    "include_training_partition_missing_class_cases": true,
+    "preserve_validation_and_test_roles": true
+  },
+  "known_absent_classes": {}
+}
