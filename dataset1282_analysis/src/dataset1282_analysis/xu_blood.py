@@ -10,6 +10,15 @@ from .contracts import atomic_json, read_json, sha256_file
 from .xu_blood_grid import AxialViews
 
 
+# Reviewed at 13ceecc2. Unscoped v1 used every case with a known blood target.
+_V1_SOURCE = {
+    'xu_blood.py': 'e70d0f19b0c292b4417f13a8c6d6b97160396df99fb5380b2a1861b508eb8abc',
+    'xu_blood_grid.py': '3d3f354441941584e14c54160bf89722f250d60a82a8f03fb40acd8f3cde8a99',
+    'xu_blood_models.py': '3e8b2508bbc470e9355eaf89490e3ffb5213d99a5e9eaaddc42d2f4f62357f8f',
+    'xu_geometry.py': '4500549b63cd6dc38551a177193137c3b2da64faa582d5d182ec84be9c805d79',
+}
+
+
 def register(commands):
     for name in ('train-blood', 'predict-blood'):
         p = commands.add_parser(name)
@@ -20,6 +29,7 @@ def register(commands):
         p.add_argument('--device', default='cpu')
         if name == 'train-blood':
             p.add_argument('--targets', required=True, type=Path, help='Completed build-targets directory')
+            p.add_argument('--supervision',choices=('marginal','complete'),default='marginal')
             p.add_argument('--resume', action='store_true')
             p.add_argument('--seed', type=int, default=2023)
             p.add_argument('--technical-unvalidated', action='store_true',
@@ -32,6 +42,43 @@ def register(commands):
 def _source():
     return {name:sha256_file(Path(__file__).with_name(name)) for name in
             ('xu_blood.py','xu_blood_grid.py','xu_blood_models.py','xu_geometry.py')}
+
+
+def blood_cohort(cache, ids, supervision, store=None):
+    from .xu_targets import blood_eligible
+    if supervision not in ('complete','marginal'):
+        raise ValueError('Unknown blood supervision arm')
+    eligible = {}
+    for role in ('train','development'):
+        selected = []
+        for name in cache.case_ids(role):
+            info = cache.supervision[name]
+            known = blood_eligible(info,ids)
+            if store is not None and known != store.has(name,'blood'):
+                raise ValueError('Blood eligibility disagrees with target manifest')
+            if known and (supervision == 'marginal' or len(info['present_classes']) == 10):
+                selected.append(name)
+        eligible[role] = selected
+    return eligible
+
+
+def _contract(cache, targets, supervision, profile, seed, eligible):
+    from .xu_workflow import artifact_identity
+    return dict(method='xu-blood-v2', request=cache.request_digest, artifacts=artifact_identity(cache),
+                targets=targets, source=_source(), supervision=supervision, profile=profile,
+                seed=seed, **eligible)
+
+
+def _matches(stored, expected):
+    if stored == expected:
+        return True
+    if expected['supervision'] != 'marginal' or stored.get('method') != 'xu-blood-v1':
+        return False
+    if any(expected['source'][k] != v for k,v in _V1_SOURCE.items() if k != 'xu_blood.py'):
+        return False
+    legacy = dict(expected, method='xu-blood-v1', source=_V1_SOURCE)
+    del legacy['supervision']
+    return stored == legacy
 
 
 def _objective(scores, target):
@@ -161,30 +208,23 @@ def _train_stage(cache, store, contract, out, encoder, sequence, stage, device):
 def train(cache,args,out):
     import torch
     from .xu_blood_models import SliceUNet, BloodSequence
-    from .xu_targets import TargetStore, blood_ids, blood_eligible
+    from .xu_targets import TargetStore, blood_ids
     from .xu_training import _save
-    from .xu_workflow import artifact_identity
     store=TargetStore(args.targets,cache)
-    ids=blood_ids(cache)
-    eligible={}
-    for role in ('train','development'):
-        eligible[role]=[]
-        for name in cache.case_ids(role):
-            expected=blood_eligible(cache.supervision[name],ids)
-            if expected!=store.has(name,'blood'):
-                raise ValueError('Blood eligibility disagrees with target manifest')
-            if expected:
-                eligible[role].append(name)
+    supervision = getattr(args,'supervision','marginal')
+    eligible = blood_cohort(cache,blood_ids(cache),supervision,store)
     if args.technical_unvalidated and not (args.profile=='smoke' and cache.scope=='technical_subset'):
         raise ValueError('Unvalidated capacity probe is restricted to technical smoke inputs')
     if not eligible['train'] or not (eligible['development'] or args.technical_unvalidated):
         raise ValueError('Require eligible blood training and development cases')
-    contract=dict(method='xu-blood-v1',request=cache.request_digest,artifacts=artifact_identity(cache),
-                  targets=store.identity,source=_source(),profile=args.profile,seed=args.seed,**eligible)
+    contract = _contract(cache,store.identity,supervision,args.profile,args.seed,eligible)
     marker=out/'blood-contract.json'
     if marker.exists():
-        if not args.resume or read_json(marker)!=contract:
+        stored = read_json(marker)
+        if not args.resume or not _matches(stored,contract):
             raise ValueError('Blood training output is occupied or incompatible')
+        # On certified v1 resume, existing per-epoch checkpoints retain their original identity.
+        contract = stored
     else:
         if any(out.glob('*.pt')):
             raise ValueError('Unowned checkpoint in blood output')
@@ -198,22 +238,24 @@ def train(cache,args,out):
     kind='best' if eligible['development'] else 'technical'
     path=out/(kind+'.pt')
     _save(path,dict(kind=kind,contract=contract,encoder=encoder.state_dict(),sequence=seq.state_dict()))
-    result=dict(command='train-blood',model=path.name,selection='development' if kind=='best' else 'technical_last',
+    result=dict(command='train-blood',model=path.name,supervision=supervision,
+                selection='development' if kind=='best' else 'technical_last',
                 train=len(eligible['train']),development=len(eligible['development']),history=history)
     atomic_json(out/'blood-training.json',result)
     return result
 
 
-def load_blood_predictor(cache, checkpoint, device='cpu', profile=None):
+def load_blood_predictor(cache, checkpoint, device='cpu', profile=None, supervision=None):
     """Return a label-free predictor yielding 0/1/2 labels in requested cache-axis ROI."""
     import torch
     from .xu_blood_models import SliceUNet, BloodSequence
-    from .xu_workflow import artifact_identity
+    from .xu_targets import blood_ids
     state=torch.load(checkpoint,map_location='cpu',weights_only=True)
     c=state['contract']
-    if (c['method']!='xu-blood-v1' or c['request']!=cache.request_digest
-            or c['artifacts']!=artifact_identity(cache) or c['source']!=_source()
-            or (profile is not None and c['profile']!=profile)):
+    arm = supervision or c.get('supervision','marginal')
+    eligible = blood_cohort(cache,blood_ids(cache),arm)
+    expected = _contract(cache,c['targets'],arm,profile or c['profile'],c['seed'],eligible)
+    if not _matches(c,expected):
         raise ValueError('Blood prediction checkpoint contract mismatch')
     if state['kind']!='best' and not (state['kind']=='technical' and c['profile']=='smoke'
                                       and cache.scope=='technical_subset'):

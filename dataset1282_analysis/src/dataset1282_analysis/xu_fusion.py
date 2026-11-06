@@ -397,7 +397,7 @@ def _fuse(cache, args, out):
         from .xu_blood import load_blood_predictor
 
         blood_predict = load_blood_predictor(
-            cache, args.blood, device=args.device, profile=args.profile
+            cache, args.blood, device=args.device, profile=args.profile, supervision=args.supervision
         )
         if sha256_file(args.blood) != hashes["blood"]:
             raise ValueError("Blood checkpoint changed during loading")

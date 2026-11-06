@@ -1,5 +1,7 @@
 # Xu 2023 固定划分解剖分割
 
+整套模型可从[全模型运行与恢复](xu-model-run.md)的单条命令启动。下文同时保留各分支入口，便于独立复核。
+
 进入本分支的 dataset1282_analysis 子目录，使用预处理时验证过的研究 Python。输入为已完成的 0.3.0 hu-marginal 目录，实验产物写在另一目录。入口脚本校验完成标志、训练统计、病例角色、标签及缓存几何；只读取此包。主训练组使用十类均出现的 552 训练 / 122 开发，边际损失组使用 590 / 128；缺标以 unknown 处理。每组独立训练、选权重，并报告全部开发例的可观察结构结果。训练病例的预测框来自见过这些患者的定位器，训练与开发覆盖率分开报告。正式队列的有效性需在固定开发集实测。本次范围为分割；流程没有诊断入口。
 
 ## 训练、取框与四路基线
@@ -54,7 +56,7 @@
 run review-targets "${base[@]}" --case "$CASE" --output "$O/review-$CASE"
 # 汇总人工核准的端面和种子后传入 --reviews。仅构建可用血池监督时可省略该选项。
 run build-targets "${base[@]}" --output "$O/targets" --reviews "$O/reviewed-planes.json"
-run train-blood "${base[@]}" --targets "$O/targets" --profile paper --device cuda --output "$O/blood"
+run train-blood "${base[@]}" --targets "$O/targets" --supervision "$ARM" --profile paper --device cuda --output "$O/blood"
 for b in init64 init128; do
   run train-init "${args[@]}" --targets "$O/targets" --boxes "$boxes" --branch "$b" --output "$O/$b"
 done

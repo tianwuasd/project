@@ -106,7 +106,8 @@ class BloodTrainingTests(unittest.TestCase):
             self.assertGreater(frame.grad.abs().max().item(),0)
 
     def test_train_resume_and_guarded_label_free_prediction(self):
-        from dataset1282_analysis.xu_blood import train,load_blood_predictor
+        from dataset1282_analysis.xu_blood import train, load_blood_predictor, _V1_SOURCE
+        from dataset1282_analysis.contracts import read_json, atomic_json
         cache=TinyPrepared()
         args=SimpleNamespace(targets=None,profile='smoke',technical_unvalidated=False,
                              seed=12,device='cpu',resume=False)
@@ -119,6 +120,7 @@ class BloodTrainingTests(unittest.TestCase):
              patch('dataset1282_analysis.xu_workflow.artifact_identity',return_value='artifacts'):
             out=Path(tmp)
             report=train(cache,args,out)
+            self.assertEqual(report['supervision'],'marginal')
             self.assertEqual(report['selection'],'development')
             self.assertEqual(report['development'],1)
             self.assertIn('validation',report['history']['sequence'][0])
@@ -130,6 +132,30 @@ class BloodTrainingTests(unittest.TestCase):
             self.assertEqual(train(cache,args,out)['history'],report['history'])
             with self.assertRaises(ValueError):
                 load_blood_predictor(cache,out/'best.pt','cpu','paper')
+            with self.assertRaisesRegex(ValueError,'contract mismatch'):
+                load_blood_predictor(cache,out/'best.pt','cpu','smoke','complete')
             args.seed+=1
             with self.assertRaisesRegex(ValueError,'incompatible'):
                 train(cache,args,out)
+            args.seed-=1
+            # Build the exact published v1 envelope around equivalent local synthetic weights.
+            legacy = dict(read_json(out/'blood-contract.json'),method='xu-blood-v1',source=dict(_V1_SOURCE))
+            del legacy['supervision']
+            for path in out.glob('*.pt'):
+                state = torch.load(path,map_location='cpu',weights_only=True)
+                state['contract'] = legacy
+                torch.save(state,path)
+            atomic_json(out/'blood-contract.json',legacy)
+            self.assertEqual(train(cache,args,out)['history'],report['history'])
+            old = load_blood_predictor(cache,out/'best.pt','cpu','smoke')
+            np.testing.assert_array_equal(old('b',None,(3,2,4)),pred)
+            with self.assertRaisesRegex(ValueError,'contract mismatch'):
+                load_blood_predictor(cache,out/'best.pt','cpu','smoke','complete')
+            args.supervision='complete'
+            with self.assertRaisesRegex(ValueError,'incompatible'):
+                train(cache,args,out)
+            args.supervision='marginal'
+            for invalid in [dict(legacy,source={}),dict(legacy,train=['b'])]:
+                atomic_json(out/'blood-contract.json',invalid)
+                with self.assertRaisesRegex(ValueError,'incompatible'):
+                    train(cache,args,out)
