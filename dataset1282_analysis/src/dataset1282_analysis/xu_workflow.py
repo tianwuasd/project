@@ -120,6 +120,7 @@ def evaluate(cache, args, out):
 
 
 def main(argv=None):
+    from .xu_roi import DEFAULT_PADDING_PERCENT, PADDING_PERCENT_OPTIONS
     p=argparse.ArgumentParser(description=__doc__)
     commands=p.add_subparsers(dest='command',required=True)
     for name in ('inspect','train','localize','audit-roi','evaluate'):
@@ -141,8 +142,9 @@ def main(argv=None):
             cmd.add_argument('--resume',action='store_true')
             cmd.add_argument('--seed',type=int,default=2023)
         if name=='localize':
-            cmd.add_argument('--padding-percent',type=int,choices=(0,10),default=10,
-                             help='Increase each strict-vote side by this total percent, split across both faces')
+            cmd.add_argument('--padding-percent',type=int,choices=PADDING_PERCENT_OPTIONS,
+                             default=DEFAULT_PADDING_PERCENT,
+                             help='Increase each strict-vote side by this total percent, split across both faces (default: %(default)s)')
             cmd.add_argument('--crop64',type=Path,required=True)
             cmd.add_argument('--crop128',type=Path,required=True)
         if name=='audit-roi':

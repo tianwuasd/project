@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -11,6 +10,7 @@ from dataset1282_analysis.contracts import atomic_json, digest, read_json
 from dataset1282_analysis.xu_geometry import CaseGeometry
 from dataset1282_analysis.xu_roi import coverage, expand_box, measure_box, native_support, vote_box
 from dataset1282_analysis.xu_roi_workflow import audit, localize, verified_book
+from dataset1282_analysis.xu_workflow import main, roi_book
 
 
 def geometry(n=128):
@@ -18,6 +18,22 @@ def geometry(n=128):
 
 
 class VotingTests(unittest.TestCase):
+    def test_default_twenty_percent_clips_and_rechecks_the_expanded_box(self):
+        geo = geometry()
+        # The starting box spans 100 voxels on each axis, including one low and one high face.
+        low = np.zeros((64,)*3, np.uint8)
+        low[0:50, 14:64, 7:57] = 1
+        high = low.repeat(2, 0).repeat(2, 1).repeat(2, 2)
+        result = vote_box(low, high, geo)
+        self.assertEqual(result['box'], [(0,110), (18,128), (4,124)])
+        self.assertTrue(result['quality']['accepted'])
+
+        for strict, reason in [((11,116), 'almost_whole_volume'), ((10,118), 'whole_volume')]:
+            with self.subTest(strict=strict):
+                self.assertTrue(measure_box([strict]*3, geo)['accepted'])
+                expanded = expand_box([strict]*3, geo.cache_shape, 20)
+                self.assertEqual(measure_box(expanded, geo)['reason'], reason)
+
     def test_ten_percent_is_total_side_length_and_full_expansion_is_rejected(self):
         self.assertEqual(expand_box(((10,110),)*3,(128,)*3,10), [(5,115)]*3)
         self.assertEqual(expand_box(((0,100),)*3,(128,)*3,10), [(0,105)]*3)
@@ -101,6 +117,26 @@ class FixtureCache:
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_cli_default_and_historical_margins_release_usable_boxes(self):
+        cache = FixtureCache()
+        downstream = SimpleNamespace(branch='all128', supervision='marginal', profile='smoke')
+        with (TemporaryDirectory() as tmp,
+              patch('dataset1282_analysis.xu_geometry.PreparedCache', return_value=cache),
+              patch('dataset1282_analysis.xu_workflow.input_id', return_value='identity'),
+              patch('dataset1282_analysis.xu_workflow.frozen_predictor', return_value=(lambda x:x, 'a'*64))):
+            base = ['--prepared', str(Path(tmp)/'cache'), '--profile', 'smoke', '--supervision', 'marginal']
+            for margin, extra_args, bound in [(20, [], [6,26]), (0, ['--padding-percent','0'], [8,24]),
+                                               (10, ['--padding-percent','10'], [7,25])]:
+                with self.subTest(margin=margin):
+                    out = Path(tmp)/str(margin)
+                    cache.predictions_only = True
+                    main(['localize', *base, '--output', str(out), '--crop64', 'a', '--crop128', 'b', *extra_args])
+                    cache.predictions_only = False
+                    main(['audit-roi', *base, '--output', str(out), '--candidates', str(out/'candidates.json')])
+                    book = roi_book(out/'boxes.json', cache, downstream)
+                    self.assertEqual(book['padding_percent'], margin)
+                    self.assertEqual(book['boxes'], {'a':[bound]*3, 'b':[bound]*3})
+
     def test_real_entrypoint_lifecycle_and_negative_gates(self):
         args = SimpleNamespace(supervision='marginal',profile='smoke',device='cpu',crop64='a',crop128='b',padding_percent=0)
         cache = FixtureCache()

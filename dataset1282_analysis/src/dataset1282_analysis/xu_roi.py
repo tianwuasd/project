@@ -7,6 +7,8 @@ from .xu_geometry import _box_in, _prediction, _scale_bounds, prediction_box
 
 
 RULE = 'dual-hard-foreground-128-margin-v2'
+PADDING_PERCENT_OPTIONS = (0, 10, 20)
+DEFAULT_PADDING_PERCENT = 20
 # Project acceptance limits, not values reported in the paper.
 MAX_BOX_FRACTION = 0.95
 MIN_CLASS_P05 = 0.95
@@ -64,8 +66,8 @@ def measure_box(box, geometry):
 
 def expand_box(box, shape, percent):
     """Increase total side length, splitting added voxels between its two faces, then clip."""
-    if type(percent) is not int or percent not in (0, 10):
-        raise ValueError('Expected a preregistered 0 or 10 percent side expansion')
+    if type(percent) is not int or percent not in PADDING_PERCENT_OPTIONS:
+        raise ValueError(f'Expected a total side expansion from {PADDING_PERCENT_OPTIONS} percent')
     if box is None:
         return None
     expanded = []
@@ -75,7 +77,7 @@ def expand_box(box, shape, percent):
     return expanded
 
 
-def vote_box(pred64, pred128, geometry, padding_percent=10):
+def vote_box(pred64, pred128, geometry, padding_percent=DEFAULT_PADDING_PERCENT):
     """Hard voting on a shared voxel-centred grid. Conflicting foreground types still support ROI."""
     low = _prediction(pred64)
     high = _prediction(pred128)

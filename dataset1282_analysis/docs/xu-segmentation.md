@@ -20,7 +20,7 @@
   for b in crop64 crop128; do
     run train "${args[@]}" --branch "$b" --output "$O/$b"
   done
-  run localize "${args[@]}" --crop64 "$O/crop64/best.pt" --crop128 "$O/crop128/best.pt" --padding-percent 10 --output "$O/votes"
+  run localize "${args[@]}" --crop64 "$O/crop64/best.pt" --crop128 "$O/crop128/best.pt" --padding-percent 20 --output "$O/votes"
   run audit-roi "${args[@]}" --candidates "$O/votes/candidates.json" --output "$O/audit"
   boxes="$O/audit/boxes.json"
   for b in all64 all128; do
@@ -35,7 +35,7 @@
 
 定位只读取 CT 和模型权重。两路硬分割先按体素中心对齐到 128³ 网格。同一位置两路均判为前景即计入定位目标，即使预测的结构名称不同。一票前景一票背景的位置记为未决。取一致前景的最小长方体，边缘向外取整映回缓存。论文 §4.2 给出多数投票取框，前景归并、平票和外扩规则由本项目明确指定。逐体素投票中的平票处理可参见 ITK。[Xu 原文](https://doi.org/10.1016/j.media.2023.102953) · [ITK 投票说明](https://docs.itk.org/projects/doxygen/en/stable/classitk_1_1LabelVotingImageFilter.html)
 
-**默认每条边的总长度增加 10%。** 例如 100 个体素扩到 110 个，两侧各加 5 个。新增体素数向上取整，奇数时高坐标侧多加一个，碰到图像边界时截到边界。三轴均可扩足且忽略取整时，框体积约增加 33.1%。用相同权重运行 `--padding-percent 0`，并指定独立的定位和审核目录，即可做严格投票的零边距对照。候选记录同时保存未扩框、历史框和前景并集框。
+**默认将严格投票所得框的每条边总长增加 20%。** 例如 100 个体素扩到 120 个，两侧各加 10 个。新增体素数向上取整，奇数时高坐标侧多加一个，碰到图像边界时截到边界。三轴均可扩足且忽略取整时，框体积相对严格投票框增加 72.8%。用相同权重分别运行 `--padding-percent 0` 和 `--padding-percent 10`，为每次定位和审核指定独立目录，即可与当前默认比较。三种边距都从同一个严格投票框计算。候选记录同时保存未扩框、历史框和前景并集框。
 
 **逐例门槛。** `audit-roi` 读取已落盘的候选，再用预处理包保留的原网格参考标签检查。体积按外接边界统计，覆盖率按能从裁剪区实际还原的原图体素中心统计。空框、没有可还原的体素、整图、缓存或原数组网格上体积占比超过 95%、任何已标结构完全漏出，都会阻止发放整批训练框。训练组和开发组还各自要求每个已标结构的覆盖率第 5 百分位至少为 95%。两个阈值均是本项目的验收选择。缺标类单列分母。失败清单写入 `localization_qc.json`，只有全部通过后才生成 `boxes.json`。使用训练框的每个步骤都会复查摘要、来源权重、规则和每例实际范围。更换训练框或监督组后重新训练下游分支。
 

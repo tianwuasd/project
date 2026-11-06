@@ -5,7 +5,8 @@ import re
 import numpy as np
 
 from .contracts import atomic_json, digest, read_json
-from .xu_roi import MAX_BOX_FRACTION, MIN_CLASS_P05, RULE, coverage, expand_box, measure_box, vote_box
+from .xu_roi import (MAX_BOX_FRACTION, MIN_CLASS_P05, PADDING_PERCENT_OPTIONS, RULE,
+                     coverage, expand_box, measure_box, vote_box)
 
 
 def _roles(cache):
@@ -22,7 +23,7 @@ def _identity(cache, args):
 def _check_identity(payload, cache, args):
     if any(payload[key] != value for key, value in _identity(cache, args).items()):
         raise ValueError('ROI identity differs from this experiment')
-    if type(payload['padding_percent']) is not int or payload['padding_percent'] not in (0, 10):
+    if type(payload['padding_percent']) is not int or payload['padding_percent'] not in PADDING_PERCENT_OPTIONS:
         raise ValueError('Unrecognized ROI margin')
     checkpoints = payload['checkpoints']
     if (set(checkpoints) != {'crop64','crop128'} or
