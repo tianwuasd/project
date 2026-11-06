@@ -1,6 +1,6 @@
 # CHD：数据分析、预处理与STU-Net-S训练
 
-这是独立的代码工程，沿用`chd-ct-panel-v2`目录名。提供数据分析、环境部署、可选STU-Net-S预处理，以及V2多GPU STU-Net-S训练；没有面板或全体积预测入口。训练开发版与预处理main分别发布，更新时按所需分支选择。
+这是独立的代码工程，沿用`chd-ct-panel-v2`目录名。0.5.1将预处理执行优化与V2多GPU STU-Net-S训练整合到同一版本，提供数据分析、环境部署、可选预处理和训练；没有面板或全体积预测入口。
 
 ## 开始使用
 
@@ -103,6 +103,8 @@ docs/                           方法、运行、来源、验收范围
 
 ## 更新与交付
 
+main和训练分支同步包含预处理优化与训练入口。已完成的旧版预处理仍可只读用于新训练，不需要重算或改签名；源合同、每折计划、角色、文件SHA和坐标仍严格核查。预处理新算法执行本身继续使用严格源码签名，不允许新代码热恢复旧预处理任务。
+
 ```bash
 python update.py --plan
 python update.py --check
@@ -114,7 +116,7 @@ python scripts/package_code.py
 
 `update.py --check/--apply`自动显示授权读取、清单版本、逐文件一致/下载/SHA校验及备份替换进度，长请求每10秒反馈等待状态。完整过程写入`outputs/updates/<时间>/update.log`，成功或失败均有`update-result.json`；终端不显示访问凭据。
 
-训练开发分支为`codex/chd-stunet-training-20261103`，在它尚未合并main期间，可显式`python update.py --ref codex/chd-stunet-training-20261103 --check`，核对后用相同ref执行`--apply`；默认main不会自动切到开发分支。
+训练开发分支保留为`codex/chd-stunet-training-20261103`。本次验收后与main同步，无需再为取得训练功能手动切换分支；后续开发提交仍须独立验收后才合入main。
 
 代码包不包含outputs、影像、权重、虚拟环境、私有配置；真实清单、日志、报告和分析图留在结果目录。
 

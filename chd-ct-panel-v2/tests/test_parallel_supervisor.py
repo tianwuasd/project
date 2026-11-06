@@ -39,6 +39,30 @@ class SupervisorTests(unittest.TestCase):
                 launch(self.prepared,self.output,resume=True)
         self.assertEqual(before,{p.name:p.read_bytes() for p in self.output.iterdir()})
 
+    def test_missing_or_empty_resume_refuses_without_creating_a_new_run(self):
+        for exists in (False,True):
+            output=self.root/('empty' if exists else 'missing')
+            if exists:output.mkdir()
+            with self.subTest(exists=exists), \
+                 patch('chd_stunet.training.supervisor.prepare_contract',return_value=({'batch_size':1},{},{'identity':'new'})), \
+                 patch('chd_stunet.training.supervisor.query_visible',side_effect=AssertionError('No GPU allocation')):
+                with self.assertRaisesRegex(ValueError,'Resume requires an existing signed'):
+                    launch(self.prepared,output,resume=True)
+            self.assertEqual(output.exists(),exists)
+            if exists:self.assertEqual(list(output.iterdir()),[])
+
+    def test_missing_latest_pointer_does_not_discard_existing_checkpoint_files(self):
+        self.output.mkdir();signature={'identity':'signed'}
+        (self.output/'signature.json').write_text(json.dumps(signature))
+        checkpoints=self.output/'checkpoints';checkpoints.mkdir()
+        (checkpoints/'state-existing.pt').write_bytes(b'preserve this checkpoint')
+        before={p.relative_to(self.output).as_posix():p.read_bytes() for p in self.output.rglob('*') if p.is_file()}
+        with patch('chd_stunet.training.supervisor.prepare_contract',return_value=({'batch_size':1},{},signature)), \
+             patch('chd_stunet.training.supervisor.freeze_code'):
+            with self.assertRaisesRegex(ValueError,'Missing latest checkpoint pointer'):
+                launch(self.prepared,self.output,resume=True)
+        self.assertEqual(before,{p.relative_to(self.output).as_posix():p.read_bytes() for p in self.output.rglob('*') if p.is_file()})
+
     def test_completed_metadata_repair_needs_no_gpu_or_author_weights(self):
         self.output.mkdir();signature={'identity':'completed'}
         (self.output/'signature.json').write_text(json.dumps(signature))

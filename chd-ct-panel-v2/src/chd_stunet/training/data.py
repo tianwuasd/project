@@ -98,6 +98,13 @@ def verify_coordinate_labels(seg,properties):
 
 def load_prepared(run, fold, settings, *, train_cases=(), val_cases=()):
     """Require role-correct complete caches; subset selection is smoke-only."""
+    from ..observability.input_check import InputCheckProgress
+    with InputCheckProgress(f'fold{fold}') as progress:
+        return _load_prepared(run,fold,settings,train_cases=train_cases,val_cases=val_cases,progress=progress)
+
+
+def _load_prepared(run,fold,settings,*,train_cases,val_cases,progress):
+    """The existing full verifier; progress never alters identities or files."""
     import blosc2
     run=Path(run).resolve(strict=True);foldroot=run/f'fold_{fold}'
     manifest=read_json(run/'manifests/imagechd_input.json')
@@ -144,7 +151,9 @@ def load_prepared(run, fold, settings, *, train_cases=(), val_cases=()):
     if sorted(plan['fit_ids'])!=expected_fit:
         raise ValueError('Preprocessing plan fitted outside the fixed main training set')
     rows={};adapters=[];identity=[]
-    for cid in chosen_train+chosen_val:
+    selected=chosen_train+chosen_val
+    for index,cid in enumerate(selected):
+        progress.update(cid,index,len(selected),'完成标记/源合同')
         source=cases[cid];completion_path=foldroot/'completion'/f'{cid}.json'
         if not completion_path.is_file():raise ValueError('Missing complete preprocessing cache: '+cid)
         completion=read_json(completion_path)
@@ -156,6 +165,7 @@ def load_prepared(run, fold, settings, *, train_cases=(), val_cases=()):
         required={cid+'.b2nd',cid+'_seg.b2nd',cid+'.pkl'}
         if set(completion['file_sha256'])!=required:raise ValueError('Unexpected cache files: '+cid)
         for name,sha in completion['file_sha256'].items():
+            progress.update(cid,index,len(selected),'完整文件SHA256 '+name)
             if sha256_file(foldroot/'data'/name)!=sha:raise ValueError('Cache SHA256 differs: '+name)
         with (foldroot/'data'/f'{cid}.pkl').open('rb') as stream:properties=pickle.load(stream)
         if properties.get('method_protocol')!=protocol or properties.get('source_hashes')!=source['source_hashes']:
@@ -178,6 +188,7 @@ def load_prepared(run, fold, settings, *, train_cases=(), val_cases=()):
         if image.shape!=seg.shape or image.shape[0]!=1 or image.dtype!=np.float32 or seg.dtype!=np.int8:
             raise ValueError('Unexpected prepared array format: '+cid)
         properties,adapted=normalize_locations(properties,image.shape,legacy_allowed)
+        progress.update(cid,index,len(selected),'按chunk核验全部前景坐标')
         verify_coordinate_labels(seg,properties)
         if adapted:adapters.append(dict(case_id=cid,adapter='audited_zyx_to_channel_zyx',producer=legacy_hash))
         rows[cid]=dict(case_id=cid,base=str(foldroot/'data'/cid),shape=list(image.shape),
@@ -186,6 +197,7 @@ def load_prepared(run, fold, settings, *, train_cases=(), val_cases=()):
                              file_sha256=completion['file_sha256'],annotation=annotation,roles=source['roles'],
                              preprocessing_contract=completion['contract']))
         del image,seg
+        progress.update(cid,index+1,len(selected),'病例核验完成')
     data_identity=dict(preprocessing_identity=signature['identity'],protocol=protocol,fold=fold,
         plan=plan,train_ids=chosen_train,val_ids=chosen_val,cases=identity,
         patient_identity_verified=manifest.get('patient_identity_verified',False),adapters=adapters)

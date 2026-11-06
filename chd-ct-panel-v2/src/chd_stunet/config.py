@@ -30,7 +30,8 @@ def prepare_paths(local):
 def training_paths(local):
     platforms=json.loads((ROOT/'configs/paths.json').read_text(encoding='utf-8'))
     return dict(platforms.get(sys.platform,{}),**{k:v for k,v in local.items()
-                if k in {'training_prepared_root','training_output_root','runtime_root','weights_path'}})
+                if k in {'training_prepared_root','training_output_root','runtime_root','weights_path',
+                         'completed_preprocessing_default'}})
 
 
 def default_prepared(paths):
@@ -38,5 +39,8 @@ def default_prepared(paths):
     pointer=ROOT/'outputs/latest_preprocessing.json'
     if pointer.is_file():
         candidate=resolve_path(json.loads(pointer.read_text(encoding='utf-8'))['output'])
+        if (candidate/'manifests/imagechd_input.json').is_file():return candidate
+    if paths.get('completed_preprocessing_default'):
+        candidate=resolve_path(paths['completed_preprocessing_default'])
         if (candidate/'manifests/imagechd_input.json').is_file():return candidate
     raise ValueError('No prepared run selected; run prepare first or use --prepared / training_prepared_root')

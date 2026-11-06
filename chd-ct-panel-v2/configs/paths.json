@@ -4,6 +4,7 @@
     "preprocess_output_root": "/data_nas/zhangruichen/chd_ct_v2_stunet_results/preprocessing",
     "runtime_root": "/data5/zhougaowei/zhangruichen_workspace/chd_ct_v2_stunet_runtime",
     "training_output_root": "/data_nas/zhangruichen/chd_ct_v2_stunet_results/training",
+    "completed_preprocessing_default": "/data_nas/zhangruichen/chd_ct_v2_stunet_results/preprocessing/stunet-s-partial/server_run_v2_20261104",
     "weights_path": "/data5/zhougaowei/zhangruichen_workspace/chd_ct_v2_stunet_runtime/weights/stunet-small/small_ep4k.model"
   },
   "win32": {

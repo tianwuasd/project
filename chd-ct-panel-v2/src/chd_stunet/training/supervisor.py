@@ -101,6 +101,22 @@ def restore_full_epoch(folder,signature):
     return state
 
 
+def _existing_checkpoint(output,signature,settings):
+    """Distinguish an admitted bootstrap from lost committed-state metadata.
+
+    A failed initial capacity check may legitimately have no checkpoint yet.
+    Existing checkpoint files without latest.json must never be overwritten
+    by silently returning to author weights. Preserve them for explicit repair.
+    """
+    folder=output/'checkpoints'
+    if (folder/'latest.json').is_file():
+        payload=read_checkpoint(folder,signature);validate_state(payload['state'],settings)
+        return payload
+    if folder.is_dir() and any(path.is_file() for path in folder.iterdir()):
+        raise ValueError('Missing latest checkpoint pointer with existing checkpoint files; original run preserved')
+    return None
+
+
 def launch(prepared,output,*,gpus='auto',elastic=True,wait_seconds=300,workers=None,resume=False,
            check_only=False,**options):
     prepared=Path(prepared).resolve(strict=True);output=Path(output).resolve()
@@ -122,8 +138,9 @@ def launch(prepared,output,*,gpus='auto',elastic=True,wait_seconds=300,workers=N
         if not (output/'signature.json').is_file() or json.loads((output/'signature.json').read_text(encoding='utf-8'))!=signature:
             raise ValueError('Resume contract differs; keep the old run and use its frozen code')
         freeze_code(output,signature,create=False)
-        if (output/'checkpoints/latest.json').is_file():
-            previous=read_checkpoint(output/'checkpoints',signature);validate_state(previous['state'],settings)
+        previous=_existing_checkpoint(output,signature,settings)
+    elif resume:
+        raise ValueError('Resume requires an existing signed training run; no new run was created')
     if previous is None and not options.get('weights'):
         raise ValueError('Author weights required for a new run; no random fallback')
     processes=[];owned={};streams=[];handlers={};stop=[False];stopping_at=None
@@ -135,8 +152,9 @@ def launch(prepared,output,*,gpus='auto',elastic=True,wait_seconds=300,workers=N
             if json.loads((output/'signature.json').read_text(encoding='utf-8'))!=signature:
                 raise ValueError('Resume contract changed while acquiring the run lock')
             freeze_code(output,signature,create=False)
-            if (output/'checkpoints/latest.json').is_file():
-                previous=read_checkpoint(output/'checkpoints',signature);validate_state(previous['state'],settings)
+            previous=_existing_checkpoint(output,signature,settings)
+        elif resume:
+            raise ValueError('Resume requires an existing signed training run; no new run was created')
         if previous is not None and previous['state']['epoch']>=settings['epochs']:
             pointer=json.loads((output/'checkpoints/latest.json').read_text(encoding='utf-8'))
             repair_best_pointer(output,previous['state']);write_json(output/'checkpoints/final.json',pointer)

@@ -72,7 +72,7 @@ run/
     dataset_fingerprint.json 拟合train IDs、统计和原生空间信息
     preprocessing_plan.json  预处理计划，未冻结网络/训练patch
     splits.json              train/val/test及独立aux_train角色
-    training_contract.json   本折拟合IDs与下游消费要求；尚未实现训练
+    training_contract.json   本折拟合IDs与下游消费要求；由独立train入口消费
     data/                    .b2nd、_seg.b2nd、.pkl
     completion/              完整产物hash，独立于data扫描目录
     results/                 逐例结果或完整错误

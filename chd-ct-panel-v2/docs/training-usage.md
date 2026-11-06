@@ -18,7 +18,9 @@ Torch约束同时传入依赖安装步骤，避免先安装2.8后被后续解析
 
 作者small_ep4k权重只在显式`--download-weights`时下载，117497661字节、SHA256 `f440f401bf4cac1d1d6f7c4635542ef057193a5f96c0b3c661a6179afeab7be6`；已有错误文件保留并拒绝，不静默随机初始化。可用`--weights`指定已有文件，或保存私有`weights_path`；原始预训练文件在检查点恢复时不再是必需输入。网络代理只作用本次`--proxy`，不改全局设置。
 
-训练读取一份预处理run。默认优先使用私有`training_prepared_root`，其次使用成功prepare保存的`outputs/latest_preprocessing.json`；不会到当前终端目录猜测描述文件。Linux结果根和权重缓存默认沿用既有STU运行根，见`configs/paths.json`。首次没有可用预处理时，先运行prepare，或显式`--prepared`。
+训练读取一份预处理run。默认优先使用私有`training_prepared_root`，其次使用成功prepare保存的`outputs/latest_preprocessing.json`，最后检查平台配置的`completed_preprocessing_default`。当前Linux候选为已完成的`server_run_v2_20261104`，显式`--prepared`始终优先；不会到终端目录猜测描述文件或搜索其他运行。Linux结果根和权重缓存默认沿用既有STU运行根，见`configs/paths.json`。没有可用输入时明确报错。
+
+0.5.1启动时逐病例显示完整SHA、角色/分折合同及前景坐标核验，长阶段每10秒显示病例、阶段和已用时间。它发生在训练输出创建/恢复写入之前，因此保存在终端或外部launcher日志，不能为了记录进度而改写不兼容的旧训练目录。旧预处理的`training_implemented=false`是历史生产阶段说明，不要求把它手改为true。
 
 ## 三个入口
 
@@ -98,6 +100,8 @@ python smoke.py --stage train --train-steps 8 --resume --output outputs/resume-s
 ```
 
 `--stop-after-steps N`指到达**总训练尝试数N**后安全暂停，恢复时去掉该参数。Ctrl+C由主进程请求安全停止，供数worker忽略SIGINT，父进程只终止自己创建的进程。不可捕获强杀仅保留此前已提交检查点。
+
+`--resume`要求已存在的签名运行；空目录或拼错路径明确拒绝，不会开始新训练。若已有检查点文件但`latest.json`指针缺失，也会保留原件并拒绝回到作者权重。首次容量检查前失败、尚无任何检查点文件的已签名运行仍可带原作者权重重试。
 
 `status.json`每秒反馈阶段、epoch/step、尝试/实际更新和内存；`logs/`有完整事件、病例、取框、学习率、loss、AMP跳步、worker PID和耗时。代码固定在`code/`，供数worker从该快照启动，环境版本启动时复核，目录更新不热换运行算法。
 
