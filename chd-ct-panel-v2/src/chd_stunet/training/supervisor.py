@@ -92,6 +92,23 @@ def _remove_control(output,*names):
     for name in names:(output/'control'/name).unlink(missing_ok=True)
 
 
+def _failure_message(output,generation,codes):
+    """Surface committed fatal records for THIS launch, including early init.
+
+    A rank can write its fatal JSON before exiting, so poll() may still be
+    None. Exit codes alone hide that useful error. Old generations remain
+    on disk for diagnosis but must never be attributed to the new group.
+    """
+    details=[]
+    for path in sorted((output/'control').glob(f'fatal-{generation}-*.json')):
+        row=json.loads(path.read_text(encoding='utf-8'))
+        details.append(f"rank {row['rank']} ({row.get('stage','unknown')}, {row.get('device','unknown')}): {row['error']}")
+    checkpoint=('last complete checkpoint retained' if (output/'checkpoints/latest.json').is_file()
+                else 'no complete checkpoint exists; startup failed before the first commit')
+    return ('Training rank group failed (exit codes '+str(codes)+'); '+
+            '; '.join(details+[checkpoint,'inspect control/fatal-*.json and rank console/logs/run.log']))
+
+
 def restore_full_epoch(folder,signature):
     payload=read_checkpoint(folder,signature,pointer_name='epoch.json')
     state=payload['state']
@@ -237,7 +254,7 @@ def launch(prepared,output,*,gpus='auto',elastic=True,wait_seconds=300,workers=N
                         if stopping_at is None:stopping_at=time.monotonic();write_json(output/'control/stop.json',dict(requested=True))
                         if time.monotonic()-stopping_at>300:raise TimeoutError('Safe stop exceeded 300 seconds; retaining last committed checkpoint')
                     if time.monotonic()-last_heartbeat>=10:
-                        log.event('parallel.heartbeat','GPU组运行中；详细步骤见training.log和各rank日志',
+                        log.event('parallel.heartbeat','GPU组运行中；详细步骤见logs/run.log和各rank日志',
                                   members=members,layout=supply['layout'],pids=[p.pid for p in processes],generation=generation)
                         last_heartbeat=time.monotonic()
                     performance=_performance(output/'epoch-performance.jsonl',generation)
@@ -278,7 +295,7 @@ def launch(prepared,output,*,gpus='auto',elastic=True,wait_seconds=300,workers=N
                 result_path=output/'control/result.json'
                 result=json.loads(result_path.read_text(encoding='utf-8')) if result_path.exists() else None
                 if any(code!=0 for code in codes) or not result or result['generation']!=generation:
-                    raise RuntimeError('Training rank group failed (exit codes '+str(codes)+'); last complete checkpoint retained; inspect rank console/training logs')
+                    raise RuntimeError(_failure_message(output,generation,codes))
                 if result['action'] in ('completed','stopped'):
                     return json.loads((output/'summary.json').read_text(encoding='utf-8'))
                 if result['action']=='pressure':

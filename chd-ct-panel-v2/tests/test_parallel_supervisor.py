@@ -21,6 +21,27 @@ class SupervisorTests(unittest.TestCase):
         self.output=self.root/'training'
     def tearDown(self):self.temporary.cleanup()
 
+    def test_failure_message_exposes_current_rank_error_and_checkpoint_state(self):
+        from chd_stunet.training.supervisor import _failure_message
+        control=self.output/'control';control.mkdir(parents=True)
+        (control/'fatal-old-0.json').write_text(json.dumps(dict(rank=0,error='stale failure')))
+        (control/'fatal-current-1.json').write_text(json.dumps(dict(rank=1,stage='process_group',device='cuda:5',
+            error='Expected tensor on cuda:1 but found tensor on cuda:5')))
+        message=_failure_message(self.output,'current',[None,None])
+        self.assertIn('rank 1',message);self.assertIn('cuda:5',message)
+        self.assertIn('Expected tensor on cuda:1',message)
+        self.assertIn('no complete checkpoint exists',message)
+        self.assertNotIn('stale failure',message)
+        checkpoints=self.output/'checkpoints';checkpoints.mkdir()
+        (checkpoints/'latest.json').write_text('{}')
+        self.assertIn('last complete checkpoint retained',_failure_message(self.output,'current',[1,1]))
+
+    def test_failure_message_without_fatal_still_reports_exit_codes(self):
+        from chd_stunet.training.supervisor import _failure_message
+        message=_failure_message(self.output,'current',[0,7])
+        self.assertIn('[0, 7]',message)
+        self.assertIn('no complete checkpoint exists',message)
+
     def test_check_only_does_not_allocate_gpu_or_write_output(self):
         settings=dict(batch_size=4)
         with patch('chd_stunet.training.supervisor.prepare_contract',return_value=(settings,dict(train_ids=['t'],val_ids=['v']),{})), \

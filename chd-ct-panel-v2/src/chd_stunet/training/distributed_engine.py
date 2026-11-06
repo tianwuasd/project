@@ -55,14 +55,29 @@ def run_rank(job_path,rank):
     torch.backends.cudnn.benchmark=False;torch.backends.cudnn.deterministic=True
     torch.backends.cuda.matmul.allow_tf32=False;torch.backends.cudnn.allow_tf32=False
     torch.use_deterministic_algorithms(True)
-    device,admission=admit_device('cuda:'+str(job['ordinals'][rank]))
-    if admission['uuid'].lower()!=members[rank].lower():raise ValueError('Visible ordinal/physical UUID changed before rank admission')
-    dist.init_process_group('nccl' if world>1 else 'gloo',init_method=job['rendezvous'],
-                            rank=rank,world_size=world,timeout=timedelta(seconds=300))
     rankdir=output/'ranks'/f'rank_{rank}';rankdir.mkdir(parents=True,exist_ok=True)
     (rankdir/'logs').mkdir(exist_ok=True)
     log=TrainingLog(output if rank==0 else rankdir);pool=monitor=None
+    device=torch.device('cuda',job['ordinals'][rank])
     try:
+        log.status(stage='gpu_admission',rank=rank,world_size=world,device=str(device))
+        log.event('parallel.admission',f'rank {rank} 开始GPU准入：{device}',rank=rank,device=str(device))
+        device,admission=admit_device(str(device))
+        if admission['uuid'].lower()!=members[rank].lower():raise ValueError('Visible ordinal/physical UUID changed before rank admission')
+        log.status(stage='process_group')
+        log.event('parallel.device',f'rank {rank} 通信组绑定 {device}；等待同组初始化',
+                  rank=rank,device=str(device),uuid=admission['uuid'],world_size=world,
+                  torch_version=str(torch.__version__),cuda_visible_devices=os.environ.get('CUDA_VISIBLE_DEVICES'))
+        # rank is a group position, not a CUDA ordinal: resource selection can
+        # assign rank 1 to visible cuda:5. PyTorch 2.15 NCCL otherwise binds to
+        # LOCAL_RANK/rank and ignores set_device(). Pass the admitted device,
+        # using the SAME visible namespace as model.to() and DDP.device_ids.
+        # One-rank Gloo remains unbound (its collectives use CPU tensors).
+        binding={'device_id':device} if world>1 else {}
+        dist.init_process_group('nccl' if world>1 else 'gloo',init_method=job['rendezvous'],
+                                rank=rank,world_size=world,timeout=timedelta(seconds=300),**binding)
+        log.event('parallel.initialized',f'rank {rank} 通信组初始化完成：{device}',rank=rank,device=str(device))
+        log.status(stage='input_contract')
         settings,dataset,signature=prepare_contract(job['prepared'],job['options'])
         expected=json.loads((output/'signature.json').read_text(encoding='utf-8'))
         if signature!=expected:raise ValueError('Frozen rank data/code/environment contract differs')
@@ -84,6 +99,8 @@ def run_rank(job_path,rank):
         # Last zero-weight deep supervision head has intentionally no gradient.
         # find_unused_parameters retains the author's output/DS structure.
         if world>1:
+            log.status(stage='ddp_initialization')
+            log.event('parallel.ddp',f'rank {rank} 检查DDP模型与通信设备：{device}',rank=rank,device=str(device))
             model=DDP(model,device_ids=[device.index],output_device=device.index,
                       broadcast_buffers=False,find_unused_parameters=True)
         criterion=DeepSupervisionLoss(settings['batch_dice'],settings['dice_smooth'])
@@ -194,7 +211,8 @@ def run_rank(job_path,rank):
             write_json(output/'control/result.json',dict(action=summary['status'],generation=job['generation']))
     except BaseException as error:
         write_json(output/'control'/f'fatal-{job["generation"]}-{rank}.json',
-                   dict(rank=rank,error=str(error),traceback=traceback.format_exc()))
+                   dict(rank=rank,stage=log.context.get('stage'),device=str(device),
+                        error=str(error),traceback=traceback.format_exc()))
         log.event('training.failed',str(error),rank=rank,traceback=traceback.format_exc())
         log.status('failed',stage='error',error=str(error))
         raise

@@ -1,25 +1,36 @@
-# STU-Net-S 多GPU执行（0.5.0开发版）
+# STU-Net-S 多GPU执行（0.5.2）
 
-采用 server-engineering skill V2 0.7.2 的固定工作量、全组资源准入、epoch边界成员调整和恢复原则。默认模型、1000轮、250/50次迭代、全局B4、128³、lr .001均保留。此分支包含训练；预处理main不因此变更。
+采用 server-engineering skill V2 0.7.2 的固定工作量、全组资源准入、epoch边界成员调整和恢复原则。默认模型、1000轮、250/50次迭代、全局B4、128³、lr .001均保留。main与训练分支均包含训练。
+
+## PyTorch 2.15设备绑定修复
+
+2.15默认NCCL实现不再用`torch.cuda.set_device()`推断通信设备；未传`device_id`时按LOCAL_RANK或rank取模选择。资源调度可能给rank1分配可见cuda:5，因此仅设置当前设备和DDP.device_ids不足以保证通信组一致。0.5.2把实际准入的torch.device显式传给NCCL初始化，不把rank当GPU编号，也不改变继承的CUDA_VISIBLE_DEVICES或UUID准入。依据：[PyTorch 2.15官方变更说明](https://github.com/pytorch/pytorch/releases/tag/v2.15.0#distributed-c10d)。
+
+rank启动会记录准入、设备/UUID、通信组初始化与DDP阶段；主launcher直接报告本代rank的fatal原因。尚无检查点时会明确显示，不声称已保留模型。此修复不改预处理、模型、loss或batch；已完成预处理仍按原合同校验复用。代码签名变化后使用新训练输出目录，保留失败任务的冻结代码，不能覆盖其code目录或强行resume。
+
+本地CPU映射回归与单CUDA短测不能替代目标Linux、多GPU/NCCL的现场验收。无需仅因本问题重装环境；先修绑定并运行正式batch/patch短测。
 
 ## 启动
 
 ```bash
+# 复用已通过training检查的现有环境；独立training环境则改为实际路径
+py=.venv_preprocess/bin/python
+
 # 检查全部输入与配方，不初始化CUDA或申请显存
-.venv_training/bin/python run.py train --prepared /预处理run --gpus auto --check-only
+"$py" run.py train --prepared /预处理run --gpus auto --check-only
 
 # 原尺寸缓存取64³patch的短测。默认B1，只能使用1张卡
-.venv_training/bin/python smoke.py --stage train --prepared /预处理run --gpus 1 --output /结果/short
+"$py" smoke.py --stage train --prepared /预处理run --gpus 1 --output /结果/short
 
 # 显式多卡短测：全局B4仍为短测64³，不代表正式128³通过
-.venv_training/bin/python smoke.py --stage train --prepared /预处理run --batch-size 4 --gpus auto --output /结果/multi-short
+"$py" smoke.py --stage train --prepared /预处理run --batch-size 4 --gpus auto --output /结果/multi-short
 
 # 正式配方：仅使用授权可见卡，不自动改大batch
-CUDA_VISIBLE_DEVICES=0,1,2,3 .venv_training/bin/python -u run.py train \
+CUDA_VISIBLE_DEVICES=0,1,2,3 "$py" -u run.py train \
   --prepared /预处理run --fold 0 --gpus auto --output /结果/fold0
 
 # 相同目录继续；恢复时不要再带stop-after-steps
-.venv_training/bin/python -u run.py train --prepared /预处理run --gpus auto --output /结果/fold0 --resume
+"$py" -u run.py train --prepared /预处理run --gpus auto --output /结果/fold0 --resume
 ```
 
 `--gpus N`为最多N张卡，`auto`最多为全局batch；有可靠UUID、空闲PID及显存证据才准入。B4布局为[4]/[2,2]/[2,1,1]/[1,1,1,1]，不会使用第五张非空rank。多卡要求Linux/NCCL；本机Windows单CUDA短测没有多卡DDP包装。`--device`用于CPU或legacy单设备；新多卡路径用CUDA_VISIBLE_DEVICES限定范围，不猜物理编号。
@@ -42,7 +53,7 @@ Ctrl+C/TERM向监督器提出安全暂停；Linux可用nohup/tmux运行，普通
 
 ## 日志与短测
 
-- `status.json`、`logs/training.log`及`logs/events.jsonl`：rank0的全局进度、loss、实际更新/溢出。
+- `status.json`、`logs/run.log`及`logs/events.jsonl`：rank0的全局进度、loss、实际更新/溢出。
 - `ranks/rank_N/logs/`：各rank供数、等待、实际worker PID、主机内存；`capacity_probe.json`：实际local shape与显存峰值。
 - `control/logs/`：监督器等待、requested/applied、布局、UUID、重组原因；`control/job-*.json`和`exit-*.json`保留每次启动资源与退出证据。
 - `epoch-performance.jsonl`：含验证/检查点/同步的完整epoch墙钟。中途恢复的半轮明确标记不可比较。
