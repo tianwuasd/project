@@ -7,6 +7,11 @@ import sys
 PROTOCOL = 1
 
 
+def interpreter_path(path):
+    """Keep the venv invocation path; Linux venv binaries often link to system Python."""
+    return os.path.normcase(os.path.abspath(os.fspath(path)))
+
+
 def resolve_launch_config(home,root,argv):
     import argparse
     from dataset1282_analysis.config import resolve_config
@@ -40,6 +45,10 @@ def select_root(root):
 
 
 def launch(entry):
+    # JSON/log consumers use UTF-8 even when the Windows console code page is GBK.
+    for stream in (sys.stdout,sys.stderr):
+        if hasattr(stream,'reconfigure'):
+            stream.reconfigure(encoding='utf-8',errors='backslashreplace')
     home = Path(__file__).resolve().parent
     try:
         root = select_root(home)
@@ -58,7 +67,11 @@ def launch(entry):
     if entry not in ('environment', 'maintenance'):
         config = resolve_launch_config(home,root,sys.argv[1:])
         python = Path(config['environment']) / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
-        if python.is_file() and Path(sys.executable).resolve() != python.resolve():
+        if python.is_file() and interpreter_path(sys.executable) != interpreter_path(python):
+            if os.environ.get('DATASET1282_REEXEC') == interpreter_path(python):
+                raise RuntimeError('Configured interpreter did not retain its environment identity')
+            os.environ['DATASET1282_REEXEC'] = interpreter_path(python)
+            os.environ['PYTHONUTF8'] = '1'
             os.execv(str(python), [str(python), '-B', str(home / (entry if entry == 'smoke' else 'run')) + '.py', *sys.argv[1:]])
     import importlib
     return importlib.import_module('dataset1282_analysis.' + entry).main()

@@ -2,7 +2,7 @@
 
 可在 Windows 本机或 Linux 服务器调用的 NIfTI + Excel 只读数据审计工程。首版提供独立环境部署、代码更新、数据统计和本地报告；适合先弄清数据来源与质量，再决定后续处理。
 
-输入影像、标签、Excel 和历史记录不会被修改。程序不会自动改头、重采样、移动标签、剔除病例或开始训练。输出文件对数与不同 PatientID 数分别统计；标签用数值编号呈现，不猜测解剖含义。未知空间单位不按毫米解释，未经核实的灰度不标 HU。
+审计入口只读，按文件对数与不同 PatientID 数分别统计。独立 `prepare` 入口按方案 A 建立患者分组，在私有工作区生成 nnU-Net 预处理副本。0.3.0 新增 HU、Excel 共同毫米网格、部分标签边际损失接口、V2 资源调度及可靠短测。[当前工作流](docs/hu-marginal-workflow.md)；[旧版试跑与审核格式](docs/preprocessing.md)。原始影像、标签、Excel 和历史记录保留。
 
 ## 开始使用
 
@@ -33,6 +33,10 @@ python run.py report --run initial-audit
 | `run.py status --run NAME` | 只读取状态，不安装或启动计算 |
 | `run.py resume --run NAME` | 从已完整提交且内容摘要匹配的病例恢复 |
 | `run.py report --run NAME` | 生成 CSV、JSON、PNG 和 HTML/Markdown 报告 |
+| `run.py prepare --run NAME` | 锁定患者候选分组；可选在独立研究环境进行源域预处理 |
+| `run.py prepare --run NAME --excel-pilot --research-python PYTHON` | 用来源训练病例的逐例 Excel 间距试跑三维自动规划，输出标签回写检查 |
+| `run.py prepare --run NAME --workflow POLICY --frozen-cohort COHORT --research-python PYTHON` | 按确认规则执行 HU 与部分标签预处理，支持 `--resume` |
+| `python scripts/short_test.py --work-root WORK --research-python PYTHON` | 预处理、数值一致性、边际损失更新和故障恢复验收 |
 | `smoke.py --profile synthetic / quick / capacity` | 正式链路合成短测、少量真实病例、真实尺寸容量测试 |
 | `update.py --check` | 检查官方仓库固定子目录最新提交 |
 | `update.py` / `update.py --rollback ID` | 下载校验并激活代码 release，或回滚保留版本 |
@@ -54,13 +58,15 @@ src/dataset1282_analysis/
   geometry.py / voxels.py / labels.py          文件头、全体素与标签统计
   resources.py / vendor/                      v2 CPU资源机制适配
   engine/                                    执行、完整病例提交与恢复
+  preprocessing/                             私有策略、隔离任务、CPU/RAM/IO队列
+  training/                                  边际损失及逐病例监督Trainer接口
   observability/                             锁、状态与日志
   reporting.py                               本地报告和数组切面
 tests/                                       仅合成行为测试
 docs/                                        方法、运行、更新与验证说明
 ```
 
-未来处理阶段可复用 `CaseInput`、配置、日志、病例队列和完成合同；新增方法须使用独立协议与输出位置。首版没有训练/GPU模块，不把 CPU 短测视为 GPU 加速验证。
+后续阶段可复用配置、日志、病例队列和完成合同。当前有单设备边际损失训练接口，完整科研训练和部分标签全体积评估仍需后续接入。CPU 短测不代表 GPU、多卡或服务器实测。
 
 更多内容见 [分析方法](docs/analysis-method.md)、[数据合同](docs/data-contract.md)、[环境部署](docs/environment.md)、[CPU与恢复](docs/running.md)、[代码更新](docs/update.md) 和 [验证记录](docs/validation.md)。
 

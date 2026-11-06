@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dataset1282-analysis"
-version = "0.1.0"
-description = "Read-only NIfTI and spreadsheet dataset audit"
+version = "0.3.0"
+description = "NIfTI and spreadsheet dataset audit with isolated nnU-Net preprocessing"
 requires-python = ">=3.11,<3.14"
 dependencies = ["numpy==2.2.6", "nibabel==5.3.2", "scipy==1.15.3", "openpyxl==3.1.5", "matplotlib==3.10.3", "psutil==7.0.0"]
 

@@ -8,6 +8,11 @@ from .vendor.vista_live_resources import snapshot as linux_snapshot
 GIB=1024**3
 
 
+def preprocessing_memory(input_voxels, output_voxels=0):
+    """Sequential nnU-Net working-set reservation, including interpolation buffers."""
+    return 1200 * 2**20 + 40 * max(input_voxels, output_voxels)
+
+
 def snapshot():
     if os.name != 'nt':
         return linux_snapshot(sample_seconds=.1)

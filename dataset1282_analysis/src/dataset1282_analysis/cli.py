@@ -14,6 +14,19 @@ def main(argv=None):
     p.add_argument('--config',help='Task configuration; overrides project.local.json')
     commands=p.add_subparsers(dest='command')
     commands.add_parser('inventory')
+    prep=commands.add_parser('prepare',help='Scheme A cohort and optional nnU-Net v2 preprocessing')
+    prep.add_argument('--run',required=True)
+    mode=prep.add_mutually_exclusive_group()
+    mode.add_argument('--voxel-smoke',action='store_true',help='Source-only technical test in index units')
+    mode.add_argument('--excel-pilot',action='store_true',help='Test Excel-reported sampling on source training cases')
+    mode.add_argument('--review',help='Private, hash-bound physical geometry and eligibility review JSON')
+    mode.add_argument('--workflow',help='Approved private HU/partial-supervision policy JSON')
+    prep.add_argument('--frozen-cohort',help='Existing immutable Scheme A cohort JSON')
+    prep.add_argument('--case',action='append',dest='cases',help='Technical subset; never a full research preprocessing run')
+    prep.add_argument('--resume',action='store_true',help='Verify and reuse committed HU workflow jobs')
+    prep.add_argument('--workers',type=int,help='Maximum process count; live admission may reduce it')
+    prep.add_argument('--staged-extension',choices=['.nii','.nii.gz'],default='.nii')
+    prep.add_argument('--research-python',help='Interpreter with nnunetv2 2.8.1')
     for name in ('analyze','resume','status','report'):
         sub=commands.add_parser(name)
         sub.add_argument('--run',required=name in ('resume','status','report'))
@@ -31,6 +44,15 @@ def main(argv=None):
     if args.command=='inventory':
         from .inputs import load_cases,inventory
         result=inventory(load_cases(config))
+    elif args.command=='prepare':
+        if args.workflow:
+            if not args.frozen_cohort: p.error('--workflow requires --frozen-cohort')
+            from .preprocessing.workflow import prepare_workflow
+            result=prepare_workflow(config,root,home,args)
+        else:
+            if args.resume or args.cases or args.workers: p.error('These options require --workflow')
+            from .preparation import prepare
+            result=prepare(config,root,home,args)
     elif args.command=='status':
         result=read_json(Path(config['work_root'])/'runs'/args.run/'status.json')
     elif args.command=='report':
