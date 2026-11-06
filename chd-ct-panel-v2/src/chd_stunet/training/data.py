@@ -10,6 +10,7 @@ from contextlib import nullcontext
 import json
 from pathlib import Path
 import pickle
+import time
 from types import SimpleNamespace
 import numpy as np
 import torch
@@ -96,14 +97,43 @@ def verify_coordinate_labels(seg,properties):
         if not bool(valid.all()):raise ValueError('Class-location/segmentation mismatch')
 
 
-def load_prepared(run, fold, settings, *, train_cases=(), val_cases=()):
+def load_prepared(run, fold, settings, *, train_cases=(), val_cases=(), group_audit=False):
     """Require role-correct complete caches; subset selection is smoke-only."""
     from ..observability.input_check import InputCheckProgress
-    with InputCheckProgress(f'fold{fold}') as progress:
-        return _load_prepared(run,fold,settings,train_cases=train_cases,val_cases=val_cases,progress=progress)
+    # The launcher first verifies the whole input. Each newly launched group
+    # independently repeats that check, distributing the expensive volume reads.
+    # Membership comes only from the live process group, never from a CLI flag.
+    rank, world = 0, 1
+    if group_audit:
+        import torch.distributed as dist
+        rank, world = dist.get_rank(), dist.get_world_size()
+    label = f'fold{fold}' if world == 1 else f'fold{fold} rank{rank}/{world}'
+    with InputCheckProgress(label) as progress:
+        try:
+            result = _load_prepared(run,fold,settings,train_cases=train_cases,val_cases=val_cases,
+                                    progress=progress,audit_rank=rank,audit_world=world)
+        except Exception as error:
+            if world == 1:
+                raise
+            outcome = (None, f'rank {rank}: {type(error).__name__}: {error}')
+        else:
+            if world == 1:
+                return result
+            outcome = (digest(result['identity']), None)
+        # Report an owner's error to the whole group before any rank uses the
+        # input. Paths are fixed by the launcher and cases by the shared digest.
+        progress.update('全组',1,world,'本路已返回，等待全组核验结果')
+        outcomes = [None] * world
+        dist.all_gather_object(outcomes, outcome)
+        for identity, failure in outcomes:
+            if failure:
+                raise ValueError('Distributed input audit failed: '+failure)
+        if any(identity != outcome[0] for identity, _ in outcomes):
+            raise ValueError('Distributed input audit disagrees on the prepared dataset')
+    return result
 
 
-def _load_prepared(run,fold,settings,*,train_cases,val_cases,progress):
+def _load_prepared(run,fold,settings,*,train_cases,val_cases,progress,audit_rank=0,audit_world=1):
     """The existing full verifier; progress never alters identities or files."""
     import blosc2
     run=Path(run).resolve(strict=True);foldroot=run/f'fold_{fold}'
@@ -164,7 +194,12 @@ def _load_prepared(run,fold,settings,*,train_cases,val_cases,progress):
             raise ValueError('Wrong fold or preprocessing plan cache: '+cid)
         required={cid+'.b2nd',cid+'_seg.b2nd',cid+'.pkl'}
         if set(completion['file_sha256'])!=required:raise ValueError('Unexpected cache files: '+cid)
+        audit_volume = index % audit_world == audit_rank
         for name,sha in completion['file_sha256'].items():
+            # Every reader verifies the properties it will unpickle, including
+            # ranks that delegate the volume checks for this case to a peer.
+            if not audit_volume and name != cid+'.pkl':
+                continue
             progress.update(cid,index,len(selected),'完整文件SHA256 '+name)
             if sha256_file(foldroot/'data'/name)!=sha:raise ValueError('Cache SHA256 differs: '+name)
         with (foldroot/'data'/f'{cid}.pkl').open('rb') as stream:properties=pickle.load(stream)
@@ -188,8 +223,9 @@ def _load_prepared(run,fold,settings,*,train_cases,val_cases,progress):
         if image.shape!=seg.shape or image.shape[0]!=1 or image.dtype!=np.float32 or seg.dtype!=np.int8:
             raise ValueError('Unexpected prepared array format: '+cid)
         properties,adapted=normalize_locations(properties,image.shape,legacy_allowed)
-        progress.update(cid,index,len(selected),'按chunk核验全部前景坐标')
-        verify_coordinate_labels(seg,properties)
+        if audit_volume:
+            progress.update(cid,index,len(selected),'按chunk核验全部前景坐标')
+            verify_coordinate_labels(seg,properties)
         if adapted:adapters.append(dict(case_id=cid,adapter='audited_zyx_to_channel_zyx',producer=legacy_hash))
         rows[cid]=dict(case_id=cid,base=str(foldroot/'data'/cid),shape=list(image.shape),
                        properties=properties,annotation=annotation,cohort_group=group,roles=source['roles'])
@@ -249,10 +285,16 @@ class PatchSampler:
             for slot in self.slots:
                 with deterministic_cpu_rng(sequence_seed(seed,'global-slot',0,slot)):
                     parts.append(self._sample([slot]))
+            if len(parts) == 1:
+                # The sample already includes its batch dimension. With one
+                # slot per GPU, concatenation would copy every patch and target.
+                return parts[0]
             return dict(data=np.concatenate([p['data'] for p in parts]),
                 target=[np.concatenate([p['target'][i] for p in parts]) for i in range(len(parts[0]['target']))],
                 available=np.concatenate([p['available'] for p in parts]),
-                cases=[case for p in parts for case in p['cases']])
+                cases=[case for p in parts for case in p['cases']],
+                supply_stages={name:sum(p['supply_stages'][name] for p in parts)
+                               for name in parts[0]['supply_stages']})
         with deterministic_cpu_rng(seed):return self._sample()
 
     def _sample(self,slots=None):
@@ -262,6 +304,7 @@ class PatchSampler:
         from nnunetv2.training.dataloading.data_loader import nnUNetDataLoader
         if self._transform is None:self._configure()
         batch=[];targets=[];metadata=[];available=[]
+        stages = dict(read_gate=0., read_decode_crop=0., augmentation=0.)
         batch_size=self.settings['batch_size']
         for slot in range(batch_size) if slots is None else slots:
             cid=self.ids[np.random.randint(len(self.ids))];row=self.rows[cid]
@@ -271,13 +314,19 @@ class PatchSampler:
                 has_ignore=True,annotated_classes_key=tuple([-1]+list(range(8))))
             lo,hi=nnUNetDataLoader.get_bbox(bbox_state,row['shape'][1:],force_fg,row['properties']['class_locations'])
             bbox=[[int(lower),int(upper)] for lower,upper in zip(lo,hi)]
+            queued = time.monotonic()
             with read_slot(self.read_gate) if self.read_gate else nullcontext():
+                reading = time.monotonic()
+                stages['read_gate'] += reading - queued
                 image=blosc2.open(row['base']+'.b2nd',mode='r',dparams={'nthreads':1})
                 seg=blosc2.open(row['base']+'_seg.b2nd',mode='r',dparams={'nthreads':1})
                 data=torch.from_numpy(crop_and_pad_nd(image,bbox,0)).float()
                 labels=torch.from_numpy(crop_and_pad_nd(seg,bbox,-1,cast_cropped_to=np.int16)).to(torch.int16)
                 del image,seg
+                stages['read_decode_crop'] += time.monotonic() - reading
+            transforming = time.monotonic()
             transformed=self._transform(image=data,segmentation=labels)
+            stages['augmentation'] += time.monotonic() - transforming
             if not bool(torch.isfinite(transformed['image']).all()):
                 raise ValueError('Non-finite augmented image patch: '+cid)
             batch.append(transformed['image']);targets.append(transformed['segmentation'])
@@ -286,4 +335,4 @@ class PatchSampler:
                                  bbox=[[int(v) for v in lo],[int(v) for v in hi]]))
         return dict(data=torch.stack(batch).numpy(),
             target=[torch.stack([target[level] for target in targets]).numpy() for level in range(len(targets[0]))],
-            available=np.asarray(available,dtype=bool),cases=metadata)
+            available=np.asarray(available,dtype=bool),cases=metadata,supply_stages=stages)

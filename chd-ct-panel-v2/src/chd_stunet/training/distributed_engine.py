@@ -29,19 +29,21 @@ from .checkpoints import read_checkpoint,restore_checkpoint
 from .code_snapshot import freeze_code
 from .feedback import TrainingLog,MemoryMonitor
 from .parallel_policy import slots_for
+from .supply_feedback import RankSupplyWindow, SupplyTrials, agree_on_layout
 from .collectives import any_rank,all_objects
 from .rank_runtime import restore_rank_rng,commit,train_attempt,validate_attempt
 from .relocation import read_handoff
 
 
-def prepare_contract(prepared,options):
+def prepare_contract(prepared,options,*,group_audit=False):
     settings=recipe(options.get('smoke',False),options.get('overrides'))
     settings.update(execution_protocol='global-slot-rng-v2',membership_policy='step-boundary-v1',supported_world_size=settings['batch_size'],
                     effective_precision='fp16' if settings['amp'] else 'fp32')
     train,val=options.get('train_cases',()),options.get('val_cases',())
     if settings['scope']=='smoke' and not train and not val:
         train,val=cached_smoke_ids(prepared,options['fold'],settings['include_auxiliary'])
-    dataset=load_prepared(prepared,options['fold'],settings,train_cases=train,val_cases=val)
+    dataset=load_prepared(prepared,options['fold'],settings,train_cases=train,val_cases=val,
+                          group_audit=group_audit)
     settings['architecture']=topology(dataset['plan']['configurations']['3d_fullres']['spacing'],settings['patch_size'])
     return settings,dataset,make_signature(settings,dataset['identity'],WEIGHT_SHA256)
 
@@ -79,7 +81,7 @@ def run_rank(job_path,rank):
                                 rank=rank,world_size=world,timeout=timedelta(seconds=300),**binding)
         log.event('parallel.initialized',f'rank {rank} 通信组初始化完成：{device}',rank=rank,device=str(device))
         log.status(stage='input_contract')
-        settings,dataset,signature=prepare_contract(job['prepared'],job['options'])
+        settings,dataset,signature=prepare_contract(job['prepared'],job['options'],group_audit=True)
         expected=json.loads((output/'signature.json').read_text(encoding='utf-8'))
         if signature!=expected:raise ValueError('Frozen rank data/code/environment contract differs')
         bootstrap=freeze_code(output,signature,create=False)
@@ -112,6 +114,9 @@ def run_rank(job_path,rank):
         supply=job['supply'];stage=supply['ranks'][rank]
         pool=BatchPool(loaders,local_settings,rankdir,log,supply['workers'][rank],bootstrap,signature['versions'],stage,
                        read_gate=output/'control/training_read_gate.json')
+        active_workers=list(supply['workers'])
+        supply_window=RankSupplyWindow()
+        trials=SupplyTrials()
         monitor=MemoryMonitor(rankdir,log,supply['stage']['reserve_bytes'],device);monitor.start()
         phase=state['phase'];total=settings['train_steps_per_epoch'] if phase=='train' else settings['validation_steps_per_epoch']
         queue=BatchQueue(pool,phase,state['epoch'],total,state['step'])
@@ -140,7 +145,8 @@ def run_rank(job_path,rank):
                 # Do not save the incomplete epoch. Parent closes this group,
                 # shrinks its TOTAL budget and reloads the last full commit.
                 queue=None;pool.close(force=True);dist.barrier()
-                if rank==0:write_json(output/'control/result.json',dict(action='pressure',generation=job['generation']))
+                if rank==0:write_json(output/'control/result.json',dict(action='pressure',generation=job['generation'],
+                                                                        active_worker_count=sum(active_workers)))
                 return
             phase=state['phase'];log.status(stage=phase,rank=rank,world_size=world,
                 epoch=state['epoch'],step=state['step'],attempts=state['attempts'],updates=state['updates'])
@@ -160,10 +166,13 @@ def run_rank(job_path,rank):
                 state['val_loss_sum']+=result['loss'];state['val_batches']+=1
                 for key in ('tp','fp','fn'):state[key]=[a+b for a,b in zip(state[key],result[key])]
             state['step']+=1;queue.commit()
+            body_seconds=time.monotonic()-began
+            if phase=='train':
+                supply_window.observe(wait,body_seconds,batch['supply']['seconds'])
             log.event('training.step',f"rank{rank} epoch{state['epoch']+1}/{settings['epochs']} {phase} {state['step']}/{total} loss {result['loss']:.5f}",
                 rank=rank,epoch=state['epoch'],phase=phase,step=state['step'],attempts=state['attempts'],updates=state['updates'],
                 global_batch=settings['batch_size'],local_batch=len(slots),cases=batch['cases'],supply=batch['supply'],
-                wait_seconds=wait,compute_seconds=time.monotonic()-began,learning_rate=optimizer.param_groups[0]['lr'],**result)
+                wait_seconds=wait,compute_seconds=body_seconds,learning_rate=optimizer.param_groups[0]['lr'],**result)
             del batch
             if state['step']!=total:continue
             if phase=='train':
@@ -200,8 +209,29 @@ def run_rank(job_path,rank):
             if change and change['generation']==job['generation'] and state['epoch']<settings['epochs']:
                 if rank==0:write_json(output/'control/result.json',dict(change,action='reconfigure'))
                 return
-            epoch_began=time.monotonic();full_epoch=True;total=settings['train_steps_per_epoch']
-            if state['epoch']<settings['epochs']:queue=BatchQueue(pool,'train',state['epoch'],total)
+            # Charge pool turnover to the upcoming epoch. Every validation
+            # Future has been consumed, so the chosen sampler/seed sequence
+            # survives resizing without replay, duplicate work or a DDP restart.
+            epoch_began=time.monotonic()
+            total=settings['train_steps_per_epoch']
+            if state['epoch']<settings['epochs']:
+                if full_epoch and total>=40 and job.get('worker_limit')!=0:
+                    decision=agree_on_layout(rank,supply_window,pool.private_credit(),trials,
+                        active_workers,supply,job.get('worker_limit'),total,seconds)
+                    if rank==0:
+                        if decision['workers']!=active_workers:
+                            write_json(output/'control/training_read_gate.json',
+                                       dict(slots=max(1,min(2,sum(decision['workers']) or world))))
+                        log.event('supply.feedback',
+                            f"第{state['epoch']}轮供数反馈 {active_workers} → {decision['workers']}，{decision['reason']}",
+                            epoch=state['epoch'],epoch_seconds=seconds,**decision)
+                    if decision['workers']!=active_workers:
+                        active_workers=decision['workers']
+                        queue.resize_after_drain(active_workers[rank])
+                        dist.barrier()
+                queue=BatchQueue(pool,'train',state['epoch'],total)
+            full_epoch=True
+            supply_window=RankSupplyWindow()
         pointer=commit(output/'checkpoints',model,optimizer,scaler,state,signature,device,members)
         rank_peaks=all_objects(monitor.peak_group_rss)
         if rank==0:

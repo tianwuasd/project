@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import random
 import signal
 import sys
@@ -40,6 +41,9 @@ class SupplyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=root) as temporary:
             settings=recipe(True,dict(patch_size=[16]*3))
             pools=[]
+            ledger=Path(temporary)/'owners';ledger.mkdir()
+            env=patch.dict(os.environ,{'CHD_TRAIN_OWNER_DIR':str(ledger),'CHD_TRAIN_NONCE':'test-supply'})
+            env.start();self.addCleanup(env.stop)
             try:
                 for count in (0,2):
                     output=Path(temporary)/str(count);output.mkdir()
@@ -53,6 +57,22 @@ class SupplyTests(unittest.TestCase):
                     self.assertEqual(queues[0].cursor,step)
                     np.testing.assert_array_equal(queues[0].peek()['values'],serial['values'])
                     for q in queues:q.commit()
+                # A live change after a drained epoch reopens only its pool.
+                # Peek/commit after that must still follow the resumed cursor.
+                receipts=list(ledger.glob('worker-*.json'))
+                self.assertGreater(len(receipts),0)
+                self.assertGreater(pools[1].private_credit(),0)
+                unrelated=ledger/'worker-foreign.json';unrelated.write_text('{}')
+                queues[1].resize_after_drain(1)
+                self.assertTrue(unrelated.exists())
+                self.assertTrue(all(not path.exists() for path in receipts))
+                resized=BatchQueue(pools[1],'train',7,4,start=2)
+                with self.assertRaisesRegex(RuntimeError,'drained'):
+                    resized.resize_after_drain(2)
+                expected=BatchQueue(pools[0],'train',7,4,start=2)
+                while resized.cursor<4:
+                    np.testing.assert_array_equal(resized.peek()['values'],expected.peek()['values'])
+                    resized.commit();expected.commit()
                 torch.testing.assert_close(before,torch.get_rng_state(),atol=0,rtol=0)
                 replay=BatchQueue(pools[0],'train',0,4,start=1)
                 expected=NumberLoader()( __import__('chd_stunet.acceleration.training_cpu',fromlist=['sequence_seed']).sequence_seed(settings['seed'],'train',0,1))

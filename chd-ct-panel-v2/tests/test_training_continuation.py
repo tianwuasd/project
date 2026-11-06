@@ -106,6 +106,69 @@ class ContinuationTests(unittest.TestCase):
             with self.assertRaises(OSError):install_continuation(output,bundle,self.signature)
         with self.assertRaisesRegex(ValueError,'Incomplete checkpoint import'):_existing_checkpoint(output,self.signature,self.settings)
 
+    def test_053_retains_exact_recipe_and_requires_known_producer(self):
+        from chd_stunet.training.continuation import _check_contract
+        from chd_stunet.training.contracts import digest
+        old = copy.deepcopy(self.signature)
+        old['producer_ast_sha256'] = {'synthetic.py': 'old'}
+        old['identity'] = digest({k:v for k,v in old.items() if k != 'identity'})
+        with self.assertRaisesRegex(ValueError, 'Unknown continuation producer'):
+            _check_contract(old, self.signature)
+        with patch('chd_stunet.training.continuation.LEGACY_053_SOURCES', {digest(old['producer_ast_sha256'])}):
+            _check_contract(old, self.signature)
+            old['recipe']['batch_size'] = 8
+            old['identity'] = digest({k:v for k,v in old.items() if k != 'identity'})
+            with self.assertRaisesRegex(ValueError, 'recipe differs'):
+                _check_contract(old, self.signature)
+
+    def test_legacy_user_limit_survives_even_after_pressure(self):
+        from chd_stunet.training.continuation import read_continuation
+        control = self.source / 'control'
+        control.mkdir()
+        (control/'controller.json').write_text(json.dumps({'pressure_recoveries': 2, 'worker_cap': 1}))
+        for value in (None, 0, 7):
+            with self.subTest(value=value):
+                (self.source/'effective_config.json').write_text(json.dumps({'requested_workers': value}))
+                controller = read_continuation(self.source, self.signature, self.settings)['controller']
+                self.assertEqual(controller['worker_limit'], 1 if value is None else value)
+                self.assertEqual(controller['worker_cap'], 1)
+
+    def test_legacy_resume_without_flag_recovers_provable_operator_limit(self):
+        from chd_stunet.training.continuation import read_continuation
+        control = self.source / 'control'
+        control.mkdir()
+        (self.source/'effective_config.json').write_text(json.dumps({'requested_workers': None}))
+        for recoveries, expected in ((0, 2), (1, 2)):
+            with self.subTest(recoveries=recoveries):
+                (control/'controller.json').write_text(json.dumps({'pressure_recoveries': recoveries, 'worker_cap': 2}))
+                result = read_continuation(self.source, self.signature, self.settings)
+                self.assertEqual(result['controller']['worker_limit'], expected)
+
+    def test_supervisor_history_separates_automatic_pressure_cuts_from_operator_caps(self):
+        from chd_stunet.training.continuation import _legacy_worker_limit
+        folder = self.source / 'control/logs'
+        folder.mkdir(parents=True)
+
+        def launch(seq, requested, applied):
+            return dict(seq=seq, event='parallel.launch',
+                        supply=dict(requested_total_workers=requested, applied_total_workers=applied))
+
+        def pressure(seq, count, cap):
+            return dict(seq=seq, event='parallel.pressure',
+                        controller=dict(pressure_recoveries=count, worker_cap=cap))
+
+        for first in (None, 32):
+            events = [launch(1, first, 28), pressure(2, 1, 14), launch(3, 14, 14),
+                      pressure(4, 2, 7), launch(5, 7, 6), launch(1, 7, 7)]
+            for extra, cap, limit, source in [
+                    ([], 7, first, 'supervisor_history'),
+                    ([launch(1, 5, 5)], 5, 5, 'supervisor_history'),
+                    ([launch(13, 5, 5)], 5, 5, 'incomplete_history_kept_cap')]:
+                with self.subTest(first=first, extra=extra):
+                    (folder/'events.jsonl').write_text(''.join(json.dumps(e)+'\n' for e in events+extra))
+                    self.assertEqual(_legacy_worker_limit(self.source, dict(pressure_recoveries=2, worker_cap=cap)),
+                                     (limit, source))
+
     def test_raw_snapshot_tamper_is_rejected_even_when_ast_is_unchanged(self):
         from chd_stunet.training.continuation import read_continuation
         path=self.source/'code/run.py';path.write_bytes(path.read_bytes()+b'\n# changed frozen bytes\n')

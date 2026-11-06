@@ -74,7 +74,8 @@ def _initialize(loaders,read_gate,versions=None):
 def _produce(phase,seed):
     began=time.monotonic()
     result=_LOADERS[phase](seed)
-    result['supply']=dict(pid=os.getpid(),seconds=time.monotonic()-began,seed=seed,source_file=__file__)
+    result['supply']=dict(pid=os.getpid(),seconds=time.monotonic()-began,seed=seed,source_file=__file__,
+                          stages_seconds=result.pop('supply_stages',{}))
     return result
 
 
@@ -130,7 +131,8 @@ class BatchPool:
 
     def produce_serial(self,phase,seed):
         began=time.monotonic();result=self.loaders[phase](seed)
-        result['supply']=dict(pid=os.getpid(),seconds=time.monotonic()-began,seed=seed)
+        result['supply']=dict(pid=os.getpid(),seconds=time.monotonic()-began,seed=seed,
+                              stages_seconds=result.pop('supply_stages',{}))
         return result
 
     def submit(self,phase,seed):
@@ -172,6 +174,73 @@ class BatchPool:
             raise MemoryError('Serial recovery has no CPU/RAM working-set headroom')
         self._open()
 
+    def resize(self, workers):
+        """Called collectively at a drained epoch boundary after group admission."""
+        if workers == self.workers:
+            return
+        receipts = [(path, record) for path, record, _, _ in self._live_worker_receipts()]
+        self.close()
+        # close() synchronously joined every child in this executor. Group
+        # handoff keeps creation of replacements behind the post-resize barrier.
+        # Only retire records that still identify these exact former workers.
+        import json
+        for path, record in receipts:
+            for attempt in range(3):
+                try:
+                    if json.loads(path.read_text(encoding='utf-8')) == record:
+                        path.unlink()
+                    break
+                except FileNotFoundError:
+                    break
+                except PermissionError:
+                    # An ownership scan can briefly hold a Windows read handle.
+                    # Retaining an old receipt is safe: birth is checked on scan.
+                    if attempt < 2:
+                        time.sleep(.02)
+                    else:
+                        self.log.event('supply.receipt_retained','已退出的供数进程登记文件仍有读者',
+                                       pid=record['pid'])
+        self.workers = workers
+        self.stage = dict(self.stage, workers=workers, cpu_budget=workers + 1,
+                          memory_budget_bytes=2*GIB + self.serial_estimate + workers*self.estimate,
+                          requested_workers=workers, source='live group supply feedback')
+        self._open()
+
+    def _live_worker_receipts(self):
+        """Match the executor's child handles to generation-scoped receipts."""
+        import json
+        from pathlib import Path
+        import psutil
+        ledger = os.environ.get('CHD_TRAIN_OWNER_DIR')
+        if not ledger or self.executor is None:
+            return
+        for child in (getattr(self.executor, '_processes', None) or {}).values():
+            try:
+                pid = child.pid
+                path = Path(ledger) / f'worker-{pid}.json'
+                record = json.loads(path.read_text(encoding='utf-8'))
+                process = psutil.Process(pid)
+                if (record['nonce'] != os.environ.get('CHD_TRAIN_NONCE') or record['pid'] != pid
+                        or process.ppid() != os.getpid() or record['parent_pid'] != os.getpid()
+                        or record['born'] != process.create_time() or not child.is_alive()):
+                    continue
+                yield path, record, process, child
+            except (OSError, psutil.Error, ValueError, AttributeError, KeyError):
+                continue
+
+    def private_credit(self):
+        """USS from owned live direct children, capped per worker reservation."""
+        import psutil
+        total = 0
+        for _, _, process, child in self._live_worker_receipts():
+            try:
+                uss = process.memory_full_info().uss
+                if process.is_running() and child.is_alive():
+                    total += min(self.estimate, max(0, uss))
+            except (OSError, psutil.Error, AttributeError):
+                continue
+        return total
+
 
 class BatchQueue:
     """Peek is not consumption; commit only after a completed train/val attempt."""
@@ -210,3 +279,8 @@ class BatchQueue:
     def commit(self):
         if self.cursor not in self.pending:raise RuntimeError('Cannot consume a batch that was not requested')
         del self.pending[self.cursor];self.cursor+=1;self._fill()
+
+    def resize_after_drain(self, workers):
+        if self.cursor != self.total or self.pending:
+            raise RuntimeError('CPU supply resize requires a drained epoch queue')
+        self.pool.resize(workers)

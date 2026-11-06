@@ -39,7 +39,9 @@ def supply_plan(facts,settings,loaders,world,maximum=None,reserve_at_entry=None)
     spare_ram=stage['memory_budget_bytes']-sum(resident)-GIB
     if spare_cpu<0 or spare_ram<0:
         raise MemoryError('Whole-group rank/serial input admission exceeds V2 CPU/RAM budget')
-    cap=spare_cpu if maximum is None else min(maximum,spare_cpu)
+    # Start enough persistent workers to overlap supply with GPU work. Trial
+    # more only after observing queue wait instead of filling spare RAM at boot.
+    cap=min(2*world, spare_cpu if maximum is None else min(maximum,spare_cpu))
     workers=[0]*world
     # Fair rounds give every resident worker a dispatch slot; no pool is
     # created merely to leave its workers permanently waiting behind a queue.

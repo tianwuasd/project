@@ -22,6 +22,7 @@ from chd_stunet.training.parallel_policy import slots_for,layout
 from chd_stunet.training.collectives import synchronize_overflow
 from chd_stunet.training.rank_runtime import commit,restore_rank_rng
 from chd_stunet.training.checkpoints import read_checkpoint,restore_checkpoint,rng_state
+from chd_stunet.training.supply_feedback import RankSupplyWindow, SupplyTrials, agree_on_layout
 
 
 class TinyDS(nn.Module):
@@ -64,6 +65,20 @@ def worker(rank,world,folder):
                             timeout=timedelta(seconds=90))
     rows=[]
     try:
+        # All ranks must enact the same feedback decision even when only the
+        # final rank has a slow supplier. Inject host limits, not DDP messages.
+        from unittest.mock import patch
+        from chd_stunet.acceleration.preprocess_cpu import GIB
+        window=RankSupplyWindow()
+        for _ in range(40):
+            window.observe(.4 if rank==world-1 else .01,.2,.5)
+        current=[2]*(world-1)+[1]
+        host=dict(cpu_permitted=64,cpu_budget=30,available_memory_bytes=60*GIB,memory_budget_bytes=48*GIB)
+        with patch('chd_stunet.training.supply_feedback.snapshot',return_value=host):
+            decision=agree_on_layout(rank,window,0,SupplyTrials(),current,
+                dict(stage={'reserve_bytes':4*GIB},worker_estimate_bytes=[GIB]*world),
+                None,250,169)
+        assert decision['workers']==[2]*world and len(decision['windows'])==world
         for mode in ('complete','mixed','partial','ignore'):
             for batch_dice in (True,False):
                 expected=torch.load(folder/f'ref-{mode}-{batch_dice}.pt',weights_only=True)
@@ -127,7 +142,8 @@ def worker(rank,world,folder):
         assert scaler.state_dict()==expected_scaler
         for value,wanted in zip(optimizer.state.values(),expected_momentum):assert torch.equal(value['momentum_buffer'],wanted)
         (folder/f'rank-{rank}.json').write_text(json.dumps(dict(rank=rank,layout=layout(4,world),
-            numerical=rows,overflow_consensus=True,per_rank_rng_exact=True,resume_update_exact=True,
+            numerical=rows,overflow_consensus=True,supply_layout_agreed=decision['workers'],
+            per_rank_rng_exact=True,resume_update_exact=True,
             partial_membership_refused=True)),encoding='utf-8')
     finally:dist.destroy_process_group()
 

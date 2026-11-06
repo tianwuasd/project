@@ -3,12 +3,28 @@ import copy
 from types import SimpleNamespace
 import sys
 import unittest
+from unittest.mock import patch
 import numpy as np
 import torch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 
 
 class TrainingDataTests(unittest.TestCase):
+    def test_rank_refuses_input_when_peer_reads_corrupt_or_different_dataset(self):
+        from chd_stunet.training import data
+        def audit_with_peer(peer):
+            def gather(outcomes, local):
+                outcomes[:] = [local, peer]
+            with patch.object(data, '_load_prepared', return_value={'identity': {'fold': 0}}), \
+                 patch.object(torch.distributed, 'get_rank', return_value=0), \
+                 patch.object(torch.distributed, 'get_world_size', return_value=2), \
+                 patch.object(torch.distributed, 'all_gather_object', side_effect=gather):
+                data.load_prepared('.', 0, {}, group_audit=True)
+        with self.assertRaisesRegex(ValueError, 'SHA256 differs'):
+            audit_with_peer((None, 'rank 1: Cache SHA256 differs'))
+        with self.assertRaisesRegex(ValueError, 'disagrees'):
+            audit_with_peer(('different-ordered-case-list', None))
+
     def test_coordinate_validation_decodes_each_chunk_only_once(self):
         from chd_stunet.training.data import verify_coordinate_labels
         class Array:

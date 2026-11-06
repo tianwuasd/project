@@ -70,7 +70,11 @@ def close_owned(processes,owned):
 def learn_workers(directory,nonce,parents,owned):
     """Late initializer handshakes are scoped to this launch and parent ranks."""
     for path in directory.glob('worker-*.json'):
-        row=json.loads(path.read_text(encoding='utf-8'))
+        try:
+            row=json.loads(path.read_text(encoding='utf-8'))
+        except FileNotFoundError:
+            # A drained rank may have joined this worker and retired its receipt.
+            continue
         if row.get('nonce')!=nonce or row.get('parent_pid') not in parents:continue
         try:
             process=psutil.Process(row['pid'])
@@ -227,11 +231,20 @@ def launch(prepared,output,*,gpus='auto',elastic=True,wait_seconds=300,workers=N
         controller_path=output/'control/controller.json'
         controller=json.loads(controller_path.read_text(encoding='utf-8')) if controller_path.exists() else dict(
             pressure_recoveries=0,worker_cap=workers,deferred=[],baseline=None)
-        # A reduced supply cap survives restarts and process-group membership.
-        if workers is not None:controller['worker_cap']=min(workers,controller['worker_cap']) if controller['worker_cap'] is not None else workers
+        # Separate the operator's limit from the restart allowance halved by
+        # memory protection. Only the latter may recover after measured trials.
+        if 'worker_limit' not in controller:
+            previous_config=output/'effective_config.json'
+            controller['worker_limit']=(json.loads(previous_config.read_text(encoding='utf-8')).get('requested_workers')
+                                        if previous_config.exists() else None)
+        if workers is not None:
+            controller['worker_limit']=workers
+        limit=controller['worker_limit']
+        if limit is not None:
+            controller['worker_cap']=min(limit,controller['worker_cap']) if controller['worker_cap'] is not None else limit
         for sig in (signal.SIGINT,signal.SIGTERM):handlers[sig]=signal.getsignal(sig);signal.signal(sig,request_stop)
         write_json(output/'effective_config.json',dict(recipe=settings,prepared=str(prepared),options=options,
-            requested_gpus=gpus,elastic=elastic,requested_workers=workers,wait_seconds=wait_seconds))
+            requested_gpus=gpus,elastic=elastic,requested_workers=limit,wait_seconds=wait_seconds))
         write_json(output/'input_adapters.json',dataset['identity']['adapters'])
         members=None;deadline=time.monotonic()+wait_seconds;last_scan=0;candidate_seen={};blocked={};placement_ceiling=maximum
         try:
@@ -264,7 +277,7 @@ def launch(prepared,output,*,gpus='auto',elastic=True,wait_seconds=300,workers=N
                 write_json(controller_path,controller)
                 job=dict(output=str(output),prepared=str(prepared),options=options,members=members,
                     ordinals=[by_uuid[m]['ordinal'] for m in members],supply=supply,generation=generation,
-                    pressure_recoveries=controller['pressure_recoveries'],
+                    pressure_recoveries=controller['pressure_recoveries'],worker_limit=limit,
                     rendezvous=(output/'control'/('rendezvous-'+generation)).as_uri())
                 # file:// rendezvous belongs exclusively to this launch.
                 jobfile=output/'control'/('job-'+generation+'.json');write_json(jobfile,job)
@@ -369,7 +382,7 @@ def launch(prepared,output,*,gpus='auto',elastic=True,wait_seconds=300,workers=N
                 elif result['action']=='pressure':
                     if controller['pressure_recoveries']>=3:raise MemoryError('Three V2 group memory recoveries exhausted')
                     controller['pressure_recoveries']+=1
-                    controller['worker_cap']=supply['applied_total_workers']//2
+                    controller['worker_cap']=result.get('active_worker_count',supply['applied_total_workers'])//2
                     restored=restore_full_epoch(output/'checkpoints',signature)
                     log.event('parallel.pressure','主机压力：全组退出、缩减供数、重放未完成轮次',controller=controller,
                               restored_epoch=restored['epoch'],restored_attempts=restored['attempts'])
