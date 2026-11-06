@@ -2,6 +2,7 @@ import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
@@ -141,3 +142,72 @@ class FusionTests(unittest.TestCase):
             atomic_json(p / "complete.json", marker)
             with self.assertRaisesRegex(ValueError, "prediction set"):
                 _completed(p, job, ("toy",), False)
+
+
+class SharedPredictionTests(unittest.TestCase):
+    def setUp(self):
+        from dataset1282_analysis.contracts import atomic_json, sha256_file
+        self.scratch = tempfile.TemporaryDirectory()
+        self.addCleanup(self.scratch.cleanup)
+        self.root = Path(self.scratch.name)
+        self.shared = self.root/'shared'
+        self.identity = dict(branch='crop64', checkpoint='weights', cases=['toy'])
+        self.calls = 0
+
+        def produce(path):
+            self.calls += 1
+            path.mkdir()
+            np.save(path/'toy.npy', np.arange(8, dtype='uint8').reshape(2,2,2))
+            files = {'toy': sha256_file(path/'toy.npy')}
+            atomic_json(path/'complete.json', dict(checkpoint=self.identity['checkpoint'], files=files))
+            return files
+        self.produce = produce
+
+    def run_branch(self, destination, producer=None):
+        from dataset1282_analysis.xu_fusion import _shared_branch
+        return _shared_branch(self.shared, self.identity, self.root/destination, ['toy'],
+                              producer or self.produce)
+
+    def test_identical_inputs_reuse_labels_and_changed_inputs_predict_again(self):
+        from dataset1282_analysis.contracts import sha256_file
+        first, miss = self.run_branch('first')
+        with patch('dataset1282_analysis.xu_fusion.os.link', side_effect=OSError('different disk')):
+            second, hit = self.run_branch('second')
+        self.assertEqual((miss['outcome'], hit['outcome'], self.calls), ('miss','hit',1))
+        self.assertEqual((first, miss['key']), (second, hit['key']))
+        self.assertEqual(first['toy'], sha256_file(self.root/'second/toy.npy'))
+        self.identity['geometry'] = 'another-grid'
+        _, distinct = self.run_branch('third')
+        self.assertNotEqual(distinct['key'], hit['key'])
+        self.assertEqual((distinct['outcome'], self.calls), ('miss',2))
+
+    def test_active_writer_and_interrupted_publish_are_safe(self):
+        from dataset1282_analysis.contracts import digest
+        from dataset1282_analysis.observability.status import operation_lock
+        key = digest(self.identity)
+        with operation_lock(self.shared/'locks'/key, 'owner'):
+            with self.assertRaisesRegex(RuntimeError, 'lock|active'):
+                self.run_branch('overlap')
+        def interrupted(path):
+            self.produce(path)
+            raise RuntimeError('injected failure')
+        with self.assertRaisesRegex(RuntimeError, 'injected failure'):
+            self.run_branch('first', interrupted)
+        self.assertFalse((self.shared/'entries'/key).exists())
+        self.assertFalse((self.root/'first/complete.json').exists())
+        self.assertEqual(self.run_branch('second')[1]['outcome'], 'miss')
+
+    def test_changed_shared_bytes_and_manifest_are_rejected(self):
+        from dataset1282_analysis.contracts import atomic_json, read_json
+        _, info = self.run_branch('first')
+        entry = self.shared/'entries'/info['key']
+        marker = entry/'manifest.json'
+        original = read_json(marker)
+        atomic_json(marker, dict(original, digest='changed'))
+        with self.assertRaisesRegex(ValueError, 'manifest'):
+            self.run_branch('second')
+        atomic_json(marker, original)
+        (entry/'toy.npy').write_bytes(b'corrupted')
+        with self.assertRaisesRegex(ValueError, 'Changed shared'):
+            self.run_branch('second')
+        self.assertEqual(self.calls, 1)

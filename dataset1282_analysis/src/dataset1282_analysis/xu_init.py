@@ -11,7 +11,8 @@ from torch.nn import functional as F
 from .contracts import atomic_json, digest, sha256_file
 from .xu_models import Xu3DSegmenter, branch_spec, _conv
 from .xu_targets import TargetStore
-from .xu_training import _augment, _image, _recover_best, _save, _write_best, learning_rate
+from .xu_supply import BatchSupply, check_gradients
+from .xu_training import _augment, _compatible_contract, _image, _recover_best, _save, _write_best, learning_rate
 
 PROTOCOL = 'xu-reviewed-proximal-v1'
 
@@ -42,13 +43,12 @@ def _loss(scores, target):
     return F.cross_entropy(scores.float(),target,ignore_index=-1) + 1 - (torch.stack(dice)*weights).sum()/weights.sum()
 
 
-def _epoch(model, names, cache, targets, book, device, rng=None, optimizer=None):
+def _epoch(model, names, cache, targets, book, device, rng=None, optimizer=None, stats=None):
     training = optimizer is not None
     model.train(training)
     spec = model.spec
     loss_sum = 0.
-    for start in range(0,len(names),spec.batch):
-        batch = names[start:start+spec.batch]
+    def prepare(batch):
         images, labels = [], []
         for name in batch:
             box = book['boxes'][name]
@@ -59,23 +59,30 @@ def _epoch(model, names, cache, targets, book, device, rng=None, optimizer=None)
                 raise ValueError('Invalid auxiliary labels or proximal supervision lost in predicted ROI')
             images.append(_image(array,spec.side))
             labels.append(torch.from_numpy(y.astype('int64')))
-        x = torch.stack(images)[:,None].to(device)
-        y = torch.stack(labels).to(device)
-        if training:
-            x,y = _augment(x,y,rng)
-            optimizer.zero_grad(set_to_none=True)
-        with torch.set_grad_enabled(training):
-            loss = _loss(model(x),y)
-        if not torch.isfinite(loss):
-            raise FloatingPointError('Nonfinite proximal loss')
-        if training:
-            loss.backward()
-            if any(not torch.isfinite(p.grad).all() for p in model.parameters() if p.grad is not None):
-                raise FloatingPointError('Nonfinite proximal gradient')
-            optimizer.step()
-        loss_sum += float(loss.detach())*len(batch)
-        if (start//spec.batch+1)%10==0:
-            print(f'Init {"training" if training else "validation"} {start+len(batch)}/{len(names)}',flush=True)
+        return torch.stack(images)[:,None], torch.stack(labels)
+
+    supply = BatchSupply(names, spec.batch, spec.side, prepare,
+                         lambda name: math.prod(cache.geometry(name).cache_shape))
+    with supply.batches() as batches:
+        for step, (batch, pair) in enumerate(batches, 1):
+            x,y = supply.transfer(pair, device)
+            if training:
+                x,y = _augment(x,y,rng)
+                optimizer.zero_grad(set_to_none=True)
+            with torch.set_grad_enabled(training):
+                loss = _loss(model(x),y)
+            if not torch.isfinite(loss):
+                raise FloatingPointError('Nonfinite proximal loss')
+            if training:
+                loss.backward()
+                check_gradients(model)
+                optimizer.step()
+            loss_sum += float(loss.detach())*len(batch)
+            if step%10==0:
+                print(f'Init {"training" if training else "validation"} {min(step*spec.batch,len(names))}/{len(names)}',flush=True)
+            del pair
+    if stats is not None:
+        stats.update(supply.stats)
     return loss_sum/len(names)
 
 
@@ -84,7 +91,7 @@ def _inference_contract(cache, branch, profile, supervision, book):
     source = Path(__file__).parent
     return dict(protocol=PROTOCOL,branch=branch,profile=profile,supervision=supervision,
                 identity=input_id(cache,supervision,book),classes=['BG','LV','RV','LA','RA','MYO','proximal_AO_PA'],
-                source={s:sha256_file(source/s) for s in ('xu_init.py','xu_models.py','xu_targets.py','xu_training.py')})
+                source={s:sha256_file(source/s) for s in ('xu_init.py','xu_models.py','xu_targets.py','xu_training.py','xu_supply.py')})
 
 
 def train_init(cache,args,out):
@@ -117,7 +124,7 @@ def train_init(cache,args,out):
     history,best_epoch,best_loss=[], -1, math.inf
     if args.resume:
         state=torch.load(last,map_location='cpu',weights_only=True)
-        if contract!=state['contract']:
+        if not _compatible_contract(state['contract'],contract):
             raise ValueError('Proximal training contract changed')
         _recover_best(best,state)
         model.load_state_dict(state['model'])
@@ -131,11 +138,13 @@ def train_init(cache,args,out):
         lr=learning_rate(epoch,spec.epochs)
         for g in optimizer.param_groups:
             g['lr']=lr
-        tr=_epoch(model,names,cache,targets,book,device,rng,optimizer)
-        va=_epoch(model,val,cache,targets,book,device)
+        train_supply, validation_supply = {}, {}
+        tr=_epoch(model,names,cache,targets,book,device,rng,optimizer,train_supply)
+        va=_epoch(model,val,cache,targets,book,device,stats=validation_supply)
         if va<best_loss:
             best_epoch,best_loss=epoch,va
-        row=dict(epoch=epoch+1,train_loss=tr,validation_loss=va,learning_rate=lr)
+        row=dict(epoch=epoch+1,train_loss=tr,validation_loss=va,learning_rate=lr,
+                 train_supply=train_supply, validation_supply=validation_supply)
         print(json.dumps(row),flush=True)
         history.append(row)
         state=dict(contract=contract,epoch=epoch,history=history,best_epoch=best_epoch,best_loss=best_loss,
@@ -156,7 +165,7 @@ def load_init_predictor(checkpoint, *, cache, branch, profile, supervision, book
     if sha256_file(checkpoint)!=fingerprint:
         raise ValueError('Proximal checkpoint changed while loading')
     expected=_inference_contract(cache,branch,profile,supervision,book)
-    if any(state['contract'].get(k)!=v for k,v in expected.items()):
+    if not _compatible_contract({k:state['contract'].get(k) for k in expected},expected):
         raise ValueError('Incompatible proximal checkpoint')
     if 'optimizer' in state and state['best_epoch']!=state['epoch']:
         raise ValueError('Inference requires a validation-selected checkpoint')

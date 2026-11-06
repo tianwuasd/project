@@ -12,6 +12,7 @@ from torch.nn import functional as F
 from .contracts import atomic_json, digest, sha256_file
 from .training.marginal import marginal_loss
 from .xu_models import BranchSpec, Xu3DSegmenter, branch_spec, build_model
+from .xu_supply import BatchSupply, check_gradients
 
 
 def _paper_loss(scores, target):
@@ -99,38 +100,41 @@ def _label(array, side, missing):
     return label
 
 
-def _epoch(model, ids, groups, load, branch, device, rng, optimizer=None):
+def _epoch(model, ids, groups, load, branch, device, rng, optimizer=None, stats=None):
     training = optimizer is not None
     model.train(training)
     batch_size = model.spec.batch
     loss_sum = 0.
-    for start in range(0, len(ids), batch_size):
-        batch = ids[start:start+batch_size]
+    def prepare(batch):
         xs, ys = [], []
-        unknown = [groups[name] for name in batch]
-        for name, missing in zip(batch, unknown):
+        for name in batch:
             x, y = load(name, branch)
             xs.append(_image(x, model.spec.side))
-            ys.append(_label(y, model.spec.side, missing))
-        images = torch.stack(xs)[:,None].to(device)
-        target = torch.stack(ys).to(device)
-        if training:
-            images, target = _augment(images, target, rng)
-            optimizer.zero_grad(set_to_none=True)
-        with torch.set_grad_enabled(training):
-            loss = branch_loss(model(images), target, unknown)
-        if not torch.isfinite(loss):
-            raise FloatingPointError('Non-finite branch loss')
-        if training:
-            loss.backward()
-            # Check before Adam mutates its state. No clipping or learning-rate change.
-            if not all(torch.isfinite(p.grad).all() for p in model.parameters() if p.grad is not None):
-                raise FloatingPointError('Non-finite branch gradient')
-            optimizer.step()
-        loss_sum += float(loss.detach()) * len(batch)
-        if (start//batch_size+1)%10 == 0:
-            print(json.dumps(dict(branch=branch, phase='train' if training else 'validation',
-                                  cases_completed=start+len(batch), total=len(ids))), flush=True)
+            ys.append(_label(y, model.spec.side, groups[name]))
+        return torch.stack(xs)[:,None], torch.stack(ys)
+
+    supply = BatchSupply(ids, batch_size, model.spec.side, prepare, getattr(load, 'source_voxels', None))
+    with supply.batches() as batches:
+        for step, (batch, pair) in enumerate(batches, 1):
+            images, target = supply.transfer(pair, device)
+            if training:
+                images, target = _augment(images, target, rng)
+                optimizer.zero_grad(set_to_none=True)
+            with torch.set_grad_enabled(training):
+                loss = branch_loss(model(images), target, [groups[name] for name in batch])
+            if not torch.isfinite(loss):
+                raise FloatingPointError('Non-finite branch loss')
+            if training:
+                loss.backward()
+                check_gradients(model)
+                optimizer.step()
+            loss_sum += float(loss.detach()) * len(batch)
+            if step%10 == 0:
+                print(json.dumps(dict(branch=branch, phase='train' if training else 'validation',
+                                      cases_completed=min(step*batch_size,len(ids)), total=len(ids))), flush=True)
+            del pair
+    if stats is not None:
+        stats.update(supply.stats)
     return loss_sum/len(ids)
 
 
@@ -161,6 +165,21 @@ def _write_best(best, state):
     _save(best,{k:state[k] for k in ('contract','epoch','model','best_loss')})
 
 
+def _compatible_contract(actual, expected):
+    if actual == expected:
+        return True
+    # Only the immediately preceding implementations used these exact byte digests.
+    # Preserve old trained weights/resume with all non-source fields checked as usual.
+    previous = dict(expected['source'])
+    if 'xu_supply.py' not in previous:
+        return False
+    del previous['xu_supply.py']
+    previous['xu_training.py'] = '2ed34c4688840f93c08992c9c623f4b88fb2b674ec0a259e12e30b3f076a38ed'
+    if 'xu_init.py' in previous:
+        previous['xu_init.py'] = '715f576c65fe60d5472ce08cdbbb468c35158e6de94d722c4db429b84a9d61d6'
+    return actual == dict(expected, source=previous)
+
+
 def _recover_best(best, state):
     if state['epoch'] == state['best_epoch']:
         # last.pt commits first so a crash cannot promote an uncommitted best.
@@ -168,7 +187,7 @@ def _recover_best(best, state):
         return
     actual = torch.load(best,map_location='cpu',weights_only=True)
     if (actual['epoch'] != state['best_epoch'] or actual['best_loss'] != state['best_loss']
-            or actual['contract'] != state['contract']):
+            or not _compatible_contract(actual['contract'], state['contract'])):
         raise ValueError('Best checkpoint differs from committed epoch history')
 
 
@@ -219,7 +238,7 @@ def train_branch(*, branch, output_dir, train_cases, validation_cases, load_samp
                     data_identity=data_identity, supervision=supervision, seed=seed,
                     split_digest=digest(dict(train=train,validation=val)), torch_version=str(torch.__version__),
                     source={name:sha256_file(source/name) for name in
-                            ('xu_models.py','xu_training.py','training/marginal.py')})
+                            ('xu_models.py','xu_training.py','xu_supply.py','training/marginal.py')})
     if pilot_epochs is not None:
         contract['technical_fit'] = dict(epochs=epochs, initial_lr=0.002, width=pilot_width)
     with torch.random.fork_rng(devices=[]):
@@ -229,7 +248,7 @@ def train_branch(*, branch, output_dir, train_cases, validation_cases, load_samp
     epoch_start, best_epoch, best_loss, history = 0, -1, float('inf'), []
     if resume:
         state = torch.load(last,map_location='cpu',weights_only=True)
-        if state['contract'] != contract:
+        if not _compatible_contract(state['contract'], contract):
             raise ValueError('Checkpoint contract changed')
         _recover_best(best,state)
         model.load_state_dict(state['model'])
@@ -244,11 +263,13 @@ def train_branch(*, branch, output_dir, train_cases, validation_cases, load_samp
         lr=learning_rate(epoch,epochs) * (10 if pilot_epochs else 1)
         for params in optimizer.param_groups:
             params['lr']=lr
-        train_loss=_epoch(model,ids,train,load_sample,branch,device,rng,optimizer)
-        validation_loss=_epoch(model,sorted(val),val,load_sample,branch,device,rng)
+        train_supply, validation_supply = {}, {}
+        train_loss=_epoch(model,ids,train,load_sample,branch,device,rng,optimizer,train_supply)
+        validation_loss=_epoch(model,sorted(val),val,load_sample,branch,device,rng,stats=validation_supply)
         if validation_loss < best_loss:
             best_loss,best_epoch=validation_loss,epoch
-        entry=dict(epoch=epoch+1,learning_rate=lr,train_loss=train_loss,validation_loss=validation_loss)
+        entry=dict(epoch=epoch+1,learning_rate=lr,train_loss=train_loss,validation_loss=validation_loss,
+                   train_supply=train_supply, validation_supply=validation_supply)
         history.append(entry)
         state=dict(contract=contract,model=model.state_dict(),optimizer=optimizer.state_dict(),
                    epoch=epoch,best_epoch=best_epoch,best_loss=best_loss,history=history)

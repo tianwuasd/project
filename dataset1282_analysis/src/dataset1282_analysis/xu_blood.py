@@ -17,6 +17,9 @@ _V1_SOURCE = {
     'xu_blood_models.py': '3e8b2508bbc470e9355eaf89490e3ffb5213d99a5e9eaaddc42d2f4f62357f8f',
     'xu_geometry.py': '4500549b63cd6dc38551a177193137c3b2da64faa582d5d182ec84be9c805d79',
 }
+# d0f2c45a differs here only in retaining unused encoder gradients.
+_PREVIOUS_V2_SOURCE = dict(_V1_SOURCE, **{
+    'xu_blood.py':'a3894bdb66686531ac768d8526a0e5d144394210c8847bec647074c300f80bb4'})
 
 
 def register(commands):
@@ -72,9 +75,11 @@ def _contract(cache, targets, supervision, profile, seed, eligible):
 def _matches(stored, expected):
     if stored == expected:
         return True
-    if expected['supervision'] != 'marginal' or stored.get('method') != 'xu-blood-v1':
-        return False
     if any(expected['source'][k] != v for k,v in _V1_SOURCE.items() if k != 'xu_blood.py'):
+        return False
+    if stored.get('method') == 'xu-blood-v2':
+        return stored == dict(expected,source=_PREVIOUS_V2_SOURCE)
+    if expected['supervision'] != 'marginal' or stored.get('method') != 'xu-blood-v1':
         return False
     legacy = dict(expected, method='xu-blood-v1', source=_V1_SOURCE)
     del legacy['supervision']
@@ -234,6 +239,9 @@ def train(cache,args,out):
     seq=BloodSequence(encoder.width).to(args.device)
     history={}
     for stage in ('encoder','sequence'):
+        if stage == 'sequence':
+            # This encoder is frozen while the temporal network trains.
+            encoder.zero_grad(set_to_none=True)
         history[stage]=_train_stage(cache,store,contract,out,encoder,seq,stage,args.device)
     kind='best' if eligible['development'] else 'technical'
     path=out/(kind+'.pt')

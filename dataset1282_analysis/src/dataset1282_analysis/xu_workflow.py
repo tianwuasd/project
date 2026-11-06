@@ -72,6 +72,9 @@ def train(cache, args, out):
         box = book['boxes'][name] if book is not None else None
         return cache.read_image(name,shape,box), cache.read_label(name,shape,box)
 
+    from math import prod
+    load.source_voxels = lru_cache(maxsize=None)(lambda name: prod(cache.geometry(name).cache_shape))
+
     def annotations(names):
         return {name:cache.supervision[name]['unknown_classes'] for name in names}
 

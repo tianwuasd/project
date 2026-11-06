@@ -46,6 +46,12 @@ def iter_stages(cache, args, out):
     fusion_files = ('job.json', 'complete.json', 'evaluation.json')
 
     def stage(name, command, options, files, marker=None, skip=None):
+        options = list(options)
+        devices = getattr(args, 'device_names', ())
+        if len(devices) == 2 and (name.endswith('128') or command in ('fuse','train-blood','localize')):
+            options[options.index('--device') + 1] = devices[1]
+        if command == 'fuse':
+            options += ['--prediction-cache', out/'prediction-cache']
         argv = (command, *prepared, '--output', str(out/name), *map(str, options))
         return Stage(name, argv, files, marker, skip)
 

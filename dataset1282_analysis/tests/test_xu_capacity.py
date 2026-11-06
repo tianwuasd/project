@@ -11,6 +11,32 @@ from dataset1282_analysis.resources import GIB
 
 
 class CapacityTests(unittest.TestCase):
+    def test_resource_limits_use_stage_share_and_policy_reserve_once(self):
+        spec = xu_capacity.specification('3d128')
+        self.assertGreater(spec['estimated_host_bytes'],0)
+        self.assertEqual(xu_capacity.admission(spec, 64*GIB, 50*GIB, total=80*GIB,
+            policy='v2',host_limit=GIB-1)[0], 'below_host_budget')
+        reason, facts = xu_capacity.admission(spec,64*GIB,50*GIB,total=80*GIB,
+            policy='v2',host_limit=8*GIB,cuda_limit=38*GIB)
+        self.assertIsNone(reason)
+        self.assertEqual(facts['cuda_allocator_budget_bytes'],38*GIB)
+        self.assertEqual(facts['host_budget_bytes'],8*GIB)
+
+    def test_frozen_encoder_weights_only_and_previous_v2_exact_compatibility(self):
+        from dataset1282_analysis import xu_blood
+        from dataset1282_analysis.xu_blood_models import SliceUNet
+        spec = xu_capacity.specification('blood-sequence')
+        with torch.device('meta'):
+            plane = 512*512*SliceUNet('paper').width*4
+        self.assertEqual(spec['estimated_working_bytes'],
+            16*spec['trainable_parameters'] + 4*spec['other_resident_parameters'] + 96*plane)
+        expected = dict(method='xu-blood-v2',source=xu_blood._source(),supervision='complete',
+                        train=['a'],development=['b'])
+        old = dict(expected,source=dict(xu_blood._PREVIOUS_V2_SOURCE))
+        self.assertTrue(xu_blood._matches(old,expected))
+        self.assertFalse(xu_blood._matches(dict(old,supervision='marginal'),expected))
+        self.assertFalse(xu_blood._matches(dict(old,source=dict(old['source'], extra='x')),expected))
+
     def test_formal_specs_count_current_models_without_allocating_weights(self):
         for stage, n, shape in (
             ('3d64',90461879,[4,1,64,64,64]), ('3d128',50957351,[4,1,128,128,128]),

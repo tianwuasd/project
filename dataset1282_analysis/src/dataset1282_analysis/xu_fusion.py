@@ -1,14 +1,20 @@
 """Weighted fusion and boundary-constrained growing on a single frozen split."""
 
+from dataclasses import asdict
+from importlib.metadata import version
 from pathlib import Path
 import json
 import os
+import platform
+import shutil
+import tempfile
 import uuid
 
 import numpy as np
 from scipy import ndimage
 
 from .contracts import atomic_json, digest, read_json, sha256_file
+from .observability.status import operation_lock
 from .xu_geometry import _box_in, _resize
 
 
@@ -260,6 +266,99 @@ def _ensure_branch(cache, args, book, branch, checkpoint, expected, names, dest)
     return outputs
 
 
+def _prediction_context(cache, args, names, job):
+    """Bind the actual CT, geometry and numeric implementation before trusting a previous forward."""
+    import torch
+
+    device = torch.device(args.device)
+    runtime = dict(torch=str(torch.__version__), numpy=np.__version__, scipy=version('scipy'),
+                   blosc2=version('blosc2'), threads=torch.get_num_threads(), device=device.type,
+                   deterministic=torch.are_deterministic_algorithms_enabled(),
+                   matmul_precision=torch.get_float32_matmul_precision(), machine=platform.machine(),
+                   host=platform.node(), build=digest(torch.__config__.show()),
+                   cpu_capability=torch.backends.cpu.get_cpu_capability())
+    if device.type == 'cuda':
+        props = torch.cuda.get_device_properties(device)
+        physical = getattr(props, 'uuid', None)
+        if not physical:
+            raise ValueError('Shared GPU predictions require a verified device UUID')
+        runtime.update(uuid=str(physical), gpu=props.name, capability=[props.major, props.minor],
+                       cuda=torch.version.cuda, cudnn=torch.backends.cudnn.version(),
+                       cudnn_tf32=torch.backends.cudnn.allow_tf32,
+                       cudnn_deterministic=torch.backends.cudnn.deterministic,
+                       cudnn_benchmark=torch.backends.cudnn.benchmark,
+                       precision_environment={k:os.environ.get(k) for k in
+                           ('NVIDIA_TF32_OVERRIDE','TORCH_ALLOW_TF32_CUBLAS_OVERRIDE','CUBLAS_WORKSPACE_CONFIG')})
+    geometry = {}
+    for name in names:
+        # A cache hit skips read_image. Verify the committed CT bytes on that path too.
+        cache._artifact(f'process-{name}', f'{cache._folder}/{name}.b2nd')
+        geometry[name] = asdict(cache.geometry(name))
+    sources = ('xu_fusion.py', 'xu_training.py', 'xu_models.py', 'xu_init.py',
+               'xu_geometry.py', 'xu_workflow.py', 'xu_roi.py', 'xu_roi_workflow.py')
+    return dict(protocol='xu-frozen-branch-prediction-1', prepared=job['request'],
+                artifacts=job['cache_artifacts'], boxes=job['boxes'], cases=list(names),
+                geometry=digest(geometry), profile=args.profile, supervision=args.supervision,
+                target_grid=[128]*3, runtime=runtime,
+                implementation={name:sha256_file(Path(__file__).with_name(name)) for name in sources})
+
+
+def _shared_branch(root, identity, dest, names, produce):
+    """Publish the complete branch as a directory; interrupted writers cannot publish partial sets."""
+    key = digest(identity)
+    entry = root/'entries'/key
+    checkpoint = identity['checkpoint']
+    with operation_lock(root/'locks'/key, 'frozen-branch-cache'):
+        created = not entry.exists()
+        if created:
+            entry.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.TemporaryDirectory(prefix='.building-', dir=entry.parent) as scratch:
+                building = Path(scratch)/'entry'
+                files = produce(building)
+                record = dict(identity=identity, files=files)
+                atomic_json(building/'manifest.json', dict(record=record, digest=digest(record)))
+                os.replace(building, entry)
+        manifest = read_json(entry/'manifest.json')
+        record = manifest['record']
+        files = record['files']
+        if (entry.is_symlink() or manifest.get('digest') != digest(record)
+                or record['identity'] != identity or set(files) != set(names)
+                or read_json(entry/'complete.json') != dict(checkpoint=checkpoint, files=files)):
+            raise ValueError('Invalid shared prediction manifest')
+        # Stage exports keep their existing layout. On one filesystem hardlinks avoid a second copy.
+        dest.mkdir(parents=True, exist_ok=True)
+        for name, expected in files.items():
+            source, target = entry/(name+'.npy'), dest/(name+'.npy')
+            if source.is_symlink() or sha256_file(source) != expected:
+                raise ValueError('Changed shared prediction artifact')
+            if target.exists():
+                if target.is_symlink() or sha256_file(target) != expected:
+                    raise ValueError('Changed stage prediction artifact')
+                continue
+            try:
+                os.link(source, target)
+            except OSError:
+                tmp = dest/('.' + uuid.uuid4().hex + '.tmp')
+                try:
+                    shutil.copyfile(source, tmp)
+                    if sha256_file(tmp) != expected:
+                        raise ValueError('Changed prediction while copying')
+                    os.replace(tmp, target)
+                finally:
+                    tmp.unlink(missing_ok=True)
+        marker = dest/'complete.json'
+        if marker.exists():
+            previous = read_json(marker)
+            if (previous.get('checkpoint') != checkpoint or previous.get('files') != files
+                    or previous.get('cache_key') != key or previous.get('outcome') not in ('hit','miss')):
+                raise ValueError('Stage prediction marker differs from the shared cache')
+            outcome = previous['outcome']
+        else:
+            outcome = 'miss' if created else 'hit'
+            atomic_json(marker, dict(checkpoint=checkpoint, files=files, cache_key=key, outcome=outcome))
+    return files, dict(key=key, outcome=outcome, cases=len(files))
+
+
 def _save_case(out, name, geo, box, small, qc, cache, evaluation):
     import nibabel as nib
 
@@ -378,6 +477,13 @@ def _fuse(cache, args, out):
         evaluate=args.evaluate,
         cache_artifacts=artifact_identity(cache),
     )
+    shared = getattr(args, 'prediction_cache', None)
+    if shared is not None:
+        shared = shared.resolve()
+        if any(shared == path or shared in path.parents or path in shared.parents
+               for path in (out.resolve(), cache.run_dir)):
+            raise ValueError('Choose a separate prediction cache outside stage and prepared directories')
+        job['prediction_cache'] = str(shared)
     _open_job(out, job, args.resume)
     if (out / "complete.json").exists():
         _completed(out, job, names, True)
@@ -388,10 +494,21 @@ def _fuse(cache, args, out):
             file=str(out / "complete.json"),
         )
     dirs = out / "branches"
-    files = {
-        k: _ensure_branch(cache, args, book, k, p, hashes[k], names, dirs / k)
-        for k, p in paths.items()
-    }
+    files = {}
+    if shared is None:
+        for k, p in paths.items():
+            files[k] = _ensure_branch(cache, args, book, k, p, hashes[k], names, dirs/k)
+    else:
+        from functools import partial
+        from .xu_workflow import side
+        context = _prediction_context(cache, args, names, job)
+        reuse = {}
+        for k, p in paths.items():
+            identity = dict(context, branch=k, checkpoint=hashes[k], prediction_side=side(k))
+            producer = partial(_ensure_branch, cache, args, book, k, p, hashes[k], names)
+            files[k], reuse[k] = _shared_branch(shared, identity, dirs/k, names, producer)
+        hits = sum(row['outcome'] == 'hit' for row in reuse.values())
+        atomic_json(out/'prediction-cache.json', dict(branches=reuse, hits=hits, misses=len(reuse)-hits))
     blood_predict = None
     if args.blood:
         from .xu_blood import load_blood_predictor
@@ -518,6 +635,8 @@ def register(subparsers):
             "--supervision", choices=("complete", "marginal"), default="complete"
         )
         p.add_argument("--device", default="cpu")
+        p.add_argument("--prediction-cache", type=Path,
+                       help="Share verified frozen branch predictions between fusion stages")
         for branch in (*FINE_WEIGHTS, *INIT, "blood"):
             p.add_argument("--" + branch, required=branch in FINE_WEIGHTS, type=Path)
 

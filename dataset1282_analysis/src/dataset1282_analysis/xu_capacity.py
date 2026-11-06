@@ -9,6 +9,7 @@ import time
 from .contracts import atomic_json
 from .observability.status import operation_lock
 from .resources import GIB, snapshot
+from .xu_resources import apply_env_limit, gpu_budget
 
 STAGES = ('3d64', '3d128', 'blood-encoder', 'blood-sequence')
 
@@ -40,26 +41,33 @@ def specification(stage):
                 working_bytes = 16*enc + 4*seq + 7*4*plane
             else:
                 n, frozen, shape = seq, enc, [1,7,512,512]
-                # After encoder fitting its last gradients can remain resident.
-                # Allow room for seven feature frames and recurrent activations.
-                working_bytes = 16*seq + 8*enc + 96*plane
+                # Frozen encoder weights, seven feature frames and recurrent activations.
+                working_bytes = 16*seq + 4*enc + 96*plane
         else:
             raise ValueError(f'Unsupported paper stage {stage}')
     return dict(shape=shape, trainable_parameters=n, other_resident_parameters=frozen,
+                estimated_host_bytes=max(GIB, 8*(n+frozen)),
                 estimated_working_bytes=working_bytes, dtype='float32', optimizer='Adam')
 
 
-def admission(spec, host_free, cuda_free=None):
+def admission(spec, host_free, cuda_free=None, *, total=None, policy='legacy',
+              host_limit=None, cuda_limit=None):
     """Conservative admission only. A successful step is required to qualify the device."""
     work = spec['estimated_working_bytes']
     params = spec['trainable_parameters'] + spec['other_resident_parameters']
     # Host also constructs the modules and batches. Allow more workspace on CPU-only runs.
     host_need = 2*work + 2*GIB if cuda_free is None else max(GIB, 8*params)
     host_budget = max(0, min(int(.8*host_free), host_free - 4*GIB)) if host_free else 0
+    if host_limit is not None:
+        host_budget = min(host_budget, host_limit)
     data = dict(host_available_bytes=host_free, host_budget_bytes=host_budget,
                 estimated_host_bytes=host_need, admission_policy='conservative workspace estimate')
     if cuda_free is not None:
-        limit = max(0, min(int(.8*cuda_free), cuda_free - GIB))
+        if total is None and policy == 'v2':
+            raise ValueError('V2 GPU admission requires total memory')
+        limit = gpu_budget(cuda_free, total, policy)
+        if cuda_limit is not None:
+            limit = min(limit, cuda_limit)
         data.update(cuda_free_bytes=cuda_free, cuda_allocator_budget_bytes=limit)
         if limit < work:
             return 'below_gpu_budget', data
@@ -115,9 +123,6 @@ def _step_blood(stage, device):
     images, target = _batch(Planes(), [3] if temporal else [1,2,3,4], temporal, device, rng)
     before = model.head.weight.detach().clone()
     if temporal:
-        # Mirror the resident encoder gradients possible after the previous encoder stage.
-        for p in encoder.parameters():
-            p.grad = torch.zeros_like(p)
         with torch.no_grad():
             frames = [encoder.features(images[:,i:i+1]) for i in range(7)]
         scores = sequence(frames)
@@ -130,7 +135,7 @@ def _step_blood(stage, device):
     return loss.item(), (model.head.weight.detach() - before).abs().max().item()
 
 
-def probe(stage, selected_device, supervision, output):
+def probe(stage, selected_device, supervision, output, policy='legacy'):
     import torch
 
     file = Path(output) / 'capacity.json'
@@ -145,10 +150,13 @@ def probe(stage, selected_device, supervision, output):
         device = torch.device(selected_device)
         if device.type not in ('cpu','cuda') or (device.type=='cpu' and device.index is not None):
             raise ValueError('Expected cpu or cuda[:index]')
+        limits = apply_env_limit(device)
+        policy = limits.get('policy', policy)
+        report['resource_policy'] = policy
         available = snapshot()['available_memory_bytes']
         spec = specification(stage)
         report.update(spec)
-        free = None
+        free = total = None
         if device.type == 'cuda':
             if not torch.cuda.is_available():
                 raise RuntimeError('CUDA unavailable in this Python')
@@ -159,7 +167,9 @@ def probe(stage, selected_device, supervision, output):
             report.update(gpu_name=torch.cuda.get_device_name(device), cuda_total_bytes=total,
                           runtime_cuda=torch.version.cuda)
         report['device'] = str(device)
-        reason, facts = admission(spec, available, free)
+        reason, facts = admission(spec, available, free, total=total, policy=policy,
+                                  host_limit=limits.get('host_budget_bytes'),
+                                  cuda_limit=limits.get('allocator_budget_bytes'))
         report.update(facts)
         if reason:
             report.update(state='not_admitted', reason=reason)
@@ -194,11 +204,12 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--stage', choices=STAGES, required=True)
     parser.add_argument('--device', default='cuda')
+    parser.add_argument('--policy', choices=('legacy','v2'), default='legacy')
     parser.add_argument('--supervision', choices=('marginal','complete'), default='marginal')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args(argv)
     with operation_lock(args.output,'xu-capacity',args.output):
-        report = probe(args.stage,args.device,args.supervision,args.output)
+        report = probe(args.stage,args.device,args.supervision,args.output,args.policy)
     print(json.dumps(report,indent=2,ensure_ascii=False),flush=True)
     if report['state'] == 'passed':
         return 0
