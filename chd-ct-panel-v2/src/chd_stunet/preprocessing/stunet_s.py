@@ -16,6 +16,9 @@ from ..observability.runlog import write_json
 from .cohort import map_labels
 from .annotations import make_annotation, validate_resampled_labels, validate_case_roles
 from .fingerprint import sample_foreground
+from .verification import verify_full_array
+from ..observability.phase_timer import PhaseTimer,TimedConfiguration
+from ..acceleration.scipy_parallel import parallel_zooms
 
 
 def hashes(pair):
@@ -102,10 +105,21 @@ def bounded_locations(seg, classes_or_regions, seed=1234, verbose=False,
     block = 1_000_000
     rng = np.random.default_rng(seed)
     result = {}
+    # Count all int8 labels in one bounded pass instead of rereading the whole
+    # volume once per requested class. RNG draws and selected offsets below
+    # remain byte-for-byte equivalent to the original implementation.
+    hist = None
+    if flat.dtype==np.int8:
+        hist=np.stack([np.bincount(flat[s:s+block].view(np.uint8),minlength=256)
+                       for s in range(0,len(flat),block)]) if len(flat) else np.empty((0,256),dtype=np.int64)
     for c in classes_or_regions:
         labs = tuple(c) if isinstance(c,(tuple,list)) else (int(c),)
         key = labs if isinstance(c,(tuple,list)) else int(c)
-        counts = [int(np.isin(flat[s:s+block],labs).sum()) for s in range(0,len(flat),block)]
+        if hist is not None and all(isinstance(v,(int,np.integer)) for v in labs):
+            indexes=[int(v)%256 for v in set(labs) if -128<=v<=127]
+            counts=hist[:,indexes].sum(1).tolist() if indexes else [0]*len(hist)
+        else:
+            counts = [int(np.isin(flat[s:s+block],labs).sum()) for s in range(0,len(flat),block)]
         total = sum(counts)
         if not total:
             result[key] = []
@@ -149,13 +163,15 @@ def preprocess_case(job):
     import blosc2
     import torch
     started = time.monotonic()
+    timer=PhaseTimer(job.get('result'))
     torch.set_num_threads(1)
     # Each owned worker calls this once. The guard also permits repeated
     # synthetic roundtrips in one process without resetting PyTorch's runtime.
     if torch.get_num_interop_threads() != 1:
         torch.set_num_interop_threads(1)
     blosc2.set_nthreads(1)
-    data,seg,original,affine,_,_,before = load_pair(job)
+    with timer.phase('source_hash_read_decompress'):
+        data,seg,original,affine,_,_,before = load_pair(job)
     native_counts = {str(k):int((seg==k).sum()) for k in range(9)}
     native_ids = {k for k in range(9) if native_counts[str(k)]}
     observed_annotation = make_annotation(set(range(1,8)) - native_ids)
@@ -180,14 +196,23 @@ def preprocess_case(job):
                           if annotation['requires_partial_loss'] else 'nonignore_region'))
     plans = PlansManager(job['plan'])
     config = plans.get_configuration('3d_fullres')
+    # Wrap the existing native callables; do not copy or replace nnU-Net's
+    # normalization/interpolation algorithm or the order in run_case_npy.
+    config=TimedConfiguration(config,timer)
 
     class ProjectBoundedPreprocessor(DefaultPreprocessor):
-        _sample_foreground_locations = staticmethod(bounded_locations)
+        _sample_foreground_locations = staticmethod(timer.wrap('foreground_locations',bounded_locations))
+
+        def _normalize(self,*args,**kwargs):
+            with timer.phase('intensity_normalization'):return super()._normalize(*args,**kwargs)
 
     processor = ProjectBoundedPreprocessor(verbose=True)
     print('阶段：影像非零裁剪 → 训练集统计归一化 → 官方重采样 → 有界前景位置采样',flush=True)
-    image, labels, properties = processor.run_case_npy(data.transpose(2,1,0)[None],
-        seg.transpose(2,1,0)[None],properties,plans,config,job['dataset_json'])
+    with parallel_zooms(job.get('cpu_threads',1),progress=timer.progress) as execution:
+        print(f"重采样执行：申请{execution['requested_threads']}线程，实际{execution['applied_threads']}线程；{execution['reason']}",flush=True)
+        with timer.phase('native_transform_total'):
+            image, labels, properties = processor.run_case_npy(data.transpose(2,1,0)[None],
+                seg.transpose(2,1,0)[None],properties,plans,config,job['dataset_json'])
     if image.shape != labels.shape or not np.isfinite(image).all():
         raise ValueError('Non-finite or shape-inconsistent preprocessed arrays')
     label_ids = set(map(int,np.unique(labels)))
@@ -209,18 +234,15 @@ def preprocess_case(job):
         path = str(base)+suffix
         if Path(path).exists():
             Path(path).unlink()
-        blosc2.asarray(np.ascontiguousarray(array),urlpath=path,blocks=b,chunks=c,cparams=cparams)
+        with timer.phase('compress_write'+suffix):
+            blosc2.asarray(np.ascontiguousarray(array),urlpath=path,blocks=b,chunks=c,cparams=cparams)
         stored = blosc2.open(path,mode='r',dparams={'nthreads':1})
-        if stored.shape != array.shape or stored.dtype != array.dtype:
-            raise ValueError('Stored shape/dtype differs from memory')
-        # Chunkwise read-back compares every value without a second full volume.
-        for z in range(0,array.shape[1],16):
-            if not np.array_equal(stored[:,z:z+16],array[:,z:z+16]):
-                raise ValueError('Stored array failed full read-back verification')
+        with timer.phase('full_readback'+suffix):
+            verify_full_array(stored,array,timer.progress)
         del stored
     with Path(str(base)+'.pkl').open('wb') as f:
         pickle.dump(properties,f,pickle.HIGHEST_PROTOCOL)
-    check_source_unchanged(job,before)
+    with timer.phase('source_recheck'):check_source_unchanged(job,before)
     target = foldroot/'data'
     target.mkdir(parents=True,exist_ok=True)
     files = {}
@@ -229,7 +251,7 @@ def preprocess_case(job):
         os.replace(staging/name,target/name)
         files[name] = sha256_file(target/name)
     staging.rmdir()
-    row = dict(success=True,case_id=cid,source_hashes=before,
+    row = dict(success=True,case_id=cid,source_hashes=before,stage_timings=timer.durations,
         annotation=annotation,cohort_group=group,roles=job.get('roles',{}),
         shape=list(image.shape),data_dtype=str(image.dtype),seg_dtype=str(labels.dtype),
         output_label_ids=sorted(label_ids),native_label_counts=native_counts,
@@ -242,8 +264,10 @@ def preprocess_case(job):
         class_location_counts={str(k):len(v) for k,v in properties['class_locations'].items()},
         file_sha256=files,contract=job['contract'],fold=job['plan']['fold'],
         elapsed_seconds=time.monotonic()-started,worker_pid=os.getpid(),
-        threads=dict(torch=torch.get_num_threads(),compression=1,scipy_resampling=1),
+        threads=dict(torch=torch.get_num_threads(),compression=1,scipy_resampling=execution['applied_threads']),
+        execution=execution,
         warnings=['ignore_region_disappeared_during_resampling'] if native_counts['8'] and 8 not in label_ids else [])
     # Completion lives OUTSIDE data/ so nnU-Net will never scan it as a case.
     write_json(foldroot/'completion'/f'{cid}.json',row)
+    timer.record('case.done',stage_timings=timer.durations)
     return row

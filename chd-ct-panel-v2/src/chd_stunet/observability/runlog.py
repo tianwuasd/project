@@ -13,7 +13,17 @@ def write_json(path, value):
     path=Path(path); path.parent.mkdir(parents=True,exist_ok=True)
     temporary=path.with_name(path.name+".partial")
     temporary.write_text(json.dumps(value,ensure_ascii=False,indent=2,allow_nan=False),encoding="utf-8")
-    os.replace(temporary,path)
+    # Windows readers/antivirus can briefly open the old file without delete
+    # sharing. Keep the old complete JSON visible and retry only documented
+    # sharing/access errors, for <=0.32s. Persistent permissions still fail;
+    # never truncate/delete the destination to make a replacement succeed.
+    for attempt in range(7):
+        try:
+            os.replace(temporary,path)
+            break
+        except PermissionError as error:
+            if getattr(error,'winerror',None) not in (5,32,33) or attempt==6:raise
+            time.sleep(.005*2**attempt)
 
 
 class RunLog:
