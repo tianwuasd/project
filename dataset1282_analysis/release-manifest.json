@@ -105,7 +105,7 @@
     "tests/test_workflow.py": "ad852aad6372e449063b9567663424112214c788cbeffa1f4b2f1e2f9f0efbee",
     "tests/test_xu_blood.py": "19c517148cdeff316d41a341612596bb95195e831a94cc34157bf479c144d8ff",
     "tests/test_xu_capacity.py": "d909a96f7880e2596710ed377ad953cb9f25bde5f1fddeec88ccb4dbdbb11c2f",
-    "tests/test_xu_dispatch.py": "8c737c64c643b1b8d5f56a1aa3d6cc8a3dd274b853ff797e9d78f489a7a4f9b5",
+    "tests/test_xu_dispatch.py": "82503ff369070d0042aedc8fe8ab3533f6ae50c970b52cea39c63a345b9903d9",
     "tests/test_xu_evaluation.py": "60e87945b53dbd7c7596a156a0ca4e72f370b2be2947ad9eba0c85e17b67aa74",
     "tests/test_xu_fusion.py": "8d9c5ed9bab8bf583d25d531701d9bd7d803f99f910447b2bd003c4d058e930e",
     "tests/test_xu_geometry.py": "14f174330b041388a4eeab04a2b5b85180a9810039259dd3084f3c937ad0ea96",

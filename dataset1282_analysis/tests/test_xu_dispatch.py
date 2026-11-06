@@ -86,7 +86,7 @@ class BranchSchedulingTests(unittest.TestCase):
         events = []
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp).resolve()
-            args = SimpleNamespace(resume=False, profile='paper', technical_subset=False, crop64=None,
+            args = SimpleNamespace(resume=False, profile='paper', supervision='marginal', technical_subset=False, crop64=None,
                                    crop128=None, reviews=None, stop_after='crop128', device='cuda:0',
                                    device_names=['cuda:0','cuda:1'], resource_policy='v2')
             stages = [Stage(n, ('train','--device','cuda:0'), ('best.pt',)) for n in ('crop64','crop128')]
