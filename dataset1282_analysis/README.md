@@ -1,5 +1,7 @@
 # dataset1282_analysis
 
+本分支新增 Xu 2023 解剖分割的第一阶段。独立研究入口能读取已完成的 0.3.0 缓存，训练双尺度定位、生成预测框、训练两个全结构分支，并在原网格上评价开发病例。运行示例和论文差异见 [Xu 分割实验](docs/xu-segmentation.md)。
+
 可在 Windows 本机或 Linux 服务器调用的 NIfTI + Excel 只读数据审计工程。首版提供独立环境部署、代码更新、数据统计和本地报告；适合先弄清数据来源与质量，再决定后续处理。
 
 审计入口只读，按文件对数与不同 PatientID 数分别统计。独立 `prepare` 入口按方案 A 建立患者分组，在私有工作区生成 nnU-Net 预处理副本。0.3.0 新增 HU、Excel 共同毫米网格、部分标签边际损失接口、V2 资源调度及可靠短测。[当前工作流](docs/hu-marginal-workflow.md)；[旧版试跑与审核格式](docs/preprocessing.md)。原始影像、标签、Excel 和历史记录保留。
