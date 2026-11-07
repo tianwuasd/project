@@ -17,12 +17,26 @@ def main():
     sys.stdin.close()
     sys.argv = [str(script), *sys.argv[2:]]
     sys.path.insert(0, str(root/'src'))
-    from dataset1282_analysis.xu_resources import GpuResourcesChanged
+    from dataset1282_analysis.xu_resources import ResourceUnavailable, HostResourcesChanged, GpuResourcesChanged
     from dataset1282_analysis.contracts import atomic_json
+    from dataset1282_analysis.xu_gpu_isolation import verify_worker_scope
     try:
+        isolation = verify_worker_scope()
+        atomic_json(Path(os.environ['XU_ISOLATION_REPORT']),isolation)
+        print('GPU isolation:',json.dumps(isolation,ensure_ascii=False),flush=True)
         runpy.run_path(str(script), run_name='__main__')
-    except GpuResourcesChanged as error:
+    except ResourceUnavailable as error:
         atomic_json(Path(os.environ['XU_RESOURCE_FAILURE']), error.evidence())
+        raise
+    except MemoryError as error:
+        atomic_json(Path(os.environ['XU_RESOURCE_FAILURE']),HostResourcesChanged(str(error)).evidence())
+        raise
+    except RuntimeError as error:
+        torch = sys.modules.get('torch')
+        if torch is not None and isinstance(error,torch.OutOfMemoryError):
+            devices = [r['device'] for r in json.loads(os.environ['XU_GPU_ISOLATION'])]
+            event = GpuResourcesChanged(str(error),devices) if devices else HostResourcesChanged(str(error))
+            atomic_json(Path(os.environ['XU_RESOURCE_FAILURE']),event.evidence())
         raise
 
 

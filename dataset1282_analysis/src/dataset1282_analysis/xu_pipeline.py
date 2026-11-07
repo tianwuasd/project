@@ -14,7 +14,8 @@ from .contracts import atomic_json, digest, read_json, sha256_file
 from .xu_dispatch import Children, plan_stage, reserve_pair, run_wave, select_devices, waves
 from .observability.status import lock_active, operation_lock, write_status
 from .xu_reallocation import record_reallocation, run_with_reallocation
-from .xu_resources import GpuResourcesChanged
+from .xu_resources import GpuResourcesChanged, ResourceUnavailable, resource_error
+from .xu_gpu_isolation import launch_scope, report_for_parent
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -32,7 +33,7 @@ def _input_file(path):
 
 def _sources(technical):
     source = Path(__file__).resolve().parent
-    files = [*source.glob('xu_*.py'), source/'training/marginal.py', source/'contracts.py',
+    files = [*source.glob('xu_*.py'), source/'training/marginal.py', source/'contracts.py',source/'resources.py',
              source/'observability/status.py', ROOT/'scripts/xu_seg.py', ROOT/'scripts/xu_pipeline.py',
              ROOT/'scripts/xu_worker.py']
     files = [p for p in files if p.name not in ('xu_pair_probe.py','xu_inference_probe.py')]  # Diagnostics.
@@ -121,7 +122,7 @@ def _execute(script, argv, name, out, owner, args):
     args.children.ensure_running()
     for key in ('XU_RESOURCE_POLICY','XU_HOST_BUDGET_BYTES','XU_HOST_DEMAND_BYTES',
                 'XU_WAVE_RESERVATION','XU_CUDA_ADMISSION','XU_CUDA_ADMISSIONS','XU_BRANCH_DEVICES',
-                'XU_PREFETCH','XU_PREFETCH_BYTES','XU_PREFETCH_WORKERS'):
+                'XU_PREFETCH','XU_PREFETCH_BYTES','XU_PREFETCH_WORKERS','XU_PREFETCH_DEPTH'):
         env.pop(key, None)
     env.update(args.overlay)
     env['XU_ELASTIC_DEVICES'] = '1'
@@ -129,8 +130,13 @@ def _execute(script, argv, name, out, owner, args):
     env['XU_LAUNCH_TOKEN'] = token
     failure = out/'resources'/f'{name}-child-{token}.json'
     env['XU_RESOURCE_FAILURE'] = str(failure)
+    env['XU_ISOLATION_REPORT'] = str(out/'resources'/f'{name}-isolation-{token}.json')
+    group = list(getattr(args,'assigned_devices',None) or [args.device])
+    local_argv, env, isolation = launch_scope(argv,args.overlay,group,env)
+    atomic_json(out/'resources'/f'{name}-launch-{token}.json',dict(mapping=isolation,
+                cuda_visible_devices=env['CUDA_VISIBLE_DEVICES'],parent_pid=os.getpid()))
     command = [sys.executable, '-B', '-u', str(ROOT/'scripts/xu_worker.py'),
-               str(ROOT/'scripts'/script), *map(str, argv)]
+               str(ROOT/'scripts'/script), *local_argv]
     print(f'Running {name} | {log}', flush=True)
     from .xu_runtime_guard import RuntimeGuard
     guard = RuntimeGuard(out/'resources',name,args.overlay,args.children)
@@ -152,6 +158,9 @@ def _execute(script, argv, name, out, owner, args):
                         raise
                 time.sleep(1)
             code = child.returncode
+        except ResourceUnavailable as error:
+            error.xu_log = str(log)
+            raise
         finally:
             if child.poll() is None:
                 args.children.stop_child(child)
@@ -161,9 +170,12 @@ def _execute(script, argv, name, out, owner, args):
             args.children.detach(child)
     if code:
         if failure.is_file():
-            evidence = read_json(failure)
-            raise GpuResourcesChanged(evidence['reason'], evidence['devices'])
-        raise StageError(f'{name} exited {code}: {_tail(log)} (log: {log})')
+            evidence = report_for_parent(read_json(failure),group)
+            error = resource_error(evidence)
+        else:
+            error = StageError(f'{name} exited {code}: {_tail(log)} (log: {log})')
+        error.xu_log = str(log)
+        raise error
 
 
 def _restore_attempt(stage, directory, out, reallocated=False):
@@ -237,14 +249,16 @@ def _capacity(stage, checked, out, owner, args):
                      'capacity-'+size, out, owner, args)
         except StageError as exc:
             if (directory/'capacity.json').is_file():
-                evidence = read_json(directory/'capacity.json')
+                evidence = report_for_parent(read_json(directory/'capacity.json'),group)
                 if evidence.get('resource_change'):
                     change = evidence['resource_change']
-                    raise GpuResourcesChanged(change['reason'], change['devices']) from exc
+                    raise resource_error(change) from exc
+                if evidence.get('state') == 'not_admitted':
+                    raise ResourceUnavailable(f'Capacity {size}: {evidence["reason"]}') from exc
                 raise StageError(f'Capacity {size}: {evidence.get("reason", evidence["state"])}. '
                                  f'See {directory/"capacity.json"}') from exc
             raise
-        report = read_json(directory/'capacity.json')
+        report = report_for_parent(read_json(directory/'capacity.json'),group)
         if report.get('state') != 'passed' or report.get('optimizer_steps') != 1:
             raise StageError(f'Capacity check did not complete a training step for {size}: {directory}')
         per_device = report.get('per_device', {})
@@ -378,7 +392,8 @@ def _run_attempt(cache, args, out, owner, contract):
         from .xu_fleet import assign_wave
         def groups():
             nonlocal stage_name
-            for candidates in waves(iter_stages(cache,args,out),getattr(args,'device_names',()),args.stop_after):
+            scheduling_devices = () if getattr(args,'force_serial',False) else getattr(args,'device_names',())
+            for candidates in waves(iter_stages(cache,args,out),scheduling_devices,args.stop_after):
                 stage_name = candidates[0].name
                 if not contract.get('fleet'):
                     yield [(stage,None) for stage in candidates]
@@ -438,7 +453,8 @@ def _run_attempt(cache, args, out, owner, contract):
             receipt = out/'receipts'/(name+'.json')
             if name not in records and receipt.is_file():
                 records[name] = read_json(receipt)
-        state = 'interrupted' if isinstance(exc,KeyboardInterrupt) else 'failed'
+        state = ('interrupted' if isinstance(exc,KeyboardInterrupt) else
+                 'waiting_resources' if isinstance(exc,ResourceUnavailable) else 'failed')
         qc = out/'audit-roi'/'localization_qc.json'
         if stage_name=='audit-roi' and isinstance(exc,StageError) and qc.is_file() and read_json(qc).get('accepted') is False:
             state = 'roi_rejected'
@@ -449,7 +465,7 @@ def _run_attempt(cache, args, out, owner, contract):
         write_status(out,state=state,stage=stage_name,error=str(exc),
                      finished=[name for name,row in records.items() if row['state'] != 'paused'],
                      paused={name:row for name,row in records.items() if row['state'] == 'paused'},
-                     last_command=previous.get('stage'),log=previous.get('log'),
+                     last_command=previous.get('stage'),log=getattr(exc,'xu_log',previous.get('log')),
                      roi_report=str(qc) if state=='roi_rejected' else None)
         raise
 
@@ -484,6 +500,11 @@ def _run(args):
         raise ValueError('自动重新分配次数必须在 0 到 20 之间')
     args.prepared, args.output = prepared, out
     cache = PreparedCache(prepared,allow_technical_subset=args.technical_subset)
+    from math import prod
+    args.max_source_voxels = max((prod(cache.geometry(name).cache_shape)
+                                for role in ('train','development') for name in cache.case_ids(role)),default=0) if args.prefetch else 0
+    args.resource_recovery = True
+    args.resource_poll_seconds = max(1,args.wait_seconds)
     contract = _contract(cache,args)
     # The frozen run and stage receipts must use the same spelling for CUDA aliases.
     args.device = contract['device']['device']
@@ -508,11 +529,11 @@ def main(argv=None):
     run.add_argument('--exclude-physical-gpus',type=int,nargs='*',default=[0,1],
                      help='Excluded NVIDIA physical GPU indices (default: 0 1); empty list disables exclusions')
     run.add_argument('--max-reallocations',type=int,default=3,
-                     help='Maximum automatic restarts after confirmed GPU resource changes')
+                     help='Resource retry threshold before increasing the wait interval (default: 3)')
     run.add_argument('--resource-policy',choices=('legacy','v2'),
                      help='Linux and multi-GPU default to v2; a single local Windows GPU defaults to legacy')
     run.add_argument('--wait-seconds',type=int,default=0, help='Bounded wait per resource check, 0 to 300 seconds')
-    run.add_argument('--prefetch-mib',type=int,default=16384, help='Maximum additional CPU batch memory per branch (MiB)')
+    run.add_argument('--prefetch-mib',type=int,default=16384, help='Preferred queue budget; admits at least one real batch within the stage RAM share')
     run.add_argument('--prefetch-workers',type=int,default=4,help='Upper bound on CPU batch preparation workers')
     run.add_argument('--prefetch',action=argparse.BooleanOptionalAction,default=True,
                      help='Use ordered, resource-bounded CPU prefetch (enabled by default)')

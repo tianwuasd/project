@@ -1,6 +1,7 @@
 import csv
-from functools import lru_cache
 import io
+import json
+import os
 import subprocess
 from uuid import UUID
 
@@ -11,8 +12,7 @@ def _cuda(result):
     return result[1:]
 
 
-@lru_cache(maxsize=1)
-def visible_devices():
+def actual_visible_devices():
     from cuda.bindings import driver
     initialized = driver.cuInit(0)
     if int(initialized[0]) == 100:
@@ -28,6 +28,15 @@ def visible_devices():
         rows.append(dict(device=f'cuda:{index}',uuid='GPU-'+str(UUID(bytes=bytes(uuid.bytes))),
                          name=name.split(b'\x00',1)[0].decode('utf-8'),total_bytes=int(total)))
     return rows
+
+
+def visible_devices(inventory=None):
+    if 'XU_COORDINATOR_DEVICES' in os.environ:
+        if os.environ.get('CUDA_VISIBLE_DEVICES') != '-1':
+            raise ValueError('管理进程不允许 CUDA 可见设备')
+        return json.loads(os.environ['XU_COORDINATOR_DEVICES'])
+    from .xu_gpu_isolation import authorized_devices
+    return authorized_devices(os.environ,gpu_snapshot() if inventory is None else inventory)
 
 
 def _query(kind, columns):
@@ -53,12 +62,12 @@ def gpu_snapshot():
 
 
 def device_info(selection):
-    names = {row['device']:row for row in visible_devices()}
+    inventory = gpu_snapshot()
+    names = {row['device']:row for row in visible_devices(inventory)}
     name = 'cuda:0' if str(selection) == 'cuda' else str(selection)
     if name not in names:
         raise ValueError('设备不在当前 CUDA 可见范围内: '+name)
     selected = names[name]
-    inventory = gpu_snapshot()
     if selected['uuid'] not in inventory:
         raise ValueError('CUDA 与 NVIDIA 查询的显卡 UUID 不一致')
     return {**inventory[selected['uuid']],**selected}

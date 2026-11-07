@@ -1,6 +1,7 @@
 """Private-data acceptance for the two whole-scan Xu localizers. Use a research Python."""
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
 import time
@@ -8,6 +9,8 @@ import time
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
+from dataset1282_analysis.xu_gpu_isolation import validate_entry
+validate_entry(sys.argv[1:],os.environ,default='cpu')
 from dataset1282_analysis.contracts import atomic_json, read_json, sha256_file
 
 

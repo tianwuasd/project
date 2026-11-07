@@ -9,7 +9,7 @@ import time
 from .contracts import atomic_json
 from .observability.status import operation_lock
 from .resources import GIB, snapshot
-from .xu_resources import apply_env_limit, gpu_budget, GpuResourcesChanged
+from .xu_resources import apply_env_limit, gpu_budget, GpuResourcesChanged, ResourceUnavailable, HostResourcesChanged
 
 STAGES = ('3d64', '3d128', 'blood-encoder', 'blood-sequence')
 
@@ -256,8 +256,14 @@ def probe(stage, selected_device, supervision, output, policy='legacy'):
             report.update(state='passed', optimizer_steps=1, loss=loss, head_max_abs_update=delta)
     except (OSError, ValueError, RuntimeError, MemoryError, FloatingPointError) as error:
         report.update(state='failed', error_type=type(error).__name__, reason=str(error))
-        if isinstance(error, GpuResourcesChanged):
+        if isinstance(error, ResourceUnavailable):
             report['resource_change'] = error.evidence()
+        elif isinstance(error,MemoryError):
+            report['resource_change'] = HostResourcesChanged(str(error)).evidence()
+        elif isinstance(error,torch.OutOfMemoryError):
+            report['resource_change'] = (GpuResourcesChanged(str(error),list(report.get('per_device',{})))
+                                         if device is not None and device.type=='cuda'
+                                         else HostResourcesChanged(str(error))).evidence()
     finally:
         for name in measured:
             peaks = dict(peak_cuda_allocated_bytes=torch.cuda.max_memory_allocated(name),

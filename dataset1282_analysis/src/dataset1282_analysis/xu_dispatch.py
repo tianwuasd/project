@@ -37,7 +37,7 @@ def select_devices(single, multiple, torch):
         count = len(visible_devices())
         if count < 1:
             raise ValueError('No visible CUDA devices; select --device cpu for a CPU run')
-        mask = os.environ.get('CUDA_VISIBLE_DEVICES')
+        mask = os.environ.get('XU_COORDINATOR_AUTH_MASK',os.environ.get('CUDA_VISIBLE_DEVICES'))
         container_mask = os.environ.get('NVIDIA_VISIBLE_DEVICES','').strip().lower()
         restricted = bool(mask or container_mask not in ('','all','void','none'))
         if count > 1 and os.name == 'posix' and not restricted and multiple != 'all-visible':
@@ -280,7 +280,7 @@ def prefetch_cpu_allocation(slots, threads, workers):
     if any(type(n) is not int or n < 1 for n in (slots,threads,workers)):
         raise ValueError('CPU 份额、数值线程和供数上限必须为正整数')
     if slots < 2:
-        raise ResourceUnavailable('并行预取需要至少两个 CPU 工作槽；当前只有一个')
+        return 1,0
     actual_threads = min(threads,slots//2)
     actual_workers = min(workers,slots//actual_threads-1)
     return actual_threads,actual_workers
@@ -289,6 +289,7 @@ def prefetch_cpu_allocation(slots, threads, workers):
 def plan_stage(stage, args, out, children, concurrent, purpose, checked):
     from .xu_resources import ResourceUnavailable, GpuResourcesChanged, combined_environment, stage_resources
     from .xu_fleet import INFERENCE, TRAIN_3D, needs_for_width, preflight_sizes
+    from .xu_supply_budget import stage_minimum, prefetch_budget
     device = (stage.argv[stage.argv.index('--device') + 1]
               if '--device' in stage.argv and stage.name != 'audit-roi' else 'cpu')
     group = list(getattr(args,'assigned_devices',None) or [device])
@@ -314,11 +315,12 @@ def plan_stage(stage, args, out, children, concurrent, purpose, checked):
                 for card in group:
                     cuda_demand[card] = max(cuda_demand[card],measured.get(card,0))
     until = time.monotonic() + args.wait_seconds
+    minimum = stage_minimum(args,stage.name)
     while True:
         children.ensure_running()
         try:
             plan = stage_resources(group, concurrent=concurrent, threads=args.threads, policy=policy,
-                                   owned_pids=children.pids(), host_demand_bytes=demand,
+                                   owned_pids=children.pids(), host_demand_bytes=demand+minimum,
                                    cuda_demand_bytes=cuda_demand,
                                    wave_reservation=getattr(args, 'wave_reservation', None),
                                    peer_active_pids=children.peer_pids(device),
@@ -330,6 +332,8 @@ def plan_stage(stage, args, out, children, concurrent, purpose, checked):
             if enabled:
                 plan['threads'],workers = prefetch_cpu_allocation(
                     plan['cpu_slots']//concurrent,plan['threads'],requested_workers)
+            host = plan['host_per_stage_bytes']
+            prefetch = prefetch_budget(host,demand,minimum,getattr(args,'prefetch_mib',16384)*1024**2) if enabled else 0
         except GpuResourcesChanged:
             raise
         except ResourceUnavailable as exc:
@@ -344,15 +348,11 @@ def plan_stage(stage, args, out, children, concurrent, purpose, checked):
         break
     overlay = combined_environment(plan, group)
     # 当前批次和模型之外，为有序供数队列分配独立预算。
-    host = plan['host_per_stage_bytes']
-    prefetch = min(getattr(args, 'prefetch_mib', 16384) * 1024**2,
-                   max(0,host-demand-max(1024**3,host//5)))
-    if enabled and prefetch <= 0:
-        raise ResourceUnavailable('CPU 预取缺少可用内存预算')
     overlay.update(XU_PREFETCH='1' if enabled else '0', XU_PREFETCH_BYTES=str(prefetch),
-                   XU_PREFETCH_WORKERS=str(workers))
+                   XU_PREFETCH_WORKERS=str(workers),XU_PREFETCH_DEPTH=str(getattr(args,'prefetch_depth',max(1,2*workers))))
     path = out/'resources'/f'{stage.name}-{purpose}-{time.time_ns()}.json'
     atomic_json(path, dict(stage=stage.name, purpose=purpose, device=device, devices=group, concurrent=concurrent,
                            requested_threads=args.threads, prefetch_budget_bytes=prefetch,
-                           prefetch_workers=workers, plan=plan))
+                           prefetch_workers=workers,minimum_batch_bytes=minimum,
+                           requested_prefetch_bytes=getattr(args,'prefetch_mib',16384)*1024**2,plan=plan))
     return device, overlay

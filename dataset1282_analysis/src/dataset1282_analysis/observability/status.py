@@ -27,6 +27,8 @@ def process_birth(pid):
             values=[wintypes.FILETIME() for _ in range(4)]
             if not kernel.GetProcessTimes(handle,*(ctypes.byref(v) for v in values)):
                 raise OSError(ctypes.get_last_error(),'Cannot inspect process birth')
+            if values[1].dwHighDateTime or values[1].dwLowDateTime:
+                return None
             return str((values[0].dwHighDateTime<<32)+values[0].dwLowDateTime)
         finally: kernel.CloseHandle(handle)
     try:

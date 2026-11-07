@@ -123,7 +123,7 @@ class PipelineRecoveryTests(unittest.TestCase):
         for device in ('cuda','cuda:0'):
             args = SimpleNamespace(prepared=self.out/'prepared', output=self.out/'experiment',
                                    device=device, crop64=None, crop128=None, reviews=None,
-                                   threads=2, technical_subset=True)
+                                   threads=2, technical_subset=True,prefetch=False,wait_seconds=0)
             with (patch('dataset1282_analysis.xu_geometry.PreparedCache'),
                   patch.object(pipeline,'_contract',return_value={'device':{'device':'cuda:0'}}),
                   patch.object(pipeline,'_run_locked') as run):

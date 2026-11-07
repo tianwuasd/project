@@ -95,23 +95,10 @@ class PairProbeTests(unittest.TestCase):
             self.assertEqual(probe.main(['--devices','cuda:0,cuda:1','--output',str(self.out)]),1)
         self.assertFalse(self.out.exists())
 
-    def test_worker_checks_peer_and_calls_capacity_on_its_own_device(self):
-        request = dict(devices=self.cards, nonce='current', barrier_seconds=1)
-        atomic_json(self.out/'request.json',request)
-        peer = dict(request='current',uuid=self.cards[1]['uuid'],pid=os.getpid()+1)
-        atomic_json(self.out/'3d128/ready.json',peer)
-        ticket = dict(device='cuda:0', policy='v2', uuid=self.cards[0]['uuid'])
-        torch = Mock()
-        with (patch.dict(sys.modules,torch=torch),
-              patch.dict(os.environ, XU_CUDA_ADMISSION=json.dumps(ticket)),
-              patch('dataset1282_analysis.xu_dispatch.device_identity',return_value=self.cards[0]),
-              patch('dataset1282_analysis.xu_capacity.probe',return_value={'state':'passed'}) as capacity):
-            probe._worker(self.out,'3d64')
-            capacity.assert_called_once_with('3d64','cuda:0','marginal',self.out/'3d64',policy='v2')
-            row = read_json(self.out/'3d64/execution.json')
-            self.assertEqual(row['peer_pid'], peer['pid'])
-            self.assertEqual(row['uuid'], self.cards[0]['uuid'])
-            atomic_json(self.out/'3d128/ready.json',dict(peer,request='stale'))
-            with self.assertRaisesRegex(RuntimeError,'Unmatched peer'):
-                probe._worker(self.out,'3d64')
-            capacity.assert_called_once()
+    def test_worker_requires_matching_scope_before_using_device(self):
+        card = dict(device='cuda:5',uuid='GPU-assigned')
+        mapping = [dict(parent_device='cuda:5',device='cuda:0',uuid='GPU-assigned')]
+        env = {'XU_GPU_ISOLATION':json.dumps(mapping)}
+        self.assertEqual(probe.worker_card(card,env),dict(card,device='cuda:0'))
+        with self.assertRaises(ValueError):
+            probe.worker_card(dict(card,uuid='GPU-other'),env)

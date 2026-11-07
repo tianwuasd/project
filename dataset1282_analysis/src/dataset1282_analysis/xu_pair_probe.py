@@ -15,9 +15,18 @@ from .xu_dispatch import Children, plan_stage, reserve_pair, run_wave, select_de
 from .xu_pipeline import ROOT, _execute
 from .xu_pipeline_stages import Stage
 from .xu_resources import ResourceUnavailable
+from .xu_gpu_isolation import report_for_parent
 
 
 SIZES = ('3d64', '3d128')
+
+
+def worker_card(parent, environment):
+    mapping = json.loads(environment['XU_GPU_ISOLATION'])
+    if (len(mapping) != 1 or mapping[0]['parent_device'] != parent['device']
+            or mapping[0]['uuid'] != parent['uuid']):
+        raise ValueError('双卡检查的工作进程范围与父任务分配不一致')
+    return dict(parent,device=mapping[0]['device'])
 
 
 def _selected(devices):
@@ -35,7 +44,8 @@ def _worker(out, size):
 
     request = read_json(out/'request.json')
     index = SIZES.index(size)
-    card = request['devices'][index]
+    parent_card = request['devices'][index]
+    card = worker_card(parent_card,os.environ)
     ticket = json.loads(os.environ.get('XU_CUDA_ADMISSION', '{}'))
     if (ticket.get('policy') != 'v2' or ticket.get('device') != card['device']
             or not ticket.get('uuid') or ticket['uuid'].removeprefix('GPU-') != card['uuid'].removeprefix('GPU-')):
@@ -44,7 +54,7 @@ def _worker(out, size):
     if device_identity(card['device'], torch) != card:
         raise RuntimeError('Physical GPU changed after parent v2 admission')
     directory = out/size
-    row = dict(size=size, device=card['device'], uuid=card['uuid'], request=request['nonce'],
+    row = dict(size=size, device=parent_card['device'], local_device=card['device'], uuid=card['uuid'], request=request['nonce'],
                pid=os.getpid(), ready_ns=time.monotonic_ns())
     atomic_json(directory/'ready.json', row)
     peer_path = out/SIZES[1-index]/'ready.json'
@@ -73,7 +83,7 @@ def _validate(out, request):
         card = request['devices'][index]
         directory = out/size
         row = read_json(directory/'execution.json')
-        report = read_json(directory/'capacity.json')
+        report = report_for_parent(read_json(directory/'capacity.json'),[card['device']])
         side = int(size[2:])
         if (row['request'] != request['nonce'] or row['device'] != card['device']
                 or row['uuid'] != card['uuid'] or row['size'] != size

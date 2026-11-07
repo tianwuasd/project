@@ -43,7 +43,7 @@ class BranchSchedulingTests(unittest.TestCase):
                 children = Children(out, owner)
                 children.configure_launch(2)
                 def worker(name):
-                    args = SimpleNamespace(threads=1, children=children, overlay={},device=name)
+                    args = SimpleNamespace(threads=1, children=children, overlay={},device='cpu')
                     peer = 'right' if name == 'left' else 'left'
                     mode = ('fail' if name == 'left' else 'wait') if fail else 'ok'
                     pipeline._execute('../tests/fixtures/xu_pair_child.py',[out,name,peer,mode],name,out,owner,args)
