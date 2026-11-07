@@ -107,8 +107,25 @@ def admission(spec, host_free, cuda_free=None, *, total=None, policy='legacy',
     return ('below_host_budget' if host_need > host_budget else None), data
 
 
-def _step_3d(stage, device, supervision, record=None):
+def _samples_3d(spec, supervision):
     import numpy as np
+
+    rng = np.random.default_rng(2023)
+    shape = (spec.side,) * 3
+    image = rng.standard_normal(shape, dtype=np.float32)
+    label = rng.integers(0, 10, shape, dtype=np.int8)
+    names = [f'probe-{i}' for i in range(spec.batch)]
+    groups = {name: [10] if supervision == 'marginal' and i % 2 else []
+              for i, name in enumerate(names)}
+
+    def load(name, branch):
+        return image, label
+
+    load.source_voxels = lambda name: image.size
+    return names, groups, load
+
+
+def _step_3d(stage, device, supervision, record=None):
     import torch
     from .xu_models import build_model
     from .xu_training import _epoch, learning_rate
@@ -117,19 +134,14 @@ def _step_3d(stage, device, supervision, record=None):
     model = build_model(branch, 'paper').to(device)
     spec = model.spec
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate(0,spec.epochs))
-    rng = np.random.default_rng(2023)
-    shape = (spec.side,) * 3
-    image = rng.standard_normal(shape, dtype=np.float32)
-    label = rng.integers(0, 10, shape, dtype=np.int8)
-    names = [f'probe-{i}' for i in range(spec.batch)]
-    groups = {name: [10] if supervision == 'marginal' and i % 2 else []
-              for i, name in enumerate(names)}
+    names, groups, load = _samples_3d(spec, supervision)
     before = model.head.weight.detach().clone()
     stats = {}
-    loss = _epoch(model, names, groups, lambda name, branch: (image,label), branch, device,
+    loss = _epoch(model, names, groups, load, branch, device,
                   torch.Generator(device=device).manual_seed(2023), optimizer, stats=stats)
     if record is not None:
         record['distribution'] = stats['distribution']
+        record['supply'] = stats
     return loss, (model.head.weight.detach() - before).abs().max().item()
 
 
