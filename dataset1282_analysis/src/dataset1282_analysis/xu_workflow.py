@@ -55,6 +55,8 @@ def roi_book(path, cache, args):
 
 def train(cache, args, out):
     from .xu_training import train_branch
+    from .xu_sample_cache import CachedPrepared
+    reader = CachedPrepared(cache,out/'.input-cache')
     book = roi_book(args.boxes, cache, args)
     strict = args.supervision=='complete'
     train_names = cache.case_ids('train', complete_only=strict)
@@ -70,10 +72,11 @@ def train(cache, args, out):
     def load(name, branch):
         shape = (side(branch),)*3
         box = book['boxes'][name] if book is not None else None
-        return cache.read_image(name,shape,box), cache.read_label(name,shape,box)
+        return reader.read_image(name,shape,box), reader.read_label(name,shape,box)
 
     from math import prod
     load.source_voxels = lru_cache(maxsize=None)(lambda name: prod(cache.geometry(name).cache_shape))
+    load.cache_stats = reader.arrays.stats
 
     def annotations(names):
         return {name:cache.supervision[name]['unknown_classes'] for name in names}

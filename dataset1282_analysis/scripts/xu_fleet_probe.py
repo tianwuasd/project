@@ -27,6 +27,7 @@ def inference_check(args,out,owner,children,free,state):
                          host_demand_bytes=lane_bytes*len(cards),cuda_demand_bytes=256*1024**2,
                          require_pid_evidence=args.resource_policy=='v2' and os.name=='posix')
     args.overlay=combined_environment(plan,cards)
+    args.overlay.update(XU_PREFETCH='1',XU_PREFETCH_BYTES=str(512*1024**2),XU_PREFETCH_WORKERS='1')
     args.device=cards[0]
     args.assigned_devices=cards
     args.children=children

@@ -1,9 +1,7 @@
 """Fresh admission for independent Xu stages. CUDA indices always refer to the job's visible devices."""
 import json
 import os
-import subprocess
 import sys
-from uuid import UUID
 
 import psutil
 
@@ -39,45 +37,13 @@ def gpu_budget(free, total, policy):
 
 
 def _device_info(selection):
-    import torch
-    device = torch.device(selection)
-    if device.type != 'cuda' or not torch.cuda.is_available():
-        raise ResourceUnavailable(f'Requested CUDA device unavailable: {selection}')
-    index = torch.cuda.current_device() if device.index is None else device.index
-    if index >= torch.cuda.device_count():
-        raise ResourceUnavailable(f'Device outside the visible CUDA set: {selection}')
-    props = torch.cuda.get_device_properties(index)
-    # torch reports an unprefixed CUDA UUID. Match only the same physical UUID
-    # in nvidia-smi; physical indices may differ under CUDA_VISIBLE_DEVICES.
-    raw = str(getattr(props, 'uuid', ''))
-    try:
-        uuid = 'GPU-' + str(UUID(raw.removeprefix('GPU-')))
-    except ValueError:
-        uuid = None
-    free, total = torch.cuda.mem_get_info(index)
-    return dict(device=f'cuda:{index}', uuid=uuid, name=props.name,
-                free_bytes=int(free), total_bytes=int(total))
+    from .xu_gpu_probe import device_info
+    return device_info(selection)
 
 
 def _compute_pids(uuid):
-    if uuid is None:
-        return None
-    try:
-        proc = subprocess.run(
-            ['nvidia-smi', '--id='+uuid, '--query-compute-apps=gpu_uuid,pid',
-             '--format=csv,noheader,nounits'], capture_output=True, text=True,
-            check=True, timeout=5)
-        pids = set()
-        for line in proc.stdout.splitlines():
-            if not line.strip():
-                continue
-            row_uuid, pid = (part.strip() for part in line.split(','))
-            if row_uuid.casefold() != uuid.casefold() or int(pid) <= 0:
-                return None
-            pids.add(int(pid))
-        return pids
-    except (OSError, subprocess.SubprocessError, ValueError):
-        return None
+    from .xu_gpu_probe import gpu_snapshot
+    return set(gpu_snapshot()[uuid]['compute_pids'])
 
 
 def _identities(pids):
@@ -129,7 +95,7 @@ def _peer_credit(peers, parent, outstanding):
 
 
 def _check_device(info, policy, owned, required):
-    pids = _compute_pids(info['uuid']) if policy == 'v2' else None
+    pids = set(info['compute_pids']) if 'compute_pids' in info else _compute_pids(info['uuid'])
     if required and pids is None:
         raise ResourceUnavailable(f"No GPU PID evidence for {info['device']} ({info['uuid']})")
     if pids is not None:
@@ -140,6 +106,8 @@ def _check_device(info, policy, owned, required):
                     owned.get(str(pid)) != live[str(pid)]]
         if external:
             raise ResourceUnavailable(f"External compute processes on {info['device']}: {sorted(external)}")
+        if not pids and info.get('utilization',0) > 5:
+            raise ResourceUnavailable(f"GPU is not idle on {info['device']}: {info['utilization']}%")
     limit = gpu_budget(info['free_bytes'], info['total_bytes'], policy)
     if limit < 1:
         raise ResourceUnavailable(f"No CUDA budget left on {info['device']}")
@@ -337,10 +305,8 @@ def apply_env_limit(device):
             or any(not t['uuid'] or t['policy'] != 'v2' for t in tickets)
             or len({t['uuid'] for t in tickets}) != len(tickets)):
         raise ResourceUnavailable('GPU group tickets do not match the allocated stage')
-    try:
-        cards = {t['device']:_apply_card(t['device'],t) for t in tickets}
-    finally:
-        torch.cuda.set_device(requested)
+    cards = {t['device']:_apply_card(t['device'],t) for t in tickets}
+    torch.cuda.set_device(requested)
     _applied_group = (os.getpid(),tuple(names))
     _applied_host = (os.getpid(),host)
     return dict(result, **cards[str(requested)], per_device=cards)
@@ -348,8 +314,6 @@ def apply_env_limit(device):
 
 def _apply_card(device, spec):
     import torch
-    # Select the card before any property or memory access can initialize a context.
-    torch.cuda.set_device(torch.device(device))
     info = _device_info(device)
     if spec['device'] != info['device'] or spec['uuid'] != info['uuid']:
         raise ResourceUnavailable(f'Allocated CUDA identity changed for {device}')
@@ -358,6 +322,8 @@ def _apply_card(device, spec):
     limit = min(info['allocator_budget_bytes'], int(spec['limit_bytes']))
     if limit <= 0 or limit < spec['cuda_demand_bytes']:
         raise ResourceUnavailable(f'CUDA demand {spec["cuda_demand_bytes"]} exceeds fresh budget {limit}')
+    # 通过 UUID、外部进程和实时显存检查后，才允许创建计算上下文。
+    torch.cuda.set_device(torch.device(device))
     torch.cuda.set_per_process_memory_fraction(limit/info['total_bytes'], device)
     info.update(allocator_budget_bytes=limit, cuda_demand_bytes=spec['cuda_demand_bytes'])
     return dict(info, policy=spec['policy'])

@@ -25,8 +25,15 @@ def _inputs():
 
 def _load(device, template, image, barrier):
     import torch
+    from .xu_supply import BatchSupply
     model = copy.deepcopy(template).to(device)
-    values = image.to(device)
+    supply = BatchSupply([0],1,64,lambda batch:(image,image),lambda _:64**3)
+    with supply.batches() as batches:
+        for _,pair in batches:
+            values,_ = supply.transfer(pair,device)
+            torch.testing.assert_close(values.cpu(),image,rtol=0,atol=0)
+    if not supply.stats['pinned_memory'] or not supply.stats['non_blocking']:
+        raise ValueError('GPU 短测必须实际完成固定页非阻塞复制')
     torch.cuda.synchronize(device)
     props = torch.cuda.get_device_properties(device)
     identifier = str(props.uuid)
@@ -49,7 +56,7 @@ def _load(device, template, image, barrier):
             checksum = int(labels.sum().item())
         return dict(case=name,device=device,uuid=identifier,ready_ns=ready,forward_start_ns=started,
                     cuda_completed_ns=finished,cuda_elapsed_ms=begin.elapsed_time(end),
-                    label_sum=checksum,finite=True,shape=list(scores.shape))
+                    label_sum=checksum,finite=True,shape=list(scores.shape),input_supply=supply.stats)
     return predict
 
 

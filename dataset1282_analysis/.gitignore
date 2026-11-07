@@ -4,6 +4,7 @@ code_versions/
 .update/
 .runtime/
 .superpowers/
+local-validation/
 __pycache__/
 *.py[cod]
 .pytest_cache/

@@ -296,6 +296,8 @@ def train_branch(*, branch, output_dir, train_cases, validation_cases, load_samp
             best_loss,best_epoch=validation_loss,epoch
         entry=dict(epoch=epoch+1,learning_rate=lr,train_loss=train_loss,validation_loss=validation_loss,
                    train_supply=train_supply, validation_supply=validation_supply)
+        if hasattr(load_sample,'cache_stats'):
+            entry['input_cache_cumulative'] = dict(load_sample.cache_stats)
         history.append(entry)
         state=dict(contract=contract,model=model.state_dict(),optimizer=optimizer.state_dict(),
                    epoch=epoch,best_epoch=best_epoch,best_loss=best_loss,history=history)
