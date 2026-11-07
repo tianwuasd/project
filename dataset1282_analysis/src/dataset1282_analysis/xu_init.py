@@ -98,6 +98,8 @@ def _inference_contract(cache, branch, profile, supervision, book):
 
 
 def train_init(cache,args,out):
+    from .xu_sample_cache import CachedPrepared
+    reader = CachedPrepared(cache,out/'.input-cache')
     from .xu_workflow import roi_book
     book = roi_book(args.boxes,cache,args)
     targets = TargetStore(args.targets,cache)
@@ -145,12 +147,13 @@ def train_init(cache,args,out):
         for g in optimizer.param_groups:
             g['lr']=lr
         train_supply, validation_supply = {}, {}
-        tr=_epoch(model,names,cache,targets,book,device,rng,optimizer,train_supply)
-        va=_epoch(model,val,cache,targets,book,device,stats=validation_supply)
+        tr=_epoch(model,names,reader,targets,book,device,rng,optimizer,train_supply)
+        va=_epoch(model,val,reader,targets,book,device,stats=validation_supply)
         if va<best_loss:
             best_epoch,best_loss=epoch,va
         row=dict(epoch=epoch+1,train_loss=tr,validation_loss=va,learning_rate=lr,
                  train_supply=train_supply, validation_supply=validation_supply)
+        row['input_cache_cumulative'] = dict(reader.arrays.stats)
         print(json.dumps(row),flush=True)
         history.append(row)
         state=dict(contract=contract,epoch=epoch,history=history,best_epoch=best_epoch,best_loss=best_loss,

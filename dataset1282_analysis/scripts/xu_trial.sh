@@ -21,14 +21,14 @@ cd "$CODE"
 test -x "$PY"
 test -s "$D/complete.json"
 "$PY" -B -c 'import torch,numpy,scipy,skimage,nibabel,blosc2,psutil; assert torch.cuda.is_available() and torch.cuda.device_count() >= 1'
-PYTHONPATH=src "$PY" -B -c 'from pathlib import Path; from dataset1282_analysis.maintenance import verify_release; print("verified files",len(verify_release(Path.cwd())["files"]))'
+PYTHONPATH="src${PYTHONPATH:+:$PYTHONPATH}" "$PY" -B -c 'from pathlib import Path; from dataset1282_analysis.maintenance import verify_release; print("verified files",len(verify_release(Path.cwd())["files"]))'
 mkdir "$RUN"
 O="$RUN/training"
 printf 'CODE=%q\nPY=%q\nD=%q\nRUN=%q\nO=%q\nGPU_POOL=%q\nPAUSE_EPOCHS=%q\n' "$CODE" "$PY" "$D" "$RUN" "$O" "$GPU_POOL" "$PAUSE_EPOCHS" > "$RUN/settings.sh"
 export OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4
 echo 'Checking prepared cohort and checkpoint recovery'
 "$PY" -B scripts/xu_seg.py inspect --prepared "$D"
-PYTHONPATH=src:tests "$PY" -B -m unittest test_xu_training test_xu_epoch_pause -v
+PYTHONPATH="src:tests${PYTHONPATH:+:$PYTHONPATH}" "$PY" -B -m unittest test_xu_training test_xu_epoch_pause -v
 for stage in inference 3d64 3d128; do
   echo "GPU short check: $stage"
   "$PY" -B -u scripts/xu_fleet_probe.py --devices "$GPU_POOL" --stage "$stage" --threads 4 --output "$RUN/check-$stage"
@@ -36,5 +36,5 @@ done
 echo "Short checks passed; starting both paper localizers through epoch $PAUSE_EPOCHS"
 "$PY" -B -u scripts/xu_pipeline.py run --prepared "$D" --output "$O" \
   --profile paper --supervision marginal --devices "$GPU_POOL" --threads 4 \
-  --wait-seconds 60 --pause-after-epoch "$PAUSE_EPOCHS"
+  --prefetch --wait-seconds 60 --pause-after-epoch "$PAUSE_EPOCHS"
 echo 'Trial command ended; inspect training/status.json for the recorded outcome'

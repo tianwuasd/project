@@ -20,20 +20,21 @@ def device_identity(name, torch):
     device = torch.device(name)
     if device.type == 'cpu' and device.index is None:
         return {'device': 'cpu'}
-    if device.type != 'cuda' or not torch.cuda.is_available():
+    if device.type != 'cuda':
         raise ValueError(f'Requested device unavailable: {name}')
-    index = torch.cuda.current_device() if device.index is None else device.index
-    if index >= torch.cuda.device_count():
+    from .xu_gpu_probe import visible_devices
+    index = 0 if device.index is None else device.index
+    cards = visible_devices()
+    if index >= len(cards):
         raise ValueError(f'Requested GPU is outside the visible allocation: {name}')
-    props = torch.cuda.get_device_properties(index)
-    return dict(device=f'cuda:{index}', name=props.name, total_bytes=props.total_memory,
-                uuid=str(getattr(props, 'uuid', 'unavailable')))
+    return dict(cards[index])
 
 
 def select_devices(single, multiple, torch):
     automatic = multiple in ('auto','all-visible') or (multiple is None and single is None)
     if automatic:
-        count = torch.cuda.device_count()
+        from .xu_gpu_probe import visible_devices
+        count = len(visible_devices())
         if count < 1:
             raise ValueError('No visible CUDA devices; select --device cpu for a CPU run')
         mask = os.environ.get('CUDA_VISIBLE_DEVICES')
@@ -114,6 +115,35 @@ class Children:
         with self.lock:
             return dict(self.births)
 
+    def owned_identities(self, stage=None):
+        return {pid:row['create_time'] for pid,row in self.owned_processes(stage).items()}
+
+    def owned_processes(self, stage=None):
+        with self.lock:
+            entries = [(pid,self.births[pid],row['stage']) for pid,(child,row) in self.active.items()
+                       if child.poll() is None and pid in self.births and
+                       (stage is None or row['stage'] == stage)]
+        table = {p.pid:p.info for p in psutil.process_iter(
+            attrs=['pid','ppid','create_time','memory_full_info'],ad_value=None)}
+        owned = {str(os.getpid()):dict(table[os.getpid()],stage=None)} if stage is None else {}
+        for pid,birth,name in entries:
+            if pid not in table:
+                continue
+            row = table[pid]
+            if row['create_time'] != birth or row['ppid'] != os.getpid():
+                raise RuntimeError('本次子进程身份发生变化')
+            owned[str(pid)] = dict(row,stage=name)
+            pending = [pid]
+            while pending:
+                parent = pending.pop()
+                for key,child in table.items():
+                    if child['ppid'] == parent and str(key) not in owned:
+                        if child['create_time'] is None:
+                            raise RuntimeError('无法核实本次子进程的创建时间')
+                        owned[str(key)] = dict(child,stage=name)
+                        pending.append(key)
+        return owned
+
     def peer_pids(self, device):
         with self.lock:
             return {pid: self.births[pid] for pid, (child, row) in self.active.items()
@@ -175,15 +205,30 @@ def reserve_pair(args, out):
             time.sleep(min(2, max(0, deadline-time.monotonic())))
 
 
+def prefetch_cpu_allocation(slots, threads, workers):
+    from .xu_resources import ResourceUnavailable
+    if any(type(n) is not int or n < 1 for n in (slots,threads,workers)):
+        raise ValueError('CPU 份额、数值线程和供数上限必须为正整数')
+    if slots < 2:
+        raise ResourceUnavailable('并行预取需要至少两个 CPU 工作槽；当前只有一个')
+    actual_threads = min(threads,slots//2)
+    actual_workers = min(workers,slots//actual_threads-1)
+    return actual_threads,actual_workers
+
+
 def plan_stage(stage, args, out, children, concurrent, purpose, checked):
     from .xu_resources import ResourceUnavailable, combined_environment, stage_resources
-    from .xu_fleet import INFERENCE, needs_for_width, preflight_sizes
+    from .xu_fleet import INFERENCE, TRAIN_3D, needs_for_width, preflight_sizes
     device = (stage.argv[stage.argv.index('--device') + 1]
               if '--device' in stage.argv and stage.name != 'audit-roi' else 'cpu')
     group = list(getattr(args,'assigned_devices',None) or [device])
     if device != group[0]:
         raise ValueError('Stage primary device differs from its frozen group')
     policy = args.resource_policy
+    enabled = args.prefetch and stage.name in TRAIN_3D
+    requested_workers = getattr(args,'prefetch_workers',4)
+    if requested_workers < 1:
+        raise ValueError('CPU worker 上限必须为正整数')
     demand = cuda_demand = 0
     if device != 'cpu' and stage.name in INFERENCE:
         demand = getattr(args,'inference_worker_bytes',0) * len(group)
@@ -211,6 +256,10 @@ def plan_stage(stage, args, out, children, concurrent, purpose, checked):
                                                       (out/'receipts'/(args.peer_name+'.json')).is_file()),
                                    require_pid_evidence=(policy == 'v2' and device.startswith('cuda')
                                                          and os.name == 'posix'))
+            workers = 1
+            if enabled:
+                plan['threads'],workers = prefetch_cpu_allocation(
+                    plan['cpu_slots']//concurrent,plan['threads'],requested_workers)
         except ResourceUnavailable as exc:
             if time.monotonic() >= until:
                 atomic_json(out/'resources'/f'{stage.name}-denied-{time.time_ns()}.json',
@@ -222,11 +271,16 @@ def plan_stage(stage, args, out, children, concurrent, purpose, checked):
             continue
         break
     overlay = combined_environment(plan, group)
-    # The current batch, model and I/O compete with the one optional read-ahead batch.
-    prefetch = min(getattr(args, 'prefetch_mib', 4096) * 1024**2,
-                   max(0, (plan['host_per_stage_bytes'] - demand) // 4))
-    overlay.update(XU_PREFETCH='1' if args.prefetch and prefetch else '0', XU_PREFETCH_BYTES=str(prefetch))
+    # 当前批次和模型之外，为有序供数队列分配独立预算。
+    host = plan['host_per_stage_bytes']
+    prefetch = min(getattr(args, 'prefetch_mib', 16384) * 1024**2,
+                   max(0,host-demand-max(1024**3,host//5)))
+    if enabled and prefetch <= 0:
+        raise ResourceUnavailable('CPU 预取缺少可用内存预算')
+    overlay.update(XU_PREFETCH='1' if enabled else '0', XU_PREFETCH_BYTES=str(prefetch),
+                   XU_PREFETCH_WORKERS=str(workers))
     path = out/'resources'/f'{stage.name}-{purpose}-{time.time_ns()}.json'
     atomic_json(path, dict(stage=stage.name, purpose=purpose, device=device, devices=group, concurrent=concurrent,
-                           requested_threads=args.threads, prefetch_budget_bytes=prefetch, plan=plan))
+                           requested_threads=args.threads, prefetch_budget_bytes=prefetch,
+                           prefetch_workers=workers, plan=plan))
     return device, overlay

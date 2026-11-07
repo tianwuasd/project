@@ -65,6 +65,7 @@ def _contract(cache, args):
                 seed=args.seed, padding_percent=PADDING, device=devices[0], torch=str(torch.__version__),
                 devices=devices, resource_policy=args.resource_policy, prefetch=args.prefetch,
                 prefetch_mib=args.prefetch_mib,
+                prefetch_workers=getattr(args,'prefetch_workers',4),
                 cpu_threads=args.threads,
                 libraries={n:version(n) for n in ('numpy','scipy','nibabel','blosc2','scikit-image')},
                 supplied_crop64=_input_file(args.crop64), supplied_crop128=_input_file(args.crop128),
@@ -78,7 +79,7 @@ def _files(directory, required):
     files = {}
     for path in sorted(directory.rglob('*')):
         relative = path.relative_to(directory)
-        if relative.parts[0] == '.runtime':
+        if relative.parts[0] in ('.runtime','.input-cache'):
             continue
         if path.resolve() != path:
             raise ValueError(f'Unexpected link in stage output: {relative}')
@@ -108,18 +109,23 @@ def _execute(script, argv, name, out, owner, args):
     args.children.ensure_running()
     for key in ('XU_RESOURCE_POLICY','XU_HOST_BUDGET_BYTES','XU_HOST_DEMAND_BYTES',
                 'XU_WAVE_RESERVATION','XU_CUDA_ADMISSION','XU_CUDA_ADMISSIONS','XU_BRANCH_DEVICES',
-                'XU_PREFETCH','XU_PREFETCH_BYTES'):
+                'XU_PREFETCH','XU_PREFETCH_BYTES','XU_PREFETCH_WORKERS'):
         env.pop(key, None)
     env.update(args.overlay)
     command = [sys.executable, '-B', '-u', str(ROOT/'scripts'/script), *map(str, argv)]
     print(f'Running {name} | {log}', flush=True)
+    from .xu_runtime_guard import RuntimeGuard
+    guard = RuntimeGuard(out/'resources',name,args.overlay,args.children)
     with log.open('xb') as stream:
         stream.write((json.dumps(command, ensure_ascii=False)+'\n').encode('utf-8'))
         stream.flush()
         child = subprocess.Popen(command, cwd=ROOT, env=env, stdout=stream, stderr=subprocess.STDOUT)
         try:
             args.children.attach(child, name, args.device, log, getattr(args,'assigned_devices',None))
-            code = child.wait()
+            while child.poll() is None:
+                guard.check()
+                time.sleep(1)
+            code = child.returncode
         finally:
             if child.poll() is None:
                 child.terminate()
@@ -128,6 +134,7 @@ def _execute(script, argv, name, out, owner, args):
                 except subprocess.TimeoutExpired:
                     child.kill()
                     child.wait()
+            guard.finish(child.returncode)
             args.children.detach(child)
     if code:
         raise StageError(f'{name} exited {code}: {_tail(log)} (log: {log})')
@@ -461,9 +468,10 @@ def main(argv=None):
     run.add_argument('--resource-policy',choices=('legacy','v2'),
                      help='Linux and multi-GPU default to v2; a single local Windows GPU defaults to legacy')
     run.add_argument('--wait-seconds',type=int,default=0, help='Bounded wait per resource check, 0 to 300 seconds')
-    run.add_argument('--prefetch-mib',type=int,default=4096, help='Maximum additional CPU batch memory per branch (MiB)')
-    run.add_argument('--prefetch',action='store_true',
-                     help='Enable one bounded CPU look-ahead batch per 3D training branch')
+    run.add_argument('--prefetch-mib',type=int,default=16384, help='Maximum additional CPU batch memory per branch (MiB)')
+    run.add_argument('--prefetch-workers',type=int,default=4,help='Upper bound on CPU batch preparation workers')
+    run.add_argument('--prefetch',action=argparse.BooleanOptionalAction,default=True,
+                     help='Use ordered, resource-bounded CPU prefetch (enabled by default)')
     run.add_argument('--threads',type=int,help='CPU numerical threads per child process')
     run.add_argument('--seed',type=int,default=2023)
     run.add_argument('--crop64',type=Path,help='Optional frozen 64-cube whole-scan locator')

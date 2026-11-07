@@ -4,10 +4,9 @@
 
 ## 在服务器启动
 
-进入本分支检出的 `dataset1282_analysis` 目录，选择已经分配给作业的 GPU 和装有 PyTorch、SciPy、nibabel、scikit-image、blosc2、psutil 的研究 Python。先确认该 Python 能识别目标 GPU，结果目录有足够空间保存检查点、辅助标签、分支预测和多份原网格分割。以下使用 Bash。
+进入检出的 `dataset1282_analysis` 目录，先运行 `python3 scripts/setup_gpu.py --install --runtime "$R"` 并执行 `source "$R/training-env.sh"`。入口复用合格的研究 Python；GPU 查询所需的 `cuda-bindings` 缺失时，只在运行目录的 `gpu-query-py主次版本/` 中安装并导出本项目使用的 `PYTHONPATH`。以下命令沿用导出的 `PY` 和 `PYTHONPATH`。结果目录需有足够空间保存检查点、网络输入缓存和预测。
 
 ```bash
-PY=/path/to/research/bin/python
 D=/path/to/prepared/RUN/hu-marginal
 O=/path/to/private/experiments/xu-marginal
 GPU=auto
@@ -46,7 +45,13 @@ nohup "$PY" -B -u scripts/xu_pipeline.py run "${args[@]}" >"${O}.launcher.log" 2
 
 **调度和恢复。** 每个新阶段重新筛选资源。v2 预留每卡总显存的 10% 且至少 4 GiB，核对 UUID、空闲显存、外部计算进程及 CPU/cgroup 证据，实际子进程逐卡复核并设置显存分配器上限。活动分支共享一份 CPU/RAM 预约，已核实的兄弟进程私有内存可抵扣其尚未兑现的预留。阶段内固定工作量与成员；中断后已开始的阶段使用已记录的同一组设备和最新完成的检查点。在下一阶段重新选卡。`assignments/` 记录每阶段的候选、分配、占用或未用的卡及有效工作槽，`resources/` 记录预算，训练日志和推理分片记录可核对逐卡实际工作量。`status.json` 的 `active` 包含进程、设备组及日志。开发数据和缓存版本的变化需用新目录。旧版冻结任务使用原包恢复。
 
-**CPU 和预测复用。** `--threads 4` 为每个活动分支的数值线程上限。显式加 `--prefetch` 可提前读取最多一批，`--prefetch-mib` 给出每支附加内存上限。供数日志记录实际启用、主机等待及传输耗时。三次融合可复用签名一致的分支预测；签名包含数据、取框、权重、环境及实际设备分片，各自的 `prediction-cache.json` 列出命中和新算数量。血池阶段切换会释放冻结参数残留梯度。
+**CPU 和预测复用。** 预取默认开启，可用 `--no-prefetch` 做实测对照；`--prefetch-workers 4` 和 `--prefetch-mib 16384` 分别是每支供数线程和队列内存上限。实际并发还受 CPU 份额、数值线程、源病例尺寸及实时 RAM 限制。多个线程按原顺序交付完整批次，增强和随机数继续在训练线程执行。`--threads 4` 控制每支数值线程数。日志记录实际 worker、队列峰值、内存预约、等待与复制时间；并行 worker 的准备时间是累计值，不能与等待时间相加当作总耗时。CUDA 使用固定页内存、独立复制流和事件同步，主机输入保留至复制完成。
+
+训练目录的 `.input-cache/` 保存同一尺寸与框的 NumPy 输入，校验源文件、变换代码和内容摘要后复用。损坏会终止任务。每轮 `input_cache_cumulative` 记录累计命中与生成次数；它属于可重新生成的加速产物，不列入检查点完成凭据。三次融合继续复用签名一致的分支预测，命中数量在 `prediction-cache.json`。模型、batch、FP32、采样、损失及学习率保持既定设置。
+
+**运行期间检查。** GPU 枚举通过 CUDA Driver UUID 查询，不建立计算上下文；外部计算 PID 或无进程归属但仍繁忙的设备拒绝准入。启动父进程与实际 worker 再次检查。父进程在每次检查结束后等待 1 秒继续检查，本阶段私有内存、主机/cgroup 余量、GPU 外部进程和显存余量写入 `resources/*-runtime.json`。发现冲突会终止本次子进程并保留最后完整 epoch；拒绝原因另存 `*-interrupted-*.json`，所有外部进程保持运行。调度检查无法阻止另一用户在检查间隔内启动任务。服务器使用 v2 显存余量，查询异常直接终止。
+
+可执行 `"$PY" scripts/xu_acceleration_check.py --prepared "$D" --output "$W/check-input-new"` 测量实际病例的串行、并行首次缓存、串行热读取和缓存复用。该检查采用小型 Conv3d 验证输入与 Adam 更新，计时只用于供数验收；完整模型吞吐通过正式试跑日志测量。
 
 `scripts/xu_fleet_probe.py` 在一次资格检查中会分组覆盖可用卡。正式 3D 一批最多 4 例，各组各做一次真实更新；该诊断的总耗时与正式训练每轮吞吐分别测量。只有一张卡的本机可显式选 `--device cuda:0`（独立容量命令用 `--devices cuda:0`）。单卡 Linux 共享运行默认 v2，本机小显存兼容策略可显式传 `--resource-policy legacy`。
 

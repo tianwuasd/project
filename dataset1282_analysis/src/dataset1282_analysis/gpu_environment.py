@@ -225,11 +225,16 @@ def ensure(runtime, explicit=None, base=None, proxy=None):
             report['selected'] = selected
             if not selected['ready']:
                 raise RuntimeError('Installed runtime failed verification; inspect selected in report')
+            from .gpu_query_environment import ensure_binding
+            report['gpu_query'] = ensure_binding(runtime,selected,install=True,proxy=proxy)
             report['state'] = 'ready'
             # Publication only after all checks succeed, under the operation lock.
             staged = shell.with_suffix('.tmp')
             with staged.open('w', encoding='utf-8', newline='\n') as stream:
                 stream.write('export PY=' + shlex.quote(selected['python']) + '\n')
+                if report['gpu_query']['path']:
+                    stream.write('export PYTHONPATH='+shlex.quote(report['gpu_query']['path'])+
+                                 '${PYTHONPATH:+:$PYTHONPATH}\n')
             os.replace(staged, shell)
             return report
         except Exception as exc:
@@ -253,6 +258,11 @@ def main(argv=None):
         if args.check:
             rows, selected = scan(args.runtime.resolve(), args.reuse_python)
             report = dict(state='ready' if selected else 'unavailable', candidates=rows, selected=selected)
+            if selected:
+                from .gpu_query_environment import ensure_binding
+                report['gpu_query'] = ensure_binding(args.runtime.resolve(),selected)
+                if not report['gpu_query']['ready']:
+                    report['state'] = 'unavailable'
         else:
             report = ensure(args.runtime, args.reuse_python, args.base_python, args.proxy)
         print(json.dumps(report, ensure_ascii=False, indent=2))
