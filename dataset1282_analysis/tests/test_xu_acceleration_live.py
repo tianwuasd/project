@@ -124,7 +124,9 @@ class GpuQueryLiveTests(unittest.TestCase):
         rows = gpu_snapshot()
         self.assertTrue(devices)
         self.assertTrue(all(row['uuid'] in rows for row in devices))
-        self.assertEqual(int(driver.cuCtxGetCurrent()[1]),0)
+        status, context = driver.cuCtxGetCurrent()
+        self.assertIn(int(status),(0,3))
+        self.assertTrue(context is None or int(context)==0)
         self.assertFalse(torch.cuda.is_initialized())
 
     def test_real_external_gpu_process_is_rejected_without_context(self):
@@ -138,7 +140,9 @@ class GpuQueryLiveTests(unittest.TestCase):
         info = {**rows[occupied[0]['uuid']],**occupied[0]}
         with self.assertRaisesRegex(ResourceUnavailable,'External compute'):
             _check_device(info,'v2',{},True)
-        self.assertEqual(int(driver.cuCtxGetCurrent()[1]),0)
+        status, context = driver.cuCtxGetCurrent()
+        self.assertIn(int(status),(0,3))
+        self.assertTrue(context is None or int(context)==0)
 
 
 class RuntimeGuardLiveTests(unittest.TestCase):
@@ -151,8 +155,7 @@ class RuntimeGuardLiveTests(unittest.TestCase):
                 self.assertLessEqual((workers+1)*threads,slots)
                 self.assertLessEqual(threads,cap)
                 self.assertGreaterEqual(workers,1)
-        with self.assertRaises(ResourceUnavailable):
-            prefetch_cpu_allocation(1,1,4)
+        self.assertEqual(prefetch_cpu_allocation(1,1,4),(1,0))
 
     def test_actual_stage_limits_consumer_and_prefetch_together(self):
         from dataset1282_analysis.xu_dispatch import Children, plan_stage

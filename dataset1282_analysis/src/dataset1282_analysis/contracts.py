@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import time
 
 
 def sha256_file(path):
@@ -30,7 +31,16 @@ def atomic_json(path, value):
             f.write('\n')
             f.flush()
             os.fsync(f.fileno())
-        os.replace(name, path)
+        deadline = time.monotonic()+2
+        while True:
+            try:
+                os.replace(name, path)
+                break
+            except PermissionError as error:
+                # Windows 短暂读句柄会阻止原子替换；限定等待后仍保留原错误。
+                if os.name != 'nt' or error.winerror not in (5,32) or time.monotonic() >= deadline:
+                    raise
+                time.sleep(.02)
     finally:
         if os.path.exists(name):
             os.unlink(name)

@@ -13,6 +13,7 @@ from dataset1282_analysis.xu_dispatch import Children, select_devices
 from dataset1282_analysis.xu_fleet import available, distribute
 from dataset1282_analysis.xu_pipeline import _execute
 from dataset1282_analysis.xu_resources import combined_environment, stage_resources
+from dataset1282_analysis.xu_gpu_isolation import configure_coordinator, report_for_parent
 
 
 def inference_check(args,out,owner,children,free,state):
@@ -41,7 +42,7 @@ def inference_check(args,out,owner,children,free,state):
     finally:
         timeout.cancel()
         timeout.join()
-    report=read_json(out/'inference.json')
+    report=report_for_parent(read_json(out/'inference.json'),cards)
     if report.get('state')!='passed' or report.get('devices')!=cards:
         raise ValueError('Missing successful forward from each assigned inference GPU')
     state['groups'].append(dict(devices=cards,report=str(out/'inference.json')))
@@ -73,7 +74,7 @@ def capacity_groups(args,out,owner,children,remaining,state):
         atomic_json(out/(path.name+'-admission.json'),plan)
         _execute('xu_capacity.py',['--stage',args.stage,'--device',args.device,'--policy',args.resource_policy,
                  '--supervision','marginal','--output',path],path.name,out,owner,args)
-        result=read_json(path/'capacity.json')
+        result=report_for_parent(read_json(path/'capacity.json'),group)
         measured=result.get('per_device',{})
         if (result.get('state')!='passed' or result.get('optimizer_steps')!=1 or set(measured)!=set(group)
                 or any(m.get('peak_cuda_allocated_bytes',0)<=0 for m in measured.values())):
@@ -83,6 +84,7 @@ def capacity_groups(args,out,owner,children,remaining,state):
 
 
 def run(args):
+    configure_coordinator()
     import torch
     out = args.output.resolve()
     if any((p/'.git').exists() for p in (out,*out.parents)) or out.exists():

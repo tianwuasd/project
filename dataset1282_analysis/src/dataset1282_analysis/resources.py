@@ -8,6 +8,13 @@ from .vendor.vista_live_resources import snapshot as linux_snapshot
 GIB=1024**3
 
 
+def available_memory_bytes():
+    # 每批供数只读取 RAM/cgroup 余量，不等待 CPU 利用率采样。
+    if os.name == 'nt':
+        return psutil.virtual_memory().available
+    return linux_snapshot(sample_seconds=0)['available_memory_bytes']
+
+
 def preprocessing_memory(input_voxels, output_voxels=0):
     """Sequential nnU-Net working-set reservation, including interpolation buffers."""
     return 1200 * 2**20 + 40 * max(input_voxels, output_voxels)

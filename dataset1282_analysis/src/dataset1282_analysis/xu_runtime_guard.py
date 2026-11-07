@@ -1,14 +1,28 @@
 import json
+import os
 import time
 
 from .contracts import atomic_json, read_json
 from .resources import GIB, snapshot
-from .xu_resources import ResourceUnavailable, GpuResourcesChanged, _identities
+from .xu_resources import ResourceUnavailable, HostResourcesChanged, GpuResourcesChanged, _identities
 
 
 def external_processes(pids, owned):
     live = _identities(pids)
     return sorted(pid for pid in pids if str(pid) not in live or owned.get(str(pid)) != live[str(pid)])
+
+
+def isolation_violations(inventory, processes, stage, allowed):
+    violations = {}
+    for uuid,card in inventory.items():
+        live = _identities(card['compute_pids'])
+        found = [pid for pid in card['compute_pids'] if str(pid) in processes
+                 and live.get(str(pid)) == processes[str(pid)]['create_time']
+                 and (processes[str(pid)]['stage'] is None or
+                      (processes[str(pid)]['stage'] == stage and uuid not in allowed))]
+        if found:
+            violations[uuid] = found
+    return violations
 
 
 class RuntimeGuard:
@@ -47,7 +61,8 @@ class RuntimeGuard:
         if self.host_limit and row['stage_uss_bytes'] > self.host_limit:
             reason = '本阶段内存超过分配预算'
         host_reason = reason
-        if self.tickets:
+        isolation_error = None
+        if self.tickets or json.loads(os.environ.get('XU_COORDINATOR_DEVICES','[]')):
             from .xu_gpu_probe import gpu_snapshot
             inventory = gpu_snapshot()
             observed = {pid for ticket in self.tickets for pid in inventory[ticket['uuid']]['compute_pids']}
@@ -57,6 +72,10 @@ class RuntimeGuard:
                 processes = self.children.owned_processes()
                 owned = {pid:p['create_time'] for pid,p in processes.items()}
                 row['owned'] = owned
+            violations = isolation_violations(inventory,processes,self.stage,{t['uuid'] for t in self.tickets})
+            row['isolation_violations'] = violations
+            if violations:
+                isolation_error = f'GPU 隔离违规，本任务进程出现在未分配设备: {violations}'
             for ticket in self.tickets:
                 card = inventory[ticket['uuid']]
                 external = external_processes(card['compute_pids'], owned)
@@ -69,15 +88,17 @@ class RuntimeGuard:
                 elif card['free_bytes'] < floor:
                     reason = f"{ticket['device']} 显存低于保留值"
                     gpu_changed.append(ticket['device'])
-        reason = host_reason or reason
+        reason = isolation_error or host_reason or reason
         if reason:
             row.update(state='denied',reason=reason)
         atomic_json(self.output/(self.stage+'-runtime.json'),row)
         if reason:
             atomic_json(self.output/(self.stage+f'-interrupted-{time.time_ns()}.json'),row)
-            if gpu_changed and not host_reason:
+            if isolation_error:
+                raise RuntimeError(isolation_error)
+            if gpu_changed and not host_reason and not isolation_error:
                 raise GpuResourcesChanged(reason, gpu_changed)
-            raise ResourceUnavailable(reason)
+            raise HostResourcesChanged(reason)
         return row
 
     def finish(self, code):

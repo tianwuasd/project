@@ -26,6 +26,14 @@ def require_applied_group(names):
 class ResourceUnavailable(RuntimeError):
     """A requested stage cannot be admitted with the current resource evidence."""
 
+    def evidence(self):
+        return dict(reason=str(self),devices=[],resource='admission')
+
+
+class HostResourcesChanged(ResourceUnavailable, MemoryError):
+    def evidence(self):
+        return dict(reason=str(self),devices=[],resource='host')
+
 
 class GpuResourcesChanged(ResourceUnavailable):
     def __init__(self, reason, devices):
@@ -33,7 +41,18 @@ class GpuResourcesChanged(ResourceUnavailable):
         self.devices = list(devices)
 
     def evidence(self):
-        return dict(reason=str(self), devices=self.devices)
+        return dict(reason=str(self), devices=self.devices, resource='gpu')
+
+
+def resource_error(evidence):
+    kind = evidence.get('resource','gpu')
+    if kind == 'gpu':
+        return GpuResourcesChanged(evidence['reason'],evidence['devices'])
+    if kind == 'host':
+        return HostResourcesChanged(evidence['reason'])
+    if kind == 'admission':
+        return ResourceUnavailable(evidence['reason'])
+    raise ValueError('未知的资源事件类型')
 
 
 def gpu_budget(free, total, policy):

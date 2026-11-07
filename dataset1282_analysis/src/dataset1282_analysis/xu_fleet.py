@@ -6,7 +6,7 @@ import os
 import time
 
 from .contracts import atomic_json, digest, read_json
-from .xu_resources import ResourceUnavailable, stage_resources
+from .xu_resources import ResourceUnavailable, GpuResourcesChanged, stage_resources
 
 TRAIN_3D = {'crop64','crop128','all64','all128','init64','init128'}
 INFERENCE = {'localize','evaluate-all64','evaluate-all128','four-way','six-way','with-blood'}
@@ -100,7 +100,7 @@ def available(pool, args, children):
     from .xu_gpu_probe import gpu_snapshot, visible_devices
     from .xu_resources import _check_device
     inventory = gpu_snapshot()
-    visible = {row['device']: row for row in visible_devices()}
+    visible = {row['device']: row for row in visible_devices(inventory)}
     owned = children.owned_identities()
     free, rejected = {}, {}
     for device in pool:
@@ -170,7 +170,7 @@ def assign_wave(wave, args, out, cache, children, contract_id):
             try:
                 free,rejected = available(pool,args,children)
                 if not free:
-                    raise ResourceUnavailable(f'No idle admitted GPU: {rejected}')
+                    raise GpuResourcesChanged(f'No idle admitted GPU: {rejected}',pool)
                 host_plan = stage_resources(['cpu'],policy=args.resource_policy)
                 host = host_plan['host_budget_bytes']
                 memory = {n:m for n,(_,m) in limits.items()}
@@ -179,6 +179,10 @@ def assign_wave(wave, args, out, cache, children, contract_id):
                     from .xu_capacity import specification
                     minimum_host = max((specification(s)['estimated_host_bytes']
                                         for name in fresh for s in preflight_sizes(name)),default=0)
+                from .xu_supply_budget import stage_minimum, GIB
+                minimum_supply = max(stage_minimum(args,name) for name in fresh)
+                if minimum_supply:
+                    minimum_host = (minimum_host+minimum_supply+GIB)*5//4
                 def capacities(lanes):
                     return {n:min(work,host//lanes//m if m else work) for n,(work,m) in limits.items()}
                 caps = capacities(2 if len(fresh)==2 or live_fixed else 1)

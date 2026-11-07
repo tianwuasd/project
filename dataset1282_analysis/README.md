@@ -71,7 +71,9 @@ docs/                                        方法、运行、更新与验证�
 
 Xu 分割入口支持按作业获准的 GPU 池并行分支、拆分固定批次、按病例分发预测，并保留缺标边际监督和原网格评价。单设备也可运行。现场资格检查、逐卡实际工作量及恢复命令见[完整模型运行说明](docs/xu-model-run.md)。
 
-GPU 入口默认排除物理 0、1 号卡。并发训练先统一登记进程再放行；确认外部占用变化后，最多自动重新分配 3 次并恢复最近完整 epoch。固定 batch 和研究参数保持不变，变化原因和分配历史分别保存在 `reallocations/`、`assignments/`。
+GPU 入口默认排除物理 0、1 号卡。并发训练先统一登记进程再放行；确认外部占用变化后，释放本组并重新准入，从最近完整 epoch 恢复。内存不足时缩小供数队列、减少 worker 并顺序执行分支；仍不足则以 `waiting_resources` 等待，定期复查。固定 batch 和研究参数保持不变，变化原因和分配历史分别保存在 `reallocations/`、`assignments/`。
+
+管理进程和 CPU 阶段不开放 CUDA 设备；GPU 工作进程在创建前只开放分配给它的 UUID，启动时核验实际可见设备。各进程的卡号映射和隔离证据保存在 `resources/`。按输出目录安全停止旧任务的命令见[运行说明](docs/xu-model-run.md)。
 
 更多内容见 [分析方法](docs/analysis-method.md)、[数据合同](docs/data-contract.md)、[环境部署](docs/environment.md)、[CPU与恢复](docs/running.md)、[代码更新](docs/update.md) 和 [验证记录](docs/validation.md)。
 
