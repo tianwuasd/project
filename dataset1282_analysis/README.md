@@ -1,5 +1,7 @@
 # dataset1282_analysis
 
+本分支从已完成的 0.3.0 HU 缓存运行固定划分的 Xu 解剖分割。`scripts/xu_pipeline.py run` 串联双尺度定位、严格投票后扩框 20%、四路基础分割、可用的起始段和血池分支、血管后处理及原网格评价。每一阶段单独保存日志、结果和恢复依据。[全模型运行与恢复](docs/xu-model-run.md) · [各分支与取框验收条件](docs/xu-segmentation.md)
+
 可在 Windows 本机或 Linux 服务器调用的 NIfTI + Excel 只读数据审计工程。首版提供独立环境部署、代码更新、数据统计和本地报告；适合先弄清数据来源与质量，再决定后续处理。
 
 审计入口只读，按文件对数与不同 PatientID 数分别统计。独立 `prepare` 入口按方案 A 建立患者分组，在私有工作区生成 nnU-Net 预处理副本。0.3.0 新增 HU、Excel 共同毫米网格、部分标签边际损失接口、V2 资源调度及可靠短测。[当前工作流](docs/hu-marginal-workflow.md)；[旧版试跑与审核格式](docs/preprocessing.md)。原始影像、标签、Excel 和历史记录保留。
@@ -66,7 +68,7 @@ tests/                                       仅合成行为测试
 docs/                                        方法、运行、更新与验证说明
 ```
 
-后续阶段可复用配置、日志、病例队列和完成合同。当前有单设备边际损失训练接口，完整科研训练和部分标签全体积评估仍需后续接入。CPU 短测不代表 GPU、多卡或服务器实测。
+Xu 分割入口支持按作业获准的 GPU 池并行分支、拆分固定批次、按病例分发预测，并保留缺标边际监督和原网格评价。单设备也可运行。现场资格检查、逐卡实际工作量及恢复命令见[完整模型运行说明](docs/xu-model-run.md)。
 
 更多内容见 [分析方法](docs/analysis-method.md)、[数据合同](docs/data-contract.md)、[环境部署](docs/environment.md)、[CPU与恢复](docs/running.md)、[代码更新](docs/update.md) 和 [验证记录](docs/validation.md)。
 
