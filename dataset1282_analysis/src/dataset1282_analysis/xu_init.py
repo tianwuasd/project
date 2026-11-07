@@ -1,6 +1,7 @@
 """Seven-class proximal aorta/pulmonary artery auxiliary branch."""
 import json
 import math
+import os
 from pathlib import Path
 import random
 
@@ -13,7 +14,7 @@ from .xu_distributed import BranchForward
 from .xu_models import Xu3DSegmenter, branch_spec, _conv
 from .xu_targets import TargetStore
 from .xu_supply import BatchSupply, check_gradients
-from .xu_training import _augment, _compatible_contract, _image, _recover_best, _save, _write_best, learning_rate
+from .xu_training import _augment, _compatible_contract, _image, _recover_best, _save, _write_best, learning_rate, execution_contract
 
 PROTOCOL = 'xu-reviewed-proximal-v1'
 
@@ -121,8 +122,7 @@ def train_init(cache,args,out):
         raise ValueError('Use a fresh directory or --resume a committed run')
     spec = branch_spec(args.branch.replace('init','all'),args.profile)
     replicas = BranchForward(device, spec.batch, require_all=True).max_active
-    if replicas > 1:
-        contract['batch_replicas'] = replicas
+    contract.update(execution_contract(replicas, spec.batch, os.environ.get('XU_ELASTIC_DEVICES') == '1'))
     if args.profile=='paper' and len(train)<spec.batch:
         raise ValueError('Insufficient eligible patients for the paper batch')
     with torch.random.fork_rng(devices=[]):

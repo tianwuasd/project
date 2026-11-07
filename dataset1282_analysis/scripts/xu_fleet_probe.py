@@ -95,6 +95,10 @@ def run(args):
         children=Children(out,owner)
         try:
             cards=select_devices(None,args.devices,torch)
+            from dataset1282_analysis.xu_gpu_probe import filter_physical_devices, gpu_snapshot
+            cards=filter_physical_devices(cards,args.exclude_physical_gpus,gpu_snapshot())
+            if not cards:
+                raise ValueError('排除指定物理 GPU 后没有可用的可见设备')
             if any(row['device']=='cpu' for row in cards):
                 raise ValueError('This diagnostic requires allocated CUDA devices')
             args.resource_policy = args.resource_policy or ('v2' if len(cards)>1 or os.name=='posix' else 'legacy')
@@ -129,6 +133,7 @@ def main(argv=None):
         return 0 if result.get('state')=='passed' else 1
     parser=ArgumentParser(description=__doc__)
     parser.add_argument('--devices',default='auto')
+    parser.add_argument('--exclude-physical-gpus',type=int,nargs='*',default=[0,1])
     parser.add_argument('--output',required=True,type=Path)
     parser.add_argument('--stage',choices=('inference','3d64','3d128','blood-encoder','blood-sequence'),default='3d64')
     parser.add_argument('--threads',type=int)

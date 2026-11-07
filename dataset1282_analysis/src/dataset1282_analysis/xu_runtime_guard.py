@@ -3,7 +3,12 @@ import time
 
 from .contracts import atomic_json, read_json
 from .resources import GIB, snapshot
-from .xu_resources import ResourceUnavailable
+from .xu_resources import ResourceUnavailable, GpuResourcesChanged, _identities
+
+
+def external_processes(pids, owned):
+    live = _identities(pids)
+    return sorted(pid for pid in pids if str(pid) not in live or owned.get(str(pid)) != live[str(pid)])
 
 
 class RuntimeGuard:
@@ -32,6 +37,7 @@ class RuntimeGuard:
                    available_memory_bytes=available,reserve_bytes=self.reserve_bytes,
                    host_limit_bytes=self.host_limit,gpus=[])
         reason = None
+        gpu_changed = []
         if available is None or available < self.reserve_bytes:
             reason = '实时主机或 cgroup 内存低于保留值'
         stage_owned = [p for p in processes.values() if p['stage'] == self.stage]
@@ -40,27 +46,37 @@ class RuntimeGuard:
         row['stage_uss_bytes'] = sum(p['memory_full_info'].uss for p in stage_owned)
         if self.host_limit and row['stage_uss_bytes'] > self.host_limit:
             reason = '本阶段内存超过分配预算'
+        host_reason = reason
         if self.tickets:
             from .xu_gpu_probe import gpu_snapshot
             inventory = gpu_snapshot()
+            observed = {pid for ticket in self.tickets for pid in inventory[ticket['uuid']]['compute_pids']}
+            if external_processes(observed, owned):
+                # 显卡查询后重新核实本组进程，涵盖并发启动的分支和后代。
+                inventory = gpu_snapshot()
+                processes = self.children.owned_processes()
+                owned = {pid:p['create_time'] for pid,p in processes.items()}
+                row['owned'] = owned
             for ticket in self.tickets:
                 card = inventory[ticket['uuid']]
-                external = []
-                for pid in card['compute_pids']:
-                    if str(pid) not in owned:
-                        external.append(pid)
+                external = external_processes(card['compute_pids'], owned)
                 floor = max(4*GIB,card['total_bytes']//10)
                 row['gpus'].append(dict(card,device=ticket['device'],external_pids=external,
                                          reserve_bytes=floor))
                 if external:
                     reason = f"{ticket['device']} 出现外部计算进程 {external}"
+                    gpu_changed.append(ticket['device'])
                 elif card['free_bytes'] < floor:
                     reason = f"{ticket['device']} 显存低于保留值"
+                    gpu_changed.append(ticket['device'])
+        reason = host_reason or reason
         if reason:
             row.update(state='denied',reason=reason)
         atomic_json(self.output/(self.stage+'-runtime.json'),row)
         if reason:
             atomic_json(self.output/(self.stage+f'-interrupted-{time.time_ns()}.json'),row)
+            if gpu_changed and not host_reason:
+                raise GpuResourcesChanged(reason, gpu_changed)
             raise ResourceUnavailable(reason)
         return row
 

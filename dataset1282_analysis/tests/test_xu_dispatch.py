@@ -39,26 +39,14 @@ class BranchSchedulingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()
             out = root/'run'
-            scripts = root/'scripts'
-            scripts.mkdir()
-            # Each OS process must see its peer before exiting. No simulated sequential executor.
-            (scripts/'worker.py').write_text(
-                "import sys,time,os\nfrom pathlib import Path\n"
-                "out=Path(sys.argv[1]); me=sys.argv[2]; peer=sys.argv[3]\n"
-                "(out/(me+'.ready')).write_text(str(os.getpid()))\n"
-                "limit=time.monotonic()+8\n"
-                "while not (out/(peer+'.ready')).exists() and time.monotonic()<limit: time.sleep(.02)\n"
-                "if not (out/(peer+'.ready')).exists(): sys.exit(91)\n"
-                "if sys.argv[4]=='fail': sys.exit(7)\n"
-                "if sys.argv[4]=='wait': time.sleep(40)\n"
-                "time.sleep(.25)\n(out/(me+'.done')).write_text('ok')\n",encoding='utf-8')
-            with operation_lock(out, 'pair-probe', out) as owner, patch.object(pipeline,'ROOT',root):
+            with operation_lock(out, 'pair-probe', out) as owner:
                 children = Children(out, owner)
+                children.configure_launch(2)
                 def worker(name):
                     args = SimpleNamespace(threads=1, children=children, overlay={},device=name)
                     peer = 'right' if name == 'left' else 'left'
                     mode = ('fail' if name == 'left' else 'wait') if fail else 'ok'
-                    pipeline._execute('worker.py',[out,name,peer,mode],name,out,owner,args)
+                    pipeline._execute('../tests/fixtures/xu_pair_child.py',[out,name,peer,mode],name,out,owner,args)
                     return name
                 if fail:
                     before = time.monotonic()

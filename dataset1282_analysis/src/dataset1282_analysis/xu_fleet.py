@@ -97,12 +97,19 @@ def distribute(names, caps, free, needs):
 
 
 def available(pool, args, children):
+    from .xu_gpu_probe import gpu_snapshot, visible_devices
+    from .xu_resources import _check_device
+    inventory = gpu_snapshot()
+    visible = {row['device']: row for row in visible_devices()}
+    owned = children.owned_identities()
     free, rejected = {}, {}
     for device in pool:
         try:
-            plan = stage_resources([device], policy=args.resource_policy, owned_pids=children.pids(),
-                                   require_pid_evidence=args.resource_policy=='v2' and os.name=='posix')
-            free[device] = plan['devices'][device]['allocator_budget_bytes']
+            card = visible[device]
+            info = {**inventory[card['uuid']], **card}
+            checked = _check_device(info, args.resource_policy, owned,
+                                    args.resource_policy == 'v2' and os.name == 'posix')
+            free[device] = checked['allocator_budget_bytes']
         except ResourceUnavailable as exc:
             rejected[device] = str(exc)
     return free, rejected
@@ -133,9 +140,14 @@ def assign_wave(wave, args, out, cache, children, contract_id):
             if (row.get('signature') != digest([contract_id,stage.name,group]) or len(set(group))!=len(group)
                     or any(d not in [*pool,'cpu'] for d in group)):
                 raise ValueError(f'Invalid GPU assignment for {stage.name}')
-            fixed[stage.name] = group
-            if not stage.skip_reason and not (out/'receipts'/(stage.name+'.json')).exists():
-                live_fixed.update(group)
+            if (getattr(args,'reallocate',False) and not stage.skip_reason
+                    and stage.name not in CPU_STAGES
+                    and not (out/'receipts'/(stage.name+'.json')).exists()):
+                fresh.append(stage.name)
+            else:
+                fixed[stage.name] = group
+                if not stage.skip_reason and not (out/'receipts'/(stage.name+'.json')).exists():
+                    live_fixed.update(group)
         elif stage.skip_reason or stage.name in CPU_STAGES:
             fixed[stage.name] = ['cpu'] if stage.name in CPU_STAGES else []
         else:
@@ -201,10 +213,16 @@ def assign_wave(wave, args, out, cache, children, contract_id):
     output = []
     for stage in wave:
         group = groups[stage.name]
-        if not (out/'started'/(stage.name+'.json')).exists() and not (out/'receipts'/(stage.name+'.json')).exists():
+        if (not (out/'receipts'/(stage.name+'.json')).exists()
+                and (not (out/'started'/(stage.name+'.json')).exists() or stage.name in fresh)):
+            history = []
+            if file(stage).exists():
+                previous = read_json(file(stage))
+                history = [*previous.get('history',[]), {k:v for k,v in previous.items() if k != 'history'}]
             atomic_json(file(stage), dict(stage=stage.name,devices=group,authorized=pool,
                         not_assigned=[d for d in pool if d not in group],unavailable=rejected,
                         idle_budget_bytes=free,working_slots=caps.get(stage.name),
-                        host_per_inference_case=memory.get(stage.name), signature=digest([contract_id,stage.name,group])))
+                        host_per_inference_case=memory.get(stage.name), signature=digest([contract_id,stage.name,group]),
+                        history=history, assigned_at=time.time()))
         output.append((_with_primary(stage,group),group))
     return [(entry,) for entry in output] if overlap or serial else [tuple(output)]
