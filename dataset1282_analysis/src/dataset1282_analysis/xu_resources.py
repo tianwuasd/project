@@ -27,6 +27,15 @@ class ResourceUnavailable(RuntimeError):
     """A requested stage cannot be admitted with the current resource evidence."""
 
 
+class GpuResourcesChanged(ResourceUnavailable):
+    def __init__(self, reason, devices):
+        super().__init__(reason)
+        self.devices = list(devices)
+
+    def evidence(self):
+        return dict(reason=str(self), devices=self.devices)
+
+
 def gpu_budget(free, total, policy):
     if policy == 'v2':
         reserve = max(4 * GIB, (total + 9) // 10)
@@ -76,6 +85,27 @@ def _owned_identities(pids):
     return kept
 
 
+def registered_identities(owned, members):
+    ancestors = [p for p in psutil.Process().parents()
+                 if owned.get(str(p.pid)) == p.create_time() and members.get(str(p.pid)) == p.create_time()]
+    if not ancestors:
+        raise ResourceUnavailable('无法核实启动许可的父进程身份')
+    controller = ancestors[-1]
+    kept = {}
+    for key, birth in members.items():
+        try:
+            process = psutil.Process(int(key))
+            if process.create_time() != birth:
+                raise ResourceUnavailable('启动许可中的进程身份发生变化')
+            ancestry = {p.pid:p.create_time() for p in process.parents()}
+            if process.pid != controller.pid and ancestry.get(controller.pid) != controller.create_time():
+                raise ResourceUnavailable('启动许可包含本组之外的进程')
+            kept[str(key)] = birth
+        except psutil.NoSuchProcess:
+            continue
+    return kept
+
+
 def _peer_credit(peers, parent, outstanding):
     """Only verified direct children can repay the peer's reserved RAM share."""
     if not isinstance(peers, dict) or outstanding <= 0:
@@ -105,12 +135,12 @@ def _check_device(info, policy, owned, required):
         external = [pid for pid in pids if str(pid) not in live or
                     owned.get(str(pid)) != live[str(pid)]]
         if external:
-            raise ResourceUnavailable(f"External compute processes on {info['device']}: {sorted(external)}")
+            raise GpuResourcesChanged(f"External compute processes on {info['device']}: {sorted(external)}", [info['device']])
         if not pids and info.get('utilization',0) > 5:
-            raise ResourceUnavailable(f"GPU is not idle on {info['device']}: {info['utilization']}%")
+            raise GpuResourcesChanged(f"GPU is not idle on {info['device']}: {info['utilization']}%", [info['device']])
     limit = gpu_budget(info['free_bytes'], info['total_bytes'], policy)
     if limit < 1:
-        raise ResourceUnavailable(f"No CUDA budget left on {info['device']}")
+        raise GpuResourcesChanged(f"No CUDA budget left on {info['device']}", [info['device']])
     return dict(info, allocator_budget_bytes=limit, pid_evidence=pids is not None,
                 compute_pids=sorted(pids or ()))
 
@@ -206,7 +236,7 @@ def stage_resources(devices, concurrent=1, threads=None, policy='v2', *, owned_p
         if host_need > per_host:
             raise ResourceUnavailable(f'{key} needs {host_need} host bytes, available share {per_host}')
         if cuda_need > (info['allocator_budget_bytes'] or 0):
-            raise ResourceUnavailable(f'{key} needs {cuda_need} CUDA bytes, budget {info["allocator_budget_bytes"]}')
+            raise GpuResourcesChanged(f'{key} needs {cuda_need} CUDA bytes, budget {info["allocator_budget_bytes"]}', [key])
         cards[key] = dict(info, host_demand_bytes=host_need, cuda_demand_bytes=cuda_need)
     return dict(policy=policy, threads=min(threads, per_cpu) if threads else per_cpu,
                 host_per_stage_bytes=per_host, host_budget_bytes=host, cpu_slots=slots,
@@ -317,11 +347,13 @@ def _apply_card(device, spec):
     info = _device_info(device)
     if spec['device'] != info['device'] or spec['uuid'] != info['uuid']:
         raise ResourceUnavailable(f'Allocated CUDA identity changed for {device}')
-    owned = {**spec['owned'], **_identities([os.getpid()])}
+    members = json.loads(os.environ.get('XU_REGISTERED_PIDS','{}'))
+    registered = registered_identities(spec['owned'],members) if members else {}
+    owned = {**spec['owned'], **registered, **_identities([os.getpid()])}
     info = _check_device(info, spec['policy'], owned, spec['require_pid_evidence'])
     limit = min(info['allocator_budget_bytes'], int(spec['limit_bytes']))
     if limit <= 0 or limit < spec['cuda_demand_bytes']:
-        raise ResourceUnavailable(f'CUDA demand {spec["cuda_demand_bytes"]} exceeds fresh budget {limit}')
+        raise GpuResourcesChanged(f'CUDA demand {spec["cuda_demand_bytes"]} exceeds fresh budget {limit}', [str(device)])
     # 通过 UUID、外部进程和实时显存检查后，才允许创建计算上下文。
     torch.cuda.set_device(torch.device(device))
     torch.cuda.set_per_process_memory_fraction(limit/info['total_bytes'], device)

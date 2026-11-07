@@ -4,7 +4,7 @@ from dataclasses import replace
 import os
 
 import psutil
-from subprocess import TimeoutExpired
+from subprocess import Popen
 from pathlib import Path
 import threading
 import time
@@ -77,10 +77,34 @@ class Children:
     def __init__(self, out, owner):
         self.out = Path(out)
         self.owner = owner
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
+        self.stop_lock = threading.Lock()
         self.active = {}
         self.stopping = False
         self.births = {os.getpid(): psutil.Process().create_time()}
+        self.configure_launch(1)
+
+    def configure_launch(self, count):
+        if self.active or self.stopping or count < 1:
+            raise RuntimeError('启动同步必须在本组进程启动前配置')
+        self.launch_members = {}
+        self.launch_gate = threading.Barrier(count, action=self._freeze_launch_members)
+
+    def _freeze_launch_members(self):
+        with self.lock:
+            self.launch_members = dict(self.births)
+
+    def await_launch(self, guard, grouped=True):
+        if not grouped:
+            self.ensure_running()
+            guard.check()
+            return self.pids()
+        self.launch_gate.wait()
+        self.ensure_running()
+        guard.check()
+        self.launch_gate.wait()
+        self.ensure_running()
+        return dict(self.launch_members)
 
     def _snapshot(self):
         rows = [row for _, row in self.active.values()]
@@ -99,11 +123,26 @@ class Children:
                 raise RuntimeError('Another branch has stopped this stage group')
             self.active[child.pid] = (child, dict(pid=child.pid, stage=name, device=device,
                                                   devices=list(devices or [device]), log=str(log)))
-            try:
-                self.births[child.pid] = psutil.Process(child.pid).create_time()
-            except psutil.Error:
-                pass  # No ownership credit for an unverified process.
+            self.births[child.pid] = psutil.Process(child.pid).create_time()
             self._snapshot()
+
+    def spawn(self, command, name, device, log, devices=None, **options):
+        # 创建和登记期间阻止并发取消；子进程仍等待父进程的启动许可。
+        with self.lock:
+            self.ensure_running()
+            child = Popen(command, **options)
+            try:
+                self.attach(child, name, device, log, devices)
+            except BaseException:
+                if child.poll() is None:
+                    child.terminate()
+                child.wait(timeout=8)
+                if child.stdin is not None:
+                    child.stdin.close()
+                self.active.pop(child.pid, None)
+                self.births.pop(child.pid, None)
+                raise
+            return child
 
     def detach(self, child):
         with self.lock:
@@ -153,18 +192,49 @@ class Children:
         with self.lock:
             self.stopping = True
             running = [child for child, _ in self.active.values()]
+        self.launch_gate.abort()
         for child in running:
-            if child.poll() is None:
-                try:
-                    child.terminate()
-                except ProcessLookupError:
-                    pass
-        for child in running:
+            self.stop_child(child)
+
+    def stop_child(self, child):
+        with self.stop_lock:
+            self._stop_child(child)
+
+    def _stop_child(self, child):
+        with self.lock:
+            entry = self.active.get(child.pid)
+        if child.poll() is not None:
+            return
+        if entry is None:
+            raise RuntimeError('拒绝终止未登记的进程')
+        name = entry[1]['stage']
+        rows = self.owned_processes(name)
+        verified = []
+        for pid, row in rows.items():
             try:
-                child.wait(timeout=8)
-            except TimeoutExpired:
-                child.kill()
-                child.wait()
+                process = psutil.Process(int(pid))
+                if process.create_time() != row['create_time']:
+                    raise RuntimeError('终止前进程身份发生变化')
+                verified.append(process)
+            except psutil.NoSuchProcess:
+                continue
+        for process in reversed(verified):
+            try:
+                if process.is_running():
+                    process.terminate()
+            except psutil.NoSuchProcess:
+                continue
+        _, alive = psutil.wait_procs(verified, timeout=8)
+        for process in alive:
+            try:
+                if process.is_running():
+                    process.kill()
+            except psutil.NoSuchProcess:
+                continue
+        _, alive = psutil.wait_procs(alive, timeout=8)
+        if alive:
+            raise RuntimeError('本任务进程尚未退出，禁止重新分配设备')
+        child.wait(timeout=8)
 
     def ensure_running(self):
         with self.lock:
@@ -217,7 +287,7 @@ def prefetch_cpu_allocation(slots, threads, workers):
 
 
 def plan_stage(stage, args, out, children, concurrent, purpose, checked):
-    from .xu_resources import ResourceUnavailable, combined_environment, stage_resources
+    from .xu_resources import ResourceUnavailable, GpuResourcesChanged, combined_environment, stage_resources
     from .xu_fleet import INFERENCE, TRAIN_3D, needs_for_width, preflight_sizes
     device = (stage.argv[stage.argv.index('--device') + 1]
               if '--device' in stage.argv and stage.name != 'audit-roi' else 'cpu')
@@ -260,6 +330,8 @@ def plan_stage(stage, args, out, children, concurrent, purpose, checked):
             if enabled:
                 plan['threads'],workers = prefetch_cpu_allocation(
                     plan['cpu_slots']//concurrent,plan['threads'],requested_workers)
+        except GpuResourcesChanged:
+            raise
         except ResourceUnavailable as exc:
             if time.monotonic() >= until:
                 atomic_json(out/'resources'/f'{stage.name}-denied-{time.time_ns()}.json',

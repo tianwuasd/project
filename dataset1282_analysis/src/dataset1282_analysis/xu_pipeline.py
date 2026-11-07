@@ -8,10 +8,13 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+from uuid import uuid4
 
 from .contracts import atomic_json, digest, read_json, sha256_file
 from .xu_dispatch import Children, plan_stage, reserve_pair, run_wave, select_devices, waves
 from .observability.status import lock_active, operation_lock, write_status
+from .xu_reallocation import record_reallocation, run_with_reallocation
+from .xu_resources import GpuResourcesChanged
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -30,7 +33,8 @@ def _input_file(path):
 def _sources(technical):
     source = Path(__file__).resolve().parent
     files = [*source.glob('xu_*.py'), source/'training/marginal.py', source/'contracts.py',
-             source/'observability/status.py', ROOT/'scripts/xu_seg.py', ROOT/'scripts/xu_pipeline.py']
+             source/'observability/status.py', ROOT/'scripts/xu_seg.py', ROOT/'scripts/xu_pipeline.py',
+             ROOT/'scripts/xu_worker.py']
     files = [p for p in files if p.name not in ('xu_pair_probe.py','xu_inference_probe.py')]  # Diagnostics.
     if technical:
         files = [p for p in files if p.name != 'xu_capacity.py']
@@ -55,11 +59,17 @@ def _contract(cache, args):
                                     'development': {'all':128, 'complete':122}}:
         raise ValueError(f'Prepared cohort differs from the approved dataset1282 fixed split: {counts}')
     devices = select_devices(args.device, args.devices, torch)
+    excluded = getattr(args, 'exclude_physical_gpus', [])
+    if excluded and any(row['device'] != 'cpu' for row in devices):
+        from .xu_gpu_probe import filter_physical_devices, gpu_snapshot
+        devices = filter_physical_devices(devices, excluded, gpu_snapshot())
+    if not devices:
+        raise ValueError('排除指定物理 GPU 后没有可用的可见设备')
     if args.resource_policy is None:
         args.resource_policy = 'v2' if len(devices) > 1 or os.name == 'posix' else 'legacy'
     if len(devices) > 1 and args.resource_policy != 'v2':
         raise ValueError('Multi-device scheduling requires the v2 resource policy')
-    return dict(protocol='xu-model-run-3', fleet=True, prepared=str(cache.run_dir), request=cache.request_digest,
+    return dict(protocol='xu-model-run-4', fleet=True, prepared=str(cache.run_dir), request=cache.request_digest,
                 artifacts=artifact_identity(cache), scope=cache.scope, counts=counts,
                 implementation=_sources(technical), profile=args.profile, supervision=args.supervision,
                 seed=args.seed, padding_percent=PADDING, device=devices[0], torch=str(torch.__version__),
@@ -67,6 +77,8 @@ def _contract(cache, args):
                 prefetch_mib=args.prefetch_mib,
                 prefetch_workers=getattr(args,'prefetch_workers',4),
                 cpu_threads=args.threads,
+                excluded_physical_gpus=sorted(set(excluded)),
+                reallocation=dict(policy='fixed-batch-v1', maximum=getattr(args,'max_reallocations',3)),
                 libraries={n:version(n) for n in ('numpy','scipy','nibabel','blosc2','scikit-image')},
                 supplied_crop64=_input_file(args.crop64), supplied_crop128=_input_file(args.crop128),
                 reviews=_input_file(args.reviews))
@@ -112,40 +124,55 @@ def _execute(script, argv, name, out, owner, args):
                 'XU_PREFETCH','XU_PREFETCH_BYTES','XU_PREFETCH_WORKERS'):
         env.pop(key, None)
     env.update(args.overlay)
-    command = [sys.executable, '-B', '-u', str(ROOT/'scripts'/script), *map(str, argv)]
+    env['XU_ELASTIC_DEVICES'] = '1'
+    token = uuid4().hex
+    env['XU_LAUNCH_TOKEN'] = token
+    failure = out/'resources'/f'{name}-child-{token}.json'
+    env['XU_RESOURCE_FAILURE'] = str(failure)
+    command = [sys.executable, '-B', '-u', str(ROOT/'scripts/xu_worker.py'),
+               str(ROOT/'scripts'/script), *map(str, argv)]
     print(f'Running {name} | {log}', flush=True)
     from .xu_runtime_guard import RuntimeGuard
     guard = RuntimeGuard(out/'resources',name,args.overlay,args.children)
     with log.open('xb') as stream:
         stream.write((json.dumps(command, ensure_ascii=False)+'\n').encode('utf-8'))
         stream.flush()
-        child = subprocess.Popen(command, cwd=ROOT, env=env, stdout=stream, stderr=subprocess.STDOUT)
+        child = args.children.spawn(command, name, args.device, log, getattr(args,'assigned_devices',None),
+                                    cwd=ROOT, env=env, stdout=stream, stderr=subprocess.STDOUT,
+                                    stdin=subprocess.PIPE, start_new_session=(os.name == 'posix'))
         try:
-            args.children.attach(child, name, args.device, log, getattr(args,'assigned_devices',None))
+            members = args.children.await_launch(guard, grouped=not name.startswith('capacity-'))
+            child.stdin.write((json.dumps(dict(token=token,members=members))+'\n').encode('utf-8'))
+            child.stdin.close()
             while child.poll() is None:
-                guard.check()
+                try:
+                    guard.check()
+                except GpuResourcesChanged:
+                    if child.poll() != 0:
+                        raise
                 time.sleep(1)
             code = child.returncode
         finally:
             if child.poll() is None:
-                child.terminate()
-                try:
-                    child.wait(timeout=15)
-                except subprocess.TimeoutExpired:
-                    child.kill()
-                    child.wait()
+                args.children.stop_child(child)
+            if child.stdin is not None and not child.stdin.closed:
+                child.stdin.close()
             guard.finish(child.returncode)
             args.children.detach(child)
     if code:
+        if failure.is_file():
+            evidence = read_json(failure)
+            raise GpuResourcesChanged(evidence['reason'], evidence['devices'])
         raise StageError(f'{name} exited {code}: {_tail(log)} (log: {log})')
 
 
-def _restore_attempt(stage, directory, out):
+def _restore_attempt(stage, directory, out, reallocated=False):
     if not directory.exists():
         return []
     if lock_active(directory/'.runtime/operation.lock'):
         raise RuntimeError(f'{stage.name} is still owned by an active process')
-    if stage.resume_marker and (directory/stage.resume_marker).is_file():
+    restart_fusion = reallocated and stage.argv[0] == 'fuse'
+    if not restart_fusion and stage.resume_marker and (directory/stage.resume_marker).is_file():
         return ['--resume']
     # Fresh-only stages (including ROI audits) cannot adopt partial files. Retain the failed attempt.
     archive = out/'attempts'/f'{stage.name}-{time.time_ns()}'
@@ -211,6 +238,9 @@ def _capacity(stage, checked, out, owner, args):
         except StageError as exc:
             if (directory/'capacity.json').is_file():
                 evidence = read_json(directory/'capacity.json')
+                if evidence.get('resource_change'):
+                    change = evidence['resource_change']
+                    raise GpuResourcesChanged(change['reason'], change['devices']) from exc
                 raise StageError(f'Capacity {size}: {evidence.get("reason", evidence["state"])}. '
                                  f'See {directory/"capacity.json"}') from exc
             raise
@@ -244,8 +274,11 @@ def _result(out, cache, contract, records):
 
 
 def _stage_spec(stage, contract_id, group=None):
-    return digest(dict(contract=contract_id, name=stage.name, argv=list(map(str,stage.argv)),
-                       devices=group, required=list(stage.required), skip=stage.skip_reason))
+    argv = list(map(str, stage.argv))
+    if '--device' in argv:
+        argv[argv.index('--device')+1] = '<assigned-device>'
+    return digest(dict(protocol='xu-stage-2', contract=contract_id, name=stage.name, argv=argv,
+                       required=list(stage.required), skip=stage.skip_reason))
 
 
 def _run_stage(stage, args, out, owner, contract, contract_id, checked, records, concurrent):
@@ -293,7 +326,7 @@ def _run_stage(stage, args, out, owner, contract, contract_id, checked, records,
             if 'devices' in contract:
                 args.device, args.overlay = plan_stage(stage, args, out, args.children, concurrent, 'launch', checked)
             atomic_json(ticket, dict(spec=spec))
-            recovery = _restore_attempt(stage, directory, out)
+            recovery = _restore_attempt(stage, directory, out, reallocated=getattr(args,'reallocate',False))
             pause = getattr(args, 'pause_after_epoch', None)
             if pause is not None and stage.name in ('crop64', 'crop128'):
                 # Do not put the stop condition in the frozen stage identity.
@@ -322,6 +355,10 @@ def _run_stage(stage, args, out, owner, contract, contract_id, checked, records,
 
 
 def _run_locked(cache, args, out, owner, contract):
+    return run_with_reallocation(lambda running: _run_attempt(cache,running,out,owner,contract), args, out)
+
+
+def _run_attempt(cache, args, out, owner, contract):
     from .xu_pipeline_stages import iter_stages
     marker = out/'run.json'
     if marker.exists():
@@ -354,6 +391,7 @@ def _run_locked(cache, args, out, owner, contract):
             active = {stage.name: stage for stage in wave}
             runnable = sum(not stage.skip_reason and not (out/'receipts'/(stage.name+'.json')).exists()
                            for stage in wave)
+            children.configure_launch(max(1,runnable))
             reservation = reserve_pair(args, out) if runnable == 2 and 'devices' in contract else None
 
             def worker(stage):
@@ -442,6 +480,8 @@ def _run(args):
         raise ValueError('Resource wait must be between 0 and 300 seconds')
     if getattr(args,'prefetch_mib',4096) < 1:
         raise ValueError('The prefetch memory ceiling must be positive')
+    if not 0 <= getattr(args,'max_reallocations',3) <= 20:
+        raise ValueError('自动重新分配次数必须在 0 到 20 之间')
     args.prepared, args.output = prepared, out
     cache = PreparedCache(prepared,allow_technical_subset=args.technical_subset)
     contract = _contract(cache,args)
@@ -465,6 +505,10 @@ def main(argv=None):
     selection = run.add_mutually_exclusive_group()
     selection.add_argument('--device', help='Select a single CUDA device or CPU instead of the automatic pool')
     selection.add_argument('--devices', help='auto (default) scans the allocated visible pool, or list cuda:0,cuda:1,...')
+    run.add_argument('--exclude-physical-gpus',type=int,nargs='*',default=[0,1],
+                     help='Excluded NVIDIA physical GPU indices (default: 0 1); empty list disables exclusions')
+    run.add_argument('--max-reallocations',type=int,default=3,
+                     help='Maximum automatic restarts after confirmed GPU resource changes')
     run.add_argument('--resource-policy',choices=('legacy','v2'),
                      help='Linux and multi-GPU default to v2; a single local Windows GPU defaults to legacy')
     run.add_argument('--wait-seconds',type=int,default=0, help='Bounded wait per resource check, 0 to 300 seconds')

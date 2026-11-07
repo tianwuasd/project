@@ -62,3 +62,18 @@ def device_info(selection):
     if selected['uuid'] not in inventory:
         raise ValueError('CUDA 与 NVIDIA 查询的显卡 UUID 不一致')
     return {**inventory[selected['uuid']],**selected}
+
+
+def filter_physical_devices(devices, excluded, inventory):
+    if any(type(index) is not int or index < 0 for index in excluded):
+        raise ValueError('物理 GPU 编号必须是非负整数')
+    result = []
+    for device in devices:
+        if device['device'] == 'cpu':
+            result.append(device)
+            continue
+        if device['uuid'] not in inventory:
+            raise ValueError('无法核实可见 GPU 的物理编号')
+        if inventory[device['uuid']]['physical_index'] not in excluded:
+            result.append(device)
+    return result

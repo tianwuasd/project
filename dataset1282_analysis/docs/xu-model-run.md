@@ -26,6 +26,8 @@ echo "PID=$!"
 
 正式服务器入口默认按作业内可见 GPU 建立资源池。可显式使用 `--devices auto`，或用 `--devices cuda:0,cuda:1,cuda:2` 指定分配到的逻辑卡。Linux 多卡自动模式沿用调度器的 `CUDA_VISIBLE_DEVICES` 或容器限定的可见设备。若调度器未设置可见范围，且整组物理 GPU 均获准，可用 `--devices all-visible` 自动枚举并筛掉忙卡。当前支持有可核验 UUID 的完整物理 GPU，MIG 实例须另行适配。
 
+流水线与 GPU 资格检查默认 `--exclude-physical-gpus 0 1`，按 NVIDIA 物理编号及 UUID 排除，不受 CUDA 可见序号重新排序影响。其余可见卡统一查询后分配给互不重叠的并发分支。全部训练子进程先登记 PID、创建时间和父子关系，完成资源复查后统一放行。显式传空列表 `--exclude-physical-gpus` 可使用全部获准的可见设备。
+
 ```bash
 # 先检查整组 GPU 是否能同时按病例预测，再核验正式 3D batch 的更新与显存。每次用新目录。
 "$PY" -B scripts/xu_fleet_probe.py --devices auto --stage inference --threads 4 --output "${O}-check-inference"
@@ -43,7 +45,9 @@ nohup "$PY" -B -u scripts/xu_pipeline.py run "${args[@]}" >"${O}.launcher.log" 2
 | 血池 | 二维编码器一次 4 张切片，最多 4 张卡。时序输入保持一个病例的七张连续切片，冻结编码器可在最多 7 张卡上提取特征，随后按原顺序运行序列网络。 |
 | 定位、单支评价、四路/六路及血池融合的模型预测 | 冻结模型按病例轮转分配，逐卡驻留预测器。可用卡、待处理病例数与实时主机内存共同决定并发量。例如有 12 张合格卡和足够病例与主存时，这些阶段能使用 12 张。原网格 CPU 收尾、审核与血管图处理使用 CPU。 |
 
-**调度和恢复。** 每个新阶段重新筛选资源。v2 预留每卡总显存的 10% 且至少 4 GiB，核对 UUID、空闲显存、外部计算进程及 CPU/cgroup 证据，实际子进程逐卡复核并设置显存分配器上限。活动分支共享一份 CPU/RAM 预约，已核实的兄弟进程私有内存可抵扣其尚未兑现的预留。阶段内固定工作量与成员；中断后已开始的阶段使用已记录的同一组设备和最新完成的检查点。在下一阶段重新选卡。`assignments/` 记录每阶段的候选、分配、占用或未用的卡及有效工作槽，`resources/` 记录预算，训练日志和推理分片记录可核对逐卡实际工作量。`status.json` 的 `active` 包含进程、设备组及日志。开发数据和缓存版本的变化需用新目录。旧版冻结任务使用原包恢复。
+**调度和恢复。** 每个新阶段重新筛选资源。v2 预留每卡总显存的 10% 且至少 4 GiB，核对 UUID、空闲显存、外部计算进程及 CPU/cgroup 证据，实际子进程逐卡复核并设置显存分配器上限。活动分支共享一份 CPU/RAM 预约，已核实的兄弟进程私有内存可抵扣其尚未兑现的预留。健康阶段保持当前成员；确认 GPU 资源变化后，停止本任务的活动组并确认退出，重新选卡及做容量检查，从最新完整 epoch 恢复训练。设备数量可以变化，全局 batch、损失、学习率及轮数保持不变。未完成的融合归档到 `attempts/` 后重新计算，完成阶段继续验证原产物。`--max-reallocations 3` 限制自动重新分配次数，每次资源等待沿用 `--wait-seconds`。数据、模型错误和资源查询失败直接停止。
+
+`assignments/` 记录候选、分配、历史设备组及有效工作槽；`reallocations/` 保存变化原因、原分配和可恢复检查点；`resources/` 保存预算与运行证据。训练日志打印恢复的完整 epoch，`status.json` 的 `active` 包含进程、设备组及日志。新空闲卡在下一阶段或重新分配时加入。开发数据和缓存版本变化需用新目录，旧版冻结任务使用原包恢复。
 
 **CPU 和预测复用。** 预取默认开启，可用 `--no-prefetch` 做实测对照；`--prefetch-workers 4` 和 `--prefetch-mib 16384` 分别是每支供数线程和队列内存上限。实际并发还受 CPU 份额、数值线程、源病例尺寸及实时 RAM 限制。多个线程按原顺序交付完整批次，增强和随机数继续在训练线程执行。`--threads 4` 控制每支数值线程数。日志记录实际 worker、队列峰值、内存预约、等待与复制时间；并行 worker 的准备时间是累计值，不能与等待时间相加当作总耗时。CUDA 使用固定页内存、独立复制流和事件同步，主机输入保留至复制完成。
 
@@ -53,7 +57,7 @@ nohup "$PY" -B -u scripts/xu_pipeline.py run "${args[@]}" >"${O}.launcher.log" 2
 
 可执行 `"$PY" scripts/xu_acceleration_check.py --prepared "$D" --output "$W/check-input-new"` 测量实际病例的串行、并行首次缓存、串行热读取和缓存复用。该检查采用小型 Conv3d 验证输入与 Adam 更新，计时只用于供数验收；完整模型吞吐通过正式试跑日志测量。
 
-`scripts/xu_fleet_probe.py` 在一次资格检查中会分组覆盖可用卡。正式 3D 一批最多 4 例，各组各做一次真实更新；该诊断的总耗时与正式训练每轮吞吐分别测量。只有一张卡的本机可显式选 `--device cuda:0`（独立容量命令用 `--devices cuda:0`）。单卡 Linux 共享运行默认 v2，本机小显存兼容策略可显式传 `--resource-policy legacy`。
+`scripts/xu_fleet_probe.py` 在一次资格检查中会分组覆盖可用卡。正式 3D 一批最多 4 例，各组各做一次真实更新；该诊断的总耗时与正式训练每轮吞吐分别测量。只有一张卡且已获准的本机可显式选 `--device cuda:0 --exclude-physical-gpus`（独立资格检查用 `--devices cuda:0 --exclude-physical-gpus`）。单卡 Linux 共享运行默认 v2，本机小显存兼容策略可显式传 `--resource-policy legacy`。
 
 3D 容量检查继承该阶段的预取开关、内存预算和 worker 数，按合成输入的实际体素数量预留供数内存。`capacity.json` 的 `supply` 记录预取是否实际启用、队列峰值、内存预留和传输计时；正式模型的检查仍需完成一次有限损失与非零参数更新。
 

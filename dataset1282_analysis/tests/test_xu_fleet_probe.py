@@ -19,8 +19,9 @@ class FleetProbeTests(unittest.TestCase):
             out = Path(directory)/'probe'
             result = subprocess.run([sys.executable,'-B',str(root/'scripts/xu_fleet_probe.py'),
                                      '--devices',occupied[0]['device'],'--stage','inference',
+                                     '--exclude-physical-gpus',
                                      '--output',str(out)],capture_output=True,text=True,timeout=40)
-            self.assertEqual(result.returncode,1,result.stdout+result.stderr)
+            self.assertEqual(result.returncode,1,(result.stdout or '')+(result.stderr or ''))
             row = json.loads((out/'result.json').read_text())
             self.assertEqual(row['state'],'failed')
             self.assertFalse(row['groups'])

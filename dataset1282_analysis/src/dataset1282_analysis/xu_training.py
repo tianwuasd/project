@@ -218,6 +218,14 @@ def _training_model(branch, profile, technical_fit):
     return Xu3DSegmenter(BranchSpec(base.side, width, 4, 2*width, 1, technical_fit['epochs']))
 
 
+def execution_contract(replicas, batch, elastic):
+    if not 1 <= replicas <= batch:
+        raise ValueError('设备数量必须适合固定 batch')
+    if elastic:
+        return dict(execution_policy='fixed-batch-reallocation-v1', global_batch=batch)
+    return {'batch_replicas': replicas} if replicas > 1 else {}
+
+
 def train_branch(*, branch, output_dir, train_cases, validation_cases, load_sample,
                  data_identity, profile='paper', supervision='complete', device='cpu',
                  resume=False, seed=2023, pilot_epochs=None, pilot_width=2, pause_after_epoch=None):
@@ -260,8 +268,7 @@ def train_branch(*, branch, output_dir, train_cases, validation_cases, load_samp
                     source={name:sha256_file(source/name) for name in
                             ('xu_models.py','xu_training.py','xu_supply.py','xu_distributed.py','training/marginal.py')})
     replicas = BranchForward(device, spec.batch, require_all=True).max_active
-    if replicas > 1:
-        contract['batch_replicas'] = replicas
+    contract.update(execution_contract(replicas, spec.batch, os.environ.get('XU_ELASTIC_DEVICES') == '1'))
     if pilot_epochs is not None:
         contract['technical_fit'] = dict(epochs=epochs, initial_lr=0.002, width=pilot_width)
     with torch.random.fork_rng(devices=[]):
@@ -278,6 +285,7 @@ def train_branch(*, branch, output_dir, train_cases, validation_cases, load_samp
         optimizer.load_state_dict(state['optimizer'])
         epoch_start = state['epoch']+1
         best_epoch,best_loss,history = state['best_epoch'],state['best_loss'],state['history']
+        print(f'Restored {branch} after epoch {epoch_start}: {last}', flush=True)
         del state
     # Keep the planned 15-epoch schedule and contract when stopping after a
     # complete train/development epoch. Resume reconstructs the next epoch RNG.
