@@ -30,6 +30,7 @@ python run.py report --run initial-audit
 | 入口 | 作用 |
 |---|---|
 | `setup_env.py --plan / --check / --install` | 展示计划、只检查、创建并安装专属环境；检查实际 API 与锁定版本 |
+| `python3 scripts/setup_gpu.py --check / --install --runtime PATH` | 先检查复用已有GPU环境；缺少时只在独立 `training` 目录安装，见[环境说明](docs/environment.md) |
 | `run.py inventory` | 读取主清单，检查规范路径和文件存在情况 |
 | `run.py analyze --stage metadata / headers / full` | 元数据、文件头或全体素审计，三个范围明确区分 |
 | `run.py status --run NAME` | 只读取状态，不安装或启动计算 |

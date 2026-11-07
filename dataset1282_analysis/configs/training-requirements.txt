@@ -1,0 +1,10 @@
+# Direct dependency baseline tested with torch 2.12.1+cu126, Python 3.11.
+# Transitive dependencies are resolved by pip and recorded with pip freeze.
+numpy==2.4.4
+scipy==1.17.1
+nibabel==5.4.2
+scikit-image==0.26.0
+blosc2==4.14.1
+psutil==7.2.2
+threadpoolctl==3.7.0
+matplotlib==3.11.0
