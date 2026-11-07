@@ -81,7 +81,9 @@ def train(cache, args, out):
     result = train_branch(branch=args.branch, output_dir=out, train_cases=annotations(train_names),
                           validation_cases=annotations(dev_names), load_sample=load,
                           data_identity=input_id(cache,args.supervision,book), profile=args.profile,
-                          supervision=args.supervision, device=args.device, resume=args.resume, seed=args.seed, pilot_epochs=args.pilot_epochs, pilot_width=args.pilot_width)
+                          supervision=args.supervision, device=args.device, resume=args.resume, seed=args.seed,
+                          pilot_epochs=args.pilot_epochs, pilot_width=args.pilot_width,
+                          pause_after_epoch=getattr(args, 'pause_after_epoch', None))
     return dict(command='train', branch=args.branch, train=len(train_names), validation=len(dev_names),
                 profile=args.profile, supervision=args.supervision, result=result)
 
@@ -148,6 +150,8 @@ def main(argv=None):
             cmd.add_argument('--branch',choices=BRANCHES,required=True)
             cmd.add_argument('--boxes',type=Path)
         if name=='train':
+            cmd.add_argument('--pause-after-epoch',type=int,choices=(1,2),
+                             help='Pause a paper locator after this completed epoch; retain its full schedule for resume')
             cmd.add_argument('--pilot-epochs',type=int,help='Longer technical-subset smoke fit, separate from paper training')
             cmd.add_argument('--pilot-width',type=int,choices=(2,4,8),default=2,help='Initial channels in a technical pilot fit')
             cmd.add_argument('--resume',action='store_true')

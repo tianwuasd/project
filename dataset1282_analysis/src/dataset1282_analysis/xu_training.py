@@ -171,6 +171,12 @@ def _write_best(best, state):
 def _compatible_contract(actual, expected):
     if actual == expected:
         return True
+    # The epoch pause is an execution boundary only; it leaves the previous
+    # multi-device optimizer, schedule, loss and model definitions unchanged.
+    previous_pause = dict(expected['source'])
+    previous_pause['xu_training.py'] = '54b970cb34279c6e94392d4632aa90a3173c4f3bf0026660ac1fa6a1111cd247'
+    if actual == dict(expected, source=previous_pause):
+        return True
     # Exact prior single-device versions. Data, split, loss and model fingerprints
     # still need to match; new multi-device training adds its own replica-count field.
     previous = dict(expected['source'])
@@ -214,13 +220,16 @@ def _training_model(branch, profile, technical_fit):
 
 def train_branch(*, branch, output_dir, train_cases, validation_cases, load_sample,
                  data_identity, profile='paper', supervision='complete', device='cpu',
-                 resume=False, seed=2023, pilot_epochs=None, pilot_width=2):
+                 resume=False, seed=2023, pilot_epochs=None, pilot_width=2, pause_after_epoch=None):
     """load_sample(case_id, branch) returns aligned image/label cubes on the branch grid.
 
     Callers bind preprocessing, cohort, geometry, and predicted ROI identities in
     data_identity and hold an exclusive output-directory lock for the run.
     """
     spec = branch_spec(branch,profile)
+    if pause_after_epoch is not None and (pause_after_epoch not in (1, 2) or profile != 'paper'
+                                          or branch not in ('crop64', 'crop128') or pilot_epochs is not None):
+        raise ValueError('Epoch pause supports only paper locators after epoch 1 or 2')
     if pilot_epochs is not None and (profile != 'smoke' or not 1 <= pilot_epochs <= 500):
         raise ValueError('Pilot fit requires 1..500 technical-profile epochs')
     if pilot_width not in (2, 4, 8) or (pilot_width != 2 and pilot_epochs is None):
@@ -270,7 +279,10 @@ def train_branch(*, branch, output_dir, train_cases, validation_cases, load_samp
         epoch_start = state['epoch']+1
         best_epoch,best_loss,history = state['best_epoch'],state['best_loss'],state['history']
         del state
-    for epoch in range(epoch_start,epochs):
+    # Keep the planned 15-epoch schedule and contract when stopping after a
+    # complete train/development epoch. Resume reconstructs the next epoch RNG.
+    stop_epoch = min(epochs, pause_after_epoch or epochs)
+    for epoch in range(epoch_start,stop_epoch):
         ids=sorted(train)
         random.Random(seed+epoch).shuffle(ids)
         rng=torch.Generator(device=device).manual_seed(seed+epoch)
@@ -291,7 +303,9 @@ def train_branch(*, branch, output_dir, train_cases, validation_cases, load_samp
         if best_epoch==epoch:
             _write_best(best,state)
         print(json.dumps(dict(branch=branch,profile=profile,**entry)),flush=True)
+    completed_epochs = len(history)
     summary=dict(branch=branch,profile=profile,supervision=supervision,train_cases=len(train),
+                 state='complete' if completed_epochs == epochs else 'paused', completed_epochs=completed_epochs,
                  validation_cases=len(val),batch=spec.batch,epochs=epochs,
                  validation_partial_cases=sum(bool(v) for v in val.values()),best_epoch=best_epoch+1,
                  best_loss=best_loss,history=history,best_checkpoint=str(best),last_checkpoint=str(last),

@@ -287,7 +287,21 @@ def _run_stage(stage, args, out, owner, contract, contract_id, checked, records,
                 args.device, args.overlay = plan_stage(stage, args, out, args.children, concurrent, 'launch', checked)
             atomic_json(ticket, dict(spec=spec))
             recovery = _restore_attempt(stage, directory, out)
+            pause = getattr(args, 'pause_after_epoch', None)
+            if pause is not None and stage.name in ('crop64', 'crop128'):
+                # Do not put the stop condition in the frozen stage identity.
+                recovery += ['--pause-after-epoch', str(pause)]
             _execute('xu_seg.py', [*stage.argv,*recovery], stage.name, out, owner, args)
+            if stage.name in ('crop64', 'crop128') and 'training.json' in stage.required:
+                training = read_json(directory/'training.json')
+                if training.get('state') == 'paused':
+                    completed = training['completed_epochs']
+                    if pause is None or not pause <= completed < training['epochs']:
+                        raise ValueError('Unexpected incomplete locator training')
+                    _files(directory, ('best.pt', 'last.pt', 'training.json'))
+                    # A resumable checkpoint is not a completed-stage receipt.
+                    return dict(state='paused', completed_epochs=completed,
+                                planned_epochs=training['epochs'], seconds=time.time()-started)
             _check_used_weights(stage,directory,records,contract)
             if stage.name=='targets' and args.reviews:
                 details = read_json(directory/'target-request.json')
@@ -351,6 +365,14 @@ def _run_locked(cache, args, out, owner, contract):
                     raise
             for stage, entry in zip(wave, run_wave(wave, worker, children)):
                 records[stage.name] = entry
+            if (getattr(args, 'pause_after_epoch', None) is not None
+                    and {'crop64', 'crop128'} <= records.keys() and not (out/'result.json').exists()):
+                write_status(out, state='paused', stage='locators', active=[],
+                             pause_after_epoch=args.pause_after_epoch,
+                             finished=[name for name,row in records.items() if row['state'] != 'paused'],
+                             paused={name:row for name,row in records.items() if row['state'] == 'paused'},
+                             resume='Remove --pause-after-epoch and add --resume to continue the original schedule')
+                return
             if args.stop_after in active and not (out/'result.json').exists():
                 write_status(out,state='stopped_after_stage',stage=args.stop_after,finished=list(records))
                 return
@@ -379,7 +401,9 @@ def _run_locked(cache, args, out, owner, contract):
                 atomic_json(out/'rejected-roi.json', dict(spec=_stage_spec(active[stage_name],contract_id,members[stage_name]),
                                                           qc_sha256=sha256_file(qc)))
         previous = read_json(out/'status.json') if (out/'status.json').exists() else {}
-        write_status(out,state=state,stage=stage_name,error=str(exc),finished=list(records),
+        write_status(out,state=state,stage=stage_name,error=str(exc),
+                     finished=[name for name,row in records.items() if row['state'] != 'paused'],
+                     paused={name:row for name,row in records.items() if row['state'] == 'paused'},
                      last_command=previous.get('stage'),log=previous.get('log'),
                      roi_report=str(qc) if state=='roi_rejected' else None)
         raise
@@ -394,6 +418,10 @@ def _run(args):
         raise ValueError('Place private experiment outputs outside the code checkout')
     if bool(args.crop64) != bool(args.crop128):
         raise ValueError('Provide both locator checkpoints or train both in this run')
+    pause = getattr(args, 'pause_after_epoch', None)
+    if pause is not None and (pause not in (1,2) or args.profile != 'paper' or args.crop64
+                               or args.stop_after is not None):
+        raise ValueError('Epoch pause requires paper locator training without supplied weights or --stop-after')
     if args.threads is not None and args.threads < 1:
         raise ValueError('Thread count must be positive')
     for name in ('crop64','crop128','reviews'):
@@ -442,6 +470,8 @@ def main(argv=None):
     run.add_argument('--crop128',type=Path,help='Optional matching 128-cube whole-scan locator')
     run.add_argument('--reviews',type=Path,help='Private verified cut planes and optional inner interfaces')
     run.add_argument('--resume',action='store_true')
+    run.add_argument('--pause-after-epoch',type=int,choices=(1,2),
+                     help='Pause both paper locators after 1 or 2 epochs; remove this flag and add --resume to continue')
     run.add_argument('--stop-after',choices=STAGE_NAMES,help='Stop after committing this stage; continue with --resume')
     commands.add_parser('status').add_argument('--output',type=Path,required=True)
     args = parser.parse_args(argv)

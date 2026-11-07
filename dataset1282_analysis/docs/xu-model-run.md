@@ -65,6 +65,27 @@ nohup "$PY" -B -u scripts/xu_pipeline.py run "${args[@]}" >"${O}.launcher.log" 2
 
 ## 查看、分段和恢复
 
+### 正式模型先试跑一至两轮
+
+Linux 可用一个薄启动脚本串接输入检查、CPU 合成训练/恢复检查、三项 GPU 检查及正式两轮试跑。`RUN` 必须是尚不存在的新目录，父目录先创建；任一检查失败都不会启动训练。代码、预处理路径和环境在该次实验中保持不变。
+
+```bash
+RUN=/path/to/private/experiments/xu-trial-unique
+mkdir -p "$(dirname "$RUN")"
+nohup bash scripts/xu_trial.sh "$PY" "$D" "$RUN" "$GPU" 2 >"${RUN}.launcher.log" 2>&1 < /dev/null &
+# 训练状态为 $RUN/training/status.json，启动参数保存在 $RUN/settings.sh。
+```
+
+先在目标 GPU 上依次运行上面的 `inference`、`3d64`、`3d128` 容量检查。检查使用合成输入；两个 3D 检查执行正式尺寸、batch 4 的一次 Adam 更新。全部通过后，在新的实验目录使用：
+
+```bash
+nohup "$PY" -B -u scripts/xu_pipeline.py run "${args[@]}" --pause-after-epoch 2 >"${O}.launcher.log" 2>&1 < /dev/null &
+```
+
+这会让 `crop64`、`crop128` 各完成两轮训练和开发集评价后返回 `paused`，不启动取框及后续分割。每轮仍遍历所选监督组的全部训练和开发病例；不是两个 batch。`--pause-after-epoch 1` 可先只跑一轮。模型尺寸、batch、原定 15 轮学习率计划及监督方式均不变；暂停只控制本次运行的停止位置。两支的 `last.pt` 和 `training.json` 保存已完成轮数，暂停阶段不会获得完成凭据。
+
+从一轮继续到两轮，在原命令加 `--resume` 并将暂停点改为 `2`。决定继续正式训练时，移除暂停选项、保持其他参数与代码不变，并加 `--resume`；程序接着最近完整轮次训练至原定 15 轮，再执行取框审核。暂停选项仅用于自行训练正式定位器，不能搭配外部冻结定位权重。请保留该实验启动时的代码版本，运行中不要更新源码。
+
 ```bash
 "$PY" scripts/xu_pipeline.py status --output "$O"
 tail -f "${O}.launcher.log"
