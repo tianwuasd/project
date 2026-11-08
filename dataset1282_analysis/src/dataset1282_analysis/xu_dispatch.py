@@ -296,7 +296,7 @@ def plan_stage(stage, args, out, children, concurrent, purpose, checked):
     if device != group[0]:
         raise ValueError('Stage primary device differs from its frozen group')
     policy = args.resource_policy
-    enabled = args.prefetch and stage.name in TRAIN_3D
+    enabled = args.prefetch and stage.name in TRAIN_3D | {'blood'}
     requested_workers = getattr(args,'prefetch_workers',4)
     if requested_workers < 1:
         raise ValueError('CPU worker 上限必须为正整数')

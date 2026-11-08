@@ -1,13 +1,14 @@
 """Train the separate 2D and temporal blood-pool networks on prepared axial slices."""
 from functools import lru_cache
 import json
-import math
 from pathlib import Path
+import time
 
 import numpy as np
 
 from .contracts import atomic_json, read_json, sha256_file
 from .xu_blood_grid import AxialViews
+from .xu_blood_supply import SliceSupply, PhaseTiming, prepare_slices, augment_slices
 
 
 # Reviewed at 13ceecc2. Unscoped v1 used every case with a known blood target.
@@ -46,7 +47,8 @@ def register(commands):
 
 def _source():
     return {name:sha256_file(Path(__file__).with_name(name)) for name in
-            ('xu_blood.py','xu_blood_grid.py','xu_blood_models.py','xu_geometry.py','xu_distributed.py')}
+            ('xu_blood.py','xu_blood_grid.py','xu_blood_models.py','xu_geometry.py','xu_distributed.py',
+             'xu_blood_supply.py','xu_supply.py','xu_supply_budget.py','xu_resume_compat.py')}
 
 
 def blood_cohort(cache, ids, supervision, store=None):
@@ -74,19 +76,20 @@ def _contract(cache, targets, supervision, profile, seed, eligible):
                 seed=seed, **eligible)
 
 
+def _normalized_contract(stored, expected):
+    if (stored.get('method') == 'xu-blood-v1' and 'supervision' not in stored
+            and expected['supervision'] == 'marginal'):
+        return dict(stored,method='xu-blood-v2',supervision='marginal')
+    return stored
+
+
 def _matches(stored, expected):
-    if stored == expected:
-        return True
-    if any(expected['source'][k] != v for k,v in _V1_SOURCE.items() if k != 'xu_blood.py'):
-        return False
-    if stored.get('method') == 'xu-blood-v2':
-        return any(stored == dict(expected,source=source)
-                   for source in (_SINGLE_GPU_V2_SOURCE,_PREVIOUS_V2_SOURCE))
-    if expected['supervision'] != 'marginal' or stored.get('method') != 'xu-blood-v1':
-        return False
-    legacy = dict(expected, method='xu-blood-v1', source=_V1_SOURCE)
-    del legacy['supervision']
-    return stored == legacy
+    from .xu_resume_compat import source_compatible
+    actual = _normalized_contract(stored,expected)
+    return (isinstance(actual.get('source'),dict) and bool(actual['source']) and
+            {k:v for k,v in actual.items() if k != 'source'} ==
+            {k:v for k,v in expected.items() if k != 'source'} and
+            source_compatible(actual['source'],expected['source'],'src/dataset1282_analysis/'))
 
 
 def _objective(scores, target):
@@ -103,23 +106,8 @@ def _objective(scores, target):
 
 
 def _batch(views, centres, temporal, device, augment):
-    import torch
-    from torch.nn import functional as F
-    windows = [views.window(z) if temporal else [z] for z in centres]
-    images = torch.from_numpy(np.stack([[views.image(i) for i in w] for w in windows])).to(device)
-    labels = torch.from_numpy(np.stack([views.label(z) for z in centres])).long().to(device)
-    if augment is not None:
-        # Rotate/flip all slices and the target together; input padding is never supervised.
-        matrices = []
-        for _ in centres:
-            angle = augment.uniform(-math.pi/12, math.pi/12)
-            flip = augment.choice([-1, 1])
-            matrices.append([[flip*math.cos(angle), -math.sin(angle), 0],
-                             [flip*math.sin(angle), math.cos(angle), 0]])
-        grid = F.affine_grid(images.new_tensor(matrices), images.shape, align_corners=False)
-        images = F.grid_sample(images,grid,align_corners=False)
-        labels = F.grid_sample((labels[:,None]+1).float(),grid,mode='nearest',align_corners=False)[:,0].long()-1
-    return images, labels
+    images, labels = prepare_slices(views, centres, temporal)
+    return augment_slices(images.to(device),labels.to(device),augment)
 
 
 class BloodForward:
@@ -161,7 +149,8 @@ class BloodForward:
         return sequence(frames)
 
 
-def _epoch(cache, store, names, encoder, sequence, device, stage, profile, seed, optimizer=None):
+def _epoch(cache, store, names, encoder, sequence, device, stage, profile, seed, optimizer=None,
+           epoch=None, total_epochs=None, telemetry=None):
     import torch
     training = optimizer is not None
     temporal = stage == 'sequence'
@@ -173,6 +162,7 @@ def _epoch(cache, store, names, encoder, sequence, device, stage, profile, seed,
         rng.shuffle(order)
     batch = 4 if profile=='paper' and not temporal else 1
     forward = BloodForward(encoder,device,temporal,batch)
+    timing = PhaseTiming()
     loss_sum, count = 0., 0
     for pos, name in enumerate(order,1):
         views = AxialViews(cache,name,store)
@@ -181,28 +171,43 @@ def _epoch(cache, store, names, encoder, sequence, device, stage, profile, seed,
             centres = np.array([len(centres)//2])
         if training:
             rng.shuffle(centres)
-        for idx in range(0,len(centres),batch):
-            images, labels = _batch(views,centres[idx:idx+batch],temporal,device,rng if training else None)
-            if not (labels >= 0).any():
-                continue
-            with torch.set_grad_enabled(training):
-                scores = forward(images,sequence)
-                loss = _objective(scores,labels)
-                if not torch.isfinite(loss):
-                    raise FloatingPointError('Nonfinite blood-pool loss')
-                if training:
-                    optimizer.zero_grad(set_to_none=True)
-                    loss.backward()
-                    optimizer.step()
-            loss_sum += float(loss.detach()) * len(images)
-            count += len(images)
+        supply = SliceSupply(views,centres,batch,temporal)
+        step_seconds = 0.
+        with supply.batches() as batches:
+            for _, pair in batches:
+                images, labels = supply.transfer(pair,device)
+                # 增强随机数在消费线程产生，保持原有病例与切片顺序。
+                images, labels = augment_slices(images,labels,rng if training else None)
+                if not (labels >= 0).any():
+                    continue
+                started = time.perf_counter()
+                with torch.set_grad_enabled(training):
+                    scores = forward(images,sequence)
+                    loss = _objective(scores,labels)
+                    if not torch.isfinite(loss):
+                        raise FloatingPointError('Nonfinite blood-pool loss')
+                    if training:
+                        optimizer.zero_grad(set_to_none=True)
+                        loss.backward()
+                        optimizer.step()
+                loss_sum += float(loss.detach()) * len(images)
+                count += len(images)
+                step_seconds += time.perf_counter()-started
+        finished = time.perf_counter()
+        if torch.device(device).type == 'cuda':
+            torch.cuda.synchronize(device)
+        timing.add(supply,step_seconds,time.perf_counter()-finished)
         views.image.cache_clear()
         print(json.dumps(dict(stage=stage,phase='train' if training else 'development',
-                              cases_completed=pos,total=len(order),slices=count)),flush=True)
+                              epoch=epoch,total_epochs=total_epochs,updated_at=time.time(),
+                              cases_completed=pos,total=len(order),slices=count,
+                              timing=timing.report(count,pos,len(order)))),flush=True)
     if not count:
         raise ValueError('No supervised blood-pool slices')
     if len(forward.distribution.stats['assigned_devices']) > 1:
         print(json.dumps(dict(stage=stage,distribution=forward.distribution.stats)),flush=True)
+    if telemetry is not None:
+        telemetry.update(timing.report(count,len(order),len(order)))
     return loss_sum/count
 
 
@@ -223,16 +228,30 @@ def _train_stage(cache, store, contract, out, encoder, sequence, stage, device):
         optimizer.load_state_dict(state['optimizer'])
         start, history, selected = state['epoch'], state['history'], state['selected']
         if start==selected:
-            _save(best,dict(contract=contract,epoch=start,stage=stage,model=state['model']))
+            complete_best = False
+            if best.exists():
+                previous = torch.load(best,map_location='cpu',weights_only=True)
+                if previous['contract'] != contract or previous['stage'] != stage or previous['epoch'] > start:
+                    raise ValueError('Selected blood checkpoint contract changed')
+                complete_best = previous['epoch'] == start
+                if complete_best and (previous['model'].keys() != state['model'].keys() or
+                        any(not torch.equal(previous['model'][k],v) for k,v in state['model'].items())):
+                    raise ValueError('Selected blood weights disagree with last committed epoch')
+                del previous
+            if not complete_best:
+                _save(best,dict(contract=contract,epoch=start,stage=stage,model=state['model']))
         del state
     for e in range(start,epochs):
+        epoch_started = time.perf_counter()
         lr=learning_rate(e,epochs)
         for group in optimizer.param_groups:
             group['lr']=lr
+        train_timing, validation_timing = {}, {}
         loss=_epoch(cache,store,contract['train'],encoder,sequence,device,stage,contract['profile'],
-                    contract['seed']+e,optimizer)
+                    contract['seed']+e,optimizer,e+1,epochs,train_timing)
         dev=contract['development']
-        val=(_epoch(cache,store,dev,encoder,sequence,device,stage,contract['profile'],0) if dev else None)
+        val=(_epoch(cache,store,dev,encoder,sequence,device,stage,contract['profile'],0,
+                    epoch=e+1,total_epochs=epochs,telemetry=validation_timing) if dev else None)
         entry=dict(epoch=e+1,loss=loss,validation=val,learning_rate=lr)
         history.append(entry)
         if not selected or val is None or val<history[selected-1]['validation']:
@@ -241,7 +260,11 @@ def _train_stage(cache, store, contract, out, encoder, sequence, stage, device):
                         optimizer=optimizer.state_dict(),history=history,selected=selected))
         if selected==e+1:
             _save(best,dict(contract=contract,epoch=e+1,stage=stage,model=model.state_dict()))
-        print(json.dumps(dict(stage=stage,**entry)),flush=True)
+        elapsed = time.perf_counter()-epoch_started
+        print(json.dumps(dict(stage=stage,**entry,total_epochs=epochs,remaining_epochs=epochs-e-1,
+                              epoch_seconds=elapsed,updated_at=time.time(),
+                              phase_eta_seconds=elapsed*(epochs-e-1),
+                              train_timing=train_timing,validation_timing=validation_timing)),flush=True)
     del optimizer
     saved=torch.load(best,map_location='cpu',weights_only=True)
     if saved['contract']!=contract or saved['stage']!=stage or saved['epoch']!=selected:
@@ -268,6 +291,16 @@ def train(cache,args,out):
         stored = read_json(marker)
         if not args.resume or not _matches(stored,contract):
             raise ValueError('Blood training output is occupied or incompatible')
+        if stored != contract:
+            from .xu_resume_compat import preserve_contract
+            normalized = _normalized_contract(stored,contract)
+            preserve_contract(normalized,contract,out,field='source',path_prefix='src/dataset1282_analysis/')
+            if normalized != stored:
+                legacy_record = out/'.runtime/resume-compat/original-blood-contract.json'
+                if legacy_record.exists() and read_json(legacy_record) != stored:
+                    raise ValueError('Original blood contract evidence changed')
+                if not legacy_record.exists():
+                    atomic_json(legacy_record,stored)
         # On certified v1 resume, existing per-epoch checkpoints retain their original identity.
         contract = stored
     else:
