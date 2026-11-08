@@ -45,7 +45,7 @@ def validate_producer(sources):
         raise ValueError('来源训练代码尚未审计预测兼容；原模型保留')
 
 
-def inspect_training(run, checkpoint='best', *, smoke=False, allow_intermediate=False):
+def inspect_training(run, checkpoint='best', *, smoke=False, allow_intermediate=False, skip_producer_audit=False):
     run = Path(run).resolve(strict=True)
     if checkpoint not in ('best', 'epoch', 'latest'):
         raise ValueError('检查点必须选择 best、epoch 或 latest')
@@ -70,7 +70,8 @@ def inspect_training(run, checkpoint='best', *, smoke=False, allow_intermediate=
     if summary['status'] not in ('completed', 'stopped'):
         raise ValueError('来源训练须已完成或安全停止')
     freeze_code(run, signature, create=False)
-    validate_producer(signature['producer_ast_sha256'])
+    if not skip_producer_audit:
+        validate_producer(signature['producer_ast_sha256'])
     current = scientific_sources(ROOT)
     # 调度源码可以升级，但解释权重的网络源码必须逐项匹配。
     critical = ('src/chd_stunet/training/model.py', 'src/chd_stunet/_vendor/stunet_architecture.py')

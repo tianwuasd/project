@@ -27,6 +27,8 @@ def add_arguments(sub, positive, nonnegative):
     parser.add_argument('--smoke', action='store_true')
     parser.add_argument('--share-desktop-pid', type=positive, help='explicit Windows smoke-only sharing with the authorized Codex desktop PID')
     parser.add_argument('--allow-intermediate', action='store_true')
+    parser.add_argument('--skip-producer-audit', action='store_true',
+                        help='skip the producer allowlist; retain frozen code and model integrity checks')
     parser.add_argument('--background', action='store_true')
     parser.add_argument('--resume', action='store_true')
     parser.add_argument('--check-only', action='store_true')
@@ -44,7 +46,8 @@ def execute(args, local):
         options = {name: getattr(args, name) for name in ('tta', 'max_gpus', 'device', 'max_batch', 'checkpoint',
                    'gpus', 'gpu_memory_gib', 'threads', 'prefetch', 'wait_seconds')
                    if getattr(args, name) is not None}
-        if args.training_run or args.prepared or args.images or args.cases or args.fold or args.limit or args.check_only or args.share_desktop_pid:
+        if (args.training_run or args.prepared or args.images or args.cases or args.fold or args.limit
+                or args.check_only or args.share_desktop_pid or args.skip_producer_audit):
             raise ValueError('恢复使用原任务已冻结的模型和病例；请省略输入选择参数')
         options.update(output=str(resolve_path(args.output)), resume=True, background=args.background)
         return run_prediction(options)
@@ -70,6 +73,7 @@ def execute(args, local):
     options.update(training_runs=runs, prepared=prepared, images=[str(resolve_path(p)) for p in (args.images or [])],
                    cases=args.cases or [], output=str(output), smoke=args.smoke,
                    allow_intermediate=args.allow_intermediate, background=args.background,
+                   skip_producer_audit=args.skip_producer_audit,
                    check_only=args.check_only, limit=args.limit or (2 if args.smoke else None))
     if args.share_desktop_pid:
         from ..acceleration.prediction import desktop_identity

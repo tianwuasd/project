@@ -166,8 +166,10 @@ def _run_prediction(options):
     else:
         if output.exists() and any(output.iterdir()):
             raise FileExistsError('预测目录非空；请选择新目录或 --resume')
+        skip_producer_audit = options.get('skip_producer_audit', False)
         models = [inspect_training(path, options['checkpoint'], smoke=options['smoke'],
-                                   allow_intermediate=options['allow_intermediate']) for path in options['training_runs']]
+                                   allow_intermediate=options['allow_intermediate'],
+                                   skip_producer_audit=skip_producer_audit) for path in options['training_runs']]
         if len({row['fold'] for row in models}) != len(models):
             raise ValueError('每折只能选择一份模型')
         records = new_cases(options['images'], models) if options.get('images') else select_cases(
@@ -179,7 +181,7 @@ def _run_prediction(options):
             return dict(status='checked', folds=[m['fold'] for m in models],
                         cases=[{'case_id': r['case_id'], 'fold': r['fold']} for r in records],
                         models=[{'run': m['run'], 'epoch': m['epoch'], 'sha256': m['pointer']['sha256']} for m in models],
-                        gpu_capacity_checked=False)
+                        gpu_capacity_checked=False, producer_audit_skipped=skip_producer_audit)
         sources = [Path(r['pair']['image']).resolve() for r in records]
         for source in [*sources, *(Path(m['run']) for m in models), Path(options['prepared'])] if options.get('prepared') else [*sources, *(Path(m['run']) for m in models)]:
             if output == source or output.is_relative_to(source) or source.is_relative_to(output):
@@ -242,6 +244,7 @@ def summarize(output, job, results, state, recoveries):
                              missing_prediction=sum(r['status'] == 'missing_prediction' for r in rows),
                              both_empty=sum(r['status'] == 'both_empty' for r in rows))
     result = dict(status=state, scope='smoke' if job['options']['smoke'] else 'formal',
+                  producer_audit_skipped=job['options'].get('skip_producer_audit', False),
                   completed_cases=len(results), requested_cases=len(job['records']), metrics=metrics,
                   folds=sorted({m['fold'] for m in job['models']}), resource_recoveries=recoveries,
                   metrics_scope=('new CT; no reference metrics' if job['options'].get('images')
@@ -268,6 +271,8 @@ def supervise(output):
             raise ValueError('冻结代码清单与任务签名不一致')
         options, identity = job['options'], job['identity']
         log = RunLog(output)
+        if options.get('skip_producer_audit', False):
+            log.event('producer_audit', '本任务显式跳过训练版本兼容名单检查；其他来源和权重核验通过')
         models = {m['fold']: m for m in job['models']}
         tasks = {}
         results = []
