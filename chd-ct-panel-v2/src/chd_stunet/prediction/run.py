@@ -1,6 +1,5 @@
 import csv
 from datetime import datetime
-import importlib.metadata
 import json
 import os
 from pathlib import Path
@@ -13,7 +12,7 @@ from uuid import uuid4
 
 import psutil
 
-from ..acceleration.prediction import budget, can_admit, process_options, reservation, resource_stop_reason, select_visible, stop_owned, sharing_inventory
+from ..acceleration.prediction import budget, can_admit, process_options, reservation, resource_stop_reason, select_visible, stop_owned, sharing_inventory, refresh_budget, admitted_threads, process_alive
 from ..acceleration.preprocess_cpu import GIB, interpreter_command
 from ..config import ROOT
 from ..observability.locking import run_lock
@@ -21,7 +20,7 @@ from ..observability.runlog import RunLog, write_json
 from ..training.contracts import digest
 from .export import valid_result
 from .inputs import estimate_case, new_cases, select_cases
-from .model import file_sha, freeze_weights, inspect_training, read_json
+from .model import file_sha, freeze_weights, inspect_training, read_json, runtime_versions
 
 
 def discover_training(root, folds):
@@ -86,9 +85,59 @@ def assert_inactive(output):
 def validate_job(job):
     if digest({k: v for k, v in job.items() if k != 'identity'}) != job['identity']:
         raise ValueError('预测任务签名损坏')
-    for name, version in job['versions'].items():
-        if importlib.metadata.version(name) != version:
+    for name, version in runtime_versions().items():
+        if job['versions'].get(name) != version:
             raise ValueError('恢复环境版本变化：'+name)
+
+
+def worker_failure(directory, returncode, *, allow_success=False, supervisor_stopped=False):
+    path = Path(directory)/'failure.json'
+    failure = read_json(path) if path.is_file() else None
+    if failure and failure.get('kind') != 'resource':
+        raise RuntimeError('预测 worker 失败：'+str(failure))
+    if failure:
+        return failure
+    if returncode is not None and not supervisor_stopped and not (allow_success and returncode == 0):
+        raise RuntimeError(f'预测 worker 未正常退出（{returncode}）：{directory}/worker.log')
+    return None
+
+
+def reap_orphans(output, identity):
+    output = Path(output).resolve()
+    cleaned = []
+    for path in sorted((output/'control').glob('*/owner.json')):
+        owner = read_json(path)
+        directory = path.parent.resolve()
+        if owner['identity'] != identity or Path(owner['directory']).resolve() != directory:
+            raise ValueError('工作进程所属任务不一致')
+        if not directory.is_relative_to(output/'control'):
+            raise ValueError('工作进程目录超出当前任务')
+        if not process_alive(owner):
+            continue
+        try:
+            process = psutil.Process(owner['pid'])
+            arguments = process.cmdline()
+            if (os.path.normcase(process.exe()) != os.path.normcase(owner['executable']) or
+                    '--directory' not in arguments or
+                    Path(arguments[arguments.index('--directory')+1]).resolve() != directory):
+                raise RuntimeError('工作进程身份无法确认，拒绝终止其他进程')
+            # 出生时间、解释器和任务目录均匹配后，才清理本任务遗留的进程。
+            if process.create_time() != owner['born']:
+                raise RuntimeError('工作进程身份变化')
+            process.terminate()
+        except psutil.NoSuchProcess:
+            # 工作进程自身的父进程监测也会退出；并发退出已经达到清理目的。
+            continue
+        _, alive = psutil.wait_procs([process], timeout=5)
+        for item in alive:
+            if item.create_time() == owner['born']:
+                item.kill()
+        _, alive = psutil.wait_procs(alive, timeout=10)
+        if alive:
+            raise RuntimeError('遗留工作进程未退出，暂停恢复以保护输出')
+        cleaned.append(owner)
+    write_json(output/'control/orphan-cleanup.json', {'identity': identity, 'cleaned': cleaned})
+    return cleaned
 
 
 def run_prediction(options):
@@ -108,6 +157,7 @@ def _run_prediction(options):
         validate_frozen(output)
         job = read_json(output/'job.json')
         validate_job(job)
+        reap_orphans(output, job['identity'])
         # 恢复时使用已冻结的来源与配置，不跟随新的 best 指针。
         for key in ('tta', 'max_gpus', 'device', 'max_batch', 'checkpoint', 'gpus',
                     'gpu_memory_gib', 'threads', 'prefetch', 'wait_seconds'):
@@ -139,7 +189,7 @@ def _run_prediction(options):
         log.event('freeze', '冻结来源模型与预测代码；原训练保持只读')
         frozen = [freeze_weights(model, output/'models'/f"fold_{model['fold']}") for model in models]
         code = freeze_prediction_code(output)
-        versions = {name: importlib.metadata.version(name) for name in ('torch', 'nnunetv2', 'numpy', 'scipy', 'nibabel', 'blosc2')}
+        versions = runtime_versions()
         job = dict(schema=1, options=options, models=frozen, records=records, versions=versions, code_sha256=code)
         job['identity'] = digest(job)
         write_json(output/'job.json', job)
@@ -238,8 +288,9 @@ def supervise(output):
                                   destination=str(destination), retries=0)
         mapping = select_visible(output/'code/src', options['gpus'], options['max_gpus']) if options['device'] == 'cuda' and tasks else []
         maximum = options['max_gpus'] if mapping else 1
+        case_limit = maximum*3
         estimates = [t['estimate'] for t in tasks.values()] or [GIB]
-        baseline = budget(estimates, maximum*3, options['threads'])
+        baseline = budget(estimates, case_limit, options['threads'])
         write_json(output/'resources-initial.json', baseline)
         workers, exporters = {}, {}
         recoveries = 0
@@ -250,6 +301,7 @@ def supervise(output):
 
         def spawn(directory, payload, export=False, gpu=None):
             directory.mkdir(parents=True)
+            payload = dict(payload, supervisor={'pid': os.getpid(), 'born': psutil.Process().create_time()})
             write_json(directory/'job.json', payload)
             stream = (directory/'worker.log').open('w', encoding='utf-8')
             env = dict(os.environ, PYTHONPATH=str(output/'code/src'), PYTHONUTF8='1')
@@ -264,7 +316,11 @@ def supervise(output):
                 arguments.append('--export')
             process = subprocess.Popen(arguments, env=env, stdin=subprocess.DEVNULL, stdout=stream,
                                        stderr=subprocess.STDOUT, **process_options())
-            return dict(process=process, born=psutil.Process(process.pid).create_time(), stream=stream,
+            child = psutil.Process(process.pid)
+            born = child.create_time()
+            write_json(directory/'owner.json', dict(pid=process.pid, born=born, executable=child.exe(),
+                       directory=str(directory), identity=identity, supervisor=payload['supervisor']))
+            return dict(process=process, born=born, stream=stream,
                         directory=directory, assigned=[], threads=payload['threads'], gpu=gpu, sequence=None)
 
         def reservations():
@@ -283,7 +339,7 @@ def supervise(output):
                 if (output/'control/stop.json').exists():
                     break
                 now = time.monotonic()
-                fresh = budget(estimates, maximum*3, options['threads'])
+                fresh = budget(estimates, case_limit, options['threads'])
                 if not capacity_committed:
                     # 等待阶段尚未领取资源；在首次启动前采用当前可用容量。
                     baseline = fresh
@@ -307,17 +363,21 @@ def supervise(output):
                     row = next((r for r in live if entry['gpu'] and r['uuid'] == entry['gpu']['uuid']), None)
                     foreign = row and set(row['external_pids'])-{entry['process'].pid}
                     pressure = resource_stop_reason(fresh, baseline)
-                    failure_path = entry['directory']/'failure.json'
-                    failed = read_json(failure_path) if failure_path.is_file() else None
-                    exited = entry['process'].poll() is not None
+                    failed = worker_failure(entry['directory'], entry['process'].poll())
                     reason = 'external_gpu' if foreign else pressure or ('resource' if failed and failed['kind'] == 'resource' else None)
-                    if exited and not reason:
-                        raise RuntimeError('预测 worker 异常：'+str(failed or entry['directory']/'worker.log'))
                     if reason:
                         log.event('requeue', f'资源变化 {reason}；保留已完成病例并重新分配')
                         stop_owned(entry)
+                        worker_failure(entry['directory'], entry['process'].returncode, supervisor_stopped=True)
                         for key in entry['assigned']:
                             if tasks[key]['state'] == 'infer':
+                                marker = output/'intermediate'/key/'inferred.json'
+                                if marker.is_file():
+                                    inferred = read_json(marker)
+                                    if inferred['identity'] != identity:
+                                        raise ValueError('GPU 中间产物身份不一致')
+                                    tasks[key].update(state='ready', inferred=inferred)
+                                    continue
                                 tasks[key]['state'] = 'pending'
                                 tasks[key]['retries'] += 1
                                 if tasks[key]['retries'] > 3:
@@ -327,49 +387,62 @@ def supervise(output):
                         if reason != 'external_gpu':
                             maximum = max(1, maximum-1)
                             options = dict(options, max_batch=max(1, options['max_batch']//2))
-                            baseline = dict(baseline, workers=max(1, baseline['workers']//2))
-                if resource_stop_reason(fresh, baseline) and exporters:
-                    for key, entry in list(exporters.items()):
-                        stop_owned(entry)
-                        tasks[key].update(state='ready', retries=tasks[key]['retries']+1)
-                        if tasks[key]['retries'] > 3:
-                            raise RuntimeError('导出连续遭遇内存压力，进度已保留：'+key)
-                        del exporters[key]
-                        recoveries += 1
-                    maximum = 1
-                    baseline = dict(baseline, workers=1)
-                    log.event('host_pressure', '主机内存压力，释放本任务导出进程后等待容量恢复')
+                            case_limit = max(1, case_limit//2)
+                            baseline = dict(baseline, workers=min(baseline['workers'], case_limit))
                 for key, entry in list(exporters.items()):
-                    if entry['process'].poll() is not None:
-                        if entry['process'].returncode:
-                            path = entry['directory']/'failure.json'
-                            failure = read_json(path) if path.is_file() else {}
-                            if failure.get('kind') != 'resource' or tasks[key]['retries'] >= 3:
-                                raise RuntimeError('CPU导出失败；日志：'+str(entry['directory']/'worker.log'))
-                            tasks[key].update(state='ready', retries=tasks[key]['retries']+1)
-                            stop_owned(entry)
-                            del exporters[key]
-                            recoveries += 1
-                            maximum = 1
-                            log.event('export_requeue', 'CPU容量不足，降低并发后重新导出：'+key)
-                            continue
-                        result = valid_result(tasks[key]['destination'], identity)
-                        if result is None:
-                            raise RuntimeError('导出进程未提交完整病例：'+key)
+                    code = entry['process'].poll()
+                    failure = worker_failure(entry['directory'], code, allow_success=True)
+                    result = valid_result(tasks[key]['destination'], identity)
+                    pressure = resource_stop_reason(fresh, baseline)
+                    if result is not None:
+                        stop_owned(entry)
+                        worker_failure(entry['directory'], entry['process'].returncode,
+                                       allow_success=True, supervisor_stopped=code is None)
                         results.append(result)
                         tasks[key]['state'] = 'done'
-                        stop_owned(entry)
                         del exporters[key]
                         log.event('case_complete', f'病例完成 {len(results)}/{len(job["records"])}：{key}')
+                        continue
+                    if code == 0 and not failure:
+                        raise RuntimeError('导出进程未提交完整病例：'+key)
+                    if pressure or failure:
+                        stop_owned(entry)
+                        worker_failure(entry['directory'], entry['process'].returncode,
+                                       allow_success=True, supervisor_stopped=code is None)
+                        # 终止信号与完成提交可能相邻；再次检查，已经完成的文件不重写。
+                        result = valid_result(tasks[key]['destination'], identity)
+                        if result is not None:
+                            results.append(result)
+                            tasks[key]['state'] = 'done'
+                        else:
+                            tasks[key].update(state='ready', retries=tasks[key]['retries']+1)
+                            if tasks[key]['retries'] > 3:
+                                raise RuntimeError('导出连续遭遇内存压力，进度已保留：'+key)
+                        del exporters[key]
+                        recoveries += 1
+                        maximum = case_limit = 1
+                        baseline = dict(baseline, workers=1)
+                        log.event('export_requeue', 'CPU容量不足，降低并发后重新核定容量：'+key)
                 # 后处理尾段释放空闲模型，避免显存和主机内存一直被保留。
                 if not any(t['state'] in ('pending', 'infer') for t in tasks.values()):
                     for token, entry in list(workers.items()):
                         if not entry['assigned']:
                             stop_owned(entry)
                             del workers[token]
+                busy = bool(any(entry['assigned'] for entry in workers.values()) or exporters)
+                if not busy:
+                    for token, entry in list(workers.items()):
+                        stop_owned(entry)
+                        del workers[token]
+                    fresh = budget(estimates, case_limit, options['threads'])
+                    baseline = refresh_budget(baseline, fresh, busy=False)
+                    if capacity_committed:
+                        log.event('capacity_refresh', f"空闲阶段重新核定资源：CPU {baseline['cpu_budget']}；"
+                                  f"内存 {baseline['memory_budget_bytes']/GIB:.2f} GiB；并发上限 {case_limit}")
+                    capacity_committed = False
                 # 优先清空已推理病例，防止大体积输出累积挤占后续内存。
                 for key, task in tasks.items():
-                    threads = min(options['threads'], max(1, fresh['cpu_budget']))
+                    threads = admitted_threads(baseline, fresh, reservations(), options['threads'])
                     if task['state'] == 'ready' and can_admit(baseline, fresh, reservations(), task['estimate'], threads):
                         payload = dict(output=str(output), identity=identity, record=task['record'],
                                        model=models[task['record']['fold']], inferred=task['inferred'],
@@ -386,7 +459,7 @@ def supervise(output):
                     if not pending or len(workers) >= maximum:
                         break
                     key = pending[0]
-                    threads = min(options['threads'], max(1, fresh['cpu_budget']))
+                    threads = admitted_threads(baseline, fresh, reservations(), options['threads'])
                     if not can_admit(baseline, fresh, reservations(), tasks[key]['estimate']+512*1024**2, threads):
                         continue
                     token = gpu['uuid'] if gpu else 'cpu'

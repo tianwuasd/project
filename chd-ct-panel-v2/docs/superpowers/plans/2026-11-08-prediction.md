@@ -60,5 +60,5 @@ Files: cli.py、smoke.py、config.py、configs/prediction/stunet-s.json、docs/p
 
 - [x] CLI 支持 predict、模型目录发现、test/all folds、背景运行、check-only、resume、停止和新病例。
 - [x] 真模型/真实 CT 完整预测；同参数串行和优化路径重复比较并保存证据。
-- [ ] 检查训练回归、文档、源文件摘要，独立审查后修复重要问题。
-- [ ] 更新发布清单并在本地分支提交；不合并 main、不上传数据或模型。
+- [x] 检查训练回归、文档、源文件摘要，独立审查后修复重要问题。
+- [x] 更新发布清单并在本地分支提交；不合并 main、不上传数据或模型。

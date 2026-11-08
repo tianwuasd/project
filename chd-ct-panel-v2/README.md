@@ -1,4 +1,4 @@
-# CHD：数据分析、预处理与STU-Net-S训练
+# CHD：数据分析、预处理与STU-Net-S训练和预测
 
 这是独立的命令行工程，沿用 `chd-ct-panel-v2` 目录名。0.6.0 提供 STU-Net-S 整幅预测、原测试集评价和新病例多折概率集成，保留多 GPU 训练、换卡或减卡与自适应 CPU 供数。已停止的 0.5.2 和 0.5.3 训练可以将检查点导入新运行目录。[多卡运行与继续训练](docs/multigpu.md)、[预测指南](docs/prediction-usage.md)。
 

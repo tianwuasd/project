@@ -13,8 +13,8 @@ from threadpoolctl import threadpool_limits
 
 from ..observability.runlog import RunLog, write_json
 from ..training.resources import GPUUnavailable
-from ..acceleration.prediction import admit_prediction_device
-from .export import export_case
+from ..acceleration.prediction import admit_prediction_device, process_alive
+from .export import export_case, valid_result
 from .infer import sliding_logits, tune_batch
 from .inputs import prepare_case
 from .model import file_sha, read_json, restore_network
@@ -33,16 +33,27 @@ def run_worker(directory, export=False):
     ended = threading.Event()
     state = {'stage': 'initialization'}
 
+    def parent_guard():
+        if not process_alive(job['supervisor']):
+            write_json(directory/'finished.json', {'action': 'supervisor_lost'})
+            # 只退出当前工作进程；预取线程或插值正在执行时也释放本任务资源。
+            os._exit(72)
+
     def update(stage, **fields):
+        parent_guard()
         with guard:
             state.update(stage=stage, **fields)
             log.status('running', **state)
 
     def heartbeat():
-        while not ended.wait(10):
-            with guard:
-                log.status('running', **state)
-                log.event('heartbeat', '预测运行中：'+str(state))
+        last = time.monotonic()
+        while not ended.wait(2):
+            parent_guard()
+            if time.monotonic()-last >= 10:
+                with guard:
+                    log.status('running', **state)
+                    log.event('heartbeat', '预测运行中：'+str(state))
+                last = time.monotonic()
 
     def progress(done, total, stage):
         if (directory/'stop.json').exists() or (output/'control/stop.json').exists():
@@ -53,8 +64,12 @@ def run_worker(directory, export=False):
     pulse.start()
     torch.set_num_threads(job['threads'])
     try:
+        parent_guard()
         if export:
             record, model, inferred = job['record'], job['model'], job['inferred']
+            if valid_result(job['destination'], job['identity']) is not None:
+                write_json(directory/'finished.json', {'action': 'reused'})
+                return
             update('export', case_id=record['case_id'])
             if file_sha(inferred['logits']) != inferred['logits_sha256']:
                 raise ValueError('GPU 中间结果损坏')

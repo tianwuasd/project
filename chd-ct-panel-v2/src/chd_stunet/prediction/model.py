@@ -11,6 +11,14 @@ from ..training.code_snapshot import freeze_code
 from ..training.contracts import digest, scientific_sources
 
 
+SOURCE_DEPENDENCIES = ('torch', 'nnunetv2', 'numpy', 'scipy', 'blosc2', 'acvl-utils', 'scikit-image')
+
+
+def runtime_versions():
+    return {name: importlib.metadata.version(name)
+            for name in (*SOURCE_DEPENDENCIES, 'nibabel', 'threadpoolctl')}
+
+
 def read_json(path):
     return json.loads(Path(path).read_text(encoding='utf-8-sig'))
 
@@ -51,7 +59,7 @@ def inspect_training(run, checkpoint='best', *, smoke=False, allow_intermediate=
         raise ValueError('仅支持已审计的 STU-Net-S / nnU-Net 2.8.1')
     if importlib.metadata.version('nnunetv2') != recipe['nnunet_version']:
         raise ValueError('预测 nnU-Net 版本与模型要求不一致')
-    for name in ('torch', 'nnunetv2', 'numpy', 'scipy', 'blosc2', 'acvl-utils'):
+    for name in SOURCE_DEPENDENCIES:
         if importlib.metadata.version(name) != signature['versions'][name]:
             raise ValueError('预测计算依赖与来源训练不同，需要兼容审计：'+name)
     if recipe['scope'] != 'formal' and not smoke:

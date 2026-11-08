@@ -48,6 +48,8 @@ tail -n 80 -F "$pred_run/launcher.log"
 
 `--background` 将监督进程与终端会话分开，关闭日志查看终端不会发送训练/预测停止请求。服务器重启、作业管理器结束整个任务或系统 OOM 仍会终止进程。恢复按病例完成标记及文件 SHA256 复用，未提交病例重新计算。旧预测使用冻结代码；更新代码后需要新建预测目录使用新版实现。
 
+工作进程每2秒核对监督进程的 PID 和出生时间；监督进程意外退出后，工作进程自行释放资源。恢复命令还会核对遗留进程的 PID、出生时间、解释器和任务目录，再清理本任务遗留进程；记录保存在 `control/orphan-cleanup.json`。无法确认归属时直接报告，不终止其他进程。
+
 `launcher.log` 与 `logs/run.log` 每约 10 秒给出病例、阶段和窗口数量。`status.json` 包含实时资源和各 worker 状态。GPU 被占用时显示外部 PID、可用内存和病例内存预估。默认持续等待；`--wait-seconds 300` 可限制资源等待时间。未知数据或模型错误立即记录 `failure.json` 并终止。
 
 每个 worker 位于 `control/gpu-*/` 或 `control/export-*/`。其中 `worker.log`、`status.json`、`admission.json` 和 `capacity-fold-*.json` 记录设备、显存余量及真实批量探测。每例 `result.json` 记录准备、计算/传输、融合、导出时间与峰值显存。
@@ -79,6 +81,8 @@ tail -n 80 -F "$pred_run/launcher.log"
 
 主机资源沿用 V2 阶段 CPU80%/RAM80% 与新采集余量；至少保留4 GiB主机内存。已核实 USS 才抵扣已兑现的内存预留。每 GPU 最多预取下一例，同时为计算、预取及独立 CPU 导出计入线程和内存。外部占用、显存不足或主机内存压力允许有限重新分配与缩减并发；已完成病例保持有效。
 
+计算和导出均空闲时释放驻留模型，重新采集 CPU/RAM 阶段预算。资源恢复后可以启动较大的病例。任务线程数同时受当前 CPU 余量和阶段剩余额度限制；资源不足时降低的并发上限保留。致命错误优先报告，完整结果优先确认；资源变化不会触发已完成病例重写。
+
 `--no-prefetch --max-batch 1` 可用于同条件基准。`--device cpu` 明确使用 CPU。单卡本机测试不能替代服务器双卡和 Linux 驱动环境验收。
 
 Windows 本机短测可在用户明确许可后，用 `--smoke --share-desktop-pid <PID>` 与 Codex 桌面共享。此选项仅接受当前 `ChatGPT.exe` 的 PID、出生时间及完整程序路径，持续校验身份，继续保留显存余量；正式任务和 Linux 拒绝该例外。
@@ -94,6 +98,10 @@ Windows 本机短测可在用户明确许可后，用 `--smoke --share-desktop-p
 
 新 CT 要求三维 NIfTI、明确 mm 单位、有效几何，文件名只含英文、数字、下划线或连字符。与来源训练/验证文件摘要相同的输入拒绝作为新病例。每折分别按原统计预测，恢复共同原图网格后平均类别概率，最后 argmax 输出 `ensemble/病例.nii.gz`；此入口无需标签。留出测试集按对应折评价，不对接触过该病例的其他折做集成。
 
+新 CT 的 header spacing 必须与 affine 轴向长度一致；存在冲突时停止并报告，输出保留已核实的原 affine。ImageCHD 使用原队列已有的 spacing 审计证据。
+
 ## 兼容边界
 
 `configs/prediction/compatibility.json` 记录已审计训练生产者的精确科学源码摘要。逐项校验来源冻结代码、签名、实际权重、网络结构、标签和计划。未知源码改动要求补充审计；不会改写旧模型签名以通过检查。正式推理输入和训练状态分别保存，预测升级不改变原训练科学设置。
+
+推理依赖校验包含 PyTorch、nnU-Net、NumPy、SciPy、Blosc2、acvl-utils 和 scikit-image；预测恢复另核对 NiBabel、threadpoolctl。环境变化需要重新核实兼容性。

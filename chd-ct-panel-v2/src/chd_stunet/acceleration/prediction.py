@@ -12,22 +12,42 @@ def budget(estimates, maximum, threads):
     return policy(snapshot(), [{'estimate': n} for n in estimates], maximum=maximum, case_threads=threads)
 
 
+def refresh_budget(stage, fresh, busy):
+    # 空闲边界重新核定容量；在途任务继续使用领取时的总预算。
+    return stage if busy else dict(fresh)
+
+
+def admitted_threads(stage, fresh, reservations, requested):
+    used = sum(row['threads'] for row in reservations)
+    return max(0, min(requested, stage['cpu_budget']-used, fresh['cpu_budget']))
+
+
+def process_alive(identity):
+    return any(process.info['pid'] == identity['pid'] and
+               process.info['create_time'] == identity['born']
+               for process in psutil.process_iter(['pid', 'create_time']))
+
+
 def can_admit(stage, fresh, reservations, estimate, threads):
     active = [row for row in reservations if row['threads'] > 0]
     idle = [row for row in reservations if row['threads'] == 0]
     # 驻留模型占内存，但空闲 worker 不占病例计算槽。
     stage = dict(stage, memory_budget_bytes=max(0, stage['memory_budget_bytes']-sum(max(r['estimate'], r['private']) for r in idle)))
     fresh = dict(fresh, memory_budget_bytes=max(0, fresh['memory_budget_bytes']-sum(max(0, r['estimate']-r['private']) for r in idle)))
-    return admits(stage, fresh, active, estimate, threads)
+    return threads > 0 and admits(stage, fresh, active, estimate, threads)
 
 
 def reservation(process, born, estimate, threads):
     private = 0
     if process.poll() is None:
-        item = psutil.Process(process.pid)
-        if item.create_time() == born:
-            info = item.memory_full_info()
-            private = int(getattr(info, 'uss', 0))
+        try:
+            item = psutil.Process(process.pid)
+            if item.create_time() == born:
+                info = item.memory_full_info()
+                private = int(getattr(info, 'uss', 0))
+        except psutil.NoSuchProcess:
+            # 正常导出可能在采样期间结束；未核实的 USS 不抵扣预留。
+            private = 0
     return dict(estimate=estimate, threads=threads, private=private)
 
 
@@ -111,14 +131,17 @@ def stop_owned(entry):
     # 只使用实际 Popen 身份及出生时间，不按进程名或全局 GPU PID 清理。
     process = entry['process']
     if process.poll() is None:
-        item = psutil.Process(process.pid)
-        if item.create_time() != entry['born']:
-            raise RuntimeError('进程出生身份变化，拒绝发送终止信号')
-        item.terminate()
-        done, alive = psutil.wait_procs([item], timeout=5)
-        for child in alive:
-            if child.create_time() == entry['born']:
-                child.kill()
+        try:
+            item = psutil.Process(process.pid)
+            if item.create_time() != entry['born']:
+                raise RuntimeError('进程出生身份变化，拒绝发送终止信号')
+            item.terminate()
+            _, alive = psutil.wait_procs([item], timeout=5)
+            for child in alive:
+                if child.create_time() == entry['born']:
+                    child.kill()
+        except psutil.NoSuchProcess:
+            pass
         process.wait(timeout=10)
     entry['stream'].close()
 

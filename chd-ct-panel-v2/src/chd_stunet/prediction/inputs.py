@@ -84,6 +84,8 @@ def new_cases(paths, models):
         if (not np.isfinite(image.affine).all() or not np.isfinite(spacing).all() or min(spacing) <= 0
                 or abs(np.linalg.det(image.affine[:3, :3])) < 1e-12):
             raise ValueError('新 CT 几何无效')
+        if not np.allclose(spacing, nib.affines.voxel_sizes(image.affine), rtol=1e-5, atol=1e-6):
+            raise ValueError('新 CT 的 header spacing 与 affine 冲突，请核实原始几何：'+str(path))
         sha = file_sha(path)
         for model in models:
             training_cases = model['signature']['data']['cases']
@@ -143,7 +145,8 @@ def prepare_case(record, model, destination, threads=1):
             if properties['source_hashes'] != record['source_hashes']:
                 raise ValueError('缓存空间属性来源错误')
     if completion is None:
-        affine = corrected_affine(native.affine, record['spacing_xyz'])
+        affine = (native.affine.copy() if record['source_kind'] == 'new'
+                  else corrected_affine(native.affine, record['spacing_xyz']))
         properties = dict(nibabel_stuff={'original_affine': affine},
                           spacing=record['spacing_xyz'][::-1], source_affine=native.affine,
                           source_shape_xyz=list(native.shape), source_hashes=record['source_hashes'])

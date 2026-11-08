@@ -92,7 +92,9 @@ def export_case(record, prepared, model, logits_path, output, *, evaluate=True, 
         raise ValueError('原图恢复尺寸或概率无效')
     if int(segmentation.min()) < 0 or int(segmentation.max()) > 7:
         raise ValueError('输出标签超出七结构范围')
-    affine = corrected_affine(np.asarray(record['source_affine']), record['spacing_xyz'])
+    affine = np.asarray(record['source_affine'])
+    if record['source_kind'] != 'new':
+        affine = corrected_affine(affine, record['spacing_xyz'])
     destination = output/(record['case_id']+'.nii.gz')
     if progress:
         progress('write_segmentation')
