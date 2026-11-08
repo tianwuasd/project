@@ -1,0 +1,13 @@
+{
+  "checkpoint": "best",
+  "device": "cuda",
+  "gpus": "auto",
+  "max_gpus": 2,
+  "gpu_memory_gib": null,
+  "max_batch": 8,
+  "threads": 4,
+  "tta": true,
+  "tile_step": 0.5,
+  "prefetch": true,
+  "wait_seconds": 0
+}

@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "scope": "Read-only inference; each source frozen file is checked; exact scientific AST map and network interpretation must match audited versions.",
+  "sources": {
+    "4334e39f150ca8c0abe38ee0f9179a3ed03552d1488349a9064053cc41749cf0": "234a5045 / 2b02cd78",
+    "499364781090920ecbea0689207d2a63635797790d70c63d224146d3b8ceb223": "ba7ab55a",
+    "c99e2ce3b34207b8a7da40520324d31fb6740579d527450bb5cadad1db685938": "25baad3d",
+    "0696115fe1c792b4398f9e80eaece6112c98ff61156571e4f14fcb03018b4f11": "73dfb061",
+    "ca2cfd265e02639cec45ac0d1e21034935f0140d0a94dc82f5cc9e7327799385": "531a7020",
+    "3bd85c2e0126946cba356d6bf19af9310830f712c31b80eb8cc144a8bf929f9f": "5f3e68c1; local real completed smoke"
+  },
+  "reason": "These sources have identical model, vendor architecture, annotation and cohort interpretation. Training scheduler, loss reduction and recovery changes do not execute during prediction. Each original recipe and checkpoint identity is preserved; this approval does not authorize resuming training with different code."
+}

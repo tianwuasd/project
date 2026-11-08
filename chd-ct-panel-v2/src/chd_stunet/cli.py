@@ -24,6 +24,13 @@ def nonnegative(text):
 
 def main(argv=None):
     arguments=list(argv) if argv is not None else sys.argv[1:]
+    if arguments and arguments[0]=='_predict-supervisor':
+        internal=argparse.ArgumentParser()
+        internal.add_argument('--output',required=True)
+        selected=internal.parse_args(arguments[1:])
+        from .prediction.run import supervise
+        supervise(selected.output)
+        return 0
     if arguments and arguments[0]=='_train-rank':
         # Frozen, supervisor-only entry. It uses the same interpreter and does
         # not rediscover machine config or expose internal controls in help.
@@ -35,6 +42,8 @@ def main(argv=None):
         run_rank(rank_args.job,rank_args.rank);return 0
     parser=argparse.ArgumentParser(description="CHD: data analysis and selectable preprocessing")
     sub=parser.add_subparsers(dest="command",required=True)
+    from .prediction.cli import add_arguments
+    add_arguments(sub,positive,nonnegative)
     analyze=sub.add_parser("analyze",help="analyze native data; no repairs or cohort exclusion")
     analyze.add_argument("--input")
     analyze.add_argument("--descriptor")
@@ -93,6 +102,14 @@ def main(argv=None):
     status.add_argument("--output",required=True)
     sub.add_parser("check",help="show configured paths; does not install anything")
     args=parser.parse_args(argv)
+    if args.command=='predict' and args.stop:
+        if not args.output:raise ValueError('--stop 必须指定 --output')
+        output=resolve_path(args.output)
+        if not (output/'job.json').is_file():raise ValueError('指定目录不是预测任务')
+        from .observability.runlog import write_json
+        write_json(output/'control/stop.json',dict(requested=True))
+        print('已请求停止预测：'+str(output),flush=True)
+        return 0
     if args.command=='prepare' and args.list_methods:
         from .preprocessing.registry import list_methods
         print(json.dumps(list_methods(),ensure_ascii=False,indent=2));return 0
@@ -103,13 +120,16 @@ def main(argv=None):
         print(json.dumps(dict(project_root=str(ROOT),local_config_present=(ROOT/"project.local.json").is_file(),
             raw_root=local.get("raw_root"),raw_exists=Path(local.get("raw_root","/__missing__")).is_dir(),
             preprocessing_paths=prepare_paths(local),
-            implementation="analysis + selectable preprocessing + STU-Net-S V2 multi-GPU training; no whole-volume prediction"),ensure_ascii=False,indent=2));return 0
-    selected_python=local.get('training_python') if args.command=='train' else local.get('preprocess_python') if args.command=='prepare' else None
+            implementation="analysis + selectable preprocessing + STU-Net-S V2 training and whole-volume prediction"),ensure_ascii=False,indent=2));return 0
+    selected_python=local.get('training_python') if args.command in ('train','predict') else local.get('preprocess_python') if args.command=='prepare' else None
     selected_python=selected_python or local.get('analysis_python')
     if not selected_python:
-        venv=ROOT/('.venv_training' if args.command=='train' else '.venv_preprocess' if args.command=='prepare' else '.venv_analysis')
+        venv=ROOT/('.venv_training' if args.command in ('train','predict') else '.venv_preprocess' if args.command=='prepare' else '.venv_analysis')
         candidate=venv/('Scripts/python.exe' if os.name=='nt' else 'bin/python')
         if candidate.is_file():selected_python=str(candidate)
+        if not selected_python and args.command=='predict':
+            candidate=ROOT/'.venv_preprocess'/('Scripts/python.exe' if os.name=='nt' else 'bin/python')
+            if candidate.is_file():selected_python=str(candidate)
     # A Linux venv Python may be a symlink to the system binary. Resolving
     # both paths erases the environment selection even though sys.prefix and
     # installed packages differ. Preserve the executable's invocation path.
@@ -123,6 +143,11 @@ def main(argv=None):
         arguments=list(argv) if argv is not None else sys.argv[1:]
         print('切换执行环境：'+selected_python,flush=True)
         return subprocess.call([selected_python,"-u",str(ROOT/"run.py"),*arguments],env=env)
+    if args.command=='predict':
+        from .prediction.cli import execute
+        result=execute(args,local)
+        print(json.dumps(result,ensure_ascii=False,indent=2))
+        return 0
     if args.command=='train':
         paths=training_paths(local)
         prepared=resolve_path(args.prepared) if args.prepared else default_prepared(paths)

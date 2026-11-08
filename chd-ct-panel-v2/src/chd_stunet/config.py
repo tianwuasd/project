@@ -34,6 +34,11 @@ def training_paths(local):
                          'completed_preprocessing_default'}})
 
 
+def prediction_paths(local):
+    return dict(training_paths(local), **{k: v for k, v in local.items()
+                if k in {'prediction_output_root'}})
+
+
 def default_prepared(paths):
     if paths.get('training_prepared_root'):return resolve_path(paths['training_prepared_root'])
     pointer=ROOT/'outputs/latest_preprocessing.json'
