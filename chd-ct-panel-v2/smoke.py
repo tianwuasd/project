@@ -14,12 +14,14 @@ if __name__=="__main__":
     arguments=sys.argv[1:]
     if '--stage' in arguments:
         at=arguments.index('--stage')
-        if at+1>=len(arguments) or arguments[at+1] not in ('analyze','prepare','train'):
-            raise SystemExit('--stage requires analyze, prepare or train')
+        if at+1>=len(arguments) or arguments[at+1] not in ('analyze','prepare','train','predict'):
+            raise SystemExit('--stage requires analyze, prepare, train or predict')
         stage=arguments[at+1]
         arguments=arguments[:at]+arguments[at+2:]
     else:
         stage='analyze'
+    if stage=='predict':
+        raise SystemExit(main(['predict','--smoke',*arguments]))
     if stage=='train':
         raise SystemExit(main(['train','--smoke',*arguments]))
     if stage=='prepare':
