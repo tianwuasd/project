@@ -102,6 +102,6 @@ Windows 本机短测可在用户明确许可后，用 `--smoke --share-desktop-p
 
 ## 兼容边界
 
-`configs/prediction/compatibility.json` 记录已审计训练生产者的精确科学源码摘要。逐项校验来源冻结代码、签名、实际权重、网络结构、标签和计划。未知源码改动要求补充审计；不会改写旧模型签名以通过检查。正式推理输入和训练状态分别保存，预测升级不改变原训练科学设置。
+`configs/prediction/compatibility.json` 记录已审计训练生产者的精确科学源码摘要。默认校验训练源码摘要是否在名单中。短测和正式预测都可显式传入 `--skip-producer-audit`，仅跳过名单检查。仍逐项核验冻结源码、训练签名、权重文件、网络源码与结构、输入计划和病例角色。任务日志和 `summary.json` 记录是否使用该开关，恢复任务沿用冻结设置。
 
 推理依赖校验包含 PyTorch、nnU-Net、NumPy、SciPy、Blosc2、acvl-utils 和 scikit-image；预测恢复另核对 NiBabel、threadpoolctl。环境变化需要重新核实兼容性。

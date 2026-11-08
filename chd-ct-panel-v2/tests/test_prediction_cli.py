@@ -13,7 +13,7 @@ class PredictionCLI(unittest.TestCase):
             process = subprocess.run([sys.executable, str(ROOT/entry), *arguments], capture_output=True,
                                      text=True, encoding='utf-8', timeout=60)
             self.assertEqual(process.returncode, 0, process.stderr)
-            for option in ('--training-run', '--background', '--resume', '--gpus'):
+            for option in ('--training-run', '--background', '--resume', '--gpus', '--skip-producer-audit'):
                 self.assertIn(option, process.stdout)
 
     def test_stop_requires_existing_prediction(self):

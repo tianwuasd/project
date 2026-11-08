@@ -59,6 +59,16 @@ class PredictionContracts(unittest.TestCase):
         self.assertEqual((run/'signature.json').read_bytes(), signature_before)
         self.assertEqual(record['dataset_json']['labels']['PA'], 7)
 
+    @unittest.skipUnless(os.environ.get('CHD_TEST_UNAUDITED_TRAINING'), '需要未列入名单的真实训练路径')
+    def test_real_unaudited_checkpoint_requires_explicit_skip(self):
+        run = Path(os.environ['CHD_TEST_UNAUDITED_TRAINING'])
+        signature_before = (run/'signature.json').read_bytes()
+        with self.assertRaisesRegex(ValueError, '来源训练代码尚未审计'):
+            inspect_training(run, smoke=True)
+        record = inspect_training(run, smoke=True, skip_producer_audit=True)
+        self.assertEqual(record['dataset_json']['labels']['PA'], 7)
+        self.assertEqual((run/'signature.json').read_bytes(), signature_before)
+
 
 if __name__ == '__main__':
     unittest.main()
