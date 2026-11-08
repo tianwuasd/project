@@ -16,6 +16,7 @@ from .observability.status import lock_active, operation_lock, write_status
 from .xu_reallocation import record_reallocation, run_with_reallocation
 from .xu_resources import GpuResourcesChanged, ResourceUnavailable, resource_error
 from .xu_gpu_isolation import launch_scope, report_for_parent
+from .xu_resume_compat import AUDIT_PATH, assert_execution_sources, preserve_contract
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -42,6 +43,16 @@ def _sources(technical):
     else:
         files.append(ROOT/'scripts/xu_capacity.py')
     return {p.relative_to(ROOT).as_posix():sha256_file(p) for p in files}
+
+
+def _check_execution(args, contract=None):
+    expected = getattr(args, 'execution_implementation', None)
+    if expected is None:
+        if contract is None:
+            return
+        expected = contract['implementation']
+    assert_execution_sources(expected, _sources(args.technical_subset),
+                             getattr(args, 'execution_audit_sha256', None))
 
 
 def _contract(cache, args):
@@ -151,6 +162,7 @@ def _execute(script, argv, name, out, owner, args):
             child.stdin.write((json.dumps(dict(token=token,members=members))+'\n').encode('utf-8'))
             child.stdin.close()
             while child.poll() is None:
+                _check_execution(args)
                 try:
                     guard.check()
                 except GpuResourcesChanged:
@@ -158,6 +170,7 @@ def _execute(script, argv, name, out, owner, args):
                         raise
                 time.sleep(1)
             code = child.returncode
+            _check_execution(args)
         except ResourceUnavailable as error:
             error.xu_log = str(log)
             raise
@@ -301,8 +314,7 @@ def _run_stage(stage, args, out, owner, contract, contract_id, checked, records,
         raise ValueError('Unsafe or duplicate pipeline stage')
     receipt = out/'receipts'/(stage.name+'.json')
     spec = _stage_spec(stage, contract_id, getattr(args,'assigned_devices',None))
-    if _sources(args.technical_subset) != contract['implementation']:
-        raise ValueError('Implementation changed while the pipeline was running')
+    _check_execution(args, contract)
     if receipt.exists():
         entry = read_json(receipt)
         if entry['spec'] != spec or entry['state'] != ('skipped' if stage.skip_reason else 'complete'):
@@ -346,6 +358,7 @@ def _run_stage(stage, args, out, owner, contract, contract_id, checked, records,
                 # Do not put the stop condition in the frozen stage identity.
                 recovery += ['--pause-after-epoch', str(pause)]
             _execute('xu_seg.py', [*stage.argv,*recovery], stage.name, out, owner, args)
+            _check_execution(args, contract)
             if stage.name in ('crop64', 'crop128') and 'training.json' in stage.required:
                 training = read_json(directory/'training.json')
                 if training.get('state') == 'paused':
@@ -369,15 +382,19 @@ def _run_stage(stage, args, out, owner, contract, contract_id, checked, records,
 
 
 def _run_locked(cache, args, out, owner, contract):
+    args.execution_implementation = copy.deepcopy(contract['implementation'])
+    args.execution_audit_sha256 = sha256_file(AUDIT_PATH)
     return run_with_reallocation(lambda running: _run_attempt(cache,running,out,owner,contract), args, out)
 
 
 def _run_attempt(cache, args, out, owner, contract):
     from .xu_pipeline_stages import iter_stages
+    _check_execution(args, contract)
     marker = out/'run.json'
     if marker.exists():
-        if not args.resume or read_json(marker) != contract:
+        if not args.resume:
             raise ValueError('Use --resume with identical inputs, model settings and implementation, or a fresh output')
+        contract = preserve_contract(read_json(marker), contract, out)
     else:
         if args.resume or any(p.name != '.runtime' for p in out.iterdir()):
             raise ValueError('A new pipeline requires an empty directory; resume requires its run.json')

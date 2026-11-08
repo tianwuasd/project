@@ -52,7 +52,7 @@ def work_limits(name, args, cache, pool_size):
     if name in TRAIN_3D:
         return (4 if args.profile == 'paper' else 1), 0
     if name == 'blood':
-        return 7, 0
+        return 1, 0
     if name in INFERENCE:
         role = 'development'
         cases = list(cache.case_ids(role))
@@ -140,7 +140,8 @@ def assign_wave(wave, args, out, cache, children, contract_id):
             if (row.get('signature') != digest([contract_id,stage.name,group]) or len(set(group))!=len(group)
                     or any(d not in [*pool,'cpu'] for d in group)):
                 raise ValueError(f'Invalid GPU assignment for {stage.name}')
-            if (getattr(args,'reallocate',False) and not stage.skip_reason
+            if ((getattr(args,'reallocate',False) or (stage.name == 'blood' and len(group) > 1))
+                    and not stage.skip_reason
                     and stage.name not in CPU_STAGES
                     and not (out/'receipts'/(stage.name+'.json')).exists()):
                 fresh.append(stage.name)

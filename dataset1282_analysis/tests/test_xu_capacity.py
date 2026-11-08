@@ -132,7 +132,10 @@ class CapacityTests(unittest.TestCase):
         old = dict(expected,source=dict(xu_blood._PREVIOUS_V2_SOURCE))
         self.assertTrue(xu_blood._matches(old,expected))
         self.assertFalse(xu_blood._matches(dict(old,supervision='marginal'),expected))
-        self.assertFalse(xu_blood._matches(dict(old,source=dict(old['source'], extra='x')),expected))
+        self.assertFalse(xu_blood._matches(
+            dict(old,source=dict(old['source'],extra=expected['source']['xu_blood.py'])),expected))
+        with self.assertRaisesRegex(ValueError,'SHA256'):
+            xu_blood._matches(dict(old,source=dict(old['source'],extra='x')),expected)
 
     def test_formal_specs_count_current_models_without_allocating_weights(self):
         for stage, n, shape in (
