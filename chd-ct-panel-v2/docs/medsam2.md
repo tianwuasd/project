@@ -45,6 +45,8 @@ python3 run.py train --model medsam2 --prepared "$prepared" \
 
 Linux 双卡使用 `--max-gpus 2`，单卡每次累积两个序列，双卡每张卡处理一个。选卡使用可见设备编号或物理 UUID，`--gpus auto` 从可用范围选择。当前双进程同步在 Windows CPU 用 Gloo 验证，Linux NCCL、GPU 显存容量和实机换卡验收仍待完成。
 
+双进程在启动后有 120 秒完成通信初始化。初始化期间发出停止命令，监督器会结束本任务仍未就绪的计算组。若初始化超时，监督器保留原检查点并重新启动一次。连续两次超时会进入 `needs_attention`，日志列出未就绪的进程序号。
+
 ```bash
 tail -n 80 -F "$train_run/logs/run.log"
 cat "$train_run/status.json"

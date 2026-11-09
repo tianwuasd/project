@@ -21,6 +21,9 @@ from .io_recovery import InputUnavailable, check_readable, expired_read
 from .journal import LogMirror, TrainingLog
 
 
+COLLECTIVE_START_TIMEOUT = 120
+
+
 def freeze_sources(output):
     sources = [ROOT/'run.py', *sorted((ROOT/'src').rglob('*.py')),
                *sorted((ROOT/'configs').rglob('*.json')), ROOT/'configs/models/medsam2.yaml']
@@ -222,6 +225,7 @@ def supervise(output):
         capacity_attempts = Counter()
         reserve = max(4*GIB, int(.2*snapshot()['available_memory_bytes']))
         unknown_retries = 0
+        collective_timeouts = 0
         next_input_probe = 0.
         input_attempt = 0
         while not (output/'control/stop.json').is_file():
@@ -392,15 +396,34 @@ def supervise(output):
                 log.event('training.admission', f'准入 {world} 张 MedSAM2 GPU', cards=selected)
             last_gpu_evidence = time.monotonic()
             last_heartbeat = last_gpu_evidence
+            collective_pending = {
+                rank: log_root/'control'/f'collective-ready-{generation}-{rank}.json'
+                for rank in range(world) if world > 1
+            }
+            collective_deadline = last_gpu_evidence+COLLECTIVE_START_TIMEOUT
+            startup_failure = None
             low_memory = 0
-            original_failures = []
             while any(process.poll() is None for process, _ in workers):
                 if mirror is not None:
                     mirror.tick()
-                original_failures = [process.returncode for process, _ in workers if process.returncode]
-                if original_failures:
+                if any(process.poll() not in (None, 0) for process, _ in workers):
                     _stop_workers(workers)
                     break
+                if collective_pending:
+                    collective_pending = {rank: marker for rank, marker in collective_pending.items()
+                                          if not marker.is_file()}
+                    if not collective_pending:
+                        collective_timeouts = 0
+                    elif (output/'control/stop.json').is_file():
+                        startup_failure = 'operator_stop'
+                    elif time.monotonic() >= collective_deadline:
+                        startup_failure = 'process_group_init_timeout'
+                    if startup_failure:
+                        _stop_workers(workers)
+                        log.event('training.group_start_interrupted', '计算组未就绪，已结束本任务计算进程',
+                                  reason=startup_failure, pending_ranks=sorted(collective_pending),
+                                  generation=generation, timeout_seconds=COLLECTIVE_START_TIMEOUT)
+                        break
                 stalled = expired_read(recovery, generation, workers, job['input_read_timeout'])
                 if stalled is not None:
                     _stop_workers(workers)
@@ -446,6 +469,17 @@ def supervise(output):
                 time.sleep(2)
             for marker in (recovery/'control').glob(f'input-read-{generation}-*.json'):
                 marker.unlink()
+            for marker in (log_root/'control').glob(f'collective-ready-{generation}-*.json'):
+                marker.unlink()
+            if startup_failure == 'operator_stop':
+                break
+            if startup_failure == 'process_group_init_timeout':
+                collective_timeouts += 1
+                if collective_timeouts < 2:
+                    continue
+                log.status('needs_attention', reason=startup_failure,
+                           pending_ranks=sorted(collective_pending), attempts=collective_timeouts)
+                raise TimeoutError('MedSAM2 计算组连续两次未能完成初始化')
             result_path = output/'worker-result.json'
             result = read_json(result_path) if result_path.is_file() else {}
             state = result.get('state')

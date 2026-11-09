@@ -304,6 +304,7 @@ def run_worker(output, job, requested_device):
     if world > 1:
         log.status('running', phase='process_group_init', rank=rank, world_size=world)
         init_collective(device, world, rank)
+        write_json(root_log/'control'/f'collective-ready-{generation}-{rank}.json', {'pid': os.getpid()})
     log.event('training.device', f'MedSAM2 {device}，{config["image_size"]}×{config["image_size"]}，'
               f'{config["frames"]} 帧，{config["epochs"]} epoch', admission=admission, resources=resources,
               shared_image_position_encoding=job['shared_image_position_encoding'],
