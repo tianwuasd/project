@@ -17,6 +17,8 @@ from .preprocessing import assert_case_files, canonical_image, to_axial, to_nati
 
 
 LABEL_NAMES = {value: key for key, value in TARGETS.items() if 1 <= value <= 7}
+VALIDATION_READ_BYTES = 8*1024**2
+VALIDATION_READ_FRAMES = 8
 
 
 class AxialFrames:
@@ -24,16 +26,27 @@ class AxialFrames:
         self.data, self.size, self.window = data, size, window
         self.reader, self.source_path = reader, source_path
         self.source_offset = source_offset
+        frame_bytes = data.shape[1]*data.shape[2]*data.dtype.itemsize
+        self.block_frames = max(1, min(VALIDATION_READ_FRAMES, VALIDATION_READ_BYTES//frame_bytes))
+        self.block_start, self.block = None, None
         self.frame = lru_cache(maxsize=2)(self.convert)
 
     def __len__(self):
         return len(self.data)
 
     def convert(self, frame):
-        with (self.reader or nullcontext()) as progress:
-            if progress is not None:
-                progress(self.source_path, self.source_offset+frame)
+        if self.reader is None:
             return frame_tensor(self.data[frame], self.size, self.window)
+        start = frame//self.block_frames*self.block_frames
+        if self.block_start != start:
+            end = min(start+self.block_frames, len(self.data))
+            # 将一段相邻切片读到内存，读取监督不覆盖后续图像转换或模型计算。
+            self.block = None
+            with self.reader as progress:
+                progress(self.source_path, self.source_offset+start, self.source_offset+end-1)
+                self.block = self.data[start:end].copy()
+            self.block_start = start
+        return frame_tensor(self.block[frame-start], self.size, self.window)
 
     def __getitem__(self, frame):
         return self.frame(frame)

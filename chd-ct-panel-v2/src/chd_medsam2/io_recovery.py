@@ -36,13 +36,14 @@ class InputReadWatch:
             write_json(self.marker, None)
             self.record = None
 
-    def note(self, path, frame=None):
+    def note(self, path, frame=None, last_frame=None):
         now = time.monotonic()
         name = str(path)
         if (self.record is None or self.record['path'] != name
                 or (self.record['frame'] is None and frame is not None)
                 or now-self.record['progress_at'] >= .5):
             self.record = dict(path=name, frame=None if frame is None else int(frame),
+                               last_frame=None if last_frame is None else int(last_frame),
                                progress_at=now, pid=os.getpid())
             write_json(self.marker, self.record)
 
