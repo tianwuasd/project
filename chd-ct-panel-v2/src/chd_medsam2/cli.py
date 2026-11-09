@@ -57,6 +57,8 @@ def parser_for(command):
         parser.add_argument('--gpus')
         parser.add_argument('--max-gpus', type=int, choices=(1, 2))
         parser.add_argument('--cpu-ranks', type=int, choices=(1, 2), help='本机短测验证双进程同步')
+        parser.add_argument('--prefetch-depth', type=int, choices=(0, 1, 2),
+                            help='每进程最多提前准备的批次数，默认 1，0 表示同步读取')
         parser.add_argument('--recovery-root', help='与结果目录独立的检查点存储根目录')
         parser.add_argument('--gpu-wait-seconds', type=int)
         parser.add_argument('--stop-after-steps', type=positive)
@@ -191,7 +193,7 @@ def train(args, local, paths, stamp):
                             resolve_path(paths.get('runtime_root', 'outputs/runtime'))/'recovery/medsam2')
     result = launch(output, contract, weights=weights, train_cases=train_cases, val_cases=val_cases,
                     validation_frames=args.validation_frames, requested=args.device, gpus=args.gpus,
-                    max_gpus=args.max_gpus, cpu_ranks=args.cpu_ranks,
+                    max_gpus=args.max_gpus, cpu_ranks=args.cpu_ranks, prefetch_depth=args.prefetch_depth,
                     wait_seconds=args.gpu_wait_seconds, shared_desktop=desktop, background=args.background,
                     resume=args.resume, stop_after_steps=args.stop_after_steps, recovery_root=recovery)
     return result, output

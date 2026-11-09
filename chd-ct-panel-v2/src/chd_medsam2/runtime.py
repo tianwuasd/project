@@ -88,7 +88,7 @@ def write_provenance(output, contract, weights, requested):
 
 
 def launch(output, contract, *, weights, train_cases, val_cases, validation_frames, requested,
-           gpus, max_gpus, cpu_ranks, wait_seconds, shared_desktop, background, resume, stop_after_steps,
+           gpus, max_gpus, cpu_ranks, prefetch_depth, wait_seconds, shared_desktop, background, resume, stop_after_steps,
            recovery_root):
     output = Path(output)
     with run_lock(output.with_name(output.name+'.launch.lock')):
@@ -107,7 +107,10 @@ def launch(output, contract, *, weights, train_cases, val_cases, validation_fram
             previous.pop('identity')
             if requested is not None and requested != previous['requested']:
                 raise ValueError('MedSAM2 续跑须保留计算精度对应的设备类型')
+            if prefetch_depth is not None and 'prefetch_depth' not in previous:
+                raise ValueError('此任务冻结的训练代码不支持调整预取批次数')
             for key, value in (('gpus', gpus), ('max_gpus', max_gpus), ('cpu_ranks', cpu_ranks),
+                               ('prefetch_depth', prefetch_depth),
                                ('shared_desktop', shared_desktop), ('wait_seconds', wait_seconds)):
                 if value is not None:
                     previous[key] = value
@@ -131,6 +134,7 @@ def launch(output, contract, *, weights, train_cases, val_cases, validation_fram
                               validation_frames=validation_frames, requested=requested or 'cuda',
                               gpus=gpus or 'auto', max_gpus=max_gpus or 1,
                               cpu_ranks=cpu_ranks or 1, wait_seconds=wait_seconds or 0,
+                              prefetch_depth=1 if prefetch_depth is None else prefetch_depth,
                               shared_desktop=shared_desktop, stop_after_steps=stop_after_steps,
                               recovery=str(recovery), task_id=task_id, journal=1))
             write_provenance(output, contract, weights, requested)
@@ -310,6 +314,11 @@ def supervise(output):
             generation = uuid4().hex
             rendezvous = (output/'control'/('collective-'+generation)).as_uri()
             world = len(visible) or job.get('cpu_ranks', 1)
+            supply_path = recovery/'supply.json'
+            if job.get('prefetch_depth'):
+                write_json(supply_path, dict(cpu_budget=facts['cpu_budget'],
+                                             available_memory_bytes=facts['available_memory_bytes'],
+                                             reserve_bytes=reserve))
             restore = str(int((recovery/'checkpoints/latest.json').is_file()))
             # 上一组已全部退出，清理本任务恢复目录里尚未提交的临时文件。
             for partial in (recovery/'checkpoints').glob('state-*.pt.partial'):
@@ -356,6 +365,10 @@ def supervise(output):
                         if external:
                             reason = 'external_gpu'
                 facts = snapshot()
+                if job.get('prefetch_depth'):
+                    write_json(supply_path, dict(cpu_budget=facts['cpu_budget'],
+                                                 available_memory_bytes=facts['available_memory_bytes'],
+                                                 reserve_bytes=reserve))
                 low_memory = low_memory+1 if facts['available_memory_bytes'] < reserve else 0
                 if low_memory >= 3:
                     reason = 'host_memory_pressure'

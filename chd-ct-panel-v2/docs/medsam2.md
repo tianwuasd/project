@@ -52,6 +52,8 @@ python3 run.py train --model medsam2 --resume --output "$train_run" --background
 
 启动参数保存在 `resolved-config.json` 和 `resolved-config.yaml`。环境、数据、提示规则及权重身份分别见 `environment.json`、`data-manifest.json`、`prompt-protocol.json` 和 `weights.json`。更新、损失分量、耗时和资源事件在 `logs/events.jsonl`。检查点先提交到 runtime 的 `recovery/medsam2`，再同步到结果目录。使用 `--recovery-root` 可指定独立存储。续跑使用同一任务冻结的代码、数据、进度及优化器状态。
 
+`--prefetch-depth` 可选择每个进程最多提前准备的批次数，默认 1。设为 0 可测同步读取，设为 2 可比较更深的队列。监督器按当前 CPU 预算和可用内存限制新增预取。更新日志记录等待时间、队列深度、样本序号和末批补齐标记。预取不提交训练进度。续跑时可调整预取深度，样本、切片和提示框仍从检查点中的序号恢复。
+
 新任务先把状态与事件写到本地恢复目录，`launch.json` 的 `log` 字段给出该目录的监督进程日志路径。各训练进程的原始输出分别保存在 `control/rank-*.log`。结果目录暂时无法写入日志时，训练进度仍可从本地 `logs/run.log` 和 `status.json` 读取。同目录的 `log-sync.json` 记录同步故障，恢复后按原始字节补齐日志。
 
 若任务结束时结果目录尚不可写，恢复写入后可以对已完成任务运行同一个 `--resume` 命令补齐日志，训练进程不会重启。

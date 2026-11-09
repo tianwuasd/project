@@ -1,6 +1,6 @@
-from collections import Counter
+from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import nullcontext
+from contextlib import ExitStack, nullcontext
 from datetime import timedelta
 import math
 import os
@@ -109,6 +109,17 @@ def create_clips(sequence, count, ids, root, rows, metadata, window, config):
         seed = sample_seed(config['seed'], index)
         result.append((seed, sample_clip(root/'cases'/cid, metadata[cid], rows[cid], window, config, seed)))
     return result
+
+
+def clip_prefetch_limit(path, maximum, world, batch_bytes):
+    if maximum == 0:
+        return 0
+    live = read_json(path)
+    if live['cpu_budget'] < 4*world:
+        return 0
+    # 预留正在消费的批次，剩余内存按进程均分。
+    available = max(0, live['available_memory_bytes'] - live['reserve_bytes'])
+    return min(maximum, max(0, available//(world*batch_bytes)-1))
 
 
 def validate(network, config, device, root, val, metadata, window, output, state, log, frame_limit, checkpoint_sha):
@@ -312,8 +323,20 @@ def run_worker(output, job, requested_device):
               total_updates=total_updates, trainable_parameters=sum(p.numel() for p in network.parameters() if p.requires_grad))
     if device.type == 'cuda':
         torch.cuda.reset_peak_memory_stats(device)
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        future = None
+    maximum_prefetch = job['prefetch_depth']
+    supply_path = Path(recovery)/'supply.json'
+    batch_count = config['global_batch']
+    local_count = batch_count//world
+    rank_offset = rank*local_count
+    clip_args = (train, root, rows, metadata, window, config)
+    # 估算包括张量、生成过程中的副本以及标签和图像读入空间。
+    batch_bytes = local_count*(config['frames']*config['image_size']**2*(32+config['max_objects'])+16*1024**2)
+    pending = deque()
+    log.event('training.supply', f'每进程预取上限 {maximum_prefetch} 个批次',
+              requested_depth=maximum_prefetch, estimated_batch_bytes=batch_bytes)
+    with ExitStack() as stack:
+        pool = ThreadPoolExecutor(max_workers=1)
+        stack.callback(pool.shutdown, wait=True, cancel_futures=True)
         while state['update'] < total_updates or state['phase'] == 'validation':
             action = None
             if primary:
@@ -356,18 +379,26 @@ def run_worker(output, job, requested_device):
                        total_updates=total_updates)
             began = time.monotonic()
             sequence = state['sequence']
-            batch_count = config['global_batch']
-            local_start = sequence+(rank if world > 1 else 0)
-            count = batch_count if world == 1 else int(rank < batch_count)
-            clip_args = (train, root, rows, metadata, window, config)
-            clips = future.result() if future else create_clips(local_start, count, *clip_args)
-            future = None
+            local_start = sequence+rank_offset
+            prefetched = bool(pending)
+            ready_at_request = False
+            if prefetched:
+                prepared_sequence, future = pending.popleft()
+                if prepared_sequence != sequence:
+                    raise RuntimeError('MedSAM2 预取与已提交样本顺序不一致')
+                ready_at_request = future.done()
+                clips = future.result()
+                del future
+            else:
+                clips = create_clips(local_start, local_count, *clip_args)
             data_seconds = time.monotonic()-began
             next_sequence = sequence+batch_count
-            if next_sequence < total_samples and resources['cpu_budget'] >= 4*world:
-                next_count = config['global_batch']
-                future = pool.submit(create_clips, next_sequence+(rank if world > 1 else 0),
-                                     next_count if world == 1 else int(rank < next_count), *clip_args)
+            limit = clip_prefetch_limit(supply_path, maximum_prefetch, world, batch_bytes)
+            queue_sequence = pending[-1][0]+batch_count if pending else next_sequence
+            while len(pending) < limit and queue_sequence < total_samples:
+                pending.append((queue_sequence, pool.submit(
+                    create_clips, queue_sequence+rank_offset, local_count, *clip_args)))
+                queue_sequence += batch_count
             log.status('running', update=state['update'], epoch=state['epoch'], phase='forward_backward')
             losses, gradient, objects = update_step(network, optimizer, loss, clips, config, device,
                                                     state['update'], total_updates, world)
@@ -375,9 +406,10 @@ def run_worker(output, job, requested_device):
             state['sequence'] = next_sequence
             state['epoch'] = min(config['epochs'], state['sequence']//len(train))
             state['update'] += 1
-            clip_rows = [dict(seed=seed, boxes=clip['boxes'].tolist(),
+            clip_rows = [dict(seed=seed, boxes=clip['boxes'].tolist(), sequence_index=index,
+                              padded=index >= total_samples,
                               **{key: clip[key] for key in ('case_id','classes','indices','span_mm')})
-                         for seed, clip in clips]
+                         for index, (seed, clip) in enumerate(clips, start=local_start)]
             if world > 1:
                 combined = [None]*world
                 dist.all_gather_object(combined, (losses, clip_rows))
@@ -398,6 +430,8 @@ def run_worker(output, job, requested_device):
                       losses=losses, gradient_norm=gradient, objects=objects,
                       learning_rates=sorted({group['lr'] for group in optimizer.param_groups}),
                       data_wait_seconds=data_seconds, update_seconds=time.monotonic()-began,
+                      first_sequence=sequence, next_sequence=next_sequence, prefetched=prefetched,
+                      ready_at_request=ready_at_request, prefetch_limit=limit, queued_batches=len(pending),
                       peak_cuda_reserved_bytes=peak,
                       clips=clip_rows)
             step_stop = job.get('stop_after_steps') is not None and state['update'] >= job['stop_after_steps']
