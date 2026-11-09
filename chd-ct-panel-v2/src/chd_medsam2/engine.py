@@ -64,7 +64,7 @@ def sync_gradients(optimizer, device):
 
 
 def update_step(network, optimizer, loss, clips, config, device, update, total_updates, world=1,
-                *, transfer=None, next_clip=None):
+                *, transfer=None, next_clip=None, activation_cpu_offload=False):
     all_objects = sum(len(clip['classes']) for _, clip in clips)
     frames = torch.zeros(config['frames'], dtype=torch.int32)
     for _, clip in clips:
@@ -94,7 +94,8 @@ def update_step(network, optimizer, loss, clips, config, device, update, total_u
             if ready is not None:
                 transfer.stage(ready)
         autocast = torch.autocast('cuda', dtype=torch.bfloat16) if device.type == 'cuda' else nullcontext()
-        with autocast:
+        saved = torch.autograd.graph.save_on_cpu(pin_memory=False) if activation_cpu_offload else nullcontext()
+        with autocast, saved:
             outputs = network(batch, valid, boxes)
             losses = masked_loss(loss, outputs, batch.masks, valid, frame_objects)
         if not bool(torch.isfinite(losses['core_loss'])):
@@ -237,17 +238,19 @@ def probe_capacity(output, job, config, device, admission, root, rows, metadata,
     log.status('running', phase='capacity_probe', rank=rank)
     shared_encoding = job['shared_image_position_encoding']
     async_copy = job.get('cuda_transfer_prefetch', False)
+    activation_cpu_offload = job.get('activation_cpu_offload', False)
     transfer = CudaClipTransfer(device) if async_copy else None
     # 容量检查包含下一段已就绪时的额外 CUDA 张量。
     reserve_clip = pin_clip(clips[0][1], device) if async_copy else None
     network = build(config, training=True, device=device, weights=job['weights'],
-                    shared_image_position_encoding=shared_encoding)
+                    shared_image_position_encoding=shared_encoding, activation_cpu_offload=activation_cpu_offload)
     optimizer = make_optimizer(network, config)
     if device.type=='cuda':
         torch.cuda.reset_peak_memory_stats(device)
     started = time.monotonic()
     losses, gradient, objects = update_step(network, optimizer, criterion(), clips, config, device, 0, 1, world,
-                                           transfer=transfer, next_clip=(lambda: reserve_clip) if async_copy else None)
+                                           transfer=transfer, next_clip=(lambda: reserve_clip) if async_copy else None,
+                                           activation_cpu_offload=activation_cpu_offload)
     if device.type=='cuda':
         torch.cuda.synchronize(device)
         peak = torch.cuda.max_memory_reserved(device)
@@ -260,6 +263,7 @@ def probe_capacity(output, job, config, device, admission, root, rows, metadata,
                     image_size=config['image_size'], frames=config['frames'], targets=objects,
                     shared_image_position_encoding=shared_encoding,
                     cuda_transfer_prefetch=async_copy,
+                    activation_cpu_offload=activation_cpu_offload,
                     local_targets=[len(clip['classes']) for _, clip in clips], loss=losses,
                     gradient_norm=gradient, peak_cuda_reserved_bytes=peak,
                     seconds=time.monotonic()-started, cases=[clip['case_id'] for _, clip in clips])
@@ -330,9 +334,11 @@ def run_worker(output, job, requested_device):
         log.status('running', phase='process_group_init', rank=rank, world_size=world)
         init_collective(device, world, rank)
         write_json(root_log/'control'/f'collective-ready-{generation}-{rank}.json', {'pid': os.getpid()})
+    activation_cpu_offload = job.get('activation_cpu_offload', False)
     log.event('training.device', f'MedSAM2 {device}，{config["image_size"]}×{config["image_size"]}，'
               f'{config["frames"]} 帧，{config["epochs"]} epoch', admission=admission, resources=resources,
               shared_image_position_encoding=job['shared_image_position_encoding'],
+              activation_cpu_offload=activation_cpu_offload,
               rank=rank, world_size=world, precision='bf16' if device.type=='cuda' else 'fp32')
     if config['scope'] != 'smoke':
         probe_capacity(output, job, config, device, admission, root, rows, metadata, window,
@@ -348,7 +354,8 @@ def run_worker(output, job, requested_device):
             return
     resume = os.environ.get('CHD_MEDSAM2_RESTORE') == '1'
     network = build(config, training=True, device=device, weights=None if resume else job['weights'],
-                    shared_image_position_encoding=job['shared_image_position_encoding'])
+                    shared_image_position_encoding=job['shared_image_position_encoding'],
+                    activation_cpu_offload=activation_cpu_offload)
     optimizer = make_optimizer(network, config)
     loss = criterion()
     if resume:
@@ -380,7 +387,7 @@ def run_worker(output, job, requested_device):
     pending = deque()
     log.event('training.supply', f'每进程预取上限 {maximum_prefetch} 个批次',
               requested_depth=maximum_prefetch, estimated_batch_bytes=batch_bytes,
-              cuda_transfer_prefetch=transfer is not None)
+              cuda_transfer_prefetch=transfer is not None, activation_cpu_offload=activation_cpu_offload)
     with ExitStack() as stack:
         pool = ThreadPoolExecutor(max_workers=1)
         stack.callback(pool.shutdown, wait=True, cancel_futures=True)
@@ -469,7 +476,8 @@ def run_worker(output, job, requested_device):
                 next_ready = lambda: ready_first_clip(next_future)
             losses, gradient, objects = update_step(network, optimizer, loss, clips, config, device,
                                                     state['update'], total_updates, world,
-                                                    transfer=transfer, next_clip=next_ready)
+                                                    transfer=transfer, next_clip=next_ready,
+                                                    activation_cpu_offload=activation_cpu_offload)
             state['sequence'] = next_sequence
             state['epoch'] = next_epoch
             state['update'] += 1

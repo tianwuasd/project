@@ -22,6 +22,8 @@ from .journal import LogMirror, TrainingLog
 
 
 COLLECTIVE_START_TIMEOUT = 120
+OFFLOAD_FORMAL_HOST_BYTES = 9*GIB
+OFFLOAD_SMOKE_HOST_BYTES = 3*GIB
 
 
 def freeze_sources(output):
@@ -93,7 +95,7 @@ def write_provenance(output, contract, weights, requested):
 
 def launch(output, contract, *, weights, train_cases, val_cases, validation_frames, requested,
            gpus, max_gpus, cpu_ranks, prefetch_depth, cuda_transfer_prefetch,
-           shared_image_position_encoding, wait_seconds, shared_desktop,
+           activation_cpu_offload, shared_image_position_encoding, wait_seconds, shared_desktop,
            background, resume, stop_after_steps, recovery_root, input_read_timeout):
     output = Path(output)
     with run_lock(output.with_name(output.name+'.launch.lock')):
@@ -116,6 +118,8 @@ def launch(output, contract, *, weights, train_cases, val_cases, validation_fram
                 raise ValueError('此任务冻结的训练代码不支持调整预取批次数')
             if cuda_transfer_prefetch is not None and 'cuda_transfer_prefetch' not in previous:
                 raise ValueError('此任务冻结的训练代码不支持调整 CUDA 异步传输')
+            if activation_cpu_offload is not None and 'activation_cpu_offload' not in previous:
+                raise ValueError('此任务冻结的训练代码不支持调整主机激活暂存')
             if shared_image_position_encoding is not None and 'shared_image_position_encoding' not in previous:
                 raise ValueError('此任务冻结的训练代码不支持调整共享图像位置编码')
             if input_read_timeout is not None and 'input_read_timeout' not in previous:
@@ -123,6 +127,7 @@ def launch(output, contract, *, weights, train_cases, val_cases, validation_fram
             for key, value in (('gpus', gpus), ('max_gpus', max_gpus), ('cpu_ranks', cpu_ranks),
                                ('prefetch_depth', prefetch_depth),
                                ('cuda_transfer_prefetch', cuda_transfer_prefetch),
+                               ('activation_cpu_offload', activation_cpu_offload),
                                ('shared_image_position_encoding', shared_image_position_encoding),
                                ('input_read_timeout', input_read_timeout),
                                ('shared_desktop', shared_desktop), ('wait_seconds', wait_seconds)):
@@ -133,6 +138,9 @@ def launch(output, contract, *, weights, train_cases, val_cases, validation_fram
                 raise ValueError('MedSAM2 CUDA 异步传输要求使用 CUDA 并启用 CPU 预取')
             if previous.get('cuda_transfer_prefetch') and previous['contract']['config']['scope'] == 'formal':
                 raise ValueError('MedSAM2 正式训练使用同步传输')
+            if previous.get('activation_cpu_offload') and (previous['requested'] != 'cuda'
+                                                           or previous.get('cuda_transfer_prefetch')):
+                raise ValueError('MedSAM2 主机激活暂存要求 CUDA 和同步数据传输')
             job = signed(dict(previous, stop_after_steps=stop_after_steps))
         else:
             if output.exists() and any(output.iterdir()):
@@ -155,6 +163,7 @@ def launch(output, contract, *, weights, train_cases, val_cases, validation_fram
                               cpu_ranks=cpu_ranks or 1, wait_seconds=wait_seconds or 0,
                               prefetch_depth=1 if prefetch_depth is None else prefetch_depth,
                               cuda_transfer_prefetch=bool(cuda_transfer_prefetch),
+                              activation_cpu_offload=bool(activation_cpu_offload),
                               shared_image_position_encoding=bool(shared_image_position_encoding),
                               input_read_timeout=input_read_timeout or DEFAULT_TIMEOUT,
                               shared_desktop=shared_desktop, stop_after_steps=stop_after_steps,
@@ -234,6 +243,12 @@ def supervise(output):
         waiting_since, next_feedback = time.monotonic(), 0.
         capacity_attempts = Counter()
         reserve = max(4*GIB, int(.2*snapshot()['available_memory_bytes']))
+        offload_host_bytes = 0
+        if job.get('activation_cpu_offload'):
+            offload_host_bytes = (OFFLOAD_SMOKE_HOST_BYTES if contract['config']['scope'] == 'smoke'
+                                  else OFFLOAD_FORMAL_HOST_BYTES)
+            log.event('training.offload_host_budget', '按每个 CUDA 进程核对主机激活暂存所需内存',
+                      reserve_bytes=reserve, required_bytes_per_rank=offload_host_bytes)
         unknown_retries = 0
         collective_timeouts = 0
         next_input_probe = 0.
@@ -312,12 +327,28 @@ def supervise(output):
                 ready = eligible(live)
                 candidate_layouts = [ready[:job.get('max_gpus', 1)], *([card] for card in ready)]
                 selected, layout = [], ()
+                host_requirements = []
                 for candidate in candidate_layouts:
                     key = tuple((card['uuid'], card['usable_bytes']//(GIB//2)) for card in candidate)
-                    if candidate and capacity_attempts[key] < 2:
-                        selected, layout = candidate, key
-                        break
+                    if not candidate or capacity_attempts[key] >= 2:
+                        continue
+                    required = reserve+len(candidate)*offload_host_bytes
+                    if facts['available_memory_bytes'] < required:
+                        host_requirements.append(required)
+                        continue
+                    selected, layout = candidate, key
+                    break
                 if not selected:
+                    if host_requirements:
+                        if now >= next_feedback:
+                            log.status('waiting_memory', reason='activation_cpu_offload', resources=facts,
+                                       required_bytes=min(host_requirements))
+                            log.event('training.wait_offload_host', '等待足够的主机内存，计算进程尚未启动',
+                                      available_bytes=facts['available_memory_bytes'],
+                                      required_bytes=min(host_requirements))
+                            next_feedback = now+10
+                        time.sleep(2)
+                        continue
                     if len(ready) == len(cards):
                         log.status('needs_attention', reason='training_capacity', gpu_inventory=live)
                         raise RuntimeError('获准 GPU 均未通过当前训练尺寸容量检查')
@@ -379,6 +410,8 @@ def supervise(output):
                 raise
             write_json(recovery/'input-audit.json', signed(dict(audit, generation=generation,
                                                                contract_identity=contract['identity'])))
+            if offload_host_bytes and snapshot()['available_memory_bytes'] < reserve+world*offload_host_bytes:
+                continue
             supply_path = recovery/'supply.json'
             if job.get('prefetch_depth'):
                 write_json(supply_path, dict(cpu_budget=facts['cpu_budget'],

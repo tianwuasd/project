@@ -62,6 +62,8 @@ python3 run.py train --model medsam2 --resume --output "$train_run" --background
 
 `--shared-image-position-encoding` 让同尺寸的帧共用图像编码器的位置网格。此选项默认关闭。启用前可用 `--capacity-only` 在同一设备和任务配置下验证。支持该选项的冻结任务可以在续跑时显式启用或用 `--no-shared-image-position-encoding` 关闭，实际执行方式记录在任务配置和容量报告中。
 
+`--activation-cpu-offload` 用于显存不足、主机内存充足的 CUDA 任务，默认关闭。编码器按块在反向时重算中间结果，其余反向所需的张量暂存在普通主机内存并按需传回 GPU。分辨率、帧数、目标数、全局批量和优化器配置均按原任务执行。启用时使用同步数据传输，按每个正式 CUDA 进程额外核对 9 GiB 主机内存，短测核对 3 GiB，均在主机保留量之外。内存不足时等待，或者在同一允许列表中选择满足条件的更小计算组。用 `--capacity-only --activation-cpu-offload` 在相同设备和配置上检查完整训练步，再以同一开关启动正式训练。[PyTorch 主机暂存接口](https://docs.pytorch.org/docs/stable/autograd.html#torch.autograd.graph.save_on_cpu) · [PyTorch 激活重算接口](https://docs.pytorch.org/docs/main/utils/checkpoint.html)
+
 新任务先把状态与事件写到本地恢复目录，`launch.json` 的 `log` 字段给出该目录的监督进程日志路径。各训练进程的原始输出分别保存在 `control/rank-*.log`。结果目录暂时无法写入日志时，训练进度仍可从本地 `logs/run.log` 和 `status.json` 读取。同目录的 `log-sync.json` 记录同步故障，恢复后按原始字节补齐日志。
 
 若任务结束时结果目录尚不可写，恢复写入后可以对已完成任务运行同一个 `--resume` 命令补齐日志，训练进程不会重启。

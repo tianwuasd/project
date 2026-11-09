@@ -61,6 +61,8 @@ def parser_for(command):
                             help='每进程最多提前准备的批次数，默认 1，0 表示同步读取')
         parser.add_argument('--cuda-transfer-prefetch', action=argparse.BooleanOptionalAction,
                             help='对已就绪的下一批首段启用 CUDA 异步传输，默认关闭')
+        parser.add_argument('--activation-cpu-offload', action=argparse.BooleanOptionalAction,
+                            help='CUDA 前向将反向所需的张量暂存到主机内存，默认关闭')
         parser.add_argument('--shared-image-position-encoding', action=argparse.BooleanOptionalAction,
                             help='同尺寸帧共用图像编码器位置网格')
         parser.add_argument('--input-read-timeout-seconds', type=positive,
@@ -167,6 +169,8 @@ def train(args, local, paths, stamp):
         raise ValueError('MedSAM2 CUDA 异步传输要求使用 CUDA 并启用 CPU 预取')
     if args.cuda_transfer_prefetch and not (args.smoke or args.capacity_only or args.resume):
         raise ValueError('MedSAM2 CUDA 异步传输仅用于短测和容量检查，正式训练使用同步传输')
+    if args.activation_cpu_offload and (args.device == 'cpu' or args.cuda_transfer_prefetch):
+        raise ValueError('MedSAM2 主机激活暂存要求 CUDA 和同步数据传输')
     desktop = desktop_identity(args.share_desktop_pid, args.smoke or args.capacity_only) if args.share_desktop_pid else None
     if args.resume:
         if not args.output or any((args.weights, args.prepared, args.epochs, train_cases, val_cases,
@@ -204,13 +208,15 @@ def train(args, local, paths, stamp):
         if args.check_only:
             return dict(status='checked', contract=contract,
                         shared_image_position_encoding=bool(args.shared_image_position_encoding),
-                        cuda_transfer_prefetch=bool(args.cuda_transfer_prefetch)), output
+                        cuda_transfer_prefetch=bool(args.cuda_transfer_prefetch),
+                        activation_cpu_offload=bool(args.activation_cpu_offload)), output
     recovery = resolve_path(args.recovery_root or local.get('medsam2_recovery_root') or
                             resolve_path(paths.get('runtime_root', 'outputs/runtime'))/'recovery/medsam2')
     result = launch(output, contract, weights=weights, train_cases=train_cases, val_cases=val_cases,
                     validation_frames=args.validation_frames, requested=args.device, gpus=args.gpus,
                     max_gpus=args.max_gpus, cpu_ranks=args.cpu_ranks, prefetch_depth=args.prefetch_depth,
                     cuda_transfer_prefetch=args.cuda_transfer_prefetch,
+                    activation_cpu_offload=args.activation_cpu_offload,
                     shared_image_position_encoding=args.shared_image_position_encoding,
                     input_read_timeout=args.input_read_timeout_seconds,
                     wait_seconds=args.gpu_wait_seconds, shared_desktop=desktop, background=args.background,

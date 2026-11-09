@@ -1,8 +1,10 @@
 import importlib.metadata
 from pathlib import Path
 import subprocess
+from weakref import WeakMethod
 
 import torch
+from torch.utils.checkpoint import checkpoint
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 import sam2
@@ -31,7 +33,18 @@ def versions():
     return {name: importlib.metadata.version(name) for name in names}
 
 
-def build(config, *, training, device, weights=None, shared_image_position_encoding=False):
+def checkpoint_block(block):
+    forward = WeakMethod(block.forward)
+
+    def recompute(features):
+        return checkpoint(forward(), features, use_reentrant=False)
+
+    # 保留原模块、参数名称和检查点键；弱引用避免前向函数持有模块自身。
+    block.forward = recompute
+
+
+def build(config, *, training, device, weights=None, shared_image_position_encoding=False,
+          activation_cpu_offload=False):
     upstream = upstream_root(config)
     directory = upstream/'sam2/configs'
     if training:
@@ -56,6 +69,9 @@ def build(config, *, training, device, weights=None, shared_image_position_encod
         if file_sha(weights) != config['weights_sha256']:
             raise ValueError('MedSAM2 医学预训练权重 SHA256 不匹配')
         network.load_state_dict(torch.load(weights, map_location='cpu', weights_only=True)['model'], strict=True)
+    if training and activation_cpu_offload:
+        for block in network.image_encoder.trunk.blocks:
+            checkpoint_block(block)
     return network.to(device).train(training)
 
 
