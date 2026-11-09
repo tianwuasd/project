@@ -61,6 +61,8 @@ def parser_for(command):
                             help='每进程最多提前准备的批次数，默认 1，0 表示同步读取')
         parser.add_argument('--shared-image-position-encoding', action=argparse.BooleanOptionalAction,
                             help='同尺寸帧共用图像编码器位置网格')
+        parser.add_argument('--input-read-timeout-seconds', type=positive,
+                            help='启动时读取预处理缓存无进展的超时秒数，默认 120')
         parser.add_argument('--recovery-root', help='与结果目录独立的检查点存储根目录')
         parser.add_argument('--gpu-wait-seconds', type=int)
         parser.add_argument('--stop-after-steps', type=positive)
@@ -130,7 +132,8 @@ def main(arguments):
 def locate_prepared(args, local, paths, fold):
     configured = args.prepared or local.get('medsam2_prepared_root')
     if configured:
-        return resolve_path(configured)
+        path = Path(configured).expanduser()
+        return Path(os.path.abspath(ROOT/path))
     root = resolve_path(local.get('preprocess_output_root',
                                   paths.get('preprocess_output_root', 'outputs/preprocessing')))/'medsam2'
     candidates = [path.parent for path in root.glob('*/summary.json')
@@ -145,7 +148,7 @@ def locate_prepared(args, local, paths, fold):
 def train(args, local, paths, stamp):
     from chd_stunet.acceleration.prediction import desktop_identity
     from .contracts import file_sha
-    from .data import open_prepared
+    from .input_audit import DEFAULT_TIMEOUT, audit_prepared
     from .model import upstream_root, versions
     from .runtime import launch
     fold = args.fold if args.fold is not None else 0
@@ -177,8 +180,11 @@ def train(args, local, paths, stamp):
             config['scope'] = 'capacity_probe'
         upstream_root(config)
         prepared = locate_prepared(args, local, paths, fold)
-        root, manifest, rows, metadata, train_ids, val_ids, window = open_prepared(
-            prepared, fold, smoke=args.smoke or args.capacity_only, train_cases=train_cases, val_cases=val_cases)
+        audit = audit_prepared(prepared, fold, smoke=args.smoke or args.capacity_only, train_cases=train_cases,
+                               val_cases=val_cases, timeout=args.input_read_timeout_seconds or DEFAULT_TIMEOUT)
+        root = Path(audit['root'])
+        manifest, metadata = audit['manifest'], audit['metadata']
+        train_ids, val_ids, window = audit['train'], audit['val'], audit['window']
         runtime = resolve_path(paths.get('runtime_root', 'outputs/runtime'))
         weights = resolve_path(args.weights or local.get('medsam2_weights_path') or runtime/'weights/medsam2/MedSAM2_latest.pt')
         if file_sha(weights) != config['weights_sha256']:
@@ -198,6 +204,7 @@ def train(args, local, paths, stamp):
                     validation_frames=args.validation_frames, requested=args.device, gpus=args.gpus,
                     max_gpus=args.max_gpus, cpu_ranks=args.cpu_ranks, prefetch_depth=args.prefetch_depth,
                     shared_image_position_encoding=args.shared_image_position_encoding,
+                    input_read_timeout=args.input_read_timeout_seconds,
                     wait_seconds=args.gpu_wait_seconds, shared_desktop=desktop, background=args.background,
                     resume=args.resume, stop_after_steps=args.stop_after_steps, recovery_root=recovery)
     return result, output

@@ -130,7 +130,7 @@ def load_native_pair(row):
 
 def file_stamp(path):
     stat = path.stat()
-    return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+    return [stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns]
 
 
 def assert_case_files(folder, marker):
@@ -145,8 +145,11 @@ def eligible_starts(frame_classes, frames, required_objects=1):
             if len(frame_classes[start]) >= required_objects]
 
 
-def case_metadata(folder, row, *, track_files=False):
-    marker = read_json(folder/'complete.json')
+def case_metadata(folder, row, *, track_files=False, progress=None):
+    marker_path = folder/'complete.json'
+    if progress is not None:
+        progress(marker_path, 0)
+    marker = read_json(marker_path)
     check_signature(marker)
     if (marker['protocol'] != PROTOCOL or marker['case_id'] != row['case_id']
             or marker['source_hashes'] != row['source_hashes']
@@ -157,8 +160,10 @@ def case_metadata(folder, row, *, track_files=False):
     stamps = {}
     for name, expected in marker['files'].items():
         path = folder/name
+        if progress is not None:
+            progress(path, 0)
         before = file_stamp(path)
-        if file_sha(path) != expected:
+        if file_sha(path, progress=progress) != expected:
             raise ValueError('MedSAM2 缓存文件损坏：'+str(path))
         if file_stamp(path) != before:
             raise ValueError('MedSAM2 缓存文件在校验中变化：'+str(path))
@@ -167,6 +172,43 @@ def case_metadata(folder, row, *, track_files=False):
         # 运行时文件属性只用于检测变化，病例签名仍以文件摘要为准。
         marker['verified_files'] = stamps
     return marker
+
+
+def open_prepared(root, fold, *, smoke=False, train_cases=(), val_cases=(), progress=None):
+    root = Path(root)
+    if progress is not None:
+        progress(root/'manifest.json', 0)
+    root = root.resolve(strict=True)
+    manifest = read_json(root/'manifest.json')
+    if progress is not None:
+        progress(root/'summary.json', 0)
+    summary = read_json(root/'summary.json')
+    check_signature(manifest)
+    if (manifest['protocol'] != PROTOCOL or summary['status'] != 'completed'
+            or summary['manifest_identity'] != manifest['identity']):
+        raise ValueError('要求完成并匹配的 MedSAM2 预处理目录')
+    if not smoke and (not manifest['full_cohort'] or train_cases or val_cases):
+        raise ValueError('正式 MedSAM2 训练需要完整审核队列')
+    cases = {row['case_id']: row for row in manifest['cases']}
+    roles = {cid: row['roles'][str(fold)] for cid, row in cases.items()}
+    train = sorted(train_cases or [cid for cid, role in roles.items() if role in ('train', 'aux_train')])
+    val = sorted(val_cases or [cid for cid, role in roles.items() if role == 'val'])
+    if smoke and not train_cases:
+        train = [cid for cid in train if roles[cid] == 'train'][:1] + [
+            cid for cid in train if roles[cid] == 'aux_train'][:1]
+    if smoke and not val_cases:
+        val = val[:1]
+    if (not train or not val or len(set(train+val)) != len(train+val)
+            or any(roles.get(cid) not in ('train', 'aux_train') for cid in train)
+            or any(roles.get(cid) != 'val' for cid in val)):
+        raise ValueError('MedSAM2 训练/验证病例与固定折角色不一致')
+    metadata = {}
+    for cid in train+val:
+        marker = case_metadata(root/'cases'/cid, cases[cid], track_files=True, progress=progress)
+        if summary['completed'].get(cid) != marker['identity']:
+            raise ValueError('MedSAM2 病例未在已提交清单中：'+cid)
+        metadata[cid] = marker
+    return root, manifest, cases, metadata, train, val, manifest['folds'][str(fold)]
 
 
 def prepare_case(folder, row, gate, phase):

@@ -14,9 +14,9 @@ TEMPORARY = frozenset({errno.ENOENT, errno.ECONNRESET, errno.ETIMEDOUT, errno.EN
 
 class InputUnavailable(OSError):
     def __init__(self, paths, details):
-        super().__init__('MedSAM2 已审核输入暂不可读')
         self.paths = sorted(set(paths))
         self.details = details
+        super().__init__('MedSAM2 已审核输入暂不可读：'+', '.join(self.paths))
 
 
 def input_path(error, prepared):
@@ -27,6 +27,8 @@ def input_path(error, prepared):
     if not path.is_relative_to(root):
         return None
     parts = path.relative_to(root).parts
+    if not parts:
+        return str(root/'manifest.json')
     if parts in (('manifest.json',), ('summary.json',)):
         return str(path)
     if len(parts)==3 and parts[0]=='cases' and parts[-1] in ('ct.npy', 'labels.npy', 'complete.json'):

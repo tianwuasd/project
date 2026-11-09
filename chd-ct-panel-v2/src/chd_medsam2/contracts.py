@@ -1,6 +1,7 @@
 import hashlib
 import json
 from pathlib import Path
+import time
 
 from chd_stunet.config import ROOT
 
@@ -11,9 +12,23 @@ def read_json(path):
     return json.loads(Path(path).read_text(encoding='utf-8-sig'))
 
 
-def file_sha(path):
+def file_sha(path, *, progress=None):
     with Path(path).open('rb') as stream:
-        return hashlib.file_digest(stream, 'sha256').hexdigest()
+        if progress is None:
+            return hashlib.file_digest(stream, 'sha256').hexdigest()
+        sha = hashlib.sha256()
+        size, reported = 0, 0
+        last = time.monotonic()
+        while block := stream.read(8*1024**2):
+            sha.update(block)
+            size += len(block)
+            now = time.monotonic()
+            if now-last >= 1:
+                progress(path, size)
+                reported, last = size, now
+        if size > reported:
+            progress(path, size)
+        return sha.hexdigest()
 
 
 def digest(record):

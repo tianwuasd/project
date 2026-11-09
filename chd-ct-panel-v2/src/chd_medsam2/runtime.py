@@ -16,7 +16,8 @@ from chd_stunet.observability.locking import run_lock
 from chd_stunet.observability.runlog import RunLog, write_json
 
 from .contracts import check_signature, file_sha, read_json, signed
-from .io_recovery import check_readable
+from .input_audit import DEFAULT_TIMEOUT, AuditCancelled, audit_prepared
+from .io_recovery import InputUnavailable, check_readable
 from .journal import LogMirror, TrainingLog
 
 
@@ -89,7 +90,7 @@ def write_provenance(output, contract, weights, requested):
 
 def launch(output, contract, *, weights, train_cases, val_cases, validation_frames, requested,
            gpus, max_gpus, cpu_ranks, prefetch_depth, shared_image_position_encoding, wait_seconds, shared_desktop,
-           background, resume, stop_after_steps, recovery_root):
+           background, resume, stop_after_steps, recovery_root, input_read_timeout):
     output = Path(output)
     with run_lock(output.with_name(output.name+'.launch.lock')):
         launch_file = output/'launch.json'
@@ -111,9 +112,12 @@ def launch(output, contract, *, weights, train_cases, val_cases, validation_fram
                 raise ValueError('此任务冻结的训练代码不支持调整预取批次数')
             if shared_image_position_encoding is not None and 'shared_image_position_encoding' not in previous:
                 raise ValueError('此任务冻结的训练代码不支持调整共享图像位置编码')
+            if input_read_timeout is not None and 'input_read_timeout' not in previous:
+                raise ValueError('此任务冻结的训练代码不支持调整输入读取超时')
             for key, value in (('gpus', gpus), ('max_gpus', max_gpus), ('cpu_ranks', cpu_ranks),
                                ('prefetch_depth', prefetch_depth),
                                ('shared_image_position_encoding', shared_image_position_encoding),
+                               ('input_read_timeout', input_read_timeout),
                                ('shared_desktop', shared_desktop), ('wait_seconds', wait_seconds)):
                 if value is not None:
                     previous[key] = value
@@ -139,6 +143,7 @@ def launch(output, contract, *, weights, train_cases, val_cases, validation_fram
                               cpu_ranks=cpu_ranks or 1, wait_seconds=wait_seconds or 0,
                               prefetch_depth=1 if prefetch_depth is None else prefetch_depth,
                               shared_image_position_encoding=bool(shared_image_position_encoding),
+                              input_read_timeout=input_read_timeout or DEFAULT_TIMEOUT,
                               shared_desktop=shared_desktop, stop_after_steps=stop_after_steps,
                               recovery=str(recovery), task_id=task_id, journal=1))
             write_provenance(output, contract, weights, requested)
@@ -194,6 +199,7 @@ def supervise(output):
     output = Path(output).resolve(strict=True)
     with run_lock(output/'.medsam2.lock'), ExitStack() as stack:
         job = frozen_job(output)
+        contract = job['contract']
         recovery = Path(job.get('recovery', output))
         owner = {'output': str(output), 'identity': job['contract']['identity']}
         if job.get('task_id'):
@@ -329,6 +335,36 @@ def supervise(output):
             generation = uuid4().hex
             rendezvous = (output/'control'/('collective-'+generation)).as_uri()
             world = len(visible) or job.get('cpu_ranks', 1)
+            def audit_progress(record):
+                log.status('running', phase='input_audit', **record)
+                log.event('training.input_audit', f"核验 {Path(record['path']).name}，已读 {record['bytes_read']} 字节",
+                          **record)
+
+            try:
+                audit = audit_prepared(contract['prepared'], contract['fold'],
+                                       smoke=contract['config']['scope'] in ('smoke', 'capacity_probe'),
+                                       train_cases=job['train_cases'], val_cases=job['val_cases'],
+                                       timeout=job['input_read_timeout'], progress=audit_progress,
+                                       cancelled=lambda: (output/'control/stop.json').is_file())
+                if (audit['manifest']['identity'] != contract['data_identity']
+                        or audit['train'] != contract['train_ids'] or audit['val'] != contract['val_ids']
+                        or {cid: row['identity'] for cid, row in audit['metadata'].items()}
+                        != contract['case_identities']):
+                    raise ValueError('MedSAM2 任务冻结后数据变化')
+            except AuditCancelled:
+                break
+            except InputUnavailable as error:
+                write_json(recovery/'input-error-audit.json', dict(paths=error.paths, details=error.details))
+                log.event('training.input_audit_wait', '启动校验无法继续读取，等待存储恢复', **error.details)
+                if error.details['reason'] == 'input_read_timeout':
+                    next_input_probe = time.monotonic()+60
+                    next_feedback = 0.
+                continue
+            except ValueError as error:
+                log.status('needs_attention', reason='input_integrity', error=str(error))
+                raise
+            write_json(recovery/'input-audit.json', signed(dict(audit, generation=generation,
+                                                               contract_identity=contract['identity'])))
             supply_path = recovery/'supply.json'
             if job.get('prefetch_depth'):
                 write_json(supply_path, dict(cpu_budget=facts['cpu_budget'],

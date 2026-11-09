@@ -1,48 +1,12 @@
-from pathlib import Path
-
 import numpy as np
 from PIL import Image
 import torch
 
-from . import PROTOCOL
-from .contracts import check_signature, read_json
-from .preprocessing import assert_case_files, case_metadata, eligible_starts
+from .preprocessing import assert_case_files, eligible_starts, open_prepared as open_prepared
 
 
 MEAN = (0.485, 0.456, 0.406)
 STD = (0.229, 0.224, 0.225)
-
-
-def open_prepared(root, fold, *, smoke=False, train_cases=(), val_cases=()):
-    root = Path(root).resolve(strict=True)
-    manifest = read_json(root/'manifest.json')
-    summary = read_json(root/'summary.json')
-    check_signature(manifest)
-    if (manifest['protocol'] != PROTOCOL or summary['status'] != 'completed'
-            or summary['manifest_identity'] != manifest['identity']):
-        raise ValueError('要求完成并匹配的 MedSAM2 预处理目录')
-    if not smoke and (not manifest['full_cohort'] or train_cases or val_cases):
-        raise ValueError('正式 MedSAM2 训练需要完整审核队列')
-    cases = {row['case_id']: row for row in manifest['cases']}
-    roles = {cid: row['roles'][str(fold)] for cid, row in cases.items()}
-    train = sorted(train_cases or [cid for cid, role in roles.items() if role in ('train', 'aux_train')])
-    val = sorted(val_cases or [cid for cid, role in roles.items() if role == 'val'])
-    if smoke and not train_cases:
-        train = [cid for cid in train if roles[cid] == 'train'][:1] + [
-            cid for cid in train if roles[cid] == 'aux_train'][:1]
-    if smoke and not val_cases:
-        val = val[:1]
-    if (not train or not val or len(set(train+val)) != len(train+val)
-            or any(roles.get(cid) not in ('train', 'aux_train') for cid in train)
-            or any(roles.get(cid) != 'val' for cid in val)):
-        raise ValueError('MedSAM2 训练/验证病例与固定折角色不一致')
-    metadata = {}
-    for cid in train+val:
-        marker = case_metadata(root/'cases'/cid, cases[cid], track_files=True)
-        if summary['completed'].get(cid) != marker['identity']:
-            raise ValueError('MedSAM2 病例未在已提交清单中：'+cid)
-        metadata[cid] = marker
-    return root, manifest, cases, metadata, train, val, manifest['folds'][str(fold)]
 
 
 def frame_tensor(frame, size, window):

@@ -16,8 +16,8 @@ from chd_stunet.acceleration.preprocess_cpu import snapshot
 from chd_stunet.observability.runlog import RunLog, write_json
 
 from .checkpoints import load, mirror_checkpoints, save
-from .contracts import file_sha, read_json
-from .data import open_prepared, sample_clip, sample_seed, sequence_ids
+from .contracts import check_signature, file_sha, read_json
+from .data import sample_clip, sample_seed, sequence_ids
 from .inference import evaluate_case
 from .io_recovery import InputUnavailable, input_path
 from .journal import TrainingLog
@@ -272,13 +272,13 @@ def run_worker(output, job, requested_device):
         raise ValueError('MedSAM2 计算进程数超出全局批量')
     primary = rank == 0
     recovery = job.get('recovery')
-    root, manifest, rows, metadata, train, val, window = open_prepared(
-        contract['prepared'], contract['fold'], smoke=config['scope'] in ('smoke', 'capacity_probe'),
-        train_cases=job['train_cases'], val_cases=job['val_cases'])
-    if (manifest['identity'] != contract['data_identity'] or train != contract['train_ids']
-            or val != contract['val_ids'] or versions() != contract['versions']
-            or {cid: record['identity'] for cid, record in metadata.items()} != contract['case_identities']):
-        raise ValueError('MedSAM2 任务冻结后数据或运行环境变化')
+    audit = read_json(Path(recovery)/'input-audit.json')
+    check_signature(audit)
+    if (audit['generation'] != os.environ['CHD_MEDSAM2_GENERATION']
+            or audit['contract_identity'] != contract['identity'] or versions() != contract['versions']):
+        raise ValueError('MedSAM2 输入校验结果与当前世代或运行环境不一致')
+    root = Path(audit['root'])
+    rows, metadata, train, val, window = (audit[key] for key in ('cases', 'metadata', 'train', 'val', 'window'))
     root_log = Path(recovery) if job.get('journal') else output
     rank_log = root_log if primary else root_log/'ranks'/str(rank)
     log = TrainingLog(rank_log, job.get('task_id', contract['identity'])) if job.get('journal') else RunLog(rank_log)
