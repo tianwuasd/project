@@ -25,7 +25,8 @@ ROOT=Path(__file__).resolve().parent
 REMOTE='https://api.github.com/repos/tianwuasd/project/contents/chd-ct-panel-v2/'
 ROOT_FILES={'run.py','analyze.py','smoke.py','setup_env.py','preprocess_worker.py','update.py',
             'pyproject.toml','README.md','.gitignore','.gitattributes','requirements-analysis.txt',
-            'requirements-preprocess.txt','requirements-training.txt','project.local.json.example'}
+            'requirements-preprocess.txt','requirements-training.txt','requirements-medsam2.txt',
+            'project.local.json.example','configs/models/medsam2.yaml'}
 
 
 class UpdateLog:

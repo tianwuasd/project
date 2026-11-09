@@ -126,24 +126,33 @@ def main():
     mode.add_argument("--check",action="store_true")
     mode.add_argument("--install",action="store_true")
     parser.add_argument("--profile",choices=["analysis","preprocess","training"],default="preprocess")
+    parser.add_argument('--model',choices=['stunet','medsam2'],default='stunet',help='training model; medsam2 uses an independent environment')
     parser.add_argument('--cpu',action='store_true',help='training installation uses CPU Torch instead of CUDA128')
     parser.add_argument('--download-weights',action='store_true',help='with training --install, fetch/check pinned author weights')
     parser.add_argument('--weights',help='optional author weight cache path')
+    parser.add_argument('--medsam2-source',help='pinned MedSAM2 Git checkout')
     parser.add_argument("--python")
     parser.add_argument("--venv")
     parser.add_argument('--proxy',help='optional temporary pip proxy, never saved globally')
     args=parser.parse_args()
+    if args.model=='medsam2' and args.profile!='training':parser.error('--model medsam2 requires --profile training')
+    if args.model=='medsam2' and args.download_weights:parser.error('--download-weights applies only to STU-Net training')
+    if args.medsam2_source and args.model!='medsam2':parser.error('--medsam2-source requires --model medsam2')
     local=ROOT/"project.local.json"
     saved=json.loads(local.read_text(encoding="utf-8")) if local.is_file() else {}
     interpreter_key={'training':'training_python','preprocess':'preprocess_python','analysis':'analysis_python'}[args.profile]
     if args.download_weights and (args.profile!='training' or not args.install):
         parser.error('--download-weights requires --profile training --install')
-    python=args.python or saved.get(interpreter_key) or saved.get("analysis_python") or sys.executable
-    venv=Path(args.venv or ROOT/('.venv_training' if args.profile=='training' else '.venv_preprocess' if args.profile=='preprocess' else '.venv_analysis')).resolve()
+    model_python_key='medsam2_python' if args.model=='medsam2' else interpreter_key
+    python=args.python or saved.get(model_python_key) or (saved.get(interpreter_key) if args.model!='medsam2' else None) or saved.get("analysis_python") or sys.executable
+    default_venv=('.venv_medsam2' if args.model=='medsam2' else '.venv_training' if args.profile=='training' else '.venv_preprocess' if args.profile=='preprocess' else '.venv_analysis')
+    venv=Path(args.venv or ROOT/default_venv).resolve()
     vpython=venv/("Scripts/python.exe" if sys.platform=="win32" else "bin/python")
-    modules=MODULES+('nnunetv2','blosc2','torch','skimage') if args.profile in ('preprocess','training') else MODULES
-    requirement_file={'analysis':'requirements-analysis.txt','preprocess':'requirements-preprocess.txt','training':'requirements-training.txt'}[args.profile]
-    record=dict(profile=args.profile,source_python=python,target_venv=str(venv),
+    if args.model=='medsam2' and args.check and not args.python and not saved.get(model_python_key):
+        python=str(vpython)
+    modules=('torch','sam2','hydra','iopath') if args.model=='medsam2' else MODULES+('nnunetv2','blosc2','torch','skimage') if args.profile in ('preprocess','training') else MODULES
+    requirement_file='requirements-medsam2.txt' if args.model=='medsam2' else {'analysis':'requirements-analysis.txt','preprocess':'requirements-preprocess.txt','training':'requirements-training.txt'}[args.profile]
+    record=dict(profile=args.profile,model=args.model,source_python=python,target_venv=str(venv),
         requirements=str(ROOT/requirement_file),modules=modules,
         action="install" if args.install else "check" if args.check else "plan",
         scope=('training software and optional pinned weight cache; GPU admission is a separate train-stage probe'
@@ -152,7 +161,16 @@ def main():
     import hashlib
     record['requirements_sha256']=hashlib.sha256(Path(record['requirements']).read_bytes()).hexdigest()
     torch_index='https://download.pytorch.org/whl/cu128' if args.profile=='training' and not args.cpu else 'https://download.pytorch.org/whl/cpu'
-    record['network']=dict(packages='PyPI',torch=dict(version='2.8.0',index=torch_index) if args.profile!='analysis' else None,
+    if args.model=='medsam2':
+        platform_paths=json.loads((ROOT/'configs/paths.json').read_text(encoding='utf-8')).get(sys.platform,{})
+        runtime=Path(saved.get('runtime_root',platform_paths.get('runtime_root',ROOT/'outputs/runtime'))).resolve()
+        medsam2_source=Path(args.medsam2_source or saved.get('medsam2_source') or runtime/'deps/MedSAM2').resolve()
+        medsam2_weights=Path(args.weights or saved.get('medsam2_weights_path') or runtime/'weights/medsam2/MedSAM2_latest.pt').resolve()
+        if not args.cpu:
+            torch_index='https://download.pytorch.org/whl/cu126'
+        record['model_contract']=dict(upstream='bowang-lab/MedSAM2',source=str(medsam2_source),
+                                      weights=str(medsam2_weights),cuda_extension=False)
+    record['network']=dict(packages='PyPI',torch=dict(version='2.12.1' if args.model=='medsam2' else '2.8.0',index=torch_index) if args.profile!='analysis' else None,
                            temporary_proxy_requested=bool(args.proxy))
     logroot=ROOT/"outputs/environment"
     logroot.mkdir(parents=True,exist_ok=True)
@@ -160,10 +178,23 @@ def main():
     log_path=logroot/(stamp+'.'+record['action']+'.log')
     record['log_path']=str(log_path)
     with log_path.open('w',encoding='utf-8') as stream:
-        report(f'环境阶段：{record["action"]}；配置：{args.profile}',stream)
+        report(f'环境阶段：{record["action"]}；配置：{args.profile}；模型：{args.model}',stream)
         report('完整日志：'+str(log_path),stream)
         report('执行解释器：'+str(python),stream)
         if args.install:report('部署位置：'+str(venv),stream)
+        if args.model=='medsam2':
+            report('MedSAM2 源码目录：'+str(medsam2_source),stream)
+            report('MedSAM2 权重文件：'+str(medsam2_weights),stream)
+    if args.model=='medsam2' and (args.check or args.install):
+        revision=subprocess.check_output(['git','-C',str(medsam2_source),'rev-parse','HEAD'],text=True).strip()
+        dirty=subprocess.check_output(['git','-C',str(medsam2_source),'status','--porcelain','--untracked-files=no'],text=True)
+        if revision!='332f30d420f1d1b08e2a79b3ae6a602458808383' or dirty.strip():
+            raise ValueError('MedSAM2 源码需要使用干净的固定提交')
+        with medsam2_weights.open('rb') as stream:
+            weight_sha=hashlib.file_digest(stream,'sha256').hexdigest()
+        if weight_sha!='c92743b99f00d078bf32a3afcc38aaa9faf1c1692dffe3eaa7a90938c1991060':
+            raise ValueError('MedSAM2 权重 SHA256 不匹配')
+        record['model_contract'].update(revision=revision,weights_sha256=weight_sha)
     if args.install:
         if venv.exists() and not (venv/"pyvenv.cfg").is_file():
             raise ValueError("Target exists and is not a recognized venv; refusing to overwrite")
@@ -174,13 +205,17 @@ def main():
             commands=[]
             if not vpython.is_file():
                 commands.append([python,'-m','venv',str(venv)])
-            if args.profile in ('preprocess','training'):
-                commands.append([str(vpython),'-m','pip','install','torch==2.8.0','--index-url',torch_index])
-            # Keep the chosen Torch version in the SAME resolver invocation as
-            # the remaining requirements. Installing it first is not a pin:
-            # a later dependency installation can otherwise silently replace it.
-            torch_pin=['torch==2.8.0'] if args.profile in ('preprocess','training') else []
-            commands.append([str(vpython),'-m','pip','install','-r',record['requirements'],*torch_pin])
+            if args.model=='medsam2':
+                env.update(SAM2_BUILD_CUDA='0',SAM2_BUILD_ALLOW_ERRORS='0')
+                torch_pin=['torch==2.12.1','torchvision==0.27.1']
+                commands.append([str(vpython),'-m','pip','install',*torch_pin,'--index-url',torch_index])
+                commands.append([str(vpython),'-m','pip','install','-r',record['requirements'],*torch_pin])
+                commands.append([str(vpython),'-m','pip','install','--no-deps','--no-build-isolation','-e',str(medsam2_source)])
+            else:
+                torch_pin=['torch==2.8.0'] if args.profile in ('preprocess','training') else []
+                if torch_pin:
+                    commands.append([str(vpython),'-m','pip','install',*torch_pin,'--index-url',torch_index])
+                commands.append([str(vpython),'-m','pip','install','-r',record['requirements'],*torch_pin])
             record['steps']=[]
             for number,command in enumerate(commands,1):
                 began=time.monotonic()
@@ -214,15 +249,26 @@ def main():
               "'modules':{n:(importlib.import_module(n) and m.version('scikit-image' if n=='skimage' else n)) for n in names}}))")
         if args.profile=='preprocess':
             code += ";from nnunetv2.preprocessing.preprocessors.default_preprocessor import DefaultPreprocessor;from nnunetv2.training.dataloading.nnunet_dataset import comp_blosc2_params;from nnunetv2.experiment_planning.experiment_planners.default_experiment_planner import ExperimentPlanner;assert m.version('nnunetv2')=='2.8.1';assert hasattr(DefaultPreprocessor,'run_case_npy');print('preprocessing APIs OK; CUDA not requested')"
-        if args.profile=='training':
+        if args.profile=='training' and args.model=='stunet':
             code += ";from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer;from nnunetv2.training.dataloading.data_loader import nnUNetDataLoader;import torch;assert m.version('nnunetv2')=='2.8.1';assert hasattr(nnUNetTrainer,'get_training_transforms');assert hasattr(nnUNetDataLoader,'get_bbox');print('training APIs OK; CUDA build='+str(torch.version.cuda)+'; no GPU capacity claim')"
-        if args.profile in ('preprocess','training'):
+        if args.model=='medsam2':
+            code=("import sys,json,torch;from pathlib import Path;sys.path.insert(0,sys.argv[1]);"
+                  "from chd_medsam2.contracts import settings;from chd_medsam2.model import versions,upstream_root;"
+                  "from chd_medsam2.losses import criterion;from sam2.sam2_video_predictor_npz import SAM2VideoPredictorNPZ;"
+                  "root=upstream_root(settings());assert root==Path(sys.argv[2]);criterion();"
+                  "assert versions()['torch'].split('+')[0]=='2.12.1' and versions()['torchvision'].split('+')[0]=='0.27.1';"
+                  "assert torch.version.cuda==json.loads(sys.argv[3]);"
+                  "print(json.dumps(dict(python=sys.executable,packages=versions(),cuda=torch.version.cuda,source=str(root))))")
+        if args.profile in ('preprocess','training') and args.model=='stunet':
             code += ";import torch;print(json.dumps({'deployment_torch':{'version':m.version('torch'),'cuda':torch.version.cuda}}))"
         with log_path.open('a',encoding='utf-8') as stream:
-            result=run_logged([python,"-X","utf8","-c",code],stream,'检查依赖版本与实际接口',timeout=120)
+            check=[python,"-X","utf8","-c",code]
+            if args.model=='medsam2':
+                check.extend((str(ROOT/'src'),str(medsam2_source),json.dumps(None if args.cpu else '12.6')))
+            result=run_logged(check,stream,'检查依赖版本与实际接口',timeout=120)
         record.update(passed=result.returncode==0,actual=result.stdout.strip(),
                       error=result.stdout.strip() if result.returncode else '')
-        if record['passed'] and args.profile in ('preprocess','training'):
+        if record['passed'] and args.profile in ('preprocess','training') and args.model=='stunet':
             builds=[]
             for line in result.stdout.splitlines():
                 try:value=json.loads(line)
@@ -243,7 +289,10 @@ def main():
     if args.install and record.get('passed'):
         # Existing private paths stay in place; only this stage's interpreter
         # changes. The CLI will automatically use it in subsequent commands.
-        saved[interpreter_key]=str(vpython)
+        if args.model=='medsam2':
+            saved.update(medsam2_python=str(vpython),medsam2_source=str(medsam2_source),
+                         medsam2_weights_path=str(medsam2_weights))
+        else:saved[interpreter_key]=str(vpython)
         if args.profile=='training' and args.download_weights:
             sys.path.insert(0,str(ROOT/'src'))
             from chd_stunet.training.weights import ensure_weights
