@@ -211,7 +211,9 @@ def probe_capacity(output, job, config, device, admission, root, rows, metadata,
         clips.append((seed, sample_clip(root/'cases'/cid, metadata[cid], rows[cid], window, config, seed,
                                         required_objects=config['max_objects'])))
     log.status('running', phase='capacity_probe', rank=rank)
-    network = build(config, training=True, device=device, weights=job['weights'])
+    shared_encoding = job['shared_image_position_encoding']
+    network = build(config, training=True, device=device, weights=job['weights'],
+                    shared_image_position_encoding=shared_encoding)
     optimizer = make_optimizer(network, config)
     if device.type=='cuda':
         torch.cuda.reset_peak_memory_stats(device)
@@ -227,6 +229,7 @@ def probe_capacity(output, job, config, device, admission, root, rows, metadata,
         peak = 0
     evidence = dict(rank=rank, world_size=world, device=str(device), admission=admission,
                     image_size=config['image_size'], frames=config['frames'], targets=objects,
+                    shared_image_position_encoding=shared_encoding,
                     local_targets=[len(clip['classes']) for _, clip in clips], loss=losses,
                     gradient_norm=gradient, peak_cuda_reserved_bytes=peak,
                     seconds=time.monotonic()-started, cases=[clip['case_id'] for _, clip in clips])
@@ -292,6 +295,7 @@ def run_worker(output, job, requested_device):
         init_collective(device, world, rank)
     log.event('training.device', f'MedSAM2 {device}，{config["image_size"]}×{config["image_size"]}，'
               f'{config["frames"]} 帧，{config["epochs"]} epoch', admission=admission, resources=resources,
+              shared_image_position_encoding=job['shared_image_position_encoding'],
               rank=rank, world_size=world, precision='bf16' if device.type=='cuda' else 'fp32')
     if config['scope'] != 'smoke':
         probe_capacity(output, job, config, device, admission, root, rows, metadata, window, train, world, rank, log)
@@ -305,7 +309,8 @@ def run_worker(output, job, requested_device):
                 dist.destroy_process_group()
             return
     resume = os.environ.get('CHD_MEDSAM2_RESTORE') == '1'
-    network = build(config, training=True, device=device, weights=None if resume else job['weights'])
+    network = build(config, training=True, device=device, weights=None if resume else job['weights'],
+                    shared_image_position_encoding=job['shared_image_position_encoding'])
     optimizer = make_optimizer(network, config)
     loss = criterion()
     if resume:

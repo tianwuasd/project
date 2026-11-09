@@ -6,6 +6,7 @@ import torch
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 import sam2
+from sam2.modeling.position_encoding import PositionEmbeddingSine
 from sam2.utils.misc import concat_points
 from training.model.sam2 import SAM2Train
 from training.utils.data_utils import BatchedVideoDatapoint, BatchedVideoMetaData
@@ -30,7 +31,7 @@ def versions():
     return {name: importlib.metadata.version(name) for name in names}
 
 
-def build(config, *, training, device, weights=None):
+def build(config, *, training, device, weights=None, shared_image_position_encoding=False):
     upstream = upstream_root(config)
     directory = upstream/'sam2/configs'
     if training:
@@ -39,6 +40,8 @@ def build(config, *, training, device, weights=None):
         model = recipe.trainer.model
         model._target_ = 'chd_medsam2.model.BoxTrain'
         model.num_correction_pt_per_frame = config['correction_points']
+        if shared_image_position_encoding:
+            model.image_encoder.neck.position_encoding._target_ = 'chd_medsam2.model.SharedImagePositionEncoding'
     else:
         model = OmegaConf.load(directory/'sam2.1_hiera_t512.yaml').model
         model._target_ = 'sam2.sam2_video_predictor_npz.SAM2VideoPredictorNPZ'
@@ -68,6 +71,14 @@ def make_batch(clip, device):
                                     frame_orig_size=torch.full((frames, objects, 2), images.shape[-1], device=device),
                                     batch_size=[frames]),
                                 dict_key='all', batch_size=[frames])
+
+
+class SharedImagePositionEncoding(PositionEmbeddingSine):
+    @torch.no_grad()
+    def forward(self, features):
+        # 同一尺度的帧使用同一位置网格，先转换精度，再广播到整个序列。
+        grid = super().forward(features[:1]).to(dtype=features.dtype)
+        return grid.expand(features.shape[0], -1, -1, -1)
 
 
 class BoxTrain(SAM2Train):
