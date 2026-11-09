@@ -24,6 +24,18 @@ def nonnegative(text):
 
 def main(argv=None):
     arguments=list(argv) if argv is not None else sys.argv[1:]
+    from chd_medsam2.cli import selected as medsam2_selected
+    if arguments and arguments[0]=='_medsam2-supervisor':
+        from chd_medsam2.runtime import supervise
+        supervise(arguments[1])
+        return 0
+    if arguments and arguments[0]=='_medsam2-worker':
+        from chd_medsam2.cli import worker
+        worker(arguments[1], arguments[2])
+        return 0
+    if medsam2_selected(arguments):
+        from chd_medsam2.cli import main as medsam2_main
+        return medsam2_main(arguments)
     if arguments and arguments[0]=='_predict-supervisor':
         internal=argparse.ArgumentParser()
         internal.add_argument('--output',required=True)
@@ -74,6 +86,7 @@ def main(argv=None):
     prepare.add_argument('--audit-only',action='store_true')
     prepare.add_argument('--resume',action='store_true')
     train=sub.add_parser('train',help='STU-Net-S V2 fixed-global-batch multi-CUDA fine-tuning')
+    train.add_argument('--model', choices=('stunet-s', 'medsam2'), default='stunet-s')
     train.add_argument('--prepared',help='verified preprocessing run; defaults to saved stage path')
     train.add_argument('--output')
     train.add_argument('--fold',type=int,choices=(0,1,2),default=0)
@@ -112,7 +125,9 @@ def main(argv=None):
         return 0
     if args.command=='prepare' and args.list_methods:
         from .preprocessing.registry import list_methods
-        print(json.dumps(list_methods(),ensure_ascii=False,indent=2));return 0
+        medsam2 = dict(name='medsam2', protocol='imagechd-medsam2-box-v1',
+                       description='独立轴位缓存，使用已审核 ImageCHD 分折和训练折 HU 窗')
+        print(json.dumps([*list_methods(), medsam2],ensure_ascii=False,indent=2));return 0
     if args.command=="status":
         print((resolve_path(args.output)/"status.json").read_text(encoding="utf-8"));return 0
     public,local=read_config()
