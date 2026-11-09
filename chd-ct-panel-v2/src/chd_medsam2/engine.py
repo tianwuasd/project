@@ -2,6 +2,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 from datetime import timedelta
+import errno
 import math
 import os
 from pathlib import Path
@@ -16,11 +17,12 @@ from chd_stunet.acceleration.preprocess_cpu import snapshot
 from chd_stunet.observability.runlog import RunLog, write_json
 
 from .checkpoints import load, mirror_checkpoints, save
-from .contracts import read_json
+from .contracts import file_sha, read_json
 from .data import open_prepared, sample_clip, sample_seed, sequence_ids
 from .inference import evaluate_case
 from .losses import criterion, masked_loss
 from .model import build, make_batch, versions
+from .preprocessing import case_metadata
 
 
 def make_optimizer(network, config):
@@ -108,16 +110,61 @@ def create_clips(sequence, count, ids, root, rows, metadata, window, config):
     return result
 
 
-def validate(network, config, device, root, val, metadata, window, output, epoch, log, frame_limit):
+def validate(network, config, device, root, val, metadata, window, output, state, log, frame_limit, checkpoint_sha):
+    epoch = state['epoch']
+    progress = dict(epoch=epoch, update=state['update'], phase='validation', cases_total=len(val))
     predictor = build(config, training=False, device=device)
     predictor.load_state_dict(network.state_dict(), strict=True)
-    scores = []
+    scores, failures = {}, {}
     destination = output/'validation'/f'epoch_{epoch:04d}'
-    for cid in val:
-        with torch.autocast('cuda', dtype=torch.bfloat16, enabled=device.type=='cuda'):
-            scores.append(evaluate_case(predictor, root, cid, metadata[cid], window, destination/cid, log,
-                                        frame_limit=frame_limit, retain_raw=False))
+    temporary = {errno.ENOENT, errno.ECONNRESET, errno.ETIMEDOUT, errno.ENETDOWN,
+                 errno.ENETUNREACH, errno.EHOSTUNREACH, errno.ESTALE}
+    for delay in (2, 5, 15, 30, 60, None):
+        for cid in val:
+            if cid in scores:
+                continue
+            log.status('running', **progress, case_id=cid, cases_completed=len(scores))
+            case_dir = destination/cid
+            marker = case_dir/'complete.json'
+            identity = dict(checkpoint_sha256=checkpoint_sha, cache_identity=metadata[cid]['identity'],
+                            case_id=cid, frame_limit=frame_limit,
+                            prompt_source='simulated_gt_single_box')
+            try:
+                if marker.is_file():
+                    record = read_json(marker)
+                    if (record['identity'] != identity or record['result_sha256'] != file_sha(case_dir/'result.json')
+                            or record['prompts_sha256'] != file_sha(case_dir/'prompts.json')):
+                        raise ValueError('已完成验证病例的模型、来源或产物变化：'+cid)
+                    score = read_json(case_dir/'result.json')
+                    log.event('validation.reuse', f'复用已核验的病例 {cid}', case_id=cid, epoch=epoch)
+                else:
+                    if cid in failures:
+                        actual = case_metadata(root/'cases'/cid,
+                                               dict(case_id=cid, source_hashes=metadata[cid]['source_hashes']))
+                        if actual['identity'] != metadata[cid]['identity']:
+                            raise ValueError('验证病例缓存身份变化：'+cid)
+                    with torch.autocast('cuda', dtype=torch.bfloat16, enabled=device.type=='cuda'):
+                        score = evaluate_case(predictor, root, cid, metadata[cid], window, case_dir, log,
+                                              frame_limit=frame_limit, retain_raw=False)
+                    write_json(marker, dict(identity=identity, result_sha256=file_sha(case_dir/'result.json'),
+                                            prompts_sha256=file_sha(case_dir/'prompts.json')))
+            except OSError as error:
+                if error.errno not in temporary:
+                    raise
+                failures[cid] = str(error)
+                continue
+            scores[cid] = score
+            failures.pop(cid, None)
+        if not failures:
+            break
+        if delay is None:
+            raise OSError(f'验证必需病例未全部完成：{failures}')
+        log.status('waiting_io', **progress, cases_completed=len(scores),
+                   pending=sorted(failures), next_retry_at=time.time()+delay)
+        log.event('validation.wait_io', '等待重新读取未完成的验证病例', pending=failures, retry_seconds=delay)
+        time.sleep(delay)
     del predictor
+    scores = [scores[cid] for cid in val]
     result = dict(epoch=epoch, prompt_source='simulated_gt_single_box', cases=len(scores),
                   scope='axial_smoke_subset' if frame_limit else 'whole_volume',
                   mean_dice=sum(row['mean_dice'] for row in scores)/len(scores),
@@ -287,8 +334,9 @@ def run_worker(output, job, requested_device):
                 state['phase'] = 'training'
                 ready = output/'control'/f"validation-{os.environ['CHD_MEDSAM2_GENERATION']}-{state['epoch']}.json"
                 if primary:
+                    checkpoint = read_json(Path(recovery or output)/'checkpoints/latest.json')
                     validation = validate(network, config, device, root, val, metadata, window, output,
-                                          state['epoch'], log, job.get('validation_frames'))
+                                          state, log, job.get('validation_frames'), checkpoint['sha256'])
                     state['history'].append(validation)
                     improved = state['best'] is None or validation['mean_dice'] > state['best']['mean_dice']
                     if improved:

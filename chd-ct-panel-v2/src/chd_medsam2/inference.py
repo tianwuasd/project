@@ -34,13 +34,17 @@ class AxialFrames:
 
 
 def simulated_prompts(labels):
-    boxes = []
-    for label in LABEL_NAMES:
-        sizes = [int(np.count_nonzero(frame == label)) for frame in labels]
-        z = int(np.argmax(sizes))
-        if sizes[z] == 0:
-            raise ValueError('主队列评分病例缺少结构：'+LABEL_NAMES[label])
-        boxes.append(dict(label=label, frame=z, xyxy=xyxy(labels[z] == label)))
+    maximum = np.zeros(8, dtype=np.int64)
+    slices = np.zeros(8, dtype=np.int64)
+    for z, frame in enumerate(labels):
+        sizes = np.bincount(frame.ravel(), minlength=8)[:8]
+        improved = sizes > maximum
+        maximum[improved], slices[improved] = sizes[improved], z
+    missing = [name for label, name in LABEL_NAMES.items() if maximum[label] == 0]
+    if missing:
+        raise ValueError('主队列评分病例缺少结构：'+', '.join(missing))
+    boxes = [dict(label=label, frame=int(slices[label]), xyxy=xyxy(labels[slices[label]] == label))
+             for label in LABEL_NAMES]
     return dict(prompt_source='simulated_gt_single_box', boxes=boxes)
 
 
@@ -110,13 +114,19 @@ def segment(predictor, axial, window, prompts, output, *, source, callback=None)
 def dice_on_native(pred, truth):
     if pred.shape != truth.shape:
         raise ValueError('MedSAM2 预测与真值尺寸不一致')
-    valid = truth != 8
+    # 按切片累计体素计数，内存开销不随整卷层数增长。
+    pred_counts, truth_counts, matched_counts = np.zeros((3, 8), dtype=np.int64)
+    for pred_frame, truth_frame in zip(pred, truth, strict=True):
+        valid = truth_frame != 8
+        p, t = pred_frame[valid], truth_frame[valid]
+        pred_counts += np.bincount(p, minlength=8)[:8]
+        truth_counts += np.bincount(t, minlength=8)[:8]
+        matched_counts += np.bincount(t[p == t], minlength=8)[:8]
     result = {}
     for label, name in LABEL_NAMES.items():
-        p, t = (pred == label) & valid, (truth == label) & valid
-        p_count, t_count = int(p.sum()), int(t.sum())
+        p_count, t_count = int(pred_counts[label]), int(truth_counts[label])
         total = p_count+t_count
-        result[name] = dict(dice=2*int((p & t).sum())/total if total else 1.,
+        result[name] = dict(dice=2*int(matched_counts[label])/total if total else 1.,
                             both_empty=not total, missing_prediction=not p_count and bool(t_count))
     return result
 
@@ -146,7 +156,8 @@ def evaluate_case(predictor, prepared, cid, meta, window, output, log, *, frame_
             raise ValueError('MedSAM2 验证分割未恢复到原始网格')
         if retain_raw:
             save_nifti(Path(output)/'segmentation.nii.gz', native, np.asarray(meta['geometry']['affine']))
-        return dice_on_native(native, to_native(truth, meta['geometry']))
+        # 轴序转换只改变排列，按连续轴位切片评分可减少缓存页的反复读取。
+        return dice_on_native(result, truth)
 
     if retain_raw:
         metrics = evaluate(output)

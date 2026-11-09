@@ -57,6 +57,31 @@ def _spawn(output, args, filename, *, visible=None, rank_environment=None):
                                 env=env, **process_options())
 
 
+def write_provenance(output, contract, weights, requested):
+    from omegaconf import OmegaConf
+
+    config = contract['config']
+    identity = contract['identity']
+    write_json(output/'resolved-config.json', contract)
+    temporary = output/'resolved-config.yaml.partial'
+    temporary.write_text(OmegaConf.to_yaml(OmegaConf.create(contract)), encoding='utf-8')
+    os.replace(temporary, output/'resolved-config.yaml')
+    write_json(output/'environment.json', dict(contract_identity=identity, versions=contract['versions'],
+                                               requested_device=requested or 'cuda'))
+    write_json(output/'data-manifest.json',
+               dict(contract_identity=identity, prepared=contract['prepared'], fold=contract['fold'],
+                    data_identity=contract['data_identity'], case_identities=contract['case_identities'],
+                    train_cases=contract['train_ids'], validation_cases=contract['val_ids'], window=contract['window']))
+    write_json(output/'prompt-protocol.json',
+               dict(contract_identity=identity, training_source='training_label_first_frame',
+                    max_training_targets=config['max_objects'], correction_points=config['correction_points'],
+                    evaluation_source='simulated_gt_single_box', evaluation_boxes_per_structure=1,
+                    evaluation_slice='maximum_label_area', includes_prompt_slices=True))
+    write_json(output/'weights.json',
+               dict(contract_identity=identity, path=str(weights), sha256=config['weights_sha256'],
+                    source_revision=config['source_revision'], weights_revision=config['weights_revision']))
+
+
 def launch(output, contract, *, weights, train_cases, val_cases, validation_frames, requested,
            gpus, max_gpus, cpu_ranks, wait_seconds, shared_desktop, background, resume, stop_after_steps,
            recovery_root):
@@ -100,7 +125,7 @@ def launch(output, contract, *, weights, train_cases, val_cases, validation_fram
                               cpu_ranks=cpu_ranks or 1, wait_seconds=wait_seconds or 0,
                               shared_desktop=shared_desktop, stop_after_steps=stop_after_steps,
                               recovery=str(recovery)))
-            write_json(output/'resolved-config.json', contract)
+            write_provenance(output, contract, weights, requested)
         (output/'control').mkdir(exist_ok=True)
         for name in ('stop.json', 'pause.json'):
             (output/'control'/name).unlink(missing_ok=True)
@@ -232,6 +257,9 @@ def supervise(output):
             rendezvous = (output/'control'/('collective-'+generation)).as_uri()
             world = len(visible) or job.get('cpu_ranks', 1)
             restore = str(int((recovery/'checkpoints/latest.json').is_file()))
+            # 上一组已全部退出，清理本任务恢复目录里尚未提交的临时文件。
+            for partial in (recovery/'checkpoints').glob('state-*.pt.partial'):
+                partial.unlink()
             workers = []
             for rank in range(world):
                 rank_env = dict(WORLD_SIZE=str(world), RANK=str(rank), LOCAL_RANK=str(rank),

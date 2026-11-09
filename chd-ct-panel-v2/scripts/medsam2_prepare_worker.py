@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'src'))
 
 from chd_stunet.observability.runlog import write_json
 from chd_medsam2.contracts import read_json
-from chd_medsam2.preprocessing import prepare_case
+from chd_medsam2.preprocessing import SourceUnavailable, prepare_case
 
 
 def main(task_path):
@@ -27,18 +27,22 @@ def main(task_path):
         write_json(result.with_suffix('.progress.json'),
                    dict(worker_pid=pid, worker_born=born, stage=name, time=time.time(), event='phase', **detail))
 
+    delays = (None,) if task.get('probe_only') else (2, 5, 15, 30, 60, None)
     with threadpool_limits(limits=task['cpu_threads']):
-        for attempt, delay in enumerate((2, 5, 15, 30, 60, None), 1):
+        for attempt, delay in enumerate(delays, 1):
             try:
                 marker, reused = prepare_case(Path(task['folder']), task['row'], Path(task['gate']), phase)
             except (OSError, ValueError) as error:
-                if isinstance(error, OSError) and error.errno in retryable and delay is not None:
+                source_unavailable = isinstance(error, SourceUnavailable) or (
+                    isinstance(error, OSError) and error.errno in retryable)
+                if source_unavailable and delay is not None:
                     phase('waiting_io', attempt=attempt, next_retry_at=time.time()+delay, error=str(error))
                     print(f'病例 {task["row"]["case_id"]} 的存储暂时不可用，{delay} 秒后重试', flush=True)
                     time.sleep(delay)
                     continue
                 traceback.print_exc()
-                write_json(result, dict(success=False, worker_pid=pid, error=str(error)))
+                write_json(result, dict(success=False, worker_pid=pid, error=str(error),
+                                        source_unavailable=source_unavailable))
                 return 1
             write_json(result, dict(success=True, worker_pid=pid, reused=reused, identity=marker['identity']))
             return 0

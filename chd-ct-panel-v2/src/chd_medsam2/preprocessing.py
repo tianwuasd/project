@@ -15,7 +15,11 @@ from chd_stunet.preprocessing.cohort import TARGETS, frozen_roles, map_labels
 from chd_stunet.preprocessing.stunet_s import corrected_affine
 
 from . import PROTOCOL
-from .contracts import check_signature, file_sha, read_json, signed
+from .contracts import check_signature, digest, file_sha, read_json, signed
+
+
+class SourceUnavailable(OSError):
+    pass
 
 
 def read_source(source, folds):
@@ -23,7 +27,8 @@ def read_source(source, folds):
     manifest = read_json(source/'manifests/imagechd_input.json')
     producer = read_json(source/'signature.json')
     check_signature(producer)
-    if producer['identity'] != manifest['identity'] or read_json(source/'dataset.json')['labels'] != TARGETS:
+    if (producer['identity'] != manifest['identity'] or producer['method']['protocol'] != manifest['protocol']
+            or read_json(source/'dataset.json')['labels'] != TARGETS):
         raise ValueError('来源预处理签名或标签映射不一致')
     rows = manifest['cases']
     all_rows = rows + manifest['excluded']
@@ -51,10 +56,13 @@ def read_source(source, folds):
         folder = source/f'fold_{fold}'
         fingerprint = read_json(folder/'dataset_fingerprint.json')
         plan = read_json(folder/'preprocessing_plan.json')
+        original = read_json(folder/'training_contract.json')
         fit = sorted(row['case_id'] for row in rows if row['cohort_group'] == 'main'
                      and row['roles'][str(fold)] == 'train')
         field = 'foreground_intensity_properties_per_channel'
-        if (sorted(plan['fit_ids']) != fit or sorted(fingerprint['fit_ids']) != fit
+        if (original['fold'] != fold or sorted(original['fit_ids']) != fit
+                or original['preprocessing_contract'] != digest(dict(run=producer['identity'], plan=plan))
+                or sorted(plan['fit_ids']) != fit or sorted(fingerprint['fit_ids']) != fit
                 or fingerprint['fitting_roles'] != ['train'] or fingerprint[field] != plan[field]):
             raise ValueError(f'第 {fold} 折灰度参数来源不匹配主训练病例')
         stats = plan[field]['0']
@@ -141,7 +149,10 @@ def prepare_case(folder, row, gate, phase):
     folder.mkdir(parents=True, exist_ok=True)
     phase('read_native_ct_and_label')
     with read_slot(gate):
-        data, truth, geometry = load_native_pair(row)
+        try:
+            data, truth, geometry = load_native_pair(row)
+        except FileNotFoundError as error:
+            raise SourceUnavailable(error.errno, '审核过的原始文件暂不可访问', error.filename) from error
     phase('reorient_and_audit')
     image, truth = to_axial(data, geometry), to_axial(truth, geometry)
     if image.shape[0] < 8 or not np.isfinite(image).all():
@@ -211,16 +222,52 @@ def run_prepare(source, output, *, folds=(0, 1, 2), cases=(), resume=False, work
                              entry=str(ROOT/'scripts/medsam2_prepare_worker.py'),
                              estimate=voxels*20+256*1024**2))
 
+        deferred, replay, exits, outages = set(), set(), {}, {}
+
         def record(cid, outcome):
             if outcome['success']:
                 completed[cid] = outcome['identity']
                 if outcome['reused']:
                     reused.append(cid)
+            elif outcome.get('source_unavailable'):
+                deferred.add(cid)
+                outages[cid] = outages.get(cid, 0)+1
+                log.event('case.wait_io', f'{cid} 暂时无法访问已审核来源', case_id=cid,
+                          attempt=outages[cid], error=outcome['error'])
+            elif 'worker_pid' not in outcome and exits.get(cid, 0) == 0:
+                exits[cid] = 1
+                replay.add(cid)
+                log.event('case.replay', f'{cid} 进程未提交结果，重新检查并处理该病例', case_id=cid)
             else:
                 failed[cid] = outcome['error']
 
-        scheduling = execute_jobs(jobs, output, log, stage_name='medsam2_prepare', workers=workers or 4,
-                                  readers=readers, completed=record)
+        scheduling = dict(completed=0, peak_jobs=0, recoveries=0, worker_replays=0)
+        pending = jobs
+        round_index = 0
+        while pending:
+            stage = 'medsam2_prepare' if round_index == 0 else f'medsam2_prepare_retry_{round_index}'
+            observed = execute_jobs(pending, output, log, stage_name=stage, workers=workers or 4,
+                                    readers=readers, completed=record)
+            round_index += 1
+            scheduling['peak_jobs'] = max(scheduling['peak_jobs'], observed['peak_jobs'])
+            scheduling['recoveries'] += observed['recoveries']
+            if not replay and deferred:
+                # 当前没有其他任务可计算，等待时不占用病例工作进程。
+                next_retry = time.time()+60
+                for _ in range(6):
+                    log.status('waiting_io', pending=sorted(deferred), completed=len(completed),
+                               next_retry_at=next_retry)
+                    time.sleep(10)
+                replay.update(deferred)
+                deferred.clear()
+            pending = [job for job in jobs if job['name'] in replay]
+            for job in pending:
+                Path(job['result']).unlink(missing_ok=True)
+                task = read_json(job['task'])
+                task['probe_only'] = job['name'] in outages
+                write_json(job['task'], task)
+            replay.clear()
+        scheduling.update(completed=len(completed)+len(failed), worker_replays=sum(exits.values()))
         state = 'needs_attention' if failed else 'completed'
         result = dict(status=state, protocol=PROTOCOL, requested=len(selected),
                       completed=completed, failed=failed, reused=sorted(reused),

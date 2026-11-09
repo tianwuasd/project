@@ -26,6 +26,8 @@ python3 run.py prepare --method medsam2 --fold all --resume --output "$prepared"
 
 服务器默认读取历史 STU-Net-S partial 运行中的审计清单、角色和主训练病例 HU 分位数。自定义来源使用 `--source-prepared "$stu_prepared"`。按病例保存原始轴位方向的单通道 CT 和标签数组，三个折共享，灰度窗按训练折分别应用。保留 96 例主队列、13 例辅助训练和既定排除规则。部分标注病例仅使用已知前景，未标记背景及 ignore 不计入损失。病例进程使用现有 CPU/RAM 准入和独立读并发限额。
 
+来源短时不可访问时，病例按间隔重新检查，其他病例可继续处理。多次仍不可访问时，任务进入 `waiting_io` 并定期复查。病例进程意外退出后重新核验完成标记并处理未完成项。标签内容或文件摘要不符合合同的病例进入待处理清单，必需病例缺失时训练入口会拒绝该缓存。
+
 ## 短测与训练
 
 ```bash
@@ -48,7 +50,9 @@ python3 run.py train --model medsam2 --stop --output "$train_run"
 python3 run.py train --model medsam2 --resume --output "$train_run" --background
 ```
 
-启动参数和输入身份保存在 `resolved-config.json`。更新、损失分量、耗时和资源事件在 `logs/events.jsonl`。检查点先提交到 runtime 的 `recovery/medsam2`，再同步到结果目录。使用 `--recovery-root` 可指定独立存储。续跑使用同一任务冻结的代码、数据、进度及优化器状态。
+启动参数保存在 `resolved-config.json` 和 `resolved-config.yaml`。环境、数据、提示规则及权重身份分别见 `environment.json`、`data-manifest.json`、`prompt-protocol.json` 和 `weights.json`。更新、损失分量、耗时和资源事件在 `logs/events.jsonl`。检查点先提交到 runtime 的 `recovery/medsam2`，再同步到结果目录。使用 `--recovery-root` 可指定独立存储。续跑使用同一任务冻结的代码、数据、进度及优化器状态。
+
+每个验证病例独立提交评分与提示摘要，并绑定验证时的检查点。中断后只复用已核验的病例结果。全部必需验证病例完成后才比较最佳检查点。
 
 ## 带提示的整卷预测
 
