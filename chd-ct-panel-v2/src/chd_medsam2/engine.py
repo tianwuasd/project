@@ -24,6 +24,7 @@ from .journal import TrainingLog
 from .losses import criterion, masked_loss
 from .model import build, make_batch, versions
 from .preprocessing import assert_case_files, case_metadata, eligible_starts
+from .transfer import CudaClipTransfer, pin_clip
 
 
 def make_optimizer(network, config):
@@ -62,7 +63,8 @@ def sync_gradients(optimizer, device):
             parameter.grad = gradient.view_as(parameter)
 
 
-def update_step(network, optimizer, loss, clips, config, device, update, total_updates, world=1):
+def update_step(network, optimizer, loss, clips, config, device, update, total_updates, world=1,
+                *, transfer=None, next_clip=None):
     all_objects = sum(len(clip['classes']) for _, clip in clips)
     frames = torch.zeros(config['frames'], dtype=torch.int32)
     for _, clip in clips:
@@ -79,15 +81,21 @@ def update_step(network, optimizer, loss, clips, config, device, update, total_u
     for group in optimizer.param_groups:
         group['lr'] = group['initial_lr']*factor
     values = Counter()
-    for seed, clip in clips:
+    for index, (seed, clip) in enumerate(clips):
         # 全局序列种子绑定输入与纠正点；预取和执行顺序不推进消费游标。
         torch.manual_seed(seed)
         network.rng = np.random.default_rng(seed)
-        batch = make_batch(clip, device)
-        valid = clip['valid'].to(device)
+        inputs = transfer.take(clip) if transfer is not None and index == 0 else clip
+        batch = make_batch(inputs, device)
+        valid = inputs['valid'].to(device)
+        boxes = inputs['boxes'].to(device)
+        if next_clip is not None and index+1 == len(clips):
+            ready = next_clip()
+            if ready is not None:
+                transfer.stage(ready)
         autocast = torch.autocast('cuda', dtype=torch.bfloat16) if device.type == 'cuda' else nullcontext()
         with autocast:
-            outputs = network(batch, valid, clip['boxes'].to(device))
+            outputs = network(batch, valid, boxes)
             losses = masked_loss(loss, outputs, batch.masks, valid, frame_objects)
         if not bool(torch.isfinite(losses['core_loss'])):
             raise FloatingPointError('MedSAM2 训练损失非有限')
@@ -101,7 +109,7 @@ def update_step(network, optimizer, loss, clips, config, device, update, total_u
     return dict(values), float(norm), all_objects
 
 
-def create_clips(sequence, count, ids, root, rows, metadata, window, config, reader):
+def create_clips(sequence, count, ids, root, rows, metadata, window, config, reader, pin_device=None):
     result = []
     with reader as progress:
         for index in range(sequence, sequence+count):
@@ -110,7 +118,16 @@ def create_clips(sequence, count, ids, root, rows, metadata, window, config, rea
             seed = sample_seed(config['seed'], index)
             result.append((seed, sample_clip(root/'cases'/cid, metadata[cid], rows[cid],
                                              window, config, seed, progress=progress)))
+    if pin_device is not None:
+        seed, first = result[0]
+        result[0] = seed, pin_clip(first, pin_device)
     return result
+
+
+def ready_first_clip(future):
+    if future.done() and not future.cancelled() and future.exception() is None:
+        return future.result()[0][1]
+    return None
 
 
 def clip_prefetch_limit(path, maximum, world, batch_bytes):
@@ -219,13 +236,18 @@ def probe_capacity(output, job, config, device, admission, root, rows, metadata,
                                             required_objects=config['max_objects'], progress=progress)))
     log.status('running', phase='capacity_probe', rank=rank)
     shared_encoding = job['shared_image_position_encoding']
+    async_copy = job.get('cuda_transfer_prefetch', False)
+    transfer = CudaClipTransfer(device) if async_copy else None
+    # 容量检查包含下一段已就绪时的额外 CUDA 张量。
+    reserve_clip = pin_clip(clips[0][1], device) if async_copy else None
     network = build(config, training=True, device=device, weights=job['weights'],
                     shared_image_position_encoding=shared_encoding)
     optimizer = make_optimizer(network, config)
     if device.type=='cuda':
         torch.cuda.reset_peak_memory_stats(device)
     started = time.monotonic()
-    losses, gradient, objects = update_step(network, optimizer, criterion(), clips, config, device, 0, 1, world)
+    losses, gradient, objects = update_step(network, optimizer, criterion(), clips, config, device, 0, 1, world,
+                                           transfer=transfer, next_clip=(lambda: reserve_clip) if async_copy else None)
     if device.type=='cuda':
         torch.cuda.synchronize(device)
         peak = torch.cuda.max_memory_reserved(device)
@@ -237,6 +259,7 @@ def probe_capacity(output, job, config, device, admission, root, rows, metadata,
     evidence = dict(rank=rank, world_size=world, device=str(device), admission=admission,
                     image_size=config['image_size'], frames=config['frames'], targets=objects,
                     shared_image_position_encoding=shared_encoding,
+                    cuda_transfer_prefetch=async_copy,
                     local_targets=[len(clip['classes']) for _, clip in clips], loss=losses,
                     gradient_norm=gradient, peak_cuda_reserved_bytes=peak,
                     seconds=time.monotonic()-started, cases=[clip['case_id'] for _, clip in clips])
@@ -248,6 +271,8 @@ def probe_capacity(output, job, config, device, admission, root, rows, metadata,
         results = [evidence]
     if rank == 0:
         write_json(output/'capacity.json', {'status': 'passed', 'ranks': results})
+    if transfer is not None:
+        transfer.clear()
     del network, optimizer, clips
     if device.type=='cuda':
         torch.cuda.empty_cache()
@@ -344,6 +369,7 @@ def run_worker(output, job, requested_device):
     if device.type == 'cuda':
         torch.cuda.reset_peak_memory_stats(device)
     maximum_prefetch = job['prefetch_depth']
+    transfer = CudaClipTransfer(device) if job.get('cuda_transfer_prefetch', False) else None
     supply_path = Path(recovery)/'supply.json'
     batch_count = config['global_batch']
     local_count = batch_count//world
@@ -353,10 +379,13 @@ def run_worker(output, job, requested_device):
     batch_bytes = local_count*(config['frames']*config['image_size']**2*(32+config['max_objects'])+16*1024**2)
     pending = deque()
     log.event('training.supply', f'每进程预取上限 {maximum_prefetch} 个批次',
-              requested_depth=maximum_prefetch, estimated_batch_bytes=batch_bytes)
+              requested_depth=maximum_prefetch, estimated_batch_bytes=batch_bytes,
+              cuda_transfer_prefetch=transfer is not None)
     with ExitStack() as stack:
         pool = ThreadPoolExecutor(max_workers=1)
         stack.callback(pool.shutdown, wait=True, cancel_futures=True)
+        if transfer is not None:
+            stack.callback(transfer.clear)
         while state['update'] < total_updates or state['phase'] == 'validation':
             action = None
             if primary:
@@ -369,6 +398,8 @@ def run_worker(output, job, requested_device):
                 dist.broadcast_object_list(flags, device=device)
                 action = flags[0]
             if action:
+                if transfer is not None:
+                    transfer.clear()
                 if primary:
                     save(output, contract, network, optimizer, state, recovery=recovery)
                     write_json(output/'worker-result.json', {'state': action})
@@ -418,7 +449,8 @@ def run_worker(output, job, requested_device):
             queue_sequence = pending[-1][0]+batch_count if pending else next_sequence
             while len(pending) < limit and queue_sequence < total_samples:
                 pending.append((queue_sequence, pool.submit(
-                    create_clips, queue_sequence+rank_offset, local_count, *clip_args, prefetch_reader)))
+                    create_clips, queue_sequence+rank_offset, local_count, *clip_args, prefetch_reader,
+                    device if transfer is not None else None)))
                 queue_sequence += batch_count
             # 预取结果可能在后台等待，消费前重新确认源缓存文件。
             with train_reader as read_progress:
@@ -426,11 +458,20 @@ def run_worker(output, job, requested_device):
                     cid = clip['case_id']
                     assert_case_files(root/'cases'/cid, metadata[cid], read_progress)
             log.status('running', update=state['update'], epoch=state['epoch'], phase='forward_backward')
+            next_epoch = min(config['epochs'], next_sequence//len(train))
+            epoch_boundary = next_epoch != state['epoch']
+            will_validate = epoch_boundary and (next_epoch % config['validation_interval'] == 0
+                                                or next_epoch == config['epochs'])
+            staged_for_update = transfer is not None and transfer.pending is not None
+            next_ready = None
+            if transfer is not None and pending and not will_validate:
+                next_future = pending[0][1]
+                next_ready = lambda: ready_first_clip(next_future)
             losses, gradient, objects = update_step(network, optimizer, loss, clips, config, device,
-                                                    state['update'], total_updates, world)
-            previous_epoch = state['epoch']
+                                                    state['update'], total_updates, world,
+                                                    transfer=transfer, next_clip=next_ready)
             state['sequence'] = next_sequence
-            state['epoch'] = min(config['epochs'], state['sequence']//len(train))
+            state['epoch'] = next_epoch
             state['update'] += 1
             clip_rows = [dict(seed=seed, boxes=clip['boxes'].tolist(), sequence_index=index,
                               padded=index >= total_samples,
@@ -448,8 +489,7 @@ def run_worker(output, job, requested_device):
             for clip in clip_rows:
                 for label in clip['classes']:
                     state['classes'][str(label)] += 1
-            epoch_boundary = state['epoch'] != previous_epoch
-            if epoch_boundary and (state['epoch'] % config['validation_interval'] == 0 or state['epoch']==config['epochs']):
+            if will_validate:
                 state['phase'] = 'validation'
             peak = torch.cuda.max_memory_reserved(device) if device.type=='cuda' else 0
             log.event('training.update', f"epoch {state['epoch']}/{config['epochs']}，更新 {state['update']}/{total_updates}",
@@ -458,6 +498,8 @@ def run_worker(output, job, requested_device):
                       data_wait_seconds=data_seconds, update_seconds=time.monotonic()-began,
                       first_sequence=sequence, next_sequence=next_sequence, prefetched=prefetched,
                       ready_at_request=ready_at_request, prefetch_limit=limit, queued_batches=len(pending),
+                      cuda_staged_for_update=staged_for_update,
+                      cuda_staged_for_next=transfer is not None and transfer.pending is not None,
                       peak_cuda_reserved_bytes=peak,
                       clips=clip_rows)
             step_stop = job.get('stop_after_steps') is not None and state['update'] >= job['stop_after_steps']

@@ -58,6 +58,8 @@ python3 run.py train --model medsam2 --resume --output "$train_run" --background
 
 `--prefetch-depth` 可选择每个进程最多提前准备的批次数，默认 1。设为 0 可测同步读取，设为 2 可比较更深的队列。监督器按当前 CPU 预算和可用内存限制新增预取。更新日志记录等待时间、队列深度、样本序号和末批补齐标记。预取不提交训练进度。续跑时可调整预取深度，样本、切片和提示框仍从检查点中的序号恢复。
 
+`--cuda-transfer-prefetch` 供 CUDA 短测和容量检查使用，默认关闭，启用时要求非零 CPU 预取深度。后台线程将下一批的首个片段放到锁页内存。该批已就绪时，训练进程通过独立 CUDA 流提前传输，最多提前传输一个片段。样本消费时等待传输完成，验证阶段前释放预传输张量。日志记录实际预传输和消费情况，`--capacity-only` 会检查额外片段的显存需求。支持此选项的冻结短测可在续跑时用 `--no-cuda-transfer-prefetch` 恢复同步传输。正式训练使用同步传输。[PyTorch CUDA 流与锁页内存](https://docs.pytorch.org/docs/stable/notes/cuda.html)
+
 `--shared-image-position-encoding` 让同尺寸的帧共用图像编码器的位置网格。此选项默认关闭。启用前可用 `--capacity-only` 在同一设备和任务配置下验证。支持该选项的冻结任务可以在续跑时显式启用或用 `--no-shared-image-position-encoding` 关闭，实际执行方式记录在任务配置和容量报告中。
 
 新任务先把状态与事件写到本地恢复目录，`launch.json` 的 `log` 字段给出该目录的监督进程日志路径。各训练进程的原始输出分别保存在 `control/rank-*.log`。结果目录暂时无法写入日志时，训练进度仍可从本地 `logs/run.log` 和 `status.json` 读取。同目录的 `log-sync.json` 记录同步故障，恢复后按原始字节补齐日志。

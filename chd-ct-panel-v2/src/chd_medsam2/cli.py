@@ -59,6 +59,8 @@ def parser_for(command):
         parser.add_argument('--cpu-ranks', type=int, choices=(1, 2), help='本机短测验证双进程同步')
         parser.add_argument('--prefetch-depth', type=int, choices=(0, 1, 2),
                             help='每进程最多提前准备的批次数，默认 1，0 表示同步读取')
+        parser.add_argument('--cuda-transfer-prefetch', action=argparse.BooleanOptionalAction,
+                            help='对已就绪的下一批首段启用 CUDA 异步传输，默认关闭')
         parser.add_argument('--shared-image-position-encoding', action=argparse.BooleanOptionalAction,
                             help='同尺寸帧共用图像编码器位置网格')
         parser.add_argument('--input-read-timeout-seconds', type=positive,
@@ -161,6 +163,10 @@ def train(args, local, paths, stamp):
         raise ValueError('Windows 本机支持单 GPU；双 GPU 使用 Linux NCCL')
     if args.cpu_ranks and not ((args.smoke or args.resume) and (args.device=='cpu' or args.resume)):
         raise ValueError('--cpu-ranks 仅供 CPU 短测使用')
+    if args.cuda_transfer_prefetch and (args.device == 'cpu' or args.prefetch_depth == 0):
+        raise ValueError('MedSAM2 CUDA 异步传输要求使用 CUDA 并启用 CPU 预取')
+    if args.cuda_transfer_prefetch and not (args.smoke or args.capacity_only or args.resume):
+        raise ValueError('MedSAM2 CUDA 异步传输仅用于短测和容量检查，正式训练使用同步传输')
     desktop = desktop_identity(args.share_desktop_pid, args.smoke or args.capacity_only) if args.share_desktop_pid else None
     if args.resume:
         if not args.output or any((args.weights, args.prepared, args.epochs, train_cases, val_cases,
@@ -197,12 +203,14 @@ def train(args, local, paths, stamp):
                         window=window, versions=versions(), prompt_source='simulated_gt_single_box')
         if args.check_only:
             return dict(status='checked', contract=contract,
-                        shared_image_position_encoding=bool(args.shared_image_position_encoding)), output
+                        shared_image_position_encoding=bool(args.shared_image_position_encoding),
+                        cuda_transfer_prefetch=bool(args.cuda_transfer_prefetch)), output
     recovery = resolve_path(args.recovery_root or local.get('medsam2_recovery_root') or
                             resolve_path(paths.get('runtime_root', 'outputs/runtime'))/'recovery/medsam2')
     result = launch(output, contract, weights=weights, train_cases=train_cases, val_cases=val_cases,
                     validation_frames=args.validation_frames, requested=args.device, gpus=args.gpus,
                     max_gpus=args.max_gpus, cpu_ranks=args.cpu_ranks, prefetch_depth=args.prefetch_depth,
+                    cuda_transfer_prefetch=args.cuda_transfer_prefetch,
                     shared_image_position_encoding=args.shared_image_position_encoding,
                     input_read_timeout=args.input_read_timeout_seconds,
                     wait_seconds=args.gpu_wait_seconds, shared_desktop=desktop, background=args.background,

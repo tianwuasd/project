@@ -92,7 +92,8 @@ def write_provenance(output, contract, weights, requested):
 
 
 def launch(output, contract, *, weights, train_cases, val_cases, validation_frames, requested,
-           gpus, max_gpus, cpu_ranks, prefetch_depth, shared_image_position_encoding, wait_seconds, shared_desktop,
+           gpus, max_gpus, cpu_ranks, prefetch_depth, cuda_transfer_prefetch,
+           shared_image_position_encoding, wait_seconds, shared_desktop,
            background, resume, stop_after_steps, recovery_root, input_read_timeout):
     output = Path(output)
     with run_lock(output.with_name(output.name+'.launch.lock')):
@@ -113,17 +114,25 @@ def launch(output, contract, *, weights, train_cases, val_cases, validation_fram
                 raise ValueError('MedSAM2 续跑须保留计算精度对应的设备类型')
             if prefetch_depth is not None and 'prefetch_depth' not in previous:
                 raise ValueError('此任务冻结的训练代码不支持调整预取批次数')
+            if cuda_transfer_prefetch is not None and 'cuda_transfer_prefetch' not in previous:
+                raise ValueError('此任务冻结的训练代码不支持调整 CUDA 异步传输')
             if shared_image_position_encoding is not None and 'shared_image_position_encoding' not in previous:
                 raise ValueError('此任务冻结的训练代码不支持调整共享图像位置编码')
             if input_read_timeout is not None and 'input_read_timeout' not in previous:
                 raise ValueError('此任务冻结的训练代码不支持调整输入读取超时')
             for key, value in (('gpus', gpus), ('max_gpus', max_gpus), ('cpu_ranks', cpu_ranks),
                                ('prefetch_depth', prefetch_depth),
+                               ('cuda_transfer_prefetch', cuda_transfer_prefetch),
                                ('shared_image_position_encoding', shared_image_position_encoding),
                                ('input_read_timeout', input_read_timeout),
                                ('shared_desktop', shared_desktop), ('wait_seconds', wait_seconds)):
                 if value is not None:
                     previous[key] = value
+            if previous.get('cuda_transfer_prefetch') and (previous['requested'] != 'cuda'
+                                                           or not previous['prefetch_depth']):
+                raise ValueError('MedSAM2 CUDA 异步传输要求使用 CUDA 并启用 CPU 预取')
+            if previous.get('cuda_transfer_prefetch') and previous['contract']['config']['scope'] == 'formal':
+                raise ValueError('MedSAM2 正式训练使用同步传输')
             job = signed(dict(previous, stop_after_steps=stop_after_steps))
         else:
             if output.exists() and any(output.iterdir()):
@@ -145,6 +154,7 @@ def launch(output, contract, *, weights, train_cases, val_cases, validation_fram
                               gpus=gpus or 'auto', max_gpus=max_gpus or 1,
                               cpu_ranks=cpu_ranks or 1, wait_seconds=wait_seconds or 0,
                               prefetch_depth=1 if prefetch_depth is None else prefetch_depth,
+                              cuda_transfer_prefetch=bool(cuda_transfer_prefetch),
                               shared_image_position_encoding=bool(shared_image_position_encoding),
                               input_read_timeout=input_read_timeout or DEFAULT_TIMEOUT,
                               shared_desktop=shared_desktop, stop_after_steps=stop_after_steps,
