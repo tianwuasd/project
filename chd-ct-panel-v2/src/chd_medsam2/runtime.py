@@ -189,6 +189,7 @@ def _inventory(cards, shared):
 
 def supervise(output):
     from chd_stunet.training.fleet import eligible
+    from .checkpoints import reconcile_recovery
 
     output = Path(output).resolve(strict=True)
     with run_lock(output/'.medsam2.lock'), ExitStack() as stack:
@@ -310,6 +311,16 @@ def supervise(output):
                     time.sleep(2)
                     continue
                 visible, device = [card['uuid'] for card in selected], 'cuda'
+            recovered = None
+            if recovery != output:
+                try:
+                    recovered = reconcile_recovery(recovery, output, job['contract'])
+                except ValueError as error:
+                    log.status('needs_attention', reason='checkpoint_integrity', error=str(error))
+                    log.event('training.checkpoint_integrity', '检查点完整性校验失败，暂停续跑', error=str(error))
+                    raise
+                if recovered and (recovered['source'] == 'mirror' or recovered['repaired']):
+                    log.event('training.checkpoint_reconciled', '已核验并恢复本地检查点副本', **recovered)
             (output/'worker-result.json').unlink(missing_ok=True)
             (output/'control/pause.json').unlink(missing_ok=True)
             for pattern in ('capacity-failure-*.json', 'fatal-*.json'):
@@ -323,7 +334,8 @@ def supervise(output):
                 write_json(supply_path, dict(cpu_budget=facts['cpu_budget'],
                                              available_memory_bytes=facts['available_memory_bytes'],
                                              reserve_bytes=reserve))
-            restore = str(int((recovery/'checkpoints/latest.json').is_file()))
+            restore = str(int(recovered is not None or (recovery == output and
+                                                       (recovery/'checkpoints/latest.json').is_file())))
             # 上一组已全部退出，清理本任务恢复目录里尚未提交的临时文件。
             for partial in (recovery/'checkpoints').glob('state-*.pt.partial'):
                 partial.unlink()
