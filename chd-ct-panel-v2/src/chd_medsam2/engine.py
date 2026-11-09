@@ -23,7 +23,7 @@ from .io_recovery import InputUnavailable, input_path
 from .journal import TrainingLog
 from .losses import criterion, masked_loss
 from .model import build, make_batch, versions
-from .preprocessing import assert_case_files, case_metadata
+from .preprocessing import assert_case_files, case_metadata, eligible_starts
 
 
 def make_optimizer(network, config):
@@ -198,8 +198,8 @@ def restore(network, optimizer, payload, device):
 
 
 def probe_capacity(output, job, config, device, admission, root, rows, metadata, window, train, world, rank, log):
-    candidates = [cid for cid in train if any(len(labels) >= config['max_objects']
-                  for labels in metadata[cid]['frame_classes'])]
+    candidates = [cid for cid in train if eligible_starts(
+        metadata[cid]['frame_classes'], config['frames'], config['max_objects'])]
     if not candidates:
         raise ValueError('训练队列没有满足容量检查目标数的真实病例')
     local_count = config['global_batch'] if world==1 else 1

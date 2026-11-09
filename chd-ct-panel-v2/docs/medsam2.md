@@ -41,6 +41,8 @@ python3 run.py train --model medsam2 --prepared "$prepared" \
 
 短测使用 128×128、连续 2 帧和 1 个 epoch。正式默认 200 个 epoch、512×512、连续 8 帧、每段最多 3 类和全局批量 2。每个训练布局使用真实 CT 片段执行单独容量探测，检查完整反向、AdamW 更新和 GPU 显存保留量。探测结果在 `capacity.json`。正式训练每 5 个 epoch 和最终 epoch 执行整卷验证，以验证病例七类平均 Dice 选择最佳检查点。
 
+训练片段按切片索引递增，起点在首帧有可用目标的片段中均匀选择，沿用官方训练采样器默认的顺序。框提示从首帧生成。整卷预测从提示切片双向传播。
+
 Linux 双卡使用 `--max-gpus 2`，单卡每次累积两个序列，双卡每张卡处理一个。选卡使用可见设备编号或物理 UUID，`--gpus auto` 从可用范围选择。当前双进程同步在 Windows CPU 用 Gloo 验证，Linux NCCL、GPU 显存容量和实机换卡验收仍待完成。
 
 ```bash

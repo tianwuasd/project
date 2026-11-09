@@ -140,6 +140,11 @@ def assert_case_files(folder, marker):
             raise ValueError('MedSAM2 缓存文件在校验后变化：'+str(path))
 
 
+def eligible_starts(frame_classes, frames, required_objects=1):
+    return [start for start in range(len(frame_classes)-frames+1)
+            if len(frame_classes[start]) >= required_objects]
+
+
 def case_metadata(folder, row, *, track_files=False):
     marker = read_json(folder/'complete.json')
     check_signature(marker)
@@ -147,6 +152,8 @@ def case_metadata(folder, row, *, track_files=False):
             or marker['source_hashes'] != row['source_hashes']
             or set(marker['files']) != {'ct.npy', 'labels.npy'}):
         raise ValueError('MedSAM2 病例完成记录与来源不一致：'+row['case_id'])
+    if not eligible_starts(marker['frame_classes'], 8):
+        raise ValueError('没有首帧带可见目标的正序连续 8 帧：'+row['case_id'])
     stamps = {}
     for name, expected in marker['files'].items():
         path = folder/name
@@ -187,8 +194,8 @@ def prepare_case(folder, row, gate, phase):
         frame_classes.append(sorted(set(map(int, np.unique(resized))) & set(expected)))
     if sorted({label for values in frame_classes for label in values}) != expected:
         raise ValueError('已知类别在正式 512 网格上消失：'+row['case_id'])
-    if not any(frame_classes[:-7]) and not any(frame_classes[7:]):
-        raise ValueError('没有带可见目标的连续 8 帧：'+row['case_id'])
+    if not eligible_starts(frame_classes, 8):
+        raise ValueError('没有首帧带可见目标的正序连续 8 帧：'+row['case_id'])
     phase('write_ct_and_labels')
     atomic_array(folder/'ct.npy', image)
     atomic_array(folder/'labels.npy', truth)

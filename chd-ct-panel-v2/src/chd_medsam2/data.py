@@ -6,7 +6,7 @@ import torch
 
 from . import PROTOCOL
 from .contracts import check_signature, read_json
-from .preprocessing import assert_case_files, case_metadata
+from .preprocessing import assert_case_files, case_metadata, eligible_starts
 
 
 MEAN = (0.485, 0.456, 0.406)
@@ -82,11 +82,9 @@ def sample_clip(folder, marker, row, window, config, seed, *, required_objects=1
     label = np.load(folder/'labels.npy', mmap_mode='r', allow_pickle=False)
     if list(image.shape) != marker['shape'] or label.shape != image.shape or image.dtype != np.float32 or label.dtype != np.int8:
         raise ValueError('MedSAM2 缓存数组形状或类型错误：'+row['case_id'])
-    candidates = [(start, direction) for direction in (1, -1)
-                  for start in range(len(image)) if 0 <= start+direction*(frames-1) < len(image)
-                  and len(marker['frame_classes'][start]) >= required_objects]
-    for candidate in rng.permutation(len(candidates)):
-        first, direction = candidates[candidate]
+    candidates = eligible_starts(marker['frame_classes'], frames, required_objects)
+    # 从合法起点的随机排列取首个合格项，对目标仍可见的起点均匀采样。
+    for first in rng.permutation(candidates):
         initial = resized_mask(label[first], size)
         classes = sorted(set(map(int, np.unique(initial))) & set(marker['observed']))
         if len(classes) >= required_objects:
@@ -94,7 +92,7 @@ def sample_clip(folder, marker, row, window, config, seed, *, required_objects=1
     else:
         raise ValueError('当前尺寸没有合格的训练片段：'+row['case_id'])
     chosen = sorted(map(int, rng.choice(classes, min(len(classes), config['max_objects']), replace=False)))
-    indices = [first+offset*direction for offset in range(frames)]
+    indices = list(range(first, first+frames))
     labels = np.stack([initial if offset == 0 else resized_mask(label[z], size)
                        for offset, z in enumerate(indices)])
     valid = labels != 8
