@@ -2,7 +2,6 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 from datetime import timedelta
-import errno
 import math
 import os
 from pathlib import Path
@@ -20,6 +19,7 @@ from .checkpoints import load, mirror_checkpoints, save
 from .contracts import file_sha, read_json
 from .data import open_prepared, sample_clip, sample_seed, sequence_ids
 from .inference import evaluate_case
+from .io_recovery import InputUnavailable, input_path
 from .losses import criterion, masked_loss
 from .model import build, make_batch, versions
 from .preprocessing import case_metadata
@@ -117,8 +117,6 @@ def validate(network, config, device, root, val, metadata, window, output, state
     predictor.load_state_dict(network.state_dict(), strict=True)
     scores, failures = {}, {}
     destination = output/'validation'/f'epoch_{epoch:04d}'
-    temporary = {errno.ENOENT, errno.ECONNRESET, errno.ETIMEDOUT, errno.ENETDOWN,
-                 errno.ENETUNREACH, errno.EHOSTUNREACH, errno.ESTALE}
     for delay in (2, 5, 15, 30, 60, None):
         for cid in val:
             if cid in scores:
@@ -149,16 +147,18 @@ def validate(network, config, device, root, val, metadata, window, output, state
                     write_json(marker, dict(identity=identity, result_sha256=file_sha(case_dir/'result.json'),
                                             prompts_sha256=file_sha(case_dir/'prompts.json')))
             except OSError as error:
-                if error.errno not in temporary:
+                unavailable = input_path(error, root)
+                if unavailable is None:
                     raise
-                failures[cid] = str(error)
+                failures[cid] = dict(path=unavailable, error=str(error))
                 continue
             scores[cid] = score
             failures.pop(cid, None)
         if not failures:
             break
         if delay is None:
-            raise OSError(f'验证必需病例未全部完成：{failures}')
+            raise InputUnavailable([item['path'] for item in failures.values()],
+                                   dict(cases=failures, progress=progress))
         log.status('waiting_io', **progress, cases_completed=len(scores),
                    pending=sorted(failures), next_retry_at=time.time()+delay)
         log.event('validation.wait_io', '等待重新读取未完成的验证病例', pending=failures, retry_seconds=delay)

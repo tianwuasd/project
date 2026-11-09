@@ -266,6 +266,7 @@ def worker(output, device):
     from chd_stunet.training.resources import GPUUnavailable
     from .checkpoints import CheckpointMirrorError
     from .engine import run_worker
+    from .io_recovery import InputUnavailable, input_path
     from .runtime import frozen_job
     output = Path(output).resolve()
     job = frozen_job(output)
@@ -280,6 +281,12 @@ def worker(output, device):
         write_json(output/'control'/f'capacity-failure-{rank}.json', {'reason': reason, 'error': str(error)})
         raise
     except Exception as error:
+        pending = input_path(error, job['contract']['prepared']) if isinstance(error, OSError) else None
+        if isinstance(error, InputUnavailable) or pending is not None:
+            paths = error.paths if isinstance(error, InputUnavailable) else [pending]
+            details = error.details if isinstance(error, InputUnavailable) else {'error': str(error)}
+            write_json(Path(job['recovery'])/f'input-error-{rank}.json', dict(paths=paths, details=details))
+            raise
         write_json(output/'control'/f'fatal-{rank}.json',
                    {'rank': int(rank), 'type': type(error).__name__, 'error': str(error)})
         raise

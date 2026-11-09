@@ -15,6 +15,7 @@ from chd_stunet.observability.locking import run_lock
 from chd_stunet.observability.runlog import RunLog, write_json
 
 from .contracts import check_signature, file_sha, read_json, signed
+from .io_recovery import check_readable
 
 
 def freeze_sources(output):
@@ -190,6 +191,8 @@ def supervise(output):
         capacity_attempts = Counter()
         reserve = max(4*GIB, int(.2*snapshot()['available_memory_bytes']))
         unknown_retries = 0
+        next_input_probe = 0.
+        input_attempt = 0
         while not (output/'control/stop.json').is_file():
             now = time.monotonic()
             storage_error = recovery/'storage-error.json'
@@ -203,6 +206,38 @@ def supervise(output):
                     time.sleep(10)
                     continue
                 storage_error.unlink()
+            input_errors = sorted(recovery.glob('input-error-*.json'))
+            if input_errors:
+                details = [read_json(path) for path in input_errors]
+                unavailable = sorted({name for row in details for name in row['paths']})
+                if now >= next_input_probe:
+                    input_attempt += 1
+                    observation = check_readable(output/'code', unavailable)
+                    if observation.get('fatal'):
+                        log.status('needs_attention', reason='validation_input', evidence=observation)
+                        raise OSError('MedSAM2 输入健康检查发现确定性错误')
+                    if observation['readable']:
+                        for path in input_errors:
+                            path.unlink()
+                        log.event('training.input_ready', '输入重新可读，从完整检查点继续',
+                                  attempt=input_attempt, evidence=details)
+                        next_input_probe = 0.
+                        continue
+                    next_input_probe = time.monotonic()+60
+                    log.event('training.wait_input', '计算进程已退出，等待重新读取输入',
+                              attempt=input_attempt, evidence=observation, details=details)
+                    next_feedback = 0.
+                if now >= next_feedback:
+                    next_retry_at = time.time()+max(0., next_input_probe-now)
+                    progress = next((row['details']['progress'] for row in details
+                                     if 'progress' in row['details']), {})
+                    status = dict(reason='input_unavailable', evidence=details, attempt=input_attempt,
+                                  next_retry_at=next_retry_at, **progress)
+                    recovery_log.status('waiting_io', **status)
+                    log.status('waiting_io', **status)
+                    next_feedback = now+10
+                time.sleep(2)
+                continue
             facts = snapshot()
             if facts['available_memory_bytes'] < reserve or facts['cpu_budget'] < 1:
                 if now >= next_feedback:
@@ -308,14 +343,14 @@ def supervise(output):
                 if time.monotonic()-last_heartbeat >= 10:
                     status_path = output/'status.json'
                     status = read_json(status_path) if status_path.is_file() else {}
-                    log.event('training.heartbeat', f"阶段 {status.get('phase', '启动')}，已报告更新 {status.get('update', 0)}",
+                    log.event('training.heartbeat', f"阶段 {status.get('phase', '启动')}，更新 {status.get('update', '尚未报告')}",
                               worker_status=status, world_size=world, available_memory_bytes=facts['available_memory_bytes'])
                     last_heartbeat = time.monotonic()
                 time.sleep(2)
             result_path = output/'worker-result.json'
             result = read_json(result_path) if result_path.is_file() else {}
             state = result.get('state')
-            if storage_error.is_file():
+            if storage_error.is_file() or any(recovery.glob('input-error-*.json')):
                 continue
             capacity = [read_json(path) for path in (output/'control').glob('capacity-failure-*.json')]
             if capacity and selected:
