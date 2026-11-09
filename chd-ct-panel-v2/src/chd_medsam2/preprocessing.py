@@ -133,9 +133,11 @@ def file_stamp(path):
     return [stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns]
 
 
-def assert_case_files(folder, marker):
+def assert_case_files(folder, marker, progress=None):
     for name, stamp in marker['verified_files'].items():
         path = folder/name
+        if progress is not None:
+            progress(path)
         if file_stamp(path) != stamp:
             raise ValueError('MedSAM2 缓存文件在校验后变化：'+str(path))
 

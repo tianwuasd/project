@@ -62,7 +62,7 @@ def parser_for(command):
         parser.add_argument('--shared-image-position-encoding', action=argparse.BooleanOptionalAction,
                             help='同尺寸帧共用图像编码器位置网格')
         parser.add_argument('--input-read-timeout-seconds', type=positive,
-                            help='启动时读取预处理缓存无进展的超时秒数，默认 120')
+                            help='读取预处理缓存无进展的超时秒数，默认 120')
         parser.add_argument('--recovery-root', help='与结果目录独立的检查点存储根目录')
         parser.add_argument('--gpu-wait-seconds', type=int)
         parser.add_argument('--stop-after-steps', type=positive)

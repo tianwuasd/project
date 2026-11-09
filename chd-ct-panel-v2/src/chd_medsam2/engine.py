@@ -19,7 +19,7 @@ from .checkpoints import load, mirror_checkpoints, save
 from .contracts import check_signature, file_sha, read_json
 from .data import sample_clip, sample_seed, sequence_ids
 from .inference import evaluate_case
-from .io_recovery import InputUnavailable, input_path
+from .io_recovery import InputReadWatch, InputUnavailable, input_path
 from .journal import TrainingLog
 from .losses import criterion, masked_loss
 from .model import build, make_batch, versions
@@ -101,13 +101,15 @@ def update_step(network, optimizer, loss, clips, config, device, update, total_u
     return dict(values), float(norm), all_objects
 
 
-def create_clips(sequence, count, ids, root, rows, metadata, window, config):
+def create_clips(sequence, count, ids, root, rows, metadata, window, config, reader):
     result = []
-    for index in range(sequence, sequence+count):
-        epoch, offset = divmod(index, len(ids))
-        cid = sequence_ids(ids, epoch, config['seed'])[offset]
-        seed = sample_seed(config['seed'], index)
-        result.append((seed, sample_clip(root/'cases'/cid, metadata[cid], rows[cid], window, config, seed)))
+    with reader as progress:
+        for index in range(sequence, sequence+count):
+            epoch, offset = divmod(index, len(ids))
+            cid = sequence_ids(ids, epoch, config['seed'])[offset]
+            seed = sample_seed(config['seed'], index)
+            result.append((seed, sample_clip(root/'cases'/cid, metadata[cid], rows[cid],
+                                             window, config, seed, progress=progress)))
     return result
 
 
@@ -122,7 +124,8 @@ def clip_prefetch_limit(path, maximum, world, batch_bytes):
     return min(maximum, max(0, available//(world*batch_bytes)-1))
 
 
-def validate(network, config, device, root, val, metadata, window, output, state, log, frame_limit, checkpoint_sha):
+def validate(network, config, device, root, val, metadata, window, output, state, log,
+             frame_limit, checkpoint_sha, reader):
     epoch = state['epoch']
     progress = dict(epoch=epoch, update=state['update'], phase='validation', cases_total=len(val))
     predictor = build(config, training=False, device=device)
@@ -149,15 +152,17 @@ def validate(network, config, device, root, val, metadata, window, output, state
                     log.event('validation.reuse', f'复用已核验的病例 {cid}', case_id=cid, epoch=epoch)
                 else:
                     if cid in failures:
-                        actual = case_metadata(root/'cases'/cid,
-                                               dict(case_id=cid, source_hashes=metadata[cid]['source_hashes']),
-                                               track_files=True)
+                        with reader as read_progress:
+                            actual = case_metadata(root/'cases'/cid,
+                                                   dict(case_id=cid, source_hashes=metadata[cid]['source_hashes']),
+                                                   track_files=True,
+                                                   progress=lambda path, _: read_progress(path))
                         if actual['identity'] != metadata[cid]['identity']:
                             raise ValueError('验证病例缓存身份变化：'+cid)
                         metadata[cid] = actual
                     with torch.autocast('cuda', dtype=torch.bfloat16, enabled=device.type=='cuda'):
                         score = evaluate_case(predictor, root, cid, metadata[cid], window, case_dir, log,
-                                              frame_limit=frame_limit, retain_raw=False)
+                                              frame_limit=frame_limit, retain_raw=False, reader=reader)
                     write_json(marker, dict(identity=identity, result_sha256=file_sha(case_dir/'result.json'),
                                             prompts_sha256=file_sha(case_dir/'prompts.json')))
             except OSError as error:
@@ -197,19 +202,21 @@ def restore(network, optimizer, payload, device):
     return payload['state']
 
 
-def probe_capacity(output, job, config, device, admission, root, rows, metadata, window, train, world, rank, log):
+def probe_capacity(output, job, config, device, admission, root, rows, metadata, window, train,
+                   world, rank, log, reader):
     candidates = [cid for cid in train if eligible_starts(
         metadata[cid]['frame_classes'], config['frames'], config['max_objects'])]
     if not candidates:
         raise ValueError('训练队列没有满足容量检查目标数的真实病例')
     local_count = config['global_batch'] if world==1 else 1
     clips = []
-    for index in range(local_count):
-        number = rank*local_count+index
-        cid = candidates[number%len(candidates)]
-        seed = sample_seed(config['seed'], number)
-        clips.append((seed, sample_clip(root/'cases'/cid, metadata[cid], rows[cid], window, config, seed,
-                                        required_objects=config['max_objects'])))
+    with reader as progress:
+        for index in range(local_count):
+            number = rank*local_count+index
+            cid = candidates[number%len(candidates)]
+            seed = sample_seed(config['seed'], number)
+            clips.append((seed, sample_clip(root/'cases'/cid, metadata[cid], rows[cid], window, config, seed,
+                                            required_objects=config['max_objects'], progress=progress)))
     log.status('running', phase='capacity_probe', rank=rank)
     shared_encoding = job['shared_image_position_encoding']
     network = build(config, training=True, device=device, weights=job['weights'],
@@ -272,14 +279,18 @@ def run_worker(output, job, requested_device):
         raise ValueError('MedSAM2 计算进程数超出全局批量')
     primary = rank == 0
     recovery = job.get('recovery')
+    generation = os.environ['CHD_MEDSAM2_GENERATION']
     audit = read_json(Path(recovery)/'input-audit.json')
     check_signature(audit)
-    if (audit['generation'] != os.environ['CHD_MEDSAM2_GENERATION']
+    if (audit['generation'] != generation
             or audit['contract_identity'] != contract['identity'] or versions() != contract['versions']):
         raise ValueError('MedSAM2 输入校验结果与当前世代或运行环境不一致')
     root = Path(audit['root'])
     rows, metadata, train, val, window = (audit[key] for key in ('cases', 'metadata', 'train', 'val', 'window'))
     root_log = Path(recovery) if job.get('journal') else output
+    train_reader = InputReadWatch(recovery, generation, rank, 'train')
+    prefetch_reader = InputReadWatch(recovery, generation, rank, 'prefetch')
+    validation_reader = InputReadWatch(recovery, generation, rank, 'validation')
     rank_log = root_log if primary else root_log/'ranks'/str(rank)
     log = TrainingLog(rank_log, job.get('task_id', contract['identity'])) if job.get('journal') else RunLog(rank_log)
     resources = snapshot()
@@ -298,7 +309,8 @@ def run_worker(output, job, requested_device):
               shared_image_position_encoding=job['shared_image_position_encoding'],
               rank=rank, world_size=world, precision='bf16' if device.type=='cuda' else 'fp32')
     if config['scope'] != 'smoke':
-        probe_capacity(output, job, config, device, admission, root, rows, metadata, window, train, world, rank, log)
+        probe_capacity(output, job, config, device, admission, root, rows, metadata, window,
+                       train, world, rank, log, train_reader)
         if config['scope'] == 'capacity_probe':
             if primary:
                 write_json(output/'summary.json', dict(status='completed', scope='capacity_probe', trained_updates=0,
@@ -365,11 +377,12 @@ def run_worker(output, job, requested_device):
                 return
             if state['phase'] == 'validation':
                 state['phase'] = 'training'
-                ready = output/'control'/f"validation-{os.environ['CHD_MEDSAM2_GENERATION']}-{state['epoch']}.json"
+                ready = output/'control'/f"validation-{generation}-{state['epoch']}.json"
                 if primary:
                     checkpoint = read_json(Path(recovery or output)/'checkpoints/latest.json')
                     validation = validate(network, config, device, root, val, metadata, window, output,
-                                          state, log, job.get('validation_frames'), checkpoint['sha256'])
+                                          state, log, job.get('validation_frames'), checkpoint['sha256'],
+                                          validation_reader)
                     state['history'].append(validation)
                     improved = state['best'] is None or validation['mean_dice'] > state['best']['mean_dice']
                     if improved:
@@ -397,19 +410,20 @@ def run_worker(output, job, requested_device):
                 clips = future.result()
                 del future
             else:
-                clips = create_clips(local_start, local_count, *clip_args)
+                clips = create_clips(local_start, local_count, *clip_args, train_reader)
             data_seconds = time.monotonic()-began
             next_sequence = sequence+batch_count
             limit = clip_prefetch_limit(supply_path, maximum_prefetch, world, batch_bytes)
             queue_sequence = pending[-1][0]+batch_count if pending else next_sequence
             while len(pending) < limit and queue_sequence < total_samples:
                 pending.append((queue_sequence, pool.submit(
-                    create_clips, queue_sequence+rank_offset, local_count, *clip_args)))
+                    create_clips, queue_sequence+rank_offset, local_count, *clip_args, prefetch_reader)))
                 queue_sequence += batch_count
             # 预取结果可能在后台等待，消费前重新确认源缓存文件。
-            for _, clip in clips:
-                cid = clip['case_id']
-                assert_case_files(root/'cases'/cid, metadata[cid])
+            with train_reader as read_progress:
+                for _, clip in clips:
+                    cid = clip['case_id']
+                    assert_case_files(root/'cases'/cid, metadata[cid], read_progress)
             log.status('running', update=state['update'], epoch=state['epoch'], phase='forward_backward')
             losses, gradient, objects = update_step(network, optimizer, loss, clips, config, device,
                                                     state['update'], total_updates, world)

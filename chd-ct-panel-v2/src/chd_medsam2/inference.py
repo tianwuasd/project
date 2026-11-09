@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 from functools import lru_cache
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -19,32 +20,43 @@ LABEL_NAMES = {value: key for key, value in TARGETS.items() if 1 <= value <= 7}
 
 
 class AxialFrames:
-    def __init__(self, data, size, window):
+    def __init__(self, data, size, window, reader=None, source_path=None, source_offset=0):
         self.data, self.size, self.window = data, size, window
+        self.reader, self.source_path = reader, source_path
+        self.source_offset = source_offset
         self.frame = lru_cache(maxsize=2)(self.convert)
 
     def __len__(self):
         return len(self.data)
 
     def convert(self, frame):
-        return frame_tensor(self.data[frame], self.size, self.window)
+        with (self.reader or nullcontext()) as progress:
+            if progress is not None:
+                progress(self.source_path, self.source_offset+frame)
+            return frame_tensor(self.data[frame], self.size, self.window)
 
     def __getitem__(self, frame):
         return self.frame(frame)
 
 
-def simulated_prompts(labels):
+def simulated_prompts(labels, progress=None):
     maximum = np.zeros(8, dtype=np.int64)
     slices = np.zeros(8, dtype=np.int64)
     for z, frame in enumerate(labels):
+        if progress is not None:
+            progress(z)
         sizes = np.bincount(frame.ravel(), minlength=8)[:8]
         improved = sizes > maximum
         maximum[improved], slices[improved] = sizes[improved], z
     missing = [name for label, name in LABEL_NAMES.items() if maximum[label] == 0]
     if missing:
         raise ValueError('主队列评分病例缺少结构：'+', '.join(missing))
-    boxes = [dict(label=label, frame=int(slices[label]), xyxy=xyxy(labels[slices[label]] == label))
-             for label in LABEL_NAMES]
+    boxes = []
+    for label in LABEL_NAMES:
+        z = int(slices[label])
+        if progress is not None:
+            progress(z)
+        boxes.append(dict(label=label, frame=z, xyxy=xyxy(labels[z] == label)))
     return dict(prompt_source='simulated_gt_single_box', boxes=boxes)
 
 
@@ -67,11 +79,12 @@ def validate_prompts(prompts, shape, *, source):
 
 
 @torch.inference_mode()
-def segment(predictor, axial, window, prompts, output, *, source, callback=None):
+def segment(predictor, axial, window, prompts, output, *, source, callback=None,
+            reader=None, source_path=None, source_offset=0):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     boxes = validate_prompts(prompts, axial.shape, source=source)
-    frames = AxialFrames(axial, predictor.image_size, window)
+    frames = AxialFrames(axial, predictor.image_size, window, reader, source_path, source_offset)
     depth, height, width = axial.shape
     # 保留整段官方传播历史，CPU 卸载；完整概率无需在内存中叠加七份。
     best = np.lib.format.open_memmap(output/'max_logits.npy', mode='w+', dtype=np.float32, shape=axial.shape)
@@ -111,12 +124,14 @@ def segment(predictor, axial, window, prompts, output, *, source, callback=None)
     return labels
 
 
-def dice_on_native(pred, truth):
+def dice_on_native(pred, truth, progress=None):
     if pred.shape != truth.shape:
         raise ValueError('MedSAM2 预测与真值尺寸不一致')
     # 按切片累计体素计数，内存开销不随整卷层数增长。
     pred_counts, truth_counts, matched_counts = np.zeros((3, 8), dtype=np.int64)
-    for pred_frame, truth_frame in zip(pred, truth, strict=True):
+    for z, (pred_frame, truth_frame) in enumerate(zip(pred, truth, strict=True)):
+        if progress is not None:
+            progress(z)
         valid = truth_frame != 8
         p, t = pred_frame[valid], truth_frame[valid]
         pred_counts += np.bincount(p, minlength=8)[:8]
@@ -131,27 +146,39 @@ def dice_on_native(pred, truth):
     return result
 
 
-def evaluate_case(predictor, prepared, cid, meta, window, output, log, *, frame_limit=None, retain_raw=True):
+def evaluate_case(predictor, prepared, cid, meta, window, output, log, *,
+                  frame_limit=None, retain_raw=True, reader=None):
     folder = prepared/'cases'/cid
-    assert_case_files(folder, meta)
-    axial = np.load(folder/'ct.npy', mmap_mode='r', allow_pickle=False)
-    truth = np.load(folder/'labels.npy', mmap_mode='r', allow_pickle=False)
-    prompts = simulated_prompts(truth)
+    image_path, label_path = folder/'ct.npy', folder/'labels.npy'
+    scope = reader or nullcontext()
+    with scope as progress:
+        assert_case_files(folder, meta, progress)
+        if progress is not None:
+            progress(image_path)
+        axial = np.load(image_path, mmap_mode='r', allow_pickle=False)
+        if progress is not None:
+            progress(label_path)
+        truth = np.load(label_path, mmap_mode='r', allow_pickle=False)
+        prompts = simulated_prompts(truth, (lambda z: progress(label_path, z)) if progress else None)
+    offset = 0
     if frame_limit:
         # 仅短测使用：截取涵盖所有七类框提示的一段实际 CT。
         frames = [item['frame'] for item in prompts['boxes']]
         start = max(0, min(min(frames), max(frames)-frame_limit+1))
         end = min(len(axial), max(start+frame_limit, max(frames)+1))
         axial, truth = axial[start:end], truth[start:end]
+        offset = start
         for item in prompts['boxes']:
             item['frame'] -= start
         prompts['axial_offset'] = start
     def evaluate(workspace):
         result = segment(predictor, axial, window, prompts, workspace, source='simulated_gt_single_box',
+                         reader=reader, source_path=image_path, source_offset=offset,
                          callback=lambda label, z, depth: log.event('validation.structure',
                                   f'{cid} {LABEL_NAMES[label]}：{depth}帧，提示第{z}帧'))
-        metrics = dice_on_native(result, truth)
-        assert_case_files(folder, meta)
+        with scope as progress:
+            metrics = dice_on_native(result, truth, (lambda z: progress(label_path, z+offset)) if progress else None)
+            assert_case_files(folder, meta, progress)
         if frame_limit:
             return metrics
         native = to_native(result, meta['geometry'])

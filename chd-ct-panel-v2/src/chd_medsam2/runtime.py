@@ -17,7 +17,7 @@ from chd_stunet.observability.runlog import RunLog, write_json
 
 from .contracts import check_signature, file_sha, read_json, signed
 from .input_audit import DEFAULT_TIMEOUT, AuditCancelled, audit_prepared
-from .io_recovery import InputUnavailable, check_readable
+from .io_recovery import InputUnavailable, check_readable, expired_read
 from .journal import LogMirror, TrainingLog
 
 
@@ -401,6 +401,16 @@ def supervise(output):
                 if original_failures:
                     _stop_workers(workers)
                     break
+                stalled = expired_read(recovery, generation, workers, job['input_read_timeout'])
+                if stalled is not None:
+                    _stop_workers(workers)
+                    write_json(recovery/'input-error-rank-read.json',
+                               dict(paths=[stalled['path']], details=stalled))
+                    log.event('training.input_read_wait', '读取预处理缓存超时，保留最近检查点并等待恢复',
+                              **stalled)
+                    next_input_probe = time.monotonic()+60
+                    next_feedback = 0.
+                    break
                 reason = None
                 if selected:
                     owned = {process.pid for process, _ in workers}
@@ -434,6 +444,8 @@ def supervise(output):
                               worker_status=status, world_size=world, available_memory_bytes=facts['available_memory_bytes'])
                     last_heartbeat = time.monotonic()
                 time.sleep(2)
+            for marker in (recovery/'control').glob(f'input-read-{generation}-*.json'):
+                marker.unlink()
             result_path = output/'worker-result.json'
             result = read_json(result_path) if result_path.is_file() else {}
             state = result.get('state')
