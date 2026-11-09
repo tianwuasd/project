@@ -248,7 +248,7 @@ def predict(args, paths, stamp):
     wanted = args.cases or sorted(candidates)
     if not wanted or len(wanted)!=len(set(wanted)) or set(wanted)-candidates.keys():
         raise ValueError('MedSAM2 测试病例必须属于来源训练折留出集')
-    metadata = {cid: case_metadata(prepared/'cases'/cid, candidates[cid]) for cid in wanted}
+    metadata = {cid: case_metadata(prepared/'cases'/cid, candidates[cid], track_files=True) for cid in wanted}
     if any(prepared_summary['completed'].get(cid) != marker['identity'] for cid, marker in metadata.items()):
         raise ValueError('MedSAM2 留出病例未在已提交清单中')
     log = RunLog(output)

@@ -12,7 +12,7 @@ from chd_stunet.preprocessing.cohort import TARGETS
 
 from .contracts import file_sha, read_json
 from .data import frame_tensor, xyxy
-from .preprocessing import canonical_image, to_axial, to_native
+from .preprocessing import assert_case_files, canonical_image, to_axial, to_native
 
 
 LABEL_NAMES = {value: key for key, value in TARGETS.items() if 1 <= value <= 7}
@@ -133,6 +133,7 @@ def dice_on_native(pred, truth):
 
 def evaluate_case(predictor, prepared, cid, meta, window, output, log, *, frame_limit=None, retain_raw=True):
     folder = prepared/'cases'/cid
+    assert_case_files(folder, meta)
     axial = np.load(folder/'ct.npy', mmap_mode='r', allow_pickle=False)
     truth = np.load(folder/'labels.npy', mmap_mode='r', allow_pickle=False)
     prompts = simulated_prompts(truth)
@@ -149,15 +150,17 @@ def evaluate_case(predictor, prepared, cid, meta, window, output, log, *, frame_
         result = segment(predictor, axial, window, prompts, workspace, source='simulated_gt_single_box',
                          callback=lambda label, z, depth: log.event('validation.structure',
                                   f'{cid} {LABEL_NAMES[label]}：{depth}帧，提示第{z}帧'))
+        metrics = dice_on_native(result, truth)
+        assert_case_files(folder, meta)
         if frame_limit:
-            return dice_on_native(result, truth)
+            return metrics
         native = to_native(result, meta['geometry'])
         if list(native.shape) != meta['geometry']['native_shape']:
             raise ValueError('MedSAM2 验证分割未恢复到原始网格')
         if retain_raw:
             save_nifti(Path(output)/'segmentation.nii.gz', native, np.asarray(meta['geometry']['affine']))
         # 轴序转换只改变排列，按连续轴位切片评分可减少缓存页的反复读取。
-        return dice_on_native(result, truth)
+        return metrics
 
     if retain_raw:
         metrics = evaluate(output)

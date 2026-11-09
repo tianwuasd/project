@@ -23,7 +23,7 @@ from .io_recovery import InputUnavailable, input_path
 from .journal import TrainingLog
 from .losses import criterion, masked_loss
 from .model import build, make_batch, versions
-from .preprocessing import case_metadata
+from .preprocessing import assert_case_files, case_metadata
 
 
 def make_optimizer(network, config):
@@ -150,9 +150,11 @@ def validate(network, config, device, root, val, metadata, window, output, state
                 else:
                     if cid in failures:
                         actual = case_metadata(root/'cases'/cid,
-                                               dict(case_id=cid, source_hashes=metadata[cid]['source_hashes']))
+                                               dict(case_id=cid, source_hashes=metadata[cid]['source_hashes']),
+                                               track_files=True)
                         if actual['identity'] != metadata[cid]['identity']:
                             raise ValueError('验证病例缓存身份变化：'+cid)
+                        metadata[cid] = actual
                     with torch.autocast('cuda', dtype=torch.bfloat16, enabled=device.type=='cuda'):
                         score = evaluate_case(predictor, root, cid, metadata[cid], window, case_dir, log,
                                               frame_limit=frame_limit, retain_raw=False)
@@ -399,6 +401,10 @@ def run_worker(output, job, requested_device):
                 pending.append((queue_sequence, pool.submit(
                     create_clips, queue_sequence+rank_offset, local_count, *clip_args)))
                 queue_sequence += batch_count
+            # 预取结果可能在后台等待，消费前重新确认源缓存文件。
+            for _, clip in clips:
+                cid = clip['case_id']
+                assert_case_files(root/'cases'/cid, metadata[cid])
             log.status('running', update=state['update'], epoch=state['epoch'], phase='forward_backward')
             losses, gradient, objects = update_step(network, optimizer, loss, clips, config, device,
                                                     state['update'], total_updates, world)

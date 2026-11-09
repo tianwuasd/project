@@ -6,14 +6,14 @@ import torch
 
 from . import PROTOCOL
 from .contracts import check_signature, read_json
-from .preprocessing import case_metadata
+from .preprocessing import assert_case_files, case_metadata
 
 
 MEAN = (0.485, 0.456, 0.406)
 STD = (0.229, 0.224, 0.225)
 
 
-def open_prepared(root, fold, *, smoke=False, train_cases=(), val_cases=(), verify=True):
+def open_prepared(root, fold, *, smoke=False, train_cases=(), val_cases=()):
     root = Path(root).resolve(strict=True)
     manifest = read_json(root/'manifest.json')
     summary = read_json(root/'summary.json')
@@ -38,7 +38,7 @@ def open_prepared(root, fold, *, smoke=False, train_cases=(), val_cases=(), veri
         raise ValueError('MedSAM2 训练/验证病例与固定折角色不一致')
     metadata = {}
     for cid in train+val:
-        marker = case_metadata(root/'cases'/cid, cases[cid], verify=verify)
+        marker = case_metadata(root/'cases'/cid, cases[cid], track_files=True)
         if summary['completed'].get(cid) != marker['identity']:
             raise ValueError('MedSAM2 病例未在已提交清单中：'+cid)
         metadata[cid] = marker
@@ -77,6 +77,7 @@ def xyxy(mask):
 def sample_clip(folder, marker, row, window, config, seed, *, required_objects=1):
     rng = np.random.default_rng(seed)
     frames, size = config['frames'], config['image_size']
+    assert_case_files(folder, marker)
     image = np.load(folder/'ct.npy', mmap_mode='r', allow_pickle=False)
     label = np.load(folder/'labels.npy', mmap_mode='r', allow_pickle=False)
     if list(image.shape) != marker['shape'] or label.shape != image.shape or image.dtype != np.float32 or label.dtype != np.int8:
@@ -102,7 +103,9 @@ def sample_clip(folder, marker, row, window, config, seed, *, required_objects=1
         valid &= labels != 0
     masks = np.stack([labels == label_id for label_id in chosen], axis=1)
     boxes = np.asarray([xyxy(initial == label_id) for label_id in chosen], dtype=np.float32)
-    return dict(images=torch.stack([frame_tensor(image[z], size, window) for z in indices]),
+    images = torch.stack([frame_tensor(image[z], size, window) for z in indices])
+    assert_case_files(folder, marker)
+    return dict(images=images,
                 masks=torch.from_numpy(masks), valid=torch.from_numpy(valid),
                 boxes=torch.from_numpy(boxes), classes=chosen, indices=indices, case_id=row['case_id'],
                 span_mm=(frames-1)*marker['geometry']['spacing_zyx'][0])

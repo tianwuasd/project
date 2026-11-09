@@ -128,17 +128,37 @@ def load_native_pair(row):
     return data, truth, canonical_image(image, row['spacing_xyz'])
 
 
-def case_metadata(folder, row, verify=True):
+def file_stamp(path):
+    stat = path.stat()
+    return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+
+
+def assert_case_files(folder, marker):
+    for name, stamp in marker['verified_files'].items():
+        path = folder/name
+        if file_stamp(path) != stamp:
+            raise ValueError('MedSAM2 缓存文件在校验后变化：'+str(path))
+
+
+def case_metadata(folder, row, *, track_files=False):
     marker = read_json(folder/'complete.json')
     check_signature(marker)
     if (marker['protocol'] != PROTOCOL or marker['case_id'] != row['case_id']
             or marker['source_hashes'] != row['source_hashes']
             or set(marker['files']) != {'ct.npy', 'labels.npy'}):
         raise ValueError('MedSAM2 病例完成记录与来源不一致：'+row['case_id'])
-    if verify:
-        for name, expected in marker['files'].items():
-            if file_sha(folder/name) != expected:
-                raise ValueError('MedSAM2 缓存文件损坏：'+str(folder/name))
+    stamps = {}
+    for name, expected in marker['files'].items():
+        path = folder/name
+        before = file_stamp(path)
+        if file_sha(path) != expected:
+            raise ValueError('MedSAM2 缓存文件损坏：'+str(path))
+        if file_stamp(path) != before:
+            raise ValueError('MedSAM2 缓存文件在校验中变化：'+str(path))
+        stamps[name] = before
+    if track_files:
+        # 运行时文件属性只用于检测变化，病例签名仍以文件摘要为准。
+        marker['verified_files'] = stamps
     return marker
 
 
