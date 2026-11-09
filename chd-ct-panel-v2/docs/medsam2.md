@@ -44,13 +44,17 @@ python3 run.py train --model medsam2 --prepared "$prepared" \
 Linux 双卡使用 `--max-gpus 2`，单卡每次累积两个序列，双卡每张卡处理一个。选卡使用可见设备编号或物理 UUID，`--gpus auto` 从可用范围选择。当前双进程同步在 Windows CPU 用 Gloo 验证，Linux NCCL、GPU 显存容量和实机换卡验收仍待完成。
 
 ```bash
-tail -n 80 -F "$train_run/launcher.log"
+tail -n 80 -F "$train_run/logs/run.log"
 cat "$train_run/status.json"
 python3 run.py train --model medsam2 --stop --output "$train_run"
 python3 run.py train --model medsam2 --resume --output "$train_run" --background
 ```
 
 启动参数保存在 `resolved-config.json` 和 `resolved-config.yaml`。环境、数据、提示规则及权重身份分别见 `environment.json`、`data-manifest.json`、`prompt-protocol.json` 和 `weights.json`。更新、损失分量、耗时和资源事件在 `logs/events.jsonl`。检查点先提交到 runtime 的 `recovery/medsam2`，再同步到结果目录。使用 `--recovery-root` 可指定独立存储。续跑使用同一任务冻结的代码、数据、进度及优化器状态。
+
+新任务先把状态与事件写到本地恢复目录，`launch.json` 的 `log` 字段给出该目录的监督进程日志路径。各训练进程的原始输出分别保存在 `control/rank-*.log`。结果目录暂时无法写入日志时，训练进度仍可从本地 `logs/run.log` 和 `status.json` 读取。同目录的 `log-sync.json` 记录同步故障，恢复后按原始字节补齐日志。
+
+若任务结束时结果目录尚不可写，恢复写入后可以对已完成任务运行同一个 `--resume` 命令补齐日志，训练进程不会重启。
 
 每个验证病例独立提交评分与提示摘要，并绑定验证时的检查点。中断后只复用已核验的病例结果。全部必需验证病例完成后才比较最佳检查点。
 

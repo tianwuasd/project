@@ -1,5 +1,6 @@
 from pathlib import Path
 from collections import Counter
+from contextlib import ExitStack
 import os
 import shutil
 import subprocess
@@ -16,6 +17,7 @@ from chd_stunet.observability.runlog import RunLog, write_json
 
 from .contracts import check_signature, file_sha, read_json, signed
 from .io_recovery import check_readable
+from .journal import LogMirror, TrainingLog
 
 
 def freeze_sources(output):
@@ -46,13 +48,15 @@ def frozen_job(output):
     return job
 
 
-def _spawn(output, args, filename, *, visible=None, rank_environment=None):
+def _spawn(output, args, filename, *, visible=None, rank_environment=None, log_root=None):
     env = dict(os.environ, PYTHONUTF8='1', PYTHONPATH=str(output/'code/src'))
     if rank_environment is not None:
         env.update(rank_environment)
     if visible is not None:
         env['CUDA_VISIBLE_DEVICES'] = ','.join(visible)
-    with (output/filename).open('a', encoding='utf-8') as stream:
+    path = (log_root or output)/filename
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('a', encoding='utf-8') as stream:
         return subprocess.Popen([interpreter_command(env), '-u', str(output/'code/run.py'), *args],
                                 stdin=subprocess.DEVNULL, stdout=stream, stderr=subprocess.STDOUT,
                                 env=env, **process_options())
@@ -97,6 +101,8 @@ def launch(output, contract, *, weights, train_cases, val_cases, validation_fram
         if resume:
             previous = frozen_job(output)
             if (output/'summary.json').is_file() and read_json(output/'summary.json')['status'] == 'completed':
+                if previous.get('journal'):
+                    LogMirror(output/'code', Path(previous['recovery']), output).flush()
                 return read_json(output/'summary.json')
             previous.pop('identity')
             if requested is not None and requested != previous['requested']:
@@ -111,29 +117,31 @@ def launch(output, contract, *, weights, train_cases, val_cases, validation_fram
                 raise FileExistsError('MedSAM2 训练输出目录非空')
             output.mkdir(parents=True, exist_ok=True)
             contract = signed(dict(contract, code_files=freeze_sources(output)))
-            recovery = Path(recovery_root)/f"{output.name}-{contract['identity'][:16]}"
+            task_id = uuid4().hex
+            recovery = Path(recovery_root)/f"{output.name}-{task_id[:16]}"
             if any(recovery.is_relative_to(path) or path.is_relative_to(recovery)
                    for path in (output, Path(contract['prepared']))):
                 raise ValueError('MedSAM2 本地恢复目录须与数据和输出目录分离')
-            recovery.mkdir(parents=True, exist_ok=True)
+            recovery.mkdir(parents=True)
             if shutil.disk_usage(recovery).free < 2*GIB or shutil.disk_usage(output).free < 2*GIB:
                 raise OSError('MedSAM2 启动需要本地和结果目录各有至少 2 GiB 检查点空间')
-            write_json(recovery/'owner.json', {'output': str(output), 'identity': contract['identity']})
+            write_json(recovery/'owner.json', {'output': str(output), 'identity': contract['identity'], 'task': task_id})
             job = signed(dict(contract=contract, weights=str(weights),
                               train_cases=list(train_cases), val_cases=list(val_cases),
                               validation_frames=validation_frames, requested=requested or 'cuda',
                               gpus=gpus or 'auto', max_gpus=max_gpus or 1,
                               cpu_ranks=cpu_ranks or 1, wait_seconds=wait_seconds or 0,
                               shared_desktop=shared_desktop, stop_after_steps=stop_after_steps,
-                              recovery=str(recovery)))
+                              recovery=str(recovery), task_id=task_id, journal=1))
             write_provenance(output, contract, weights, requested)
         (output/'control').mkdir(exist_ok=True)
         for name in ('stop.json', 'pause.json'):
             (output/'control'/name).unlink(missing_ok=True)
         write_json(output/'job.json', job)
-        process = _spawn(output, ['_medsam2-supervisor', str(output)], 'launcher.log')
-        result = dict(status='launched', output=str(output), log=str(output/'launcher.log'),
-                      pid=process.pid, born=psutil.Process(process.pid).create_time())
+        log_root = Path(job['recovery']) if job.get('journal') else output
+        process = _spawn(output, ['_medsam2-supervisor', str(output)], 'launcher.log', log_root=log_root)
+        result = dict(status='launched', output=str(output), log=str(log_root/'launcher.log'),
+                      pid=process.pid, born=psutil.Process(process.pid).create_time(), task=job.get('task_id'))
         write_json(launch_file, result)
     if background:
         return result
@@ -146,7 +154,7 @@ def launch(output, contract, *, weights, train_cases, val_cases, validation_fram
         return {'status': 'stopped', 'output': str(output)}
     if code:
         raise RuntimeError('MedSAM2 任务未完成，查看 '+result['log'])
-    return read_json(output/'summary.json') if (output/'summary.json').is_file() else read_json(output/'status.json')
+    return read_json(output/'summary.json') if (output/'summary.json').is_file() else read_json(log_root/'status.json')
 
 
 def _cards(output, selection):
@@ -175,14 +183,22 @@ def supervise(output):
     from chd_stunet.training.fleet import eligible
 
     output = Path(output).resolve(strict=True)
-    with run_lock(output/'.medsam2.lock'):
+    with run_lock(output/'.medsam2.lock'), ExitStack() as stack:
         job = frozen_job(output)
-        log = RunLog(output)
         recovery = Path(job.get('recovery', output))
-        if recovery != output and read_json(recovery/'owner.json') != {
-                'output': str(output), 'identity': job['contract']['identity']}:
+        owner = {'output': str(output), 'identity': job['contract']['identity']}
+        if job.get('task_id'):
+            owner['task'] = job['task_id']
+        if recovery != output and read_json(recovery/'owner.json') != owner:
             raise ValueError('MedSAM2 本地恢复目录归属不匹配')
-        recovery_log = RunLog(recovery)
+        if job.get('journal'):
+            log_root = recovery
+            log = recovery_log = TrainingLog(recovery, job.get('task_id', job['contract']['identity']))
+            mirror = stack.enter_context(LogMirror(output/'code', recovery, output))
+        else:
+            log_root = output
+            log, recovery_log = RunLog(output), RunLog(recovery)
+            mirror = None
         cards = _cards(output, job['gpus']) if job['requested']=='cuda' else []
         if job['requested']=='cuda' and not cards:
             raise ValueError('MedSAM2 当前没有可见 CUDA 设备')
@@ -194,6 +210,8 @@ def supervise(output):
         next_input_probe = 0.
         input_attempt = 0
         while not (output/'control/stop.json').is_file():
+            if mirror is not None:
+                mirror.tick()
             now = time.monotonic()
             storage_error = recovery/'storage-error.json'
             if storage_error.is_file():
@@ -233,7 +251,8 @@ def supervise(output):
                                      if 'progress' in row['details']), {})
                     status = dict(reason='input_unavailable', evidence=details, attempt=input_attempt,
                                   next_retry_at=next_retry_at, **progress)
-                    recovery_log.status('waiting_io', **status)
+                    if recovery_log is not log:
+                        recovery_log.status('waiting_io', **status)
                     log.status('waiting_io', **status)
                     next_feedback = now+10
                 time.sleep(2)
@@ -300,9 +319,10 @@ def supervise(output):
                 rank_env = dict(WORLD_SIZE=str(world), RANK=str(rank), LOCAL_RANK=str(rank),
                                 CHD_MEDSAM2_GENERATION=generation, CHD_MEDSAM2_RENDEZVOUS=rendezvous,
                                 CHD_MEDSAM2_RESTORE=restore)
-                filename = 'launcher.log' if rank==0 else f'control/rank-{rank}.log'
+                # 每个进程独占标准输出文件，防止 Windows 继承的文件句柄互相覆盖。
+                filename = 'launcher.log' if rank==0 and mirror is None else f'control/rank-{rank}.log'
                 process = _spawn(output, ['_medsam2-worker', str(output), device], filename,
-                                 visible=visible, rank_environment=rank_env)
+                                 visible=visible, rank_environment=rank_env, log_root=log_root)
                 born = psutil.Process(process.pid).create_time()
                 workers.append((process, born))
                 write_json(output/'control'/f'worker-{rank}.json',
@@ -314,6 +334,8 @@ def supervise(output):
             low_memory = 0
             original_failures = []
             while any(process.poll() is None for process, _ in workers):
+                if mirror is not None:
+                    mirror.tick()
                 original_failures = [process.returncode for process, _ in workers if process.returncode]
                 if original_failures:
                     _stop_workers(workers)
@@ -341,7 +363,7 @@ def supervise(output):
                     write_json(output/'control/pause.json', {'reason': reason})
                     log.event('training.pause', '等待当前更新完成并提交，再重新准入', reason=reason)
                 if time.monotonic()-last_heartbeat >= 10:
-                    status_path = output/'status.json'
+                    status_path = log_root/'status.json'
                     status = read_json(status_path) if status_path.is_file() else {}
                     log.event('training.heartbeat', f"阶段 {status.get('phase', '启动')}，更新 {status.get('update', '尚未报告')}",
                               worker_status=status, world_size=world, available_memory_bytes=facts['available_memory_bytes'])
@@ -369,7 +391,7 @@ def supervise(output):
                     continue
                 log.status('needs_attention', reason='worker_exit', returncodes=codes,
                            fatal=[str(path) for path in fatal])
-                raise RuntimeError('MedSAM2 计算进程失败，查看 launcher.log 中原始异常')
+                raise RuntimeError(f'MedSAM2 计算进程失败，查看 {log_root/"control"} 中的 rank 日志')
             if state in ('completed', 'stopped'):
                 return
             if state != 'paused':

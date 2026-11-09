@@ -20,6 +20,7 @@ from .contracts import file_sha, read_json
 from .data import open_prepared, sample_clip, sample_seed, sequence_ids
 from .inference import evaluate_case
 from .io_recovery import InputUnavailable, input_path
+from .journal import TrainingLog
 from .losses import criterion, masked_loss
 from .model import build, make_batch, versions
 from .preprocessing import case_metadata
@@ -262,7 +263,9 @@ def run_worker(output, job, requested_device):
             or val != contract['val_ids'] or versions() != contract['versions']
             or {cid: record['identity'] for cid, record in metadata.items()} != contract['case_identities']):
         raise ValueError('MedSAM2 任务冻结后数据或运行环境变化')
-    log = RunLog(output if primary else output/'ranks'/str(rank))
+    root_log = Path(recovery) if job.get('journal') else output
+    rank_log = root_log if primary else root_log/'ranks'/str(rank)
+    log = TrainingLog(rank_log, job.get('task_id', contract['identity'])) if job.get('journal') else RunLog(rank_log)
     resources = snapshot()
     torch.set_num_threads(max(1, min(4, resources['cpu_budget']//world)))
     assigned = f"cuda:{os.environ.get('LOCAL_RANK', '0')}" if requested_device == 'cuda' else requested_device
