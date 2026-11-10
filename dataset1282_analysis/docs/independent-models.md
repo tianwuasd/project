@@ -54,9 +54,13 @@ GPU 工作进程按 UUID 隔离，物理 0、1 号与其他获准设备一同参
 
 ```bash
 "$PY" -B -u scripts/sam_med3d_train.py run \
-  --prepared "$D" --weights "$SAM" --gpus 2 --steps 2 --output "$TRIAL"
+  --prepared "$D" --weights "$SAM" --gpus 2 --steps 2 --wait-seconds 30 --output "$TRIAL"
 ```
 
 短测从训练组选择四个已标注左心室的独立病例，每卡每步处理一例。按推理同样的 1.5 mm 间距和 128³ 局部块产生训练输入，正点从对应训练掩膜内部取样。冻结影像编码器，使用 NCCL 同步更新提示编码器和掩膜解码器。调度进程为每个训练进程分配不同物理 UUID，每个进程只看到自己的显卡。默认从当前授权范围选择两张符合准入条件的空闲卡。
+
+训练使用 FP32、AdamW、学习率 0.00008、权重衰减 0.1、梯度范数上限 1.0，以及二元交叉熵与软 Dice 之和。双卡全局批量为 2。实际参数写入 `request.json` 和 `result.json`。
+
+启动前资源不足时，默认每 30 秒复查显卡和主机资源。等待期间 `status.json` 显示 `waiting_resources`，两张显卡同时通过准入后才创建训练进程。`--wait-seconds 0` 立即报告资源不足。
 
 查看 `logs/sam-train-rank*.log`。两个进程都完成更新、参数摘要一致且权重写入 `last.pt` 后，才会生成 `result.json` 并标记 `passed`。

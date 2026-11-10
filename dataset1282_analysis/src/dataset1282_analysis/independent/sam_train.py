@@ -6,6 +6,7 @@ from math import prod
 import os
 from pathlib import Path
 import sys
+import time
 from types import SimpleNamespace
 
 import nibabel as nib
@@ -22,9 +23,13 @@ from ..xu_dispatch import Children, run_wave, select_devices
 from ..xu_geometry import PreparedCache
 from ..xu_gpu_isolation import configure_coordinator, validate_entry
 from ..xu_pipeline import ROOT, _execute
-from ..xu_resources import ResourceUnavailable, apply_env_limit, combined_environment, reserve_wave, stage_resources
+from ..xu_resources import ResourceUnavailable, apply_env_limit, combined_environment, gpu_budget, reserve_wave, stage_resources
 from ..xu_training import _save
-from .sam_med3d import WIDTH, WEIGHT_SHA256, load_model, prompt_patch
+from .sam_med3d import SPACING_MM, WIDTH, WEIGHT_SHA256, load_model, prompt_patch
+
+
+CUDA_BYTES = 3*1024**3
+CASE_SEED = 2023
 
 
 class PromptHead(nn.Module):
@@ -71,6 +76,7 @@ def fingerprint(head):
 
 def train_rank(output, rank, device):
     request = read_json(output/'request.json')
+    settings = request['training']
     card = request['cards'][rank]
     mapping, = json.loads(os.environ['XU_GPU_ISOLATION'])
     if mapping['uuid'] != card['uuid'] or mapping['device'] != device:
@@ -91,12 +97,13 @@ def train_rank(output, rank, device):
     head = PromptHead(model).train()
     training = (nn.parallel.DistributedDataParallel(head, device_ids=[0], find_unused_parameters=True)
                 if size > 1 else head)
-    optimizer = torch.optim.AdamW(head.parameters(), lr=8e-5, weight_decay=.1)
+    optimizer = torch.optim.AdamW(head.parameters(), lr=settings['learning_rate'],
+                                  weight_decay=settings['weight_decay'])
     before = fingerprint(head)
     losses = []
     torch.cuda.reset_peak_memory_stats(device)
     for step, name in enumerate(request['cases'][rank], 1):
-        patch, target, center = sample(cache, name, request['label'], 2023 + size*step + rank)
+        patch, target, center = sample(cache, name, request['label'], settings['seed'] + size*step + rank)
         image = torch.from_numpy(patch)[None, None].to(device)
         target = torch.from_numpy(target)[None, None].to(device, dtype=torch.float32)
         point = torch.as_tensor(center, device=device, dtype=torch.float32)[None, None]
@@ -107,12 +114,13 @@ def train_rank(output, rank, device):
         optimizer.zero_grad(set_to_none=True)
         logits = training(embedding, point, point_type, previous)
         probability = logits.sigmoid()
-        dice = (2*(probability*target).sum()+1)/(probability.sum()+target.sum()+1)
+        smooth = settings['dice_smoothing']
+        dice = (2*(probability*target).sum()+smooth)/(probability.sum()+target.sum()+smooth)
         loss = F.binary_cross_entropy_with_logits(logits, target) + 1-dice
         if not bool(torch.isfinite(loss)):
             raise ValueError('SAM-Med3D 损失非有限')
         loss.backward()
-        nn.utils.clip_grad_norm_(head.parameters(), 1., error_if_nonfinite=True)
+        nn.utils.clip_grad_norm_(head.parameters(), settings['gradient_clip'], error_if_nonfinite=True)
         optimizer.step()
         losses.append(loss.item())
         print(dict(rank=rank, step=step, total=request['steps'], loss=losses[-1]), flush=True)
@@ -130,7 +138,44 @@ def train_rank(output, rank, device):
         dist.destroy_process_group()
 
 
+def wait_for_cards(args, output, children, host_bytes):
+    candidates = [card for card in select_devices(None,args.devices,torch)
+                  if card['device'] != 'cpu'
+                  and gpu_budget(card['total_bytes'],card['total_bytes'],'v2') >= CUDA_BYTES]
+    if len(candidates) < args.gpus:
+        raise ValueError(f'当前授权范围只有 {len(candidates)} 张容量符合要求的显卡，需要 {args.gpus} 张')
+    while True:
+        cards, plans, denied = [], [], []
+        try:
+            reserve = reserve_wave(args.threads,'v2') if args.gpus==2 else None
+        except ResourceUnavailable as error:
+            denied.append(str(error))
+        else:
+            for card in candidates:
+                try:
+                    plan = stage_resources([card['device']], concurrent=args.gpus, threads=args.threads,
+                        wave_reservation=reserve, require_pid_evidence=True,
+                        host_demand_bytes=host_bytes, cuda_demand_bytes=CUDA_BYTES, owned_pids=children.pids())
+                except ResourceUnavailable as error:
+                    denied.append(str(error))
+                    continue
+                cards.append(card)
+                plans.append(plan)
+                if len(cards) == args.gpus:
+                    return cards,plans
+        reason = '；'.join(denied)
+        message = f'可用显卡 {len(cards)}/{args.gpus}。{reason}'
+        if args.wait_seconds == 0:
+            raise ResourceUnavailable(message)
+        write_status(output, state='waiting_resources', stage='sam-med3d-admission', active=[],
+                     eligible=len(cards), required=args.gpus, next_check_seconds=args.wait_seconds, reason=reason)
+        print(f'{message} {args.wait_seconds} 秒后重新检查。',flush=True)
+        time.sleep(args.wait_seconds)
+
+
 def run(args):
+    if args.threads < 1 or not 0 <= args.wait_seconds <= 300:
+        raise ValueError('线程数须为正数，等待间隔须在 0 至 300 秒之间')
     configure_coordinator()
     output = args.output.resolve()
     paths = (ROOT, args.prepared.resolve(), args.weights.resolve())
@@ -143,36 +188,25 @@ def run(args):
                 if args.label in cache.supervision[name]['present_classes']]
     if len(eligible) < args.gpus*args.steps:
         raise ValueError('短测需要足够的互不重复且标有目标结构的训练病例')
-    names = np.random.default_rng(2023).choice(eligible, size=args.gpus*args.steps, replace=False).tolist()
+    names = np.random.default_rng(CASE_SEED).choice(eligible, size=args.gpus*args.steps, replace=False).tolist()
     gib = 1024**3
     host_bytes = 3*gib + 10*max(prod(cache.geometry(name).native_shape_xyz) for name in names)
     output.mkdir(mode=0o700, parents=True, exist_ok=False)
     with operation_lock(output, 'sam-med3d-trial', output) as owner:
         children = Children(output, owner)
         try:
-            reserve = reserve_wave(args.threads, 'v2') if args.gpus==2 else None
-            cards, plans, denied = [], [], []
-            for card in select_devices(None, args.devices, torch):
-                device = card['device']
-                try:
-                    plan = stage_resources([device], concurrent=args.gpus, threads=args.threads,
-                        wave_reservation=reserve, require_pid_evidence=True,
-                        host_demand_bytes=host_bytes, cuda_demand_bytes=3*gib,
-                        owned_pids=children.pids())
-                except ResourceUnavailable as error:
-                    denied.append(str(error))
-                    continue
-                cards.append(card)
-                plans.append(plan)
-                if len(cards) == args.gpus:
-                    break
-            if len(cards) != args.gpus:
-                raise ResourceUnavailable(f'需要 {args.gpus} 张符合准入条件的空闲显卡。' + ' '.join(denied))
+            cards,plans = wait_for_cards(args,output,children,host_bytes)
             store = (dist.TCPStore('127.0.0.1', 0, None, True, timedelta(minutes=4), False, use_libuv=False)
                      if args.gpus==2 else None)
+            training = dict(optimizer='AdamW', learning_rate=8e-5, weight_decay=.1, gradient_clip=1.,
+                            loss='BCEWithLogits + soft Dice', dice_smoothing=1., seed=CASE_SEED,
+                            precision='float32', patch_voxels=[WIDTH]*3, spacing_mm=[SPACING_MM]*3,
+                            batch_per_gpu=1, global_batch=args.gpus, frozen=['image_encoder'],
+                            trainable=['prompt_encoder','mask_decoder'])
             request = dict(prepared=str(cache.run_dir), prepared_digest=cache.request_digest,
                            technical_subset=args.technical_subset, weights=str(args.weights.resolve()),
-                           label=args.label, steps=args.steps, cards=cards,
+                           weights_sha256=WEIGHT_SHA256, label=args.label, steps=args.steps, cards=cards,
+                           training=training, wait_seconds=args.wait_seconds,
                            port=store.port if store else None,
                            cases=[names[rank::args.gpus] for rank in range(args.gpus)])
             atomic_json(output/'request.json', request)
@@ -190,12 +224,14 @@ def run(args):
             ranks = [read_json(output/f'rank-{i}.json') for i in range(args.gpus)]
             if len({r['before'] for r in ranks}) != 1 or len({r['after'] for r in ranks}) != 1:
                 raise ValueError('两张显卡的模型参数未同步')
-            receipt = dict(state='passed', ranks=ranks, checkpoint_sha256=sha256_file(output/'last.pt'))
+            receipt = dict(state='passed', ranks=ranks, label=args.label, optimizer_steps=args.steps,
+                           training=training, checkpoint_sha256=sha256_file(output/'last.pt'))
             atomic_json(output/'result.json', receipt)
             write_status(output, state='complete', stage='sam-med3d-trial', active=[])
             print(output/'result.json', flush=True)
         except (Exception, KeyboardInterrupt) as error:
-            write_status(output, state='failed', error=str(error), active=[])
+            write_status(output, state='interrupted' if isinstance(error,KeyboardInterrupt) else 'failed',
+                         error=str(error), active=[])
             raise
         finally:
             children.stop()
@@ -212,6 +248,8 @@ def main():
     p.add_argument('--steps', type=int, choices=range(1,9), default=2)
     p.add_argument('--label', type=int, choices=range(1,11), default=1)
     p.add_argument('--threads', type=int, default=4)
+    p.add_argument('--wait-seconds', type=int, default=30,
+                   help='资源不足时的复查间隔，0 表示立即退出')
     p.add_argument('--technical-subset', action='store_true')
     p = commands.add_parser('worker')
     p.add_argument('--output', type=Path, required=True)
