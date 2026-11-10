@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-from chd_stunet.config import ROOT, read_config, resolve_path, training_paths
+from chd_stunet.config import ROOT, prediction_paths, read_config, resolve_path, training_paths
 
 from .contracts import read_json, settings
 
@@ -80,6 +80,9 @@ def parser_for(command):
         parser.add_argument('--prompts')
         parser.add_argument('--prompt-source', choices=['manual_box', 'simulated_gt_single_box'], required=True)
         parser.add_argument('--checkpoint', choices=['best', 'latest'], default='best')
+        parser.add_argument('--check-only', action='store_true', help='核验权重和输入，不占用 GPU')
+        parser.add_argument('--resume', action='store_true', help='续跑指定输出目录的留出集预测')
+        parser.add_argument('--retain-raw', action='store_true', help='保留留出病例各类原始掩膜和轴位数组')
     else:
         raise ValueError('MedSAM2 支持 prepare、train 和 predict')
     return parser
@@ -128,7 +131,8 @@ def main(arguments):
     elif command == 'train':
         result, output = train(args, local, paths, stamp)
     else:
-        result, output = predict(args, paths, stamp)
+        from .prediction import predict
+        result, output = predict(args, prediction_paths(local), stamp)
     print(json.dumps(dict(result, output=str(output)), ensure_ascii=False, indent=2), flush=True)
     return 1 if result.get('status') == 'needs_attention' else 0
 
@@ -222,69 +226,6 @@ def train(args, local, paths, stamp):
                     wait_seconds=args.gpu_wait_seconds, shared_desktop=desktop, background=args.background,
                     resume=args.resume, stop_after_steps=args.stop_after_steps, recovery_root=recovery)
     return result, output
-
-
-def predict(args, paths, stamp):
-    import torch
-    from chd_stunet.acceleration.prediction import admit_prediction_device, desktop_identity
-    from chd_stunet.observability.runlog import RunLog, write_json
-    from .checkpoints import load
-    from .inference import evaluate_case, predict_image
-    from .model import build, versions
-    from .preprocessing import case_metadata
-    from .runtime import frozen_job
-    from .contracts import check_signature
-
-    training = resolve_path(args.training_run)
-    contract = frozen_job(training)['contract']
-    config = contract['config']
-    if (config['scope']=='capacity_probe' or (config['scope']=='smoke' and not args.smoke)
-            or versions()!=contract['versions']):
-        raise ValueError('MedSAM2 预测范围或依赖与训练合同不匹配')
-    if args.fold is not None and args.fold != contract['fold']:
-        raise ValueError('MedSAM2 预测与来源训练折不一致')
-    output = resolve_path(args.output) if args.output else resolve_path(paths.get('prediction_output_root',
-                                                      'outputs/prediction'))/'medsam2'/stamp
-    if output.exists() and any(output.iterdir()):
-        raise FileExistsError('MedSAM2 预测输出须为空目录')
-    prepared = Path(contract['prepared'])
-    if any(output.is_relative_to(path) or path.is_relative_to(output) for path in (training, prepared)):
-        raise ValueError('MedSAM2 预测输出须和输入分离')
-    if args.prompt_source == 'manual_box' and (not args.image or not args.prompts or args.cases):
-        raise ValueError('人工提示需要 --image 和 --prompts')
-    if args.prompt_source != 'manual_box' and (args.image or args.prompts):
-        raise ValueError('真值模拟提示只用于原折留出病例')
-    shared = desktop_identity(args.share_desktop_pid, args.smoke) if args.share_desktop_pid else None
-    device, admission = admit_prediction_device(args.device or 'cuda', shared)
-    if device.type == 'cuda':
-        torch.cuda.set_per_process_memory_fraction(admission['usable_bytes']/admission['total_bytes'], device)
-    predictor = build(config, training=False, device=device)
-    predictor.load_state_dict(load(training, contract, args.checkpoint)['model'], strict=True)
-    if args.prompt_source == 'manual_box':
-        with torch.autocast('cuda', dtype=torch.bfloat16, enabled=device.type=='cuda'):
-            return predict_image(predictor, resolve_path(args.image), resolve_path(args.prompts),
-                                 contract['window'], output), output
-    manifest = read_json(prepared/'manifest.json')
-    prepared_summary = read_json(prepared/'summary.json')
-    check_signature(manifest)
-    if manifest['identity'] != contract['data_identity']:
-        raise ValueError('MedSAM2 测试清单与训练合同不同')
-    candidates = {row['case_id']: row for row in manifest['cases'] if row['roles'][str(contract['fold'])]=='test'}
-    wanted = args.cases or sorted(candidates)
-    if not wanted or len(wanted)!=len(set(wanted)) or set(wanted)-candidates.keys():
-        raise ValueError('MedSAM2 测试病例必须属于来源训练折留出集')
-    metadata = {cid: case_metadata(prepared/'cases'/cid, candidates[cid], track_files=True) for cid in wanted}
-    if any(prepared_summary['completed'].get(cid) != marker['identity'] for cid, marker in metadata.items()):
-        raise ValueError('MedSAM2 留出病例未在已提交清单中')
-    log = RunLog(output)
-    with torch.autocast('cuda', dtype=torch.bfloat16, enabled=device.type=='cuda'):
-        rows = [evaluate_case(predictor, prepared, cid, metadata[cid], contract['window'],
-                              output/'cases'/cid, log) for cid in wanted]
-    summary = dict(status='completed', scope='whole_volume', fold=contract['fold'],
-                   prompt_source=args.prompt_source, results=rows,
-                   mean_dice=sum(row['mean_dice'] for row in rows)/len(rows))
-    write_json(output/'summary.json', summary)
-    return summary, output
 
 
 def worker(output, device):

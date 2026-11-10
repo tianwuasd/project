@@ -84,11 +84,19 @@ python3 run.py train --model medsam2 --resume --output "$train_run" --background
 
 ## 带提示的整卷预测
 
+`train_run` 为完成的 MedSAM2 训练目录，默认使用按验证集 Dice 保存的 `best` 检查点。正式命令默认处理该折全部留出病例。短测默认处理一个病例，保留整卷切片。可用 `--cases ct_1002` 指定来源训练折的留出病例。
+
 ```bash
+python3 smoke.py --stage predict --model medsam2 --training-run "$train_run" \
+  --prompt-source simulated_gt_single_box --output "$smoke_run"
 python3 run.py predict --model medsam2 --training-run "$train_run" \
   --prompt-source simulated_gt_single_box --output "$pred_run"
 python3 run.py predict --model medsam2 --training-run "$train_run" \
   --prompt-source manual_box --image "$ct" --prompts "$boxes" --output "$new_pred"
 ```
 
-人工提示 JSON 包含 `prompt_source: manual_box`、输入 CT 的 `image_sha256` 和七项 `boxes`。每项使用 `label`（1 到 7）、零起点 RAS 轴位层号 `frame`，及原切片像素坐标 `xyxy`（左、上、右、下）。类别依次为 LV、RV、LA、RA、MYO、AO、PA。每类一个框，坐标需落在切片内。正式留出结果包含原网格 NIfTI、原始类掩膜、提示 JSON 和分结构指标。
+`--check-only` 只核验训练来源、检查点和预测输入，无需申请 GPU。`--device cpu` 使用 CPU。默认从当前允许使用的显卡中选择一张空闲卡，优先选择可用显存较多的卡。预留显存取 4 GiB 与总显存 10% 中的较大值。可以用 `CUDA_VISIBLE_DEVICES` 限制候选范围。
+
+留出集预测中断后，用相同参数和原 `--output` 加上 `--resume`。程序核对检查点、病例清单和计算精度，校验已完成病例的输出摘要，然后继续未完成病例。每例保存原 CT 网格的 `segmentation.nii.gz`、`prompts.json` 和 `result.json`。需要保留各类原始掩膜和轴位数组时，加 `--retain-raw`。总 `summary.json` 汇总平均 Dice、七结构平均 Dice 和缺失预测数。可用 `tail -F "$pred_run/logs/run.log"` 跟踪逐例和逐结构进度，`status.json` 保存当前阶段和帧数。
+
+人工提示 JSON 包含 `prompt_source: manual_box`、输入 CT 的 `image_sha256` 和七项 `boxes`。每项使用 `label`（1 到 7）、零起点 RAS 轴位层号 `frame`，及原切片像素坐标 `xyxy`（左、上、右、下）。类别依次为 LV、RV、LA、RA、MYO、AO、PA。每类一个框，坐标需落在切片内。人工提示模式导出分割和提示记录，无评分。

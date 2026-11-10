@@ -13,7 +13,7 @@ from chd_stunet.preprocessing.cohort import TARGETS
 
 from .contracts import file_sha, read_json
 from .data import frame_tensor, xyxy
-from .preprocessing import assert_case_files, canonical_image, to_axial, to_native
+from .preprocessing import assert_case_files, canonical_image, file_stamp, to_axial, to_native
 
 
 LABEL_NAMES = {value: key for key, value in TARGETS.items() if 1 <= value <= 7}
@@ -93,7 +93,7 @@ def validate_prompts(prompts, shape, *, source):
 
 @torch.inference_mode()
 def segment(predictor, axial, window, prompts, output, *, source, callback=None,
-            reader=None, source_path=None, source_offset=0):
+            reader=None, source_path=None, source_offset=0, frame_progress=None):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     boxes = validate_prompts(prompts, axial.shape, source=source)
@@ -127,6 +127,8 @@ def segment(predictor, axial, window, prompts, output, *, source, callback=None,
                 wins = layer > best[z]
                 best[z][wins], labels[z][wins] = layer[wins], label
                 seen.add(z)
+                if frame_progress:
+                    frame_progress(label, len(seen), depth)
         if seen != set(range(depth)):
             raise RuntimeError('MedSAM2 双向传播未覆盖全部切片')
         mask.flush()
@@ -160,7 +162,8 @@ def dice_on_native(pred, truth, progress=None):
 
 
 def evaluate_case(predictor, prepared, cid, meta, window, output, log, *,
-                  frame_limit=None, retain_raw=True, reader=None):
+                  frame_limit=None, retain_raw=True, reader=None, export_segmentation=False,
+                  frame_progress=None):
     folder = prepared/'cases'/cid
     image_path, label_path = folder/'ct.npy', folder/'labels.npy'
     scope = reader or nullcontext()
@@ -187,6 +190,7 @@ def evaluate_case(predictor, prepared, cid, meta, window, output, log, *,
     def evaluate(workspace):
         result = segment(predictor, axial, window, prompts, workspace, source='simulated_gt_single_box',
                          reader=reader, source_path=image_path, source_offset=offset,
+                         frame_progress=frame_progress,
                          callback=lambda label, z, depth: log.event('validation.structure',
                                   f'{cid} {LABEL_NAMES[label]}：{depth}帧，提示第{z}帧'))
         with scope as progress:
@@ -197,7 +201,8 @@ def evaluate_case(predictor, prepared, cid, meta, window, output, log, *,
         native = to_native(result, meta['geometry'])
         if list(native.shape) != meta['geometry']['native_shape']:
             raise ValueError('MedSAM2 验证分割未恢复到原始网格')
-        if retain_raw:
+        if retain_raw or export_segmentation:
+            Path(output).mkdir(parents=True, exist_ok=True)
             save_nifti(Path(output)/'segmentation.nii.gz', native, np.asarray(meta['geometry']['affine']))
         # 轴序转换只改变排列，按连续轴位切片评分可减少缓存页的反复读取。
         return metrics
@@ -218,24 +223,36 @@ def evaluate_case(predictor, prepared, cid, meta, window, output, log, *,
     return record
 
 
-def predict_image(predictor, image_path, prompts_path, window, output):
-    output = Path(output)
-    if output.exists() and any(output.iterdir()):
-        raise FileExistsError('MedSAM2 预测输出须为空目录')
+def read_prompted_image(image_path, prompts_path):
+    stamp = file_stamp(image_path)
     image = nib.load(image_path)
     if image.header.get_xyzt_units()[0] != 'mm':
         raise ValueError('新 CT 要求明确的毫米坐标单位')
     geometry = canonical_image(image)
+    prompts = read_json(prompts_path)
+    if prompts['image_sha256'] != file_sha(image_path) or file_stamp(image_path) != stamp:
+        raise ValueError('人工框提示与输入 CT 摘要不一致')
+    # 提示坐标以转为 RAS 后的轴位数组为准，头部尺寸核验无需读取整卷。
+    order = np.argsort(np.asarray(geometry['forward'])[:, 0])[::-1]
+    validate_prompts(prompts, tuple(image.shape[axis] for axis in order), source='manual_box')
+    return image, geometry, prompts, stamp
+
+
+def predict_image(predictor, image, geometry, prompts, stamp, window, output, log, *, frame_progress=None):
+    image_path = Path(image.get_filename())
+    if file_stamp(image_path) != stamp:
+        raise ValueError('新 CT 在提示核验后变化')
     axial = to_axial(image.get_fdata(dtype=np.float32), geometry)
+    if file_stamp(image_path) != stamp:
+        raise ValueError('新 CT 在读取中变化')
     if not np.isfinite(axial).all():
         raise ValueError('新 CT 含非有限像素值')
-    prompts = read_json(prompts_path)
-    if prompts['image_sha256'] != file_sha(image_path):
-        raise ValueError('人工框提示与输入 CT 摘要不一致')
-    prediction = segment(predictor, axial, window, prompts, output, source='manual_box')
+    prediction = segment(predictor, axial, window, prompts, output, source='manual_box',
+                         frame_progress=frame_progress,
+                         callback=lambda label, z, depth: log.event('prediction.structure',
+                                  f'{LABEL_NAMES[label]}：{depth}帧，提示第{z}帧'))
     target = output/'segmentation.nii.gz'
     save_nifti(target, to_native(prediction, geometry), np.asarray(geometry['affine']))
     record = dict(status='completed', segmentation=str(target), sha256=file_sha(target),
                   image_sha256=prompts['image_sha256'], prompt_source='manual_box')
-    write_json(output/'summary.json', record)
     return record

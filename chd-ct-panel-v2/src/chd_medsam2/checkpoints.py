@@ -184,12 +184,20 @@ def save(output, contract, network, optimizer, state, *, best=False, recovery=No
 
 
 def load(output, contract, role='latest'):
+    return load_committed(output, contract, checkpoint_pointer(output, role))
+
+
+def checkpoint_pointer(output, role):
+    pointer = roles(Path(output)/'checkpoints').get(role)
+    if pointer is None:
+        raise FileNotFoundError(f'MedSAM2 检查点角色尚未提交：{role}')
+    return pointer
+
+
+def load_committed(output, contract, pointer):
     import torch
 
     root = Path(output)/'checkpoints'
-    pointer = roles(root).get(role)
-    if pointer is None:
-        raise FileNotFoundError(f'MedSAM2 检查点角色尚未提交：{role}')
     path = root/pointer['name']
     if (pointer['identity'] != contract['identity'] or path.parent != root
             or file_sha(path) != pointer['sha256']):
