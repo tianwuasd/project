@@ -64,3 +64,18 @@ GPU 工作进程按 UUID 隔离，物理 0、1 号与其他获准设备一同参
 启动前资源不足时，默认每 30 秒复查显卡和主机资源。等待期间 `status.json` 显示 `waiting_resources`，两张显卡同时通过准入后才创建训练进程。`--wait-seconds 0` 立即报告资源不足。
 
 查看 `logs/sam-train-rank*.log`。两个进程都完成更新、参数摘要一致且权重写入 `last.pt` 后，才会生成 `result.json` 并标记 `passed`。
+
+## 后台连续运行与正式训练
+
+```bash
+nohup "$PY" -B -u scripts/sam_med3d_train.py chain \
+  --prepared "$D" --weights "$SAM" --gpus 2 --epochs 20 --output "$RUN" \
+  >"$RUN.log" 2>&1 < /dev/null &
+echo "$!"
+```
+
+程序在 `short/` 等待两张可用显卡并运行两步短测。短测通过后，在 `train/` 重新检查显卡并从官方 Turbo 权重开始正式训练。每轮打乱训练病例顺序，每例抽取一个已标注结构，各轮轮换结构。590 例、双卡全局批量 2 时每轮 295 次更新。
+
+开发集每例使用固定结构和固定提示点。每轮统计各结构局部块 Dice，以已测结构的平均 Dice 选最优权重。正式训练的 `training.json` 记录轮次、开发结果和最优权重文件。每轮原子保存 `last.pt`，包含模型、优化器和训练历史。
+
+后台任务接收 TERM 后停止自己的训练进程。在正式训练阶段中断时，可用 `run --epochs 20 --resume`，输入、权重和输出沿用 `train/` 对应的配置，从最近保存的完整轮次继续。轮数可以增加。
