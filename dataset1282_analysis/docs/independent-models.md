@@ -49,3 +49,14 @@ GPU 工作进程按 UUID 隔离，物理 0、1 号与其他获准设备一同参
 两套预测默认读取三个冻结留出组。可用 `--groups` 或 `--case` 选择子集。技术验收可使用 `--technical-subset --development` 读取已预处理的开发病例。训练短测可显式降低 `--epochs`、`--train-steps` 和 `--development-steps`。
 
 正式评分记录各结构 Dice、HD95、ASD 和有效样本数。SAM 报告另记录缺提示、缺标和空预测。比较结果时按同一批病例和结构区分自动分割与单正点提示分割。
+
+## SAM-Med3D 双卡训练短测
+
+```bash
+"$PY" -B -u scripts/sam_med3d_train.py run \
+  --prepared "$D" --weights "$SAM" --gpus 2 --steps 2 --output "$TRIAL"
+```
+
+短测从训练组选择四个已标注左心室的独立病例，每卡每步处理一例。按推理同样的 1.5 mm 间距和 128³ 局部块产生训练输入，正点从对应训练掩膜内部取样。冻结影像编码器，使用 NCCL 同步更新提示编码器和掩膜解码器。调度进程为每个训练进程分配不同物理 UUID，每个进程只看到自己的显卡。默认从当前授权范围选择两张符合准入条件的空闲卡。
+
+查看 `logs/sam-train-rank*.log`。两个进程都完成更新、参数摘要一致且权重写入 `last.pt` 后，才会生成 `result.json` 并标记 `passed`。
