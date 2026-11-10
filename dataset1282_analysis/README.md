@@ -84,3 +84,7 @@ GPU 入口默认排除物理 0、1 号卡。并发训练先统一登记进程再
 使用项目专属环境运行 `python -B -m unittest discover -s tests -v`。测试只创建临时合成输入，实际数据不放入仓库。需要完整环境与足够 RAM 才能执行正式链路测试；资源不足会明确停止。
 
 代码发布目标固定为 `tianwuasd/project` 的 `dataset1282_analysis` 子目录。真实影像、Excel、患者字段、映射、分析结果、环境和本机配置均不属于代码发布内容。
+
+## STU-Net-S 与 SAM-Med3D
+
+两套独立模型沿用 Dataset1282 的病例划分和原图评价。命令、依赖、提示点格式和短测范围见[独立模型使用说明](docs/independent-models.md)。
