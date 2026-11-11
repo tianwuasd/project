@@ -8,9 +8,9 @@ import time
 from .contracts import atomic_json, digest, read_json
 from .xu_resources import ResourceUnavailable, GpuResourcesChanged, stage_resources
 
-TRAIN_3D = {'crop64','crop128','all64','all128','init64','init128'}
-INFERENCE = {'localize','evaluate-all64','evaluate-all128','four-way','six-way','with-blood'}
-CPU_STAGES = {'audit-roi','targets','vessels'}
+TRAIN_3D = {'crop64','crop128','all64','all128','init64','init128','auto-init64','auto-init128'}
+INFERENCE = {'localize','evaluate-all64','evaluate-all128','four-way','six-way','auto-six-way','with-blood'}
+CPU_STAGES = {'audit-roi','targets','auto-targets','vessels'}
 
 
 def preflight_sizes(stage):

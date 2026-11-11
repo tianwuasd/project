@@ -2,6 +2,8 @@
 
 本分支从已完成的 0.3.0 HU 缓存运行固定划分的 Xu 解剖分割。`scripts/xu_pipeline.py run` 串联双尺度定位、严格投票后扩框 20%、四路基础分割、可用的起始段和血池分支、血管后处理及原网格评价。每一阶段单独保存日志、结果和恢复依据。[全模型运行与恢复](docs/xu-model-run.md) · [各分支与取框验收条件](docs/xu-segmentation.md)
 
+Blood 支持容量约束的七帧分组、开发集特征复用和逐病例只读会话。原任务可显式增加 `--auto-init`，复用已有权重与完整轮次检查点，并训练使用扩大物理范围的 init64/init128。[执行、验收与续跑命令](docs/blood-auto-init.md)
+
 可在 Windows 本机或 Linux 服务器调用的 NIfTI + Excel 只读数据审计工程。首版提供独立环境部署、代码更新、数据统计和本地报告；适合先弄清数据来源与质量，再决定后续处理。
 
 审计入口只读，按文件对数与不同 PatientID 数分别统计。独立 `prepare` 入口按方案 A 建立患者分组，在私有工作区生成 nnU-Net 预处理副本。0.3.0 新增 HU、Excel 共同毫米网格、部分标签边际损失接口、V2 资源调度及可靠短测。[当前工作流](docs/hu-marginal-workflow.md)；[旧版试跑与审核格式](docs/preprocessing.md)。原始影像、标签、Excel 和历史记录保留。
@@ -84,3 +86,7 @@ GPU 入口默认排除物理 0、1 号卡。并发训练先统一登记进程再
 使用项目专属环境运行 `python -B -m unittest discover -s tests -v`。测试只创建临时合成输入，实际数据不放入仓库。需要完整环境与足够 RAM 才能执行正式链路测试；资源不足会明确停止。
 
 代码发布目标固定为 `tianwuasd/project` 的 `dataset1282_analysis` 子目录。真实影像、Excel、患者字段、映射、分析结果、环境和本机配置均不属于代码发布内容。
+
+## STU-Net-S 与 SAM-Med3D
+
+两套独立模型沿用 Dataset1282 的病例划分和原图评价。命令、依赖、提示点格式和短测范围见[独立模型使用说明](docs/independent-models.md)。

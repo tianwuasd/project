@@ -22,7 +22,7 @@ def stage_minimum(args, name):
         voxels = max(1,getattr(args,'max_source_voxels',0))
         batch = 4 if args.profile == 'paper' else 1
         return max(blood_batch_bytes(voxels,batch,False),blood_batch_bytes(voxels,1,True))
-    if name not in ('crop64','crop128','all64','all128','init64','init128'):
+    if name not in ('crop64','crop128','all64','all128','init64','init128','auto-init64','auto-init128'):
         return 0
     side = 128 if name.endswith('128') else 64
     batch = 4 if args.profile == 'paper' else 1

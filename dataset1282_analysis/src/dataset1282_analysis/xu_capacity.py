@@ -174,6 +174,7 @@ def _step_blood(stage, device, record=None):
     scores = forward(images,sequence)
     if record is not None:
         record['distribution'] = forward.distribution.stats
+        record['blood_execution'] = forward.execution
     loss = _objective(scores, target)
     optimizer.zero_grad(set_to_none=True)
     loss.backward()

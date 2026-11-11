@@ -95,10 +95,29 @@ def iter_stages(cache, args, out):
         six += ['--'+branch, out/branch/'best.pt']
     yield stage('six-way', 'fuse', six, fusion_files, 'job.json', init_skip)
 
+    auto = getattr(args, 'auto_init', False)
+    if auto:
+        from .xu_init_extension import eligible_counts
+        yield stage('auto-targets', 'build-auto-targets',
+                    ['--radius-mm', str(args.init_radius_mm),
+                     '--margin-percent', str(args.init_margin_percent)],
+                    ('target-request.json', 'targets.json', 'auto-target-report.json'), 'target-request.json')
+        auto_counts = eligible_counts(cache, out/'auto-targets', args.supervision)
+        shortfall = _shortfall('auto-init', auto_counts, 4 if args.profile == 'paper' else 1)
+        if shortfall:
+            raise ValueError(f'Explicit auto-init supervision requirement failed: {shortfall}')
+        six = list(four)
+        for branch in ('init64', 'init128'):
+            yield stage('auto-'+branch, 'train-init',
+                        [*arm, *seed, *boxes, '--targets', out/'auto-targets', '--branch', branch],
+                        training_files, 'last.pt')
+            six += ['--'+branch, out/('auto-'+branch)/'best.pt']
+        yield stage('auto-six-way', 'fuse', six, fusion_files, 'job.json')
+
     yield stage('blood', 'train-blood', [*arm, *seed, *targets], ('best.pt', 'blood-training.json'),
                 'blood-contract.json', blood_skip)
-    fused = 'four-way' if init_skip else 'six-way'
-    blood_fusion = [*(four if init_skip else six), '--blood', out/'blood'/'best.pt']
+    fused = 'auto-six-way' if auto else ('four-way' if init_skip else 'six-way')
+    blood_fusion = [*(six if auto or not init_skip else four), '--blood', out/'blood'/'best.pt']
     yield stage('with-blood', 'fuse', blood_fusion, fusion_files, 'job.json', blood_skip)
     if blood_skip is None:
         fused = 'with-blood'

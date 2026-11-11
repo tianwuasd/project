@@ -168,11 +168,16 @@ class TargetStore:
         self.cache = cache
         self.manifest = read_json(self.root/'targets.json')
         c = self.manifest['contract']
-        if (c['protocol'] != PROTOCOL or c['request'] != cache.request_digest
+        from .xu_auto_init import PROTOCOL as AUTO_PROTOCOL, validate_auto_contract
+        if (c['protocol'] not in (PROTOCOL, AUTO_PROTOCOL) or c['request'] != cache.request_digest
                 or c != read_json(self.root/'target-request.json')
                 or set(self.manifest['cases']) != set(cache.case_ids('train')) | set(cache.case_ids('development'))
                 or c['artifacts'] != artifact_identity(cache) or c['anatomy'] != anatomy(cache)):
             raise ValueError('Auxiliary targets from another preparation')
+        if c['protocol'] == AUTO_PROTOCOL:
+            validate_auto_contract(c, cache)
+            if any(set(row['available']) - {'init'} for row in self.manifest['cases'].values()):
+                raise ValueError('Automatic proximal books provide init supervision only')
         self.identity = digest(self.manifest)
         self._verified = set()
 
@@ -361,7 +366,7 @@ def review_views(cache, args, out):
 
 
 def register(subparsers):
-    for name in ('review-targets','build-targets','train-init'):
+    for name in ('review-targets','build-targets','build-auto-targets','train-init'):
         p = subparsers.add_parser(name)
         p.add_argument('--prepared',type=Path,required=True)
         p.add_argument('--technical-subset',action='store_true')
@@ -371,7 +376,10 @@ def register(subparsers):
             p.add_argument('--center-xyz-mm',nargs=3,type=float)
             continue
         p.add_argument('--resume',action='store_true')
-        if name=='build-targets':
+        if name=='build-auto-targets':
+            p.add_argument('--radius-mm',type=float,default=30.0)
+            p.add_argument('--margin-percent',type=float,default=20.0)
+        elif name=='build-targets':
             p.add_argument('--reviews',type=Path,help='Private, reviewed local-mm cut planes/interfaces')
             p.add_argument('--width-mm',type=float,default=1.0)
         else:
@@ -385,6 +393,9 @@ def register(subparsers):
 
 
 def run(cache, args, out):
+    if args.command=='build-auto-targets':
+        from .xu_auto_init import build_auto_targets
+        return build_auto_targets(cache,args,out)
     if args.command=='review-targets':
         return review_views(cache,args,out)
     if args.command=='build-targets':
