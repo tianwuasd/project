@@ -16,6 +16,7 @@ class SliceUNet(nn.Module):
     """Penultimate layer is the input to the temporal classifier."""
     def __init__(self, profile):
         super().__init__()
+        self.activation_checkpointing = True
         levels, self.width = {'paper': (8, 32), 'smoke': (3, 2)}[profile]
         channels = [self.width * 2**i for i in range(levels)]
         self.encoder = nn.ModuleList(block(before, after) for before, after
@@ -26,7 +27,7 @@ class SliceUNet(nn.Module):
         self.head = nn.Conv2d(self.width, 3, 1)
 
     def _block(self, layer, x):
-        if self.training and len(self.encoder) == 8 and torch.is_grad_enabled():
+        if self.activation_checkpointing and self.training and len(self.encoder) == 8 and torch.is_grad_enabled():
             return checkpoint(layer, x, use_reentrant=False)
         return layer(x)
 
@@ -59,6 +60,7 @@ class BloodSequence(nn.Module):
     """Two bidirectional ConvLSTM layers. Classify the center of a seven-slice window."""
     def __init__(self, width):
         super().__init__()
+        self.activation_checkpointing = True
         self.layers = nn.ModuleList(nn.ModuleList([ConvLSTMCell(cin, width),
                                                    ConvLSTMCell(cin, width)])
                                     for cin in (width, 2 * width))
@@ -70,7 +72,7 @@ class BloodSequence(nn.Module):
         c = torch.zeros_like(h)
         result = []
         for x in frames:
-            if self.training and cell.hidden == 32:
+            if self.activation_checkpointing and self.training and cell.hidden == 32:
                 h, c = checkpoint(cell, x, h, c, use_reentrant=False)
             else:
                 h, c = cell(x, h, c)

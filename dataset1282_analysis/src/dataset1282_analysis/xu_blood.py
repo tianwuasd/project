@@ -1,4 +1,5 @@
 """Train the separate 2D and temporal blood-pool networks on prepared axial slices."""
+from collections import OrderedDict
 from functools import lru_cache
 import json
 from pathlib import Path
@@ -9,6 +10,8 @@ import numpy as np
 from .contracts import atomic_json, read_json, sha256_file
 from .xu_blood_grid import AxialViews
 from .xu_blood_supply import SliceSupply, PhaseTiming, prepare_slices, augment_slices
+from .xu_blood_execution import execution_policy
+from .xu_blood_io import case_readers
 
 
 # Reviewed at 13ceecc2. Unscoped v1 used every case with a known blood target.
@@ -48,7 +51,8 @@ def register(commands):
 def _source():
     return {name:sha256_file(Path(__file__).with_name(name)) for name in
             ('xu_blood.py','xu_blood_grid.py','xu_blood_models.py','xu_geometry.py','xu_distributed.py',
-             'xu_blood_supply.py','xu_supply.py','xu_supply_budget.py','xu_resume_compat.py')}
+             'xu_blood_supply.py','xu_supply.py','xu_supply_budget.py','xu_resume_compat.py',
+             'xu_blood_execution.py','xu_blood_io.py')}
 
 
 def blood_cohort(cache, ids, supervision, store=None):
@@ -117,6 +121,9 @@ class BloodForward:
         from .xu_distributed import BranchForward
         self.encoder = encoder
         self.temporal = temporal
+        self.execution = execution_policy(encoder, device, temporal)
+        self.encoder.activation_checkpointing = self.execution['encoder_checkpointing']
+        self.frame_cache = OrderedDict()
         self.distribution = BranchForward(device,7 if temporal else batch_size)
         if temporal:
             class Features(torch.nn.Module):
@@ -135,16 +142,45 @@ class BloodForward:
         else:
             self.features = None
 
-    def __call__(self, images, sequence):
+    def clear_frames(self):
+        self.frame_cache.clear()
+
+    def _encode_frames(self, images):
+        frames = []
+        size = self.execution['frame_batch_applied']
+        for group in images.transpose(0,1).split(size):
+            encoded = self.distribution.forward(self.features, group.contiguous())
+            frames.extend(encoded.split(1))
+        return frames
+
+    def __call__(self, images, sequence, frame_keys=None):
         import torch
         if not self.temporal:
             return self.distribution.forward(self.encoder,images)
+        if images.shape[:2] != (1,7):
+            raise ValueError('Temporal blood input must retain one ordered seven-frame case')
+        sequence.activation_checkpointing = self.execution['sequence_checkpointing']
         with torch.no_grad():
-            if len(self.distribution.stats['assigned_devices']) == 1:
-                frames = [self.distribution.forward(self.features,images[:,i:i+1]) for i in range(7)]
+            if frame_keys is not None and self.execution['development_feature_cache']:
+                if sequence.training or len(frame_keys) != 7:
+                    raise ValueError('跨窗口特征复用仅允许未经增强的开发集预测')
+                missing = list(dict.fromkeys(k for k in frame_keys if k not in self.frame_cache))
+                if missing:
+                    indices = [frame_keys.index(k) for k in missing]
+                    size = self.execution['frame_batch_applied']
+                    for start in range(0,len(indices),size):
+                        group = indices[start:start+size]
+                        encoded = self.distribution.forward(self.features, images[0,group,None].contiguous())
+                        for key, value in zip((missing[i] for i in range(start,start+len(group))),encoded.split(1)):
+                            self.frame_cache[key] = value
+                frames = [self.frame_cache[k] for k in frame_keys]
+                for key in frame_keys:
+                    self.frame_cache.move_to_end(key)
+                while len(self.frame_cache) > 7:
+                    self.frame_cache.popitem(last=False)
+            elif len(self.distribution.stats['assigned_devices']) == 1:
+                frames = self._encode_frames(images)
             else:
-                if images.shape[:2] != (1,7):
-                    raise ValueError('Temporal blood input must retain one ordered seven-frame case')
                 frames = self.distribution.forward(self.features, images.transpose(0,1).contiguous()).split(1)
         return sequence(frames)
 
@@ -162,37 +198,43 @@ def _epoch(cache, store, names, encoder, sequence, device, stage, profile, seed,
         rng.shuffle(order)
     batch = 4 if profile=='paper' and not temporal else 1
     forward = BloodForward(encoder,device,temporal,batch)
+    print(json.dumps(dict(stage=stage, phase='train' if training else 'development',
+                          epoch=epoch, execution=forward.execution)),flush=True)
     timing = PhaseTiming()
     loss_sum, count = 0., 0
     for pos, name in enumerate(order,1):
-        views = AxialViews(cache,name,store)
-        centres = np.arange(views.zyx[0])
-        if profile=='smoke':
-            centres = np.array([len(centres)//2])
-        if training:
-            rng.shuffle(centres)
-        supply = SliceSupply(views,centres,batch,temporal)
-        step_seconds = 0.
-        with supply.batches() as batches:
-            for _, pair in batches:
-                images, labels = supply.transfer(pair,device)
-                # 增强随机数在消费线程产生，保持原有病例与切片顺序。
-                images, labels = augment_slices(images,labels,rng if training else None)
-                if not (labels >= 0).any():
-                    continue
-                started = time.perf_counter()
-                with torch.set_grad_enabled(training):
-                    scores = forward(images,sequence)
-                    loss = _objective(scores,labels)
-                    if not torch.isfinite(loss):
-                        raise FloatingPointError('Nonfinite blood-pool loss')
-                    if training:
-                        optimizer.zero_grad(set_to_none=True)
-                        loss.backward()
-                        optimizer.step()
-                loss_sum += float(loss.detach()) * len(images)
-                count += len(images)
-                step_seconds += time.perf_counter()-started
+        with case_readers(cache,store,name) as (image_reader,target_reader):
+            views = AxialViews(image_reader,name,target_reader)
+            centres = np.arange(views.zyx[0])
+            if profile=='smoke':
+                centres = np.array([len(centres)//2])
+            if training:
+                rng.shuffle(centres)
+            supply = SliceSupply(views,centres,batch,temporal)
+            step_seconds = 0.
+            with supply.batches() as batches:
+                for selected_centres, pair in batches:
+                    images, labels = supply.transfer(pair,device)
+                    # 增强随机数在消费线程产生，保持原有病例与切片顺序。
+                    images, labels = augment_slices(images,labels,rng if training else None)
+                    if not (labels >= 0).any():
+                        continue
+                    started = time.perf_counter()
+                    keys = ([(name,int(z)) for z in views.window(int(selected_centres[0]))]
+                            if temporal and not training else None)
+                    with torch.set_grad_enabled(training):
+                        scores = forward(images,sequence,keys)
+                        loss = _objective(scores,labels)
+                        if not torch.isfinite(loss):
+                            raise FloatingPointError('Nonfinite blood-pool loss')
+                        if training:
+                            optimizer.zero_grad(set_to_none=True)
+                            loss.backward()
+                            optimizer.step()
+                    loss_sum += float(loss.detach()) * len(images)
+                    count += len(images)
+                    step_seconds += time.perf_counter()-started
+            forward.clear_frames()
         finished = time.perf_counter()
         if torch.device(device).type == 'cuda':
             torch.cuda.synchronize(device)

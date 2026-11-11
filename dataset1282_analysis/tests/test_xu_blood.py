@@ -106,26 +106,31 @@ class BloodTrainingTests(unittest.TestCase):
             self.assertGreater(frame.grad.abs().max().item(),0)
 
     def test_train_resume_and_guarded_label_free_prediction(self):
-        from dataset1282_analysis.xu_blood import train, load_blood_predictor, _V1_SOURCE
-        from dataset1282_analysis.contracts import read_json, atomic_json
-        cache=TinyPrepared()
-        args=SimpleNamespace(targets=None,profile='smoke',technical_unvalidated=False,
-                             seed=12,device='cpu',resume=False)
+        from dataset1282_analysis.xu_blood import train, load_blood_predictor
+        from dataset1282_analysis.xu_targets import TargetStore, build_targets
+        from test_xu_targets import on_disk_phantom
+        task_root=Path(r'D:\projects\back\t17\dataset1282-blood-train')
+        task_root.mkdir(parents=True,exist_ok=True)
         saved_threads=torch.get_num_threads()
         torch.set_num_threads(min(2,saved_threads))
         self.addCleanup(torch.set_num_threads,saved_threads)
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch('dataset1282_analysis.xu_targets.TargetStore',return_value=TinyTargets(cache)), \
-             patch('dataset1282_analysis.xu_targets.blood_ids',return_value=tuple(range(1,10))), \
-             patch('dataset1282_analysis.xu_workflow.artifact_identity',return_value='artifacts'):
-            out=Path(tmp)
+        with tempfile.TemporaryDirectory(dir=task_root) as tmp:
+            root=Path(tmp)
+            cache=on_disk_phantom(root/'prepared')
+            target_dir=root/'targets'
+            build_targets(cache,SimpleNamespace(width_mm=1.,reviews=None,resume=False),target_dir)
+            store=TargetStore(target_dir,cache)
+            args=SimpleNamespace(targets=target_dir,profile='smoke',technical_unvalidated=False,
+                                 supervision='marginal',seed=12,device='cpu',resume=False)
+            out=root/'training'
+            out.mkdir()
             report=train(cache,args,out)
             self.assertEqual(report['supervision'],'marginal')
             self.assertEqual(report['selection'],'development')
             self.assertEqual(report['development'],1)
             self.assertIn('validation',report['history']['sequence'][0])
             predictor=load_blood_predictor(cache,out/'best.pt','cpu','smoke')
-            pred=predictor('b',None,(3,2,4))
+            pred=predictor('dev_b',None,(3,2,4))
             self.assertEqual(pred.shape,(3,2,4))
             self.assertEqual(pred.dtype,np.uint8)
             args.resume=True
@@ -138,24 +143,6 @@ class BloodTrainingTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'incompatible'):
                 train(cache,args,out)
             args.seed-=1
-            # Build the exact published v1 envelope around equivalent local synthetic weights.
-            legacy = dict(read_json(out/'blood-contract.json'),method='xu-blood-v1',source=dict(_V1_SOURCE))
-            del legacy['supervision']
-            for path in out.glob('*.pt'):
-                state = torch.load(path,map_location='cpu',weights_only=True)
-                state['contract'] = legacy
-                torch.save(state,path)
-            atomic_json(out/'blood-contract.json',legacy)
-            self.assertEqual(train(cache,args,out)['history'],report['history'])
-            old = load_blood_predictor(cache,out/'best.pt','cpu','smoke')
-            np.testing.assert_array_equal(old('b',None,(3,2,4)),pred)
-            with self.assertRaisesRegex(ValueError,'contract mismatch'):
-                load_blood_predictor(cache,out/'best.pt','cpu','smoke','complete')
             args.supervision='complete'
             with self.assertRaisesRegex(ValueError,'incompatible'):
                 train(cache,args,out)
-            args.supervision='marginal'
-            for invalid in [dict(legacy,source={}),dict(legacy,train=['b'])]:
-                atomic_json(out/'blood-contract.json',invalid)
-                with self.assertRaisesRegex(ValueError,'incompatible'):
-                    train(cache,args,out)

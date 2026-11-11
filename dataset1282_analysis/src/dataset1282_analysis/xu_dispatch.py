@@ -13,6 +13,7 @@ from .contracts import atomic_json
 from .observability.status import register_workers, write_status
 
 PAIRS = {'crop64': 'crop128', 'all64': 'all128', 'init64': 'init128',
+         'auto-init64': 'auto-init128',
          'evaluate-all64': 'evaluate-all128'}
 
 

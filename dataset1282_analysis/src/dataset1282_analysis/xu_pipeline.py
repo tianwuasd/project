@@ -17,6 +17,7 @@ from .xu_reallocation import record_reallocation, run_with_reallocation
 from .xu_resources import GpuResourcesChanged, ResourceUnavailable, resource_error
 from .xu_gpu_isolation import launch_scope, report_for_parent
 from .xu_resume_compat import AUDIT_PATH, assert_execution_sources, preserve_contract
+from .xu_init_extension import STAGES as AUTO_STAGES, bind_extension, extension_identity
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -212,6 +213,8 @@ def _check_manifests(stage, out, records):
             ('--boxes','audit-roi',('boxes.json','localization_qc.json')),
             ('--targets','targets',('targets.json',))]:
         if flag in stage.argv:
+            if flag == '--targets':
+                source = Path(stage.argv[stage.argv.index(flag)+1]).name
             for name in files:
                 if sha256_file(out/source/name) != records[source]['files'][name]:
                     raise ValueError(f'{stage.name} input changed: {source}/{name}')
@@ -234,7 +237,12 @@ def _check_used_weights(stage, directory, records, contract):
         return
     for branch, actual in used.items():
         supplied = contract.get('supplied_'+branch)
-        expected = supplied['sha256'] if supplied else records[branch]['files']['best.pt']
+        source = branch
+        if branch in ('init64', 'init128') and '--'+branch in stage.argv:
+            checkpoint = Path(stage.argv[stage.argv.index('--'+branch)+1])
+            if checkpoint.parent.name == 'auto-'+branch:
+                source = 'auto-'+branch
+        expected = supplied['sha256'] if supplied else records[source]['files']['best.pt']
         if actual != expected:
             raise ValueError(f'{stage.name} consumed different {branch} weights than the frozen run')
 
@@ -244,10 +252,10 @@ def _capacity(stage, checked, out, owner, args):
         return
     if stage.name == 'blood':
         sizes = ('blood-encoder', 'blood-sequence')
-    elif stage.name in ('crop64', 'all64', 'init64'):
+    elif stage.name in ('crop64', 'all64', 'init64', 'auto-init64'):
         # Validate the larger branch before spending a full training run on its smaller partner.
         sizes = ('3d64',) if args.stop_after == stage.name or len(args.device_names) > 1 else ('3d64','3d128')
-    elif stage.name in ('crop128', 'all128', 'init128'):
+    elif stage.name in ('crop128', 'all128', 'init128', 'auto-init128'):
         sizes = ('3d128',)
     else:
         return
@@ -282,15 +290,16 @@ def _capacity(stage, checked, out, owner, args):
             checked[args.device, size] = checked[group,size][args.device]
 
 
-def _result(out, cache, contract, records):
+def _result(out, cache, contract, records, extension=None):
     from .xu_pipeline_stages import auxiliary_counts
     from .xu_targets import anatomy
     comparisons = {}
-    for name in ('evaluate-all64','evaluate-all128','four-way','six-way','with-blood','vessels'):
+    for name in ('evaluate-all64','evaluate-all128','four-way','six-way',
+                 *(('auto-six-way',) if extension else ()), 'with-blood','vessels'):
         if records[name]['state'] == 'complete':
             report = read_json(out/name/'evaluation.json')
             comparisons[name] = {key:report[key] for key in ('full_annotation','observed_structure')}
-    return dict(contract=digest(contract), scope=contract['scope'], supervision=contract['supervision'],
+    result = dict(contract=digest(contract), scope=contract['scope'], supervision=contract['supervision'],
                 padding_percent=PADDING, counts=contract['counts'],
                 stages={k:v['state'] for k,v in records.items()},
                 skipped={k:v['reason'] for k,v in records.items() if v['state']=='skipped'},
@@ -298,6 +307,11 @@ def _result(out, cache, contract, records):
                 anatomy=anatomy(cache),
                 evaluation='fixed development set used for checkpoint selection',
                 comparisons=comparisons, native_predictions='vessels/cases')
+    if extension:
+        from .xu_init_extension import eligible_counts
+        result['auto_init_extension'] = dict(settings=extension,
+            eligible=eligible_counts(cache, out/'auto-targets', contract['supervision']))
+    return result
 
 
 def _stage_spec(stage, contract_id, group=None):
@@ -310,7 +324,8 @@ def _stage_spec(stage, contract_id, group=None):
 
 def _run_stage(stage, args, out, owner, contract, contract_id, checked, records, concurrent):
     directory = out/stage.name
-    if stage.name not in STAGE_NAMES or stage.name in records or directory.resolve()!=directory:
+    allowed = (*STAGE_NAMES, *AUTO_STAGES) if getattr(args, 'auto_init', False) else STAGE_NAMES
+    if stage.name not in allowed or stage.name in records or directory.resolve()!=directory:
         raise ValueError('Unsafe or duplicate pipeline stage')
     receipt = out/'receipts'/(stage.name+'.json')
     spec = _stage_spec(stage, contract_id, getattr(args,'assigned_devices',None))
@@ -401,6 +416,7 @@ def _run_attempt(cache, args, out, owner, contract):
         atomic_json(marker, contract)
 
     contract_id = digest(contract)
+    extension = bind_extension(args, out, contract)
     checked, records = {}, {}
     children = Children(out, owner)
     stage_name = 'setup'
@@ -435,7 +451,8 @@ def _run_attempt(cache, args, out, owner, contract):
                 branch_args.wave_reservation = reservation
                 branch_args.peer_name = next((s.name for s in wave if s.name != stage.name), None)
                 try:
-                    return _run_stage(stage, branch_args, out, owner, contract, contract_id,
+                    stage_id = extension_identity(stage, contract_id, extension)
+                    return _run_stage(stage, branch_args, out, owner, contract, stage_id,
                                       checked, records, max(1, runnable))
                 except (Exception, KeyboardInterrupt) as exc:
                     exc.xu_stage = stage.name
@@ -454,9 +471,10 @@ def _run_attempt(cache, args, out, owner, contract):
                 write_status(out,state='stopped_after_stage',stage=args.stop_after,finished=list(records))
                 return
 
-        if set(records) != set(STAGE_NAMES):
+        expected = set(STAGE_NAMES) | (set(AUTO_STAGES) if extension else set())
+        if set(records) != expected:
             raise ValueError('Pipeline ended before recording every required stage')
-        result = _result(out, cache, contract, records)
+        result = _result(out, cache, contract, records, extension)
         if (out/'result.json').exists() and read_json(out/'result.json') != result:
             raise ValueError('Final result differs from verified stage evidence')
         if not (out/'result.json').exists():
@@ -559,10 +577,13 @@ def main(argv=None):
     run.add_argument('--crop64',type=Path,help='Optional frozen 64-cube whole-scan locator')
     run.add_argument('--crop128',type=Path,help='Optional matching 128-cube whole-scan locator')
     run.add_argument('--reviews',type=Path,help='Private verified cut planes and optional inner interfaces')
+    run.add_argument('--auto-init',action='store_true',help='Enable the immutable automatic proximal-target extension')
+    run.add_argument('--init-radius-mm',type=float,default=30.0)
+    run.add_argument('--init-margin-percent',type=float,default=20.0)
     run.add_argument('--resume',action='store_true')
     run.add_argument('--pause-after-epoch',type=int,choices=(1,2),
                      help='Pause both paper locators after 1 or 2 epochs; remove this flag and add --resume to continue')
-    run.add_argument('--stop-after',choices=STAGE_NAMES,help='Stop after committing this stage; continue with --resume')
+    run.add_argument('--stop-after',choices=(*STAGE_NAMES, *AUTO_STAGES),help='Stop after committing this stage; continue with --resume')
     commands.add_parser('status').add_argument('--output',type=Path,required=True)
     args = parser.parse_args(argv)
     try:

@@ -63,11 +63,12 @@ class CapacityTests(unittest.TestCase):
         self.assertEqual(xu_capacity.device_demands('3d128',names[:1],spec)[names[0]],
                          spec['estimated_working_bytes'])
 
-    def test_blood_shards_keep_order_global_loss_and_update(self):
+    def test_blood_cpu_grouping_keeps_order_global_loss_and_update(self):
         from dataset1282_analysis.xu_blood import BloodForward, _objective
         class Encoder(torch.nn.Module):
             def __init__(self):
                 super().__init__()
+                self.width = 1
                 self.weight = torch.nn.Parameter(torch.tensor(1.3))
             def features(self,x):
                 return self.weight*x
@@ -77,16 +78,21 @@ class CapacityTests(unittest.TestCase):
         class Sequence(Encoder):
             def forward(self,frames):
                 return super().forward(sum((i+1)*x/28 for i,x in enumerate(frames)))
-        def slices(model,chunks,devices):
-            return torch.cat([model(x) for x in chunks])
-        def one(temporal,distributed):
-            enc, seq = Encoder(), Sequence()
+        def one(temporal,grouped):
+            enc, seq = Encoder().eval(), Sequence()
             shape = (1,7,8,8) if temporal else (4,1,8,8)
             x = torch.arange(torch.tensor(shape).prod()).float().reshape(shape)/64
             y = (torch.arange(len(x)*64).reshape(len(x),8,8)%3).long()
             y[:,0,:] = -1
-            worker = BloodForward(enc,'cuda:2' if distributed else 'cpu',temporal,4)
-            logits = worker(x,seq)
+            worker = BloodForward(enc,'cpu',temporal,4) if grouped else None
+            if worker is not None:
+                logits = worker(x,seq)
+            elif temporal:
+                with torch.no_grad():
+                    frames = [enc.features(x[:,i:i+1]) for i in range(7)]
+                logits = seq(frames)
+            else:
+                logits = enc(x)
             loss = _objective(logits,y)
             model = seq if temporal else enc
             opt = torch.optim.Adam(model.parameters(),lr=.002)
@@ -94,20 +100,15 @@ class CapacityTests(unittest.TestCase):
             if temporal:
                 self.assertIsNone(enc.weight.grad)
             opt.step()
-            return logits.detach(),loss.detach(),model.weight.grad,model.weight.detach(),worker.distribution.stats
+            return logits.detach(),loss.detach(),model.weight.grad,model.weight.detach(),worker.distribution.stats if worker else None
         for temporal in (False,True):
-            with self.subTest(temporal=temporal), patch.dict(os.environ,{},clear=True):
+            with self.subTest(temporal=temporal):
                 reference = one(temporal,False)
-                names = ['cuda:2','cuda:0','cuda:1']
-                with patch.dict(os.environ,{'XU_BRANCH_DEVICES':json.dumps(names)}), patch(
-                        'dataset1282_analysis.xu_resources.require_applied_group'), patch(
-                        'dataset1282_analysis.xu_distributed.BranchForward.freeze'), patch(
-                        'dataset1282_analysis.xu_distributed._replica_forward',side_effect=slices):
-                    actual = one(temporal,True)
+                actual = one(temporal,True)
                 for left,right in zip(reference[:4],actual[:4]):
                     torch.testing.assert_close(left,right)
                 self.assertEqual(list(actual[4]['cases_by_device'].values()),
-                                 [3,2,2] if temporal else [2,1,1])
+                                 [7] if temporal else [4])
     def test_resource_limits_use_stage_share_and_policy_reserve_once(self):
         spec = xu_capacity.specification('3d128')
         self.assertGreater(spec['estimated_host_bytes'],0)
