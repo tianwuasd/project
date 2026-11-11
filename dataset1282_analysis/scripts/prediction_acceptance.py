@@ -8,6 +8,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'src'))
 from dataset1282_analysis.contracts import atomic_json, read_json, sha256_file
+from dataset1282_analysis.short_workspace import ShortWorkspace
 
 
 def main():
@@ -19,12 +20,16 @@ def main():
     training = args.training.resolve(strict=True)
     if read_json(training/'run.json')['scope'] != 'technical_subset':
         raise ValueError('Acceptance requires synthetic technical training, with formal held-out data sealed')
-    out = args.output.resolve()
-    if out.exists() and any(out.iterdir()):
-        raise ValueError('Acceptance requires a fresh output directory')
-    out.mkdir(parents=True,exist_ok=True)
-    scratch = out/'temporary'
-    scratch.mkdir()
+    protected=[training]+([args.models] if args.models else [])
+    with ShortWorkspace(args.output,protected_paths=protected,prefix='prediction-accept') as workspace:
+        workspace.record('configuration',arguments=vars(args),training=read_json(training/'run.json'))
+        run_checks(args,training,workspace)
+    print(workspace.logs,flush=True)
+
+
+def run_checks(args,training,workspace):
+    out=workspace.logs
+    scratch=workspace.scratch
     env = dict(os.environ,OMP_NUM_THREADS='1',MKL_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1',
                PYTHONPATH=os.pathsep.join([str(ROOT/'src'),str(ROOT/'tests'),os.environ.get('PYTHONPATH','')]),
                CUDA_VISIBLE_DEVICES='-1',PYTHONIOENCODING='utf-8',TEMP=str(scratch),TMP=str(scratch),
@@ -43,13 +48,12 @@ def main():
                                     cwd=ROOT,env=env,stdout=stream,stderr=subprocess.STDOUT,timeout=900)
         row = dict(check=name,seconds=time.monotonic()-started,exit=result.returncode,log_sha256=sha256_file(log))
         checks.append(row)
-        atomic_json(out/'checks.json',checks)
+        workspace.record('check',**row)
         print(row,flush=True)
         if result.returncode:
             raise RuntimeError(f'{name}: see {log}')
-    atomic_json(out/'acceptance.json',dict(scope='synthetic CPU prediction acceptance',
-                training_protocol=read_json(training/'run.json')['protocol'],checks=checks,cuda_tested=False))
-    print(out/'acceptance.json',flush=True)
+    workspace.record('acceptance',scope='synthetic CPU prediction acceptance',
+                     training_protocol=read_json(training/'run.json')['protocol'],checks=checks,cuda_tested=False)
 
 
 if __name__ == '__main__':

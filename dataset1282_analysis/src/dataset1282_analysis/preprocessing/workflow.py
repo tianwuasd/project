@@ -16,6 +16,7 @@ from ..engine.runner import code_identity
 from ..observability.logging import event
 from ..observability.status import operation_lock, write_status
 from ..resources import preprocessing_memory
+from ..storage_paths import assert_output_location
 
 DATASET = 'Dataset282_CHDSource'
 
@@ -113,7 +114,7 @@ def prepare_workflow(config, root, home, args):
     from .runtime import numerical_runtime
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,79}', args.run):
         raise ValueError('Invalid run identifier')
-    output = Path(config['work_root']) / 'prepared' / args.run / 'hu-marginal'
+    output = assert_output_location(Path(config['work_root']) / 'prepared' / args.run / 'hu-marginal')
     if output.resolve() != output:
         raise ValueError('Linked preparation output')
     with operation_lock(home, 'prepare-hu', output) as owner:

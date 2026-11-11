@@ -1,4 +1,5 @@
 import argparse
+from contextlib import redirect_stdout, redirect_stderr
 from datetime import timedelta
 from hashlib import sha256
 import json
@@ -20,6 +21,8 @@ from torch.nn import functional as F
 
 from ..contracts import atomic_json, digest, read_json, sha256_file
 from ..observability.status import operation_lock, write_status
+from ..storage_paths import assert_output_location
+from ..short_workspace import ShortWorkspace
 from ..xu_dispatch import Children, run_wave, select_devices
 from ..xu_geometry import PreparedCache
 from ..xu_gpu_isolation import configure_coordinator, validate_entry
@@ -289,7 +292,7 @@ def wait_for_cards(args, output, children, host_bytes):
 
 
 def separate_output(args):
-    output = args.output.resolve()
+    output = assert_output_location(args.output)
     paths = (ROOT, args.prepared.resolve(), args.weights.resolve())
     if any(output == path or path in output.parents or output in path.parents for path in paths):
         raise ValueError('训练输出须与代码、预处理和权重分开')
@@ -297,6 +300,22 @@ def separate_output(args):
 
 
 def run(args):
+    if args.epochs is not None:
+        return _run(args)
+    with ShortWorkspace(args.output,protected_paths=[ROOT,args.prepared,args.weights],
+                        prefix='sam-short') as workspace:
+        workspace.record('configuration',arguments=vars(args),
+                         input_identities={str(path):sha256_file(path) for path in
+                             (args.weights,args.prepared/'complete.json',args.prepared/'request.json')
+                             if path.is_file()})
+        options=argparse.Namespace(**(vars(args) | dict(output=workspace.scratch/'run')))
+        with (workspace.logs/'execution.log').open('w',encoding='utf-8') as stream:
+            with redirect_stdout(stream),redirect_stderr(stream):
+                _run(options)
+    print(workspace.logs,flush=True)
+
+
+def _run(args):
     if args.threads < 1 or not 0 <= args.wait_seconds <= 300:
         raise ValueError('线程数须为正数，等待间隔须在 0 至 300 秒之间')
     if args.epochs is not None and (args.epochs < 1 or args.label is not None):

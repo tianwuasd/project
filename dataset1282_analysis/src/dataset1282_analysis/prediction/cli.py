@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 from ..contracts import atomic_json, digest, read_json, sha256_file
 from ..observability.status import operation_lock, write_status
+from ..storage_paths import assert_output_location
 from . import PROTOCOL
 from .heldout import GROUPS, plan_inputs
 from .source import freeze_source, implementation, inspect_source
@@ -13,7 +14,7 @@ from .source import freeze_source, implementation, inspect_source
 
 def validate_output(args):
     from ..xu_pipeline import ROOT
-    out = args.output.resolve()
+    out = assert_output_location(args.output)
     config = read_json(args.config)
     for protected in (args.prepared.resolve(),args.training.resolve(),Path(config['data_root']).resolve(),ROOT):
         if out == protected or out in protected.parents or protected in out.parents:
@@ -26,7 +27,7 @@ def validate_output(args):
 
 def open_job(args):
     from ..xu_geometry import PreparedCache
-    out = args.output.resolve()
+    out = assert_output_location(args.output)
     config = validate_output(args)
     cache = PreparedCache(args.prepared,allow_technical_subset=args.technical_subset)
     cases = plan_inputs(cache,config,args.policy,args.groups,args.cases)
@@ -121,7 +122,7 @@ def execute(args,out,owner,job,phase):
 def run(args):
     if args.threads < 1 or not 1 <= args.wait_seconds <= 300:
         raise ValueError('Positive CPU threads and wait-seconds within 1..300 are required')
-    out = args.output.resolve()
+    out = assert_output_location(args.output)
     validate_output(args)
     if not args.resume and out.exists() and any(out.iterdir()):
         raise ValueError('New prediction requires a fresh output directory')
@@ -170,14 +171,15 @@ def main(argv=None):
         print(read_json(args.output/'status.json'))
     elif args.command == 'evaluate':
         from .evaluation import evaluate
-        evaluate(args.output.resolve())
+        evaluate(assert_output_location(args.output))
     elif args.command == 'worker':
         from ..xu_resources import apply_env_limit
         from .workflow import prepare,predict
         apply_env_limit(args.device)
+        output = assert_output_location(args.output)
         if args.phase == 'prepare':
-            prepare(args.output.resolve())
+            prepare(output)
         else:
-            predict(args.output.resolve(),args.device)
+            predict(output,args.device)
     else:
         run(args)

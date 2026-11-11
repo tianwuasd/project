@@ -11,6 +11,7 @@ import time
 
 from .contracts import atomic_json, read_json
 from .observability.status import operation_lock
+from .storage_paths import assert_output_location
 
 ROOT = Path(__file__).resolve().parents[2]
 TORCH_INDEX = 'https://download.pytorch.org/whl/cu126'
@@ -204,7 +205,7 @@ def install(runtime, base=None, proxy=None):
 
 
 def ensure(runtime, explicit=None, base=None, proxy=None):
-    runtime = Path(runtime).resolve()
+    runtime = assert_output_location(runtime)
     runtime.mkdir(parents=True, exist_ok=True)
     with operation_lock(runtime, 'gpu-environment'):
         shell = runtime/'training-env.sh'
@@ -254,6 +255,7 @@ def main(argv=None):
     parser.add_argument('--base-python', help='Python 3.11-3.13 used only to create a new venv')
     parser.add_argument('--proxy', help='Explicit proxy used only by installation children')
     args = parser.parse_args(argv)
+    args.runtime = assert_output_location(args.runtime)
     try:
         if args.check:
             rows, selected = scan(args.runtime.resolve(), args.reuse_python)

@@ -52,7 +52,7 @@ def _source():
     return {name:sha256_file(Path(__file__).with_name(name)) for name in
             ('xu_blood.py','xu_blood_grid.py','xu_blood_models.py','xu_geometry.py','xu_distributed.py',
              'xu_blood_supply.py','xu_supply.py','xu_supply_budget.py','xu_resume_compat.py',
-             'xu_blood_execution.py','xu_blood_io.py')}
+             'xu_blood_execution.py','xu_blood_io.py','xu_blood_checkpoint.py')}
 
 
 def blood_cohort(cache, ids, supervision, store=None):
@@ -319,7 +319,6 @@ def train(cache,args,out):
     import torch
     from .xu_blood_models import SliceUNet, BloodSequence
     from .xu_targets import TargetStore, blood_ids
-    from .xu_training import _save
     store=TargetStore(args.targets,cache)
     supervision = getattr(args,'supervision','marginal')
     eligible = blood_cohort(cache,blood_ids(cache),supervision,store)
@@ -360,7 +359,8 @@ def train(cache,args,out):
         history[stage]=_train_stage(cache,store,contract,out,encoder,seq,stage,args.device)
     kind='best' if eligible['development'] else 'technical'
     path=out/(kind+'.pt')
-    _save(path,dict(kind=kind,contract=contract,encoder=encoder.state_dict(),sequence=seq.state_dict()))
+    from .xu_blood_checkpoint import save_selected_bundle
+    save_selected_bundle(path,kind,contract)
     result=dict(command='train-blood',model=path.name,supervision=supervision,
                 selection='development' if kind=='best' else 'technical_last',
                 train=len(eligible['train']),development=len(eligible['development']),history=history)
@@ -373,7 +373,8 @@ def load_blood_predictor(cache, checkpoint, device='cpu', profile=None, supervis
     import torch
     from .xu_blood_models import SliceUNet, BloodSequence
     from .xu_targets import blood_ids
-    state=torch.load(checkpoint,map_location='cpu',weights_only=True)
+    from .xu_blood_checkpoint import selected_components
+    state=selected_components(checkpoint)
     c=state['contract']
     arm = supervision or c.get('supervision','marginal')
     eligible = blood_cohort(cache,blood_ids(cache),arm)

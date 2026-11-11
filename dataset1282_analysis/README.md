@@ -4,6 +4,8 @@
 
 Blood 支持容量约束的七帧分组、开发集特征复用和逐病例只读会话。原任务可显式增加 `--auto-init`，复用已有权重与完整轮次检查点，并训练使用扩大物理范围的 init64/init128。[执行、验收与续跑命令](docs/blood-auto-init.md)
 
+短测仅保留日志；正式训练按网络覆盖保存最新完整续跑状态，并保留开发集选出的模型。临时输入缓存限制容量，阶段完成后释放；融合的分支数组验证后清除，保留预测、评价和恢复凭据。服务器原始数据使用 `/data_nas`，全部生成文件使用 `/data5/zhougaowei/zhangruichen_workspace/dataset1282_work`。代码默认通过公开镜像更新。[目录迁移、保留规则与镜像更新](docs/storage-and-mirrors.md)
+
 可在 Windows 本机或 Linux 服务器调用的 NIfTI + Excel 只读数据审计工程。首版提供独立环境部署、代码更新、数据统计和本地报告；适合先弄清数据来源与质量，再决定后续处理。
 
 审计入口只读，按文件对数与不同 PatientID 数分别统计。独立 `prepare` 入口按方案 A 建立患者分组，在私有工作区生成 nnU-Net 预处理副本。0.3.0 新增 HU、Excel 共同毫米网格、部分标签边际损失接口、V2 资源调度及可靠短测。[当前工作流](docs/hu-marginal-workflow.md)；[旧版试跑与审核格式](docs/preprocessing.md)。原始影像、标签、Excel 和历史记录保留。

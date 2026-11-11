@@ -22,11 +22,17 @@ class FleetProbeTests(unittest.TestCase):
                                      '--exclude-physical-gpus',
                                      '--output',str(out)],capture_output=True,text=True,timeout=40)
             self.assertEqual(result.returncode,1,(result.stdout or '')+(result.stderr or ''))
-            row = json.loads((out/'result.json').read_text())
+            logs=list(out.glob('fleet-inference-*/acceptance.log'))
+            self.assertEqual(len(logs),1)
+            events=[json.loads(line) for line in logs[0].read_text(encoding='utf-8').splitlines()]
+            row=next(event['contents'] for event in events
+                     if event['event']=='report' and event['path'].endswith('result.json'))
             self.assertEqual(row['state'],'failed')
             self.assertFalse(row['groups'])
             self.assertIn('External compute',row['unavailable'][occupied[0]['device']])
             self.assertFalse(list(out.glob('*-admission.json')))
+            self.assertFalse(list(out.rglob('.scratch')))
+            self.assertTrue(all(p.suffix=='.log' for p in out.rglob('*') if p.is_file()))
 
     def test_real_cli_protects_existing_output(self):
         root = Path(__file__).resolve().parents[1]
@@ -35,7 +41,9 @@ class FleetProbeTests(unittest.TestCase):
             evidence = out/'keep.txt'
             evidence.write_text('retained',encoding='utf-8')
             result = subprocess.run([sys.executable,'-B',str(root/'scripts/xu_fleet_probe.py'),
-                                     '--devices','all-visible','--output',str(out)],
+                                     '--devices','cpu','--output',str(out)],
                                     capture_output=True,text=True,timeout=40)
             self.assertEqual(result.returncode,1)
             self.assertEqual(evidence.read_text(),'retained')
+            self.assertFalse(list(out.rglob('.scratch')))
+            self.assertTrue(all(p==evidence or p.suffix=='.log' for p in out.rglob('*') if p.is_file()))

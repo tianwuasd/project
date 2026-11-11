@@ -3,6 +3,9 @@ from functools import lru_cache
 from itertools import product
 from math import prod
 import pickle
+import os
+from pathlib import Path
+import re
 from time import perf_counter
 
 import numpy as np
@@ -127,7 +130,75 @@ def run_epoch(model, reader, names, settings, device, loss, optimizer, seed):
     return total/steps
 
 
-def train(cache, job, output, epochs, device):
+def _owned_checkpoint(path):
+    path = Path(path)
+    if path.is_symlink() or path.resolve() != path or not path.is_file():
+        raise ValueError('STU-Net 检查点必须是本运行目录中的普通文件')
+    if hasattr(os,'getuid') and path.stat().st_uid != os.getuid():
+        raise ValueError('STU-Net 检查点属于其他用户')
+
+
+def _prune_best_checkpoints(output, identity):
+    output = Path(output).absolute()
+    _owned_checkpoint(output/'run.json')
+    _owned_checkpoint(output/'training.json')
+    job = read_json(output/'run.json')
+    if (output.resolve() != output or digest(job) != identity
+            or job['model'] != 'stunet' or job['command'] != 'train'):
+        raise ValueError('STU-Net 清理目录与原运行身份不一致')
+    summary = read_json(output/'training.json')
+    last_path = output/'last.pt'
+    _owned_checkpoint(last_path)
+    last_hash = sha256_file(last_path)
+    last = torch.load(last_path,map_location='cpu',weights_only=True,mmap=True)
+    epoch = last['epoch']
+    if (last['job'] != identity or summary['job'] != identity or summary['epoch'] != epoch
+            or summary['history'] != last['history'] or len(last['history']) != epoch
+            or [row['epoch'] for row in last['history']] != list(range(1,epoch+1))
+            or not isinstance(last['optimizer'],dict) or not {'state','param_groups'} <= last['optimizer'].keys()
+            or not last['optimizer']['param_groups']):
+        raise ValueError('STU-Net 最新优化器与已提交训练摘要不一致')
+    best_epoch = last['best_epoch']
+    best_name = f'best-{best_epoch}.pt'
+    if (not 1 <= best_epoch <= epoch or summary['best_file'] != best_name
+            or summary['best_sha256'] != last['best_sha256']
+            or min(last['history'],key=lambda row:row['development_loss'])['epoch'] != best_epoch):
+        raise ValueError('STU-Net 已选最佳轮次不一致')
+    selected = output/best_name
+    _owned_checkpoint(selected)
+    selected_hash = sha256_file(selected)
+    state = torch.load(selected,map_location='cpu',weights_only=True,mmap=True)
+    if (selected_hash != last['best_sha256'] or state['job'] != identity
+            or state['epoch'] != best_epoch or not isinstance(state['model'],dict) or not state['model']):
+        raise ValueError('STU-Net 已选推理权重不完整')
+    del state, last
+    planned = []
+    for path in sorted(output.glob('best-*.pt')):
+        match = re.fullmatch(r'best-([1-9][0-9]*)\.pt',path.name)
+        if match is None or path == selected:
+            continue
+        _owned_checkpoint(path)
+        checksum = sha256_file(path)
+        state = torch.load(path,map_location='cpu',weights_only=True,mmap=True)
+        candidate_epoch = int(match.group(1))
+        if state['job'] != identity or state['epoch'] != candidate_epoch or not isinstance(state['model'],dict) or not state['model']:
+            raise ValueError('待清理 STU-Net 权重的归属或轮次不一致')
+        del state
+        if candidate_epoch <= epoch:
+            planned.append((path,checksum))
+    # 全部候选验证完成后，再确认最新状态和选定权重仍然完整。
+    if sha256_file(last_path) != last_hash or sha256_file(selected) != selected_hash or read_json(output/'training.json') != summary:
+        raise ValueError('STU-Net 状态在清理检查期间发生变化')
+    for path,checksum in planned:
+        _owned_checkpoint(path)
+        if sha256_file(path) != checksum:
+            raise ValueError('待清理 STU-Net 权重发生变化')
+    for path,_ in planned:
+        path.unlink()
+    return [path.name for path,_ in planned]
+
+
+def train(cache, job, output, epochs, device, weights_path=None):
     settings = job['settings']
     identity = digest(job)
     last_path = output/'last.pt'
@@ -140,7 +211,7 @@ def train(cache, job, output, epochs, device):
             raise ValueError('检查点与训练设置或目标轮数不兼容')
         model.load_state_dict(previous['model'],strict=True)
     else:
-        atomic_json(output/'pretrained.json',load_pretrained(model,job['weights']))
+        atomic_json(output/'pretrained.json',load_pretrained(model,weights_path or job['weights']))
     model.to(device)
     optimizer = torch.optim.SGD(model.parameters(),lr=settings['learning_rate'],
                                 momentum=.99,nesterov=True,weight_decay=3e-5)
@@ -154,6 +225,7 @@ def train(cache, job, output, epochs, device):
         atomic_json(output/'training.json',dict(job=identity,epoch=previous['epoch'],history=history,
                     best_file=best_path.name,best_sha256=previous['best_sha256']))
         del previous
+        _prune_best_checkpoints(output,identity)
     reader = PatchReader(cache,settings['patch'])
     loss = MarginalBatchLoss()
     best = min((row['development_loss'] for row in history),default=float('inf'))
@@ -178,6 +250,7 @@ def train(cache, job, output, epochs, device):
                              history=history,best_sha256=best_hash,best_epoch=best_epoch))
         atomic_json(output/'training.json',dict(job=identity,epoch=epoch,history=history,
                     best_file=best_file.name,best_sha256=best_hash))
+        _prune_best_checkpoints(output,identity)
         print(row,flush=True)
 
 

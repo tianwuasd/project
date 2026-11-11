@@ -95,7 +95,18 @@ def _inference_contract(cache, branch, profile, supervision, book):
     source = Path(__file__).parent
     return dict(protocol=PROTOCOL,branch=branch,profile=profile,supervision=supervision,
                 identity=input_id(cache,supervision,book),classes=['BG','LV','RV','LA','RA','MYO','proximal_AO_PA'],
-                source={s:sha256_file(source/s) for s in ('xu_init.py','xu_models.py','xu_targets.py','xu_training.py','xu_supply.py','xu_distributed.py')})
+                source={s:sha256_file(source/s) for s in ('xu_init.py','xu_models.py','xu_targets.py','xu_training.py','xu_supply.py','xu_distributed.py','xu_resume_compat.py')})
+
+
+def _compatible_proximal_contract(actual, expected):
+    from .xu_resume_compat import source_compatible
+    if actual == expected:
+        return True
+    if ('source' not in actual or 'source' not in expected
+            or {k:v for k,v in actual.items() if k != 'source'}
+            != {k:v for k,v in expected.items() if k != 'source'}):
+        return False
+    return source_compatible(actual['source'],expected['source'],'src/dataset1282_analysis/')
 
 
 def train_init(cache,args,out):
@@ -132,8 +143,9 @@ def train_init(cache,args,out):
     history,best_epoch,best_loss=[], -1, math.inf
     if args.resume:
         state=torch.load(last,map_location='cpu',weights_only=True)
-        if not _compatible_contract(state['contract'],contract):
+        if not _compatible_proximal_contract(state['contract'],contract):
             raise ValueError('Proximal training contract changed')
+        contract=state['contract']
         _recover_best(best,state)
         model.load_state_dict(state['model'])
         optimizer.load_state_dict(state['optimizer'])
@@ -174,7 +186,7 @@ def load_init_predictor(checkpoint, *, cache, branch, profile, supervision, book
     if sha256_file(checkpoint)!=fingerprint:
         raise ValueError('Proximal checkpoint changed while loading')
     expected=_inference_contract(cache,branch,profile,supervision,book)
-    if not _compatible_contract({k:state['contract'].get(k) for k in expected},expected):
+    if not _compatible_proximal_contract({k:state['contract'].get(k) for k in expected},expected):
         raise ValueError('Incompatible proximal checkpoint')
     if 'optimizer' in state and state['best_epoch']!=state['epoch']:
         raise ValueError('Inference requires a validation-selected checkpoint')

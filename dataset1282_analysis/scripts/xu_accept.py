@@ -1,10 +1,10 @@
-"""Private-data acceptance for the two whole-scan Xu localizers. Use a research Python."""
 import argparse
 import json
 import os
 from pathlib import Path
 import sys
 import time
+from contextlib import redirect_stdout, redirect_stderr
 
 import numpy as np
 
@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from dataset1282_analysis.xu_gpu_isolation import validate_entry
 validate_entry(sys.argv[1:],os.environ,default='cpu')
 from dataset1282_analysis.contracts import atomic_json, read_json, sha256_file
+from dataset1282_analysis.short_workspace import ShortWorkspace
 
 
 def box_of(mask):
@@ -130,6 +131,17 @@ def paper_step64(cache, name, device):
 
 
 def main(args):
+    with ShortWorkspace(args.output,protected_paths=[args.prepared],prefix='xu-accept') as workspace:
+        workspace.record('configuration',arguments=vars(args),
+                         input_identities={name:sha256_file(args.prepared/name) for name in
+                             ('complete.json','fit.json','request.json') if (args.prepared/name).is_file()})
+        with (workspace.logs/'execution.log').open('w',encoding='utf-8') as stream:
+            with redirect_stdout(stream), redirect_stderr(stream):
+                run_acceptance(args,workspace.scratch)
+    print(workspace.logs,flush=True)
+
+
+def run_acceptance(args,out):
     import nibabel as nib
     import torch
     from dataset1282_analysis.xu_geometry import PreparedCache
@@ -137,11 +149,9 @@ def main(args):
     from dataset1282_analysis.xu_training import load_predictor, train_branch
     from dataset1282_analysis.xu_workflow import input_id
 
-    run, out = args.prepared.resolve(), args.output.resolve()
+    run = args.prepared.resolve()
     if run == out or run in out.parents:
         raise ValueError('Place private acceptance outputs outside the preprocessing run')
-    if out.exists() and any(out.iterdir()):
-        raise ValueError('Use a new or empty acceptance directory')
     out.mkdir(parents=True, exist_ok=True)
     torch.set_num_threads(args.threads)
     torch.manual_seed(2023)
@@ -235,7 +245,7 @@ def main(args):
 
 
 if __name__=='__main__':
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description='Logs-only whole-scan Xu acceptance')
     parser.add_argument('--prepared',required=True,type=Path)
     parser.add_argument('--output',required=True,type=Path)
     parser.add_argument('--device',default='cpu')
