@@ -1,6 +1,7 @@
 """Run the existing Xu stages in order and verify their artifacts before resuming."""
 import argparse
 import copy
+from dataclasses import replace
 from importlib.metadata import version
 import json
 import os
@@ -18,6 +19,10 @@ from .xu_resources import GpuResourcesChanged, ResourceUnavailable, resource_err
 from .xu_gpu_isolation import launch_scope, report_for_parent
 from .xu_resume_compat import AUDIT_PATH, assert_execution_sources, preserve_contract
 from .xu_init_extension import STAGES as AUTO_STAGES, bind_extension, extension_identity
+from .artifact_retention import (release_branch_arrays, release_input_cache,
+                                 release_shared_prediction_cache, validate_retained_files)
+from .storage_paths import assert_output_location
+from .storage_migration import canonical_path, load_relocation
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,9 +38,17 @@ def _input_file(path):
     return dict(path=str(path), sha256=sha256_file(path))
 
 
+def _bound_input_file(path, args):
+    identity = _input_file(path)
+    if identity is not None and getattr(args,'execution_relocation',None):
+        identity['path'] = canonical_path(identity['path'])
+    return identity
+
+
 def _sources(technical):
     source = Path(__file__).resolve().parent
     files = [*source.glob('xu_*.py'), source/'training/marginal.py', source/'contracts.py',source/'resources.py',
+             source/'artifact_retention.py', source/'storage_paths.py', source/'storage_migration.py',
              source/'observability/status.py', ROOT/'scripts/xu_seg.py', ROOT/'scripts/xu_pipeline.py',
              ROOT/'scripts/xu_worker.py']
     files = [p for p in files if p.name not in ('xu_pair_probe.py','xu_inference_probe.py')]  # Diagnostics.
@@ -82,7 +95,7 @@ def _contract(cache, args):
         args.resource_policy = 'v2' if len(devices) > 1 or os.name == 'posix' else 'legacy'
     if len(devices) > 1 and args.resource_policy != 'v2':
         raise ValueError('Multi-device scheduling requires the v2 resource policy')
-    return dict(protocol='xu-model-run-4', fleet=True, prepared=str(cache.run_dir), request=cache.request_digest,
+    result = dict(protocol='xu-model-run-4', fleet=True, prepared=str(cache.run_dir), request=cache.request_digest,
                 artifacts=artifact_identity(cache), scope=cache.scope, counts=counts,
                 implementation=_sources(technical), profile=args.profile, supervision=args.supervision,
                 seed=args.seed, padding_percent=PADDING, device=devices[0], torch=str(torch.__version__),
@@ -95,6 +108,23 @@ def _contract(cache, args):
                 libraries={n:version(n) for n in ('numpy','scipy','nibabel','blosc2','scikit-image')},
                 supplied_crop64=_input_file(args.crop64), supplied_crop128=_input_file(args.crop128),
                 reviews=_input_file(args.reviews))
+    args.execution_relocation = None
+    if getattr(args,'resume',False) and (args.output/'run.json').is_file():
+        relocation = load_relocation(args.output)
+        if relocation is not None:
+            relative = (args.output/'run.json').relative_to(Path(relocation['destination'])).as_posix()
+            if relative not in relocation['contracts']:
+                raise ValueError('恢复的运行不属于已验证迁移清单')
+            stored = read_json(args.output/'run.json')
+            relocated_prepared = canonical_path(cache.run_dir)
+            if relocated_prepared != stored['prepared']:
+                raise ValueError('迁移后的预处理来源与原运行不一致')
+            result['prepared'] = relocated_prepared
+            for field in ('supplied_crop64','supplied_crop128','reviews'):
+                if result[field] is not None:
+                    result[field]['path'] = canonical_path(result[field]['path'])
+            args.execution_relocation = relocation
+    return result
 
 
 def _files(directory, required):
@@ -328,14 +358,18 @@ def _run_stage(stage, args, out, owner, contract, contract_id, checked, records,
     if stage.name not in allowed or stage.name in records or directory.resolve()!=directory:
         raise ValueError('Unsafe or duplicate pipeline stage')
     receipt = out/'receipts'/(stage.name+'.json')
-    spec = _stage_spec(stage, contract_id, getattr(args,'assigned_devices',None))
+    identity_stage = stage
+    if getattr(args,'execution_relocation',None):
+        identity_stage = replace(stage,argv=tuple(canonical_path(value) if Path(value).is_absolute() else value
+                                                  for value in stage.argv))
+    spec = _stage_spec(identity_stage, contract_id, getattr(args,'assigned_devices',None))
     _check_execution(args, contract)
     if receipt.exists():
         entry = read_json(receipt)
         if entry['spec'] != spec or entry['state'] != ('skipped' if stage.skip_reason else 'complete'):
             raise ValueError(f'Invalid receipt for {stage.name}')
-        if not stage.skip_reason and _files(directory, stage.required) != entry['files']:
-            raise ValueError(f'Completed artifacts changed: {stage.name}')
+        if not stage.skip_reason:
+            validate_retained_files(directory,entry['files'],stage.required)
         print(f'Verified {stage.name}', flush=True)
     else:
         started = time.time()
@@ -354,11 +388,11 @@ def _run_stage(stage, args, out, owner, contract, contract_id, checked, records,
                         rejection.get('qc_sha256') != sha256_file(directory/'localization_qc.json')):
                     raise ValueError('Rejected ROI evidence changed')
                 raise StageError('This frozen run already failed the ROI audit. See audit-roi/localization_qc.json')
-            if stage.name == 'targets' and _input_file(args.reviews) != contract['reviews']:
+            if stage.name == 'targets' and _bound_input_file(args.reviews,args) != contract['reviews']:
                 raise ValueError('External review changed since the run started')
             if stage.name=='localize' and args.crop64 and (
-                    _input_file(args.crop64) != contract['supplied_crop64'] or
-                    _input_file(args.crop128) != contract['supplied_crop128']):
+                    _bound_input_file(args.crop64,args) != contract['supplied_crop64'] or
+                    _bound_input_file(args.crop128,args) != contract['supplied_crop128']):
                 raise ValueError('External locator weights changed since the run started')
             _check_manifests(stage,out,records)
             if 'devices' in contract:
@@ -367,7 +401,8 @@ def _run_stage(stage, args, out, owner, contract, contract_id, checked, records,
             if 'devices' in contract:
                 args.device, args.overlay = plan_stage(stage, args, out, args.children, concurrent, 'launch', checked)
             atomic_json(ticket, dict(spec=spec))
-            recovery = _restore_attempt(stage, directory, out, reallocated=getattr(args,'reallocate',False))
+            recovery = _restore_attempt(stage, directory, out,
+                       reallocated=getattr(args,'reallocate',False) or bool(getattr(args,'execution_relocation',None)))
             pause = getattr(args, 'pause_after_epoch', None)
             if pause is not None and stage.name in ('crop64', 'crop128'):
                 # Do not put the stop condition in the frozen stage identity.
@@ -393,6 +428,9 @@ def _run_stage(stage, args, out, owner, contract, contract_id, checked, records,
             entry = dict(state='complete', files=_files(directory, stage.required))
         entry.update(spec=spec, seconds=time.time()-started)
         atomic_json(receipt, entry)
+    if entry['state'] == 'complete':
+        release_input_cache(directory)
+        release_branch_arrays(directory,entry['files'],stage.required)
     return entry
 
 
@@ -479,6 +517,7 @@ def _run_attempt(cache, args, out, owner, contract):
             raise ValueError('Final result differs from verified stage evidence')
         if not (out/'result.json').exists():
             atomic_json(out/'result.json',result)
+        release_shared_prediction_cache(out/'prediction-cache')
         write_status(out, state='complete',stage='vessels',finished=list(records),result=str(out/'result.json'))
         print(f'Completed | {out/"result.json"}', flush=True)
     except (Exception, KeyboardInterrupt) as exc:
@@ -507,7 +546,7 @@ def _run_attempt(cache, args, out, owner, contract):
 
 def _run(args):
     from .xu_geometry import PreparedCache
-    out, prepared = args.output.resolve(), args.prepared.resolve()
+    out, prepared = assert_output_location(args.output), args.prepared.resolve()
     if out==prepared or out in prepared.parents or prepared in out.parents:
         raise ValueError('Use separate prepared and output directories')
     if ROOT == out or ROOT in out.parents:

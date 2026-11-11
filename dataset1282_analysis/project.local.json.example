@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "data_root": "/srv/data/CHD",
-  "metadata_excel": "/srv/data/metadata.xlsx",
-  "work_root": "/srv/work/dataset1282_analysis",
-  "environment": "/srv/envs/dataset1282_analysis"
+  "data_root": "/data_nas/zhangruichen/dataset1282_CHD_CT_back",
+  "metadata_excel": null,
+  "work_root": "/data5/zhougaowei/zhangruichen_workspace/dataset1282_work",
+  "environment": "/data5/zhougaowei/zhangruichen_workspace/dataset1282_work/environment"
 }

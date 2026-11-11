@@ -9,10 +9,14 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.request
 from .contracts import atomic_json,digest,read_json,sha256_file
 from .observability.status import operation_lock,lock_active
+from .storage_paths import assert_output_location
 
 REMOTE='https://github.com/tianwuasd/project.git'
+MIRRORS={'gh-proxy':'https://gh-proxy.com/https://github.com/tianwuasd/project.git',
+         'gitclone':'https://gitclone.com/github.com/tianwuasd/project.git'}
 BRANCH='main'
 SUBDIRECTORY='dataset1282_analysis'
 PROTOCOL=1
@@ -99,28 +103,66 @@ def rollback_release(home,commit):
     with operation_lock(home,'rollback'): return _activate_unlocked(home,commit)
 
 
-def _git(cache,*args,proxy=None,timeout=120):
+def _git(cache,*args,proxy=None,timeout=120,public_only=False,require_filter=False):
     command=['git','-c','core.hooksPath='+str(Path(cache)/'disabled-hooks'),'-c','protocol.file.allow=never']
     if proxy: command+=['-c','http.proxy='+proxy,'-c','https.proxy='+proxy]
     command+=['--git-dir',str(cache),*args]
-    result=subprocess.run(command,capture_output=True,timeout=timeout)
+    env=None
+    if public_only:
+        command[1:1]=['-c','credential.helper=','-c','http.extraHeader=',
+                      '-c','http.extraHeader=Authorization:','-c','http.extraHeader=Cookie:',
+                      '-c','http.followRedirects=false']
+        env={k:v for k,v in os.environ.items() if not k.startswith(('GIT_CONFIG','GIT_ASKPASS','SSH_ASKPASS'))}
+        env.update(GIT_CONFIG_NOSYSTEM='1',GIT_CONFIG_GLOBAL=os.devnull,GIT_TERMINAL_PROMPT='0',GIT_ASKPASS='')
+        local_config=Path(cache)/'config'
+        if local_config.exists():
+            audit=subprocess.run(['git','config','--file',str(local_config),'--name-only','--list'],capture_output=True,check=True,timeout=30)
+            allowed={'core.repositoryformatversion','core.filemode','core.bare','core.logallrefupdates','core.symlinks','core.ignorecase','remote.origin.url','remote.origin.promisor','remote.origin.partialclonefilter'}
+            if any(key.strip().lower() not in allowed for key in audit.stdout.decode().splitlines()):
+                raise ValueError('Mirror cache contains configuration outside the unauthenticated allowlist')
+    if require_filter:
+        env=dict(env or os.environ);env['GIT_TRACE_PACKET']='1'
+        command[1:1]=['-c','protocol.version=2']
+    result=subprocess.run(command,capture_output=True,timeout=timeout,env=env)
     if result.returncode:
         # Do not emit credential-bearing URLs or the caller environment.
         raise RuntimeError('Git stage failed: '+args[0]+' (exit '+str(result.returncode)+')')
+    if require_filter and not any(re.search(rb'packet:\s+\S+<.*\bfilter\b',line) for line in result.stderr.splitlines()):
+        raise ValueError('Remote does not advertise partial-clone filtering; refusing a full repository transfer')
     return result.stdout
 
 
-def fetch_plan(home,proxy=None):
-    home=Path(home);cache=home/'.update/cache.git';cache.parent.mkdir(parents=True,exist_ok=True)
+def official_public_head(proxy=None):
+    opener=urllib.request.build_opener(urllib.request.ProxyHandler({'https':proxy} if proxy else {}))
+    base='https://api.github.com/repos/tianwuasd/project'
+    values=[]
+    for url in (base,base+'/commits/'+BRANCH):
+        request=urllib.request.Request(url,headers={'Accept':'application/vnd.github+json','User-Agent':'dataset1282-public-updater'})
+        with opener.open(request,timeout=30) as response:
+            payload=response.read(1024*1024+1)
+        if len(payload)>1024*1024: raise ValueError('Official metadata exceeds size limit')
+        values.append(json.loads(payload))
+    if values[0].get('private') is not False or values[0].get('visibility')!='public':
+        raise ValueError('Mirror updates require an officially verified public repository')
+    return _valid_commit(values[1]['sha'])
+
+
+def fetch_plan(home,proxy=None,mirror=None,expected_commit=None):
+    home=assert_output_location(home);cache=home/'.update/cache.git';cache.parent.mkdir(parents=True,exist_ok=True)
+    if mirror is not None and mirror not in MIRRORS: raise ValueError('Unknown fixed public mirror')
+    if expected_commit and not mirror: raise ValueError('An explicit official commit pin requires mirror mode')
+    expected=(_valid_commit(expected_commit) if expected_commit else official_public_head(proxy)) if mirror else None
     if not cache.exists():
         subprocess.run(['git','init','--bare',str(cache)],check=True,capture_output=True,timeout=30)
     # Origin is fixed in code; no credentials are copied to another host.
-    _git(cache,'config','remote.origin.url',REMOTE)
+    _git(cache,'config','remote.origin.url',MIRRORS[mirror] if mirror else REMOTE)
     _git(cache,'config','remote.origin.promisor','true')
     _git(cache,'config','remote.origin.partialclonefilter','blob:none')
-    _git(cache,'fetch','--depth=1','--filter=blob:none','origin',BRANCH,proxy=proxy)
+    _git(cache,'ls-remote','--heads','origin',BRANCH,proxy=proxy,public_only=bool(mirror),require_filter=True)
+    _git(cache,'fetch','--depth=1','--filter=blob:none','origin',BRANCH,proxy=proxy,public_only=bool(mirror))
     commit=_git(cache,'rev-parse','FETCH_HEAD').decode().strip();_valid_commit(commit)
-    listing=_git(cache,'ls-tree','-rz','--full-tree',commit,'--',SUBDIRECTORY,proxy=proxy)
+    if expected is not None and commit!=expected: raise ValueError('Mirror HEAD differs from verified official HEAD; activation refused')
+    listing=_git(cache,'ls-tree','-rz','--full-tree',commit,'--',SUBDIRECTORY,proxy=proxy,public_only=bool(mirror))
     entries=[];total=0
     for record in listing.split(b'\0'):
         if not record: continue
@@ -132,11 +174,11 @@ def fetch_plan(home,proxy=None):
         entries.append({'name':name,'oid':oid,'mode':mode})
     if not entries or 'release-manifest.json' not in [e['name'] for e in entries]: raise ValueError('Project release manifest not found on official branch')
     if len(entries)>1000: raise ValueError('Release file count exceeds project bound')
-    return {'remote':REMOTE,'branch':BRANCH,'subdirectory':SUBDIRECTORY,'commit':commit,'cache':str(cache),'entries':entries}
+    return {'remote':REMOTE,'mirror':mirror,'verified_official_head':expected,'head_evidence':'explicit_official_pin' if expected_commit else 'official_api' if mirror else 'official_git', 'branch':BRANCH,'subdirectory':SUBDIRECTORY,'commit':commit,'cache':str(cache),'entries':entries}
 
 
 def install_release(home,plan,proxy=None):
-    home=Path(home);commit=_valid_commit(plan['commit']);versions=home/'code_versions';versions.mkdir(exist_ok=True)
+    home=assert_output_location(home);commit=_valid_commit(plan['commit']);versions=home/'code_versions';versions.mkdir(exist_ok=True)
     target=versions/commit
     if target.exists(): verify_release(target);return target
     with tempfile.TemporaryDirectory(prefix='candidate-',dir=home/'.update') as temporary:
@@ -146,7 +188,7 @@ def install_release(home,plan,proxy=None):
             name=safe_relative(item['name'])
             if name.lower() in seen: raise ValueError('Duplicate release path')
             seen.add(name.lower())
-            payload=_git(plan['cache'],'cat-file','blob',item['oid'],proxy=proxy,timeout=90)
+            payload=_git(plan['cache'],'cat-file','blob',item['oid'],proxy=proxy,timeout=90,public_only=bool(plan.get('mirror')))
             total+=len(payload)
             if len(payload)>8*1024**2 or total>32*1024**2: raise ValueError('Release size limit exceeded')
             path=candidate/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(payload)
@@ -180,8 +222,10 @@ def main(argv=None):
     actions=p.add_mutually_exclusive_group()
     actions.add_argument('--check',action='store_true');actions.add_argument('--rollback')
     p.add_argument('--proxy',help='Process-scoped proxy, e.g. http://127.0.0.1:7897; no global configuration changes')
+    p.add_argument('--mirror',nargs='?',const='gh-proxy',default='gh-proxy',choices=sorted(MIRRORS),help='Fixed public unauthenticated mirror (default: gh-proxy); official API HEAD must match exactly')
+    p.add_argument('--expected-commit',help='Full commit independently verified on official GitHub; allows public mirror when official API is unreachable')
     args=p.parse_args(argv)
-    home=Path(os.environ.get('DATASET1282_HOME',Path(__file__).resolve().parents[2]))
+    home=assert_output_location(os.environ.get('DATASET1282_HOME',Path(__file__).resolve().parents[2]))
     try:
         with operation_lock(home,'update'):
             if args.rollback:
@@ -191,7 +235,7 @@ def main(argv=None):
                 _check_dependencies(home,candidate)
                 result=_activate_unlocked(home,args.rollback)
             else:
-                plan=fetch_plan(home,args.proxy)
+                plan=fetch_plan(home,args.proxy,args.mirror,args.expected_commit)
                 current=read_json(home/'current.json')['commit'] if (home/'current.json').exists() else None
                 if args.check:
                     result={k:v for k,v in plan.items() if k not in ('entries','cache')}

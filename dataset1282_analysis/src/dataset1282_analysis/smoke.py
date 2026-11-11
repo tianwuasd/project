@@ -1,11 +1,10 @@
-"""Smoke profiles call the official runner and never write inside user input folders."""
 import argparse
 import json
 import os
 from pathlib import Path
-import tempfile
 from .config import resolve_config
 from .contracts import atomic_json,sha256_file
+from .short_workspace import ShortWorkspace
 
 
 def synthetic_fixture(root):
@@ -38,23 +37,42 @@ def synthetic_fixture(root):
 
 
 def main(argv=None):
-    p=argparse.ArgumentParser(description=__doc__)
+    p=argparse.ArgumentParser(description='Logs-only disposable smoke profiles')
     p.add_argument('--profile',choices=['synthetic','quick','capacity'],default='synthetic')
     p.add_argument('--run-id')
     args=p.parse_args(argv)
     root=Path(os.environ['DATASET1282_CODE_ROOT']);home=Path(os.environ['DATASET1282_HOME'])
     config=resolve_config({},home/'project.local.json',root)
     from .engine.runner import run_analysis
+    protected=[value for value in (config['data_root'],config['metadata_excel']) if value]
+    with ShortWorkspace(Path(config['work_root'])/'smoke',protected_paths=protected,
+                        prefix=args.profile) as workspace:
+        workspace.record('configuration',profile=args.profile,config=config,
+                         input_identities={str(value):sha256_file(value) for value in protected
+                                           if Path(value).is_file()})
+        if config['data_root']:
+            manifest=Path(config['data_root'])/'manifest.json'
+            workspace.record('input_manifest',path=manifest,sha256=sha256_file(manifest))
+        result=run_profile(args,config,root,home,workspace,run_analysis)
+        workspace.record('result',**result)
+        if not result['ok']:
+            raise RuntimeError(f'Smoke acceptance failed; see {workspace.logs}')
+    print(json.dumps(result,ensure_ascii=False,indent=2))
+    return 0
+
+
+def run_profile(args,config,root,home,workspace,run_analysis):
+    config=dict(config,work_root=str(workspace.scratch/'work'))
+    home=workspace.scratch/'home'
+    home.mkdir()
     if args.profile=='synthetic':
-        target=Path(config['work_root'])/'smoke';target.mkdir(parents=True,exist_ok=True)
-        with tempfile.TemporaryDirectory(dir=target) as d:
-            data,excel=synthetic_fixture(Path(d)/'input')
-            config.update(data_root=str(data),metadata_excel=str(excel),work_root=str(Path(d)/'work'))
-            result=run_analysis(config,root,home,run_id='synthetic')
-            resumed=run_analysis(config,root,home,run_id='synthetic',resume=True)
-            ok=result['complete']==2 and result['failed']==1 and resumed['reused']==2
-            result={'ok':ok,'first':result,'resumed':resumed,'expected_failure':'deliberately truncated synthetic gzip'}
-            atomic_json(target/'synthetic-validation.json',result)
+        data,excel=synthetic_fixture(workspace.scratch/'input')
+        config.update(data_root=str(data),metadata_excel=str(excel))
+        workspace.record('synthetic_configuration',config=config)
+        result=run_analysis(config,root,home,run_id='synthetic')
+        resumed=run_analysis(config,root,home,run_id='synthetic',resume=True)
+        ok=result['complete']==2 and result['failed']==1 and resumed['reused']==2
+        result={'ok':ok,'first':result,'resumed':resumed,'expected_failure':'deliberately truncated synthetic gzip'}
     else:
         import nibabel as nib
         from .inputs import load_cases
@@ -75,5 +93,4 @@ def main(argv=None):
             chosen['largest']=maximum[1]
         result=run_analysis(config,root,home,run_id=args.run_id,case_ids=sorted(set(chosen.values())))
         result['ok']=result['failed']==0
-    print(json.dumps(result,ensure_ascii=False,indent=2))
-    return 0 if result['ok'] else 1
+    return result

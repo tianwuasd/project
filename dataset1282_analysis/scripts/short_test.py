@@ -1,10 +1,4 @@
-"""Repeatable local acceptance: synthetic official pipeline or explicit real-case subset.
-
-Run with the audit interpreter. All evidence is saved below --work-root.
-The research interpreter runs nnU-Net and loss tests; no global installation edits.
-"""
 import argparse
-from datetime import datetime
 import json
 import os
 from pathlib import Path
@@ -15,6 +9,7 @@ import time
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'src'))
 from dataset1282_analysis.contracts import atomic_json, read_json, sha256_file
+from dataset1282_analysis.short_workspace import ShortWorkspace
 
 
 def fixture(base):
@@ -75,7 +70,7 @@ def fixture(base):
 
 
 def main():
-    parser=argparse.ArgumentParser(description=__doc__)
+    parser=argparse.ArgumentParser(description='Logs-only synthetic or real-subset acceptance')
     parser.add_argument('--work-root',required=True)
     parser.add_argument('--research-python',required=True)
     parser.add_argument('--real-config')
@@ -83,27 +78,43 @@ def main():
     parser.add_argument('--frozen-cohort')
     parser.add_argument('--case',action='append',dest='cases')
     args=parser.parse_args()
-    base=Path(args.work_root).resolve()/('short-'+datetime.now().strftime('%Y%m%d-%H%M%S'))
-    base.mkdir(parents=True)
-    env=dict(os.environ,PYTHONPATH=str(ROOT/'src'),PYTHONUTF8='1',TMP=str(base),TEMP=str(base))
+    protected=[]
+    if args.real_config:
+        if not all((args.policy,args.frozen_cohort,args.cases)):
+            parser.error('Real test requires policy, frozen cohort and explicit case IDs')
+        cfg=read_json(args.real_config)
+        protected=[args.real_config,args.policy,args.frozen_cohort,cfg['data_root'],cfg['metadata_excel']]
+    with ShortWorkspace(args.work_root,protected_paths=protected) as workspace:
+        workspace.record('configuration',arguments=vars(args),
+                         inputs={str(path):sha256_file(path) for path in protected if Path(path).is_file()})
+        run_checks(args,workspace)
+    print(workspace.logs,flush=True)
+
+
+def run_checks(args,workspace):
+    base=workspace.scratch
+    home=base/'home'
+    home.mkdir()
+    env=dict(os.environ,PYTHONPATH=str(ROOT/'src'),PYTHONUTF8='1',TMP=str(base),TEMP=str(base),
+             CUDA_VISIBLE_DEVICES='-1',DATASET1282_HOME=str(home),DATASET1282_CODE_ROOT=str(ROOT))
     evidence=[]
     def command(name,cmd,success=True,timeout=1800,expected_error=None):
         start=time.monotonic()
-        with (base/(name+'.log')).open('wb') as stream:
+        log=workspace.logs/(name+'.log')
+        workspace.record('command',check=name,argv=cmd)
+        with log.open('wb') as stream:
             result=subprocess.run(cmd,env=env,stdout=stream,stderr=subprocess.STDOUT,timeout=timeout)
         evidence.append(dict(check=name,exit=result.returncode,seconds=time.monotonic()-start,
                              passed=(result.returncode==0)==success))
         if expected_error is not None:
-            evidence[-1]['passed'] &= expected_error in (base/(name+'.log')).read_text(encoding='utf-8',errors='replace')
-        atomic_json(base/'checks.json',evidence)
+            evidence[-1]['passed'] &= expected_error in log.read_text(encoding='utf-8',errors='replace')
+        workspace.record('check',**evidence[-1])
         print(name,evidence[-1],flush=True)
         if not evidence[-1]['passed']:
-            raise RuntimeError('Failed '+name+'; see '+str(base/(name+'.log')))
+            raise RuntimeError('Failed '+name+'; see '+str(log))
     command('workflow-unit',[sys.executable,'-B','-m','unittest','discover','-s',str(ROOT/'tests'),'-p','test_workflow.py','-v'])
     command('marginal-unit',[args.research_python,'-B','-m','unittest','discover','-s',str(ROOT/'tests'),'-p','test_marginal.py','-v'])
     if args.real_config:
-        if not all((args.policy,args.frozen_cohort,args.cases)):
-            parser.error('Real test requires policy, frozen cohort and explicit case IDs')
         config,policy,cohort,names=Path(args.real_config),Path(args.policy),Path(args.frozen_cohort),args.cases
         # Redirect outputs, retaining the real immutable inputs and local environment.
         cfg=read_json(config)
@@ -112,7 +123,12 @@ def main():
         config=base/'config.json'
     else:
         config,policy,cohort,names=fixture(base)
-    common=[sys.executable,'-B',str(ROOT/'run.py'),'--config',str(config),'prepare',
+    workspace.record('input_configuration',config=read_json(config),cases=names,
+                     identities={str(path):sha256_file(path) for path in (config,policy,cohort)},
+                     synthetic=not bool(args.real_config))
+    common=[sys.executable,'-B','-c',
+            'from dataset1282_analysis.cli import main; raise SystemExit(main())',
+            '--config',str(config),'prepare',
             '--workflow',str(policy),'--frozen-cohort',str(cohort),'--research-python',args.research_python]
     for name in names: common+=['--case',name]
     serial=common+['--run','serial','--workers','1','--staged-extension','.nii.gz']

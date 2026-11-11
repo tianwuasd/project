@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .contracts import atomic_json, digest, read_json, sha256_file
 from .observability.status import operation_lock
+from .storage_paths import assert_output_location
 
 BRANCHES = ('crop64','crop128','all64','all128')
 PROTOCOL = 'xu2023-source-seg-1'
@@ -187,7 +188,7 @@ def main(argv=None):
                            for role in ('train','development')},
                     auxiliary_status='init64/init128 require verified proximal-vessel supervision')
     else:
-        out=args.output.resolve()
+        out=assert_output_location(args.output)
         root=args.prepared.resolve()
         if out==root or root in out.parents or out in root.parents:
             raise ValueError('Choose a separate experiment output outside the preprocessing cache')

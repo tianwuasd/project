@@ -8,6 +8,8 @@ import sys
 from ..contracts import atomic_json, digest, read_json, sha256_file
 from ..observability.status import operation_lock, write_status
 from ..prediction.heldout import GROUPS
+from ..storage_paths import assert_output_location
+from ..storage_migration import canonical_path, load_relocation, resolve_relocated_path
 from . import PROTOCOL
 
 
@@ -95,6 +97,41 @@ def resource_request(job, cache):
     return 2*gib+voxels*56, int((.8+prod(patch)/240_000)*gib)
 
 
+def _training_relocation(output, job):
+    if job['model'] != 'stunet' or job['command'] != 'train':
+        return None
+    relocation = load_relocation(output)
+    if relocation is None:
+        return None
+    relative = (output/'run.json').relative_to(Path(relocation['destination'])).as_posix()
+    return relocation if relative in relocation['contracts'] else None
+
+
+def _resume_training_job(output, job):
+    stored = read_json(output/'run.json')
+    relocation = _training_relocation(output, stored)
+    candidate = dict(job)
+    if relocation is not None:
+        for key in ('prepared','weights'):
+            candidate[key] = canonical_path(candidate[key])
+    if candidate != stored:
+        raise ValueError('续跑的病例、配置或权重发生变化')
+    return stored
+
+
+def _training_execution_paths(output, job):
+    relocation = _training_relocation(output,job)
+    paths = {key:Path(job[key]) for key in ('prepared','weights')}
+    if relocation is not None:
+        source = Path(relocation['source'])
+        for key,path in paths.items():
+            if path == source or source in path.parents:
+                paths[key] = resolve_relocated_path(path,Path(relocation['destination'])/'.storage-relocation.json',output/'run.json')
+    if sha256_file(paths['weights']) != job['weights_sha256']:
+        raise ValueError('迁移后的 STU-Net 预训练权重摘要不一致')
+    return paths
+
+
 def execute(args, model, output, owner, job, cache):
     import torch
     from ..xu_dispatch import Children, select_devices
@@ -142,7 +179,7 @@ def start(args, model):
     from ..xu_geometry import PreparedCache
     from ..xu_pipeline import ROOT
 
-    output = args.output.resolve()
+    output = assert_output_location(args.output)
     sources = [args.prepared.resolve(),ROOT]
     for name in ('training','weights','prompts','config','policy'):
         value = getattr(args,name,None)
@@ -163,8 +200,7 @@ def start(args, model):
         path = output/'run.json'
         job = json.loads(json.dumps(job,default=str))
         if args.resume:
-            if read_json(path) != job:
-                raise ValueError('续跑的病例、配置或权重发生变化')
+            job = _resume_training_job(output,job)
         else:
             atomic_json(path,job)
         try:
@@ -188,17 +224,18 @@ def worker(args,model):
     resources = apply_env_limit(args.device)
     print('Applied limits:',resources,flush=True)
     torch.set_num_threads(int(os.environ.get('OMP_NUM_THREADS','4')))
-    output = args.output.resolve()
+    output = assert_output_location(args.output)
     job = read_json(output/'run.json')
     if job['protocol'] != PROTOCOL or job['model'] != model:
         raise ValueError('模型运行身份不一致')
-    cache = PreparedCache(job['prepared'],allow_technical_subset=job['technical_subset'])
+    execution_paths = _training_execution_paths(output,job) if job['command']=='train' and model=='stunet' else None
+    cache = PreparedCache(execution_paths['prepared'] if execution_paths else job['prepared'],allow_technical_subset=job['technical_subset'])
     if cache.request_digest != job['prepared_digest']:
         raise ValueError('预处理身份发生变化')
     device = torch.device(args.device)
     if job['command'] == 'train':
         from .stunet import train
-        train(cache,job,output,args.epochs,device)
+        train(cache,job,output,args.epochs,device,weights_path=execution_paths['weights'])
     else:
         from .prediction import predict
         predict(cache,job,output,device)
@@ -251,6 +288,6 @@ def main(model):
         print((args.output/'status.json').read_text(encoding='utf-8'))
     elif args.command=='evaluate':
         from .prediction import evaluate
-        evaluate(args.output.resolve(),model)
+        evaluate(assert_output_location(args.output),model)
     else:
         start(args,model)

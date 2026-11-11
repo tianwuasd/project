@@ -24,12 +24,12 @@
 
 ## 原目录续跑
 
-先确认原 Xu 进程已经退出，再在原 Xu worktree 更新本分支。SAM 独立训练目录沿用自身代码。
+先确认原 Xu 进程已经退出，再更新代码并按照[目录迁移说明](storage-and-mirrors.md)迁移旧过程目录。SAM 任务也须在迁移期间停止。确认迁移完成后使用新工作目录续跑。
 
 ```bash
-git pull --ff-only origin feat/dataset1282-blood-auto-init
+git pull --ff-only https://gh-proxy.com/https://github.com/tianwuasd/project.git main
 source /data5/zhougaowei/zhangruichen_workspace/dataset1282_runtime/training-env.sh
-W=/data_nas/zhangruichen/dataset1282_preprocessing
+W=/data5/zhougaowei/zhangruichen_workspace/dataset1282_work
 O="$W/experiments/xu-train-1794048634"
 nohup "$PY" -B -u scripts/xu_pipeline.py run \
   --prepared "$W/work/prepared/zmic-source-v030/hu-marginal" --output "$O" \

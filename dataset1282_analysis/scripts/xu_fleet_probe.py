@@ -1,4 +1,3 @@
-"""Qualify usable devices in the allocated pool with actual fixed-batch Xu updates."""
 from argparse import ArgumentParser
 import os
 from pathlib import Path
@@ -14,6 +13,7 @@ from dataset1282_analysis.xu_fleet import available, distribute
 from dataset1282_analysis.xu_pipeline import _execute
 from dataset1282_analysis.xu_resources import combined_environment, stage_resources
 from dataset1282_analysis.xu_gpu_isolation import configure_coordinator, report_for_parent
+from dataset1282_analysis.short_workspace import ShortWorkspace
 
 
 def inference_check(args,out,owner,children,free,state):
@@ -84,9 +84,16 @@ def capacity_groups(args,out,owner,children,remaining,state):
 
 
 def run(args):
+    with ShortWorkspace(args.output,prefix='fleet-'+args.stage) as workspace:
+        workspace.record('configuration',arguments=vars(args))
+        result=run_probe(args,workspace.scratch/'probe')
+    print(workspace.logs,flush=True)
+    return result
+
+
+def run_probe(args,out):
     configure_coordinator()
     import torch
-    out = args.output.resolve()
     if any((p/'.git').exists() for p in (out,*out.parents)) or out.exists():
         raise ValueError('Select a new private output directory outside a Git checkout')
     if args.threads is not None and args.threads < 1:
@@ -116,10 +123,10 @@ def run(args):
             else:
                 capacity_groups(args,out,owner,children,remaining,state)
             state['state']='passed'
-        except (Exception, KeyboardInterrupt) as exc:
-            state.update(state='failed',reason=str(exc))
         finally:
             children.stop()
+            if sys.exc_info()[0] is not None:
+                state.update(state='failed',reason=str(sys.exc_info()[1]))
             atomic_json(out/'result.json',state)
     print(state,flush=True)
     return 0 if state['state']=='passed' else 1
@@ -133,18 +140,14 @@ def main(argv=None):
             raise ValueError('Missing output and assigned inference GPUs')
         result = run_worker(Path(argv[1]),argv[2],argv[2:])
         return 0 if result.get('state')=='passed' else 1
-    parser=ArgumentParser(description=__doc__)
+    parser=ArgumentParser(description='Logs-only fixed-batch Xu capacity qualification')
     parser.add_argument('--devices',default='auto')
     parser.add_argument('--exclude-physical-gpus',type=int,nargs='*',default=[0,1])
     parser.add_argument('--output',required=True,type=Path)
     parser.add_argument('--stage',choices=('inference','3d64','3d128','blood-encoder','blood-sequence'),default='3d64')
     parser.add_argument('--threads',type=int)
     parser.add_argument('--resource-policy',choices=('v2','legacy'))
-    try:
-        return run(parser.parse_args(argv))
-    except (OSError,RuntimeError,ValueError) as exc:
-        print(str(exc),file=sys.stderr)
-        return 1
+    return run(parser.parse_args(argv))
 
 
 if __name__=='__main__':
