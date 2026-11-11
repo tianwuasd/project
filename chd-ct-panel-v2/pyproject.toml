@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chd-stunet"
-version = "0.6.1"
-description = "CHD analysis, versioned preprocessing, STU-Net-S fine-tuning and whole-volume prediction"
+version = "0.7.0"
+description = "ImageCHD analysis, preprocessing, STU-Net-S and MedSAM2 fine-tuning and prediction"
 requires-python = ">=3.11"
 dependencies = ["numpy", "scipy", "nibabel", "matplotlib", "psutil", "threadpoolctl"]
 

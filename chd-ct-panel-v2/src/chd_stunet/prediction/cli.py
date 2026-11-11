@@ -7,6 +7,7 @@ from ..config import default_prepared, prediction_paths, resolve_path
 def add_arguments(sub, positive, nonnegative):
     import argparse
     parser = sub.add_parser('predict', help='whole-volume heldout prediction with frozen STU-Net-S models')
+    parser.add_argument('--model', choices=('stunet-s', 'medsam2'), default='stunet-s')
     parser.add_argument('--training-run', nargs='+', help='one existing training run per selected fold')
     parser.add_argument('--prepared')
     parser.add_argument('--fold', nargs='+', choices=['0', '1', '2', 'all'])
