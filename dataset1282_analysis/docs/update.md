@@ -1,12 +1,12 @@
 # 限定子项目的代码更新
 
 ```text
-python update.py --check --proxy http://127.0.0.1:7897
-python update.py --proxy http://127.0.0.1:7897
+python update.py --check --proxy "$PX"
+python update.py --proxy "$PX"
 python update.py --rollback FULL_ID
 ```
 
-目标固定为https://github.com/tianwuasd/project.git、main分支、dataset1282_analysis子目录。更新使用隔离bare Git缓存和blob过滤，不在父仓库执行git pull，也不改其他子项目。
+`PX` 由当前机器已验证的 GitHub 代理地址设置；服务器与 Windows 本机使用各自的端口。目标固定为https://github.com/tianwuasd/project.git、chd_1282_monai分支、dataset1282_analysis子目录。更新使用隔离bare Git缓存和blob过滤，不在父仓库执行git pull，也不改其他子项目。
 
 远端分支先解析为完整commit，之后使用该commit的树和blob身份下载。只接受白名单普通文件，拒绝链接、路径穿越、大小写冲突、缺文件、超限、协议不匹配和摘要不符。release-manifest.json校验内容一致性，并对Python文件离线语法检查；同源manifest不是独立数字签名。
 
