@@ -14,7 +14,7 @@ python run.py prepare --list-methods
 python smoke.py --stage prepare --method stunet-s --output outputs/prepare-smoke
 ```
 
-新环境用 `python setup_env.py --install --profile preprocess` 部署到独立 `.venv_preprocess`，后续入口自动选择它。不下载权重、不申请GPU、不修改系统Python。Linux路径默认沿用此前服务器目录；本机路径保存在不入Git的project.local.json。无需历史描述文件，程序自己生成输入清单。
+新环境用 `python setup_env.py --install --profile preprocess` 部署到独立 `.venv_preprocess`，后续入口自动选择它。不下载权重、不申请GPU、不修改系统Python。Linux 数据集从 `/data_nas` 读取，预处理、训练和预测默认输出到 workspace；本机路径保存在不入Git的project.local.json。无需历史描述文件，程序自己生成输入清单。
 
 环境部署/检查会立即显示当前配置、解释器和完整日志路径，逐步输出创建环境、安装依赖与API核验的开始、结束、耗时和退出码；子进程输出同时刷新到终端和`outputs/environment/*.log`。连续10秒没有新输出时显示当前步骤及已运行时间，不代表测得了下载进度。失败后停止后续部署步骤，完整日志与失败记录保留，成功核验后才保存解释器配置。
 
@@ -34,6 +34,8 @@ python run.py status --output outputs/fold0
 `stunet-s`审计110对，按确认规则纳入96对；保留原97对角色。辅助标签仅在衍生数组中映射ignore8，各折只用train拟合统计。短测限制输出病例数，不缩小原图或缩减拟合训练集。方法、协议、运行输出各自分目录。科学规则、部署和完整日志说明见[预处理使用说明](docs/preprocessing-usage.md)。
 
 新增`stunet-s-partial`：保留同一96例主队列，另处理13例缺MYO病例为`aux_train`；源灰度问题病例继续排除。它保存已标类别、缺标类别和背景歧义，供后续部分监督训练消费。新增病例不参与主训练集统计拟合，也不作为验证/测试真值。详见[部分标注预处理](docs/partial-preprocessing.md)。
+
+预处理成功后自动精简已完成任务的描述、结果副本、最新进度及遗留暂存，训练数据、恢复合同和详细日志保留。旧结果可用 `python -B run.py compact --prepared PATH` 只读查看，加 `--apply` 应用。实际移除量与占用写入 `cleanup.json`，见[产物保留与精简](docs/preprocessing-artifacts.md)。
 
 ```bash
 python smoke.py --stage prepare --method stunet-s-partial --output outputs/partial-smoke
@@ -105,7 +107,7 @@ docs/                           方法、运行、来源、验收范围
 
 ## 更新与交付
 
-main和训练分支同步包含预处理优化与训练入口。已完成的旧版预处理仍可只读用于新训练，不需要重算或改签名；源合同、每折计划、角色、文件SHA和坐标仍严格核查。预处理新算法执行本身继续使用严格源码签名，不允许新代码热恢复旧预处理任务。
+main和训练分支同步包含预处理优化与训练入口。已完成的旧版预处理仍可只读用于新训练，不需要重算或改签名；源合同、每折计划、角色、文件SHA和坐标仍严格核查。预处理的 `--resume` 使用经过摘要核验的原运行冻结生产者，严格保留原方法、版本与源码合同。
 
 ```bash
 python update.py --plan

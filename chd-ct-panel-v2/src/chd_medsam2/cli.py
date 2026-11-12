@@ -121,6 +121,8 @@ def main(arguments):
         source = resolve_path(args.source_prepared or paths.get('completed_preprocessing_default'))
         output = resolve_path(args.output) if args.output else resolve_path(
             local.get('preprocess_output_root', paths.get('preprocess_output_root', 'outputs/preprocessing')))/'medsam2'/stamp
+        from chd_stunet.maintenance.prepared_artifacts import writable_output, compact_prepared
+        output = writable_output(output)
         folds = (0,1,2) if 'all' in args.fold else tuple(sorted({int(fold) for fold in args.fold}))
         cases = args.cases or []
         if args.limit:
@@ -128,6 +130,9 @@ def main(arguments):
             cases = (cases or sorted(row['case_id'] for row in rows))[:args.limit]
         result = run_prepare(source, output, folds=folds, cases=cases, resume=args.resume,
                              workers=args.workers, readers=args.readers)
+        if result['status'] == 'completed':
+            cleaned = compact_prepared(output, apply=True)
+            print(f"产物精简完成：移除{cleaned['removed_files']}个任务文件，{cleaned['removed_logical_bytes']}字节；数组和详细日志保留", flush=True)
     elif command == 'train':
         result, output = train(args, local, paths, stamp)
     else:

@@ -1,5 +1,7 @@
 """Resolve one explicit configuration; local machine paths stay out of Git."""
 import json
+import getpass
+import os
 import sys
 from pathlib import Path
 
@@ -20,16 +22,31 @@ def resolve_path(value, *, base=ROOT):
     return (base/path if not path.is_absolute() else path).resolve()
 
 
+def platform_paths(local, *, platform=None, project_root=ROOT):
+    platforms=json.loads((ROOT/'configs/paths.json').read_text(encoding='utf-8'))
+    values=platforms.get(platform or sys.platform,{})
+    if not any('{workspace_root}' in str(value) for value in values.values()):
+        return values
+    configured=local.get('workspace_root') or os.environ.get('CHD_WORKSPACE_ROOT')
+    if configured:
+        workspace=Path(configured).expanduser().resolve()
+    else:
+        ancestors=[p for p in (project_root,*project_root.parents) if p.name.endswith('_workspace')]
+        if not ancestors:
+            raise ValueError('请在本机配置设置 workspace_root，或提供 CHD_WORKSPACE_ROOT；生成目录必须位于 workspace')
+        workspace=ancestors[0]
+    return {name:value.format(workspace_root=str(workspace),user=getpass.getuser())
+            if isinstance(value,str) else value for name,value in values.items()}
+
+
 def prepare_paths(local):
     """Scientific parameters live in the method; machine config supplies paths."""
-    platforms=json.loads((ROOT/'configs/paths.json').read_text(encoding='utf-8'))
-    return dict(platforms.get(sys.platform,{}),**{k:v for k,v in local.items()
+    return dict(platform_paths(local),**{k:v for k,v in local.items()
                 if k in {'raw_root','preprocess_output_root','runtime_root','descriptor'}})
 
 
 def training_paths(local):
-    platforms=json.loads((ROOT/'configs/paths.json').read_text(encoding='utf-8'))
-    return dict(platforms.get(sys.platform,{}),**{k:v for k,v in local.items()
+    return dict(platform_paths(local),**{k:v for k,v in local.items()
                 if k in {'training_prepared_root','training_output_root','runtime_root','weights_path',
                          'completed_preprocessing_default'}})
 

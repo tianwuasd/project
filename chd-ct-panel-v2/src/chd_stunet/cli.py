@@ -114,7 +114,14 @@ def main(argv=None):
     status=sub.add_parser("status",help="read an existing run status without scientific imports")
     status.add_argument("--output",required=True)
     sub.add_parser("check",help="show configured paths; does not install anything")
+    compact=sub.add_parser('compact',help='inspect or compact completed preprocessing artifacts')
+    compact.add_argument('--prepared',required=True)
+    compact.add_argument('--apply',action='store_true',help='remove only rebuildable completed-job records')
     args=parser.parse_args(argv)
+    if args.command=='compact':
+        from .maintenance.prepared_artifacts import compact_prepared
+        print(json.dumps(compact_prepared(resolve_path(args.prepared),apply=args.apply),ensure_ascii=False,indent=2))
+        return 0
     if args.command=='predict' and args.stop:
         if not args.output:raise ValueError('--stop 必须指定 --output')
         output=resolve_path(args.output)
@@ -199,6 +206,8 @@ def main(argv=None):
         from .preprocessing.registry import get_method
         method=get_method(args.method)
         output=resolve_path(args.output) if args.output else resolve_path(paths.get('preprocess_output_root','outputs/preprocessing'))/args.method/method['protocol']/stamp
+        from .maintenance.prepared_artifacts import writable_output,compact_prepared,verify_snapshot
+        output=writable_output(output)
         folds=(0,1,2) if 'all' in args.fold else tuple(sorted(set(map(int,args.fold))))
         # Runtime leaves limit native libraries before importing nnU-Net. The
         # parent is a supervisor, not an extra multi-threaded compute worker.
@@ -206,11 +215,25 @@ def main(argv=None):
             os.environ[key]='1'
         from threadpoolctl import threadpool_limits
         from .preprocessing.run import run_prepare
-        with threadpool_limits(limits=1):
-            result=run_prepare(raw,output,method_name=args.method,descriptor=descriptor,folds=folds,
+        if args.resume:
+            code=verify_snapshot(output)
+            options=dict(raw_root=str(raw),output=str(output),method_name=args.method,
+                descriptor=str(descriptor) if descriptor else None,folds=folds,
                 selected_cases=args.cases or (),limit=args.limit,workers=args.workers,
-                readers=args.readers or public.get('readers',2),
-                resume=args.resume,audit_only=args.audit_only,cohort=args.cohort,case_threads=args.case_threads)
+                readers=args.readers or public.get('readers',2),resume=True,audit_only=args.audit_only,
+                cohort=args.cohort,case_threads=args.case_threads)
+            subprocess.run([sys.executable,'-B','-u',str(ROOT/'scripts/resume_prepare.py'),
+                            str(code),json.dumps(options)],check=True)
+            result=json.loads((output/'summary.json').read_text(encoding='utf-8'))
+        else:
+            with threadpool_limits(limits=1):
+                result=run_prepare(raw,output,method_name=args.method,descriptor=descriptor,folds=folds,
+                    selected_cases=args.cases or (),limit=args.limit,workers=args.workers,
+                    readers=args.readers or public.get('readers',2),
+                    resume=args.resume,audit_only=args.audit_only,cohort=args.cohort,case_threads=args.case_threads)
+        if result.get('protocol') and not result['failed_cases'] and not args.audit_only:
+            cleaned=compact_prepared(output,apply=True)
+            print(f"产物精简完成：移除{cleaned['removed_files']}个任务文件，{cleaned['removed_logical_bytes']}字节；训练数据和详细日志保留",flush=True)
         print(json.dumps(dict(output=str(output),**result),ensure_ascii=False,indent=2))
         if result.get('protocol') and not result['failed_cases'] and not args.audit_only:
             from .observability.runlog import write_json
