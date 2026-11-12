@@ -90,7 +90,7 @@ def run(job, probe=None, gpu_query=None, allocation=None, popen=None, backend=No
             prior_result = read_json(output / 'cases' / case['case_id'] / 'latest-result.json', {})
             attempt = prior_result.get('directory') or str(output / 'cases' / case['case_id'] / ('attempt-' + uuid.uuid4().hex[:12]))
             pending.append({'case': case, 'memory': memory, 'phase': phase, 'source': source,
-                            'own': bool(own), 'attempt': attempt})
+                            'own': bool(own), 'attempt': attempt, 'disk_bytes': math_disk(geom)})
         except Exception as error:
             state['cases'].append({'case_id': case['case_id'], 'status': 'failed', 'error': str(error)})
             state['failed'] += 1
@@ -151,6 +151,7 @@ def run(job, probe=None, gpu_query=None, allocation=None, popen=None, backend=No
                     free = []  # Recheck occupancy after releasing an inference slot.
                     next_probe = 0
                 waiting_gpu = False
+                waiting_disk = False
                 # Keep available GPUs busy before consuming the same bounded
                 # CPU/RAM slots with optional merge tails.
                 pending.sort(key=lambda row: {'verify': 0, 'infer': 1, 'plan': 2, 'merge': 3}[row['phase']])
@@ -166,6 +167,12 @@ def run(job, probe=None, gpu_query=None, allocation=None, popen=None, backend=No
                     used = sum(r['item']['memory'] for r in active.values())
                     if used + item['memory'] > alloc['memory_bytes']:
                         continue
+                    disk_held = sum(r['item']['disk_bytes'] for r in active.values())
+                    if shutil.disk_usage(output).free < disk_held + item['disk_bytes']:
+                        if not active:
+                            raise ValueError('运行期间磁盘可用空间不足，已停止派发病例')
+                        waiting_disk = True
+                        continue
                     device = None
                     if item['phase'] == 'infer' and selected:
                         gpu_active = [r for r in active.values() if r.get('device')]
@@ -173,7 +180,11 @@ def run(job, probe=None, gpu_query=None, allocation=None, popen=None, backend=No
                             continue
                         if time.monotonic() >= next_probe:
                             current = current or (probe or gpu_info)()
-                            free = gpu_query(selected, current, settings['min_gpu_gib'])
+                            if settings.get('allow_shared_gpu'):
+                                free = gpu_query(selected, current, settings['min_gpu_gib'], allow_shared=True,
+                                                 reserve_gib=settings.get('gpu_reserve_gib', 0))
+                            else:
+                                free = gpu_query(selected, current, settings['min_gpu_gib'])
                             next_probe = time.monotonic() + 2
                         busy = {r['device']['uuid'] for r in gpu_active}
                         device = next((d for d in free if d['uuid'] not in busy), None)
@@ -190,6 +201,9 @@ def run(job, probe=None, gpu_query=None, allocation=None, popen=None, backend=No
                                    stop=str(stop), identity=identity,
                                    expected_identity=identity if item['own'] else None,
                                    verification=str(target / 'verification.json'))
+                    if device and settings.get('allow_shared_gpu'):
+                        payload['gpu_guard'] = {'uuid': device['uuid'], 'minimum_gib': settings['min_gpu_gib'],
+                                                'reserve_gib': settings.get('gpu_reserve_gib', 0)}
                     path = target / (item['phase'] + '-request.json')
                     write_json(path, payload)
                     env = child_env(alloc['threads'], device)
@@ -211,6 +225,7 @@ def run(job, probe=None, gpu_query=None, allocation=None, popen=None, backend=No
                     print(f"[{key}] {item['phase']} / {device['uuid'] if device else 'CPU'}", flush=True)
                 state['max_parallel'] = max(state['max_parallel'], len(active))
                 state['waiting_gpu'] = waiting_gpu
+                state['waiting_disk'] = waiting_disk
                 state['pending'] = len(pending)
                 elapsed = time.monotonic() - started
                 state['elapsed_seconds'] = round(elapsed, 1)

@@ -1,6 +1,6 @@
 # AAOCA 原始 CT 到医生可编辑分割
 
-TotalSegmentator 2.18.0 的三个预训练任务为原始 HU CT 生成十一种结构。终端 0.4 和命令行 run 直接读取原图，保存 `aaoca_11.seg.nrrd`，成功导出核验后清理模型中间掩膜。
+TotalSegmentator 2.18.0 的三个预训练任务为原始 HU CT 生成十一种结构。0.5 命令行入口直接读取原图，保存 `aaoca_11.seg.nrrd`，成功导出核验后清理模型中间掩膜。
 
 ## 模型和标签
 
@@ -16,22 +16,19 @@ TotalSegmentator 2.18.0 的三个预训练任务为原始 HU CT 生成十一种�
 
 心腔名称与上游 heart_ 前缀一致。结构独立命名和着色，重叠区域保留。冠脉尚未细分分支，不自动判定开口异常或壁内段。
 
-## 终端与命令行
+## 直接启动
 
 在 AAOCA 根目录启动：
 
 ```bash
-bash start_segmentation.sh --runtime /srv/private/aaoca-seg-terminal
+bash start_segmentation.sh install --runtime /srv/private/aaoca-runtime
+bash start_segmentation.sh license --runtime /srv/private/aaoca-runtime
+bash start_segmentation.sh check --runtime /srv/private/aaoca-runtime
 ```
 
-e 安装环境并验证许可，c 配置原始清单、结果和获准设备，n 新建任务。完整操作见[工作台说明](../../SEGMENTATION_WORKBENCH.md)。心腔和冠脉任务的许可遵循上游要求；许可不写入源码、CSV 或命令行。
+入口直接接收参数。完整操作见[直接分割说明](../../SEGMENTATION_WORKBENCH.md)。心腔和冠脉任务的许可遵循上游要求；许可不写入源码、CSV 或命令行。
 
-独立命令行使用 Python 3.11 及以上：
-
-```bash
-python -m pip install -r requirements-inference.txt
-python run.py doctor
-```
+启动与自动安装使用 Python 3.11–3.13；已有 runtime 的独立环境和许可可以复用。
 
 CSV 示例中的代号和路径均为虚构：
 
@@ -43,24 +40,24 @@ sample_a,/srv/private/images/sample_a.nii.gz,true,true
 确认字段必须有 HU 和真实毫米尺度依据，一个三维期相一行，同一影像不得重复。CSV 含私人路径，不公开。
 
 ```bash
-python run.py inventory --inventory /srv/private/research/CT总清单.json --data-root /srv/private/research --manifest /srv/private/input.csv
-python run.py plan --manifest /srv/private/input.csv --output-root /srv/private/labels --limit 1
-python run.py run --manifest /srv/private/input.csv --output-root /srv/private/labels --device gpu:0 --threads 2 --limit 1
+bash start_segmentation.sh inventory --inventory /srv/private/research/CT总清单.json --data-root /srv/private/research --manifest /srv/private/input.csv
+bash start_segmentation.sh plan --runtime /srv/private/aaoca-runtime --manifest /srv/private/input.csv --output-root /srv/private/labels --limit 1
+bash start_segmentation.sh run --runtime /srv/private/aaoca-runtime --manifest /srv/private/input.csv --output-root /srv/private/labels --gpus 0,1 --workers 2 --threads 2 --min-free-gib 8 --gpu-reserve-gib 2 --background
 ```
 
-去掉 --limit 会执行清单中全部体积，只有明确开展正式处理时才扩大范围。可用重复 --case-id 限定体积，--device cpu 选择 CPU。
+示例要求 0、1 已分配给当前用户。每张卡同时处理一个病例，允许已有计算任务；空闲显存达到工作门槛加预留量时派发，默认共 10 GiB。每个模型开始前重新检查，实际并发还受 CPU/RAM/读写预算限制。显存门槛不构成硬限制或独占预约。--cpu 选择 CPU；--limit 和重复 --case-id 可限定体积。
 
 模型内部完成必要重采样、裁剪与标准化，输出恢复输入网格。外部不保存重采样 CT、归一化 CT 或概率图副本。
 
 ## 医生编辑和保留文件
 
-医生加载原始 CT 和 `cases/<代号>/attempt-*/aaoca_11.seg.nrrd`，在 3D Slicer Segment Editor 中逐结构修订。文件包含名称、颜色和空间信息，重叠结构存于独立标签层。
+医生加载原始 CT 和结果根目录下的 `seg-<任务编号>/cases/<代号>/attempt-*/aaoca_11.seg.nrrd`，在 3D Slicer Segment Editor 中逐结构修订。文件包含名称、颜色和空间信息，重叠结构存于独立标签层。
 
 成功后保留最终标签及小型私人来源、质检、恢复记录和日志。输入、代码/依赖、配置与输出哈希一致时复用标签；损坏时明确报错。中断推理重新执行该体积，导出未完成时保留掩膜。仅清理本任务已核验的掩膜，原始 CT 和外部历史成果保留。
 
 医生需重点复核冠脉开口、主动脉根部、近端走行、肺动脉邻近边界和细小分支。空掩膜标为待复核，不据此认定结构不存在。
 
-旧网页入口、显式旧格式函数和冻结任务保留各自合同。新任务使用上述终端或命令行，无需启动 MONAI Label 服务。
+status、logs、stop、resume 使用同一 --runtime，默认选择最近的分割任务，也可用 --job 指定。任务请求与代码冻结，恢复沿用原任务。
 
 ## 验证与公开边界
 

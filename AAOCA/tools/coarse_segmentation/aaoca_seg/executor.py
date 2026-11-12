@@ -59,7 +59,7 @@ def execute_model(command, log, stop, registry):
             stop_child(child)
 
 
-def infer(case, attempt, threads, device, stop, identity):
+def infer(case, attempt, threads, device, stop, identity, gpu_guard=None):
     validate_case(case, full=True)
     attempt = Path(attempt)
     attempt.mkdir(parents=True, exist_ok=True)
@@ -87,6 +87,9 @@ def infer(case, attempt, threads, device, stop, identity):
         for task, command in commands(image, attempt, device, threads):
             if Path(stop).exists():
                 raise KeyboardInterrupt
+            if gpu_guard:
+                from .resources import wait_gpu_memory
+                wait_gpu_memory(gpu_guard, stop)
             write_json(attempt / 'phase.json', {'phase': task, 'time': timestamp()})
             write_json(attempt / f'{task}.command.json', command)
             execute_model(command, attempt / f'{task}.log', stop, attempt / 'model-process.json')
@@ -209,7 +212,7 @@ def main():
     try:
         if payload['phase'] == 'infer':
             infer(payload['case'], payload['attempt'], payload['threads'], payload['device'],
-                  payload['stop'], payload['identity'])
+                  payload['stop'], payload['identity'], payload.get('gpu_guard'))
         elif payload['phase'] == 'verify':
             if payload.get('output_format') == 'slicer-seg-v1' and completed(Path(payload['attempt']) / 'result.json', payload['case'], payload['source']):
                 result = read_json(Path(payload['attempt']) / 'result.json')

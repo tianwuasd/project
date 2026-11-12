@@ -27,7 +27,8 @@ from .service_state import (
 
 DEFAULTS = {'manifest': '', 'results': '', 'mode': 'cpu', 'devices': [], 'gpu_count': 1,
             'min_gpu_gib': 8, 'cpu_limit': None, 'memory_gib': None, 'workers': None,
-            'threads': None, 'io_workers': None, 'preprocess_output': '/data_nas/zhangruichen/aaoca_preprocessed'}
+            'threads': None, 'io_workers': None, 'preprocess_output': '/data_nas/zhangruichen/aaoca_preprocessed',
+            'allow_shared_gpu': False, 'gpu_reserve_gib': 0}
 
 
 def digest(path):
@@ -65,6 +66,10 @@ def validate_settings(settings):
             raise ValueError(f'{key} 须为正数')
     if settings['gpu_count'] is None or settings['min_gpu_gib'] is None:
         raise ValueError('GPU 并发和空闲显存阈值不能为 auto')
+    if type(settings['allow_shared_gpu']) is not bool:
+        raise ValueError('共享 GPU 设置须为布尔值')
+    if isinstance(settings['gpu_reserve_gib'], bool) or not math.isfinite(settings['gpu_reserve_gib']) or settings['gpu_reserve_gib'] < 0:
+        raise ValueError('预留显存须为非负数')
     if settings['mode'] == 'gpu' and not settings['devices']:
         raise ValueError('请在设备页明确选择分配给你的 GPU')
     if settings['mode'] == 'cpu' and settings['devices']:
@@ -221,7 +226,7 @@ class Workbench:
                 if not source.is_relative_to((job / 'code').resolve()) or digest(source) != expected:
                     raise ValueError('代码快照改变，不能续跑')
             if not python_path(self.root).is_file():
-                raise ValueError('请先通过 e 安装独立推理环境')
+                raise ValueError('请先运行 start_segmentation.py install --runtime 指定运行目录')
             # Keep every owner attempt; the scientific request and output stay frozen.
             old = read_json(job / 'state.json', {})
             write_json(job / 'runs' / (uuid.uuid4().hex + '.json'), old)

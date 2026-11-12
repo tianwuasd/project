@@ -82,14 +82,14 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(runtime_env(self.workspace)["CUDA_VISIBLE_DEVICES"], "GPU-private-synthetic")
 
     def test_gpu_requires_allocation_and_stable_uuid(self):
-        info = {"cuda_available": True, "devices": [{"index": 0, "uuid": "GPU-test"}]}
+        info = {"cuda_available": True, "devices": [{"index": 0, "uuid": "GPU-00000000-0000-4000-8000-000000000001"}]}
         with patch("aaoca_seg.managed.read_json", wraps=read_json):
             write_json(self.workspace / "environment.json", info)
             with self.assertRaises(ValueError):
                 self.configure(device="gpu:0", gpu_confirmed=False)
             self.configure(device="gpu:0", gpu_confirmed=True)
-            self.assertEqual(self.controller.config["gpu_uuid"], "GPU-test")
-            info["devices"][0]["uuid"] = "GPU-changed"
+            self.assertEqual(self.controller.config["gpu_uuid"], "GPU-00000000-0000-4000-8000-000000000001")
+            info["devices"][0]["uuid"] = "GPU-00000000-0000-4000-8000-000000000002"
             with self.assertRaises(ValueError):
                 check_device(self.controller.config, info)
         check_device({"device": "cpu"}, {})

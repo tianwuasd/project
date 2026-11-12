@@ -9,6 +9,7 @@ import subprocess
 import sys
 
 from .service_state import CODE_ROOT, private_dir, read_json, redact, write_json, write_private
+from .resources import canonical_gpu_uuid
 
 BUILDS = {"cpu", "cu118", "cu126", "auto"}
 
@@ -85,19 +86,16 @@ def choose_build(requested, host):
 
 PROBE = '''
 import json
+import torch
 from aaoca_seg.pipeline import environment
+from aaoca_seg.resources import canonical_gpu_uuid
 info = environment()
 info['devices'] = []
-info['cuda_available'] = False
-try:
-    import torch
-    info['cuda_available'] = torch.cuda.is_available()
-    info['torch_cuda'] = torch.version.cuda
-    for i in range(torch.cuda.device_count()):
-        p = torch.cuda.get_device_properties(i)
-        info['devices'].append({'index': i, 'name': p.name, 'uuid': str(getattr(p, 'uuid', '未知')), 'total_gib': round(p.total_memory / 2**30, 1)})
-except Exception:
-    info['cuda_error'] = 'PyTorch CUDA 探测失败，请检查驱动和安装版本'
+info['cuda_available'] = torch.cuda.is_available()
+info['torch_cuda'] = torch.version.cuda
+for i in range(torch.cuda.device_count()):
+    p = torch.cuda.get_device_properties(i)
+    info['devices'].append({'index': i, 'name': p.name, 'uuid': canonical_gpu_uuid(str(p.uuid)), 'total_gib': round(p.total_memory / 2**30, 1)})
 print(json.dumps(info, ensure_ascii=False))
 '''
 
@@ -125,7 +123,7 @@ def check_device(config, info):
     if not info.get("cuda_available") or index not in {d["index"] for d in info.get("devices", [])}:
         raise ValueError("所选 GPU 不在当前可见且可用的设备中，请重新检查环境")
     selected = next(d for d in info["devices"] if d["index"] == index)
-    if config.get("gpu_uuid") != selected["uuid"]:
+    if canonical_gpu_uuid(config.get("gpu_uuid")) != canonical_gpu_uuid(selected["uuid"]):
         raise ValueError("GPU 映射已变化，请重新选择并确认设备")
 
 

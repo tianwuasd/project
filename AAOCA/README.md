@@ -6,7 +6,7 @@
 
 ## AAOCA 独立粗分割
 
-在本目录运行 `bash start_segmentation.sh --runtime /srv/private/aaoca-seg-terminal`。0.4 默认直接读取原始 HU/mm CT，使用 TotalSegmentator 三个任务，保存原始网格上的 `aaoca_11.seg.nrrd` 供医生在 3D Slicer 中修订。外部不生成重采样或归一化 CT；最终标签核验后清理本任务中间掩膜。支持独立环境/许可、多 GPU 队列、后台运行和完整性校验后续跑。操作见 [独立分割面板](SEGMENTATION_WORKBENCH.md)。
+0.5 使用命令行直接运行：`bash start_segmentation.sh run --runtime /srv/private/aaoca-runtime --manifest /srv/private/aaoca.csv --output-root /srv/private/labels --gpus 0,1 --background`。直接读取原始 HU/mm CT，使用 TotalSegmentator 三个任务，输出医生可编辑的 `aaoca_11.seg.nrrd`；最终标签核验后清理本任务中间掩膜。支持多 GPU 病例并行，所选显卡已有任务时按剩余显存和预留量准入。环境、许可、查询和恢复均使用明确命令，见[直接分割说明](SEGMENTATION_WORKBENCH.md)。
 
 ## AAOCA 独立预处理
 
