@@ -2,6 +2,7 @@
   "project": "chd-ct-panel-v2",
   "version": "0.7.0",
   "files": {
+    "docs/monai-online-design.md": "f7beeeb43d56e06ed0415c8891f152c4dfe5911e5fa3fee940acbe1232867759",
     "docs/preprocessing-shared-cache.md": "a2a35ed02c56448b1d97d07a952ff80f24782dbeb558a59830a582a56db8b389",
     "docs/superpowers/plans/2026-11-12-shared-fold-cache.md": "a77c81d87704625408bebda6e27ba11ac30d7964341ff970460415bec804b06a",
     "docs/superpowers/specs/2026-11-12-shared-fold-cache-design.md": "9320488b54af4213ca19894f19850e7e576756a2a865acf47cd6f5fe54c6538b",
