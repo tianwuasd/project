@@ -7,6 +7,7 @@ import time
 
 from ..observability.locking import try_lock, unlock
 from ..observability.runlog import write_json
+from ..preprocessing.shared_cache import data_directory,lease
 
 
 def read_json(path):
@@ -45,9 +46,10 @@ def identifier(value):
 
 
 def inventory(root):
-    files = [p for p in root.rglob('*') if p.is_file() and p != root/'cleanup.json']
+    excluded = ['cleanup.json', '.cache-writer.json']
+    files = [p for p in root.rglob('*') if p.is_file() and p not in [root/name for name in excluded]]
     return dict(files=len(files), logical_bytes=sum(p.stat().st_size for p in files),
-                excludes=['cleanup.json'], measurement='logical_file_sizes')
+                excludes=excluded, measurement='logical_file_sizes')
 
 
 def candidates(root):
@@ -70,6 +72,7 @@ def candidates(root):
             if fold not in (0, 1, 2):
                 raise ValueError('未知预处理折')
             folder = f'fold_{fold}'
+            data_root=data_directory(root,fold)
             contract = read_json(root/folder/'training_contract.json')['preprocessing_contract']
             for cid in summary['requested_case_ids']:
                 identifier(cid)
@@ -81,7 +84,7 @@ def candidates(root):
                         or set(marker.get('file_sha256', {})) != required):
                     raise ValueError('病例完成记录不一致：'+cid)
                 for name in required:
-                    if not owned_file(root, f'{folder}/data/{name}').is_file():
+                    if not owned_file(root, (data_root/name).relative_to(root)).is_file():
                         raise ValueError('已完成病例缺少数据：'+cid)
                 removable.extend([f'tasks/{folder}/{cid}.json', f'{folder}/results/{cid}.json',
                                   f'{folder}/results/{cid}.progress.json', f'{folder}/completion/{cid}.json.partial'])
@@ -141,39 +144,44 @@ def compact_prepared(output, *, apply=False):
         if not try_lock(stream):
             raise RuntimeError('预处理运行仍被其他进程占用，未清理任何文件')
         try:
-            began = time.monotonic()
-            paths, directories = candidates(root)
-            before = inventory(root)
-            records = []
-            for path in paths:
-                info = path.stat()
-                records.append(dict(path=path.relative_to(root).as_posix(), bytes=info.st_size,
-                                    mtime_ns=info.st_mtime_ns, inode=info.st_ino))
-            result = dict(schema=1, policy='prepared-essential-v1', applied=apply,
-                          scope='completed_preprocessing_only', cleanup_state='planned',
-                          before=before, candidates=records, removed_files=0, removed_logical_bytes=0,
-                          staging_directories=directories,
-                          retained=['training_data', 'completion_markers', 'audit_samples', 'audit_records',
-                                    'manifests', 'fold_plans', 'source_code', 'logs', 'resources'])
-            if apply:
-                write_json(root/'cleanup.json', result)
-                for record in records:
-                    path = owned_file(root, record['path'])
-                    info = path.stat()
-                    if (info.st_size, info.st_mtime_ns, info.st_ino) != (record['bytes'], record['mtime_ns'], record['inode']):
-                        raise ValueError('精简期间文件发生变化：'+str(path))
-                    path.unlink()
-                    result['removed_files'] += 1
-                    result['removed_logical_bytes'] += record['bytes']
-                for relative in directories:
-                    owned_file(root, relative, directory=True).rmdir()
-            result.update(cleanup_state='completed' if apply else 'planned', after=inventory(root),
-                          elapsed_seconds=time.monotonic()-began)
-            if apply:
-                write_json(root/'cleanup.json', result)
-            return result
+            with lease(root,read_only=not apply):
+                return _compact_locked(root,apply)
         finally:
             unlock(stream)
+
+
+def _compact_locked(root,apply):
+    began = time.monotonic()
+    paths, directories = candidates(root)
+    before = inventory(root)
+    records = []
+    for path in paths:
+        info = path.stat()
+        records.append(dict(path=path.relative_to(root).as_posix(), bytes=info.st_size,
+                            mtime_ns=info.st_mtime_ns, inode=info.st_ino))
+    result = dict(schema=1, policy='prepared-essential-v1', applied=apply,
+                  scope='completed_preprocessing_only', cleanup_state='planned',
+                  before=before, candidates=records, removed_files=0, removed_logical_bytes=0,
+                  staging_directories=directories,
+                  retained=['training_data', 'completion_markers', 'audit_samples', 'audit_records',
+                            'manifests', 'fold_plans', 'source_code', 'logs', 'resources'])
+    if apply:
+        write_json(root/'cleanup.json', result)
+        for record in records:
+            path = owned_file(root, record['path'])
+            info = path.stat()
+            if (info.st_size, info.st_mtime_ns, info.st_ino) != (record['bytes'], record['mtime_ns'], record['inode']):
+                raise ValueError('精简期间文件发生变化：'+str(path))
+            path.unlink()
+            result['removed_files'] += 1
+            result['removed_logical_bytes'] += record['bytes']
+        for relative in directories:
+            owned_file(root, relative, directory=True).rmdir()
+    result.update(cleanup_state='completed' if apply else 'planned', after=inventory(root),
+                  elapsed_seconds=time.monotonic()-began)
+    if apply:
+        write_json(root/'cleanup.json', result)
+    return result
 
 
 def verify_snapshot(output):

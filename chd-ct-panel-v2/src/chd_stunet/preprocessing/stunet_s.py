@@ -19,6 +19,7 @@ from .fingerprint import sample_foreground
 from .verification import verify_full_array
 from ..observability.phase_timer import PhaseTimer,TimedConfiguration
 from ..acceleration.scipy_parallel import parallel_zooms
+from .shared_cache import protect_case
 
 
 def hashes(pair):
@@ -156,6 +157,7 @@ def corrected_affine(affine, spacing):
     return result
 
 
+@protect_case
 def preprocess_case(job):
     from nnunetv2.preprocessing.preprocessors.default_preprocessor import DefaultPreprocessor
     from nnunetv2.training.dataloading.nnunet_dataset import comp_blosc2_params
@@ -243,7 +245,7 @@ def preprocess_case(job):
     with Path(str(base)+'.pkl').open('wb') as f:
         pickle.dump(properties,f,pickle.HIGHEST_PROTOCOL)
     with timer.phase('source_recheck'):check_source_unchanged(job,before)
-    target = foldroot/'data'
+    target = foldroot.parent/'shared_data' if job.get('shared_cache') else foldroot/'data'
     target.mkdir(parents=True,exist_ok=True)
     files = {}
     for suffix in ('.b2nd','_seg.b2nd','.pkl'):

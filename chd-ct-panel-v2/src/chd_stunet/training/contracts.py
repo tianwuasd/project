@@ -36,6 +36,7 @@ def scientific_sources(root=ROOT):
               root/'src/chd_stunet/acceleration/training_cpu.py',
               root/'src/chd_stunet/preprocessing/annotations.py',
               root/'src/chd_stunet/preprocessing/cohort.py']
+    paths += list((root/'src/chd_stunet/preprocessing').glob('shared_cache.py'))
     result={}
     for path in sorted(paths):
         tree=ast.parse(path.read_text(encoding='utf-8'))

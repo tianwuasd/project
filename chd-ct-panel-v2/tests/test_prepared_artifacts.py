@@ -48,7 +48,7 @@ class PreparedArtifactsTests(unittest.TestCase):
     def make_run(self, model):
         root = self.folder/model
         root.mkdir()
-        cid = 'ct_1001'
+        cid = 'sample_a'
         row = dict(case_id=cid, source_hashes={'image': hashlib.sha256(self.samples[0]).hexdigest(),
                                              'label': hashlib.sha256(self.samples[1]).hexdigest()})
         write_json(root/'status.json', {'state': 'completed'})
@@ -109,7 +109,7 @@ class PreparedArtifactsTests(unittest.TestCase):
         self.assertGreater(result['removed_logical_bytes'], 0)
         for p in data.iterdir():
             self.assertEqual(sha(p), before[p.relative_to(root)])
-        self.assertTrue((root/'audit/ct_1001.npy').is_file())
+        self.assertTrue((root/'audit/sample_a.npy').is_file())
         self.assertTrue((root/'logs/evidence.json').is_file())
         self.assertEqual(compact_prepared(root, apply=True)['removed_files'], 0)
 
@@ -122,22 +122,48 @@ class PreparedArtifactsTests(unittest.TestCase):
         self.assertEqual(result['removed_files'], 4)
         self.assertEqual(arrays, {p.name: sha(p) for p in data.glob('*.npy')})
 
+    def test_shared_arrays_survive_preview_and_compaction(self):
+        from chd_stunet.preprocessing.shared_cache import MODE, begin_view, commit_view, digest, lease
+        root, data = self.make_run('stunet')
+        cid = 'sample_a'
+        plan = {'fold': 0}
+        contract = digest(dict(run='file-management-test', plan=plan))
+        write_json(root/'signature.json', dict(identity='file-management-test', method={'storage_mode': MODE}))
+        write_json(root/'fold_0/preprocessing_plan.json', plan)
+        write_json(root/'fold_0/training_contract.json', {'preprocessing_contract': contract})
+        marker_path = root/f'fold_0/completion/{cid}.json'
+        marker = json.loads(marker_path.read_text(encoding='utf-8'))
+        write_json(marker_path, dict(marker, contract=contract, fold=0))
+        with lease(root, enabled=True):
+            begin_view(root, 0, [cid], contract)
+            target = root/'shared_data'
+            target.mkdir()
+            for path in data.iterdir():
+                path.rename(target/path.name)
+            commit_view(root, 0, [cid], contract)
+        before = {p.relative_to(root): p.read_bytes() for p in root.rglob('*') if p.is_file()}
+        compact_prepared(root)
+        self.assertEqual(before, {p.relative_to(root): p.read_bytes() for p in root.rglob('*') if p.is_file()})
+        result = compact_prepared(root, apply=True)
+        self.assertEqual(result['removed_files'], 5)
+        self.assertEqual(marker['file_sha256'], {p.name: sha(p) for p in target.iterdir()})
+
     def test_active_run_and_incomplete_data_are_protected(self):
         root, data = self.make_run('stunet')
         with run_lock(root/'.run.lock'):
             with self.assertRaises(RuntimeError):
                 compact_prepared(root, apply=True)
-        (data/'ct_1001.pkl').unlink()
+        (data/'sample_a.pkl').unlink()
         with self.assertRaises(ValueError):
             compact_prepared(root, apply=True)
-        self.assertTrue((root/'tasks/audit/ct_1001.json').is_file())
+        self.assertTrue((root/'tasks/audit/sample_a.json').is_file())
 
     def test_unknown_staging_file_stops_cleanup(self):
         root, _ = self.make_run('stunet')
-        (root/'fold_0/staging/ct_1001-123/keep.txt').write_bytes(self.samples[0])
+        (root/'fold_0/staging/sample_a-123/keep.txt').write_bytes(self.samples[0])
         with self.assertRaises(ValueError):
             compact_prepared(root, apply=True)
-        self.assertTrue((root/'tasks/audit/ct_1001.json').is_file())
+        self.assertTrue((root/'tasks/audit/sample_a.json').is_file())
 
     def test_data_only_root_is_rejected(self):
         with self.assertRaises(ValueError):

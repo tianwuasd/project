@@ -24,6 +24,7 @@ from .registry import get_method
 from .cohort import TARGETS,frozen_roles,select_cohort
 from .fingerprint import make_plan
 from .capacity import case_scale
+from .shared_cache import MODE, lease, begin_view, commit_view
 
 
 def digest(value):
@@ -77,7 +78,7 @@ def check_resume_before_writing(output, signature, pairs):
                 raise ValueError('Resume intensity sample changed: '+row['case_id'])
 
 
-def cache_valid(foldroot,cid,contract,source_hashes,annotation=None):
+def cache_valid(foldroot,cid,contract,source_hashes,annotation=None,*,shared=False):
     path = foldroot/'completion'/f'{cid}.json'
     if not path.is_file():
         return False
@@ -86,17 +87,25 @@ def cache_valid(foldroot,cid,contract,source_hashes,annotation=None):
         return False
     if annotation is not None and row.get('annotation') != annotation:
         return False
-    return all((foldroot/'data'/name).is_file() and sha256_file(foldroot/'data'/name)==sha
+    data = foldroot.parent/'shared_data' if shared else foldroot/'data'
+    return all((data/name).is_file() and sha256_file(data/name)==sha
                for name,sha in row.get('file_sha256',{}).items()) and len(row.get('file_sha256',{})) == 3
 
 
 def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(0,1,2),
                 selected_cases=(),limit=None,workers=None,readers=None,resume=False,audit_only=False,
-                cohort='all',case_threads=4):
+                cohort='all',case_threads=4,storage='independent',cache_fold=None):
     raw, output = Path(raw_root).resolve(strict=True),Path(output).resolve()
     if not raw.is_dir() or raw==output or output.is_relative_to(raw) or raw.is_relative_to(output):
         raise ValueError('Raw data and derived output must be separate directories')
     method = get_method(method_name)
+    if storage not in ('independent','shared'):
+        raise ValueError('Unknown preprocessing storage mode')
+    shared = storage=='shared'
+    if shared:
+        method=dict(method,storage_mode=MODE)
+        cache_fold=folds[0] if cache_fold is None else cache_fold
+        if cache_fold not in folds:raise ValueError('活动折必须属于本次请求的计划折')
     if cohort not in ('all','main','auxiliary'):
         raise ValueError('Unknown output cohort: '+str(cohort))
     if cohort=='auxiliary' and not method.get('expected_auxiliary'):
@@ -114,7 +123,7 @@ def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(
         check_resume_before_writing(output,signature,pairs)
     elif resume:
         raise ValueError('Resume requires an existing signed run')
-    with run_lock(output/'.run.lock'):
+    with run_lock(output/'.run.lock'), lease(output,enabled=shared) as cache_token:
         # A second simultaneous creator must not slip past the pre-lock check.
         if (output/'signature.json').exists():
             if json.loads((output/'signature.json').read_text(encoding='utf-8')) != signature:
@@ -130,6 +139,7 @@ def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(
                 output_cohort=cohort,
                 requested_workers=workers,requested_readers=readers,requested_case_threads=case_threads,
                 audit_only=audit_only,
+                storage=storage,cache_fold=cache_fold,
                 source_scope=f"110 pairs audit; {method.get('expected_main',96)} main, "
                     f"{method.get('expected_auxiliary',0)} auxiliary; historical 97 roles retained"))
             for relative in signature['producer_sha256']:
@@ -236,6 +246,7 @@ def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(
                            numTraining=0,description='preprocessing only; roles are in splits.json')
             write_json(output/'dataset.json',dataset)
             all_prepare_jobs,capacity = [],[]
+            shared_contract=None
             for fold in (() if audit_only else folds):
                 log.event('fingerprint.start',f"fold{fold}：仅使用主队列train拟合强度统计与目标spacing；辅助不参与拟合")
                 fingerprint,plan = make_plan(included,samples,fold,method)
@@ -248,13 +259,18 @@ def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(
                            for role in roles_in_output})
                 write_json(foldroot/'training_contract.json',dict(consumer,fold=fold,
                     preprocessing_contract=contract,fit_ids=plan['fit_ids']))
+                if shared and fold!=cache_fold:
+                    continue
+                if shared:
+                    shared_contract=contract
+                    begin_view(output,fold,[row['case_id'] for row in targets],contract)
                 target_spacing = plan['target_spacing_before_transpose'][::-1]
                 for row in targets:
                     cid = row['case_id']
                     scale=case_scale(row,plan)
                     reservation=estimate_memory(row['shape_xyz'],row['spacing_xyz'],target_spacing)
                     capacity.append(dict(fold=fold,reservation_bytes=reservation,**scale))
-                    if cache_valid(foldroot,cid,contract,row['source_hashes'],row['annotation']):
+                    if cache_valid(foldroot,cid,contract,row['source_hashes'],row['annotation'],shared=shared):
                         reused += 1
                         reused_groups[row['cohort_group']] += 1
                         continue
@@ -263,6 +279,8 @@ def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(
                         spacing_xyz=row['spacing_xyz'],spacing_evidence=row['spacing_evidence'],
                         expected_hashes=row['source_hashes'],gate=str(output/'read_gate.json'),
                         result=str(result_path),foldroot=str(foldroot),contract=contract,
+                        shared_cache=shared,
+                        cache_write_token=cache_token,
                         annotation=row['annotation'],cohort_group=row['cohort_group'],roles=row['roles'])
                     taskfile = output/'tasks'/f'fold_{fold}'/f'{cid}.json'
                     write_json(taskfile,task)
@@ -276,8 +294,7 @@ def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(
                     f"{largest['predicted_transposed_shape']}，{largest['output_voxels']:,}体素，"
                     f"相对裁剪后放大{largest['expansion_from_crop']:.1f}倍；预留{largest['reservation_bytes']/1024**3:.2f}GiB（非实测占用）",
                     largest=largest,preview=str(output/'capacity_preview.json'))
-            # Fold-specific statistics and contracts remain independent. Only
-            # scheduling is shared: a slow case cannot hold the next fold idle.
+            # 每折独立拟合。共享模式只调度当前活动折，换折时复用同一数据目录。
             def prepared(name,result):
                 nonlocal processed
                 if result['success']:
@@ -287,10 +304,13 @@ def run_prepare(raw_root,output,*,method_name='stunet-s',descriptor=None,folds=(
                     failed.append(dict(name=name,**result))
             execute_jobs(all_prepare_jobs,output,log,stage_name='prepare_all_folds',workers=workers,
                          readers=readers,completed=prepared,case_threads=case_threads)
+            if shared and not audit_only and not failed:
+                commit_view(output,cache_fold,[row['case_id'] for row in targets],shared_contract)
             summary = dict(method=method_name,protocol=method['protocol'],source_pairs=len(rows),
                 included_pairs=len(included),excluded_pairs=len(excluded),fold_counts=fold_counts,
                 cohort_counts=group_counts,output_cohort=cohort,
-                audited_reused=reused_audit,requested_folds=list(folds),audit_only=audit_only,
+                audited_reused=reused_audit,requested_folds=[cache_fold] if shared and not audit_only else list(folds),
+                planned_folds=list(folds),storage=storage,active_fold=cache_fold,audit_only=audit_only,
                 requested_case_ids=[r['case_id'] for r in targets],processed_cases=processed,
                 processed_by_cohort=processed_groups,reused_by_cohort=reused_groups,
                 reused_cases=reused,failed_cases=failed,elapsed_seconds=time.monotonic()-started,

@@ -37,6 +37,8 @@ python run.py status --output outputs/fold0
 
 预处理成功后自动精简已完成任务的描述、结果副本、最新进度及遗留暂存，训练数据、恢复合同和详细日志保留。旧结果可用 `python -B run.py compact --prepared PATH` 只读查看，加 `--apply` 应用。实际移除量与占用写入 `cleanup.json`，见[产物保留与精简](docs/preprocessing-artifacts.md)。
 
+STU-Net 新预处理默认保留三折计划，共用一个活动折缓存目录。`--fold all --cache-fold 0` 只生成第0折数组；第0折训练结束后，在同一预处理输出目录运行 `prepare --resume --fold all --cache-fold 1` 切换，再训练第1折，第2折同理。切换按各折原参数重新计算，模型与检查点分别保存，同一缓存同时只供一折训练使用。旧缓存继续使用原布局，详见[共享缓存](docs/preprocessing-shared-cache.md)。
+
 ```bash
 python smoke.py --stage prepare --method stunet-s-partial --output outputs/partial-smoke
 python run.py prepare --method stunet-s-partial --cohort auxiliary --fold 0

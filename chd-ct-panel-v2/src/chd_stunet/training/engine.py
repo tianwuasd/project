@@ -15,6 +15,7 @@ import traceback
 import numpy as np
 import torch
 from ..observability.locking import run_lock
+from ..preprocessing.shared_cache import protect_training
 from ..observability.runlog import write_json
 from ..acceleration.training_cpu import BatchPool,BatchQueue
 from ..acceleration.preprocess_cpu import snapshot
@@ -120,6 +121,7 @@ def prune_checkpoints(folder):
         if path.name not in keep:path.unlink()
 
 
+@protect_training
 def run_train(prepared,output,*,fold=0,weights=None,device='cuda:0',smoke=False,
               train_cases=(),val_cases=(),overrides=None,workers=None,resume=False,
               stop_after_steps=None,check_only=False):

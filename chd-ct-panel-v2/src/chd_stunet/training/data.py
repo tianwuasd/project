@@ -17,6 +17,7 @@ import torch
 from ..data.analysis import sha256_file
 from ..preprocessing.annotations import make_annotation,validate_case_roles
 from ..preprocessing.cohort import TARGETS,frozen_roles
+from ..preprocessing.shared_cache import data_directory,is_shared,ready_view,reader_claim
 from .contracts import digest
 
 # Exact previously audited producers with the three-column coordinate bug.
@@ -33,7 +34,9 @@ def read_json(path):return json.loads(Path(path).read_text(encoding='utf-8'))
 def cached_smoke_ids(run,fold,include_auxiliary=True):
     """Select cached role-correct examples; never borrow an outer test volume."""
     run=Path(run);manifest=read_json(run/'manifests/imagechd_input.json')
+    available=set(ready_view(run,fold)['case_ids']) if is_shared(run) else None
     rows=[r for r in manifest['cases'] if (run/f'fold_{fold}/completion'/f"{r['case_id']}.json").is_file()]
+    if available is not None:rows=[r for r in rows if r['case_id'] in available]
     main=[r['case_id'] for r in rows if r['roles'][str(fold)]=='train']
     aux=[r['case_id'] for r in rows if r['roles'][str(fold)]=='aux_train'] if include_auxiliary else []
     val=[r['case_id'] for r in rows if r['roles'][str(fold)]=='val']
@@ -108,7 +111,7 @@ def load_prepared(run, fold, settings, *, train_cases=(), val_cases=(), group_au
         import torch.distributed as dist
         rank, world = dist.get_rank(), dist.get_world_size()
     label = f'fold{fold}' if world == 1 else f'fold{fold} rank{rank}/{world}'
-    with InputCheckProgress(label) as progress:
+    with reader_claim(run,fold), InputCheckProgress(label) as progress:
         try:
             result = _load_prepared(run,fold,settings,train_cases=train_cases,val_cases=val_cases,
                                     progress=progress,audit_rank=rank,audit_world=world)
@@ -137,6 +140,7 @@ def _load_prepared(run,fold,settings,*,train_cases,val_cases,progress,audit_rank
     """The existing full verifier; progress never alters identities or files."""
     import blosc2
     run=Path(run).resolve(strict=True);foldroot=run/f'fold_{fold}'
+    data_root=data_directory(run,fold)
     manifest=read_json(run/'manifests/imagechd_input.json')
     signature=read_json(run/'signature.json')
     plan=read_json(foldroot/'preprocessing_plan.json')
@@ -182,6 +186,8 @@ def _load_prepared(run,fold,settings,*,train_cases,val_cases,progress,audit_rank
         raise ValueError('Preprocessing plan fitted outside the fixed main training set')
     rows={};adapters=[];identity=[]
     selected=chosen_train+chosen_val
+    if is_shared(run) and set(selected)-set(ready_view(run,fold)['case_ids']):
+        raise ValueError('当前共享缓存缺少本折训练或验证病例，请先完成本折预处理')
     for index,cid in enumerate(selected):
         progress.update(cid,index,len(selected),'完成标记/源合同')
         source=cases[cid];completion_path=foldroot/'completion'/f'{cid}.json'
@@ -201,8 +207,8 @@ def _load_prepared(run,fold,settings,*,train_cases,val_cases,progress,audit_rank
             if not audit_volume and name != cid+'.pkl':
                 continue
             progress.update(cid,index,len(selected),'完整文件SHA256 '+name)
-            if sha256_file(foldroot/'data'/name)!=sha:raise ValueError('Cache SHA256 differs: '+name)
-        with (foldroot/'data'/f'{cid}.pkl').open('rb') as stream:properties=pickle.load(stream)
+            if sha256_file(data_root/name)!=sha:raise ValueError('Cache SHA256 differs: '+name)
+        with (data_root/f'{cid}.pkl').open('rb') as stream:properties=pickle.load(stream)
         if properties.get('method_protocol')!=protocol or properties.get('source_hashes')!=source['source_hashes']:
             raise ValueError('Stored property provenance differs: '+cid)
         annotation=source.get('annotation')
@@ -218,8 +224,8 @@ def _load_prepared(run,fold,settings,*,train_cases,val_cases,progress,audit_rank
             for key,wanted in (('annotation',annotation),('cohort_group',group),('roles',source['roles'])):
                 if key in record and record[key]!=wanted:raise ValueError('Case supervision differs: '+cid+' '+key)
                 if key not in record and not legacy_allowed:raise ValueError('Case supervision missing: '+cid+' '+key)
-        image=blosc2.open(str(foldroot/'data'/f'{cid}.b2nd'),mode='r',dparams={'nthreads':1})
-        seg=blosc2.open(str(foldroot/'data'/f'{cid}_seg.b2nd'),mode='r',dparams={'nthreads':1})
+        image=blosc2.open(str(data_root/f'{cid}.b2nd'),mode='r',dparams={'nthreads':1})
+        seg=blosc2.open(str(data_root/f'{cid}_seg.b2nd'),mode='r',dparams={'nthreads':1})
         if image.shape!=seg.shape or image.shape[0]!=1 or image.dtype!=np.float32 or seg.dtype!=np.int8:
             raise ValueError('Unexpected prepared array format: '+cid)
         properties,adapted=normalize_locations(properties,image.shape,legacy_allowed)
@@ -227,8 +233,10 @@ def _load_prepared(run,fold,settings,*,train_cases,val_cases,progress,audit_rank
             progress.update(cid,index,len(selected),'按chunk核验全部前景坐标')
             verify_coordinate_labels(seg,properties)
         if adapted:adapters.append(dict(case_id=cid,adapter='audited_zyx_to_channel_zyx',producer=legacy_hash))
-        rows[cid]=dict(case_id=cid,base=str(foldroot/'data'/cid),shape=list(image.shape),
+        rows[cid]=dict(case_id=cid,base=str(data_root/cid),shape=list(image.shape),
                        properties=properties,annotation=annotation,cohort_group=group,roles=source['roles'])
+        if is_shared(run):
+            rows[cid]['cache_view']=dict(root=str(run),fold=fold,generation=ready_view(run,fold)['generation'])
         identity.append(dict(case_id=cid,source_hashes=completion['source_hashes'],
                              file_sha256=completion['file_sha256'],annotation=annotation,roles=source['roles'],
                              preprocessing_contract=completion['contract']))
@@ -277,6 +285,12 @@ class PatchSampler:
             self._initial=np.asarray(self.settings['patch_size'])
 
     def __call__(self, seed):
+        view=self.rows[self.ids[0]].get('cache_view')
+        claim=reader_claim(view['root'],view['fold'],generation=view['generation']) if view else nullcontext()
+        with claim:
+            return self._produce(seed)
+
+    def _produce(self, seed):
         from ..acceleration.training_cpu import deterministic_cpu_rng,sequence_seed
         if self.slots is not None:
             # Global slot seeds survive rank/worker changes. Each rank reads

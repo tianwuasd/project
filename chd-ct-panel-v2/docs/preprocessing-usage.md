@@ -18,10 +18,10 @@ python smoke.py --stage prepare --method stunet-s --output outputs/server-smoke
 
 Linux 默认原始数据、保存位置、运行根分别在 `configs/paths.json`，沿用此前确认的路径。描述文件可以不提供，程序会扫描文件对及作者间距表，自动生成自己的清单，避免再到代码工作目录猜测 `imagechd_input.json`。`project.local.json` 只覆盖机器路径和解释器；科学参数在方法配置中。
 
-正式处理三个折：
+保存三折计划，生成第0折的共享数据缓存：
 
 ```bash
-python run.py prepare --method stunet-s --fold all
+python run.py prepare --method stunet-s --fold all --cache-fold 0
 ```
 
 也可先运行一折。输出目录应固定，重跑时显式加 `--resume`：
@@ -32,7 +32,7 @@ python run.py prepare --method stunet-s --fold 0 --output outputs/fold0-run --re
 python run.py status --output outputs/fold0-run
 ```
 
-相对输出目录以项目根为准，与当前终端目录无关。不提供 `--output` 时自动在结果根按 方法/协议/时间戳 分目录。`--cases`、`--limit` 仅限制最终输出病例，全部源数据仍接受审计，各折始终使用完整训练角色拟合；短测不会缩小原图尺寸。`--workers`是可选上限，不填时由资源策略决定；CLI默认读取上限2，`--readers`可明确覆盖，CPU计算不受这个读取数限制。
+相对输出目录以项目根为准，与当前终端目录无关。不提供 `--output` 时，共享模式在结果根按 方法/协议/shared_cache 保存；`--storage independent` 按 方法/协议/时间戳 保存各折独立数组。共享缓存需按折顺序训练，换折运行相同方法、同一输出目录的 `--resume --fold all --cache-fold N`，见[共享缓存与三折顺序](preprocessing-shared-cache.md)。`--cases`、`--limit` 仅限制最终输出病例，全部源数据仍接受审计，各折始终使用完整训练角色拟合；短测不会缩小原图尺寸。`--workers`是可选上限，不填时由资源策略决定；CLI默认读取上限2，`--readers`可明确覆盖，CPU计算不受这个读取数限制。
 
 ## 完整标注基线stunet-s的科学规则
 
@@ -73,11 +73,13 @@ run/
     preprocessing_plan.json  预处理计划，未冻结网络/训练patch
     splits.json              train/val/test及独立aux_train角色
     training_contract.json   本折拟合IDs与下游消费要求；由独立train入口消费
-    data/                    .b2nd、_seg.b2nd、.pkl
+    data/                    独立存储模式的 .b2nd、_seg.b2nd、.pkl
     completion/              完整产物hash，独立于data扫描目录
     results/                 逐例结果或完整错误
     staging/                 未提交项；无完成标记不可复用
   resources/                 阶段准入与实际峰值
+  shared_data/               共享模式的活动折数组
+  shared_cache.json          共享模式的活动折、构建状态及病例范围
   logs/                      总日志、逐例日志、事件、每秒资源
   status.json                当前阶段/心跳/进度/错误
   summary.json               本次处理/复用/失败及明确分母

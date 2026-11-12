@@ -17,6 +17,7 @@ import torch
 from ..config import ROOT
 from ..acceleration.preprocess_cpu import snapshot,interpreter_command
 from ..observability.locking import run_lock
+from ..preprocessing.shared_cache import protect_training
 from ..observability.runlog import write_json
 from .distributed_engine import prepare_contract
 from .checkpoints import read_checkpoint
@@ -160,6 +161,7 @@ def _saved_stop(output,settings,dataset,signature,reason):
     return result
 
 
+@protect_training
 def launch(prepared,output,*,gpus='auto',elastic=True,wait_seconds=300,workers=None,resume=False,continue_from=None,
            check_only=False,**options):
     prepared=Path(prepared).resolve(strict=True);output=Path(output).resolve()

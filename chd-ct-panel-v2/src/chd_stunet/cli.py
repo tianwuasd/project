@@ -79,6 +79,9 @@ def main(argv=None):
                          help='requested resampling threads per case (default 4); shares total V2 CPU budget')
     prepare.add_argument('--readers',type=positive,help='optional read/decompression limit, separate from compute')
     prepare.add_argument('--fold',nargs='+',choices=['0','1','2','all'],default=['all'])
+    prepare.add_argument('--storage',choices=['shared','independent'],default='shared',
+                         help='共享存储默认只保留一个活动折；independent按折分别保存')
+    prepare.add_argument('--cache-fold',type=int,choices=(0,1,2),help='共享目录当前需要生成的折，默认第一个请求折')
     prepare.add_argument('--cases',nargs='+',help='preprocess these cases; audit and train-only fitting remain full scope')
     prepare.add_argument('--cohort',choices=('all','main','auxiliary'),default='all',
                          help='limit outputs only; auxiliary requires stunet-s-partial; fit always uses main train')
@@ -205,7 +208,8 @@ def main(argv=None):
         stamp=datetime.now(timezone(timedelta(hours=8))).strftime('%Y%m%d_%H%M%S')
         from .preprocessing.registry import get_method
         method=get_method(args.method)
-        output=resolve_path(args.output) if args.output else resolve_path(paths.get('preprocess_output_root','outputs/preprocessing'))/args.method/method['protocol']/stamp
+        directory='shared_cache' if args.storage=='shared' else stamp
+        output=resolve_path(args.output) if args.output else resolve_path(paths.get('preprocess_output_root','outputs/preprocessing'))/args.method/method['protocol']/directory
         from .maintenance.prepared_artifacts import writable_output,compact_prepared,verify_snapshot
         output=writable_output(output)
         folds=(0,1,2) if 'all' in args.fold else tuple(sorted(set(map(int,args.fold))))
@@ -222,6 +226,12 @@ def main(argv=None):
                 selected_cases=args.cases or (),limit=args.limit,workers=args.workers,
                 readers=args.readers or public.get('readers',2),resume=True,audit_only=args.audit_only,
                 cohort=args.cohort,case_threads=args.case_threads)
+            saved=json.loads((output/'signature.json').read_text(encoding='utf-8'))
+            if saved['method'].get('storage_mode')=='shared_active_fold_v1':
+                state=json.loads((output/'shared_cache.json').read_text(encoding='utf-8')) if (output/'shared_cache.json').is_file() else {}
+                options.update(storage='shared',cache_fold=args.cache_fold if args.cache_fold is not None else state.get('fold',folds[0]))
+            elif args.cache_fold is not None:
+                raise ValueError('旧独立缓存使用自己的冻结布局；新建共享输出后再指定 --cache-fold')
             subprocess.run([sys.executable,'-B','-u',str(ROOT/'scripts/resume_prepare.py'),
                             str(code),json.dumps(options)],check=True)
             result=json.loads((output/'summary.json').read_text(encoding='utf-8'))
@@ -230,7 +240,8 @@ def main(argv=None):
                 result=run_prepare(raw,output,method_name=args.method,descriptor=descriptor,folds=folds,
                     selected_cases=args.cases or (),limit=args.limit,workers=args.workers,
                     readers=args.readers or public.get('readers',2),
-                    resume=args.resume,audit_only=args.audit_only,cohort=args.cohort,case_threads=args.case_threads)
+                    resume=args.resume,audit_only=args.audit_only,cohort=args.cohort,case_threads=args.case_threads,
+                    storage=args.storage,cache_fold=args.cache_fold)
         if result.get('protocol') and not result['failed_cases'] and not args.audit_only:
             cleaned=compact_prepared(output,apply=True)
             print(f"产物精简完成：移除{cleaned['removed_files']}个任务文件，{cleaned['removed_logical_bytes']}字节；训练数据和详细日志保留",flush=True)

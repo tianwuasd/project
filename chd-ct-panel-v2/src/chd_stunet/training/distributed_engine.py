@@ -18,6 +18,7 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from ..acceleration.training_cpu import BatchPool,BatchQueue
 from ..observability.runlog import write_json
+from ..preprocessing.shared_cache import protect_rank
 from .contracts import recipe,make_signature
 from .data import PatchSampler,load_prepared,cached_smoke_ids
 from .model import topology,build_model
@@ -48,6 +49,7 @@ def prepare_contract(prepared,options,*,group_audit=False):
     return settings,dataset,make_signature(settings,dataset['identity'],WEIGHT_SHA256)
 
 
+@protect_rank
 def run_rank(job_path,rank):
     signal.signal(signal.SIGINT,signal.SIG_IGN)
     job=json.loads(Path(job_path).read_text(encoding='utf-8'))
