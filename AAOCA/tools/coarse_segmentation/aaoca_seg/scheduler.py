@@ -37,7 +37,8 @@ def run(job, probe=None, gpu_query=None, allocation=None, popen=None, backend=No
     write_json(job / 'resources.json', alloc)
     identity = {'versions': (backend or environment())['versions'],
                 'source': {p.name: sha256(p) for p in Path(__file__).parent.glob('*.py')},
-                'method': ('aaoca-totalseg-2.18.0-resampled-hu-11-v1' if request.get('preprocessing_source')
+                'method': ('aaoca-totalseg-2.18.0-native-hu-slicer-seg-v1' if request.get('output_format') == 'slicer-seg-v1' else
+                           'aaoca-totalseg-2.18.0-resampled-hu-11-v1' if request.get('preprocessing_source')
                            else 'aaoca-totalseg-2.18.0-native-hu-11-v1')}
     previous = read_json(job / 'identity.json')
     if previous and previous != identity:
@@ -185,6 +186,7 @@ def run(job, probe=None, gpu_query=None, allocation=None, popen=None, backend=No
                     target = Path(item['attempt'])
                     target.mkdir(parents=True, exist_ok=True)
                     payload = dict(item, threads=alloc['threads'], device='gpu:0' if device else 'cpu',
+                                   output_format=request.get('output_format', 'legacy'),
                                    stop=str(stop), identity=identity,
                                    expected_identity=identity if item['own'] else None,
                                    verification=str(target / 'verification.json'))

@@ -51,8 +51,8 @@ def main(argv=None):
         def interrupted(_signum, _frame):
             raise KeyboardInterrupt
         signal.signal(signal.SIGTERM, interrupted)
-        result = run_batch(cases, args.output_root, args.device, args.threads,
-                           args.stop_file, require_backend())
+        from .label_only import run_batch as run_labels
+        result = run_labels(cases, args.output_root, args.device, args.threads, args.stop_file)
         return 0 if result["status"] == "completed" else (130 if result["status"] == "stopped" else 2)
     except (ValueError, OSError) as error:
         print(f"错误: {error}", file=sys.stderr)

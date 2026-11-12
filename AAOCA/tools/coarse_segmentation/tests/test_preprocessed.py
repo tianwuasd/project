@@ -128,8 +128,8 @@ class PreprocessedTests(unittest.TestCase):
         self.assertEqual(read_json(child / 'request.json')['cases'][0]['preprocessing'],
                          read_json(parent / 'request.json')['cases'][0]['preprocessing'])
 
-    def test_menu_default_preprocessed_selection_can_cancel_without_submission(self):
-        panel = Panel(self.work.root, ask=Mock(side_effect=['合成任务', '', str(self.root.parent), '1', '1', '', 'no']), emit=lambda _: None)
+    def test_menu_default_native_selection_can_cancel_without_submission(self):
+        panel = Panel(self.work.root, ask=Mock(side_effect=['合成任务', '', '1', '', 'no']), emit=lambda _: None)
         panel.new()
         self.assertEqual(self.work.entries(), [])
         self.assertFalse((self.work.root / 'seg-settings.json').exists())

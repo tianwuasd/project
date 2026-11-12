@@ -157,7 +157,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(int(combined.dataobj[4, 4, 4]), 11)
         self.assertEqual(combined.get_data_dtype(), np.dtype("uint8"))
         self.assertTrue(np.allclose(combined.affine, nib.load(str(self.image)).affine))
-        self.assertEqual(int(nib.load(str(attempt / "heartchambers_highres/myocardium.nii.gz")).dataobj[4, 4, 4]), 1)
+        self.assertEqual(int(nib.load(str(attempt / "heartchambers_highres/heart_myocardium.nii.gz")).dataobj[4, 4, 4]), 1)
         qc = json.loads((attempt / "qc.json").read_text(encoding="utf-8"))
         self.assertTrue(qc["overlaps"])
         self.assertTrue(qc["review_required"])

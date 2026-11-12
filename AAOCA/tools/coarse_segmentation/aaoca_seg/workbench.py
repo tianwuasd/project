@@ -171,6 +171,10 @@ class Workbench:
                 cases = [r for r in cases if r['case_id'] in wanted]
             if not cases:
                 raise ValueError('病例列表为空')
+            output_format = ('legacy' if preprocessed or any(row.get('preprocessing') for row in cases)
+                             or ('merge' in steps and 'infer' not in steps) else 'slicer-seg-v1')
+            if output_format == 'slicer-seg-v1' and 'infer' in steps and 'merge' not in steps:
+                steps.append('merge')
             cases = [dict(row, source_stat={'size': Path(row['image']).stat().st_size,
                                             'mtime_ns': Path(row['image']).stat().st_mtime_ns}) for row in cases]
             root = self._paths(settings, cases)
@@ -192,6 +196,7 @@ class Workbench:
             for file in ('launch_job.py', 'queue_job.py', 'run.py', 'requirements.txt', 'requirements-inference.txt'):
                 shutil.copy2(CODE_ROOT / file, code / file)
             request = {'kind': 'segmentation', 'id': job_id, 'name': name, 'created_at': timestamp(),
+                       'output_format': output_format,
                        'steps': steps, 'settings': settings, 'cases': cases, 'inputs': inputs,
                        'output': str(root / ('seg-' + job_id[:12])), 'input_job': input_job, 'rerun_of': rerun_of,
                        'preprocessing_source': (str(Path(preprocessed).expanduser().resolve()) if preprocessed
