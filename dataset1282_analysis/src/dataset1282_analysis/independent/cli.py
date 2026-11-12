@@ -248,7 +248,7 @@ def main(model):
         p = commands.add_parser(name)
         p.add_argument('--prepared',required=True,type=Path)
         p.add_argument('--output',required=True,type=Path)
-        p.add_argument('--device',help='cpu、cuda:序号或省略以使用获准的空闲卡')
+        p.add_argument('--device',help='cpu、cuda:序号或省略以使用获准且显存充足的卡')
         p.add_argument('--threads',type=int,default=4)
         p.add_argument('--wait-seconds',type=int,default=30)
         p.add_argument('--technical-subset',action='store_true')

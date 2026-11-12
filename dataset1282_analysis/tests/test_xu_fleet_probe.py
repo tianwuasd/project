@@ -6,14 +6,17 @@ import tempfile
 import unittest
 
 from dataset1282_analysis.xu_gpu_probe import gpu_snapshot, visible_devices
+from dataset1282_analysis.xu_resources import gpu_budget
 
 
 class FleetProbeTests(unittest.TestCase):
-    def test_real_cli_refuses_an_external_compute_process(self):
+    def test_real_cli_accepts_shared_card_with_sufficient_memory(self):
         inventory = gpu_snapshot()
-        occupied = [d for d in visible_devices() if inventory[d['uuid']]['compute_pids']]
+        occupied = [d for d in visible_devices() if inventory[d['uuid']]['compute_pids'] and
+                    gpu_budget(inventory[d['uuid']]['free_bytes'],inventory[d['uuid']]['total_bytes'],'v2')
+                    >= 256*1024**2]
         if not occupied:
-            self.skipTest('当前可见 GPU 没有外部计算进程')
+            self.skipTest('当前没有剩余显存满足推理需求的共享显卡')
         root = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory() as directory:
             out = Path(directory)/'probe'
@@ -21,15 +24,14 @@ class FleetProbeTests(unittest.TestCase):
                                      '--devices',occupied[0]['device'],'--stage','inference',
                                      '--exclude-physical-gpus',
                                      '--output',str(out)],capture_output=True,text=True,timeout=40)
-            self.assertEqual(result.returncode,1,(result.stdout or '')+(result.stderr or ''))
+            self.assertEqual(result.returncode,0,(result.stdout or '')+(result.stderr or ''))
             logs=list(out.glob('fleet-inference-*/acceptance.log'))
             self.assertEqual(len(logs),1)
             events=[json.loads(line) for line in logs[0].read_text(encoding='utf-8').splitlines()]
             row=next(event['contents'] for event in events
                      if event['event']=='report' and event['path'].endswith('result.json'))
-            self.assertEqual(row['state'],'failed')
-            self.assertFalse(row['groups'])
-            self.assertIn('External compute',row['unavailable'][occupied[0]['device']])
+            self.assertEqual(row['state'],'passed')
+            self.assertTrue(row['groups'])
             self.assertFalse(list(out.glob('*-admission.json')))
             self.assertFalse(list(out.rglob('.scratch')))
             self.assertTrue(all(p.suffix=='.log' for p in out.rglob('*') if p.is_file()))
