@@ -9,6 +9,7 @@ from monai.transforms import Compose
 
 
 PROTOCOL = 'imagechd_stunet_s_seven_structure_v1'
+V2_PROTOCOL = 'chd_v2_stunet_s_seven_structure_v1'
 LABEL_SPACE = 'imagechd_0_7_ignore_minus1'
 
 
@@ -41,8 +42,14 @@ class STUImageCHDDataset:
             raise ValueError('需要明确的三折编号和train/val/test角色')
         self.descriptor = Path(descriptor).resolve(strict=True)
         record = json.loads(self.descriptor.read_text(encoding='utf-8-sig'))
-        if record.get('protocol') != PROTOCOL:
+        self.protocol = record.get('protocol')
+        if self.protocol not in (PROTOCOL, V2_PROTOCOL):
             raise ValueError('需要独立ImageCHD STU输入描述文件')
+        if self.protocol == V2_PROTOCOL:
+            source = record.get('source_provenance', {})
+            if (source.get('builder') != 'imagechd_raw_v1'
+                    or source.get('split_algorithm') != 'original_case_level_threefold_v1'):
+                raise ValueError('ImageCHD v2来源或病例划分不符合约定')
         cases = record['cases']
         ids = [c['case_id'] for c in cases]
         if not ids or len(ids) != len(set(ids)):
@@ -80,6 +87,11 @@ class STUImageCHDDataset:
             digest = hashlib.file_digest(stream, 'sha256').hexdigest()
         if digest != case['image_sha256']:
             raise ValueError('ImageCHD源影像SHA256不符')
+        if self.protocol == V2_PROTOCOL:
+            with label_path.open('rb') as stream:
+                digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+            if digest != case['label_sha256']:
+                raise ValueError('ImageCHD源标签SHA256不符')
         image, label = nib.load(image_path), nib.load(label_path)
         if len(image.shape) != 3 or image.shape != label.shape or not np.allclose(
                 image.affine, label.affine, rtol=1e-6, atol=1e-7):
@@ -91,9 +103,14 @@ class STUImageCHDDataset:
         if (labels.min() < 0 or labels.max() > 255
                 or not np.equal(labels, np.floor(labels)).all()):
             raise ValueError('ImageCHD原始标签必须是0..255有限整数')
-        extras = sorted(int(v) for v in np.unique(labels) if v > 7)
+        present = {int(v) for v in np.unique(labels)}
+        extras = sorted(v for v in present if v > 7)
         if extras != sorted(case['extra_label_ids']):
             raise ValueError('ImageCHD附加标签与冻结描述不一致')
+        if self.protocol == V2_PROTOCOL:
+            missing = sorted(set(range(1, 8)) - present)
+            if missing != sorted(case['missing_label_ids']):
+                raise ValueError('ImageCHD缺少标签记录与源标签不一致')
         spacing = np.asarray(case['spacing_mm'], dtype=np.float64)
         if (case['spacing_source'] != 'imagechd_author_excel' or spacing.shape != (3,)
                 or not np.isfinite(spacing).all() or not ((spacing > 0) & (spacing < 100)).all()):
