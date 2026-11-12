@@ -23,8 +23,7 @@ def prediction_cases(args, cache):
             raise ValueError('请选择冻结开发集中互不重复的病例')
         cases = {}
         for name in names:
-            relative = f'staged/{name}/image{cache.staged_extension}'
-            path = cache._artifact(f'stage-{name}',relative)
+            path = cache.native_image_path(name)
             geo = cache.geometry(name)
             cases[name] = dict(role='development',image=str(path),shape=geo.native_shape_xyz,
                                spacing=geo.spacing_xyz,sha256=dict(image=sha256_file(path)))
@@ -176,7 +175,7 @@ def execute(args, model, output, owner, job, cache):
 
 
 def start(args, model):
-    from ..xu_geometry import PreparedCache
+    from ..input_source import open_prepared as PreparedCache
     from ..xu_pipeline import ROOT
 
     output = assert_output_location(args.output)
@@ -215,7 +214,7 @@ def start(args, model):
 
 def worker(args,model):
     import torch
-    from ..xu_geometry import PreparedCache
+    from ..input_source import open_prepared as PreparedCache
     from ..xu_gpu_isolation import validate_entry
     from ..xu_resources import apply_env_limit
     import os

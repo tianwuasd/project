@@ -24,7 +24,7 @@ from ..observability.status import operation_lock, write_status
 from ..storage_paths import assert_output_location
 from ..short_workspace import ShortWorkspace
 from ..xu_dispatch import Children, run_wave, select_devices
-from ..xu_geometry import PreparedCache
+from ..input_source import open_prepared as PreparedCache
 from ..xu_gpu_isolation import configure_coordinator, validate_entry
 from ..xu_pipeline import ROOT, _execute
 from ..xu_resources import ResourceUnavailable, apply_env_limit, combined_environment, gpu_budget, reserve_wave, stage_resources
@@ -57,11 +57,9 @@ def sample(cache, name, label, seed):
         raise ValueError('训练病例缺少指定的已标注结构')
     rng = np.random.default_rng(seed)
     point = [int(x) for x in np.unravel_index(rng.choice(foreground), reference.shape)]
-    relative = f'staged/{name}/image{cache.staged_extension}'
-    image = nib.load(cache._artifact(f'stage-{name}', relative))
-    if image.shape != reference.shape or not np.allclose(image.affine, np.diag([*geometry.spacing_xyz, 1.])):
+    values = cache.read_native_image(name)
+    if values.shape != reference.shape:
         raise ValueError('训练影像与标签的原网格不匹配')
-    values = image.get_fdata(dtype=np.float32, caching='unchanged')
     patch, center, scale, offset = prompt_patch(values, geometry.spacing_xyz, point)
     target = affine_transform(reference, np.diag(scale), offset=offset, output_shape=patch.shape,
                               order=0, mode='grid-constant', prefilter=False) == label

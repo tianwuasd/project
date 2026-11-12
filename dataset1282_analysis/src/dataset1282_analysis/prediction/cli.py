@@ -26,7 +26,7 @@ def validate_output(args):
 
 
 def open_job(args):
-    from ..xu_geometry import PreparedCache
+    from ..input_source import open_prepared as PreparedCache
     out = assert_output_location(args.output)
     config = validate_output(args)
     cache = PreparedCache(args.prepared,allow_technical_subset=args.technical_subset)

@@ -17,4 +17,10 @@ dist/
 *.xlsx
 *.csv
 *.log
+*.b2nd
+*.pt
+*.pth
+*.pkl
+online.json
+acceptance-work/
 !tests/fixtures/*.csv

@@ -48,6 +48,8 @@ def _bound_input_file(path, args):
 def _sources(technical):
     source = Path(__file__).resolve().parent
     files = [*source.glob('xu_*.py'), source/'training/marginal.py', source/'contracts.py',source/'resources.py',
+             source/'input_source.py', source/'online_input.py', source/'online_memory.py',
+             source/'online_prediction.py', source/'prediction/heldout.py',
              source/'artifact_retention.py', source/'storage_paths.py', source/'storage_migration.py',
              source/'observability/status.py', ROOT/'scripts/xu_seg.py', ROOT/'scripts/xu_pipeline.py',
              ROOT/'scripts/xu_worker.py']
@@ -545,7 +547,7 @@ def _run_attempt(cache, args, out, owner, contract):
 
 
 def _run(args):
-    from .xu_geometry import PreparedCache
+    from .input_source import open_prepared as PreparedCache
     out, prepared = assert_output_location(args.output), args.prepared.resolve()
     if out==prepared or out in prepared.parents or prepared in out.parents:
         raise ValueError('Use separate prepared and output directories')

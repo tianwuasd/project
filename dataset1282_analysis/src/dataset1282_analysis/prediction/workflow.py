@@ -7,7 +7,8 @@ import numpy as np
 
 from ..contracts import atomic_json, digest, read_json, sha256_file
 from ..xu_fusion import _atomic_array, _refine_shape, _save_case, blood_grow, grid_prediction, vote
-from ..xu_geometry import PreparedCache, _resize
+from ..input_source import open_prepared as PreparedCache
+from ..xu_geometry import _resize
 from ..xu_roi import vote_box
 from .heldout import HeldoutCache, prepare_case, verify_case
 from .source import FINE, implementation, safe_path, verify_frozen

@@ -9,7 +9,7 @@ import numpy as np
 from ..contracts import atomic_json, digest, read_json, sha256_file
 from ..observability.status import operation_lock, write_status
 from ..xu_evaluation import class_metrics, summarize
-from ..xu_geometry import PreparedCache
+from ..input_source import open_prepared as PreparedCache
 from . import PROTOCOL
 
 

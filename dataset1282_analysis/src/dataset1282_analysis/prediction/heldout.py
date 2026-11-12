@@ -80,6 +80,9 @@ def verify_plan(training):
 
 
 def prepare_memory(job):
+    if (Path(job['prepared'])/'online.json').is_file():
+        from ..online_prediction import prepare_memory as online_memory
+        return online_memory(job)
     plan = read_json(Path(job['prepared'])/'preprocessed/Dataset282_CHDSource/nnUNetPlans.json')
     spacing = plan['configurations']['3d_fullres']['spacing']
     permutation = plan['transpose_forward']
@@ -92,6 +95,9 @@ def prepare_memory(job):
 
 
 def prepare_case(out, name):
+    from ..online_prediction import online_job, OnlineHeldout
+    if online_job(out):
+        return OnlineHeldout(out).verify(name)
     import blosc2
     import nibabel as nib
     from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
@@ -148,6 +154,9 @@ def prepare_case(out, name):
 
 
 def verify_case(out,name):
+    from ..online_prediction import online_job, OnlineHeldout
+    if online_job(out):
+        return OnlineHeldout(out).verify(name)
     folder = out/'prepared'/name
     marker = read_json(safe_path(folder,'complete.json'))
     job = read_json(out/'run.json')
@@ -162,6 +171,12 @@ def verify_case(out,name):
 
 
 class HeldoutCache:
+    def __new__(cls, out):
+        from ..online_prediction import online_job, OnlineHeldout
+        if online_job(out):
+            return OnlineHeldout(out)
+        return super().__new__(cls)
+
     def __init__(self,out):
         self.out = Path(out)
         self.job = read_json(self.out/'run.json')

@@ -48,11 +48,21 @@ def _matching_transition(stored_map, current_map, path_prefix, audit_path):
         raise ValueError('Unknown source compatibility path prefix')
     if not audit_path.is_file():
         return None
-    for edge in _audit(audit_path)['transitions']:
-        for maps in edge['sources']:
-            if (maps['path_prefix'] == path_prefix and maps['stored'] == stored_map
-                    and maps['current'] == current_map):
-                return edge['id']
+    # 每条边都包含完整的前后源码摘要；仅连接已逐项审核的整组映射。
+    edges = [(edge['id'], maps) for edge in _audit(audit_path)['transitions']
+             for maps in edge['sources'] if maps['path_prefix'] == path_prefix]
+    pending, visited = [(stored_map, [])], set()
+    for source, chain in pending:
+        identity = digest(source)
+        if identity in visited:
+            continue
+        visited.add(identity)
+        for identifier, maps in edges:
+            if maps['stored'] == source:
+                steps = [*chain, identifier]
+                if maps['current'] == current_map:
+                    return ' -> '.join(steps)
+                pending.append((maps['current'], steps))
     return None
 
 

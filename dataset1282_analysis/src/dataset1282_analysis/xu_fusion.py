@@ -272,7 +272,7 @@ def _prediction_context(cache, args, names, job):
     geometry = {}
     for name in names:
         # A cache hit skips read_image. Verify the committed CT bytes on that path too.
-        cache._artifact(f'process-{name}', f'{cache._folder}/{name}.b2nd')
+        cache.verify_image(name)
         geometry[name] = asdict(cache.geometry(name))
     sources = ('xu_fusion.py', 'xu_training.py', 'xu_models.py', 'xu_init.py',
                'xu_geometry.py', 'xu_workflow.py', 'xu_roi.py', 'xu_roi_workflow.py', 'xu_inference_pool.py')

@@ -179,7 +179,7 @@ def main(argv=None):
         module.register(commands)
         handlers.update({k:module.run for k in commands.choices.keys()-previous})
     args=p.parse_args(argv)
-    from .xu_geometry import PreparedCache
+    from .input_source import open_prepared as PreparedCache
     from .xu_roi_workflow import localize, audit
     cache=PreparedCache(args.prepared,allow_technical_subset=args.technical_subset)
     if args.command=='inspect':

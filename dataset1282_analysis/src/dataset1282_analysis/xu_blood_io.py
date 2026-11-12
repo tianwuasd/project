@@ -1,4 +1,4 @@
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from threading import RLock
 
 import blosc2
@@ -26,7 +26,7 @@ def _validate_grid(array, *, label):
 
 
 class _CaseReader:
-    def __init__(self, cache, store, name):
+    def __init__(self, cache, store, name, image=None):
         self.cache = cache
         self.store = store
         self.name = name
@@ -37,7 +37,13 @@ class _CaseReader:
         self._paths_by_kind = {}
         self.closed = False
         self.stats = {'opens': 0, 'hash_checks': 0}
-        self._open_artifact('image')
+        self._online_image = image is not None
+        if self._online_image:
+            if image.dtype != np.float32 or image.shape != (1, *self._geometry.cache_shape):
+                raise ValueError('在线 Blood 输入网格无效')
+            self._arrays['image'] = image
+        else:
+            self._open_artifact('image')
         if store.has(name, 'blood'):
             self._open_artifact('blood')
 
@@ -90,8 +96,10 @@ class _CaseReader:
         with self.lock:
             if self.closed:
                 raise RuntimeError('Case reader is closed')
-            path = self._paths_by_kind[kind]
-            if _stamp(path) != self._stamps[kind]:
+            path = self._paths_by_kind.get(kind)
+            if kind == 'image' and self._online_image:
+                self.cache.verify_image(self.name)
+            elif _stamp(path) != self._stamps[kind]:
                 if kind == 'blood':
                     self.stats['hash_checks'] += 1
                     sha256_file(path)
@@ -129,8 +137,10 @@ class _CaseReader:
 
 @contextmanager
 def case_readers(cache, store, name):
-    reader = _CaseReader(cache, store, name)
-    try:
-        yield reader, reader
-    finally:
-        reader.close()
+    context = cache.case_lease(name) if getattr(cache, 'online', False) else nullcontext(None)
+    with context as entry:
+        reader = _CaseReader(cache, store, name, None if entry is None else entry['image'][None])
+        try:
+            yield reader, reader
+        finally:
+            reader.close()

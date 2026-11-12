@@ -32,8 +32,10 @@ def topology(spacing, patch):
     return strides + [[1,1,1]]*(5-len(strides))
 
 
-def network(strides, deep_supervision):
-    return STUNet(1,11,depth=[1]*6,dims=[16,32,64,128,256,256],
+def network(strides, deep_supervision, num_classes=11):
+    if num_classes not in (8, 11):
+        raise ValueError('STU-Net 输出类别数必须对应 ImageCHD 或 Dataset1282')
+    return STUNet(1,num_classes,depth=[1]*6,dims=[16,32,64,128,256,256],
                   pool_op_kernel_sizes=strides,conv_kernel_sizes=[[3]*3]*6,
                   enable_deep_supervision=deep_supervision)
 
@@ -62,10 +64,7 @@ class PatchReader:
 
     @lru_cache(maxsize=64)
     def locations(self, name):
-        relative = f'{self.cache._folder}/{name}.pkl'
-        # 仅加载已完成的本项目预处理产物，读取前核验原提交摘要。
-        with self.cache._artifact(f'process-{name}',relative).open('rb') as stream:
-            props = pickle.load(stream)
+        props = self.cache.properties(name)
         classes = self.cache.supervision[name]['present_classes']
         locations = props['class_locations']
         return [locations[c] for c in classes if c in locations and len(locations[c])]

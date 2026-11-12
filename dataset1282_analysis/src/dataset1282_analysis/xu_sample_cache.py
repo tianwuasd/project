@@ -176,6 +176,11 @@ class ArrayCache:
 
 
 class CachedPrepared:
+    def __new__(cls, original, output):
+        if getattr(original, 'online', False):
+            return original
+        return super().__new__(cls)
+
     def __init__(self, original, output):
         self.original = original
         self.arrays = ArrayCache(output)

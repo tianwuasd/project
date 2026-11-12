@@ -17,7 +17,7 @@ from .storage_paths import assert_output_location
 REMOTE='https://github.com/tianwuasd/project.git'
 MIRRORS={'gh-proxy':'https://gh-proxy.com/https://github.com/tianwuasd/project.git',
          'gitclone':'https://gitclone.com/github.com/tianwuasd/project.git'}
-BRANCH='main'
+BRANCH='chd_1282_monai'
 SUBDIRECTORY='dataset1282_analysis'
 PROTOCOL=1
 REQUIRED={'bootstrap.py','run.py','setup_env.py','update.py','smoke.py','requirements-lock.txt',

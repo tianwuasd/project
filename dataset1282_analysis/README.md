@@ -1,5 +1,7 @@
 # dataset1282_analysis
 
+`chd_1282_monai` 提供按需读取的低磁盘容量模式：复用已完成预处理的训练计划与冻结划分，输出只含元数据的紧凑目录。Xu、STU-Net、SAM-Med3D 使用统一读取入口，原始 CT 和标签只读，整例数组仅进入有字节上限的内存缓存。[使用与容量说明](docs/monai-online.md)
+
 本分支从已完成的 0.3.0 HU 缓存运行固定划分的 Xu 解剖分割。`scripts/xu_pipeline.py run` 串联双尺度定位、严格投票后扩框 20%、四路基础分割、可用的起始段和血池分支、血管后处理及原网格评价。每一阶段单独保存日志、结果和恢复依据。[全模型运行与恢复](docs/xu-model-run.md) · [各分支与取框验收条件](docs/xu-segmentation.md)
 
 Blood 支持容量约束的七帧分组、开发集特征复用和逐病例只读会话。原任务可显式增加 `--auto-init`，复用已有权重与完整轮次检查点，并训练使用扩大物理范围的 init64/init128。[执行、验收与续跑命令](docs/blood-auto-init.md)
