@@ -15,6 +15,7 @@ spec = importlib.util.spec_from_file_location("chd_code_update", PROJECT / "upda
 updater = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(updater)
 SOURCE_VERSIONS = ["48048b1d84592ba3080d83dfe8352185ca1a6a5f", "80d96b1ee92665dc20237ce2afd47d3bb2956079"]
+DEPLOYMENT_BASE = "6620887dc7d6f9cc54b39d4e8caf2b79d6898be6"
 
 
 def git(directory, *args, data=None):
@@ -28,7 +29,8 @@ def fixture_commit(origin, source, parent=None):
         header, name = row.split(b"\t", 1)
         entries[name] = header
     for name in ("update.py", "launcher.py"):
-        blob = git(origin, "hash-object", "-w", "--stdin", data=(PROJECT / name).read_bytes()).strip()
+        content = git(PROJECT, "show", DEPLOYMENT_BASE + ":" + name) if parent is None else (PROJECT / name).read_bytes()
+        blob = git(origin, "hash-object", "-w", "--stdin", data=content).strip()
         entries[name.encode()] = b"100644 blob " + blob
     body = b"".join(header + b"\t" + name + b"\0" for name, header in sorted(entries.items()))
     subtree = git(origin, "mktree", "-z", data=body).strip()
@@ -65,6 +67,17 @@ def run(root, report):
                        check=True, stdout=subprocess.PIPE, timeout=60)
         cache = updater.GitCache(cache_path, expected_urls={url})
         code, runtime = root / "code", root / "course"
+        selected = cache.choose_source([(root / "missing-mirror").as_uri(), url], expected=first, timeout=5)
+        case.assertEqual(selected, first)
+        case.assertEqual(cache.transport, url)
+        case.assertEqual(sum(row["ok"] for row in cache.network_info["probes"]), 1)
+        checks.append("real Git probing skips an unavailable mirror and selects a working filtered source")
+        failed = updater.GitCache(cache_path, expected_urls={url})
+        with case.assertRaises(ConnectionError):
+            failed.choose_source([(root / "missing-mirror").as_uri()], timeout=5)
+        with case.assertRaises(ValueError):
+            updater.mirror_url("https://credential@mirror.example")
+        checks.append("all failed mirrors and credential-bearing mirror addresses are rejected")
         with case.assertRaises(subprocess.CalledProcessError):
             updater.install(cache, code, runtime, first)
         case.assertFalse((code / "current.json").exists())
@@ -127,6 +140,8 @@ def run(root, report):
         local = set(cache.run("cat-file", "--batch-all-objects", "--batch-check=%(objectname)").decode().splitlines())
         case.assertNotIn(outside, local)
         staged = updater.install(cache, code, runtime, second)
+        case.assertEqual((code / "update.py").read_bytes(), (PROJECT / "update.py").read_bytes())
+        checks.append("an audited old updater upgrades atomically while the old release remains intact")
         case.assertEqual(staged["state"], "installed_not_activated")
         case.assertEqual(current, (code / "current.json").read_bytes())
         with case.assertRaises(FileNotFoundError):
