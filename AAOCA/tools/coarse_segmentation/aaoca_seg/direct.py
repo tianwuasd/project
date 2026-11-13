@@ -61,7 +61,11 @@ def parser():
             devices.add_argument('--gpus', type=gpu_indices, help='明确获准使用的可见 GPU 编号，例如 0,1')
             devices.add_argument('--cpu', action='store_true')
             command.add_argument('--name', default='AAOCA')
-            command.add_argument('--workers', type=int, help='病例并发上限，默认等于所选 GPU 数量')
+            command.add_argument('--continue-from', help='接续已停止的任务编号或 latest；核验后跳过已完成体积')
+            command.add_argument('--workers', type=int, help='全部阶段的进程并发上限，默认卡数加准备和导出并发')
+            command.add_argument('--prepare-workers', type=int, default=1)
+            command.add_argument('--export-workers', type=int, default=1)
+            command.add_argument('--prefetch', type=int, help='准备中和已就绪的病例上限，默认等于卡数')
             command.add_argument('--gpu-count', type=int, help='最多同时使用的 GPU 数，默认等于所选数量')
             command.add_argument('--min-free-gib', type=positive, default=8)
             command.add_argument('--gpu-reserve-gib', type=positive, default=2)
@@ -107,6 +111,7 @@ def report(work, job):
         return {'status': 'empty'}
     request = read_json(job / 'request.json')
     return {'job': job.name, 'output': request['output'], 'state': status(job),
+            'continued_completed': len((request.get('continuation') or {}).get('skipped', [])),
             'progress': read_json(Path(request['output']) / 'status.json', {})}
 
 
@@ -124,7 +129,7 @@ def wait_job(work, job, background):
         if time.monotonic() >= next_report:
             progress = report(work, job)['progress']
             print(json.dumps({key: progress.get(key) for key in
-                              ('status', 'finished', 'total', 'failed', 'waiting_gpu', 'waiting_disk', 'active')},
+                              ('status', 'finished', 'total', 'failed', 'waiting_gpu', 'waiting_disk', 'ready', 'preparing', 'active')},
                              ensure_ascii=False), flush=True)
             next_report = time.monotonic() + 10
         time.sleep(.25)
@@ -184,18 +189,27 @@ def main(argv=None):
         work.start(job)
         return wait_job(work, job, args.background)
     cases = read_manifest(args.manifest, args.case_ids, args.limit)
+    continuation = None
+    if args.continue_from:
+        from .continuation import remaining_cases
+        cases, continuation = remaining_cases(work, args.continue_from, cases)
+        if not cases:
+            print(json.dumps({'status': 'all_completed', 'continuation': continuation}, ensure_ascii=False, indent=2))
+            return 0
     devices = select_devices(probe(workspace), args.gpus) if args.gpus is not None else []
     settings = {**DEFAULTS, 'manifest': str(Path(args.manifest).resolve()),
                 'results': str(Path(args.output_root).resolve()), 'mode': 'gpu' if devices else 'cpu',
                 'devices': devices, 'gpu_count': args.gpu_count if args.gpu_count is not None else max(1, len(devices)),
-                'workers': args.workers if args.workers is not None else max(1, len(devices)),
+                'workers': args.workers if args.workers is not None else max(1, len(devices)) + args.prepare_workers + args.export_workers,
                 'threads': args.threads, 'cpu_limit': args.cpu_limit,
                 'memory_gib': args.memory_gib,
-                'io_workers': args.io_workers if args.io_workers is not None else max(1, len(devices)),
+                'io_workers': args.io_workers if args.io_workers is not None else max(1, len(devices)) + args.prepare_workers + args.export_workers,
+                'prepare_workers': args.prepare_workers, 'export_workers': args.export_workers,
+                'prefetch': args.prefetch if args.prefetch is not None else max(1, len(devices)),
                 'min_gpu_gib': args.min_free_gib, 'allow_shared_gpu': True,
                 'gpu_reserve_gib': args.gpu_reserve_gib}
     job = work.create(args.name, ['plan', 'infer', 'merge'], settings=settings,
-                      case_ids=[case['case_id'] for case in cases])
+                      case_ids=[case['case_id'] for case in cases], continuation=continuation)
     work.start(job)
     return wait_job(work, job, args.background)
 

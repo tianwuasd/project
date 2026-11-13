@@ -6,7 +6,7 @@
 
 ## AAOCA 独立粗分割
 
-0.5 使用命令行直接运行：`bash start_segmentation.sh run --runtime /srv/private/aaoca-runtime --manifest /srv/private/aaoca.csv --output-root /srv/private/labels --gpus 0,1 --background`。直接读取原始 HU/mm CT，使用 TotalSegmentator 三个任务，输出医生可编辑的 `aaoca_11.seg.nrrd`；最终标签核验后清理本任务中间掩膜。支持多 GPU 病例并行，所选显卡已有任务时按剩余显存和预留量准入。环境、许可、查询和恢复均使用明确命令，见[直接分割说明](SEGMENTATION_WORKBENCH.md)。
+0.6 使用命令行直接运行：`bash start_segmentation.sh run --runtime /srv/private/aaoca-runtime --manifest /srv/private/aaoca.csv --output-root /srv/private/labels --gpus 0,1 --background`。CPU提前准备、GPU推理和CPU导出按有界队列重叠执行，默认总workers为卡数加准备和导出并发。直接读取原始HU/mm CT，三个TotalSegmentator任务输出医生可编辑的 `aaoca_11.seg.nrrd`；最终核验后清理本任务中间掩膜。共享显卡按剩余显存和预留量准入；旧任务停止后可用 --continue-from 核验并跳过已完成结果。见[直接分割说明](SEGMENTATION_WORKBENCH.md)。
 
 ## AAOCA 独立预处理
 

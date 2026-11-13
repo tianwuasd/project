@@ -44,6 +44,14 @@ class DirectCommandTests(unittest.TestCase):
             self.assertEqual(args.runtime, 'private-runtime')
             self.assertEqual(args.job, 'a' * 32)
 
+    def test_staged_controls_and_continuation_are_parsed(self):
+        args = parser().parse_args(['run', '--manifest', 'input.csv', '--output-root', 'labels',
+                                    '--gpus', '3,4', '--workers', '4', '--io-workers', '4',
+                                    '--prepare-workers', '1', '--export-workers', '1', '--prefetch', '2',
+                                    '--continue-from', 'latest'])
+        self.assertEqual((args.prepare_workers, args.export_workers, args.prefetch), (1, 1, 2))
+        self.assertEqual(args.continue_from, 'latest')
+
 
 if __name__ == '__main__':
     unittest.main()

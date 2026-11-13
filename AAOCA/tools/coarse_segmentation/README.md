@@ -1,6 +1,6 @@
 # AAOCA 原始 CT 到医生可编辑分割
 
-TotalSegmentator 2.18.0 的三个预训练任务为原始 HU CT 生成十一种结构。0.5 命令行入口直接读取原图，保存 `aaoca_11.seg.nrrd`，成功导出核验后清理模型中间掩膜。
+TotalSegmentator 2.18.0 的三个预训练任务为原始 HU CT 生成十一种结构。0.6 命令行入口直接读取原图，保存 `aaoca_11.seg.nrrd`，成功导出核验后清理模型中间掩膜。CPU提前准备、GPU推理和CPU导出使用有界队列重叠执行。
 
 ## 模型和标签
 
@@ -42,12 +42,16 @@ sample_a,/srv/private/images/sample_a.nii.gz,true,true
 ```bash
 bash start_segmentation.sh inventory --inventory /srv/private/research/CT总清单.json --data-root /srv/private/research --manifest /srv/private/input.csv
 bash start_segmentation.sh plan --runtime /srv/private/aaoca-runtime --manifest /srv/private/input.csv --output-root /srv/private/labels --limit 1
-bash start_segmentation.sh run --runtime /srv/private/aaoca-runtime --manifest /srv/private/input.csv --output-root /srv/private/labels --gpus 0,1 --workers 2 --threads 2 --min-free-gib 8 --gpu-reserve-gib 2 --background
+bash start_segmentation.sh run --runtime /srv/private/aaoca-runtime --manifest /srv/private/input.csv --output-root /srv/private/labels --gpus 0,1 --workers 4 --io-workers 4 --prepare-workers 1 --export-workers 1 --prefetch 2 --threads 2 --min-free-gib 8 --gpu-reserve-gib 2 --background
 ```
 
 示例要求 0、1 已分配给当前用户。每张卡同时处理一个病例，允许已有计算任务；空闲显存达到工作门槛加预留量时派发，默认共 10 GiB。每个模型开始前重新检查，实际并发还受 CPU/RAM/读写预算限制。显存门槛不构成硬限制或独占预约。--cpu 选择 CPU；--limit 和重复 --case-id 可限定体积。
 
 模型内部完成必要重采样、裁剪与标准化，输出恢复输入网格。外部不保存重采样 CT、归一化 CT 或概率图副本。
+
+workers覆盖CPU准备、GPU推理和CPU导出；默认卡数加准备并发1和导出并发1。准备中和已就绪病例受prefetch上限限制，原图及无损解压缓存均校验哈希。源数据或缓存损坏会报错。阶段开始/结束及就绪等待时间记录在私人events.jsonl中。
+
+更新后，旧任务仍用原冻结代码。停止旧任务后，在新run参数追加 --continue-from 旧任务编号或latest，可核验并跳过已完成结果，让剩余病例使用新调度。旧结果原位保留，新任务记录结果引用，不改写旧任务。
 
 ## 医生编辑和保留文件
 
