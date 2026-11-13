@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chd-segmentation"
+version = "0.1.0"
+description = "MONAI congenital-heart segmentation workflows"
+requires-python = ">=3.11"
+dependencies = ["torch>=2.8", "monai==1.5.2", "nnunetv2==2.8.1", "nibabel>=5.3", "numpy>=2", "scipy>=1.15", "PyYAML>=6", "psutil>=7", "filelock>=3"]
+
+[project.scripts]
+chd-segmentation = "chd_segmentation.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

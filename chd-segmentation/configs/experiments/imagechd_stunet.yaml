@@ -1,0 +1,18 @@
+dataset: imagechd
+model: stunet
+scope: formal
+manifest: /path/to/private/imagechd_fold0_manifest.yaml
+plan: /path/to/fitted/preprocessing_plan.json
+pretrained: /path/to/weights/small_ep4k.model
+work_root: /path/to/workspace
+run_dir: /path/to/workspace/runs/imagechd_stunet_fold0
+fold: 0
+training:
+  patch: [128, 128, 128]
+  batch: 1
+  attempts: 250000
+  learning_rate: 0.001
+resources:
+  device: cpu
+  cpu_threads: 2
+  cache_bytes: 1073741824
