@@ -78,8 +78,7 @@ class Panel:
         fields = [('manifest', '原始 HU/mm CSV 清单'), ('results', '结果根目录'),
                   ('cpu_limit', 'CPU 总预算'), ('memory_gib', '内存 GiB'), ('workers', '总病例并发上限'),
                   ('threads', '每病例线程上限'), ('io_workers', '读写并发上限'),
-                  ('gpu_count', 'GPU 并发上限'), ('min_gpu_gib', '最低空闲显存 GiB'),
-                  ('preprocess_output', '预处理任务目录或结果根目录')]
+                  ('gpu_count', 'GPU 并发上限'), ('min_gpu_gib', '最低空闲显存 GiB')]
         while True:
             self.emit('\n分割配置（auto 会按 affinity/cgroup、当前负载和可用内存收缩）')
             for i, (key, label) in enumerate(fields, 1):
@@ -116,7 +115,7 @@ class Panel:
                     draft[key] = float(value) if key in {'memory_gib', 'min_gpu_gib'} else int(value)
 
     def steps(self, default='1,2,3'):
-        self.emit('1 输入/资源预检（CPU）  2 模型推理  3 合并与质检（CPU）')
+        self.emit('1 输入/资源预检（CPU）  2 模型推理  3 导出医生编辑标签并清理临时掩膜（CPU）')
         value = self.prompt(f'步骤，多选用逗号 [{default}]：', default)
         mapping = {'1': 'plan', '2': 'infer', '3': 'merge'}
         try:
@@ -126,20 +125,18 @@ class Panel:
 
     def new(self):
         name = self.prompt('新任务名称：')
-        source = self.prompt('输入来源：p 预处理结果，0 原始 HU 清单，h 历史分割任务 [p]：', 'p')
+        source = self.prompt('输入来源：0 原始 HU 清单，h 历史分割任务 [0]：', '0')
         parent = self.choose() if source == 'h' else None
-        if source not in {'p', '0', 'h'}:
-            raise ValueError('请选择 p、0 或 h')
-        preprocessed = self.choose_preprocessed() if source == 'p' else None
+        if source not in {'0', 'h'}:
+            raise ValueError('请选择 0 或 h')
         steps = self.steps()
         subset = self.prompt('病例代号，逗号分隔；回车全部：')
         ids = [v.strip() for v in subset.split(',')] if subset else None
-        self.emit('预处理输入使用同网格的未截断 HU 配套影像；分割标签将与归一化 CT 对齐。'
-                  if preprocessed else '使用所选来源的 HU/mm 影像；不会把[-1,1]直接传给模型。')
+        self.emit('直接读取原始 HU/mm CT；保存原始网格上的 .seg.nrrd，模型临时数据在导出核验后清理。')
         if self.prompt('输入 y 创建并提交后台任务，b 返回：') != 'y':
             return
         self.selected = self.work.create(name, steps, input_job=parent.name if parent else None,
-                                         case_ids=ids, preprocessed=preprocessed)
+                                         case_ids=ids)
         self.work.start(self.selected)
         self.emit('已提交；退出面板、断开 SSH 后继续运行。')
 
@@ -247,10 +244,10 @@ class Panel:
         request = read_json(self.selected / 'request.json')
         for pointer in Path(request['output']).glob('cases/*/latest-result.json'):
             self.emit(str(pointer.parent.name) + '：' + read_json(pointer, {}).get('directory', '未知'))
-        self.emit('粗分割仍需人工复核；result.json/qc.json 记录输出及空掩膜、重叠。')
+        self.emit('加载原始 CT 和 aaoca_11.seg.nrrd 供医生修改；私人 result.json 记录完整性和质检。')
 
     def run(self):
-        self.emit('AAOCA 独立粗分割面板 — 预处理结果 / TotalSegmentator / 11 类')
+        self.emit('AAOCA 独立粗分割面板 — 原始 CT / TotalSegmentator / 医生编辑标签')
         while True:
             try:
                 self.emit('\nn 新建任务  c 配置  h 历史  s 进度  o 结果\nr 续跑  k 已完成任务重跑  x 停止  l 日志  f 持续日志\ng 显卡  e 环境/许可  a 环境日志  u 更新  q/0 退出')
@@ -287,7 +284,7 @@ def main(argv=None):
     parser.add_argument('--query', choices=['status', 'history', 'logs', 'gpu', 'setup'])
     parser.add_argument('--job', help='只读查询的历史任务 UUID')
     parser.add_argument('--profile', help='导入之前的私有服务器配置，不打印许可')
-    parser.add_argument('--preprocessed', help='本次默认选择的已完成预处理任务或根目录；不启动预处理')
+    parser.add_argument('--preprocessed', help=argparse.SUPPRESS)
     parser.add_argument('--results', help='本次分割结果根目录；省略则沿用已保存配置')
     args = parser.parse_args(argv)
     try:

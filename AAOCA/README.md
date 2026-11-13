@@ -4,9 +4,11 @@
 
 本目录仅发布程序、合成测试及公开说明。真实患者资料、姓名编号映射、修复政策、数据库、报告和研究影像不在 Git 中。
 
+仅更新当前 AAOCA 目录：使用独立标准库程序 `update_aaoca_code.py`，按提交和目录清单获取本项目源码、逐文件校验后应用，自动清理本次下载残留。支持已明确选择的公开仓库镜像，见 [代码更新说明](CODE_UPDATE.md)。
+
 ## AAOCA 独立粗分割
 
-在本目录运行 `bash start_segmentation.sh --runtime /srv/private/aaoca-seg-terminal`，打开与 CT 任务管理方式一致的中文终端面板。0.3 默认选择已完成的 AAOCA 预处理任务，自动读取 1.3 产生的未截断 HU 配套影像，标签对齐同网格的 `[-1,1]` CT。支持环境/许可配置、多 GPU 病例并行、统一 CPU/内存/读写预算、后台运行、历史输入、续跑及另建任务重跑。操作见 [独立分割面板](SEGMENTATION_WORKBENCH.md)。
+0.6 使用命令行直接运行：`bash start_segmentation.sh run --runtime /srv/private/aaoca-runtime --manifest /srv/private/aaoca.csv --output-root /srv/private/labels --gpus 0,1 --background`。CPU提前准备、GPU推理和CPU导出按有界队列重叠执行，默认总workers为卡数加准备和导出并发。直接读取原始HU/mm CT，三个TotalSegmentator任务输出医生可编辑的 `aaoca_11.seg.nrrd`；最终核验后清理本任务中间掩膜。共享显卡按剩余显存和预留量准入；旧任务停止后可用 --continue-from 核验并跳过已完成结果。见[直接分割说明](SEGMENTATION_WORKBENCH.md)。
 
 ## AAOCA 独立预处理
 

@@ -7,11 +7,11 @@ import re
 
 # id, upstream class, Chinese name, task. These are project IDs, not upstream IDs.
 LABELS = (
-    (1, "ventricle_left", "左心室", "heartchambers_highres"),
-    (2, "ventricle_right", "右心室", "heartchambers_highres"),
-    (3, "atrium_left", "左心房", "heartchambers_highres"),
-    (4, "atrium_right", "右心房", "heartchambers_highres"),
-    (5, "myocardium", "心肌", "heartchambers_highres"),
+    (1, "heart_ventricle_left", "左心室", "heartchambers_highres"),
+    (2, "heart_ventricle_right", "右心室", "heartchambers_highres"),
+    (3, "heart_atrium_left", "左心房", "heartchambers_highres"),
+    (4, "heart_atrium_right", "右心房", "heartchambers_highres"),
+    (5, "heart_myocardium", "心肌", "heartchambers_highres"),
     (6, "aorta", "主动脉", "heartchambers_highres"),
     (7, "pulmonary_artery", "肺动脉", "heartchambers_highres"),
     (8, "pulmonary_vein", "肺静脉", "total"),

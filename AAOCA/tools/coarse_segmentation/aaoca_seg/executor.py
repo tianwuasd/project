@@ -23,6 +23,8 @@ def checkpoint(path, case):
     record = read_json(path)
     if not isinstance(record, dict) or record.get('status') != 'inferred':
         raise ValueError('缺少完整推理检查点')
+    if record.get('masks_pruned'):
+        raise ValueError('最终标签未通过完整性校验，原始掩膜已清理；请另建任务重新推理')
     if record.get('case_id') != case['case_id'] or record.get('source') != str(Path(case['image']).resolve()):
         raise ValueError('推理检查点输入来源不符')
     if record.get('source_sha256') != sha256(case['image']):
@@ -57,7 +59,7 @@ def execute_model(command, log, stop, registry):
             stop_child(child)
 
 
-def infer(case, attempt, threads, device, stop, identity):
+def infer(case, attempt, threads, device, stop, identity, gpu_guard=None, prepared=None):
     validate_case(case, full=True)
     attempt = Path(attempt)
     attempt.mkdir(parents=True, exist_ok=True)
@@ -71,8 +73,16 @@ def infer(case, attempt, threads, device, stop, identity):
     write_json(frozen, input_identity)
     temporary = attempt / 'input.nii'
     image = Path(case['image'])
+    succeeded = False
     try:
-        if str(image).lower().endswith('.gz'):
+        if prepared:
+            from .preparation import validate_prepared
+            if Path(prepared).resolve() != (attempt / 'prepared.json').resolve():
+                raise ValueError('CPU 准备记录不属于当前病例任务')
+            record = validate_prepared(case, prepared)
+            image = Path(record['image'])
+            geometry = record['geometry']
+        elif str(image).lower().endswith('.gz'):
             # One lossless decompression for all three models, CRC checked by gzip.
             with gzip.open(image, 'rb') as source, temporary.open('wb') as target:
                 while chunk := source.read(8 * 1024 * 1024):
@@ -80,36 +90,126 @@ def infer(case, attempt, threads, device, stop, identity):
                         raise KeyboardInterrupt
                     target.write(chunk)
             image = temporary
-        geometry = inspect_image(image, full=True)
+        if not prepared:
+            geometry = inspect_image(image, full=True)
         started = time.monotonic()
         for task, command in commands(image, attempt, device, threads):
             if Path(stop).exists():
                 raise KeyboardInterrupt
+            if gpu_guard:
+                from .resources import wait_gpu_memory
+                wait_gpu_memory(gpu_guard, stop)
             write_json(attempt / 'phase.json', {'phase': task, 'time': timestamp()})
             write_json(attempt / f'{task}.command.json', command)
             execute_model(command, attempt / f'{task}.log', stop, attempt / 'model-process.json')
         if sha256(case['image']) != source_hash:
             raise ValueError('推理期间输入改变')
         validate_case(case, full=True)
+        unit_repairs = restore_empty_mask_units(case['image'], attempt)
         artifacts = {str(Path(task) / f'{name}.nii.gz'): sha256(attempt / task / f'{name}.nii.gz')
                      for _, name, _, task in LABELS}
         record = {'status': 'inferred', 'case_id': case['case_id'], 'source': str(Path(case['image']).resolve()),
                   'source_sha256': source_hash, 'geometry': geometry, 'mask_root': str(attempt.resolve()),
                   'artifacts': artifacts, 'identity': identity, 'seconds': time.monotonic() - started,
-                  'ended_at': timestamp()}
+                  'ended_at': timestamp(), 'empty_mask_unit_repairs': unit_repairs}
         if case.get('preprocessing'):
             record['preprocessing'] = case['preprocessing']
         write_json(attempt / 'inference.json', record)
+        write_json(attempt.parent / 'latest-inference.json', {'checkpoint': str((attempt / 'inference.json').resolve())})
+        succeeded = True
         return record
     finally:
-        temporary.unlink(missing_ok=True)
+        if not prepared or succeeded:
+            temporary.unlink(missing_ok=True)
 
 
-def merge(case, source, destination):
+def restore_empty_mask_units(image_path, attempt):
+    import nibabel as nib
+    import numpy as np
+    import uuid
+
+    source = nib.load(str(image_path))
+    if source.header.get_xyzt_units()[0] != 'mm':
+        raise ValueError('掩膜单位核验需要有毫米单位的原始 CT')
+    repaired = []
+    for _, name, _, task in LABELS:
+        path = Path(attempt) / task / f'{name}.nii.gz'
+        mask = nib.load(str(path))
+        if mask.header.get_xyzt_units()[0] != 'unknown':
+            continue
+        log = (Path(attempt) / f'{task}.log').read_text(encoding='utf-8')
+        if ('INFO: Crop is empty. Returning empty segmentation.' not in log
+                or mask.shape != source.shape
+                or not np.allclose(mask.affine, source.affine, atol=1e-3, rtol=0)):
+            raise ValueError(f'{name}: 模型输出缺少可确认的毫米空间信息')
+        data = np.asanyarray(mask.dataobj)
+        if np.any(data != 0):
+            raise ValueError(f'{name}: 单位缺失的非空预测不能自动修改')
+        header = mask.header.copy()
+        header.set_xyzt_units('mm', mask.header.get_xyzt_units()[1])
+        temporary = path.with_name('.' + uuid.uuid4().hex + '.nii.gz')
+        try:
+            nib.save(nib.Nifti1Image(data, mask.affine, header), str(temporary))
+            restored = nib.load(str(temporary))
+            if (restored.header.get_xyzt_units()[0] != 'mm' or restored.shape != source.shape
+                    or not np.allclose(restored.affine, source.affine, atol=1e-3, rtol=0)
+                    or np.any(np.asanyarray(restored.dataobj) != 0)):
+                raise ValueError('空掩膜毫米单位写入核验失败')
+            temporary.replace(path)
+        finally:
+            temporary.unlink(missing_ok=True)
+        repaired.append(str(Path(task) / f'{name}.nii.gz'))
+    return repaired
+
+
+def prune_masks(record, destination):
+    if Path(record['mask_root']).is_symlink() or Path(destination).is_symlink():
+        raise ValueError('清理目录不能是链接')
+    root = Path(record['mask_root']).resolve()
+    destination = Path(destination).resolve()
+    # 仅清理同一病例目录中的自有推理；外部历史任务不可被当前任务删除。
+    if root.parent != destination.parent:
+        raise ValueError('禁止清理外部来源任务的掩膜')
+    expected = {str(Path(task) / f'{name}.nii.gz') for _, name, _, task in LABELS}
+    if set(record['artifacts']) != expected:
+        raise ValueError('清理清单与十一结构不符')
+    for relative, digest in record['artifacts'].items():
+        path = root / relative
+        if path.is_symlink() or path.parent.is_symlink() or not path.resolve().is_relative_to(root):
+            raise ValueError('掩膜清理路径越界或包含链接')
+        if path.exists() and sha256(path) != digest:
+            raise ValueError('待清理掩膜已经改变')
+    for relative in expected:
+        (root / relative).unlink(missing_ok=True)
+    for task in {task for _, _, _, task in LABELS}:
+        folder = root / task
+        if folder.is_dir() and not any(folder.iterdir()):
+            folder.rmdir()
+    write_json(root / 'inference.json', dict(record, masks_pruned=True))
+
+
+def commit_editable(destination, result, record):
+    destination = Path(destination).resolve()
+    write_json(destination / 'result.json', result)
+    # 最终结果位置先提交，清理中断后可通过该指针恢复。
+    write_json(destination.parent / 'latest-result.json', {'directory': str(destination)})
+    prune_masks(record, destination)
+
+
+def merge(case, source, destination, output_format='legacy'):
     record = checkpoint(source, case)
     destination = Path(destination)
     destination.mkdir(parents=True, exist_ok=True)
-    files, report = combine(case['image'], destination, record['mask_root'])
+    if output_format == 'slicer-seg-v1':
+        from .segmentation import export_segmentation
+        if case.get('preprocessing'):
+            raise ValueError('医生编辑输出需要原始 HU CT 输入')
+        final, report = export_segmentation(case['image'], record['mask_root'], destination)
+        files = [final]
+    elif output_format == 'legacy':
+        files, report = combine(case['image'], destination, record['mask_root'])
+    else:
+        raise ValueError('未知输出格式')
     if sha256(case['image']) != record['source_sha256']:
         raise ValueError('质检期间输入改变')
     validate_case(case, full=True)
@@ -117,16 +217,33 @@ def merge(case, source, destination):
               'source_sha256': record['source_sha256'], 'review_required': True,
               'empty_masks': report['empty_masks'], 'ended_at': timestamp(),
               'artifacts': {str(p.resolve()): sha256(p) for p in files}}
+    if output_format == 'slicer-seg-v1':
+        report['empty_mask_unit_repairs'] = record.get('empty_mask_unit_repairs', [])
+        result.update(output_format=output_format, identity=record['identity'], qc=report,
+                      label_reference_image=str(Path(case['image']).resolve()))
     if case.get('preprocessing'):
         result['preprocessing'] = case['preprocessing']
         result['label_reference_image'] = case['preprocessing']['normalized_image']
-    write_json(destination / 'result.json', result)
+    if output_format == 'slicer-seg-v1':
+        commit_editable(destination, result, record)
+    else:
+        write_json(destination / 'result.json', result)
     return result
 
 
 def completed(path, case, source):
-    checkpoint(source, case)
     result = read_json(path, {})
+    if result.get('output_format') == 'slicer-seg-v1':
+        from .segmentation import FILENAME
+        target = str((Path(path).parent / FILENAME).resolve())
+        if (result.get('status') != 'completed' or result.get('case_id') != case['case_id']
+                or result.get('inference') != str(Path(source).resolve())
+                or result.get('label_reference_image') != str(Path(case['image']).resolve())
+                or result.get('source_sha256') != sha256(case['image'])
+                or set(result.get('artifacts', {})) != {target}):
+            return False
+        return Path(target).is_file() and sha256(target) == result['artifacts'][target]
+    checkpoint(source, case)
     if result.get('status') != 'completed' or result.get('case_id') != case['case_id']:
         return False
     if result.get('inference') != str(Path(source).resolve()):
@@ -145,10 +262,21 @@ def main():
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, interrupt)
     try:
-        if payload['phase'] == 'infer':
+        if payload['phase'] == 'prepare':
+            from .preparation import prepare
+            prepare(payload['case'], payload['attempt'], payload['stop'])
+        elif payload['phase'] == 'infer':
             infer(payload['case'], payload['attempt'], payload['threads'], payload['device'],
-                  payload['stop'], payload['identity'])
+                  payload['stop'], payload['identity'], payload.get('gpu_guard'), payload.get('prepared'))
         elif payload['phase'] == 'verify':
+            if payload.get('output_format') == 'slicer-seg-v1' and completed(Path(payload['attempt']) / 'result.json', payload['case'], payload['source']):
+                result = read_json(Path(payload['attempt']) / 'result.json')
+                if result.get('identity') != payload.get('expected_identity'):
+                    raise ValueError('最终标签的代码或环境身份不符')
+                record = read_json(payload['source'])
+                prune_masks(record, payload['attempt'])
+                write_json(payload['verification'], {'valid': True, 'completed': True})
+                return 0
             record = checkpoint(payload['source'], payload['case'])
             # Own frozen inference must match its original environment/code contract.
             if payload.get('expected_identity') and record.get('identity') != payload['expected_identity']:
@@ -156,7 +284,7 @@ def main():
             done = completed(Path(payload['attempt']) / 'result.json', payload['case'], payload['source'])
             write_json(payload['verification'], {'valid': True, 'completed': done})
         else:
-            merge(payload['case'], payload['source'], payload['attempt'])
+            merge(payload['case'], payload['source'], payload['attempt'], payload.get('output_format', 'legacy'))
         return 0
     except KeyboardInterrupt:
         return 130

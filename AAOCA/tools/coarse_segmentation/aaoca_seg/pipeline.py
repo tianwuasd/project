@@ -59,7 +59,7 @@ def validate_output(root, cases):
 
 def environment():
     versions = {}
-    for package in ("TotalSegmentator", "numpy", "nibabel", "torch", "nnunetv2"):
+    for package in ("TotalSegmentator", "numpy", "nibabel", "torch", "nnunetv2", "pynrrd"):
         try:
             versions[package] = importlib.metadata.version(package)
         except importlib.metadata.PackageNotFoundError:

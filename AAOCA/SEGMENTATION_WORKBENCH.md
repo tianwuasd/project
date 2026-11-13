@@ -1,94 +1,61 @@
-# AAOCA 独立粗分割面板
+# AAOCA 命令行直接分割
 
-版本 0.3.0。在 **AAOCA 项目目录**启动，入口独立于原始资料整理和预处理；新任务默认选择已完成的 AAOCA 预处理结果：
+版本 0.6.0。入口为 `start_segmentation.py` / `start_segmentation.sh`，直接接收命令参数，不提供交互菜单。输入为有 HU/mm 来源依据的原始三维 CT，输出为原始 CT 网格上的 `aaoca_11.seg.nrrd`，供医生在 3D Slicer 中修订。
 
-```bash
-bash start_segmentation.sh
-```
+## 环境、许可与清单
 
-系统 Python 3.11–3.13 即可打开面板；推理依赖由面板安装到此 runtime 的 `venv/`。不需要激活预处理环境。退出面板、关闭 VS Code 或断开 SSH，已提交的任务继续运行。服务器重启或管理员终止进程后，需要重新进入面板续跑。
+代码更新使用 [AAOCA 子目录更新](CODE_UPDATE.md)，下载范围限定为当前 AAOCA 源码目录。分割环境、许可、模型、输出和冻结任务继续保存在原 runtime 与结果目录。
 
-2026-10-24：默认预处理结果根目录已在实际代码中设为 `/data_nas/zhangruichen/aaoca_preprocessed`。已有 `seg-settings.json` 的路径优先，未配置或旧配置为空时使用该默认值；分割结果根目录保持已有配置。默认runtime仍为 `~/.local/state/aaoca-seg-terminal`（`AAOCA_SEG_RUNTIME`或`--runtime`可覆盖），没有迁移旧任务或合并两个面板。
-
-在原服务器代码目录中，新的显式入口也可直接接上预处理：
+在 AAOCA 目录运行，系统 Python 使用 3.11–3.13。运行环境、缓存、模型和许可保存在指定的私人 runtime；已有 runtime 的环境和许可可以复用。
 
 ```bash
-cd /data5/zhougaowei/zhangruichen_workspace/aaoca_code/project/AAOCA
-bash start_segmentation.sh --preprocessed /data_nas/zhangruichen/aaoca_preprocessed
+bash start_segmentation.sh install --runtime /srv/private/aaoca-runtime
+bash start_segmentation.sh license --runtime /srv/private/aaoca-runtime
+bash start_segmentation.sh check --runtime /srv/private/aaoca-runtime
+bash start_segmentation.sh inventory --inventory /srv/private/data/CT总清单.json --data-root /srv/private/data --manifest /srv/private/aaoca.csv
 ```
 
-`--preprocessed`只设定本次默认来源，仍在`n`中选择具体已完成任务；`--results`可明确指定本次独立分割结果根目录。参数优先于已保存配置，配置页`w`后保存整页；仅打开/查询不会写配置。原来的 `--runtime` 和带参数命令保持兼容，不调用预处理入口。
+license 提示输入许可且不回显；自动化可用 --stdin 通过私人管道提供许可。许可不进入命令参数。inventory 仅导出已核验的 AAOCA 原始体积，私有 CSV 不上传。单个三维期相对应一行，格式见[分割说明](tools/coarse_segmentation/README.md)。
 
-## 首次操作
+## 直接运行与 GPU 设置
 
-1. `e` → `1` 安装独立环境；`a` 查看安装日志，等待完成。自动选择的 PyTorch 安装方案仍需实际服务器驱动验证。
-2. `e` → `3` 输入许可码，输入不回显；许可只存在私有 runtime。`a` 查看验证结果。
-3. `c` 的 `10` 设置预处理结果根目录或某次任务目录，设置独立的分割结果根目录和资源。`d` 可查看硬件及进程可见 GPU，输入**已经分配给你的**可见编号；编号 `0` 有效。选择 GPU 后输入 `y` 确认分配，最后 `w` 保存整页配置。
-4. `n` 命名任务，输入来源回车默认 `p`，选择已完成的预处理任务，然后选择步骤。首次可在“病例代号”栏只选少量体积，复核后扩大范围。回车代表该任务中的全部体积。
-5. `s` 看进度，`l` 看一次日志，`f` 每 10 秒刷新日志，`g` 每秒显示显卡。持续查看时 Ctrl+C 返回面板，后台计算继续。
-
-已保存过旧网页面板的私有配置，可一次导入：
+下面的示例要求 0、1 已分配给当前用户：
 
 ```bash
-python3 start_segmentation.py --runtime /srv/private/aaoca-seg-terminal \
-  --profile /srv/private/server.private.json
+bash start_segmentation.sh run --runtime /srv/private/aaoca-runtime --manifest /srv/private/aaoca.csv --output-root /srv/private/labels --gpus 0,1 --workers 4 --io-workers 4 --prepare-workers 1 --export-workers 1 --prefetch 2 --min-free-gib 8 --gpu-reserve-gib 2 --background
 ```
 
-该操作导入清单、结果根目录及私有许可；GPU 必须在新面板重新核对分配。不要把私有配置提交 GitHub。网页兼容入口 `tools/coarse_segmentation/server.py` 保留；建议为终端面板使用独立 runtime。
+--gpus 使用当前 PyTorch 可见编号，程序保存完整 GPU UUID。--workers 是全部阶段的进程并发上限；--gpu-count 限制同时使用的卡数。准备、GPU 推理和 CPU 导出分别调度，每张卡同时处理一个本任务病例；同一病例依次运行 total、heartchambers_highres、coronary_arteries。
 
-## 输入和步骤
+默认准备并发1、导出并发1，workers 和 io-workers 默认为卡数加这两项，因此两张卡默认最多4个活跃进程。--prefetch 限制正在准备和已就绪病例的合计数量，默认等于卡数。CPU 提前读取、校验并无损解压下一病例；GPU推理结束后CPU导出可以与后续推理重叠。实际并发受CPU、RAM、磁盘和读写预算限制。
 
-预处理 1.3 起，每例在同一重采样网格上保存 `image.nii.gz`（固定 `[-1,1]` 归一化）和 `image_hu.nii.gz`（未截断 HU）。分割选择整个任务目录，自动将 **HU 配套影像**交给 TotalSegmentator；模型仍自行执行其需要的内部重采样和标准化。最终标签与归一化影像的形状、间距、方向和位置一致。新增的是预处理网格上的推理路径，模型任务、11 类定义与合并优先级保持不变；其效果需实测，不能假定与原网格推理完全相同。
+允许所选显卡已有计算任务。派发前要求空闲显存至少为 --min-free-gib 加 --gpu-reserve-gib，默认合计 10 GiB；不会因已有进程或高利用率拒绝这张卡。每个模型开始前重新检查显存，不满足则等待并响应停止请求。该门槛不构成独占预约或显存硬限制，其他进程的新增分配和病例大小仍可能导致不足，失败会记录。
 
-菜单只枚举指定目录的直接子任务，读取完成清单和病例记录，不扫描整个数据盘。全部病例完成且无活动写入时才允许选择。执行前在 CPU 阶段核验两份影像的完整 SHA256 和空间几何；推理前后、结果复用时继续核验冻结来源。输入有损坏或改变会报错，不等待 GPU 后才发现。
+--cpu 使用 CPU。--limit 1 或重复 --case-id 可限定检查范围。默认等待任务结束并定时打印进度；--background 提交后立即返回。已提交任务由独立进程运行，SSH 断开后继续。首次完整推理串行建立权重缓存，之后开放多卡病例并行。
 
-**旧版只有归一化影像的结果不能直接用于此路径。** 请从原始 HU 用 1.3 新建预处理任务；不能将已截断的 `[-1,1]` 乘以 1000 当作原始 HU，也不能给旧缓存补一个假的完成标记。旧预处理任务仍用原代码和环境续跑，不覆盖。
+队列在派发前累计活跃阶段的保守磁盘预算，准备、推理和导出分别估算。就绪文件的实际占用包含在文件系统剩余空间中，数量受prefetch限制；没有活跃阶段且空间不足时明确停止并保留可验证缓存。临时准备仅执行无损解压，模型内部的重采样仍由TotalSegmentator完成。
 
-兼容入口：来源选 `0` 使用已确认 HU/mm 的 CSV，选 `h` 引用历史分割任务。CSV 格式和导出方法见[粗分割说明](tools/coarse_segmentation/README.md)。同一三维期相一行，确认字段必须有真实依据。直接将带有归一化标记的图像放入 CSV 也会被拒绝。
+## 查询、停止与恢复
 
-| 步骤 | 内容 | 资源 |
-|---|---|---|
-| 1 输入/资源预检 | 全部所选文件头、几何和内存/磁盘估算 | CPU，不等待 GPU |
-| 2 模型推理 | total 的三种静脉、heartchambers_highres 七结构、coronary_arteries | 一卡一病例，CPU 模式也可用 |
-| 3 合并与质检 | 保留二值掩膜，生成 11 类合并标签、重叠/空掩膜记录 | CPU，推理进程退出后释放对应 GPU |
+已准备病例在推理中断后保留缓存并进行哈希核验。旧任务继续使用冻结代码；更新不会替换正在运行任务的调度。先停止旧任务并确认进程退出后，可在新run命令追加 --continue-from 旧任务编号（或latest）。程序校验旧任务代码、相同的模型/标签/导出算法、依赖版本、原始输入及最终标签；跳过已完成病例，保留旧标签位置并在新任务中记录引用。未完成病例使用新调度重新准备和推理。损坏成果和不兼容算法会明确拒绝接续。
 
-默认 `1,2,3`；选择 `2` 或 `2,3` 仍自动执行必要的输入检查，包括预处理配套文件的完整核验。仅选择 `3` 时必须选历史分割任务，逐文件完整核验 HU 输入与掩膜后再合并。任务 1 的“完成”只表示预检通过。
-
-`n` 的“历史输入”复用旧任务的 HU 文件列表及预处理来源记录。只有不选择推理、只做合并时才引用旧推理掩膜。引用关系会写进任务配置；不要删除被引用的影像、预处理目录或历史分割任务。
-
-## 续跑和重跑
-
-- `r`：选择任务，保持原名称、配置、代码快照和输出目录。完整推理检查点、完整合并结果通过 SHA256 校验后复用；中断的推理病例重做三个模型，不是从神经网络内部续跑。若只有 CPU 合并未完成，可以直接用已完成的掩膜，不需要重新申请 GPU。
-- `k`：从已完成任务另建新任务，可重新选择步骤。生成新结果目录，保留旧任务。只重跑 `3` 可复用旧掩膜；包含 `2` 时重新推理。
-- `x`：显示选中任务后确认停止。完整提交的检查点和结果保留；“请求停止”不等于进程已经退出。不要删除锁文件或使用全局杀进程命令。
-- `h` / `o`：选择历史任务、查看状态或结果位置。状态和日志查询不安装依赖，不启动分割。
-- 各输入页 `b` 返回、`q` 退出；首页 `0` 也可退出。取消未保存的配置不会提交任务。
-
-源文件或冻结代码/环境改变时拒绝复用并给出原因；输入变了应新建任务。损坏的推理掩膜不会被静默视作成功。每次续跑重新测量 CPU/RAM 额度，但不改变科学方法与已选择的 GPU UUID 范围。
-
-## 资源和提速
-
-GPU 候选池与并发上限分开设置，取当前继承可见范围与明确分配 UUID 的交集。提交时选择过的 UUID 若在运行环境中不可见，任务报错；程序不会清空调度器限制。有一张空闲卡即可开始，其余获准卡空闲后可加入。默认仅在空闲显存至少 8 GiB、利用率不超过 10%、无其他计算进程时派发；阈值可配置，**不保证所有病例都能在 8 GiB 上运行**。没有可用卡时等待，可查询和停止。
-
-一个队列统一控制 GPU 推理与 CPU 校验/合并的总并发。自动 CPU 预算考虑 affinity、祖先 cgroup 配额及短时空闲采样；内存预算为有效可用内存的 85%，可设置更小的手动上限。默认病例并发最多 8、读写并发最多 4、每病例线程最多 8，实际根据资源缩减；主进程与重采样/保存工作线程按两组计入预算，BLAS/OpenMP 等线程有上限。仍是估算与程序级限流，并非独占资源、硬 RSS 隔离或最优参数证明。
-
-内存估算同时考虑原始体积和假设 0.5 mm 中间网格、临时数组及固定开销；这是调度估算，不改变模型 spacing，真实模型峰值需在目标服务器校准。估算超过总预算的病例明确失败，避免无限等内存。I/O 上限限制活跃病例进程，TotalSegmentator 内部的读写无法单独精确计量。
-
-每例压缩 CT 无损解压一次供三个模型读取，推理后清除该临时 `.nii`，原图不改写；保留完整输入/输出哈希校验。首个完整推理串行运行，以初始化三个任务的权重缓存，再开放多卡，避免多个进程同时下载同一组模型。模型仍按病例启动独立进程，因此不宣称消除了模型加载成本。
-
-## 保存内容与更新
-
-runtime 中保存 `seg-settings.json`、私有环境/许可/权重，以及 `jobs/<UUID>/` 的冻结请求、代码快照、历史运行记录、资源预算、计划、进程身份及日志。结果位于配置的根目录下 `seg-<唯一编号>/cases/<代号>/attempt-*/`；`inference.json` 是完整推理检查点，`result.json`、`qc.json` 和 `aaoca_11_labels.nii.gz` 是合并结果。
-
-预处理影像保持原位，分割另存。`result.json` 的 `label_reference_image` 指向同网格的归一化 CT，`preprocessing` 保存来源目录、配置/记录与双影像摘要。查看时可直接叠加该 CT 与 `aaoca_11_labels.nii.gz`；标签并未恢复到预处理前的原始扫描网格。分割输出/runtime 与来源预处理任务必须分离。旧 0.2 任务继续按自己的冻结代码和输入运行。
-
-`u` 进行有界线路检查和下载，核对官方提交及可快进关系，备份当前程序，然后安装到 runtime 下独立的 `releases/`，重新打开面板使用新版。**共享 project 工作副本不会被这个菜单改写**，因此不会顺带更新其他项目。原 root 启动器读取私有发布指针；历史任务继续使用自己的代码快照。官方无法访问时会说明最新状态未确认。共享仓库有未保存修改时停止更新并保留修改。
+下面命令默认操作同一 runtime 中最近的分割任务；--job 可指定任务编号。
 
 ```bash
-# 重连后进入同一个运行目录，或直接只读查询
-python3 start_segmentation.py --runtime /srv/private/aaoca-seg-terminal --query status
-python3 start_segmentation.py --runtime /srv/private/aaoca-seg-terminal --query history
-python3 start_segmentation.py --runtime /srv/private/aaoca-seg-terminal --query logs
+bash start_segmentation.sh status --runtime /srv/private/aaoca-runtime
+bash start_segmentation.sh logs --runtime /srv/private/aaoca-runtime
+bash start_segmentation.sh stop --runtime /srv/private/aaoca-runtime
+bash start_segmentation.sh resume --runtime /srv/private/aaoca-runtime --background
 ```
 
-软件测试使用合成体积、模拟推理及真实后台进程；验证记录见 [面板验证](tools/coarse_segmentation/docs/terminal-validation.md)。真实 TotalSegmentator 权重、目标 GPU 驱动、峰值内存、吞吐和 AAOCA 分割质量需要服务器实测。11 类定义及人工审核范围见[粗分割说明](tools/coarse_segmentation/README.md)。
+任务请求、代码及输入身份冻结。恢复使用原冻结任务，完整标签通过哈希检查后复用；正在推理的未完成病例重新执行三个模型，已完成推理可继续 CPU 导出。状态与日志查询不会安装环境或启动推理。
+
+## 文件与医生审核
+
+结果保存在结果根目录下的 `seg-<任务编号>/cases/<体积代号>/attempt-*/aaoca_11.seg.nrrd`。保留十一种结构的名称、颜色、全部重叠区域和原始 CT 空间；最终文件原子写入并完整回读后，删除本任务十一份中间掩膜和临时解压 CT。
+
+模型内部执行必要重采样、裁剪和标准化；外部不保存预处理影像或概率图。小型私人来源、质检、状态和日志随任务保留。医生加载原始 CT 与标签，重点复核冠脉开口、近端走行及细小分支。程序质检不表示临床准确性已验证。
+
+模型返回空 ROI 时，只有任务日志明确记录空裁剪、掩膜全部为零、尺寸及空间矩阵与毫米单位原图一致，才为缺失单位的空掩膜补回毫米标记，并记录在 QC。其他缺失单位或空间不符的输出会拒绝导出。QC 的 empty_masks 列出未检出的结构；十一项全部为空表示模型未检出结构，需要人工检查原图及模型适用范围。
+
+GitHub 仅发布源码、通用测试和说明。影像、病例编号、清单、输出、许可、权重与私人日志保留在私人服务器。

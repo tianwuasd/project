@@ -27,7 +27,9 @@ from .service_state import (
 
 DEFAULTS = {'manifest': '', 'results': '', 'mode': 'cpu', 'devices': [], 'gpu_count': 1,
             'min_gpu_gib': 8, 'cpu_limit': None, 'memory_gib': None, 'workers': None,
-            'threads': None, 'io_workers': None, 'preprocess_output': '/data_nas/zhangruichen/aaoca_preprocessed'}
+            'threads': None, 'io_workers': None, 'preprocess_output': '/data_nas/zhangruichen/aaoca_preprocessed',
+            'allow_shared_gpu': False, 'gpu_reserve_gib': 0,
+            'prepare_workers': 0, 'export_workers': 0, 'prefetch': 0}
 
 
 def digest(path):
@@ -65,6 +67,15 @@ def validate_settings(settings):
             raise ValueError(f'{key} 须为正数')
     if settings['gpu_count'] is None or settings['min_gpu_gib'] is None:
         raise ValueError('GPU 并发和空闲显存阈值不能为 auto')
+    if type(settings['allow_shared_gpu']) is not bool:
+        raise ValueError('共享 GPU 设置须为布尔值')
+    for key in ('prepare_workers', 'export_workers', 'prefetch'):
+        if type(settings[key]) is not int or not 0 <= settings[key] <= 32:
+            raise ValueError(f'{key} 须为 0–32 整数')
+    if settings['prepare_workers'] and (not settings['export_workers'] or not settings['prefetch']):
+        raise ValueError('提前准备需要正数的导出并发和预取数量')
+    if isinstance(settings['gpu_reserve_gib'], bool) or not math.isfinite(settings['gpu_reserve_gib']) or settings['gpu_reserve_gib'] < 0:
+        raise ValueError('预留显存须为非负数')
     if settings['mode'] == 'gpu' and not settings['devices']:
         raise ValueError('请在设备页明确选择分配给你的 GPU')
     if settings['mode'] == 'cpu' and settings['devices']:
@@ -141,7 +152,7 @@ class Workbench:
         if self.root.is_relative_to(producer) or producer.is_relative_to(self.root):
             raise ValueError('分割运行目录必须与来源预处理任务分开')
 
-    def create(self, name, steps, settings=None, input_job=None, case_ids=None, rerun_of=None, preprocessed=None):
+    def create(self, name, steps, settings=None, input_job=None, case_ids=None, rerun_of=None, preprocessed=None, continuation=None):
         settings = {**DEFAULTS, **(settings or self.settings)}
         validate_settings(settings)
         if input_job and preprocessed:
@@ -171,6 +182,10 @@ class Workbench:
                 cases = [r for r in cases if r['case_id'] in wanted]
             if not cases:
                 raise ValueError('病例列表为空')
+            output_format = ('legacy' if preprocessed or any(row.get('preprocessing') for row in cases)
+                             or ('merge' in steps and 'infer' not in steps) else 'slicer-seg-v1')
+            if output_format == 'slicer-seg-v1' and 'infer' in steps and 'merge' not in steps:
+                steps.append('merge')
             cases = [dict(row, source_stat={'size': Path(row['image']).stat().st_size,
                                             'mtime_ns': Path(row['image']).stat().st_mtime_ns}) for row in cases]
             root = self._paths(settings, cases)
@@ -192,6 +207,8 @@ class Workbench:
             for file in ('launch_job.py', 'queue_job.py', 'run.py', 'requirements.txt', 'requirements-inference.txt'):
                 shutil.copy2(CODE_ROOT / file, code / file)
             request = {'kind': 'segmentation', 'id': job_id, 'name': name, 'created_at': timestamp(),
+                       'continuation': continuation,
+                       'output_format': output_format,
                        'steps': steps, 'settings': settings, 'cases': cases, 'inputs': inputs,
                        'output': str(root / ('seg-' + job_id[:12])), 'input_job': input_job, 'rerun_of': rerun_of,
                        'preprocessing_source': (str(Path(preprocessed).expanduser().resolve()) if preprocessed
@@ -216,7 +233,7 @@ class Workbench:
                 if not source.is_relative_to((job / 'code').resolve()) or digest(source) != expected:
                     raise ValueError('代码快照改变，不能续跑')
             if not python_path(self.root).is_file():
-                raise ValueError('请先通过 e 安装独立推理环境')
+                raise ValueError('请先运行 start_segmentation.py install --runtime 指定运行目录')
             # Keep every owner attempt; the scientific request and output stay frozen.
             old = read_json(job / 'state.json', {})
             write_json(job / 'runs' / (uuid.uuid4().hex + '.json'), old)

@@ -159,18 +159,19 @@ class TerminalTests(unittest.TestCase):
         self.assertLessEqual(result['memory_bytes'], 10 * 2**30)
 
     def test_gpu_visibility_uuid_and_other_compute_users(self):
-        devices = [{'index': 0, 'uuid': 'GPU-a'}, {'index': 1, 'uuid': 'GPU-b'}]
+        first = 'GPU-00000000-0000-4000-8000-000000000001'
+        second = 'GPU-00000000-0000-4000-8000-000000000002'
+        devices = [{'index': 0, 'uuid': first}, {'index': 1, 'uuid': second}]
         selected = resources.select_devices({'devices': devices}, [1])
         with self.assertRaises(ValueError):
             resources.select_devices({'devices': devices}, [2])
         with self.assertRaises(ValueError):
             resources.available_devices(selected, {'devices': devices[:1]})
-        query = Mock(stdout='GPU-a, 20000, 0\nGPU-b, 22000, 0\n')
-        busy = Mock(stdout='GPU-b, 12345\n')
-        with patch('aaoca_seg.resources.subprocess.run', side_effect=[query, busy]):
-            self.assertEqual(resources.available_devices(selected, {'devices': devices}), [])
+        snapshot = {first: {'free_mib': 20000, 'utilization': 0},
+                    second: {'free_mib': 22000, 'utilization': 0}}
+        self.assertEqual(resources.eligible_devices(selected, {'devices': devices}, snapshot, {second}), [])
         with patch.dict(os.environ, {'CUDA_VISIBLE_DEVICES': '2,3'}):
-            self.assertEqual(resources.child_env(2, {'uuid': 'GPU-b'})['CUDA_VISIBLE_DEVICES'], 'GPU-b')
+            self.assertEqual(resources.child_env(2, {'uuid': second})['CUDA_VISIBLE_DEVICES'], second)
             self.assertEqual(resources.child_env(2)['CUDA_VISIBLE_DEVICES'], '')
 
     def infer(self, case=None, attempt=None):

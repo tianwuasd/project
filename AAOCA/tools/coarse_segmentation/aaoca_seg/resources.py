@@ -1,10 +1,22 @@
 """One shared, measured resource budget and allocated GPU UUID intersection."""
+import csv
 import math
 import os
 import subprocess
+import time
 from pathlib import Path
+from uuid import UUID
 
 GIB = 2**30
+
+
+def canonical_gpu_uuid(value):
+    if not isinstance(value, str):
+        raise ValueError('GPU 需要完整 UUID，暂不支持 MIG')
+    identifier = value.removeprefix('GPU-')
+    if len(identifier) != 36:
+        raise ValueError('GPU 需要完整 UUID，暂不支持 MIG')
+    return 'GPU-' + str(UUID(identifier))
 
 
 def group_paths(root='/sys/fs/cgroup', membership='/proc/self/cgroup'):
@@ -88,33 +100,64 @@ def select_devices(info, candidates):
     selected = []
     for index in candidates:
         item = devices.get(index)
-        if not item or not str(item.get('uuid', '')).startswith('GPU-'):
+        if not item:
             raise ValueError('GPU 不可见或缺少完整 UUID；请重新检查环境（暂不支持 MIG）')
-        selected.append({'index': index, 'uuid': item['uuid'], 'name': item.get('name')})
+        selected.append({'index': index, 'uuid': canonical_gpu_uuid(item.get('uuid')), 'name': item.get('name')})
     return selected
 
 
-def available_devices(selected, current, minimum_gib=8):
-    visible = {d['uuid']: d for d in current.get('devices', [])}
+def gpu_snapshot():
+    query = subprocess.run(['nvidia-smi', '--query-gpu=uuid,memory.free,utilization.gpu',
+                            '--format=csv,noheader,nounits'], capture_output=True, text=True, timeout=5, check=True)
+    return {canonical_gpu_uuid(uid.strip()): {'free_mib': float(mb), 'utilization': float(utilization)}
+            for uid, mb, utilization in csv.reader(query.stdout.splitlines())}
+
+
+def eligible_devices(selected, current, snapshot, occupied, minimum_gib=8, *, allow_shared=False, reserve_gib=0):
+    if not math.isfinite(minimum_gib) or minimum_gib <= 0 or not math.isfinite(reserve_gib) or reserve_gib < 0:
+        raise ValueError('显存门槛须为正数，预留显存须为非负数')
+    visible = {canonical_gpu_uuid(d['uuid']): d for d in current.get('devices', [])}
+    selected = [dict(d, uuid=canonical_gpu_uuid(d['uuid'])) for d in selected]
     if any(d['uuid'] not in visible for d in selected):
         raise ValueError('继承的 GPU 可见范围/分配已变化；不能扩大范围续跑，请新建任务')
-    try:
-        query = subprocess.run(['nvidia-smi', '--query-gpu=uuid,memory.free,utilization.gpu',
-                                '--format=csv,noheader,nounits'], capture_output=True, text=True, timeout=5, check=True)
+    threshold = (minimum_gib + reserve_gib) * 1024
+    result = []
+    for device in selected:
+        uid = device['uuid']
+        state = snapshot[uid]
+        if state['free_mib'] >= threshold and (allow_shared or (state['utilization'] <= 10 and uid not in occupied)):
+            result.append({'index': visible[uid]['index'], 'uuid': uid})
+    return result
+
+
+def available_devices(selected, current, minimum_gib=8, *, allow_shared=False, reserve_gib=0):
+    visible = {canonical_gpu_uuid(d['uuid']) for d in current.get('devices', [])}
+    if any(canonical_gpu_uuid(d['uuid']) not in visible for d in selected):
+        raise ValueError('继承的 GPU 可见范围/分配已变化；不能扩大范围续跑，请新建任务')
+    snapshot = gpu_snapshot()
+    occupied = set()
+    if not allow_shared:
         processes = subprocess.run(['nvidia-smi', '--query-compute-apps=gpu_uuid,pid',
                                     '--format=csv,noheader,nounits'], capture_output=True, text=True, timeout=5, check=True)
-    except (OSError, subprocess.SubprocessError):
-        return []  # Unknown occupancy is not evidence of an idle allocated GPU.
-    occupied = {line.split(',')[0].strip() for line in processes.stdout.splitlines() if ',' in line}
-    free = set()
-    for line in query.stdout.splitlines():
-        try:
-            uid, mb, utilization = [v.strip() for v in line.split(',')]
-            if float(mb) >= minimum_gib * 1024 and float(utilization) <= 10 and uid not in occupied:
-                free.add(uid)
-        except ValueError:
-            continue
-    return [{'index': visible[d['uuid']]['index'], 'uuid': d['uuid']} for d in selected if d['uuid'] in free]
+        occupied = {row[0].strip() for row in csv.reader(processes.stdout.splitlines())}
+    return eligible_devices(selected, current, snapshot, occupied, minimum_gib,
+                            allow_shared=allow_shared, reserve_gib=reserve_gib)
+
+
+def wait_gpu_memory(guard, stop):
+    uid = canonical_gpu_uuid(guard['uuid'])
+    threshold = (guard['minimum_gib'] + guard['reserve_gib']) * 1024
+    waiting = False
+    while True:
+        if Path(stop).exists():
+            raise KeyboardInterrupt
+        free = gpu_snapshot()[uid]['free_mib']
+        if free >= threshold:
+            return
+        if not waiting:
+            print(f'等待所选 GPU 显存：当前空闲 {free/1024:.1f} GiB，需要 {threshold/1024:.1f} GiB', flush=True)
+            waiting = True
+        time.sleep(2)
 
 
 def child_env(threads, device=None):
