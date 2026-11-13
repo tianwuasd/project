@@ -9,7 +9,7 @@ import numpy as np
 import psutil
 import torch
 
-from ..artifacts.store import digest, file_digest, operation_lock, read_json, require_output, write_json
+from ..artifacts.store import digest, file_digest, operation_lock, read_json, require_output, require_result_output, write_json
 from ..data.dataset import CaseDataset
 from ..datasets.manifest import load_manifest
 from ..models.stunet.adapter import StunetAdapter
@@ -30,7 +30,12 @@ def predict(config, output, inputs=None, case_ids=None):
         raise ValueError("预测代码与训练记录不一致，需要经过验证的兼容记录")
     if inputs is not None:
         prepared["manifest"] = load_manifest(inputs, prepared["dataset"], prepared["scope"])
-    output = require_output(output, config["work_root"], [prepared["manifest"]["data_root"], config["run_dir"]])
+    protected = [prepared["manifest"]["data_root"]]
+    if inputs is not None:
+        protected.append(inputs)
+    output = require_result_output(config, output, protected)
+    log_dir = require_output(config["run_dir"], config["work_root"],
+                             [prepared["manifest"]["data_root"], Path(__file__).parents[3]])
     names = {row["case_id"] for row in prepared["manifest"]["cases"]}
     requested = names if case_ids is None else set(case_ids)
     if not requested or not requested <= names:
@@ -114,7 +119,7 @@ def predict(config, output, inputs=None, case_ids=None):
                                   "restore_write_seconds": perf_counter() - mark, **entry["timing"]}}
             completed["cases"][name] = receipt
             write_json(output / "predictions.json", completed)
-            event(output, "prediction", case_id=name, scope=prepared["scope"], timing=receipt["timing"])
+            event(log_dir, "prediction", case_id=name, scope=prepared["scope"], timing=receipt["timing"])
             results.append(receipt)
             del native, probabilities, logits, entry
             dataset.clear()

@@ -6,7 +6,7 @@ import yaml
 
 
 DEFAULTS = {
-    "model": "stunet", "scope": "formal", "fold": 0,
+    "model": "stunet", "scope": "formal", "fold": 0, "result_root": None,
     "training": {"patch": [128, 128, 128], "batch": 1, "attempts": 1000,
                  "learning_rate": 0.001, "momentum": 0.99, "weight_decay": 3e-5,
                  "seed": 20261113, "precision": "fp32", "foreground_fraction": 0.33,
@@ -47,6 +47,11 @@ def load_config(path):
     for key in required - {"dataset"}:
         target = Path(config[key]).expanduser()
         config[key] = str((path.parent / target).resolve() if not target.is_absolute() else target.resolve())
+    if config["result_root"] is not None:
+        if not isinstance(config["result_root"], str) or not config["result_root"].strip():
+            raise ValueError("result_root 必须为非空路径或 null")
+        target = Path(config["result_root"]).expanduser()
+        config["result_root"] = str((path.parent / target).resolve() if not target.is_absolute() else target.resolve())
     t, p, r = config["training"], config["prediction"], config["resources"]
     if len(t["patch"]) != 3 or any(type(x) is not int or x < 8 for x in t["patch"]):
         raise ValueError("patch 必须为三个不小于 8 的整数")
