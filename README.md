@@ -16,9 +16,13 @@ python -B run.py --version
 
 本机的 `.venv` 复用既有研究依赖并安装 MONAI 1.5.2；其本地依赖引用不用于服务器部署。服务器需要独立安装 `pyproject.toml` 声明的依赖并验证对应 PyTorch 构建。代码不自动安装依赖，也不自动更换已有环境。
 
+zmic 使用 `/data4/zhangruichen`：Git 检出在 `code/git`，本项目位于其中的 `chd-segmentation`；过程产物在 `course/chd-segmentation`，最终结果在 `result/chd-segmentation`，独立环境计划放在 `env/chd-segmentation`，原始数据从 `data` 读取。部署、配置及更新命令见 [zmic 部署说明](docs/ZMIC_DEPLOYMENT.md)。目录存在与环境可用性须按服务器实际文件核对。
+
 ## 准备私有输入
 
 实验配置示例在 `configs/experiments/`，机器路径集中填写。每套数据需要既有拟合计划、官方 `small_ep4k.model` 以及私有清单。相对病例路径按清单的 `data_root` 解析。
+
+`work_root` 限定预处理描述、运行日志和检查点；可选 `result_root` 限定预测与评价输出。省略 `result_root` 时沿用 `work_root`；zmic 示例已显式设置两个独立目录。私有配置保存在 `course/chd-segmentation/configs`，清单中的 `data_root` 填写 `data` 内实际数据集位置。示例中的输入文件位置需核对，不能直接代表服务器已经具备这些文件。
 
 ```yaml
 dataset: imagechd
@@ -48,12 +52,12 @@ cases:
 ## 运行
 
 ```text
-python -B run.py prepare --config configs/experiments/imagechd_stunet.yaml --output /workspace/prepared/imagechd_fold0.json
-python -B run.py train --config configs/experiments/imagechd_stunet.yaml --prepared /workspace/prepared/imagechd_fold0.json
-python -B run.py train --config configs/experiments/imagechd_stunet.yaml --prepared /workspace/prepared/imagechd_fold0.json --resume
-python -B run.py status --run /workspace/runs/imagechd_stunet_fold0
-python -B run.py predict --config configs/experiments/imagechd_stunet.yaml --output /workspace/predictions/imagechd_fold0
-python -B run.py evaluate --config configs/experiments/imagechd_stunet.yaml --prepared /workspace/prepared/imagechd_fold0.json --predictions /workspace/predictions/imagechd_fold0 --output /workspace/reports/metrics.json
+python -B run.py prepare --config /data4/zhangruichen/course/chd-segmentation/configs/imagechd_stunet.yaml --output /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0.json
+python -B run.py train --config /data4/zhangruichen/course/chd-segmentation/configs/imagechd_stunet.yaml --prepared /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0.json
+python -B run.py train --config /data4/zhangruichen/course/chd-segmentation/configs/imagechd_stunet.yaml --prepared /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0.json --resume
+python -B run.py status --run /data4/zhangruichen/course/chd-segmentation/runs/imagechd_stunet_fold0
+python -B run.py predict --config /data4/zhangruichen/course/chd-segmentation/configs/imagechd_stunet.yaml --output /data4/zhangruichen/result/chd-segmentation/imagechd/fold0/predictions
+python -B run.py evaluate --config /data4/zhangruichen/course/chd-segmentation/configs/imagechd_stunet.yaml --prepared /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0.json --predictions /data4/zhangruichen/result/chd-segmentation/imagechd/fold0/predictions --output /data4/zhangruichen/result/chd-segmentation/imagechd/fold0/metrics.json
 ```
 
 预测通过 `--inputs` 读取相同数据协议的新清单，通过 `--case` 选择病例。推断不读取标签数组；评价独立执行。导出默认恢复原始数组尺寸与 source affine，同时在结果记录保留工作毫米网格的来源。选择 `export_space: working` 时使用衍生毫米网格。新任务应使用新目录，完成结果按身份复用。
@@ -63,7 +67,7 @@ python -B run.py evaluate --config configs/experiments/imagechd_stunet.yaml --pr
 ## 短测与保留
 
 ```text
-python -B smoke.py --spec project.local.yaml --work-root /workspace/smoke/unique_task --report /workspace/reports/unique_task
+python -B smoke.py --spec /data4/zhangruichen/course/chd-segmentation/configs/smoke.local.yaml --work-root /data4/zhangruichen/course/chd-segmentation/smoke/unique_task --report /data4/zhangruichen/course/chd-segmentation/smoke-reports/unique_task
 python -B -m unittest discover -s tests -v
 ```
 
@@ -72,6 +76,8 @@ python -B -m unittest discover -s tests -v
 `--validate-only` 只验证初始化状态保存/恢复与预测，不执行优化器更新。单元测试中的操作系统锁检查需要将 `CHD_TEST_ROOT` 指向获准的测试目录，临时锁目录自动清理。
 
 正式训练每阶段保留一份最新完整检查点、运行配置、进度和有界事件日志。预测保留每例最终掩膜及摘要，概率不持久保存。短测只保留输入身份、实际结果、阶段耗时、资源峰值和清理记录；临时配置、权重和掩膜在本任务退出时清理。
+
+预测事件日志追加到对应训练运行的 `events.jsonl`；最终结果目录只保存掩膜、必要身份/完成记录和写出锁。短测在自有临时目录验证过程/结果分离，全部测试掩膜随该目录清理。
 
 ## 来源
 

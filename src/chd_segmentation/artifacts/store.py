@@ -55,3 +55,9 @@ def require_output(path, work_root, protected=()):
         if result == source or result.is_relative_to(source) or source.is_relative_to(result):
             raise ValueError("输出与受保护的输入或代码位置重叠")
     return result
+
+
+def require_result_output(config, path, protected=()):
+    root = config["work_root"] if config.get("result_root") is None else config["result_root"]
+    inputs = [config[key] for key in ("run_dir", "manifest", "plan", "pretrained")]
+    return require_output(path, root, [*inputs, Path(__file__).parents[3], *protected])

@@ -1,11 +1,13 @@
 dataset: chd1282
 model: stunet
 scope: formal
-manifest: /path/to/private/chd1282_manifest.yaml
-plan: /path/to/fitted/nnUNetPlans.json
-pretrained: /path/to/weights/small_ep4k.model
-work_root: /path/to/workspace
-run_dir: /path/to/workspace/runs/chd1282_stunet_fold0
+# 这些输入位置是部署约定，使用前核对实际文件；数据子目录由私有清单声明。
+manifest: /data4/zhangruichen/course/chd-segmentation/inputs/chd1282_manifest.yaml
+plan: /data4/zhangruichen/course/chd-segmentation/inputs/plans/chd1282/nnUNetPlans.json
+pretrained: /data4/zhangruichen/data/pretrained/STU-Net/small_ep4k.model
+work_root: /data4/zhangruichen/course/chd-segmentation
+run_dir: /data4/zhangruichen/course/chd-segmentation/runs/chd1282_stunet_fold0
+result_root: /data4/zhangruichen/result/chd-segmentation
 fold: 0
 training:
   patch: [64, 96, 96]

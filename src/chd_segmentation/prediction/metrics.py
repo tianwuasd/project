@@ -3,7 +3,7 @@ from pathlib import Path
 import nibabel as nib
 import numpy as np
 
-from ..artifacts.store import digest, file_digest, read_json, require_output, write_json
+from ..artifacts.store import digest, file_digest, read_json, require_result_output, write_json
 
 
 def case_data_identity(prepared, row):
@@ -17,9 +17,9 @@ def case_data_identity(prepared, row):
 def evaluation_output(config, prepared, prediction_dir, output):
     protected = [prepared["manifest"]["data_root"], prediction_dir, config["run_dir"],
                  config["manifest"], config["plan"], config["pretrained"]]
-    result = require_output(output, config["work_root"], protected)
+    result = require_result_output(config, output, protected)
     if result.suffix.lower() != ".json":
-        raise ValueError("评价输出必须是工作目录内的独立 JSON 文件")
+        raise ValueError("评价输出必须是结果目录内的独立 JSON 文件")
     if result.exists():
         raise FileExistsError("评价输出已存在，请指定新的报告文件")
     return result

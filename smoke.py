@@ -86,6 +86,7 @@ def run(spec_path, root, report, validate_only=False):
             name = experiment["dataset"]
             directory = workspace.root / name
             directory.mkdir(exist_ok=False)
+            process, results = directory / "course", directory / "result"
             row = deepcopy(experiment["case"])
             row["roles"] = ["train", "validation"]
             manifest = {"dataset": name, "scope": "technical", "data_root": experiment["data_root"], "cases": [row],
@@ -94,7 +95,8 @@ def run(spec_path, root, report, validate_only=False):
             config = deepcopy(DEFAULTS)
             config.update({"dataset": name, "scope": "technical", "manifest": str(directory / "manifest.json"),
                            "plan": experiment["plan"], "pretrained": experiment["pretrained"],
-                           "work_root": str(workspace.root), "run_dir": str(directory / "training")})
+                           "work_root": str(process), "run_dir": str(process / "training"),
+                           "result_root": str(results)})
             config["training"].update({"patch": [32, 32, 32], "attempts": 2, "batch": 1,
                                        "save_every_attempts": 2, "foreground_fraction": 1.})
             config["technical"] = {"roi_xyz": experiment["roi_xyz"], "allow_role_overlap": True}
@@ -104,7 +106,7 @@ def run(spec_path, root, report, validate_only=False):
                       "roi_xyz": experiment["roi_xyz"], "patch": config["training"]["patch"], "device": "cpu"}
             workspace.results.append(record)
             mark = perf_counter()
-            prepared = prepare(config, directory / "prepared.json")
+            prepared = prepare(config, process / "prepared.json")
             record["prepare_seconds"] = perf_counter() - mark
             dataset = CaseDataset(prepared, config["resources"])
             first = dataset.get(row["case_id"])
@@ -119,8 +121,8 @@ def run(spec_path, root, report, validate_only=False):
             dataset.clear()
             del first, second, dataset
             gc.collect()
-            record["first_train"] = train(config, directory / "prepared.json", stop_after=0 if validate_only else 1)
-            record["resume_train"] = train(config, directory / "prepared.json", resume=True,
+            record["first_train"] = train(config, process / "prepared.json", stop_after=0 if validate_only else 1)
+            record["resume_train"] = train(config, process / "prepared.json", resume=True,
                                            stop_after=0 if validate_only else None)
             expected_updates = 0 if validate_only else 2
             if not record["resume_train"]["restored_exact"] or record["resume_train"]["updates"] != expected_updates:
@@ -128,12 +130,17 @@ def run(spec_path, root, report, validate_only=False):
             if not validate_only and (not record["first_train"]["parameters_changed_this_invocation"] or not record["resume_train"]["parameters_changed_this_invocation"]):
                 raise ValueError("训练更新没有改变实际模型参数")
             record["optimizer_updates_in_this_test"] = expected_updates
-            predictions = directory / "prediction"
+            predictions = results / "prediction"
             record["prediction"] = predict(config, predictions)
             record["prediction_reuse"] = predict(config, predictions)
             if record["prediction_reuse"]["reused"] != 1 or record["prediction_reuse"]["new"] != 0:
                 raise ValueError("重复预测没有复用完成结果")
-            record["evaluation"] = evaluate(predictions, prepared, directory / "evaluation.json", config)
+            record["evaluation"] = evaluate(predictions, prepared, results / "evaluation.json", config)
+            events = [json.loads(line) for line in (process / "training" / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+            if (predictions / "events.jsonl").exists() or not any(row["event"] == "prediction" for row in events):
+                raise ValueError("预测事件日志未保存到过程目录")
+            record["storage"] = {"work_root": str(process), "result_root": str(results),
+                                 "prediction_events_in_course": True, "result_events_absent": True}
             for kind in ("image", "label"):
                 if file_digest(row[kind]) != row["sha256"][kind]:
                     raise ValueError("原始文件在短测后发生变化")
