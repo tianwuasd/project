@@ -16,7 +16,9 @@ python -B run.py --version
 
 本机的 `.venv` 复用既有研究依赖并安装 MONAI 1.5.2；其本地依赖引用不用于服务器部署。服务器需要独立安装 `pyproject.toml` 声明的依赖并验证对应 PyTorch 构建。代码不自动安装依赖，也不自动更换已有环境。
 
-zmic 使用 `/data4/zhangruichen`：Git 检出在 `code/git`，本项目位于其中的 `chd-segmentation`；过程产物在 `course/chd-segmentation`，最终结果在 `result/chd-segmentation`，独立环境计划放在 `env/chd-segmentation`，原始数据从 `data` 读取。部署、配置及更新命令见 [zmic 部署说明](docs/ZMIC_DEPLOYMENT.md)。目录存在与环境可用性须按服务器实际文件核对。
+zmic 使用 `/data4/zhangruichen`：`code/git` 保存 Git 对象缓存，实际运行代码在独立的 `code/chd-segmentation`，由 `current.json` 选择已校验版本；过程产物在 `course/chd-segmentation`，最终结果在 `result/chd-segmentation`，独立环境计划放在 `env/chd-segmentation`，原始数据从 `data` 读取。部署、配置及更新命令见 [zmic 部署说明](docs/ZMIC_DEPLOYMENT.md)。目录存在与环境可用性须按服务器实际文件核对。
+
+独立 `update.py` 只使用 Python 3.11+ 标准库与系统 Git。默认只安装本项目源码并记录完整 SHA；指定 `--activate --python 实际解释器` 后执行依赖检查，通过后原子设置生效指针。受管目录的 `run.py --code-info` 显示实际代码、提交与环境；运行期间持有共享代码锁。新版本源码不会覆盖正在运行任务的文件。
 
 ## 准备私有输入
 
