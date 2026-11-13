@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+project.local.yaml
+workspace/
+outputs/
+*.pt
+*.model
+*.nii*

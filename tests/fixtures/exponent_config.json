@@ -1,0 +1,9 @@
+{
+  "dataset": "chd1282",
+  "manifest": "manifest.yaml",
+  "plan": "nnUNetPlans.json",
+  "pretrained": "small_ep4k.model",
+  "work_root": "workspace",
+  "run_dir": "workspace/run",
+  "training": {"weight_decay": 3e-05}
+}

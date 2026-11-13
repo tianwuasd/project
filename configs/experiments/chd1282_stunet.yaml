@@ -1,0 +1,18 @@
+dataset: chd1282
+model: stunet
+scope: formal
+manifest: /path/to/private/chd1282_manifest.yaml
+plan: /path/to/fitted/nnUNetPlans.json
+pretrained: /path/to/weights/small_ep4k.model
+work_root: /path/to/workspace
+run_dir: /path/to/workspace/runs/chd1282_stunet_fold0
+fold: 0
+training:
+  patch: [64, 96, 96]
+  batch: 1
+  attempts: 62500
+  learning_rate: 0.001
+resources:
+  device: cpu
+  cpu_threads: 2
+  cache_bytes: 1073741824
