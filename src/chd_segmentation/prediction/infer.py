@@ -14,8 +14,10 @@ from ..data.dataset import CaseDataset
 from ..datasets.manifest import load_manifest
 from ..models.stunet.adapter import StunetAdapter
 from ..observability.events import event
-from ..training.checkpoint import load_checkpoint
+from ..training.checkpoint import load_checkpoint, prediction_snapshot
 from ..training.engine import code_identity, device_for
+from ..preprocessing.prepare import validate_prepared_config
+from .metrics import case_data_identity
 from .restore import restore
 
 
@@ -23,6 +25,7 @@ def predict(config, output, inputs=None, case_ids=None):
     started = perf_counter()
     training = read_json(Path(config["run_dir"]) / "run.json")
     prepared = deepcopy(training["prepared"])
+    validate_prepared_config(prepared, config)
     if code_identity() != training["scientific"]["code_identity"]:
         raise ValueError("预测代码与训练记录不一致，需要经过验证的兼容记录")
     if inputs is not None:
@@ -32,11 +35,10 @@ def predict(config, output, inputs=None, case_ids=None):
     requested = names if case_ids is None else set(case_ids)
     if not requested or not requested <= names:
         raise ValueError("预测病例不存在于输入清单中")
-    pointer = read_json(Path(config["run_dir"]) / "latest.json")
     options = config["prediction"]
     torch.set_num_threads(config["resources"]["cpu_threads"])
     device = device_for(config)
-    with operation_lock(output):
+    with operation_lock(output), prediction_snapshot(config["run_dir"]) as pointer:
         completed = read_json(output / "predictions.json") if (output / "predictions.json").exists() else {"cases": {}}
         dataset = CaseDataset(prepared, config["resources"], with_label=False)
         model, state = None, None
@@ -62,7 +64,7 @@ def predict(config, output, inputs=None, case_ids=None):
             mark = perf_counter()
             entry = dataset.get(name)
             if model is None:
-                state = load_checkpoint(config["run_dir"], training["identity"])
+                state = load_checkpoint(config["run_dir"], training["identity"], pointer=pointer)
                 model = StunetAdapter.build(state["spec"]).to(device).eval()
                 model.load_state_dict(state["model"], strict=True)
                 spec = state["spec"]
@@ -102,6 +104,9 @@ def predict(config, output, inputs=None, case_ids=None):
             del observed
             os.replace(pending, path)
             receipt = {"case_id": name, "identity": identity, "file": path.name, "sha256": file_digest(path),
+                       "data_identity": case_data_identity(prepared, row), "dataset": prepared["dataset"],
+                       "reference_sha256": row.get("sha256", {}).get("label"),
+                       "checkpoint_sha256": pointer["sha256"],
                        "shape_xyz": entry["source_shape_xyz"], "affine": affine, "roi_xyz": entry["roi_xyz"],
                        "scope": prepared["scope"], "export_space": options["export_space"],
                        "unknown_classes": row["unknown_classes"], "reused": False,

@@ -49,3 +49,17 @@ def load_prepared(path):
         raise ValueError("预处理描述内容摘要不符")
     record["identity"] = identity
     return record
+
+
+def validate_prepared_config(record, config):
+    for key in ("dataset", "scope", "fold", "technical"):
+        if record[key] != config[key]:
+            raise ValueError("当前配置与预处理描述不一致：" + key)
+    for key in ("manifest", "plan"):
+        if file_digest(config[key]) != record["source_identity"][key]:
+            raise ValueError("当前输入内容与预处理描述不一致：" + key)
+    for row in record["manifest"]["cases"]:
+        for kind, expected in row["source_stamp"].items():
+            stat = Path(row[kind]).stat()
+            if [stat.st_size, stat.st_mtime_ns] != expected:
+                raise ValueError("原始文件在准备后发生变化：" + kind)

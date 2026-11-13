@@ -76,7 +76,7 @@ class SmokeWorkspace:
         return False
 
 
-def run(spec_path, root, report):
+def run(spec_path, root, report, validate_only=False):
     experiments = yaml.safe_load(Path(spec_path).read_text(encoding="utf-8"))["experiments"]
     if not 1 <= len(experiments) <= 2 or len({row["case"]["image"] for row in experiments}) != len(experiments):
         raise ValueError("短测只允许总计一至两个不同真实病例")
@@ -119,18 +119,21 @@ def run(spec_path, root, report):
             dataset.clear()
             del first, second, dataset
             gc.collect()
-            record["first_train"] = train(config, directory / "prepared.json", stop_after=1)
-            record["resume_train"] = train(config, directory / "prepared.json", resume=True)
-            if not record["resume_train"]["restored_exact"] or record["resume_train"]["updates"] != 2:
+            record["first_train"] = train(config, directory / "prepared.json", stop_after=0 if validate_only else 1)
+            record["resume_train"] = train(config, directory / "prepared.json", resume=True,
+                                           stop_after=0 if validate_only else None)
+            expected_updates = 0 if validate_only else 2
+            if not record["resume_train"]["restored_exact"] or record["resume_train"]["updates"] != expected_updates:
                 raise ValueError("训练恢复状态或更新数未通过")
-            if not record["first_train"]["parameters_changed_this_invocation"] or not record["resume_train"]["parameters_changed_this_invocation"]:
+            if not validate_only and (not record["first_train"]["parameters_changed_this_invocation"] or not record["resume_train"]["parameters_changed_this_invocation"]):
                 raise ValueError("训练更新没有改变实际模型参数")
+            record["optimizer_updates_in_this_test"] = expected_updates
             predictions = directory / "prediction"
             record["prediction"] = predict(config, predictions)
             record["prediction_reuse"] = predict(config, predictions)
             if record["prediction_reuse"]["reused"] != 1 or record["prediction_reuse"]["new"] != 0:
                 raise ValueError("重复预测没有复用完成结果")
-            record["evaluation"] = evaluate(predictions, prepared, directory / "evaluation.json")
+            record["evaluation"] = evaluate(predictions, prepared, directory / "evaluation.json", config)
             for kind in ("image", "label"):
                 if file_digest(row[kind]) != row["sha256"][kind]:
                     raise ValueError("原始文件在短测后发生变化")
@@ -146,5 +149,6 @@ if __name__ == "__main__":
     parser.add_argument("--spec", required=True)
     parser.add_argument("--work-root", required=True)
     parser.add_argument("--report", required=True)
+    parser.add_argument("--validate-only", action="store_true", help="核验保护逻辑、初始状态恢复与预测；不执行优化器更新")
     args = parser.parse_args()
-    run(args.spec, args.work_root, args.report)
+    run(args.spec, args.work_root, args.report, args.validate_only)

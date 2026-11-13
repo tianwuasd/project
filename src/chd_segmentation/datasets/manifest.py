@@ -32,6 +32,11 @@ def load_manifest(path, dataset, scope):
             if not source.is_relative_to(root) or not source.is_file():
                 raise ValueError("病例文件不在数据根目录内或不存在")
             row[kind] = str(source)
+            expected = row.get("sha256", {}).get(kind)
+            if not isinstance(expected, str) or len(expected) != 64 or any(c not in "0123456789abcdef" for c in expected):
+                raise ValueError("清单必须提供已审计来源的 SHA256：" + kind)
+            stat = source.stat()
+            row.setdefault("source_stamp", {})[kind] = [stat.st_size, stat.st_mtime_ns]
         spacing = np.asarray(row["spacing_xyz"], dtype=float)
         if spacing.shape != (3,) or not np.isfinite(spacing).all() or (spacing <= 0).any():
             raise ValueError("缺少可靠的逐例毫米间距")

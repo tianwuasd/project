@@ -25,6 +25,7 @@ def main(argv=None):
     predict.add_argument("--inputs")
     predict.add_argument("--case", action="append")
     evaluate = commands.add_parser("evaluate")
+    evaluate.add_argument("--config", required=True)
     evaluate.add_argument("--prepared", required=True)
     evaluate.add_argument("--predictions", required=True)
     evaluate.add_argument("--output", required=True)
@@ -46,7 +47,7 @@ def main(argv=None):
     else:
         from .prediction.metrics import evaluate
         from .preprocessing.prepare import load_prepared
-        result = evaluate(args.predictions, load_prepared(args.prepared), args.output)
+        result = evaluate(args.predictions, load_prepared(args.prepared), args.output, load_config(args.config))
     print(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False))
 
 

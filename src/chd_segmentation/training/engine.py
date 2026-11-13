@@ -14,7 +14,7 @@ from ..artifacts.store import digest, operation_lock, read_json, require_output,
 from ..data.dataset import CaseDataset, sample_patch
 from ..models.stunet.adapter import StunetAdapter, WEIGHT_SHA256
 from ..observability.events import event
-from ..preprocessing.prepare import load_prepared
+from ..preprocessing.prepare import load_prepared, validate_prepared_config
 from .checkpoint import load_checkpoint, save_checkpoint, tensors_equal
 
 
@@ -58,6 +58,7 @@ def get_batch(dataset, rows, config, rng, device):
 def train(config, prepared_path, resume=False, stop_after=None):
     started = perf_counter()
     prepared = load_prepared(prepared_path)
+    validate_prepared_config(prepared, config)
     if prepared["dataset"] != config["dataset"] or prepared["scope"] != config["scope"] or prepared["fold"] != config["fold"]:
         raise ValueError("训练配置与预处理描述不匹配")
     output = require_output(config["run_dir"], config["work_root"], [prepared["manifest"]["data_root"]])
