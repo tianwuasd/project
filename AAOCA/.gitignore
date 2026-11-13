@@ -23,6 +23,8 @@
 !/SERVER_WORKBENCH.md
 !/PRIVATE_UPGRADE.md
 !/upgrade_aaoca_server.py
+!/update_aaoca_code.py
+!/CODE_UPDATE.md
 !/一键处理.cmd
 !/common.py
 !/convert_ct.py
@@ -72,3 +74,4 @@
 !/tools/chd_dataset/requirements.txt
 __pycache__/
 *.py[cod]
+.aaoca-code-*
