@@ -20,6 +20,8 @@ zmic 使用 `/data4/zhangruichen`：`code/git` 保存 Git 对象缓存，实际�
 
 独立 `update.py` 只使用 Python 3.11+ 标准库与系统 Git。默认只安装本项目源码并记录完整 SHA；指定 `--activate --python 实际解释器` 后执行依赖检查，通过后原子设置生效指针。受管目录的 `run.py --code-info` 显示实际代码、提交与环境；运行期间持有共享代码锁。新版本源码不会覆盖正在运行任务的文件。
 
+公开仓库更新默认探测 `ghfast.top`、`gh-proxy.com` 与 GitHub，选择提交匹配、支持按需下载且响应较快的镜像。地址和超时保存在 `course/chd-segmentation/update_network.json`，可以手动修改；也可使用 `--mirror 地址` 或 `--mirror direct`。镜像请求不携带 Git 凭据，选定来源与探测结果记录到过程目录。文件内容校验失败时停止本次更新。
+
 ## 准备私有输入
 
 实验配置示例在 `configs/experiments/`，机器路径集中填写。每套数据需要既有拟合计划、官方 `small_ep4k.model` 以及私有清单。相对病例路径按清单的 `data_root` 解析。
