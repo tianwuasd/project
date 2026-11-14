@@ -78,11 +78,11 @@ def _matching_transition(stored_map, current_map, path_prefix, audit_path):
             if (maps['path_prefix'] == path_prefix and maps['stored'] == stored_map
                     and maps['current'] == current_map):
                 return edge['id']
-    if path_prefix != '':
-        return None
     patch = _gpu_sharing_audit(GPU_SHARING_PATH)
+    changes = patch['changes'] if path_prefix == '' else {
+        'xu_resume_compat.py': patch['changes']['src/dataset1282_analysis/xu_resume_compat.py']}
     previous = dict(current_map)
-    for name, versions in patch['changes'].items():
+    for name, versions in changes.items():
         if current_map.get(name) != versions['current']:
             return None
         previous[name] = versions['stored']

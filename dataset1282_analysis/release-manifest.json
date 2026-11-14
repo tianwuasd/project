@@ -114,7 +114,7 @@
     "src/dataset1282_analysis/xu_pipeline_stages.py": "e60a218b468f95ae332a449090cc7e14f522f7d50ba835dcbaa2e0985cc0cf9d",
     "src/dataset1282_analysis/xu_reallocation.py": "5d8c1e0c307524eb9e758ad05a5fb327b3b10d7f936ce8341738049b8d95acc1",
     "src/dataset1282_analysis/xu_resources.py": "1f5e493f5e223a2596663728734a84f2f1c2ab0f831d0d5a8f357682310e327c",
-    "src/dataset1282_analysis/xu_resume_compat.py": "fea726d3601f079beca7d31c3248b1b71a187504a256539e37315a20fbf73406",
+    "src/dataset1282_analysis/xu_resume_compat.py": "c4dca592983145afdf6ddb0acc012b9796b837b739a7776fd8287e8a5e99e585",
     "src/dataset1282_analysis/xu_roi.py": "e5e4903368cb4d6707f02ce1a8ff8feda727e91a98a3af0bdd3e5430d4c908d8",
     "src/dataset1282_analysis/xu_roi_workflow.py": "66079a8891385436e2b6dc46e9edab9d6dfcc8f4825c76d2ac792cf38bb001ea",
     "src/dataset1282_analysis/xu_runtime_guard.py": "a5a8bc712bfe15f571f47463589a12456c5cfd1a3ec4757491dd8cc54249cb84",
@@ -222,10 +222,10 @@
     "tests/fixtures/xu_owned_sleep.py": "8aa3df1ff7b73dc0328d0b515c6b3c556f694bb88b63fd32c1c643fcad108d33",
     "tests/fixtures/xu_pair_child.py": "f11a332cfb091d3fa0cc2637ffb46101e48428eec1ed0cb65a545798597cf77e",
     "tests/fixtures/xu_supply_child.py": "0f447ddf0e9e7a8cfe38abbba51165450215a29c60992b7bb30407ab7f08dfb9",
-    "configs/xu-gpu-sharing-compat.json": "6b500bd63859d9a580c8e7a988d7c0b55e5de40eae7158d7fbe7ca5692c01ea0",
+    "configs/xu-gpu-sharing-compat.json": "0adb81d9728e2ebeba2ac8b0aa0e9f465480afdde07e8d10fdd8e4f8620f2564",
     "src/dataset1282_analysis/storage_adoption.py": "a5020e7bf54f0d0e9a4f7f9a5e3880a324a010ce9b0fe23cd1ce6b8da9de0f70",
     "tests/test_storage_adoption.py": "3424268f7e59c0aa67adbffe4b9e6413ae37211aa81251b71e3385fb5c3b4f05",
     "tests/test_xu_gpu_sharing_live.py": "8b7d7142a6214d6526fba6de01b1d350e2344fb1b923d3662de9fb5348f94053",
-    "tests/test_xu_gpu_sharing_compat.py": "322e7608de6a860f68ce693e3c520804855e0283bfe4e07370b59a4e83c5bcfb"
+    "tests/test_xu_gpu_sharing_compat.py": "79848da3032f1b34b9f7968e3440e506e80a0bf17ef24542111f58329ff14cbc"
   }
 }
