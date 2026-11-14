@@ -2,16 +2,12 @@ from pathlib import Path
 
 from ..artifacts.store import digest, file_digest, operation_lock, read_json, require_output, write_json
 from ..datasets.manifest import LABELS, load_manifest
+from .planning import resolve_plan, validate_auto_plan
 
 
 def prepare(config, output):
     manifest = load_manifest(config["manifest"], config["dataset"], config["scope"])
-    plan = read_json(config["plan"])
-    if len(plan["configurations"]["3d_fullres"]["spacing"]) != 3:
-        raise ValueError("需要三维预处理计划")
-    if not plan.get("foreground_intensity_properties_per_channel"):
-        raise ValueError("缺少既有训练拟合的归一化统计")
-    if config["scope"] == "formal" and manifest.get("plan_scope") != "formal":
+    if config["scope"] == "formal" and config["planning"]["mode"] == "existing" and manifest.get("plan_scope") != "formal":
         raise ValueError("正式任务需要声明正式拟合计划的来源")
     rows = manifest["cases"]
     if config["scope"] == "formal":
@@ -24,6 +20,15 @@ def prepare(config, output):
                 raise ValueError("同患者出现在不同数据角色中")
     if any(len(set(row["roles"]) - {"predict"}) > 1 for row in rows) and not config["technical"]["allow_role_overlap"]:
         raise ValueError("病例角色重叠未获得技术范围声明")
+    output = require_output(output, config["work_root"], [manifest["data_root"], Path(__file__).parents[3],
+                            config["plan"], config["manifest"], config["pretrained"]])
+    plan = resolve_plan(config, manifest)
+    if len(plan["configurations"]["3d_fullres"]["spacing"]) != 3:
+        raise ValueError("需要三维预处理计划")
+    if not plan.get("foreground_intensity_properties_per_channel"):
+        raise ValueError("缺少训练拟合的归一化统计")
+    if config["scope"] == "formal" and plan.get("scope") == "technical":
+        raise ValueError("正式任务不能使用技术短测计划")
     dataset_json = {"channel_names": {"0": "CT"},
                     "labels": {name: index for index, name in enumerate(LABELS[config["dataset"]])},
                     "file_ending": ".nii.gz"}
@@ -32,7 +37,6 @@ def prepare(config, output):
               "source_identity": {"manifest": file_digest(config["manifest"]), "plan": file_digest(config["plan"])},
               "technical": config["technical"]}
     record["identity"] = digest(record)
-    output = require_output(output, config["work_root"], [manifest["data_root"], Path(__file__).parents[3]])
     with operation_lock(output.parent):
         if output.exists():
             if read_json(output) != record:
@@ -58,6 +62,8 @@ def validate_prepared_config(record, config):
     for key in ("manifest", "plan"):
         if file_digest(config[key]) != record["source_identity"][key]:
             raise ValueError("当前输入内容与预处理描述不一致：" + key)
+    if config.get("planning", {}).get("mode") == "auto":
+        validate_auto_plan(record["plan"], config, record["manifest"])
     for row in record["manifest"]["cases"]:
         for kind, expected in row["source_stamp"].items():
             stat = Path(row[kind]).stat()

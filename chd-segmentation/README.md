@@ -2,7 +2,7 @@
 
 版本 0.1.0。当前接入 STU-Net-S 的 CHD1282（11 类）和 ImageCHD（8 类）CPU 流程：准备描述、训练、完整状态恢复、MONAI 滑窗预测、原数组网格导出、独立评价和短测。两数据集共用网络代码，分别训练权重。
 
-本轮实测使用每数据集一例真实缺标签病例、32³ 技术子区域、每组合两次更新，包含保存后继续更新。完整病例训练效果、正式尺寸容量、CUDA/DDP、资源自动调度和服务器更新尚未验收；GPU 配置会明确拒绝运行。已有拟合计划是当前输入要求，新计划拟合尚未接入。Xu、SAM-Med3D、Q 的接入安排保存在总开发计划中。
+短测限定每数据集一例真实病例、32³ 技术子区域、每组合两次更新，包含保存后继续更新。完整病例训练效果、正式尺寸容量、CUDA/DDP 和资源自动调度尚未验收；GPU 配置会明确拒绝运行。prepare 默认根据当前训练清单生成预处理计划，短测生成独立技术计划。Xu、SAM-Med3D、Q 的接入安排保存在总开发计划中。
 
 ## 环境与入口
 
@@ -36,7 +36,7 @@ python3 -B /data4/zhangruichen/code/chd-segmentation/update.py
 
 ## 准备私有输入
 
-实验配置示例在 `configs/experiments/`，机器路径集中填写。每套数据需要既有拟合计划、官方 `small_ep4k.model` 以及私有清单。相对病例路径按清单的 `data_root` 解析。
+实验配置示例在 `configs/experiments/`，机器路径集中填写。每套数据需要官方 `small_ep4k.model` 以及私有清单。相对病例路径按清单的 `data_root` 解析。默认 `planning.mode: auto`，无需提供已有计划；prepare 仅使用清单中 train 病例拟合灰度统计及目标间距。计划保存在 work_root 下的 `plans/<dataset>/fold_<fold>/<scope>/preprocessing_plan.json`，也可显式设置 plan 输出路径。配置、身份复用及旧计划使用方式见 [自动预处理计划](docs/PREPROCESSING.md)。
 
 `work_root` 限定预处理描述、运行日志和检查点；可选 `result_root` 限定预测与评价输出。省略 `result_root` 时沿用 `work_root`；zmic 示例已显式设置两个独立目录。私有配置保存在 `course/chd-segmentation/configs`，清单中的 `data_root` 填写 `data` 内实际数据集位置。示例中的输入文件位置需核对，不能直接代表服务器已经具备这些文件。
 
@@ -61,9 +61,9 @@ cases:
       label: actual_label_sha256
 ```
 
-正式训练还需独立 validation 病例，患者不能跨角色。示例数字仅解释字段，实际值必须来自审核记录。ImageCHD 的未知类别仅允许缺 MYO（编号 5）；1282 使用其原始 0—10 编号和 `shared_index_excel` 空间规则。未标注和已确认缺如分别记录。额外标签仅按显式 `ignore_label_ids` 屏蔽。
+正式训练还需独立 validation 病例，患者不能跨角色。示例数字仅解释字段，实际值必须来自审核记录。ImageCHD 的未知类别仅允许缺 MYO（编号 5）；1282 使用其原始 0—10 编号和 `shared_index_excel` 空间规则。未标注和已确认缺如分别记录。额外标签仅按显式 `ignore_label_ids` 屏蔽。plan_scope 仅用于显式读取既有计划的来源声明，不能代替对拟合病例的核查。
 
-图像和标签原件只读。prepare 保存紧凑描述与计划引用，不输出整套重采样副本；训练和预测使用 MONAI Dataset/Compose 在 RAM 处理。当前缓存为本进程有界 LRU，不能宣称跨进程共享或自动 worker 扩展。
+图像和标签原件只读。prepare 按病例顺序读取训练数据，在 RAM 中进行有界前景采样，保存紧凑计划与描述，不输出整套重采样副本；训练和预测使用 MONAI Dataset/Compose 在 RAM 处理。当前缓存为本进程有界 LRU，不能宣称跨进程共享或自动 worker 扩展。
 
 ## 运行
 

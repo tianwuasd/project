@@ -72,7 +72,7 @@ class CaseTransform:
         if self.with_label:
             self._source(row, "label")
 
-    def __call__(self, row):
+    def read_case(self, row):
         started = perf_counter()
         image = nib.load(self._source(row, "image"))
         if len(image.shape) != 3:
@@ -96,12 +96,8 @@ class CaseTransform:
             raise ValueError("技术子区域超出真实图像范围")
         region = tuple(slice(begin, end) for begin, end in roi)
         shape = np.array([end - begin for begin, end in roi])
-        plan = self.prepared["plan"]
-        target_spacing = np.asarray(plan["configurations"]["3d_fullres"]["spacing"])
         native_spacing = np.asarray(row["spacing_xyz"], dtype=np.float32).astype(float)
-        transposed_spacing = native_spacing[::-1][plan["transpose_forward"]]
-        planned_shape = np.ceil(shape[::-1][plan["transpose_forward"]] * transposed_spacing / target_spacing)
-        estimate = int(np.prod(shape) * 16 + np.prod(planned_shape) * 24)
+        estimate = int(np.prod(shape) * 32)
         if psutil.virtual_memory().available < self.reserve + estimate:
             raise MemoryError("病例构建所需内存超出安全余量")
         data = np.asarray(image.dataobj[region], dtype=np.float32)
@@ -121,6 +117,17 @@ class CaseTransform:
             if any((segmentation == c).any() for c in row["unknown_classes"]):
                 raise ValueError("读取标签与未知类别声明矛盾")
         read_seconds = perf_counter() - started
+        return data, segmentation, image, native_spacing, roi, read_seconds
+
+    def __call__(self, row):
+        data, segmentation, image, native_spacing, roi, read_seconds = self.read_case(row)
+        plan = self.prepared["plan"]
+        target_spacing = np.asarray(plan["configurations"]["3d_fullres"]["spacing"])
+        transposed_spacing = native_spacing[::-1][plan["transpose_forward"]]
+        planned_shape = np.ceil(np.asarray(data.shape)[::-1][plan["transpose_forward"]] *
+                                transposed_spacing / target_spacing)
+        if psutil.virtual_memory().available < self.reserve + int(np.prod(planned_shape) * 24):
+            raise MemoryError("重采样所需内存超出安全余量")
         properties = {"spacing": native_spacing[::-1].tolist()}
         manager = PlansManager(deepcopy(plan))
         configuration = manager.get_configuration("3d_fullres")
@@ -140,7 +147,7 @@ class CaseTransform:
             working_affine = np.diag([*native_spacing, 1.])
         else:
             working_affine[:3, :3] *= native_spacing / np.linalg.norm(working_affine[:3, :3], axis=0)
-        return {"case_id": row["case_id"], "image": values, "label": targets[0] if label is not None else None,
+        return {"case_id": row["case_id"], "image": values, "label": targets[0] if segmentation is not None else None,
                 "unknown_classes": row["unknown_classes"], "properties": properties,
                 "source_shape_xyz": list(image.shape), "source_affine": image.affine.tolist(),
                 "source_units": image.header.get_xyzt_units()[0], "working_affine": working_affine.tolist(),

@@ -3,7 +3,8 @@ model: stunet
 scope: formal
 # 这些输入位置是部署约定，使用前核对实际文件；数据子目录由私有清单声明。
 manifest: /data4/zhangruichen/course/chd-segmentation/inputs/imagechd_fold0_manifest.yaml
-plan: /data4/zhangruichen/course/chd-segmentation/inputs/plans/imagechd/preprocessing_plan.json
+planning:
+  mode: auto
 pretrained: /data4/zhangruichen/data/pretrained/STU-Net/small_ep4k.model
 work_root: /data4/zhangruichen/course/chd-segmentation
 run_dir: /data4/zhangruichen/course/chd-segmentation/runs/imagechd_stunet_fold0

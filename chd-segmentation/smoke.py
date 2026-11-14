@@ -101,9 +101,12 @@ def run(spec_path, root, report, validate_only=False):
             write_json(directory / "manifest.json", manifest)
             config = deepcopy(DEFAULTS)
             config.update({"dataset": name, "scope": "technical", "manifest": str(directory / "manifest.json"),
-                           "plan": experiment["plan"], "pretrained": experiment["pretrained"],
+                           "plan": str(process / "plans" / "preprocessing_plan.json"), "pretrained": experiment["pretrained"],
                            "work_root": str(process), "run_dir": str(process / "training"),
                            "result_root": str(results)})
+            config["planning"].update(experiment.get("planning", {}))
+            if config["planning"]["mode"] != "auto":
+                raise ValueError("短测必须从所选真实病例自动生成技术计划")
             config["training"].update({"patch": [32, 32, 32], "attempts": 2, "batch": 1,
                                        "save_every_attempts": 2, "foreground_fraction": 1.})
             config["technical"] = {"roi_xyz": experiment["roi_xyz"], "allow_role_overlap": True}
@@ -115,6 +118,17 @@ def run(spec_path, root, report, validate_only=False):
             mark = perf_counter()
             prepared = prepare(config, process / "prepared.json")
             record["prepare_seconds"] = perf_counter() - mark
+            generation = prepared["plan"]["generation"]
+            record["planning"] = {key: generation[key] for key in
+                                  ("request_identity", "samples_per_case_applied", "total_samples", "seconds")}
+            record["planning"]["fit_ids"] = prepared["plan"]["fit_ids"]
+            plan_stamp = Path(config["plan"]).stat().st_mtime_ns
+            mark = perf_counter()
+            repeated = prepare(config, process / "prepared.json")
+            record["planning"]["reuse_seconds"] = perf_counter() - mark
+            if repeated != prepared or Path(config["plan"]).stat().st_mtime_ns != plan_stamp:
+                raise ValueError("自动计划未按相同身份复用")
+            record["planning"]["reused_without_write"] = True
             dataset = CaseDataset(prepared, config["resources"])
             first = dataset.get(row["case_id"])
             if not (first["label"] > 0).any():

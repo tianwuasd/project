@@ -36,8 +36,15 @@ def main(argv=None):
         result = read_json(Path(args.run) / "summary.json")
     elif args.command == "prepare":
         from .preprocessing.prepare import prepare
-        result = prepare(load_config(args.config), args.output)
-        result = {"identity": result["identity"], "scope": result["scope"], "cases": len(result["manifest"]["cases"])}
+        from time import perf_counter
+        config = load_config(args.config)
+        existed = Path(config["plan"]).is_file()
+        started = perf_counter()
+        result = prepare(config, args.output)
+        result = {"identity": result["identity"], "scope": result["scope"], "cases": len(result["manifest"]["cases"]),
+                  "plan": config["plan"], "planning_mode": config["planning"]["mode"],
+                  "plan_reused": existed, "fit_ids": result["plan"].get("fit_ids"),
+                  "seconds": perf_counter() - started}
     elif args.command == "train":
         from .training.engine import train
         result = train(load_config(args.config), args.prepared, args.resume, args.stop_after)
