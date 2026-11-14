@@ -117,7 +117,7 @@ def run_probe(args,out):
             state.update(authorized=cards, policy=args.resource_policy)
             remaining, state['unavailable'] = available(pool,args,children)
             if not remaining:
-                raise ValueError('No idle GPU passed admission')
+                raise ValueError('No GPU passed the measured memory budget')
             if args.stage=='inference':
                 inference_check(args,out,owner,children,remaining,state)
             else:

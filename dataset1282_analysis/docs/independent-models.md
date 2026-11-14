@@ -9,7 +9,7 @@ STU-Net-S 对 CT 做自动多类别分割。SAM-Med3D Turbo 对 CT 和人工三�
 - STU-Net-S 使用作者的 `small_ep4k.model`。加载编码器和解码器，重新初始化 11 通道输出头。[权重来源](https://huggingface.co/ziyanhuang/STU-Net/blob/75d046881d0273899b65bf3ef1ee601e9973e7c8/small_ep4k.model)
 - SAM-Med3D 使用 `sam_med3d_turbo.pth`。固定发布版本并核对 SHA256 后严格加载全部张量。[权重来源](https://huggingface.co/blueyo0/SAM-Med3D/blob/07f6f6961f76ce5b30718472352ca09500ca8e53/sam_med3d_turbo.pth)
 
-GPU 工作进程按 UUID 隔离，物理 0、1 号与其他获准设备一同参与选择。外部计算进程占用的卡跳过。资源不足时释放工作进程，等待重新准入。STU-Net 从最近完整轮继续，预测从已提交病例之后继续。运行期间查看各自的 `status.json`、`logs/` 和 `resources/`。
+GPU 工作进程按 UUID 隔离，物理 0、1 号与其他获准设备一同参与选择。有外部计算任务时，根据实时剩余显存和本阶段需求判断是否准入，并记录外部进程。资源不足时释放工作进程，等待重新准入。STU-Net 从最近完整轮继续，预测从已提交病例之后继续。运行期间查看各自的 `status.json`、`logs/` 和 `resources/`。
 
 ## STU-Net-S
 

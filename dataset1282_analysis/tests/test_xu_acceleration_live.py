@@ -129,23 +129,39 @@ class GpuQueryLiveTests(unittest.TestCase):
         self.assertTrue(context is None or int(context)==0)
         self.assertFalse(torch.cuda.is_initialized())
 
-    def test_real_external_gpu_process_is_rejected_without_context(self):
+    def test_real_occupied_gpu_uses_remaining_memory_without_context(self):
         from cuda.bindings import driver
         from dataset1282_analysis.xu_gpu_probe import visible_devices, gpu_snapshot
-        from dataset1282_analysis.xu_resources import _check_device, ResourceUnavailable
+        from dataset1282_analysis.xu_resources import _check_device, gpu_budget
         rows = gpu_snapshot()
         occupied = [r for r in visible_devices() if rows[r['uuid']]['compute_pids']]
         if not occupied:
             self.skipTest('当前可见 GPU 没有外部计算进程')
-        info = {**rows[occupied[0]['uuid']],**occupied[0]}
-        with self.assertRaisesRegex(ResourceUnavailable,'External compute'):
-            _check_device(info,'v2',{},True)
+        eligible = [r for r in occupied if gpu_budget(rows[r['uuid']]['free_bytes'],
+                                                     rows[r['uuid']]['total_bytes'],'v2') > 0]
+        if not eligible:
+            self.skipTest('有外部任务的可见 GPU 均低于显存保留值')
+        info = {**rows[eligible[0]['uuid']],**eligible[0]}
+        checked = _check_device(info,'v2',{},True)
+        self.assertEqual(checked['allocator_budget_bytes'],gpu_budget(info['free_bytes'],info['total_bytes'],'v2'))
+        self.assertEqual(checked['external_pids'],sorted(info['compute_pids']))
         status, context = driver.cuCtxGetCurrent()
         self.assertIn(int(status),(0,3))
         self.assertTrue(context is None or int(context)==0)
 
 
 class RuntimeGuardLiveTests(unittest.TestCase):
+    def test_real_shared_gpu_status_records_process_without_pressure(self):
+        from dataset1282_analysis.xu_gpu_probe import gpu_snapshot
+        from dataset1282_analysis.xu_runtime_guard import gpu_card_status
+        cards = [card for card in gpu_snapshot().values() if card['compute_pids'] and
+                 card['free_bytes'] >= max(4*1024**3,card['total_bytes']//10)]
+        if not cards:
+            self.skipTest('当前没有显存充足且存在其他任务的显卡')
+        status, low_memory = gpu_card_status(cards[0],'cuda:0',{})
+        self.assertFalse(low_memory)
+        self.assertEqual(status['external_pids'],sorted(cards[0]['compute_pids']))
+
     def test_cpu_allocation_requires_slots_for_consumer_and_workers(self):
         from dataset1282_analysis.xu_dispatch import prefetch_cpu_allocation
         from dataset1282_analysis.xu_resources import ResourceUnavailable

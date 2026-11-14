@@ -171,7 +171,7 @@ def assign_wave(wave, args, out, cache, children, contract_id):
             try:
                 free,rejected = available(pool,args,children)
                 if not free:
-                    raise GpuResourcesChanged(f'No idle admitted GPU: {rejected}',pool)
+                    raise GpuResourcesChanged(f'No GPU meets the measured memory budget: {rejected}',pool)
                 host_plan = stage_resources(['cpu'],policy=args.resource_policy)
                 host = host_plan['host_budget_bytes']
                 memory = {n:m for n,(_,m) in limits.items()}
