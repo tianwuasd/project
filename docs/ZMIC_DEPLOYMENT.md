@@ -62,7 +62,7 @@ python3 -B /data4/zhangruichen/code/chd-segmentation/update.py --force
 
 统一从固定代码目录使用 `run.py` 或 `smoke.py` 启动任务。两个入口在导入业务模块前持有共享代码锁；更新需要独占代码锁。同时检查旧入口的过程目录锁和训练锁，保持活动任务运行，不在任务期间修改代码。直接调用内部函数或绕过入口的外部脚本不在该锁的保护范围内。
 
-环境和代码分别维护。先核对实际解释器，再执行：
+环境和代码分别维护。服务器可使用 `/home/zhangruichen/miniconda3` 管理工具，项目环境独立放在 `env/chd-segmentation`。先核对实际解释器，再执行：
 
 ```bash
 /data4/zhangruichen/env/chd-segmentation/bin/python -B /data4/zhangruichen/code/chd-segmentation/setup_env.py --check
@@ -70,6 +70,6 @@ python3 -B /data4/zhangruichen/code/chd-segmentation/run.py --code-info
 /data4/zhangruichen/env/chd-segmentation/bin/python -B /data4/zhangruichen/code/chd-segmentation/run.py --version
 ```
 
-`--code-info` 仅使用标准库，显示当前 Git HEAD、本项目的本地修改标记、实际代码目录和调用解释器；业务命令必须使用训练环境。私有实验配置填写 course 中的 work_root、run_dir 和 result 中的 result_root，data_root 指向 data 中的真实数据集。具体数据子目录、清单、拟合计划和解释器仍需按服务器现有文件核对。
+`--code-info` 仅使用标准库，显示当前 Git HEAD、本项目的本地修改标记、实际代码目录和调用解释器；业务命令必须使用训练环境。私有实验配置填写 course 中的 work_root、run_dir 和 result 中的 result_root，data_root 指向 data 中的真实数据集。默认自动拟合训练病例生成计划，无需上传旧计划；清单和权重位置仍需按服务器现有文件核对。用法见 [自动预处理计划](PREPROCESSING.md)。
 
 本次目录调整按用户要求未运行本地测试。服务器迁移结果以实际回执中的 code、relocated_from、sha、head 和 origin_main 为准；CUDA/DDP 与正式训练仍需独立验收。
