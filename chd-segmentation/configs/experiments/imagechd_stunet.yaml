@@ -23,5 +23,7 @@ training:
 resources:
   device: cuda
   gpu_count: 2
+  share: false
+  min_gpus: null
   workers: auto
   cache_bytes: 1073741824

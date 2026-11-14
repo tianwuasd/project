@@ -34,7 +34,9 @@ def patch_task(request):
     with _gate:
         entry = _dataset.get(name)
         pair = sample_patch(entry, settings["patch"], rng, settings["foreground_fraction"] if phase == 0 else 0.)
-    return pair, entry["unknown_classes"], name, perf_counter() - began, _dataset.hits > hits
+        unknown = entry["unknown_classes"]
+        del entry
+    return pair, unknown, name, perf_counter() - began, _dataset.hits > hits
 
 
 class BatchSupply:
@@ -77,7 +79,9 @@ class BatchSupply:
                 with self.gate:
                     entry = self.local.get(name)
                     pair = sample_patch(entry, settings["patch"], rng, settings["foreground_fraction"] if phase == 0 else 0.)
-                results.append((pair, entry["unknown_classes"], name, perf_counter() - began, self.local.hits > hits))
+                    unknown = entry["unknown_classes"]
+                    del entry
+                results.append((pair, unknown, name, perf_counter() - began, self.local.hits > hits))
         tensors = [torch.from_numpy(np.stack(values)) for values in zip(*(r[0] for r in results))]
         if device.type == "cuda":
             tensors = [value.pin_memory().to(device, non_blocking=True) for value in tensors]
@@ -88,6 +92,8 @@ class BatchSupply:
     def __exit__(self, *_):
         if self.pool:
             self.pool.shutdown(wait=True, cancel_futures=True)
+            self.pool = None
         if self.local:
             self.local.clear()
+            self.local = None
         self.queue.clear()

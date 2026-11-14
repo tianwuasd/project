@@ -8,6 +8,16 @@ import numpy as np
 from ..preprocessing.transforms import CaseTransform
 
 
+def array_bytes(value):
+    if isinstance(value, np.ndarray):
+        return value.nbytes
+    if isinstance(value, dict):
+        return sum(array_bytes(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return sum(array_bytes(item) for item in value)
+    return 0
+
+
 class CaseDataset:
     def __init__(self, prepared, resources, with_label=True, log_dir=None, logging=None):
         self.rows = prepared["manifest"]["cases"]
@@ -28,7 +38,7 @@ class CaseDataset:
         else:
             result = self.dataset[self.by_id[name]]
             self.misses += 1
-            size = sum(value.nbytes for value in result.values() if isinstance(value, np.ndarray))
+            size = array_bytes(result)
             while self.cache and self.cached_bytes + size > self.budget:
                 _, (_, removed) = self.cache.popitem(last=False)
                 self.cached_bytes -= removed
