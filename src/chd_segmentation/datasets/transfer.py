@@ -20,6 +20,34 @@ def write_changed(path, value):
     return True
 
 
+def bind_model_configs(descriptor, directory, course, weight):
+    directory, course = Path(directory), Path(course)
+    changed = []
+    for item in descriptor.get('model_configs', []):
+        name = item['filename']
+        if Path(name).name != name:
+            raise ValueError('模型配置必须使用迁移包内的文件名')
+        path = directory/name
+        config = deepcopy(item['config'])
+        if path.is_file():
+            previous = yaml.safe_load(path.read_text(encoding='utf-8'))
+            if previous.get('model') != config['model']:
+                raise ValueError('已有模型配置的模型类型与迁移包不同')
+            config = previous
+        run = course/'runs'/('q1282_'+descriptor['identity'][:8])
+        config.update(run_dir=str(run), work_root=str(course), groups=str(directory/'q_groups.json'))
+        config['pretrained'] = str(weight) if item['stage'] == 'base' else None
+        config['parents'] = {stage: str(run/stage/'best.pt') for stage in ('base', 'localizer')} \
+            if item['stage'] == 'local' else {}
+        encoded = yaml.safe_dump(config, allow_unicode=True, sort_keys=False)
+        if not path.is_file() or path.read_text(encoding='utf-8') != encoded:
+            pending = path.with_name(path.name+'.pending')
+            pending.write_text(encoded, encoding='utf-8', newline='\n')
+            pending.replace(path)
+            changed.append(name)
+    return changed
+
+
 def bind_inputs(directory, root, dataset_roots=None, pretrained=None):
     directory, root = Path(directory).resolve(strict=True), Path(root).resolve(strict=True)
     descriptor = read_json(directory / "bundle.json")
@@ -93,6 +121,7 @@ def bind_inputs(directory, root, dataset_roots=None, pretrained=None):
             pending.write_text(encoded, encoding="utf-8", newline="\n")
             pending.replace(path)
             changed.append(name)
+    changed.extend(bind_model_configs(descriptor, directory, course, weight))
     receipt = {"state": "bound", "bundle_identity": descriptor["identity"], "root": str(root),
                "datasets": {d: {"root": str(ready[d]["data_root"]), "cases": len(ready[d]["cases"])} for d in ready},
                "weight": str(weight), "scope": "文件名、大小与冻结元数据；原始 SHA256 在实际读取病例时核验"}

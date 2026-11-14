@@ -7,7 +7,6 @@ import random
 from time import perf_counter
 
 from filelock import FileLock
-import nibabel as nib
 import numpy as np
 import psutil
 import torch
@@ -16,7 +15,6 @@ import yaml
 from ..artifacts.store import digest, file_digest, write_json
 from ..data.dataset import CaseDataset
 from ..preprocessing.prepare import load_prepared
-from ..prediction.restore import restore
 
 
 def options(path,overrides=None):
@@ -343,75 +341,4 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
     return summary
 
 
-def predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=None):
-    from .execution import admitted,run_workers
-    prepared = load_prepared(prepared_path)
-    applied = deepcopy(config)
-    applied['execution'].update(gpu_count=1,cpu_processes=1,batch_layout=None,workers=0)
-    if applied['execution'].get('gpu_ids'):
-        applied['execution']['gpu_ids'] = applied['execution']['gpu_ids'][:1]
-    key = digest(dict(checkpoint=file_digest(checkpoint),prepared=prepared['identity'],output=str(Path(output).resolve())))[:16]
-    applied['run_dir'] = str(Path(config['work_root'] or Path(config['run_dir']).parent)/'model-predictions'/key)
-    with admitted(applied,prepared,'prediction') as (common,allocation):
-        return run_workers(dict(operation='predict',config=applied,prepared=prepared,stage='prediction',
-            prepared_path=str(Path(prepared_path).resolve()),checkpoint=str(Path(checkpoint).resolve()),
-            output=str(Path(output).resolve()),case_ids=case_ids,prompts=prompts),common,allocation)
-
-
-def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=None):
-    started = perf_counter()
-    resources(config)
-    prepared = load_prepared(prepared_path)
-    state = load_state(checkpoint)
-    if state['config']['model']!=config['model'] or state['scope']!=prepared['scope']:
-        raise ValueError('预测模型或范围与检查点不同')
-    if not config['technical'] and state['scope']!='formal':
-        raise ValueError('正式预测禁止技术检查点')
-    trained = state['prepared']
-    if prepared['dataset']!=trained['dataset'] or digest(prepared['plan'])!=digest(trained['plan']):
-        raise ValueError('新预测输入必须使用训练时的同一数据集语义与拟合计划')
-    if state['identity']!=model_identity(config,trained,state['stage'],state['initialization_sha256']):
-        raise ValueError('预测配置、源码或上游检查点与训练身份不同')
-    bundle = adapter(config,trained,state['stage'],initialize=False)
-    bundle.model.load_state_dict(state['model'],strict=True)
-    bundle.model.to(config['device']).eval()
-    root = Path(output).resolve()
-    if root.exists():
-        raise FileExistsError('预测目录已存在')
-    if Path(prepared['manifest']['data_root']) in root.parents:
-        raise ValueError('预测输出不能位于原始数据目录内')
-    rows = prepared['manifest']['cases']
-    names = [row['case_id'] for row in rows] if case_ids is None else case_ids
-    if not names or not set(names)<={row['case_id'] for row in rows}:
-        raise ValueError('预测病例未登记')
-    if config['model']=='medsam2':
-        from .medsam2.data import NativeCases
-        dataset = NativeCases(prepared,with_label=False)
-    else:
-        dataset = dataset_for(prepared,False)
-    root.mkdir(parents=True)
-    results = []
-    for name in names:
-        entry = dataset.get(name)
-        mark = perf_counter()
-        with torch.inference_mode():
-            probability,diagnostics = bundle.predict(entry,prompts)
-        if config['model']=='medsam2':
-            from .medsam2.data import restore_native
-            native = restore_native(probability,entry)
-        else:
-            native = restore(probability,entry,prepared['plan'])
-        path = root/(name+'.nii.gz')
-        image = nib.Nifti1Image(native,np.asarray(entry['source_affine']))
-        image.header.set_xyzt_units(entry['source_units'])
-        nib.save(image,path)
-        check = nib.load(path)
-        if check.shape!=tuple(entry['source_shape_xyz']) or not np.array_equal(np.asanyarray(check.dataobj),native):
-            raise ValueError('预测保存后读回不一致')
-        results.append(dict(case_id=name,file=str(path),sha256=file_digest(path),diagnostics=diagnostics,
-                            seconds=perf_counter()-mark,shape=list(check.shape),timing=entry['timing']))
-        dataset.clear()
-    summary = dict(model=config['model'],scope=prepared['scope'],checkpoint_sha256=file_digest(checkpoint),
-                   cases=results,seconds=perf_counter()-started)
-    write_json(root/'summary.json',summary)
-    return summary
+from .prediction import predict

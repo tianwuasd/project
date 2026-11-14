@@ -56,7 +56,7 @@ def main(argv=None):
     bind.add_argument("--pretrained", help="已有权重的实际位置")
     for command in (prepare, train, predict, evaluate, test):
         command.add_argument("--split", help="旧工程或手动选择的划分文件")
-        command.add_argument("--split-format", choices=("auto", "imagechd", "imagechd_roles", "chd1282_cohort", "folds", "roles"))
+        command.add_argument("--split-format", choices=("auto", "imagechd", "imagechd_roles", "chd1282_cohort", "q1282", "folds", "roles"))
         command.add_argument("--split-id-field", help="清单中的精确映射字段，默认 case_id")
         command.add_argument("--fold", type=int)
     args = parser.parse_args(argv)

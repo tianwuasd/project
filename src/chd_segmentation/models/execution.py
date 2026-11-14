@@ -132,10 +132,10 @@ def rank_entry(rank,payload,common,allocation,gate,port):
         if payload.get('operation')=='predict':
             device = torch.device('cuda',rank) if allocation['gpus'] else torch.device('cpu')
             verify_device(device,allocation,rank)
-            from .workflow import _predict
+            from .prediction import _predict
             applied = dict(payload['config'],device=str(device),threads=1)
             summary = _predict(applied,payload['prepared_path'],payload['checkpoint'],payload['output'],
-                payload['case_ids'],payload['prompts'])
+                payload['case_ids'],payload['prompts'],**payload.get('prediction_options',{}))
             write_json(root/'summary.json',summary)
             measurement = rank_measurement(device,allocation,rank)
             record_peaks(common,allocation['spec'],allocation['gpus'],allocation['shares'],

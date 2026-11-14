@@ -7,7 +7,9 @@
 | 文件 | 职责 |
 |---|---|
 | `models_cli.py` | 独立模型训练与预测命令 |
-| `models/workflow.py` | 读取准备描述、来源身份、优化器更新、完整保存/恢复及原网格导出 |
+| `models/workflow.py` | 读取准备描述、来源身份、优化器更新与完整保存/恢复 |
+| `models/prediction.py` | 普通及标签框预测、测试子组选择、原网格导出和有提示评价 |
+| `datasets/q_split.py` | 从1282冻结来源生成可迁移Q患者组合及配置 |
 | `models/execution.py` | 调用助手1共享GPU/CPU准入、批量份额、进程登记和隔离预测 |
 | `models/q_route1/` | r2局部网络、邻边事件、解析梯度、三步求解、定位器和一次概率融合 |
 | `models/medsam2/official.py`、`worker.py` | 官方Trainer、有效配置、隔离运行与官方检查点恢复 |
@@ -22,7 +24,7 @@
 
 先通过原有 `prepare` 生成准备描述，模型命令读取同一记录与实际计划；影像和标签原件只读。Q内部类别顺序固定为背景、LV、RV、LA、RA、Myo、AO、PA、PV、SVC、IVC。CHD1282原始类别显式映射；ImageCHD输出回到其原始8类，PV/SVC/IVC保留未知监督，输出时其概率并入背景。
 
-正式Q训练需要 `groups` 文件，以 A、B、C、D 为键、病例ID列表为值。预处理统计拟合病例限于A；基座和定位器训练A，局部网络训练B。各组患者身份需要独立。上游检查点保存训练病例和准备描述身份；局部阶段核对这两项。
+正式Q训练需要 `groups` 文件，以 A、B、C、D 为键、病例ID列表为值。预处理统计拟合病例限于A；基座和定位器训练A，局部网络训练B。各组患者身份需要独立。上游检查点保存训练病例和准备描述身份；局部阶段核对这两项。1282组合已按原训练患者A:B=2:1生成，A/B/C/D分别393/197/128/456例，操作见[1282组合与标签框](Q1282_AND_LABEL_BOX.md)。
 
 ## 命令
 
@@ -47,7 +49,7 @@ python -B run.py models predict --config /path/to/q-local.yaml --prepared /path/
 python -B run.py models predict --config /path/to/medsam2.yaml --prepared /path/to/prepared.json --checkpoint /path/to/medsam2/sequence/latest.pt --prompts /path/to/prompts.yaml --output /path/to/result/medsam2
 ```
 
-预测数据加载器不读取标签数组。新病例使用包含新清单的准备描述，训练计划和数据集语义需与检查点一致。Q根据CT定位器产生候选。MedSAM2提供提示式预测，提示文件必须登记人工或图像定位器来源；自动提示需登记定位器检查点摘要。MedSAM2提示坐标使用原图所选范围的DHW网格，二维框以XYXY记录，frame指D轴切片，提示文件的space字段为 `native_dhw`。每个病例可提供多个结构提示，冲突按最高logit选择，背景logit固定为0。输出恢复到源数组尺寸与affine。
+普通预测数据加载器不读取标签数组。新病例使用包含新清单的准备描述，训练计划和数据集语义需与检查点一致。Q根据CT定位器产生候选。MedSAM2普通提示文件登记人工或图像定位器来源；自动提示登记定位器检查点摘要。显式`--prompt-mode label-box`从标签生成框并输出有提示评价，规则和命令见[1282组合与标签框](Q1282_AND_LABEL_BOX.md)。MedSAM2提示坐标使用原图所选范围的DHW网格，二维框以XYXY记录，frame指D轴切片，提示文件的space字段为 `native_dhw`。结构冲突按最高logit选择，背景logit固定为0。输出恢复到源数组尺寸与affine。
 
 ```yaml
 case_id:
@@ -58,7 +60,7 @@ case_id:
     box_xyxy: [20, 30, 80, 90]
 ```
 
-MedSAM2使用[固定官方提交332f30d](https://github.com/bowang-lab/MedSAM2/tree/332f30d420f1d1b08e2a79b3ae6a602458808383) 的Trainer、SAM2Train、官方VOS数据与变换、MultiStepMultiMasksAndIous 和 SAM2VideoPredictorNPZ。读取原始影像网格，CT窗默认来自训练计划的拟合上下界，也可明确填写gray_window。按官方CT处理方式执行窗内截断及0—255转换，后续执行官方RGB、增强和标准化。未标类别不生成目标，训练提示从已知标注产生；测试标注只进入独立评价。CUDA后处理扩展显式关闭。
+MedSAM2使用[固定官方提交332f30d](https://github.com/bowang-lab/MedSAM2/tree/332f30d420f1d1b08e2a79b3ae6a602458808383) 的Trainer、SAM2Train、官方VOS数据与变换、MultiStepMultiMasksAndIous 和 SAM2VideoPredictorNPZ。读取原始影像网格，CT窗默认来自训练计划的拟合上下界，也可明确填写gray_window。按官方CT处理方式执行窗内截断及0—255转换，后续执行官方RGB、增强和标准化。未标类别不生成目标，训练提示从已知标注产生；测试标签仅在显式标签框评测模式用于生成框及评价。CUDA后处理扩展显式关闭。
 
 官方源码在vendor/MedSAM2，额外依赖在env/medsam2，官方权重在data/model_weights/MedSAM2_latest.pt，均被Git忽略并保留复用。权重来自[官方Hugging Face仓库固定版本](https://huggingface.co/wanglab/MedSAM2/tree/e4a6f35edd7e091619cbc0750f462f1574e23955)，容量156040129字节，SHA-256为 `c92743b99f00d078bf32a3afcc38aaa9faf1c1692dffe3eaa7a90938c1991060`。训练前逐文件核对，官方初始化器严格加载全部参数。
 

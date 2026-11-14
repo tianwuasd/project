@@ -71,7 +71,7 @@ class MedSAM2Adapter:
         elif initialize and not config['technical']:
             raise ValueError('MedSAM2正式训练需要登记官方预训练权重')
 
-    def predict(self,entry,prompts):
+    def predict(self,entry,prompts,label_box=False):
         from hydra.utils import instantiate
         from omegaconf import OmegaConf
         if not prompts or entry['case_id'] not in prompts:
@@ -94,7 +94,8 @@ class MedSAM2Adapter:
         state = predictor.init_state(image,height,width,offload_video_to_cpu=True,offload_state_to_cpu=True)
         classes = len(LABELS[self.prepared['dataset']])
         for item in items:
-            permitted = ('manual','image_localizer','technical_simulated') if self.config['technical'] else ('manual','image_localizer')
+            permitted = ('label_box',) if label_box else (
+                ('manual','image_localizer','technical_simulated') if self.config['technical'] else ('manual','image_localizer'))
             if item['source'] not in permitted:
                 raise ValueError('正式预测提示来源必须是人工或图像定位器')
             if item['space']!='native_dhw' or not 0<=item['frame']<depth or not 0<item['class_id']<classes:
@@ -104,13 +105,23 @@ class MedSAM2Adapter:
                 raise ValueError('MedSAM2提示框超出输入网格')
             if item['source']=='image_localizer' and not item.get('checkpoint_sha256'):
                 raise ValueError('自动提示必须登记图像定位器检查点摘要')
-            predictor.add_new_points_or_box(state,item['frame'],item['class_id'],box=np.asarray(box,dtype=np.float32))
+            if not label_box:
+                predictor.add_new_points_or_box(state,item['frame'],item['class_id'],box=np.asarray(box,dtype=np.float32))
         scores = torch.full((classes,depth,height,width),-1024.,dtype=torch.float32)
         scores[0] = 0
-        for reverse in (False,True):
-            for index,ids,logits in predictor.propagate_in_video(state,reverse=reverse):
-                for position,class_id in enumerate(ids):
-                    scores[class_id,index] = logits[position,0].float().cpu()
+        if label_box:
+            for item in items:
+                for reverse in (False,True):
+                    predictor.reset_state(state)
+                    predictor.add_new_points_or_box(state,item['frame'],item['class_id'],
+                        box=np.asarray(item['box_xyxy'],dtype=np.float32))
+                    for index,ids,logits in predictor.propagate_in_video(state,reverse=reverse):
+                        scores[item['class_id'],index] = logits[0,0].float().cpu()
+        else:
+            for reverse in (False,True):
+                for index,ids,logits in predictor.propagate_in_video(state,reverse=reverse):
+                    for position,class_id in enumerate(ids):
+                        scores[class_id,index] = logits[position,0].float().cpu()
         probability = scores.softmax(0).numpy()
         return probability,dict(prompt_sources=[item['source'] for item in items],prompt_space='native_dhw',
                                 upstream_commit=UPSTREAM_COMMIT,frames=depth,postprocess_extension=False)

@@ -16,9 +16,9 @@
 | MedSAM2额外依赖 | requirements-medsam2.txt | 独立MedSAM2依赖目录，或已核对的训练环境 | 在服务器安装，按其Torch/CUDA构建核验 |
 | Q基座官方权重 | 既有small_ep4k.model | data/pretrained/STU-Net/small_ep4k.model | 复用已审计的STU权重 |
 | 两数据集审计清单及冻结划分 | 助手1既有私有server-inputs | course/chd-segmentation/inputs | 复用已有材料及bind-inputs入口 |
-| Q患者分组文件 | A/B/C/D病例名单及患者身份 | course/chd-segmentation/inputs/q-groups.yaml | 正式训练前需提供或审核 |
+| Q1282私有输入包 | D:/projects/back/deliverables/chd-segmentation-assistant2-inputs | course/chd-segmentation/inputs/q1282 | 已生成393/197/128/456例组合、来源证据和三个阶段配置；迁移后bind-inputs |
 | 两模型实际路径配置 | configs/models中的模板复制后填写 | course/chd-segmentation/configs/models | 需按服务器路径填写 |
-| MedSAM2预测提示 | 人工框或图像定位器输出 | course/chd-segmentation/inputs/prompts.yaml | 提示式预测时需要；训练提示由训练标签产生 |
+| MedSAM2预测提示 | 人工框、图像定位器输出或显式label-box评测 | course/chd-segmentation/inputs/prompts.yaml | 标签框模式无需另交提示文件；需要测试标签；训练提示由训练标签产生 |
 
 env/medsam2是本机额外Python包，服务器应按依赖清单安装并实际导入核验。既有Windows解释器和环境文件供本机使用。原始影像继续读取服务器既有data目录。
 
@@ -26,7 +26,7 @@ MedSAM2依赖清单中的TensorDict0.15.6要求PyTorch2.11及以上，本机已�
 
 将模型配置复制到course目录后，需要重新填写official_root、dependency_root、pretrained、run_dir和work_root。模板中的相对路径供本机工程目录使用，服务器配置应填写服务器上的实际路径。
 
-Q的A训练上游、B训练局部、C用于选模、D独立评价，四组患者相互独立；预处理统计拟合限于A。当前尚未生成正式Q分组文件。组名相同不能代替患者身份核查。local阶段需要已完成的base和localizer检查点；base和localizer阶段的配置parents应为空。
+Q的A训练上游、B训练局部、C用于选模、D独立评价，四组患者相互独立；预处理统计拟合限于A。1282私有输入包已保留原验证、内部测试和两个外部子组，仅将原训练患者按2:1分成A/B，具体命令见[1282组合与标签框](Q1282_AND_LABEL_BOX.md)。local阶段读取已完成的base和localizer的best.pt；base和localizer阶段parents为空。
 
 ## GPU及运行设置
 
