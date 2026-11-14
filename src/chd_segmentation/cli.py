@@ -26,6 +26,9 @@ def main(argv=None):
     train.add_argument("--stop-after", type=int)
     train.add_argument("--device", choices=("cpu", "cuda"))
     train.add_argument("--gpus", type=int, choices=range(1, 5), help="显卡数量")
+    train.add_argument("--min-gpus", type=int, choices=range(1, 5), help="允许自动调整的最少卡数；默认等待目标卡数")
+    train.add_argument("--share-gpu", action=argparse.BooleanOptionalAction, default=None,
+                       help="显式开启繁忙显卡共享；默认关闭")
     train.add_argument("--gpu-ids", help="物理编号或 UUID，逗号分隔，例如 0,2")
     train.add_argument("--batch", type=int, help="全局 batch")
     train.add_argument("--batch-layout", help="手动每卡 batch，例如 2,1,1")
@@ -73,6 +76,7 @@ def main(argv=None):
     if args.command == "train":
         resources, training = {}, {}
         for key, value in (("device", args.device), ("gpu_count", args.gpus),
+                           ("min_gpus", args.min_gpus), ("share", args.share_gpu),
                            ("workers", "auto" if args.workers == "auto" else int(args.workers) if args.workers else None)):
             if value is not None:
                 resources[key] = value

@@ -32,7 +32,7 @@ def predict(config, output, inputs=None, case_ids=None, manifest=None):
     if torch.cuda.is_initialized():
         raise RuntimeError("GPU 预测需要新的命令进程，以使用准入后的可见设备")
     runtime = deepcopy(config)
-    runtime["resources"].update(gpu_count=1, batch_layout=None, share=False, workers=0)
+    runtime["resources"].update(gpu_count=1, min_gpus=None, batch_layout=None, share=False, workers=0)
     if runtime["resources"]["gpu_ids"] is not None and len(runtime["resources"]["gpu_ids"]) != 1:
         raise ValueError("单次预测仅使用一张卡，请配置一个 gpu_ids 或使用自动选卡")
     training = read_json(Path(config["run_dir"]) / "run.json")

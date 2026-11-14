@@ -23,7 +23,9 @@ DEFAULTS = {
                   "reserve_ram_bytes": 4 * 1024 ** 3, "cpu_fraction": 0.8, "ram_fraction": 0.8,
                   "workers": "auto", "max_workers": 32, "prefetch": 2, "readers": "auto", "max_readers": 8,
                   "gpu_count": 1, "gpu_ids": None, "batch_layout": None, "cpu_processes": 1,
-                  "wait_seconds": None, "poll_seconds": 2, "share": True,
+                  "wait_seconds": None, "poll_seconds": 2, "share": False,
+                  "min_gpus": None, "adapt_seconds": 30, "growth_seconds": 60,
+                  "pressure_retries": 3,
                   "share_window_seconds": 30, "share_utilization": 50,
                   "vram_reserve_bytes": 4 * 1024 ** 3, "vram_reserve_fraction": 0.1,
                   "peak_margin": 1.2},
@@ -138,6 +140,15 @@ def load_config(path, overrides=None):
         raise ValueError("device 必须为 cpu 或 cuda；具体显卡使用 gpu_ids 选择")
     if not 1 <= r["gpu_count"] <= 4 or not 1 <= r["cpu_processes"] <= 4:
         raise ValueError("每组进程数必须为 1–4")
+    if r["min_gpus"] is not None and (type(r["min_gpus"]) is not int or not 1 <= r["min_gpus"] <= r["gpu_count"]):
+        raise ValueError("min_gpus 必须介于 1 和目标 gpu_count 之间；null 表示等待目标卡数")
+    if type(r["share"]) is not bool or type(r["pressure_retries"]) is not int or r["pressure_retries"] < 0:
+        raise ValueError("共享开关或内存压力恢复次数无效")
+    if any(type(r[k]) not in (int, float) or not math.isfinite(r[k]) or r[k] <= 0
+           for k in ("adapt_seconds", "growth_seconds")):
+        raise ValueError("资源调整及增长观察间隔必须为有限正数")
+    if r["batch_layout"] is not None and r["min_gpus"] not in (None, r["gpu_count"]):
+        raise ValueError("手动 batch_layout 需要固定进程数量")
     if r["gpu_ids"] is not None and (not isinstance(r["gpu_ids"], list) or
             len(set(map(str, r["gpu_ids"]))) != len(r["gpu_ids"]) or len(r["gpu_ids"]) != r["gpu_count"]):
         raise ValueError("gpu_ids 必须为不重复的物理编号或 UUID 列表，数量等于 gpu_count")

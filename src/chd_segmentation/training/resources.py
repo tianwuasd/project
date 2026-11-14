@@ -5,17 +5,17 @@ import math
 import os
 from pathlib import Path
 import subprocess
-import sys
 import time
 
 from filelock import FileLock
-import nibabel as nib
 import numpy as np
 import psutil
 from scipy.optimize import linear_sum_assignment
 
 from ..artifacts.store import digest, file_digest, read_json, write_json
 from ..observability.events import event
+from .budget import case_estimates, cpu_plan
+from .host import host_capacity
 
 GIB = 1024 ** 3
 
@@ -27,71 +27,7 @@ def layout(batch, world, manual=None):
     return shares
 
 
-def host_capacity():
-    process = psutil.Process()
-    cores = len(process.cpu_affinity()) if hasattr(process, "cpu_affinity") else psutil.cpu_count()
-    memory = psutil.virtual_memory()
-    total, available = memory.total, memory.available
-    if sys.platform == "linux":
-        quota = Path("/sys/fs/cgroup/cpu.max")
-        if quota.is_file():
-            maximum, period = quota.read_text().split()
-            if maximum != "max":
-                cores = min(cores, max(1, int(maximum) // int(period)))
-        limit, current = Path("/sys/fs/cgroup/memory.max"), Path("/sys/fs/cgroup/memory.current")
-        if limit.is_file() and limit.read_text().strip() != "max":
-            total = min(total, int(limit.read_text()))
-            available = min(available, max(0, int(limit.read_text()) - int(current.read_text())))
-    return {"cores": cores, "total_bytes": total, "available_bytes": available}
-
-
-def cpu_plan(config, prepared, world, peers=(), stage="train"):
-    r = config["resources"]
-    facts = host_capacity()
-    cores = max(1, math.floor(facts["cores"] * r["cpu_fraction"])) - sum(p["cpu_slots"] for p in peers)
-    available = min(int(facts["total_bytes"] * r["ram_fraction"]), facts["available_bytes"] - r["reserve_ram_bytes"])
-    # 已占用的内存体现在 available 中，只额外扣除其他任务尚未使用的承诺额度。
-    for p in peers:
-        private = sum(psutil.Process(m["pid"]).memory_full_info().uss for m in [p, *p.get("members", [])] if alive(m))
-        available -= max(0, p["ram_bytes"] - private)
-    roi = config["technical"]["roi_xyz"]
-    target = np.array(prepared["plan"]["configurations"]["3d_fullres"]["spacing"])
-    estimates = []
-    rows = prepared["manifest"]["cases"]
-    if stage == "train":
-        rows = [row for row in rows if set(row["roles"]) & {"train", "validation"}]
-    for row in rows:
-        shape = np.array([end - begin for begin, end in roi] if roi else nib.load(row["image"]).shape)
-        output_shape = np.ceil(shape[::-1][prepared["plan"]["transpose_forward"]] *
-            np.array(row["spacing_xyz"])[::-1][prepared["plan"]["transpose_forward"]] / target)
-        estimates.append(int(np.prod(shape)) * 32 + int(np.prod(output_shape)) * 64)
-    case_bytes = max(estimates)
-    patch_bytes = int(np.prod(config["training"]["patch"])) * 16 * config["training"]["batch"]
-    resident = GIB + world * (GIB + case_bytes)
-    if available < resident + patch_bytes * r["prefetch"] or cores < world + 1:
-        raise MemoryError("CPU/内存预算不足以启动训练进程；请减少卡数或等待资源释放")
-    cap = r["max_workers"] if r["workers"] == "auto" else min(r["workers"], r["max_workers"])
-    cache = min(r["cache_bytes"], (available - resident - patch_bytes * r["prefetch"]) // world)
-    shares = layout(config["training"]["batch"], world, r["batch_layout"])
-    def estimate(workers):
-        queues = sum(patch_bytes * shares[i] / config["training"]["batch"] * max(r["prefetch"], w)
-                     for i, w in enumerate(workers))
-        return int(resident + queues + sum(w * (GIB + case_bytes + cache) + (cache if w == 0 else 0) for w in workers))
-    workers = [0] * world
-    for number in range(min(cap, max(0, cores - world - 1))):
-        candidate = workers.copy()
-        candidate[number % world] += 1
-        if estimate(candidate) > available:
-            break
-        workers = candidate
-    maximum, caches = sum(workers), [int(cache)] * world
-    return {"facts": facts, "workers": workers, "cache_bytes": caches, "max_workers": maximum,
-            "cpu_slots": world + maximum + 1, "ram_bytes": estimate(workers),
-            "reader_slots": min(r["max_readers"] if r["readers"] == "auto" else r["readers"],
-                                max(1, maximum + world)), "case_estimate_bytes": case_bytes}
-
-
-def inventory():
+def inventory(owned_pids=(), visible_devices="inherited"):
     raw = subprocess.run(["nvidia-smi", "--query-gpu=index,uuid,memory.total,memory.free,utilization.gpu",
                           "--format=csv,noheader,nounits"], check=True, capture_output=True, text=True).stdout
     rows = [{"index": int(i), "uuid": u.strip(), "total": int(t) * 1024 ** 2,
@@ -99,10 +35,13 @@ def inventory():
             for i, u, t, f, v in csv.reader(io.StringIO(raw))]
     apps = subprocess.run(["nvidia-smi", "--query-compute-apps=gpu_uuid,pid", "--format=csv,noheader,nounits"],
                           check=True, capture_output=True, text=True).stdout
-    busy = {row[0].strip() for row in csv.reader(io.StringIO(apps)) if row}
+    applications = list(csv.reader(io.StringIO(apps)))
+    busy = {row[0].strip() for row in applications if row and int(row[1]) not in owned_pids}
+    owned = {row[0].strip() for row in applications if row and int(row[1]) in owned_pids}
     for row in rows:
         row["busy"] = row["uuid"] in busy
-    visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+        row["owned"] = row["uuid"] in owned
+    visible = os.environ.get("CUDA_VISIBLE_DEVICES") if visible_devices == "inherited" else visible_devices
     if visible is not None:
         tokens = [v.strip() for v in visible.split(",") if v.strip()]
         if any(not (v.isdigit() or v.startswith("GPU-")) for v in tokens):
@@ -111,11 +50,11 @@ def inventory():
     return rows
 
 
-def capacity_key(config, spec, local_batch):
+def capacity_key(config, spec, local_batch, world=None):
     from importlib.metadata import version
     return digest({"model": "stunet", "spec": spec, "batch": local_batch,
                    "precision": config["training"]["precision"],
-                   "world": config["resources"]["gpu_count"],
+                   "world": config["resources"]["gpu_count"] if world is None else world,
                    "implementation": [file_digest(Path(__file__).with_name("engine.py")),
                                       file_digest(Path(__file__).parents[1] / "losses" / "partial.py")],
                    "versions": {name: version(name) for name in ("torch", "monai", "nnunetv2")}})
@@ -131,7 +70,7 @@ def process_vram(uuid, pid):
     return entries[0]
 
 
-def gpu_decision(config, spec, history, peaks, peers):
+def gpu_decision(config, spec, history, peaks, peers, world=None, require_measured=False):
     r = config["resources"]
     current = history[-1][1]
     requested = r["gpu_ids"]
@@ -140,12 +79,13 @@ def gpu_decision(config, spec, history, peaks, peers):
     if any(g is None for g in selected):
         raise ValueError("手动显卡超出 CUDA_VISIBLE_DEVICES 或当前服务器范围")
     reserved = {u for p in peers for u in p["uuids"]}
-    shares = layout(config["training"]["batch"], r["gpu_count"], r["batch_layout"])
+    world = r["gpu_count"] if world is None else world
+    shares = layout(config["training"]["batch"], world, r["batch_layout"])
     reports = [{"index": g["index"], "uuid": g["uuid"], "busy": g["busy"], "free_bytes": g["free"],
                 "utilization": g["utilization"], "ranks": {}} for g in selected]
     result = {"gpus": None, "candidates": reports, "visible_indices": [g["index"] for g in current],
               "requested_ids": requested, "reason": "没有满足全部训练份额的显卡组合"}
-    if len(selected) < r["gpu_count"]:
+    if len(selected) < world:
         result["reason"] = "当前可见显卡数量不足请求数量"
         return result
     allowed = np.zeros((len(shares), len(selected)), dtype=bool)
@@ -153,17 +93,25 @@ def gpu_decision(config, spec, history, peaks, peers):
     for rank, local_batch in enumerate(shares):
         for column, g in enumerate(selected):
             reserve = max(r["vram_reserve_bytes"], int(g["total"] * r["vram_reserve_fraction"]))
-            if requested is not None and column != rank:
+            if requested is not None and world == r["gpu_count"] and column != rank:
                 reason = "手动显卡顺序对应其他训练进程"
             elif g["uuid"] in reserved:
                 reason = "本项目其他活动任务已预留"
             elif not g["busy"]:
-                reason = "eligible_idle" if g["free"] >= reserve else "空闲显卡未达到显存安全预留"
+                measured = peaks.get(g["uuid"], {}).get(capacity_key(config, spec, local_batch, world)) if require_measured else 0
+                if measured is None:
+                    reason = "自动调整卡数需要此卡同配方和每卡 batch 的实测容量"
+                elif require_measured and (type(measured) not in (int, float) or not math.isfinite(measured) or measured <= 0):
+                    raise ValueError("GPU 显存峰值记录必须为有限正数")
+                elif g["free"] < measured * r["peak_margin"] + reserve:
+                    reason = "空闲显卡未达到训练容量及显存安全预留"
+                else:
+                    reason = "eligible_idle"
             elif not r["share"]:
                 reason = "当前配置关闭显卡共享"
             else:
                 if local_batch not in keys:
-                    keys[local_batch] = capacity_key(config, spec, local_batch)
+                    keys[local_batch] = capacity_key(config, spec, local_batch, world)
                 measured = peaks.get(g["uuid"], {}).get(keys[local_batch])
                 samples = [next((a for a in snapshot if a["uuid"] == g["uuid"]), None) for _, snapshot in history]
                 if measured is None:
@@ -185,7 +133,8 @@ def gpu_decision(config, spec, history, peaks, peers):
     maximum_free = max(1, max(g["free"] for g in selected))
     costs = np.full(allowed.shape, (size + 1) ** 3, dtype=float)
     for column, g in enumerate(selected):
-        costs[allowed[:, column], column] = (size + 1 if g["busy"] else 0) - g["free"] / maximum_free
+        costs[allowed[:, column], column] = ((size + 1 if g["busy"] else 0) -
+            (2 if g.get("owned") else 0) - g["free"] / maximum_free)
     ranks, columns = linear_sum_assignment(costs)
     if not allowed[ranks, columns].all():
         return result
@@ -196,6 +145,77 @@ def gpu_decision(config, spec, history, peaks, peers):
 
 def choose_gpus(config, spec, history, peaks, peers):
     return gpu_decision(config, spec, history, peaks, peers)["gpus"]
+
+
+def fleet_decision(config, spec, history, peaks, peers, previous_world=None):
+    r = config["resources"]
+    minimum = r["gpu_count"] if r["min_gpus"] is None else r["min_gpus"]
+    decisions = []
+    for world in range(r["gpu_count"], minimum - 1, -1):
+        decision = gpu_decision(config, spec, history, peaks, peers, world,
+                                require_measured=world != r["gpu_count"] or
+                                previous_world is not None and world != previous_world)
+        decisions.append({"world": world, "reason": decision["reason"], "candidates": decision["candidates"]})
+        if decision["gpus"] is not None:
+            decision["alternatives"] = decisions
+            return decision
+    decision["alternatives"] = decisions
+    return decision
+
+
+def refresh_supply(config, prepared, allocation, apply=False):
+    root = Path(config["work_root"]) / "resources"
+    with FileLock(str(root / ".resource.lock")):
+        rows = active_peers(root / "active.json")
+        owner = allocation["owner"]
+        own = [p for p in rows if p["pid"] == owner["pid"] and p["birth"] == owner["birth"]]
+        if len(own) != 1:
+            raise RuntimeError("训练资源所有权已经失效")
+        peers = [p for p in rows if p not in own]
+        result = cpu_plan(config, prepared, allocation["world"], peers, own=own,
+                          estimates=allocation["supply"]["case_estimates"])
+        if apply and result["admitted"]:
+            own[0].update(cpu_slots=result["cpu_slots"], ram_bytes=result["ram_bytes"])
+            write_json(root / "active.json", rows)
+        return result
+
+
+def available_world(config, spec, allocation):
+    if not allocation["gpus"]:
+        return allocation["world"]
+    root = Path(config["work_root"]) / "resources"
+    with FileLock(str(root / ".resource.lock")):
+        rows = active_peers(root / "active.json")
+        owner = allocation["owner"]
+        own = [p for p in rows if p["pid"] == owner["pid"] and p["birth"] == owner["birth"]]
+        if len(own) != 1:
+            raise RuntimeError("训练资源所有权已经失效")
+        peers = [p for p in rows if p not in own]
+        owned = {m["pid"] for p in own for m in [p, *p.get("members", [])] if alive(m)}
+        peaks_path = root / "gpu-peaks.json"
+        peaks = read_json(peaks_path) if peaks_path.exists() else {}
+        history = allocation.setdefault("fleet_history", [])
+        history.append((time.monotonic(), inventory(owned, allocation.get("allowed_visible_devices"))))
+        window = config["resources"]["share_window_seconds"]
+        while len(history) > 1 and history[-1][0] - history[1][0] >= window:
+            history.pop(0)
+        decision = fleet_decision(config, spec, history, peaks, peers, allocation["world"])
+        desired = len(decision["gpus"]) if decision["gpus"] else 0
+        allocation["fleet_replacement"] = desired == allocation["world"] and (
+            {g["uuid"] for g in decision["gpus"]} != {g["uuid"] for g in allocation["gpus"]})
+        if desired > allocation["world"]:
+            signature = [g["uuid"] for g in decision["gpus"]]
+            previous = own[0].get("growth_candidate")
+            if previous is None or previous["uuids"] != signature:
+                own[0]["growth_candidate"] = {"uuids": signature, "since": time.monotonic()}
+                write_json(root / "active.json", rows)
+                return allocation["world"]
+            if time.monotonic() - previous["since"] < config["resources"]["growth_seconds"]:
+                return allocation["world"]
+        elif own and "growth_candidate" in own[0]:
+            del own[0]["growth_candidate"]
+            write_json(root / "active.json", rows)
+    return desired
 
 
 def alive(record):
@@ -231,7 +251,7 @@ def close_members(config, owner):
 
 
 @contextmanager
-def resource_lease(config, prepared, spec, stage="train"):
+def resource_lease(config, prepared, spec, stage="train", previous_world=None):
     root = Path(config["work_root"]) / "resources"
     root.mkdir(parents=True, exist_ok=True)
     registry, lock = root / "active.json", root / ".resource.lock"
@@ -239,6 +259,7 @@ def resource_lease(config, prepared, spec, stage="train"):
     started, history, last_log = time.monotonic(), [], None
     resources = config["resources"]
     limit = resources["wait_seconds"]
+    estimates = case_estimates(config, prepared, stage) if prepared else None
     event(config["run_dir"], "resources_requested", stage=stage, device=config["resources"]["device"],
           gpu_count=config["resources"]["gpu_count"], gpu_ids=config["resources"]["gpu_ids"],
           workers=resources["workers"], batch=config["training"]["batch"], wait_seconds=limit,
@@ -255,11 +276,14 @@ def resource_lease(config, prepared, spec, stage="train"):
             peaks = read_json(peaks_path) if peaks_path.exists() else {}
             if history:
                 history.append((time.monotonic(), inventory()))
-            decision = gpu_decision(config, spec, history, peaks, peers) if history else {"gpus": []}
+            decision = fleet_decision(config, spec, history, peaks, peers, previous_world) if history else {
+                "gpus": [], "candidates": [], "visible_indices": [], "requested_ids": None, "reason": "CPU 准入"}
             gpus = decision["gpus"]
+            supply = None
             if gpus is not None:
                 world = len(gpus) or config["resources"]["cpu_processes"]
-                supply = cpu_plan(config, prepared, world, peers, stage)
+                supply = cpu_plan(config, prepared, world, peers, stage, estimates=estimates)
+            if supply is not None and supply["admitted"]:
                 record = {"pid": me.pid, "birth": me.create_time(), "uuids": [g["uuid"] for g in gpus],
                           "cpu_slots": supply["cpu_slots"], "ram_bytes": supply["ram_bytes"]}
                 write_json(registry, [*peers, record])
@@ -270,11 +294,13 @@ def resource_lease(config, prepared, spec, stage="train"):
         interval = config.get("logging", {}).get("heartbeat_seconds", 15)
         if last_log is None or elapsed - last_log >= interval:
             event(config["run_dir"], "waiting_resources", stage=stage, seconds=elapsed, timeout_seconds=limit,
-                  waiting_forever=limit is None, observed_gpus=history[-1][1], candidates=decision["candidates"],
-                  visible_indices=decision["visible_indices"], requested_ids=decision["requested_ids"], reason=decision["reason"])
+                  waiting_forever=limit is None, observed_gpus=history[-1][1] if history else [], candidates=decision["candidates"],
+                  visible_indices=decision["visible_indices"], requested_ids=decision["requested_ids"],
+                  reason=supply["reason"] if supply is not None else decision["reason"], cpu=supply,
+                  alternatives=decision.get("alternatives"), sharing=resources["share"])
             last_log = elapsed
         if limit is not None and elapsed >= limit:
-            raise TimeoutError("已达到手动设置的显卡等待时限；具体候选卡条件见 waiting_resources 日志")
+            raise TimeoutError("已达到手动设置的资源等待时限；显卡和 CPU/RAM 缺口见 waiting_resources 日志")
         delay = resources["poll_seconds"] if limit is None else min(resources["poll_seconds"], limit - elapsed)
         time.sleep(delay)
     try:
@@ -293,7 +319,7 @@ def record_peaks(config, spec, gpus, shares, measurements):
         path = root / "gpu-peaks.json"
         peaks = read_json(path) if path.exists() else {}
         for gpu, batch, measurement in zip(gpus, shares, measurements):
-            key = capacity_key(config, spec, batch)
+            key = capacity_key(config, spec, batch, len(gpus))
             previous = peaks.setdefault(gpu["uuid"], {}).get(key, 0)
             peaks[gpu["uuid"]][key] = max(previous, measurement)
         write_json(path, peaks)

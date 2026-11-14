@@ -1,4 +1,5 @@
 from contextlib import ExitStack, nullcontext
+from copy import deepcopy
 from dataclasses import asdict
 from datetime import timedelta
 from hashlib import sha256
@@ -22,7 +23,9 @@ from ..models.stunet.adapter import StunetAdapter, WEIGHT_SHA256
 from ..observability.events import event, logged, stage
 from ..preprocessing.prepare import load_prepared, validate_prepared_config
 from .checkpoint import load_checkpoint, save_checkpoint, tensors_equal
-from .resources import close_members, host_capacity, layout, process_vram, record_peaks, register_member, resource_lease
+from .build_gate import BuildGate
+from .resources import (available_world, close_members, host_capacity, layout, process_vram,
+                        record_peaks, refresh_supply, register_member, resource_lease)
 
 
 def code_identity():
@@ -66,6 +69,39 @@ def any_rank(value, device, world):
     if world > 1:
         dist.all_reduce(flag, op=dist.ReduceOp.MAX)
     return bool(flag.item())
+
+
+def supply_settings(plan):
+    return {key: plan[key] for key in ("workers", "cache_bytes", "reader_slots", "prefetch")}
+
+
+def rebalance_supply(job, supply, gate, device, rank, stop_event):
+    world, config = job["world"], job["config"]
+    proposal = refresh_supply(config, job["prepared"], job) if rank == 0 else None
+    proposal = all_objects(proposal, world)[0]
+    if proposal["admitted"] and supply_settings(proposal) == supply_settings(job["supply"]):
+        return "unchanged"
+    if rank == 0:
+        event(config["run_dir"], "supply_resize_proposed", previous=supply_settings(job["supply"]), proposed=proposal)
+    # 所有 rank 先结束旧池，未消费的确定性请求由全局游标重新派发。
+    supply.__exit__(None, None, None)
+    if world > 1:
+        dist.barrier()
+    proposal = refresh_supply(config, job["prepared"], job, apply=True) if rank == 0 else None
+    proposal = all_objects(proposal, world)[0]
+    if not proposal["admitted"]:
+        return "pressure"
+    if rank == 0:
+        gate.set_limit(proposal["reader_slots"])
+    if world > 1:
+        dist.barrier()
+    job["supply"] = proposal
+    supply.workers, supply.cache_bytes = proposal["workers"][rank], proposal["cache_bytes"][rank]
+    supply.__enter__()
+    if rank == 0:
+        event(config["run_dir"], "supply_resize_applied", applied=proposal,
+              replay="从已消费的全局游标重放预取", model_retained=True)
+    return "applied"
 
 
 def checkpoint(output, model, optimizer, scaler, progress, job, receipt, device, rank):
@@ -114,12 +150,25 @@ def run_rank(rank, job, gate, stop_event):
             state = load_checkpoint(output, job["identity"]) if job["resume"] else None
             restored = False
             if state:
-                if "progress" not in state or len(state["rank_rng"]) != world:
-                    raise ValueError("恢复训练需要相同进程数量及完整多进程检查点")
+                if "progress" not in state or not state.get("rank_rng"):
+                    raise ValueError("恢复训练需要完整进度及逐 rank 随机状态")
+                old_world = len(state["rank_rng"])
+                changed_world = old_world != world
+                boundary = state["progress"]["phase"] == "train" and (
+                    state["attempts"] == 0 or settings["epochs"] is not None and
+                    state["attempts"] % settings["steps_per_epoch"] == 0)
+                if changed_world and not boundary:
+                    raise ValueError("进程数量变化需要完整 epoch 检查点")
                 model.load_state_dict(state["model"], strict=True)
                 optimizer.load_state_dict(state["optimizer"])
                 scaler.load_state_dict(state["scaler"])
-                rng = state["rank_rng"][rank]
+                rng = state["rank_rng"][rank] if rank < old_world else None
+                if rng is None:
+                    seed = int.from_bytes(sha256(state["rank_rng"][0]["torch"].numpy().tobytes() +
+                        f":{world}:{rank}:{state['attempts']}".encode()).digest()[:8], "little") % (2 ** 63)
+                    torch.manual_seed(seed)
+                    rng = {"torch": torch.get_rng_state(),
+                           "cuda": torch.cuda.get_rng_state(device) if device.type == "cuda" else None}
                 torch.set_rng_state(rng["torch"])
                 if device.type == "cuda":
                     torch.cuda.set_rng_state(rng["cuda"], device)
@@ -130,9 +179,17 @@ def run_rank(rank, job, gate, stop_event):
                     restored = restored and torch.equal(torch.cuda.get_rng_state(device), rng["cuda"])
                 if not restored:
                     raise ValueError("模型、优化器、scaler 或随机状态恢复不完整")
+                restored_state = restored
+                restored = restored and not changed_world
+                if changed_world and rank == 0:
+                    event(output, "rank_count_changed", previous_world=old_world, applied_world=world,
+                          optimizer_restored=True, scaler_restored=True, sampler=state["sampler_rng"],
+                          rng_policy="保留已有 rank 状态，新增 rank 使用检查点派生种子",
+                          reduction="全局样本统计归约；浮点加和顺序可能变化", bitwise_equivalent=False)
                 progress, receipt = state["progress"], state["pretrained_receipt"]
                 del state
             else:
+                restored_state = False
                 with stage(config, "pretrained_load", rank=rank, path=config["pretrained"]):
                     receipt = StunetAdapter.load_pretrained(model, config["pretrained"])
                 progress = {"attempts": 0, "updates": 0, "skipped": 0, "epoch": 0, "phase": "train", "val_step": 0,
@@ -160,13 +217,15 @@ def run_rank(rank, job, gate, stop_event):
             last_loss, changed, reason, completed = None, False, None, False
             peak_reserved, peak_non_allocator = 0, 0
             queued_phase, submitted, phase_end = None, 0, 0
+            next_adapt = perf_counter() + resources["adapt_seconds"]
+            next_growth = perf_counter() + resources["growth_seconds"]
             total = settings["epochs"] * settings["steps_per_epoch"] if settings["epochs"] else settings["attempts"]
             while True:
                 completed = progress["epoch"] >= (settings["epochs"] or 1)
                 if completed:
                     break
                 if any_rank(stop_event.is_set(), device, world):
-                    reason = "signal"
+                    reason = "resource_pressure" if job["pressure_event"].is_set() else "signal"
                     break
                 if job["stop_after"] is not None and progress["attempts"] >= job["stop_after"] and progress["phase"] == "train":
                     reason = "bounded_stop"
@@ -178,6 +237,25 @@ def run_rank(rank, job, gate, stop_event):
                 if any_rank(pressure, device, world):
                     reason = "resource_pressure"
                     break
+                resize_due = rank == 0 and perf_counter() >= next_adapt
+                if any_rank(resize_due, device, world):
+                    if rank == 0 and job["gpus"]:
+                        available_world(config, job["spec"], job)
+                    candidate = refresh_supply(config, job["prepared"], job) if rank == 0 else None
+                    candidate = all_objects(candidate, world)[0]
+                    growing = candidate["admitted"] and (sum(candidate["workers"]) > sum(job["supply"]["workers"]) or
+                        candidate["reader_slots"] > job["supply"]["reader_slots"] or
+                        sum(candidate["cache_bytes"]) > sum(job["supply"]["cache_bytes"]))
+                    permitted = rank == 0 and (not growing or perf_counter() >= next_growth)
+                    if any_rank(permitted, device, world):
+                        resized = rebalance_supply(job, supply, gate, device, rank, stop_event)
+                        if resized == "pressure":
+                            reason = "resource_pressure"
+                            break
+                        if resized == "applied":
+                            queued_phase = None
+                        next_growth = perf_counter() + resources["growth_seconds"]
+                    next_adapt = perf_counter() + resources["adapt_seconds"]
                 phase = progress["phase"]
                 cursor = progress["attempts"] if phase == "train" else progress["val_step"]
                 if queued_phase != (phase, progress["epoch"]):
@@ -194,7 +272,7 @@ def run_rank(rank, job, gate, stop_event):
                     if rank == 0:
                         event(output, "phase_started", phase=phase, epoch=progress["epoch"] + 1,
                               epochs=settings["epochs"], completed=cursor, total=phase_end)
-                depth = max(resources["prefetch"], job["supply"]["workers"][rank])
+                depth = job["supply"]["prefetch"]
                 while submitted < phase_end and len(supply.queue) < depth:
                     sample_index = submitted if phase == "train" else progress["epoch"] * settings["validation_steps"] + submitted
                     supply.submit(train_ids if phase == "train" else val_ids, 0 if phase == "train" else 1, sample_index)
@@ -276,6 +354,20 @@ def run_rank(rank, job, gate, stop_event):
                     mark = perf_counter()
                     checkpoint(output, model, optimizer, scaler, progress, job, receipt, device, rank)
                     timings["checkpoint_seconds"] += perf_counter() - mark
+                if phase == "validation" and progress["phase"] == "train" and progress["epoch"] < (settings["epochs"] or 1):
+                    peaks = all_objects(peak_reserved + peak_non_allocator, world)
+                    if rank == 0:
+                        record_peaks(config, job["spec"], job["gpus"], job["shares"], peaks)
+                    decision = {"world": available_world(config, job["spec"], job),
+                                "replacement": job.get("fleet_replacement", False)} if rank == 0 else None
+                    decision = all_objects(decision, world)[0]
+                    desired = decision["world"]
+                    if desired != world or decision["replacement"]:
+                        reason = "regroup"
+                        if rank == 0:
+                            event(output, "gpu_regroup_requested", previous_world=world, desired_world=desired,
+                                  minimum=resources["min_gpus"], target=resources["gpu_count"], epoch=progress["epoch"])
+                        break
             mark = perf_counter()
             pointer = checkpoint(output, model, optimizer, scaler, progress, job, receipt, device, rank)
             timings["checkpoint_seconds"] += perf_counter() - mark
@@ -287,7 +379,8 @@ def run_rank(rank, job, gate, stop_event):
                 record_peaks(config, job["spec"], job["gpus"], job["shares"],
                              [row["peak_vram_bytes"] for row in measurements] if job["gpus"] and completed else [])
                 summary = {"state": "completed" if completed else "stopped", "reason": reason, "scope": config["scope"],
-                    "identity": job["identity"], **progress, "restored_exact": restored, "checkpoint": pointer,
+                    "identity": job["identity"], **progress, "restored_exact": restored,
+                    "restored_training_state": restored_state, "checkpoint": pointer,
                     "parameters_changed_this_invocation": changed, "last_training_loss": last_loss,
                     "seconds": perf_counter() - started, "timing": timings, "world_size": world,
                     "global_batch": settings["batch"], "batch_layout": job["shares"], "devices": job["gpus"],
@@ -315,7 +408,7 @@ def train(config, prepared_path, resume=False, stop_after=None):
         "training": config["training"], "pretrained": WEIGHT_SHA256, "code_identity": code_identity(),
         "versions": {n: version(n) for n in ("torch", "monai", "nnunetv2", "numpy", "scipy")}}
     identity = digest(scientific)
-    with operation_lock(output), resource_lease(config, prepared, spec) as allocation:
+    with operation_lock(output):
         if resume:
             previous = read_json(output / "run.json")
             expected = {**scientific, "code_identity": previous["scientific"]["code_identity"]}
@@ -329,35 +422,86 @@ def train(config, prepared_path, resume=False, stop_after=None):
             load_checkpoint(output, identity)
         elif (output / "run.json").exists():
             raise FileExistsError("运行目录已存在，请选择恢复训练或新目录")
-        else:
-            write_json(output / "run.json", {"identity": identity, "scientific": scientific, "config": config, "prepared": prepared})
-        world = allocation["world"]
-        shares = layout(config["training"]["batch"], world, config["resources"]["batch_layout"])
-        with socket.socket() as rendezvous:
-            rendezvous.bind(("127.0.0.1", 0))
-            port = rendezvous.getsockname()[1]
-        job = {**allocation, "config": config, "prepared": prepared, "spec": spec, "identity": identity,
-               "shares": shares, "resume": resume, "stop_after": stop_after, "rendezvous": f"tcp://127.0.0.1:{port}"}
-        context = mp.get_context("spawn")
-        gate, stop_event = context.BoundedSemaphore(allocation["supply"]["reader_slots"]), context.Event()
-        previous_visible = os.environ.get("CUDA_VISIBLE_DEVICES")
-        if allocation["gpus"]:
-            if torch.cuda.is_initialized():
-                raise RuntimeError("协调进程已初始化 CUDA，请使用新的训练命令启动")
-            os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(g["uuid"] for g in allocation["gpus"])
-        env_previous = {k: os.environ.get(k) for k in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS")}
-        for key in env_previous:
-            os.environ[key] = "1"
-        previous_handlers = {sig: signal.signal(sig, lambda *_: stop_event.set()) for sig in (signal.SIGINT, signal.SIGTERM)}
-        try:
-            torch.multiprocessing.spawn(run_rank, args=(job, gate, stop_event), nprocs=world, join=True)
-        finally:
-            close_members(config, allocation["owner"])
-            for sig, handler in previous_handlers.items():
-                signal.signal(sig, handler)
-            for key, value in {**env_previous, "CUDA_VISIBLE_DEVICES": previous_visible}.items():
-                if value is None:
-                    os.environ.pop(key, None)
-                else:
-                    os.environ[key] = value
-        return read_json(output / "summary.json")
+        pressure_retries = 0
+        while True:
+            admission = deepcopy(config)
+            old_world = None
+            if resume:
+                previous_state = load_checkpoint(output, identity)
+                old_world = len(previous_state["rank_rng"])
+                boundary = previous_state["progress"]["phase"] == "train" and (previous_state["attempts"] == 0 or
+                    config["training"]["epochs"] is not None and
+                    previous_state["attempts"] % config["training"]["steps_per_epoch"] == 0)
+                if not boundary and config["resources"]["device"] == "cuda":
+                    admission["resources"].update(gpu_count=old_world, min_gpus=None)
+                    event(output, "fixed_world_resume", world=old_world, reason="当前完整检查点位于 epoch 内部")
+                del previous_state
+            with resource_lease(admission, prepared, spec, previous_world=old_world) as allocation:
+                if not resume:
+                    write_json(output / "run.json", {"identity": identity, "scientific": scientific,
+                               "config": config, "prepared": prepared})
+                summary = launch_group(config, prepared, spec, identity, allocation, resume, stop_after)
+            if summary["reason"] not in ("resource_pressure", "regroup"):
+                return summary
+            if summary["reason"] == "resource_pressure":
+                pressure_retries += 1
+                if pressure_retries > config["resources"]["pressure_retries"]:
+                    raise MemoryError("达到已配置的内存压力恢复次数；完整检查点已保留")
+                config["resources"]["max_workers"] = max(1, config["resources"]["max_workers"] // 2)
+                config["resources"]["cache_bytes"] //= 2
+                config["resources"]["prefetch"] = max(1, config["resources"]["prefetch"] // 2)
+                config["resources"]["max_readers"] = max(1, config["resources"]["max_readers"] // 2)
+            event(output, "training_readmission", reason=summary["reason"], pressure_retries=pressure_retries,
+                  progress={key: summary[key] for key in ("epoch", "attempts", "updates", "phase")},
+                  requested_resources=config["resources"])
+            resume = True
+
+
+def launch_group(config, prepared, spec, identity, allocation, resume, stop_after):
+    world = allocation["world"]
+    if resume:
+        state = load_checkpoint(config["run_dir"], identity)
+        boundary = state["progress"]["phase"] == "train" and (state["attempts"] == 0 or
+            config["training"]["epochs"] is not None and state["attempts"] % config["training"]["steps_per_epoch"] == 0)
+        if len(state["rank_rng"]) != world and not boundary:
+            raise ValueError("当前检查点处于 epoch 内部，恢复时需要原进程数量")
+        del state
+    shares = layout(config["training"]["batch"], world, config["resources"]["batch_layout"])
+    with socket.socket() as rendezvous:
+        rendezvous.bind(("127.0.0.1", 0))
+        port = rendezvous.getsockname()[1]
+    job = {**allocation, "config": config, "prepared": prepared, "spec": spec, "identity": identity,
+           "shares": shares, "resume": resume, "stop_after": stop_after, "rendezvous": f"tcp://127.0.0.1:{port}"}
+    context = mp.get_context("spawn")
+    gate, stop_event = BuildGate(context, allocation["supply"]["reader_slots"]), context.Event()
+    job["pressure_event"] = context.Event()
+    previous_visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+    job["allowed_visible_devices"] = previous_visible
+    if allocation["gpus"]:
+        if torch.cuda.is_initialized():
+            raise RuntimeError("协调进程已初始化 CUDA，请使用新的训练命令启动")
+        os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(g["uuid"] for g in allocation["gpus"])
+    env_previous = {k: os.environ.get(k) for k in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS")}
+    for key in env_previous:
+        os.environ[key] = "1"
+    previous_handlers = {sig: signal.signal(sig, lambda *_: stop_event.set()) for sig in (signal.SIGINT, signal.SIGTERM)}
+    try:
+        processes = torch.multiprocessing.spawn(run_rank, args=(job, gate, stop_event), nprocs=world, join=False)
+        while not processes.join(timeout=1):
+            facts = host_capacity()
+            if facts["available_bytes"] < config["resources"]["reserve_ram_bytes"]:
+                if not job["pressure_event"].is_set():
+                    event(config["run_dir"], "host_pressure_detected", facts=facts,
+                          reserve_bytes=config["resources"]["reserve_ram_bytes"])
+                job["pressure_event"].set()
+                stop_event.set()
+    finally:
+        close_members(config, allocation["owner"])
+        for sig, handler in previous_handlers.items():
+            signal.signal(sig, handler)
+        for key, value in {**env_previous, "CUDA_VISIBLE_DEVICES": previous_visible}.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+    return read_json(Path(config["run_dir"]) / "summary.json")
