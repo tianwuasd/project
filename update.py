@@ -148,7 +148,7 @@ class GitRepository:
             result.check_returncode()
         return result.stdout
 
-    def validate(self):
+    def validate(self, force=False):
         if self.run("remote", "get-url", "origin").decode().strip() not in self.urls:
             raise ValueError("origin 不属于指定的项目仓库")
         if self.run("config", "--get-regexp", r"^url\..*\.insteadof$", absent=True):
@@ -161,11 +161,11 @@ class GitRepository:
         if code.is_symlink() or (code.exists() and not code.is_dir()):
             raise ValueError("本项目代码路径必须为普通目录")
         initial = not self.run("ls-files", "-z")
-        if initial:
+        if initial and not force:
             if code.exists() and any(code.iterdir()):
                 raise ValueError("本项目未初始化索引，代码目录包含已有文件")
-        elif (self.run("status", "--porcelain=v1", "-z", "--untracked-files=all", "--", SUBDIRECTORY)
-              or self.run("ls-files", "--others", "-z", "--", SUBDIRECTORY)):
+        elif not force and (self.run("status", "--porcelain=v1", "-z", "--untracked-files=all", "--", SUBDIRECTORY)
+                            or self.run("ls-files", "--others", "-z", "--", SUBDIRECTORY)):
             raise ValueError("chd-segmentation 存在本地修改或未跟踪文件，停止更新")
         if code.exists() and any(path.is_symlink() for path in code.rglob("*")):
             raise ValueError("本项目代码目录包含符号链接")
@@ -216,7 +216,7 @@ class GitRepository:
             data = ("\n".join(missing[start:start + 64]) + "\n").encode()
             self.run("-c", "fetch.negotiationAlgorithm=noop", "fetch", self.transport, "--no-tags", "--no-write-fetch-head", "--recurse-submodules=no", "--filter=blob:none", "--stdin", data=data, network=True)
 
-    def staged_overrides(self, head, commit):
+    def staged_overrides(self, head, commit, force=False):
         names = set(filter(None, self.run("diff", "--cached", "--no-renames", "--no-ext-diff", "--no-textconv", "--name-only", "-z", head, "--", ".", ":(exclude)" + SUBDIRECTORY).split(b"\0")))
         if not names:
             return b""
@@ -241,12 +241,12 @@ class GitRepository:
         for name in sorted(names):
             entry = entries.get(name)
             staged = entry[:2] if entry else None
-            if trees[0].get(name) != trees[1].get(name) and staged != trees[1].get(name):
+            if not force and trees[0].get(name) != trees[1].get(name) and staged != trees[1].get(name):
                 raise ValueError("其他项目的暂存内容与远端冲突，保留原索引：" + name.decode("utf-8"))
             overrides.append(entry[2] if entry else b"0 " + b"0" * 40 + b"\t" + name)
         return b"\0".join(overrides) + b"\0"
 
-    def update_project(self, head, commit, files, initial):
+    def update_project(self, head, commit, files, initial, force=False):
         gitdir = self.path / ".git"
         actual_index, index_lock = gitdir / "index", gitdir / "index.lock"
         candidate = gitdir / ("chd-index-" + uuid4().hex)
@@ -255,12 +255,12 @@ class GitRepository:
         code = self.path / SUBDIRECTORY
         for name, blob in old_files.items():
             path = code / name
-            if path.exists() and self.run("hash-object", "--no-filters", "--", str(path)).decode().strip() != blob:
+            if not force and path.exists() and self.run("hash-object", "--no-filters", "--", str(path)).decode().strip() != blob:
                 raise ValueError("本项目已有文件被修改：" + name)
         owned_lock = False
         try:
             # 从目标树取得索引元数据，保留其他项目的暂存内容，不读取其文件对象。
-            overrides = b"" if initial else self.staged_overrides(head, commit)
+            overrides = b"" if initial else self.staged_overrides(head, commit, force=force)
             self.run("read-tree", "--no-sparse-checkout", "--index-output=" + str(candidate), commit)
             if overrides:
                 self.run("update-index", "-z", "--index-info", data=overrides, index=candidate)
@@ -272,7 +272,8 @@ class GitRepository:
             project_names = [(SUBDIRECTORY + "/" + name).encode() for name in files]
             self.run("update-index", "--no-skip-worktree", "-z", "--stdin", data=b"\0".join(project_names) + b"\0", index=candidate)
             changed = [(SUBDIRECTORY + "/" + name).encode() for name, blob in files.items()
-                       if old_files.get(name) != blob or not (code / name).is_file()]
+                       if old_files.get(name) != blob or not (code / name).is_file()
+                       or (force and self.run("hash-object", "--no-filters", "--", str(code / name)).decode().strip() != blob)]
             with index_lock.open("xb") as stream:
                 owned_lock = True
                 if (actual_index.read_bytes() if actual_index.exists() else None) != old_index:
@@ -347,14 +348,14 @@ def legacy_files(repo, runtime):
     return code, [path for path in code.rglob("*") if path.is_file()]
 
 
-def synchronize(repo, runtime, commit, remove_legacy=False):
+def synchronize(repo, runtime, commit, remove_legacy=False, force=False):
     started, runtime = monotonic(), Path(runtime).resolve()
     if runtime.is_relative_to(repo.path) or repo.path.is_relative_to(runtime):
         raise ValueError("代码与过程目录必须独立")
     with file_lock(runtime / ".code.lock"), file_lock(repo.path / ".git" / "chd-code.lock"), ExitStack() as locks:
         for path in sorted((runtime / "runs").rglob(".run.lock")):
             locks.enter_context(file_lock(path))
-        initial = repo.validate()
+        initial = repo.validate(force=force)
         legacy, obsolete = legacy_files(repo, runtime) if remove_legacy else (None, [])
         head = repo.run("rev-parse", "HEAD").decode().strip()
         require_head(commit, repo.remote_head())
@@ -370,13 +371,13 @@ def synchronize(repo, runtime, commit, remove_legacy=False):
         downloaded = monotonic() - mark
         require_head(commit, repo.remote_head())
         mark = monotonic()
-        repo.validate()
-        repo.update_project(head, commit, files, initial)
+        repo.validate(force=force)
+        repo.update_project(head, commit, files, initial, force=force)
         repo.run("config", "branch.main.remote", "origin")
         repo.run("config", "branch.main.merge", "refs/heads/main")
         require_head(commit, repo.run("rev-parse", "HEAD").decode().strip())
         require_head(commit, repo.run("rev-parse", "origin/main").decode().strip())
-        repo.validate()
+        repo.validate(force=force)
         size = 0
         for name, blob in files.items():
             path = repo.path / SUBDIRECTORY / name
@@ -390,7 +391,7 @@ def synchronize(repo, runtime, commit, remove_legacy=False):
             # 已逐文件核验、持有任务锁，且路径严格限定为代码目录下的旧项目。
             legacy_files(repo, runtime)
             shutil.rmtree(legacy)
-        result = {"state": "synchronized", "sha": commit, "head": commit, "origin_main": commit, "code": str(repo.path / SUBDIRECTORY), "repository": REPOSITORY, "network": repo.network_info, "file_count": len(files), "code_bytes": size, "download_seconds": downloaded, "checkout_verify_seconds": checkout_seconds, "seconds": monotonic() - started, "checked_at": datetime.now(timezone.utc).isoformat(), "legacy_cleanup": {"deleted_files": len(obsolete), "released_bytes": deleted_bytes}}
+        result = {"state": "synchronized", "forced": force, "tracked_code_clean": True, "sha": commit, "head": commit, "origin_main": commit, "code": str(repo.path / SUBDIRECTORY), "repository": REPOSITORY, "network": repo.network_info, "file_count": len(files), "code_bytes": size, "download_seconds": downloaded, "checkout_verify_seconds": checkout_seconds, "seconds": monotonic() - started, "checked_at": datetime.now(timezone.utc).isoformat(), "legacy_cleanup": {"deleted_files": len(obsolete), "released_bytes": deleted_bytes}}
         write_json(runtime / "updates" / "latest.json", result)
         return result
 
@@ -401,12 +402,13 @@ def main():
     parser.add_argument("--runtime", default="/data4/zhangruichen/course/chd-segmentation")
     parser.add_argument("--sha")
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--force", action="store_true", help="本项目代码以远端为准，修复未完整检出的索引，保留其他项目的文件和暂存记录")
     parser.add_argument("--remove-legacy", action="store_true", help="核验并删除本项目旧版本安装目录")
     parser.add_argument("--mirror", action="append")
     parser.add_argument("--network-config")
     args = parser.parse_args()
     repo = GitRepository(args.repo)
-    repo.validate()
+    repo.validate(force=args.force)
     settings_path = Path(args.network_config) if args.network_config else Path(args.runtime) / "update_network.json"
     settings = network_settings(settings_path)
     choice = args.mirror or ["auto"]
@@ -417,7 +419,7 @@ def main():
     else:
         if not settings_path.exists():
             write_json(settings_path, settings)
-        result = synchronize(repo, args.runtime, commit, remove_legacy=args.remove_legacy)
+        result = synchronize(repo, args.runtime, commit, remove_legacy=args.remove_legacy, force=args.force)
     print(json.dumps(result, ensure_ascii=False, indent=2), flush=True)
 
 

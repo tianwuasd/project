@@ -22,6 +22,8 @@ zmic 使用 `/data4/zhangruichen`：Git 仓库在 `code/git`，本项目只下�
 
 公开仓库更新默认探测 `ghfast.top`、`gh-proxy.com` 与 GitHub，选择提交匹配、支持按需下载且响应较快的镜像。地址和超时保存在 `course/chd-segmentation/update_network.json`，可以手动修改；也可使用 `--mirror 地址` 或 `--mirror direct`。镜像请求不携带 Git 凭据，选定来源与探测结果记录到过程目录。文件内容校验失败时停止本次更新。
 
+用户明确允许本项目以远端为准时，执行 `python3 -B update.py --force`。它修复部分索引和本项目暂存删除、缺失文件，覆盖目标源码的本地修改，保留其他项目文件和原有暂存记录，并保留目标源码列表之外的未知文件。活动任务、外部索引锁、链接和路径异常仍会阻止操作。首次迁移附加 `--remove-legacy`，在同步并校验成功后清理已登记的旧项目代码目录；数据、环境和运行结果独立保留。
+
 ## 准备私有输入
 
 实验配置示例在 `configs/experiments/`，机器路径集中填写。每套数据需要既有拟合计划、官方 `small_ep4k.model` 以及私有清单。相对病例路径按清单的 `data_root` 解析。

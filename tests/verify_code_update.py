@@ -55,6 +55,85 @@ def fixture_commit(origin, tree, outside, unchanged, parent=None):
     return git(origin, *args, data=b"Actual application source snapshot\n").decode().strip()
 
 
+def verify_force(root, origin, first, second, outside_data, next_outside, old):
+    started, checks = perf_counter(), []
+    repo_path, runtime = root / "force-code" / "git", root / "force-course"
+    url = origin.as_uri()
+    git(origin, "update-ref", "refs/heads/sync-seed", first)
+    subprocess.run(["git", "clone", "--no-checkout", "--filter=blob:none", "--no-tags", "--branch", "sync-seed", url, str(repo_path)], check=True, stdout=subprocess.PIPE, timeout=60)
+    git(repo_path, "branch", "-m", "main")
+    repo = updater.GitRepository(repo_path, expected_urls={url})
+    repo.choose_source([url], expected=second, timeout=5)
+    first_files = repo.inventory(first)
+    repo.fetch_files(first_files)
+    legacy = repo_path.parent / "chd-segmentation"
+    old.install(old.GitCache(repo_path, expected_urls={url}), legacy, runtime, first)
+    local_blob = git(repo_path, "hash-object", "-w", "--stdin", data=outside_data + b"\nLocal staged content\n").strip()
+    partial = b"100644 " + local_blob + b" 0\tunrelated.md\0"
+    partial += b"100644 " + first_files["README.md"].encode() + b" 0\tchd-segmentation/README.md\0"
+    repo.run("update-index", "-z", "--index-info", data=partial)
+    repo.run("checkout-index", "-z", "--stdin", data=b"unrelated.md\0chd-segmentation/README.md\0")
+    code = repo_path / "chd-segmentation"
+    readme = code / "README.md"
+    readme.write_bytes(readme.read_bytes() + b"\nLocal tracked code change\n")
+    git(repo_path, "add", "--", "chd-segmentation/README.md")
+    private = code / "keep.local.txt"
+    private.write_bytes(outside_data)
+    other = repo_path / "unrelated.md"
+    before_other = (other.read_bytes(), other.stat().st_mtime_ns)
+    before_private = (private.read_bytes(), private.stat().st_mtime_ns)
+    before_index = repo.run("ls-files", "--stage", "-z", "--", "unrelated.md", "dataset1282_analysis")
+    case = unittest.TestCase()
+    case.assertTrue(repo.run("ls-files", "-z"))
+    case.assertIn(b"D  chd-segmentation/", repo.run("status", "--porcelain=v1", "--", "chd-segmentation"))
+    with case.assertRaises(ValueError):
+        updater.synchronize(repo, runtime, second, remove_legacy=True)
+    with updater.file_lock(runtime / ".code.lock", shared=True):
+        with case.assertRaises(OSError):
+            updater.synchronize(repo, runtime, second, force=True, remove_legacy=True)
+    checks.append("forced synchronization still refuses active tasks")
+    index_lock = repo_path / ".git" / "index.lock"
+    with index_lock.open("xb") as stream:
+        stream.write(b"External Git operation")
+    with case.assertRaises(subprocess.CalledProcessError):
+        updater.synchronize(repo, runtime, second, force=True, remove_legacy=True)
+    case.assertEqual(index_lock.read_bytes(), b"External Git operation")
+    index_lock.unlink()
+    checks.append("forced synchronization preserves an external Git index lock")
+    forced = updater.synchronize(repo, runtime, second, force=True, remove_legacy=True)
+    case.assertTrue(forced["forced"])
+    case.assertTrue(forced["tracked_code_clean"])
+    case.assertEqual(repo.run("rev-parse", "HEAD").decode().strip(), second)
+    case.assertEqual(repo.run("rev-parse", "origin/main").decode().strip(), second)
+    case.assertFalse(repo.run("diff", "--name-only", "HEAD", "--", "chd-segmentation"))
+    case.assertEqual(readme.read_bytes(), (PROJECT / "README.md").read_bytes())
+    case.assertFalse(legacy.exists())
+    case.assertGreater(forced["legacy_cleanup"]["deleted_files"], 0)
+    checks.append("forced forward synchronization repairs a populated partial index, staged project deletions and local code changes, then removes the verified legacy project")
+    case.assertEqual((other.read_bytes(), other.stat().st_mtime_ns), before_other)
+    case.assertEqual((private.read_bytes(), private.stat().st_mtime_ns), before_private)
+    case.assertEqual(repo.run("ls-files", "--stage", "-z", "--", "unrelated.md", "dataset1282_analysis"), before_index)
+    case.assertNotIn(next_outside, set(repo.run("cat-file", "--batch-all-objects", "--batch-check=%(objectname)").decode().splitlines()))
+    checks.append("forced synchronization preserves other project files and index entries, retains unknown local files, and never downloads unrelated blobs")
+    tracked_times = {name: (code / name).stat().st_mtime_ns for name in repo.inventory(second)}
+    updater.synchronize(repo, runtime, second, force=True)
+    case.assertEqual({name: (code / name).stat().st_mtime_ns for name in tracked_times}, tracked_times)
+    checks.append("repeating forced synchronization does not rewrite unchanged code files")
+    (code / "run.py").unlink()
+    with case.assertRaises(ValueError):
+        repo.validate()
+    updater.synchronize(repo, runtime, second, force=True)
+    case.assertEqual((code / "run.py").read_bytes(), (PROJECT / "run.py").read_bytes())
+    info = subprocess.run([sys.executable, "-B", str(code / "run.py"), "--code-info"], check=True, stdout=subprocess.PIPE, timeout=60)
+    case.assertEqual(json.loads(info.stdout)["sha"], second)
+    case.assertFalse(list((repo_path / ".git").glob("chd-index-*")))
+    case.assertFalse(index_lock.exists())
+    help_result = subprocess.run([sys.executable, "-B", str(PROJECT / "update.py"), "--force", "--help"], check=True, stdout=subprocess.PIPE, timeout=30)
+    case.assertIn(b"--force", help_result.stdout)
+    checks.append("forced synchronization repairs missing tracked files and the actual CLI accepts the force option")
+    return {"checks": checks, "seconds": perf_counter() - started, "legacy_cleanup": forced["legacy_cleanup"], "scope": "same two actual source snapshots; partial index and missing-file recovery"}
+
+
 def run(root, report):
     root, report = Path(root).resolve(), Path(report).resolve()
     if root.exists() or report.is_relative_to(root) or root.is_relative_to(report):
@@ -230,6 +309,10 @@ def run(root, report):
         case.assertFalse((repo_path / ".git" / "index.lock").exists())
         checks.append("repeated update reuses one fixed code directory without producing another code copy")
         timings["upgrade_and_entry_seconds"] = perf_counter() - mark
+        forced = verify_force(root, origin, first, second, outside_data, next_outside, old)
+        checks.extend(forced["checks"])
+        timings["forced_recovery_seconds"] = forced["seconds"]
+        result["forced_recovery"] = forced
         result.update({"state": "passed", "fixture_commits": [first, second], "target_source_tree": target_tree, "check_count": len(checks), "preserved_files": [{"path": str(path.relative_to(root)), "sha256": hashlib.sha256(snapshot[0]).hexdigest(), "mtime_ns": snapshot[1]} for path, snapshot in untouched.items()]})
     finally:
         if sys.exception() is not None:
