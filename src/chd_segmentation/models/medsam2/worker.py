@@ -130,6 +130,8 @@ def main(payload,rank,common,allocation,gate):
             optimizer_updates=trainer.steps['train']-before,seconds=elapsed,
             updates_per_second=(trainer.steps['train']-before)/elapsed,
             learning_rates=sorted(set(group['lr'] for group in trainer.optim.optimizer.param_groups)),metrics=result))
+        from ...observability.events import event
+        event(root,'model_epoch_completed',model='medsam2',rank=rank,**history[-1])
         numpy_rng = np.random.get_state()
         rank_states = all_states(dict(python_rng=random.getstate(),
             numpy_rng=(numpy_rng[0],numpy_rng[1].tolist(),*numpy_rng[2:]),torch_rng=torch.get_rng_state(),

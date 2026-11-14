@@ -109,14 +109,18 @@ class MedSAM2Adapter:
                 predictor.add_new_points_or_box(state,item['frame'],item['class_id'],box=np.asarray(box,dtype=np.float32))
         scores = torch.full((classes,depth,height,width),-1024.,dtype=torch.float32)
         scores[0] = 0
+        propagation_steps = []
         if label_box:
             for item in items:
                 for reverse in (False,True):
+                    completed = 0
                     predictor.reset_state(state)
                     predictor.add_new_points_or_box(state,item['frame'],item['class_id'],
                         box=np.asarray(item['box_xyxy'],dtype=np.float32))
                     for index,ids,logits in predictor.propagate_in_video(state,reverse=reverse):
                         scores[item['class_id'],index] = logits[0,0].float().cpu()
+                        completed += 1
+                    propagation_steps.append(dict(class_id=item['class_id'],reverse=reverse,frames=completed))
         else:
             for reverse in (False,True):
                 for index,ids,logits in predictor.propagate_in_video(state,reverse=reverse):
@@ -124,4 +128,5 @@ class MedSAM2Adapter:
                         scores[class_id,index] = logits[position,0].float().cpu()
         probability = scores.softmax(0).numpy()
         return probability,dict(prompt_sources=[item['source'] for item in items],prompt_space='native_dhw',
-                                upstream_commit=UPSTREAM_COMMIT,frames=depth,postprocess_extension=False)
+                                upstream_commit=UPSTREAM_COMMIT,frames=depth,postprocess_extension=False,
+                                propagation_steps=propagation_steps)

@@ -10,7 +10,7 @@
 
 Q科学模块保留原网络、事件、求解、融合、定位目标与允许集合监督。统一入口保留M02/M07，正式训练使用A/B/C/D患者分组、分层候选和20%概率扰动、预热余弦及C组选模。关系R辅助头和独立临床参考未在本次输入中配置。
 
-MedSAM2固定官方提交332f30d，使用官方Trainer、VOS采样/增强、模型、损失、优化器及检查点。初始化权重为官方MedSAM2_latest.pt，固定来源、容量和SHA-256在weights.py登记。序列为8帧、最多3目标、512分辨率，正式预算75epoch；提示式预测支持人工框或外部图像定位器提供的框，提示坐标为native_dhw。技术验收使用训练标签模拟提示并单独登记来源。
+MedSAM2固定官方提交332f30d，使用官方Trainer、VOS采样/增强、模型、损失、优化器及检查点。初始化权重为官方MedSAM2_latest.pt，固定来源、容量和SHA-256在weights.py登记。序列为8帧、最多3目标、512分辨率，正式预算75epoch；普通提示式预测支持人工框或外部图像定位器的框，提示坐标为native_dhw。显式label-box模式从测试标签生成框并报告有提示Dice；直接官方发布权重预测通过--official-weights登记零微调更新。
 
 本地环境额外依赖与官方源码分别在env/medsam2、vendor/MedSAM2，均被Git忽略并保留复用。原始病例与验收报告在工作目录外；公开源码不包含病例文件或患者名单。
 
@@ -23,3 +23,5 @@ MedSAM2固定官方提交332f30d，使用官方Trainer、VOS采样/增强、模�
 助手1main继承来源：公开提交6ef3fd4c51eb53da26faa54a147fc35ae15ebc40的chd-segmentation子树与本地助手1c28e191树摘要相同。助手2继承该项目全部变化，保留模型入口及工作目录支持。共享GPU资源调用位于models/execution.py，依赖training/resources.py；模型CPU缓存、官方数据worker、预取队列和读盘并发使用已准入配置。Q全局累积4样本按各rank份额归约；MedSAM2保留官方分布式Trainer和均等每卡batch。检查点保存逐rank状态并核对完整执行拓扑。
 
 需要提交或上传的文件、服务器位置、Q分组及MedSAM2提示要求见 [服务器材料清单](ASSISTANT2_SERVER_FILES.md)。该文件同时说明当前发布边界：继承远端main与发布助手2模型是两个独立操作，服务器update.py以实际已发布main为准。
+
+2026-11-14调整：1282的Q组合已生成A393/B197/C128/D456，私有交付包位于D:/projects/back/deliverables/chd-segmentation-assistant2-inputs；C、D及测试子组沿用原冻结角色，A/B仅细分原训练患者。统计拟合角色仅A，B保留标签并通过groups选择局部训练。继承助手1已提交c57c52c日志和95660ae空闲优先、混合选卡、持续等待；模型执行配置传递独立日志目录及心跳，显存容量记录按模型和阶段区分。验收范围见Q1282_LABEL_BOX_PLAN.md及私有报告。

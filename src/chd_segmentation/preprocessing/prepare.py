@@ -3,12 +3,18 @@ from pathlib import Path
 from ..artifacts.store import digest, file_digest, operation_lock, read_json, require_output, write_json
 from ..datasets.manifest import LABELS, load_manifest
 from ..datasets.splits import apply_split
+from ..observability.events import event, logged, stage
 from .planning import resolve_plan, validate_auto_plan
 
 
+@logged("prepare")
 def prepare(config, output):
-    manifest = apply_split(load_manifest(config["manifest"], config["dataset"], config["scope"],
-                                        allow_unassigned=config["split"]["path"] is not None), config)
+    with stage(config, "manifest_and_split", manifest=config["manifest"], fold=config["fold"]):
+        manifest = apply_split(load_manifest(config["manifest"], config["dataset"], config["scope"],
+                                            allow_unassigned=config["split"]["path"] is not None), config)
+    event(config["run_dir"], "split_ready", cases=len(manifest["cases"]),
+          roles={role: sum(role in row["roles"] for row in manifest["cases"])
+                 for role in ("train", "validation", "test")})
     if config["scope"] == "formal" and config["planning"]["mode"] == "existing" and manifest.get("plan_scope") != "formal":
         raise ValueError("正式任务需要声明正式拟合计划的来源")
     rows = manifest["cases"]
@@ -49,6 +55,8 @@ def prepare(config, output):
                 raise ValueError("已有预处理描述的身份不匹配")
         else:
             write_json(output, record)
+    event(config["run_dir"], "prepared_ready", output=str(output), identity=record["identity"],
+          cases=len(rows), plan=config["plan"])
     return record
 
 

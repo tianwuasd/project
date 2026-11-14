@@ -13,6 +13,7 @@ import yaml
 
 from ..artifacts.store import digest,file_digest,read_json,write_json
 from ..config import DEFAULTS,_merge,validate_resources
+from ..observability.events import Stage
 from ..training.resources import resource_lease,layout,register_member,close_members,host_capacity,process_vram,record_peaks
 
 
@@ -37,7 +38,8 @@ def execution_config(config):
     if config['model']=='medsam2' and len(set(shares))!=1:
         raise ValueError('MedSAM2官方DistributedSampler要求全局batch可均分到各卡')
     patch = [config['frames'],config['resolution'],config['resolution']] if config['model']=='medsam2' else [config['patch']]*3
-    return dict(model=config['model'],resources=resources,
+    return dict(model=config['model'],resources=resources,run_dir=config['run_dir'],
+        logging=config.get('logging',DEFAULTS['logging']),
         work_root=config['work_root'] or str(Path(config['run_dir']).parent),
         technical=dict(roi_xyz=None),training=dict(batch=batch,patch=patch,precision=config['precision']))
 
@@ -53,6 +55,7 @@ def resource_spec(config,prepared,stage):
 @contextmanager
 def admitted(config,prepared,stage):
     common = execution_config(config)
+    common['run_dir'] = str(Path(config['run_dir'])/'admission'/stage)
     common['technical'] = prepared['technical']
     root = Path(common['work_root']).resolve()
     source = Path(prepared['manifest']['data_root']).resolve()
@@ -61,10 +64,10 @@ def admitted(config,prepared,stage):
     spec = resource_spec(config,prepared,stage)
     budget = prepared
     if config['model']=='q_route1' and stage!='prediction':
-        from .workflow import training_names
+        from .workflow import training_names,validated_q_groups
         names = set(training_names(config,prepared,stage))
         if not config['technical']:
-            names.update(yaml.safe_load(Path(config['groups']).read_text(encoding='utf-8'))['C'])
+            names.update(validated_q_groups(config,prepared)['C'])
         budget = deepcopy(prepared)
         budget['manifest']['cases'] = [dict(row,roles=['train']) for row in prepared['manifest']['cases']
                                       if row['case_id'] in names]
@@ -124,7 +127,9 @@ def rank_measurement(device,allocation,rank):
 
 def rank_entry(rank,payload,common,allocation,gate,port):
     root = Path(payload['config']['run_dir'])/payload['stage']
-    with (root/f'rank{rank}.log').open('a',encoding='utf-8') as log,redirect_stdout(log),redirect_stderr(log):
+    with (root/f'rank{rank}.log').open('a',encoding='utf-8') as log,redirect_stdout(log),redirect_stderr(log), \
+            Stage(root,'model_worker',heartbeat_seconds=common['logging']['heartbeat_seconds'],
+                  model=payload['config']['model'],rank=rank,operation=payload.get('operation','train')):
         register_member(common,allocation['owner'])
         os.environ.update(MASTER_ADDR='127.0.0.1',MASTER_PORT=str(port),RANK=str(rank),LOCAL_RANK=str(rank),
                           WORLD_SIZE=str(allocation['world']))

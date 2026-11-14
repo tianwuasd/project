@@ -2,7 +2,7 @@
 
 ## 本次代码
 
-代码保存在D:/projects/project/chd-segmentation-assistant2，独立分支codex/chd-segmentation-assistant2-medsam2-q-r2。继承助手1公开main的6ef3fd4，对应本地项目提交c28e191。代码提交包含模型实现、共享资源调用、配置、测试和说明。
+代码保存在D:/projects/project/chd-segmentation-assistant2，独立分支codex/chd-segmentation-assistant2-medsam2-q-r2。继承助手1公开main的6ef3fd4，对应本地项目提交c28e191；继续整合其已提交日志c57c52c及GPU等待95660ae。代码提交包含模型实现、共享资源调用、配置、测试和说明。
 
 向GitHub发布时只提交上述源码；官方权重、依赖目录、病例清单、患者分组、预测和训练检查点分别管理。当前本地分支通过main继承并保留助手2模型修改，服务器update.py仍以已发布远端main为准；只有本分支内容正式发布后，服务器日常更新才会包含这些模型修改。
 
@@ -30,7 +30,9 @@ Q的A训练上游、B训练局部、C用于选模、D独立评价，四组患者
 
 ## GPU及运行设置
 
-两模型的execution字段复用助手1资源配置。work_root需与同一项目其他任务一致，使resources目录统一登记设备、CPU和RAM。支持1—4张卡、自动选择或gpu_ids手动选择；仅在全部可见卡繁忙且存在本模型、阶段、数据身份和尺寸的真实显存记录时评估共享。显存余量和等待窗口沿用main设置。
+两模型的execution字段复用助手1资源配置。work_root需与同一项目其他任务一致，使resources目录统一登记设备、CPU和RAM。支持1—4张卡、自动选择或gpu_ids手动选择；优先空闲卡，数量不足时允许组合满足共享条件的繁忙卡。繁忙卡需要本模型、阶段、数据身份、尺寸及本卡batch的真实显存记录，并满足连续观察窗口、负载与显存安全余量。等待期间整体取得所需设备，候选卡逐项原因写入日志。
+
+默认execution.wait_seconds为null，持续等待；可用`--wait-seconds 300`设置本次时限，`--wait-seconds forever`持续等待。手动停止可终止等待。logging.heartbeat_seconds默认15秒，case_details默认true；主进程输出阶段心跳。资源等待日志保存在run_dir/admission/<阶段>/events.jsonl，执行日志及rank日志在run_dir/<阶段>；资源不足且尚未启动的任务可使用原目录重新尝试。Q记录每次完整更新，MedSAM2记录完整epoch，病例读取、标签框和预测结束分别记录。
 
 MedSAM2的batch是全局序列数，默认2，两卡各1；四卡时需显式设置batch4。官方DistributedSampler使用各卡相同batch，不能均分时启动前直接报错。Q的accumulation=4是r2一次优化器更新的全局样本数，1/2/3/4卡分别分担[4]/[2,2]/[2,1,1]/[1,1,1,1]；各卡累积的梯度按全局4样本求和归约，再统一裁剪和更新。
 

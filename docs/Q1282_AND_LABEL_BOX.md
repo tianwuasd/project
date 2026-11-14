@@ -18,7 +18,7 @@ python -B run.py prepare --config /path/to/q-inputs/q1282_prepare.yaml --output 
 
 数据或权重位置有差异时可在bind-inputs提供`--chd-root`、`--pretrained`。绑定会填写prepare及三个模型配置的机器路径，已有训练预算等手动配置保留。三个阶段依次使用q1282_base.yaml、q1282_localizer.yaml、q1282_local.yaml；局部阶段读取上游best.pt。
 
-原STU-Net完整训练集的计划与检查点属于独立基线。Q需要自己的A组拟合计划和A组上游权重。Q正式训练逐项核对分组互斥、拟合病例及上游训练名单。
+原STU-Net完整训练集的计划与检查点属于独立基线。Q需要自己的A组拟合计划和A组上游权重。Q正式训练逐项核对外部A/B/C/D完整名单与准备描述中的冻结组别、来源角色、重复或遗漏病例、患者互斥、拟合病例及上游训练名单。
 
 本机私有包位于D:/projects/back/deliverables/chd-segmentation-assistant2-inputs，含冻结来源证据、可迁移影像清单、q1282_split.json、q_groups.json、配置及q_split_audit.json。影像原件保持原位置。患者名单和清单只按私有材料迁移。
 
@@ -43,4 +43,6 @@ summary.json记录每例标签摘要、提示层、紧框、外扩量、最终�
 
 tests/verify_q1282_bundle.py核验冻结元数据、原训练覆盖、患者互斥、A拟合角色、D子组、机器绑定的可重复性及手动配置保留，不读取CT体素。
 
-tests/verify_label_box_real.py使用ImageCHD ct_1003的32³技术范围、两个真实结构、官方发布权重及零训练更新，核验框确定性、未知类别保护、普通模式提示要求、原网格导出、标签摘要和有提示Dice。该范围只证明接口功能。
+tests/verify_label_box_real.py使用ImageCHD ct_1003的32³技术范围、最多两个真实结构、官方发布权重及零训练更新，优先选择提示层大于零的结构，核验实际反向传播、框确定性、未知类别保护、普通模式提示要求、原网格导出、标签摘要和有提示Dice。summary记录每个结构、方向的实际传播帧数。该范围只证明接口功能。
+
+tests/verify_model_guards_real.py分别验证错误Q分组被拒绝，以及同一真实病例在CPU预算不足时，Q和MedSAM2各连续两次准入失败后仍未创建执行阶段目录；不执行训练更新。资源等待日志独立保存在admission目录。

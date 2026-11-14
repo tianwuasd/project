@@ -9,6 +9,7 @@ import yaml
 
 from ..artifacts.store import digest, file_digest, write_json
 from ..datasets.splits import select_test
+from ..observability.events import event
 from ..prediction.dice import supervised_dice
 from ..prediction.restore import restore
 from ..preprocessing.prepare import load_prepared
@@ -109,15 +110,18 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
     label_mode = prompt_mode == 'label-box'
     if config['model'] == 'medsam2':
         from .medsam2.data import NativeCases
-        dataset = NativeCases(prepared, with_label=label_mode)
+        dataset = NativeCases(prepared, with_label=label_mode, log_dir=Path(config['run_dir'])/'prediction',
+                              logging=config['logging'])
     else:
         dataset = dataset_for(prepared, False)
     root.mkdir(parents=True)
     results = []
     classes = len(prepared['dataset_json']['labels'])
+    log_dir = Path(config['run_dir'])/'prediction'
     for row in rows:
         mark = perf_counter()
         name = row['case_id']
+        event(log_dir, 'model_case_started', case_id=name, model=config['model'], prompt_mode=prompt_mode)
         entry = dataset.get(name)
         case_prompts, protocol = prompts, None
         truth = entry['label'] if label_mode else None
@@ -125,6 +129,7 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
             from .medsam2.prompts import label_box_prompts
             case_prompts, protocol = label_box_prompts(entry, row['sha256']['label'], classes,
                 label_classes, box_seed, box_max_shift)
+            event(log_dir, 'label_box_generated', case_id=name, protocol=protocol)
         # 传播模型只接收图像与显式提示；参考标签只用于生成框和计算指标。
         inference_entry = dict(entry, label=None)
         inference_started = perf_counter()
@@ -153,6 +158,8 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
             seconds=perf_counter()-mark, inference_seconds=inference_seconds, shape=list(check.shape),
             timing=entry['timing'], roi_xyz=entry['roi_xyz'], prompt_protocol=protocol, classes=metrics,
             test_set=row.get('test_set'), test_group=row.get('test_group')))
+        event(log_dir, 'model_case_completed', case_id=name, seconds=perf_counter()-mark,
+              inference_seconds=inference_seconds, shape=list(check.shape), classes=metrics)
         dataset.clear()
     summary = dict(model=config['model'], scope=prepared['scope'], checkpoint_sha256=file_digest(checkpoint),
         initialization=initialization, prompt_mode=prompt_mode, test_set=test_set, test_group=test_group,

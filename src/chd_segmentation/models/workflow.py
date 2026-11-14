@@ -18,7 +18,9 @@ from ..preprocessing.prepare import load_prepared
 
 
 def options(path,overrides=None):
-    raw = yaml.safe_load(Path(path).read_text(encoding='utf-8'))
+    path = Path(path)
+    content = path.read_text(encoding='utf-8')
+    raw = json.loads(content) if path.suffix.lower()=='.json' else yaml.safe_load(content)
     if overrides:
         overrides = deepcopy(overrides)
         if 'global_batch' in overrides:
@@ -33,10 +35,12 @@ def options(path,overrides=None):
                     official_root=None, dependency_root=None, freeze_image_encoder=False,
                     max_candidates=24, warmup_updates=2000,method='M07',key_references=None,
                     validate_every=1000,batch=2,workers=15,epochs=None,gray_window=None,
-                    work_root=None,execution={})
+                    work_root=None,execution={},logging=dict(heartbeat_seconds=15,case_details=True))
     if not isinstance(raw, dict) or set(raw)-set(defaults):
         raise ValueError('模型配置字段无效')
     config = {**defaults, **raw}
+    if isinstance(config['logging'],dict):
+        config['logging'] = {**defaults['logging'],**config['logging']}
     if config['model']=='medsam2':
         if 'learning_rate' not in raw:
             config['learning_rate'] = .00005
@@ -69,6 +73,11 @@ def options(path,overrides=None):
         raise ValueError('验证间隔必须为正整数')
     if not np.isfinite(config['learning_rate']) or config['learning_rate'] <= 0:
         raise ValueError('学习率必须为有限正数')
+    logging = config['logging']
+    if not isinstance(logging,dict) or set(logging)!= {'heartbeat_seconds','case_details'} or \
+            type(logging['heartbeat_seconds']) not in (int,float) or not np.isfinite(logging['heartbeat_seconds']) or \
+            logging['heartbeat_seconds']<0 or type(logging['case_details']) is not bool:
+        raise ValueError('模型日志心跳需要有限非负秒数，病例细节开关需要布尔值')
     root = Path(path).resolve().parent
     for key in ('run_dir','pretrained','groups','official_root','dependency_root','key_references','work_root'):
         if config[key] is not None:
@@ -107,6 +116,42 @@ def source_identity(config):
     return {str(path.relative_to(root)):file_digest(path) for path in sorted(root.rglob('*.py'))}
 
 
+def validated_q_groups(config,prepared):
+    if not config['groups']:
+        raise ValueError('Q正式训练需要显式A/B/C/D分组')
+    groups = yaml.safe_load(Path(config['groups']).read_text(encoding='utf-8'))
+    if not isinstance(groups,dict) or set(groups)!=set('ABCD') or any(
+            not isinstance(groups[key],list) or not groups[key] for key in groups):
+        raise ValueError('Q分组必须包含非空A/B/C/D病例名单')
+    rows = {row['case_id']:row for row in prepared['manifest']['cases']}
+    seen_patients,seen_cases = set(),set()
+    for role in 'ABCD':
+        names = groups[role]
+        if any(not isinstance(name,str) for name in names) or len(set(names))!=len(names) or \
+                not set(names)<=rows.keys() or seen_cases & set(names):
+            raise ValueError('Q分组病例重复、重叠或未登记')
+        patients = {rows[name].get('patient') for name in names}
+        if seen_patients & patients or not all(patients):
+            raise ValueError('Q患者分组重叠或缺少患者身份')
+        seen_cases.update(names)
+        seen_patients.update(patients)
+    if prepared['manifest'].get('split_source',{}).get('format')=='q1282' or any('q_group' in row for row in rows.values()):
+        expected = {key:set() for key in 'ABCD'}
+        source_roles = dict(A={'train'},B={'train'},C={'development'},
+                            D={'source_test','target_primary','target_secondary'})
+        for name,row in rows.items():
+            group = row.get('q_group')
+            if group not in expected or row.get('source_role') not in source_roles[group]:
+                raise ValueError('Q1282准备描述缺少冻结组别或来源角色')
+            expected[group].add(name)
+        if any(set(groups[key])!=expected[key] for key in 'ABCD'):
+            raise ValueError('Q1282外部分组与准备描述的冻结名单不一致')
+    fit_ids = set(prepared['plan'].get('fit_ids',[]))
+    if not fit_ids or not fit_ids <= set(groups['A']):
+        raise ValueError('Q统计拟合必须限于A组')
+    return groups
+
+
 def training_names(config, prepared, stage):
     if config['technical']:
         if prepared['scope']!='technical' or len(prepared['manifest']['cases'])>2:
@@ -115,21 +160,7 @@ def training_names(config, prepared, stage):
     if prepared['scope']!='formal':
         raise ValueError('正式模型训练需要正式准备描述')
     if config['model']=='q_route1':
-        if not config['groups']:
-            raise ValueError('Q正式训练需要显式A/B/C/D分组')
-        groups = yaml.safe_load(Path(config['groups']).read_text(encoding='utf-8'))
-        if set(groups)!=set('ABCD') or any(not isinstance(groups[key],list) or not groups[key] for key in groups):
-            raise ValueError('Q分组必须包含非空A/B/C/D病例名单')
-        rows = {row['case_id']:row for row in prepared['manifest']['cases']}
-        seen = set()
-        for role in 'ABCD':
-            patients = {rows[name]['patient'] for name in groups[role]}
-            if seen & patients or not all(patients):
-                raise ValueError('Q患者分组重叠或缺少患者身份')
-            seen |= patients
-        fit_ids = set(prepared['plan'].get('fit_ids',[]))
-        if not fit_ids or not fit_ids <= set(groups['A']):
-            raise ValueError('Q统计拟合必须限于A组')
+        groups = validated_q_groups(config,prepared)
         return groups['B' if stage=='local' else 'A']
     names = [row['case_id'] for row in prepared['manifest']['cases'] if 'train' in row['roles']]
     if not names:
@@ -156,7 +187,7 @@ def save_state(path, state):
 
 def model_identity(config,prepared,stage,initialization_sha256=None):
     scientific = {key:value for key,value in config.items() if key not in
-                  ('run_dir','threads','dependency_root','official_root','execution','work_root','device')}
+                  ('run_dir','threads','dependency_root','official_root','execution','work_root','device','logging')}
     return digest(dict(config=scientific,prepared=prepared['identity'],stage=stage,code=source_identity(config),
         parents={key:file_digest(value) for key,value in config['parents'].items()},
         pretrained=initialization_digest(config,initialization_sha256),
@@ -222,7 +253,8 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
             with gate:
                 return super().get(name)
     dataset = AdmittedCases(prepared,dict(reserve_ram_bytes=common['resources']['reserve_ram_bytes'],
-        cache_bytes=allocation['supply']['cache_bytes'][rank]),with_label=True)
+        cache_bytes=allocation['supply']['cache_bytes'][rank]),with_label=True,
+        log_dir=root,logging=config['logging'])
     bundle.prepare_training(dataset,names)
     update,history,best = 0,[],None
     restored = False
@@ -290,7 +322,7 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
             history.append(dict(update=update,loss=loss_sum,gradient_norm=float(norm),seconds=perf_counter()-mark))
             improved = False
             if not config['technical'] and (update%config['validate_every']==0 or update==config['updates']):
-                validation_names = (yaml.safe_load(Path(config['groups']).read_text(encoding='utf-8'))['C']
+                validation_names = (validated_q_groups(config,prepared)['C']
                     if config['model']=='q_route1' else [row['case_id'] for row in prepared['manifest']['cases'] if 'validation' in row['roles']])
                 if not validation_names:
                     raise ValueError('正式选模需要独立验证病例')
@@ -316,7 +348,8 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
                 save_state(root/'latest.pt',state)
                 if improved:
                     save_state(root/'best.pt',state)
-                print(json.dumps(dict(model=config['model'],stage=stage,**history[-1]),ensure_ascii=False),flush=True)
+                from ..observability.events import event
+                event(root,'model_update_completed',model=config['model'],stage=stage,**history[-1])
             all_states(update)
         measurement = rank_measurement(device,allocation,rank)
         if device.type=='cuda':

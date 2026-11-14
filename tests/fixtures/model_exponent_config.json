@@ -1,0 +1,7 @@
+{
+  "model": "q_route1",
+  "run_dir": "./model-config-check",
+  "technical": true,
+  "learning_rate": 2e-4,
+  "execution": {"cpu_fraction": 1e-6}
+}

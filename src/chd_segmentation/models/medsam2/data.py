@@ -52,10 +52,10 @@ def window_image(image,window):
 
 
 class NativeCases:
-    def __init__(self,prepared,with_label=True):
+    def __init__(self,prepared,with_label=True,log_dir=None,logging=None):
         self.prepared = prepared
         self.rows = {row['case_id']:row for row in prepared['manifest']['cases']}
-        self.reader = CaseTransform(prepared,4*2**30,with_label=with_label)
+        self.reader = CaseTransform(prepared,4*2**30,with_label=with_label,log_dir=log_dir,logging=logging)
         self.current_name,self.current = None,None
 
     def get(self,name):
@@ -96,8 +96,8 @@ def restore_native(probability,entry):
 
 
 class ManifestRawDataset(VOSRawDataset):
-    def __init__(self,prepared_path,names,window):
-        self.cases = NativeCases(load_prepared(prepared_path),with_label=True)
+    def __init__(self,prepared_path,names,window,log_dir=None,logging=None):
+        self.cases = NativeCases(load_prepared(prepared_path),with_label=True,log_dir=log_dir,logging=logging)
         self.names,self.window = list(names),window
 
     def __len__(self):

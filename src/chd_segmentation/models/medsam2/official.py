@@ -38,7 +38,8 @@ def effective_config(config,prepared,prepared_path,root,names):
     stats = prepared['plan']['foreground_intensity_properties_per_channel']['0']
     window = config['gray_window'] or [stats['percentile_00_5'],stats['percentile_99_5']]
     raw = dict(_target_='chd_segmentation.models.medsam2.data.ManifestRawDataset',
-               prepared_path=str(Path(prepared_path).resolve()),names=names,window=window)
+               prepared_path=str(Path(prepared_path).resolve()),names=names,window=window,
+               log_dir=str(root),logging=config['logging'])
     leaf = recipe.trainer.data.train.datasets[0].dataset.datasets[0]
     leaf._target_ = 'chd_segmentation.models.medsam2.data.HeartVOSDataset'
     leaf.video_dataset = OmegaConf.create(raw)

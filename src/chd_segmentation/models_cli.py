@@ -5,6 +5,10 @@ from pathlib import Path
 import yaml
 
 
+def wait_seconds(value):
+    return None if value.lower()=='forever' else float(value)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description='MedSAM2与Q路线一r2模型入口',allow_abbrev=False)
     commands = parser.add_subparsers(dest='command',required=True)
@@ -38,6 +42,8 @@ def main(argv=None):
         command.add_argument('--gpu-ids')
         command.add_argument('--batch-layout')
         command.add_argument('--workers')
+        command.add_argument('--wait-seconds',type=wait_seconds,default=argparse.SUPPRESS,
+            help='显卡等待秒数；forever持续等待，默认持续等待')
     train.add_argument('--batch',type=int)
     args = parser.parse_args(argv)
     if args.command=='split-q1282':
@@ -50,17 +56,29 @@ def main(argv=None):
         execution['gpu_count'] = args.gpus
     if args.gpu_ids:
         execution['gpu_ids'] = args.gpu_ids.split(',')
+        if args.gpus is not None and args.gpus!=len(execution['gpu_ids']):
+            parser.error('--gpus与--gpu-ids数量不同')
         execution['gpu_count'] = len(execution['gpu_ids'])
     if args.batch_layout:
         execution['batch_layout'] = list(map(int,args.batch_layout.split(',')))
     if args.workers is not None:
         execution['workers'] = 'auto' if args.workers=='auto' else int(args.workers)
+    if hasattr(args,'wait_seconds'):
+        execution['wait_seconds'] = args.wait_seconds
     overrides = dict(execution=execution)
     if args.device is not None:
         overrides['device'] = args.device
     if args.command=='train' and args.batch is not None:
         overrides['global_batch'] = args.batch
     config = options(args.config,overrides)
+    from .observability.events import Stage
+    with Stage(None,'model_command',heartbeat_seconds=config['logging']['heartbeat_seconds'],
+               model=config['model'],operation=args.command):
+        result = execute(args,config,train_model,predict_model)
+    print(json.dumps(result,ensure_ascii=False,allow_nan=False))
+
+
+def execute(args,config,train_model,predict_model):
     if args.command=='train':
         result = train_model(config,args.prepared,args.stage,args.resume,args.stop_after)
     else:
@@ -70,4 +88,4 @@ def main(argv=None):
             prompt_mode=args.prompt_mode,label_classes=label_classes,box_seed=args.box_seed,
             box_max_shift=args.box_max_shift,official_weights=args.official_weights,
             test_set=args.test_set,test_group=args.test_group)
-    print(json.dumps(result,ensure_ascii=False,allow_nan=False))
+    return result

@@ -1,9 +1,11 @@
 from pathlib import Path
+from time import perf_counter
 
 import nibabel as nib
 import numpy as np
 
 from ..artifacts.store import digest, file_digest, read_json, require_result_output, write_json
+from ..observability.events import event, logged, stage
 
 
 def case_data_identity(prepared, row):
@@ -23,7 +25,9 @@ def evaluation_output(config, prepared, prediction_dir, output):
     return result
 
 
+@logged("evaluation", config_argument=3)
 def evaluate(prediction_dir, prepared, output, config):
+    started = perf_counter()
     output = evaluation_output(config, prepared, prediction_dir, output)
     records = read_json(Path(prediction_dir) / "predictions.json")["cases"]
     selection = [(row, records[row["case_id"]]) for row in prepared["manifest"]["cases"] if row["case_id"] in records]
@@ -32,17 +36,20 @@ def evaluate(prediction_dir, prepared, output, config):
     identity = digest({"cases": [{"data": case_data_identity(prepared, row), "label": row["sha256"].get("label"),
                                  "prediction": receipt["sha256"], "checkpoint": receipt["checkpoint_sha256"]}
                                 for row, receipt in selection], "metric": "supervised-dice-v2"})
-    for row, receipt in selection:
+    for index, (row, receipt) in enumerate(selection, 1):
         if receipt["data_identity"] != case_data_identity(prepared, row) or \
                 receipt.get("reference_sha256") not in (None, row["sha256"]["label"]):
             raise ValueError("预测与评价的数据、类别或标签版本不同")
-        if file_digest(row["label"]) != row["sha256"]["label"] or \
-                file_digest(Path(prediction_dir) / receipt["file"]) != receipt["sha256"]:
-            raise ValueError("评价来源标签或预测摘要不一致")
+        with stage(config, "evaluation_verify", case_id=row["case_id"], completed=index - 1, total=len(selection)):
+            if file_digest(row["label"]) != row["sha256"]["label"] or \
+                    file_digest(Path(prediction_dir) / receipt["file"]) != receipt["sha256"]:
+                raise ValueError("评价来源标签或预测摘要不一致")
     if output.exists():
         previous = read_json(output)
         if previous.get("identity") != identity:
             raise FileExistsError("已有评价的输入或模型不同，请使用新的结果目录")
+        event(config["run_dir"], "evaluation_reused", cases=len(selection), output=str(output),
+              seconds=perf_counter() - started)
         return {**previous, "reused": True}
     results = []
     classes = len(prepared["dataset_json"]["labels"])
@@ -50,6 +57,9 @@ def evaluate(prediction_dir, prepared, output, config):
         receipt = records.get(row["case_id"])
         if receipt is None:
             continue
+        mark = perf_counter()
+        event(config["run_dir"], "evaluation_case_started", case_id=row["case_id"],
+              completed=len(results), total=len(selection))
         path = Path(prediction_dir) / receipt["file"]
         roi = tuple(slice(begin, end) for begin, end in receipt["roi_xyz"])
         prediction_image, reference_image = nib.load(path), nib.load(row["label"])
@@ -74,6 +84,9 @@ def evaluate(prediction_dir, prepared, output, config):
                                 "dice": float(2 * (target & found).sum() / (reference_count + predicted_count))
                                 if reference_count + predicted_count else None}
         results.append({"case_id": row["case_id"], "scope": receipt["scope"], "roi_xyz": receipt["roi_xyz"], "classes": by_class})
+        event(config["run_dir"], "evaluation_case_completed", case_id=row["case_id"], completed=len(results),
+              total=len(selection), seconds=perf_counter() - mark, supervised_classes=list(by_class),
+              skipped_unknown_classes=row["unknown_classes"])
     aggregates = {}
     for c in range(1, classes):
         values = [row["classes"][str(c)]["dice"] for row in results
@@ -83,4 +96,6 @@ def evaluate(prediction_dir, prepared, output, config):
                "cases": results, "aggregate": aggregates,
                "reused": False, "interpretation": "技术子区域运行结果，不证明泛化效果" if prepared["scope"] == "technical" else "按有监督类别评价"}
     write_json(output, summary)
+    event(config["run_dir"], "evaluation_completed", cases=len(results), aggregate=aggregates,
+          seconds=perf_counter() - started, output=str(output))
     return summary

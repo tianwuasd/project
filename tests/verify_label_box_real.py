@@ -57,7 +57,8 @@ def run(args):
         known = sorted(set(map(int, np.unique(entry['label'])))-{0, -1}-set(entry['unknown_classes']))
         if len(known) < 2:
             raise ValueError('实际子区域需要至少两个已知结构来检查独立传播')
-        selected = known[:2]
+        known.sort(key=lambda class_id:(int((entry['label']==class_id).sum((1,2)).argmax())==0,class_id))
+        selected = known[:args.structures]
         prompts, protocol = label_box_prompts(entry, row['sha256']['label'], 8, selected)
         assert (prompts, protocol) == label_box_prompts(entry, row['sha256']['label'], 8, selected)
         for item in prompts[row['case_id']]:
@@ -78,6 +79,14 @@ def run(args):
         assert predicted['initialization']['optimizer_updates'] == 0
         assert predicted['cases'][0]['prompt_protocol'] == protocol
         assert set(predicted['evaluation']['case_classes'][row['case_id']]) == set(map(str, selected))
+        logs = list((workspace.root/'course/model-predictions').rglob('events.jsonl'))
+        assert len(logs) == 2
+        import json
+        events = [json.loads(line) for path in logs for line in path.read_text(encoding='utf-8').splitlines()]
+        assert {'resources_requested','resources_allocated','resources_released','model_case_started',
+                'label_box_generated','model_case_completed'} <= {item['event'] for item in events}
+        assert any(item['frame']>0 for item in protocol['prompts'])
+        assert any(step['reverse'] and step['frames']>1 for step in predicted['cases'][0]['diagnostics']['propagation_steps'])
         for value in predicted['evaluation']['case_classes'][row['case_id']].values():
             assert value['reference_voxels'] > 0 and 0 <= value['dice'] <= 1
         # 普通路径在没有标签的独立准备描述中也必须要求显式外部提示。
@@ -105,4 +114,5 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     for name in ('spec', 'work-root', 'report'):
         parser.add_argument('--'+name, required=True)
+    parser.add_argument('--structures',type=int,choices=(1,2),default=2)
     run(parser.parse_args())
