@@ -1,6 +1,6 @@
 model: q_route1
 run_dir: /path/to/course/q-r2
-device: cpu
+device: cuda
 precision: fp32
 threads: 2
 seed: 20261111
@@ -17,3 +17,7 @@ groups: /path/to/course/q-groups.yaml
 parents:
   base: /path/to/course/q-r2/base/latest.pt
   localizer: /path/to/course/q-r2/localizer/latest.pt
+work_root: /path/to/course/chd-segmentation
+execution:
+  gpu_count: 2
+  workers: 0

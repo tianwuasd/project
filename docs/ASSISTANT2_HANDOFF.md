@@ -19,3 +19,7 @@ MedSAM2固定官方提交332f30d，使用官方Trainer、VOS采样/增强、模�
 验收报告：`D:/projects/back/sync-reports/chd-segmentation-assistant2`，MedSAM2官方权重与训练器的两数据集记录位于medsam-official；单例完整检查点、并发保护及native_dhw预测回归记录位于medsam-atomic。真实验收程序每数据集使用一例病例、每阶段最多两次更新，保存后重载继续并导出原空间。Q使用96³视野和32³网络技术尺寸，MedSAM2使用32³视野及官方8帧512分辨率训练。报告限定于本地CPU技术功能；目标服务器CUDA/DDP、正式患者分组准入、长训练、心脏分割效果及临床终点仍需各自实际验收。
 
 本分支按用户要求独立保留。后续合并与服务器发布使用明确的目标提交和单独的整合验收。
+
+助手1main继承来源：公开提交6ef3fd4c51eb53da26faa54a147fc35ae15ebc40的chd-segmentation子树与本地助手1c28e191树摘要相同。助手2继承该项目全部变化，保留模型入口及工作目录支持。共享GPU资源调用位于models/execution.py，依赖training/resources.py；模型CPU缓存、官方数据worker、预取队列和读盘并发使用已准入配置。Q全局累积4样本按各rank份额归约；MedSAM2保留官方分布式Trainer和均等每卡batch。检查点保存逐rank状态并核对完整执行拓扑。
+
+需要提交或上传的文件、服务器位置、Q分组及MedSAM2提示要求见 [服务器材料清单](ASSISTANT2_SERVER_FILES.md)。该文件同时说明当前发布边界：继承远端main与发布助手2模型是两个独立操作，服务器update.py以实际已发布main为准。

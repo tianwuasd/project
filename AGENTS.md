@@ -4,8 +4,8 @@
 
 - 工作分支为 `codex/chd-segmentation-assistant2-medsam2-q-r2`，基点为 `298a75a50e18117bd62c741ebbc328b89dc8e7ad`。
 - 所有编辑、暂存与提交在本工作目录执行。原目录 `D:/projects/project/chd-segmentation` 由先心代码助手1维护。
-- 保留本目录自己的 Git index；不切换原目录分支，不暂存原目录内容，不调用项目 update.py，不合并 main。
-- 共享训练调度、GPU分配、CPU供数及正式数据划分由助手1维护。本分支通过模型独立入口与已有准备描述接入。
+- 保留本目录自己的 Git index；不切换原目录分支，不暂存原目录内容，不调用项目 update.py。用户已要求继承助手1已发布main：远端6ef3fd4c51eb53da26faa54a147fc35ae15ebc40的chd-segmentation子树与本地助手1提交c28e191逐文件相同。
+- 共享GPU分配、资源登记和CPU预算沿用助手1的training/resources.py。MedSAM2和Q分别接入模型入口，保留各自训练方法、预算和数据分组。
 - Q 保留 r2 的类别、网络、损失、求解和一次整例融合。预处理输入沿用已有准备描述；不改变标签语义或患者分组。
 - MedSAM2 使用官方序列训练及记忆传播；提示来源分别登记。预测过程中禁止读取测试标签生成提示。
 - 本次已获准在 `D:/projects/back/t17/chd-segmentation-assistant2` 使用最多2例真实病例，每阶段最多2次更新，最多200个验证文件、峰值8 GiB，结束清理副产物。验收报告保留在 `D:/projects/back/sync-reports/chd-segmentation-assistant2`，不超过10 MiB。

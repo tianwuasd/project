@@ -13,7 +13,8 @@ from .transforms import CaseTransform
 
 
 def plan_request(config, manifest):
-    rows = sorted((row for row in manifest["cases"] if "train" in row["roles"]), key=lambda row: row["case_id"])
+    rows = sorted((row for row in manifest["cases"] if "train" in row["roles"] and
+                   row.get("cohort") != "auxiliary"), key=lambda row: row["case_id"])
     if not rows or any(row.get("label") is None for row in rows):
         raise ValueError("自动计划需要有真实标签的训练病例")
     if config["scope"] == "technical" and len(manifest["cases"]) > 2:

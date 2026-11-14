@@ -23,7 +23,7 @@ from chd_segmentation.models.workflow import options,train,predict,load_state,da
 from chd_segmentation.models.q_route1.adapter import allowed,export_probabilities
 
 
-def verify(spec_path,work_root,report_root,selected_model,dataset=None):
+def verify(spec_path,work_root,report_root,selected_model,dataset=None,world=1):
     experiments = yaml.safe_load(Path(spec_path).read_text(encoding='utf-8'))['experiments']
     if dataset is not None:
         experiments = [experiment for experiment in experiments if experiment['dataset']==dataset]
@@ -55,11 +55,26 @@ def verify(spec_path,work_root,report_root,selected_model,dataset=None):
             workspace.results.append(record)
             model_path = directory/'model.yaml'
             config = dict(model=selected_model,run_dir=str(directory/'course'/selected_model),device='cpu',precision='fp32',
-                threads=2,updates=2,accumulation=1,patch=32,local_size=32,technical=True,max_candidates=1,
+                threads=2,updates=2,accumulation=4 if selected_model=='q_route1' and world>1 else 1,patch=32,local_size=32,technical=True,max_candidates=1,
                 pretrained=experiment['pretrained'] if selected_model=='q_route1' else str(ROOT/'data/model_weights/MedSAM2_latest.pt'),
                 official_root=str(ROOT/'vendor/MedSAM2'),dependency_root=str(ROOT/'env/medsam2'),
-                frames=8,resolution=512,freeze_image_encoder=False,batch=1,workers=0)
+                frames=8,resolution=512,freeze_image_encoder=False,batch=1,workers=0,
+                work_root=str(directory/'course'),execution=dict(cpu_processes=world,
+                    workers=1 if selected_model=='medsam2' else 0,prefetch=1))
             write_json(model_path,config)
+            if selected_model=='medsam2':
+                from chd_segmentation.models.execution import admitted,execution_config
+                probe = deepcopy(prepared)
+                for probe_row in probe['manifest']['cases']:
+                    probe_row['roles']=['predict']
+                q_probe = dict(options(model_path),model='q_route1',pretrained=experiment['pretrained'])
+                q_probe['execution'] = dict(q_probe['execution'],workers=0)
+                with admitted(q_probe,probe,'base') as (common,allocation):
+                    if allocation['supply']['case_estimate_bytes']<=0:
+                        raise ValueError('Q资源预算缺少实际训练病例')
+                record['q_role_projection_admitted']=True
+                if execution_config(options(model_path))['training']['patch']!=[8,512,512]:
+                    raise ValueError('MedSAM2资源预算需要按实际8帧512序列估算')
             stages = ('base','localizer','local') if selected_model=='q_route1' else ('sequence',)
             record['models'][selected_model]={}
             for stage in stages:
@@ -77,17 +92,27 @@ def verify(spec_path,work_root,report_root,selected_model,dataset=None):
                 prior = load_state(first['checkpoint'])
                 parameters = {key:value.clone() for key,value in prior['model'].items()}
                 del prior
+                if selected_model=='q_route1' and world==3:
+                    changed_layout = deepcopy(applied)
+                    changed_layout['execution']['batch_layout']=[1,2,1]
+                    with unittest.TestCase().assertRaises(ValueError):
+                        train(changed_layout,directory/'course/prepared.json',stage,resume=True)
+                    record['models'][selected_model]['changed_layout_rejected']=True
                 continued = train(applied,directory/'course/prepared.json',stage,resume=True)
                 if selected_model=='medsam2':
                     native = torch.load(continued['official_checkpoint'],map_location='cpu',weights_only=True)
                     if continued['restored_exact'] is not True or native['epoch']!=2 or native['steps']['train']!=2 or len(native['_chd']['history'])!=2:
                         raise ValueError('官方检查点及随机状态恢复未通过')
-                    for key in ('python_rng','numpy_rng','torch_rng','prompt_rng','cuda_rng','identity'):
-                        if key not in native['_chd']:
+                    for key in ('python_rng','numpy_rng','torch_rng','prompt_rng','cuda_rng'):
+                        if key not in native['_chd']['rank_states'][0]:
                             raise ValueError('完整官方检查点缺少恢复状态：'+key)
                     record['models'][selected_model]['atomic_resume_bundle']=True
+                    if continued['data_workers']!=[1] or continued['prefetch_factor']!=1:
+                        raise ValueError('官方数据loader的worker与预取配额未实际应用')
                     del native
                 current = load_state(continued['checkpoint'])
+                if continued['world_size']!=world or continued['restored_exact'] is not True:
+                    raise ValueError('多进程数量或完整状态恢复未通过')
                 changed = any(not torch.equal(parameters[key],value) for key,value in current['model'].items())
                 if first['update']!=1 or continued['update']!=2 or not changed:
                     raise ValueError('实际参数更新与保存恢复未通过')
@@ -135,5 +160,6 @@ if __name__=='__main__':
     parser.add_argument('--report-root',required=True)
     parser.add_argument('--model',choices=('q_route1','medsam2'),required=True)
     parser.add_argument('--dataset',choices=('chd1282','imagechd'))
+    parser.add_argument('--world',type=int,choices=(1,2,3,4),default=1)
     args=parser.parse_args()
-    verify(args.spec,args.work_root,args.report_root,args.model,args.dataset)
+    verify(args.spec,args.work_root,args.report_root,args.model,args.dataset,args.world)

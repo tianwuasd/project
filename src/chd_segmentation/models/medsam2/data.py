@@ -9,6 +9,36 @@ from training.dataset.vos_raw_dataset import VOSRawDataset,VOSFrame,VOSVideo
 from training.dataset.vos_segment_loader import NPZSegmentLoader
 from training.dataset.vos_dataset import VOSDataset
 
+_read_gate = None
+_prefetch_depth = 2
+
+
+class BudgetDataLoader(torch.utils.data.DataLoader):
+    def __init__(self,dataset,**kwargs):
+        workers = kwargs['num_workers']
+        kwargs['prefetch_factor'] = max(1,_prefetch_depth//workers) if workers else None
+        super().__init__(dataset,**kwargs)
+
+
+class ResourceWorkerInit:
+    def __init__(self,common,owner,gate):
+        self.common,self.owner,self.gate = common,owner,gate
+
+    def __call__(self,worker_id):
+        global _read_gate
+        from ...training.resources import register_member
+        register_member(self.common,self.owner)
+        torch.set_num_threads(1)
+        _read_gate = self.gate
+
+
+def set_read_gate(gate,prefetch_depth):
+    global _read_gate,_prefetch_depth
+    _read_gate = gate
+    _prefetch_depth = prefetch_depth
+    import training.dataset.sam2_datasets as official_data
+    official_data.DataLoader = BudgetDataLoader
+
 
 def window_image(image,window):
     low,high = window
@@ -29,6 +59,12 @@ class NativeCases:
         self.current_name,self.current = None,None
 
     def get(self,name):
+        if _read_gate is None:
+            return self._get(name)
+        with _read_gate:
+            return self._get(name)
+
+    def _get(self,name):
         row = self.rows[name]
         self.reader.check_sources(row)
         if name==self.current_name:

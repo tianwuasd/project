@@ -1,0 +1,18 @@
+model: q_route1
+run_dir: /path/to/course/q-r2
+work_root: /path/to/course/chd-segmentation
+device: cuda
+precision: fp32
+seed: 20261111
+technical: false
+updates: 40000
+accumulation: 4
+patch: 128
+local_size: 128
+learning_rate: 0.0002
+pretrained: /path/to/data/model_weights/small_ep4k.model
+groups: /path/to/course/q-groups.yaml
+parents: {}
+execution:
+  gpu_count: 2
+  workers: 0

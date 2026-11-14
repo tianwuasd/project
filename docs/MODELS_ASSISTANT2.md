@@ -8,6 +8,7 @@
 |---|---|
 | `models_cli.py` | 独立模型训练与预测命令 |
 | `models/workflow.py` | 读取准备描述、来源身份、优化器更新、完整保存/恢复及原网格导出 |
+| `models/execution.py` | 调用助手1共享GPU/CPU准入、批量份额、进程登记和隔离预测 |
 | `models/q_route1/` | r2局部网络、邻边事件、解析梯度、三步求解、定位器和一次概率融合 |
 | `models/medsam2/official.py`、`worker.py` | 官方Trainer、有效配置、隔离运行与官方检查点恢复 |
 | `models/medsam2/data.py`、`adapter.py` | 原始网格数据接口、官方VOS采样/增强及提示传播 |
@@ -16,6 +17,8 @@
 | `tests/verify_models_real.py` | 两套数据真实病例的有界验收及自动清理 |
 
 ## 输入与类别
+
+本分支已继承助手1公开main的6ef3fd4项目内容，对应本地c28e191。两个模型通过training/resources.py共用资源登记和准入策略，实际进程、批量份额和供数配置写入resources.json；完整恢复同时核对execution-topology.json。显卡与材料说明见 [服务器文件与GPU设置](ASSISTANT2_SERVER_FILES.md)。
 
 先通过原有 `prepare` 生成准备描述，模型命令读取同一记录与实际计划；影像和标签原件只读。Q内部类别顺序固定为背景、LV、RV、LA、RA、Myo、AO、PA、PV、SVC、IVC。CHD1282原始类别显式映射；ImageCHD输出回到其原始8类，PV/SVC/IVC保留未知监督，输出时其概率并入背景。
 

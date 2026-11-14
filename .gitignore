@@ -12,3 +12,9 @@ env/
 vendor/MedSAM2/
 assistant2.local.yaml
 data/model_weights/
+server-inputs/
+*_manifest.json
+*_cohort.json
+*_policy.json
+bundle.json
+binding.json

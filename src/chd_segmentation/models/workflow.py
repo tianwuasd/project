@@ -19,15 +19,23 @@ from ..preprocessing.prepare import load_prepared
 from ..prediction.restore import restore
 
 
-def options(path):
+def options(path,overrides=None):
     raw = yaml.safe_load(Path(path).read_text(encoding='utf-8'))
+    if overrides:
+        overrides = deepcopy(overrides)
+        if 'global_batch' in overrides:
+            overrides['accumulation' if raw['model']=='q_route1' else 'batch'] = overrides.pop('global_batch')
+        if 'execution' in overrides:
+            raw['execution'] = {**raw.get('execution',{}),**overrides.pop('execution')}
+        raw.update(overrides)
     defaults = dict(model=None, run_dir=None, device='cpu', precision='fp32', threads=2,
                     seed=20261114, updates=2, accumulation=4, learning_rate=0.0002,
                     patch=128, local_size=128, frames=8, resolution=512,
                     pretrained=None, parents={}, groups=None, technical=False,
                     official_root=None, dependency_root=None, freeze_image_encoder=False,
                     max_candidates=24, warmup_updates=2000,method='M07',key_references=None,
-                    validate_every=1000,batch=2,workers=15,epochs=None,gray_window=None)
+                    validate_every=1000,batch=2,workers=15,epochs=None,gray_window=None,
+                    work_root=None,execution={})
     if not isinstance(raw, dict) or set(raw)-set(defaults):
         raise ValueError('模型配置字段无效')
     config = {**defaults, **raw}
@@ -64,10 +72,12 @@ def options(path):
     if not np.isfinite(config['learning_rate']) or config['learning_rate'] <= 0:
         raise ValueError('学习率必须为有限正数')
     root = Path(path).resolve().parent
-    for key in ('run_dir','pretrained','groups','official_root','dependency_root','key_references'):
+    for key in ('run_dir','pretrained','groups','official_root','dependency_root','key_references','work_root'):
         if config[key] is not None:
             config[key] = str((root/Path(config[key])).resolve())
     config['parents'] = {key:str((root/Path(value)).resolve(strict=True)) for key,value in config['parents'].items()}
+    from .execution import execution_config
+    execution_config(config)
     return config
 
 
@@ -147,7 +157,8 @@ def save_state(path, state):
 
 
 def model_identity(config,prepared,stage,initialization_sha256=None):
-    scientific = {key:value for key,value in config.items() if key not in ('run_dir','threads','dependency_root','official_root')}
+    scientific = {key:value for key,value in config.items() if key not in
+                  ('run_dir','threads','dependency_root','official_root','execution','work_root','device')}
     return digest(dict(config=scientific,prepared=prepared['identity'],stage=stage,code=source_identity(config),
         parents={key:file_digest(value) for key,value in config['parents'].items()},
         pretrained=initialization_digest(config,initialization_sha256),
@@ -169,56 +180,92 @@ def train(config, prepared_path, stage, resume=False, stop_after=None):
     if config['model']=='medsam2':
         from .medsam2.official import train_official
         return train_official(config,prepared_path,stage,resume,stop_after)
-    started = perf_counter()
-    device = resources(config)
+    from .execution import admitted,run_workers
     prepared = load_prepared(prepared_path)
+    training_names(config,prepared,stage)
+    root = Path(config['run_dir'])/stage
+    if root.resolve().is_relative_to(Path(prepared['manifest']['data_root']).resolve()):
+        raise ValueError('训练输出不能位于原始数据目录内')
+    if stop_after is not None and not 1<=stop_after<=config['updates']:
+        raise ValueError('stop-after超出预算')
+    root.parent.mkdir(parents=True,exist_ok=True)
+    with FileLock(root.parent/(stage+'.lock'),timeout=0):
+        if root.exists() and not resume:
+            raise FileExistsError('阶段目录已存在，使用resume或新目录')
+        if resume and not (root/'latest.pt').is_file():
+            raise FileNotFoundError('阶段缺少完整检查点')
+        with admitted(config,prepared,stage) as (common,allocation):
+            return run_workers(dict(config=config,prepared=prepared,stage=stage,
+                resume=resume,stop_after=stop_after),common,allocation)
+
+
+def _train_q_rank(payload,rank,common,allocation,gate,device):
+    from .execution import all_states,synchronize_gradients,pressure,rank_measurement
+    from ..training.resources import record_peaks
+    config,prepared,stage = payload['config'],payload['prepared'],payload['stage']
+    resume,stop_after = payload['resume'],payload['stop_after']
+    started = perf_counter()
     names = training_names(config,prepared,stage)
     root = Path(config['run_dir'])/stage
-    if root.exists() and not resume:
-        raise FileExistsError('阶段目录已存在，使用resume或新目录')
-    if resume and not (root/'latest.pt').is_file():
-        raise FileNotFoundError('阶段缺少完整检查点')
-    if stop_after is not None and not 1 <= stop_after <= config['updates']:
-        raise ValueError('stop-after超出预算')
-    if prepared['manifest']['data_root'] == str(root) or Path(prepared['manifest']['data_root']) in root.parents:
-        raise ValueError('训练输出不能位于原始数据目录内')
     seed = config['seed']
     torch.manual_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
-    rng = np.random.default_rng(seed)
+    rng = np.random.default_rng(np.random.SeedSequence([seed,rank]))
     previous = load_state(root/'latest.pt') if resume else None
     initial_sha = initialization_digest(config,previous['initialization_sha256'] if previous else None)
-    bundle = adapter(config,prepared,stage,initialize=not resume)
+    bundle = adapter(dict(config,device=str(device),seed=seed+rank),prepared,stage,initialize=not resume)
     model = bundle.model.to(device)
     model.train()
     optimizer = bundle.optimizer()
     identity = model_identity(config,prepared,stage,initial_sha)
-    dataset = dataset_for(prepared,True)
+    class AdmittedCases(CaseDataset):
+        def get(self,name):
+            with gate:
+                return super().get(name)
+    dataset = AdmittedCases(prepared,dict(reserve_ram_bytes=common['resources']['reserve_ram_bytes'],
+        cache_bytes=allocation['supply']['cache_bytes'][rank]),with_label=True)
     bundle.prepare_training(dataset,names)
     update,history,best = 0,[],None
+    restored = False
     if resume:
         state = previous
         if state['identity']!=identity:
             raise ValueError('恢复的配置、数据、源码或上游身份不同')
         model.load_state_dict(state['model'],strict=True)
         optimizer.load_state_dict(state['optimizer'])
-        torch.set_rng_state(state['torch_rng'])
-        random.setstate(state['python_rng'])
-        np.random.set_state(state['numpy_rng'])
-        rng.bit_generator.state = state['data_rng']
+        if len(state['rank_states'])!=allocation['world'] or state['batch_layout']!=allocation['shares']:
+            raise ValueError('Q恢复需要相同进程数量与批量份额')
+        local_state = state['rank_states'][rank]
+        torch.set_rng_state(local_state['torch_rng'])
+        random.setstate(local_state['python_rng'])
+        np.random.set_state(local_state['numpy_rng'])
+        rng.bit_generator.state = local_state['data_rng']
         if device.type=='cuda':
-            torch.cuda.set_rng_state_all(state['cuda_rng'])
-        bundle.restore_extra(state['extra'])
+            torch.cuda.set_rng_state(local_state['cuda_rng'],device)
+        bundle.restore_extra(local_state['extra'])
+        from ..training.checkpoint import tensors_equal
+        restored = (tensors_equal(model.state_dict(),state['model']) and
+            tensors_equal(optimizer.state_dict(),state['optimizer']) and
+            torch.equal(torch.get_rng_state(),local_state['torch_rng']) and
+            tensors_equal(bundle.extra_state(),local_state['extra']) and
+            rng.bit_generator.state==local_state['data_rng'])
+        if not restored:
+            raise ValueError('Q模型、优化器或逐进程随机状态未完整恢复')
         update,history,best = state['update'],state['history'],state['best']
-    root.mkdir(parents=True,exist_ok=True)
-    with FileLock(root/'stage.lock',timeout=0):
+    reason = None
+    peak_vram = 0
+    replicas_equal = None
+    with torch.enable_grad():
         while update < (config['updates'] if stop_after is None else stop_after):
             mark = perf_counter()
+            if pressure(common,device):
+                reason = 'resource_pressure'
+                break
             optimizer.zero_grad(set_to_none=True)
             bundle.schedule(optimizer,update)
             loss_sum = 0.
-            for _ in range(config['accumulation']):
+            for _ in range(allocation['shares'][rank]):
                 entry = bundle.sample(dataset,names,rng)
                 with torch.autocast(device.type,dtype=torch.bfloat16,enabled=config['precision']=='bf16'):
                     loss = bundle.loss(entry,rng,update)
@@ -227,8 +274,20 @@ def train(config, prepared_path, stage, resume=False, stop_after=None):
                 (loss/config['accumulation']).backward()
                 loss_sum += float(loss.detach())/config['accumulation']
                 del loss
+            synchronize_gradients(model)
+            loss_sum = sum(all_states(loss_sum))
             norm = torch.nn.utils.clip_grad_norm_(model.parameters(),5.,error_if_nonfinite=True)
             optimizer.step()
+            if config['technical']:
+                import hashlib
+                checksum = hashlib.sha256()
+                for value in model.state_dict().values():
+                    checksum.update(value.detach().cpu().contiguous().reshape(-1).view(torch.uint8).numpy().tobytes())
+                replicas_equal = len(set(all_states(checksum.hexdigest())))==1
+                if not replicas_equal:
+                    raise ValueError('Q各进程更新后的模型参数不一致')
+            if device.type=='cuda':
+                peak_vram = max(peak_vram,rank_measurement(device,allocation,rank)['peak_vram_bytes'])
             update += 1
             history.append(dict(update=update,loss=loss_sum,gradient_norm=float(norm),seconds=perf_counter()-mark))
             improved = False
@@ -239,32 +298,67 @@ def train(config, prepared_path, stage, resume=False, stop_after=None):
                     raise ValueError('正式选模需要独立验证病例')
                 model.eval()
                 with torch.no_grad():
-                    value = bundle.validate(dataset,validation_names)
+                    value = bundle.validate(dataset,validation_names) if rank==0 else None
+                value = all_states(value)[0]
                 model.train()
                 improved = best is None or value<best
                 if improved:
                     best = value
                 history[-1]['validation_loss'] = value
-            state = dict(identity=identity,model=model.state_dict(),optimizer=optimizer.state_dict(),
+            local_state = dict(torch_rng=torch.get_rng_state(),python_rng=random.getstate(),numpy_rng=np.random.get_state(),
+                data_rng=rng.bit_generator.state,cuda_rng=torch.cuda.get_rng_state(device) if device.type=='cuda' else None,
+                extra=bundle.extra_state())
+            rank_states = all_states(local_state)
+            state = dict(identity=identity,model=model.state_dict(),optimizer=optimizer.state_dict(),rank_states=rank_states,
+                batch_layout=allocation['shares'],
                 update=update,history=history,config=config,prepared_identity=prepared['identity'],stage=stage,
-                spec=bundle.spec,torch_rng=torch.get_rng_state(),python_rng=random.getstate(),numpy_rng=np.random.get_state(),
-                data_rng=rng.bit_generator.state,cuda_rng=torch.cuda.get_rng_state_all() if device.type=='cuda' else None,
-                extra=bundle.extra_state(),training_cases=names,scope=prepared['scope'],best=best)
+                spec=bundle.spec,training_cases=names,scope=prepared['scope'],best=best)
             state.update(prepared=prepared,initialization_sha256=initial_sha)
-            save_state(root/'latest.pt',state)
-            if improved:
-                save_state(root/'best.pt',state)
-            print(json.dumps(dict(model=config['model'],stage=stage,**history[-1]),ensure_ascii=False),flush=True)
+            if rank==0:
+                save_state(root/'latest.pt',state)
+                if improved:
+                    save_state(root/'best.pt',state)
+                print(json.dumps(dict(model=config['model'],stage=stage,**history[-1]),ensure_ascii=False),flush=True)
+            all_states(update)
+        measurement = rank_measurement(device,allocation,rank)
+        if device.type=='cuda':
+            measurement['peak_vram_bytes'] = max(measurement['peak_vram_bytes'],peak_vram)
+        measurements = all_states(measurement)
         summary = dict(model=config['model'],stage=stage,scope=prepared['scope'],update=update,history=history,
-                       checkpoint=str(root/'latest.pt'),checkpoint_sha256=file_digest(root/'latest.pt'),
+                       checkpoint=str(root/'latest.pt'),
                        seconds=perf_counter()-started,rss_bytes=psutil.Process().memory_info().rss,
-                       peak_vram_bytes=torch.cuda.max_memory_allocated() if device.type=='cuda' else None)
-        write_json(root/'summary.json',summary)
+                       peak_vram_bytes=max(m['peak_vram_bytes'] for m in measurements) if device.type=='cuda' else None,
+                       reason=reason,world_size=allocation['world'],batch_layout=allocation['shares'],
+                       ranks=measurements,restored_exact=all(all_states(restored)) if resume else None,
+                       replicas_equal=replicas_equal)
+        if rank==0:
+            if not (root/'latest.pt').is_file():
+                raise MemoryError('Q在第一次更新前资源不足，未生成训练检查点')
+            summary['checkpoint_sha256'] = file_digest(root/'latest.pt')
+            write_json(root/'summary.json',summary)
+            if update==(config['updates'] if stop_after is None else stop_after):
+                record_peaks(common,allocation['spec'],allocation['gpus'],allocation['shares'],
+                    [m['peak_vram_bytes'] for m in measurements] if allocation['gpus'] else [])
     dataset.clear()
     return summary
 
 
 def predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=None):
+    from .execution import admitted,run_workers
+    prepared = load_prepared(prepared_path)
+    applied = deepcopy(config)
+    applied['execution'].update(gpu_count=1,cpu_processes=1,batch_layout=None,workers=0)
+    if applied['execution'].get('gpu_ids'):
+        applied['execution']['gpu_ids'] = applied['execution']['gpu_ids'][:1]
+    key = digest(dict(checkpoint=file_digest(checkpoint),prepared=prepared['identity'],output=str(Path(output).resolve())))[:16]
+    applied['run_dir'] = str(Path(config['work_root'] or Path(config['run_dir']).parent)/'model-predictions'/key)
+    with admitted(applied,prepared,'prediction') as (common,allocation):
+        return run_workers(dict(operation='predict',config=applied,prepared=prepared,stage='prediction',
+            prepared_path=str(Path(prepared_path).resolve()),checkpoint=str(Path(checkpoint).resolve()),
+            output=str(Path(output).resolve()),case_ids=case_ids,prompts=prompts),common,allocation)
+
+
+def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=None):
     started = perf_counter()
     resources(config)
     prepared = load_prepared(prepared_path)

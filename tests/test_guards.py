@@ -12,6 +12,12 @@ FIXTURE = Path(__file__).parent / "fixtures" / "exponent_config.json"
 
 
 class IdentityGuardTests(unittest.TestCase):
+    def test_model_gpu_count_is_not_overwritten_by_indexed_device(self):
+        from chd_segmentation.models.workflow import options
+        config = Path(__file__).resolve().parents[1]/'configs/models/medsam2.yaml'
+        with self.assertRaisesRegex(ValueError,'cuda'):
+            options(config,dict(device='cuda:0',execution=dict(gpu_count=2)))
+
     def test_current_plan_must_match_prepared_source(self):
         from chd_segmentation.preprocessing.prepare import validate_prepared_config
         base = {"dataset": "chd1282", "scope": "technical", "fold": 0, "technical": {"roi_xyz": None}}

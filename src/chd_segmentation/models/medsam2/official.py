@@ -1,7 +1,4 @@
-import os
 from pathlib import Path
-import subprocess
-import sys
 
 from filelock import FileLock
 
@@ -70,38 +67,26 @@ def _train_locked(config,prepared,prepared_path,root,stage,resume,stop_after):
         raise ValueError('MedSAM2官方配方需要8帧、512分辨率、无梯度累积且训练全部模型')
     receipt = verify_official_weight(config['pretrained'])
     from ..workflow import training_names,model_identity
+    from ..execution import admitted,run_workers
     names = training_names(config,prepared,stage)
     if config['technical'] and config['updates']>2:
         raise ValueError('MedSAM2技术验证最多两次更新')
+    if stop_after is not None and (type(stop_after) is not int or stop_after<1 or
+                                  config['technical'] and stop_after>config['updates']):
+        raise ValueError('MedSAM2停止更新数超出预算')
     if root.exists() and not resume:
         raise FileExistsError('MedSAM2训练目录已存在')
     if resume and not (root/'checkpoints/checkpoint.pt').is_file():
         raise FileNotFoundError('MedSAM2恢复需要完整官方检查点')
     recipe = effective_config(config,prepared,prepared_path,root,names)
     identity = model_identity(config,prepared,stage)
-    payload = dict(config=config,prepared=prepared,recipe=recipe,identity=identity,weight=receipt,
+    payload = dict(config=config,prepared=prepared,recipe=recipe,identity=identity,weight=receipt,stage=stage,
                    prepared_path=str(Path(prepared_path).resolve()),resume=resume,stop_after=stop_after)
     if resume and read_json(root/'identity.json')!={'identity':identity}:
         raise ValueError('MedSAM2恢复的输入、配置或源码身份不同')
-    root.mkdir(parents=True,exist_ok=True)
-    write_json(root/'worker-input.json',payload)
-    write_json(root/'identity.json',dict(identity=identity))
-    write_json(root/'official-config.json',recipe)
-    project = Path(__file__).resolve().parents[4]
-    keep = {'PATH','SYSTEMROOT','WINDIR','COMSPEC','PATHEXT','USERPROFILE','APPDATA','LOCALAPPDATA',
-            'PROGRAMDATA','PROGRAMFILES','PROGRAMFILES(X86)','SYSTEMDRIVE','NUMBER_OF_PROCESSORS',
-            'USERNAME','USER','LOGNAME'}
-    environment = {key:value for key,value in os.environ.items() if key.upper() in keep}
-    environment.update(PYTHONDONTWRITEBYTECODE='1',PYTHONPATH=os.pathsep.join([str(project/'src'),
-        config['dependency_root'],config['official_root']]),TEMP=str(root/'runtime'),TMP=str(root/'runtime'),
-        USE_LIBUV='0',OMP_NUM_THREADS=str(config['threads']),MKL_NUM_THREADS=str(config['threads']))
-    environment['CUDA_VISIBLE_DEVICES'] = '' if config['device']=='cpu' else config['device'].split(':')[-1]
-    environment['TORCHINDUCTOR_CACHE_DIR'] = str(root/'runtime/torch')
-    (root/'runtime').mkdir(exist_ok=True)
-    with (root/'official-console.log').open('ab') as log:
-        result = subprocess.run([sys.executable,'-B','-m','chd_segmentation.models.medsam2.worker',
-            str(root/'worker-input.json')],env=environment,cwd=project,stdout=log,stderr=subprocess.STDOUT,check=False)
-    if result.returncode:
-        tail = (root/'official-console.log').read_text(encoding='utf-8',errors='replace')[-6000:]
-        raise RuntimeError('MedSAM2官方训练失败：\n'+tail)
-    return read_json(root/'summary.json')
+    with admitted(config,prepared,stage) as (common,allocation):
+        root.mkdir(parents=True,exist_ok=True)
+        write_json(root/'worker-input.json',payload)
+        write_json(root/'identity.json',dict(identity=identity))
+        write_json(root/'official-config.json',recipe)
+        return run_workers(payload,common,allocation)
