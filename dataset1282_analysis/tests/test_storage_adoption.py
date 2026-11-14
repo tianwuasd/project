@@ -55,6 +55,10 @@ class ExistingProcessAdoptionTest(unittest.TestCase):
                                           'job': {'id': marker.stem},
                                           'artifacts': {artifact_relative.as_posix(): checksum}}),
                               encoding='utf-8')
+            source.mkdir(parents=True)
+            with self.assertRaisesRegex(ValueError, 'still exists'):
+                _adopt_unlocked(source, destination, experiment)
+            source.rmdir()
             result = _adopt_unlocked(source, destination, experiment)
             self.assertEqual(result['committed_cases'], 1)
             self.assertEqual(canonical_path(prepared), str(original_prepared))
