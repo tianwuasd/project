@@ -13,6 +13,8 @@ LABELS = {
 def load_manifest(path, dataset, scope, allow_unassigned=False):
     path = Path(path).resolve(strict=True)
     value = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if value.get("binding_required"):
+        raise ValueError("迁移清单尚未绑定数据目录，请先执行 bind-inputs")
     if value["dataset"] != dataset or value["scope"] != scope:
         raise ValueError("数据清单与数据集或任务范围不匹配")
     root = Path(value["data_root"]).resolve(strict=True)

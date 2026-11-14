@@ -22,9 +22,11 @@ from .metrics import case_data_identity
 from .restore import restore
 
 
-def predict(config, output, inputs=None, case_ids=None):
+def predict(config, output, inputs=None, case_ids=None, manifest=None):
+    if inputs is not None and manifest is not None:
+        raise ValueError("预测输入文件与已验证清单只能指定一种")
     if config["resources"]["device"] == "cpu":
-        return _predict(config, output, inputs, case_ids)
+        return _predict(config, output, inputs, case_ids, manifest)
     if torch.cuda.is_initialized():
         raise RuntimeError("GPU 预测需要新的命令进程，以使用准入后的可见设备")
     runtime = deepcopy(config)
@@ -33,10 +35,13 @@ def predict(config, output, inputs=None, case_ids=None):
         raise ValueError("单次预测仅使用一张卡，请配置一个 gpu_ids 或使用自动选卡")
     training = read_json(Path(config["run_dir"]) / "run.json")
     previous = os.environ.get("CUDA_VISIBLE_DEVICES")
-    with resource_lease(runtime, training["prepared"], training["scientific"]["spec"]) as allocation:
+    prepared = deepcopy(training["prepared"])
+    if manifest is not None:
+        prepared["manifest"] = manifest
+    with resource_lease(runtime, prepared, training["scientific"]["spec"], stage="predict") as allocation:
         os.environ["CUDA_VISIBLE_DEVICES"] = allocation["gpus"][0]["uuid"]
         try:
-            return _predict(runtime, output, inputs, case_ids)
+            return _predict(runtime, output, inputs, case_ids, manifest)
         finally:
             torch.cuda.empty_cache()
             if previous is None:
@@ -45,7 +50,7 @@ def predict(config, output, inputs=None, case_ids=None):
                 os.environ["CUDA_VISIBLE_DEVICES"] = previous
 
 
-def _predict(config, output, inputs=None, case_ids=None):
+def _predict(config, output, inputs=None, case_ids=None, manifest=None):
     started = perf_counter()
     training = read_json(Path(config["run_dir"]) / "run.json")
     prepared = deepcopy(training["prepared"])
@@ -54,6 +59,8 @@ def _predict(config, output, inputs=None, case_ids=None):
         raise ValueError("预测代码与训练记录不一致，需要经过验证的兼容记录")
     if inputs is not None:
         prepared["manifest"] = load_manifest(inputs, prepared["dataset"], prepared["scope"])
+    if manifest is not None:
+        prepared["manifest"] = deepcopy(manifest)
     protected = [prepared["manifest"]["data_root"]]
     if inputs is not None:
         protected.append(inputs)

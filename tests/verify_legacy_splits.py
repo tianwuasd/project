@@ -23,13 +23,14 @@ def run(args):
     config["split"]["path"] = args.chd_cohort
     selected = apply_split(manifest, config)
     assert manifest == before
-    assert Counter(r["roles"][0] for r in selected["cases"]) == {"train": 598, "validation": 130}
+    assert Counter(r["roles"][0] for r in selected["cases"]) == {"train": 598, "validation": 130, "test": 458}
     patients = {}
     for row in selected["cases"]:
         role = row["roles"][0]
         assert row["patient"] == frozen["cases"][row["case_id"]]["patient"]
         assert patients.setdefault(row["patient"], role) == role
-    assert not {r["case_id"] for r in selected["cases"]} & {key for key, row in frozen["cases"].items() if row["role"] == "source_test"}
+    assert Counter(r.get("test_group") for r in selected["cases"] if "test" in r["roles"]) == {
+        "source_test": 127, "target_primary": 300, "target_secondary": 31}
     image = json.loads(Path(args.image_manifest).read_text(encoding="utf-8"))
     config["split"]["path"] = args.image_splits
     image_selected = apply_split({"dataset": "imagechd", "cases": image["cases"]}, config)
@@ -48,7 +49,8 @@ def run(args):
             assert by_id[row["case_id"]]["roles"] == [{"val": "validation", "aux_train": "train"}.get(role, role)]
     result = {"state": "passed", "scope": "existing split metadata only; no CT voxels or training",
         "chd1282": {"file": str(Path(args.chd_cohort).resolve()), "sha256": file_digest(args.chd_cohort),
-                    "seed": frozen["seed"], "train": 598, "validation": 130, "sealed_source_test": 127,
+                    "seed": frozen["seed"], "train": 598, "validation": 130, "internal_test": 127,
+                    "external_primary": 300, "external_secondary": 31,
                     "patient_roles_disjoint": True},
         "imagechd": {"file": str(Path(args.image_splits).resolve()), "sha256": file_digest(args.image_splits),
                      "train_main": 53, "train_auxiliary": 13, "validation": 10, "test": 33,
