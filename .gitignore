@@ -8,3 +8,6 @@ outputs/
 *.pt
 *.model
 *.nii*
+env/
+vendor/MedSAM2/
+assistant2.local.yaml

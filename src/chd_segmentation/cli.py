@@ -8,6 +8,11 @@ from .config import load_config
 
 
 def main(argv=None):
+    import sys
+    actual = sys.argv[1:] if argv is None else argv
+    if actual and actual[0] == 'models':
+        from .models_cli import main as model_main
+        return model_main(actual[1:])
     parser = argparse.ArgumentParser(description="先心分割处理")
     parser.add_argument("--version", action="version", version=__version__)
     commands = parser.add_subparsers(dest="command", required=True)

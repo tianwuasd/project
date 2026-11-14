@@ -18,7 +18,7 @@ REPOSITORY = "tianwuasd/project"
 SUBDIRECTORY = "chd-segmentation"
 OFFICIAL = "https://github.com/" + REPOSITORY + ".git"
 DEFAULT_NETWORK = {"mirrors": ["https://ghfast.top", "https://gh-proxy.com"], "probe_timeout_seconds": 10}
-ROOT_FILES = {".gitignore", ".gitattributes", "README.md", "pyproject.toml", "run.py", "smoke.py", "setup_env.py", "update.py", "launcher.py"}
+ROOT_FILES = {".gitignore", ".gitattributes", "README.md", "pyproject.toml", "run.py", "smoke.py", "setup_env.py", "update.py", "launcher.py", "requirements-medsam2.txt"}
 
 
 def public_environment():
@@ -73,10 +73,11 @@ def file_lock(path, shared=False):
 @contextmanager
 def code_guard(source):
     code = Path(source).resolve().parent
-    repo = code if (code / ".git").is_dir() else code.parent
-    if not (repo / ".git").is_dir():
-        raise ValueError("请从已同步的 Git 工作目录运行项目")
-    with file_lock(repo / ".git" / "chd-code.lock", shared=True):
+    repo = Path(subprocess.run(["git", "-C", str(code), "rev-parse", "--show-toplevel"],
+                              check=True, capture_output=True, text=True).stdout.strip()).resolve()
+    git_dir = Path(subprocess.run(["git", "-C", str(code), "rev-parse", "--absolute-git-dir"],
+                                 check=True, capture_output=True, text=True).stdout.strip()).resolve()
+    with file_lock(git_dir / "chd-code.lock", shared=True):
         yield repo
 
 

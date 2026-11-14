@@ -1,0 +1,19 @@
+model: q_route1
+run_dir: /path/to/course/q-r2
+device: cpu
+precision: fp32
+threads: 2
+seed: 20261111
+technical: false
+updates: 20000
+accumulation: 4
+patch: 128
+local_size: 128
+learning_rate: 0.0002
+warmup_updates: 2000
+max_candidates: 24
+pretrained: /path/to/data/model_weights/small_ep4k.model
+groups: /path/to/course/q-groups.yaml
+parents:
+  base: /path/to/course/q-r2/base/latest.pt
+  localizer: /path/to/course/q-r2/localizer/latest.pt
