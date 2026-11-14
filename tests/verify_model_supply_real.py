@@ -89,6 +89,8 @@ def worker(rank,config,recipe,stream,root,port):
         with stream.build(rank,0,0):
             stream.reserve(rank,raw['names'][0])
             entry = cases.get(raw['names'][0])
+        stream.mark_ready(rank)
+        stream.deliver(rank)
         value = torch.tensor(float(entry['image'].mean()))
         cases.clear();del cases,entry
     stream.finish(rank,'rank0-case',torch.device('cpu'))
@@ -136,7 +138,7 @@ def run(args):
         from chd_segmentation.models.memory import case_estimates
         estimates = case_estimates(dict(model='medsam2'),prepared,'sequence')
         stream = OrderedSupply(context,[1,1],1,CpuReady(context,2,directory),directory,
-            capacity_bytes=max(v['workspace_bytes'] for v in estimates),estimates=estimates)
+            capacity_bytes=max(v['workspace_bytes'] for v in estimates),estimates=estimates,unit='sequence_batch')
         with socket.socket() as rendezvous:
             rendezvous.bind(('127.0.0.1',0));port = rendezvous.getsockname()[1]
         previous = dict(os.environ)
@@ -151,6 +153,14 @@ def run(args):
         starts = [value for value in logs if value['event']=='model_build_started']
         if len(starts)!=5 or any(v['active']>1 or max(v['ready_depth'])>1 for v in starts):
             raise ValueError('实际病例构建并发或队列深度超过界限')
+        ready_events = [v for v in logs if v['event']=='model_data_ready']
+        delivered = [v for v in logs if v['event']=='model_data_delivered']
+        if len(ready_events)!=5 or len(delivered)!=5:
+            raise ValueError('整批就绪与交付事件不完整')
+        if any(v['ready_depth'][v['rank']]!=1 for v in ready_events):
+            raise ValueError('整批就绪事件没有登记实际等待交付的数据')
+        if any(v['ready_depth'][v['rank']] or not v['consumer_active'][v['rank']] for v in delivered):
+            raise ValueError('交付后队列与消费状态不一致')
         records = [json.loads((directory/f'rank{rank}.json').read_text(encoding='utf-8')) for rank in range(2)]
         write_json(workspace.report/'supply-events.json',logs)
         workspace.results.append(dict(case_id=row['case_id'],ranks=records,frames=8,resolution=512,

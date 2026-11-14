@@ -285,6 +285,8 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
             with gate.build(rank,gate.batch.value,self.position):
                 gate.reserve(rank,name)
                 entry = super().get(name)
+            gate.mark_ready(rank)
+            gate.deliver(rank)
             self.position += 1
             return entry
     dataset = AdmittedCases(prepared,dict(reserve_ram_bytes=common['resources']['reserve_ram_bytes'],

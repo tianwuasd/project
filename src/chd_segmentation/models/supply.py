@@ -42,7 +42,7 @@ class CpuReady:
 
 
 class OrderedSupply:
-    def __init__(self,context,shares,slots,ready,root,capacity_bytes=0,estimates=()):
+    def __init__(self,context,shares,slots,ready,root,capacity_bytes=0,estimates=(),unit='item'):
         if slots<1 or not shares or any(value<1 for value in shares):
             raise ValueError('供数名额和训练份额必须为正')
         self.ready,self.root,self.world = ready,root,len(shares)
@@ -54,6 +54,9 @@ class OrderedSupply:
         self.quotas = context.Array('q',shares)
         self.waiting = context.Array('q',[0]*self.world)
         self.reserved = context.Array('q',[0]*self.world)
+        self.queued = context.Array('q',[0]*self.world)
+        self.consumer_active = context.Array('q',[0]*self.world)
+        self.unit = unit
         self.capacity = capacity_bytes
         self.estimates = {row['case_id']:row['workspace_bytes'] for row in estimates}
         self.phase = context.Array('c',256)
@@ -63,7 +66,8 @@ class OrderedSupply:
             return dict(phase=self.phase.value.decode('utf-8'),batch=self.batch.value,active=self.active.value,reader_slots=self.slots,
                 built=list(self.built),quotas=list(self.quotas),waiting=list(self.waiting),
                 active_workspace_bytes=sum(self.reserved),workspace_capacity_bytes=self.capacity,
-                ready_depth=[int(q>0 and b==q) for b,q in zip(self.built,self.quotas)],
+                samples_built_complete=[int(q>0 and b==q) for b,q in zip(self.built,self.quotas)],
+                ready_depth=list(self.queued),consumer_active=list(self.consumer_active),queue_unit=self.unit,
                 ready_depth_min=0,ready_depth_max=1)
 
     def start(self,rank,phase,quotas,device=None):
@@ -72,7 +76,7 @@ class OrderedSupply:
         self.ready.wait(rank,f'supply-start:{phase}:{quotas}',device)
         if rank==0:
             with self.condition:
-                if self.active.value or any(self.waiting):
+                if self.active.value or any(self.waiting) or any(self.queued) or any(self.consumer_active):
                     raise RuntimeError('前一阶段供数尚未结束')
                 self.batch.value = 0
                 self.phase.value = phase.encode('utf-8')
@@ -80,6 +84,21 @@ class OrderedSupply:
                 self.built[:] = [0]*self.world
                 self.condition.notify_all()
         self.ready.wait(rank,f'supply-started:{phase}')
+
+    def mark_ready(self,rank):
+        with self.condition:
+            if self.queued[rank] or not self.built[rank]:
+                raise RuntimeError('数据尚未构建或发生重复就绪登记')
+            self.queued[rank] = 1
+        event(self.root,'model_data_ready',rank=rank,**self.snapshot())
+
+    def deliver(self,rank):
+        with self.condition:
+            if self.queued[rank]!=1:
+                raise RuntimeError('交付前没有已就绪的数据')
+            self.queued[rank] = 0
+            self.consumer_active[rank] = 1
+        event(self.root,'model_data_delivered',rank=rank,**self.snapshot())
 
     def reserve(self,rank,name):
         amount = self.estimates[name]
@@ -130,11 +149,12 @@ class OrderedSupply:
         self.ready.wait(rank,f'supply-consumed:{phase}:{batch}',device)
         if rank==0:
             with self.condition:
-                if self.active.value or list(self.built)!=list(self.quotas):
+                if self.active.value or any(self.queued) or list(self.built)!=list(self.quotas):
                     raise RuntimeError('当前批次未完成构建或消费')
                 event(self.root,'model_batch_credit_returned',rank=rank,**self.snapshot())
                 self.batch.value += 1
                 self.built[:] = [0]*self.world
+                self.consumer_active[:] = [0]*self.world
                 self.condition.notify_all()
         self.ready.wait(rank,f'supply-released:{phase}:{batch}')
         event(self.root,'model_batch_released',rank=rank,consumed_batch=batch,**self.snapshot())

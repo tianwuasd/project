@@ -10,6 +10,22 @@ def future_batch(stream,finished):
 
 
 class SupplyTests(unittest.TestCase):
+    def test_collation_boundary_marks_actual_ready_queue(self):
+        context = mp.get_context('spawn')
+        ready = supply.CpuReady(context,1,None)
+        stream = supply.OrderedSupply(context,[1],1,ready,None)
+        stream.start(0,'training',[1])
+        with stream.build(0,0,0):
+            pass
+        self.assertEqual(stream.snapshot()['ready_depth'],[0])
+        stream.mark_ready(0)
+        self.assertEqual(stream.snapshot()['ready_depth'],[1])
+        stream.deliver(0)
+        self.assertEqual(stream.snapshot()['ready_depth'],[0])
+        self.assertEqual(stream.snapshot()['consumer_active'],[1])
+        stream.finish(0,'training')
+        self.assertEqual(stream.snapshot()['consumer_active'],[0])
+
     def test_current_batch_finishes_before_next_build(self):
         context = mp.get_context('spawn')
         ready = supply.CpuReady(context,1,None)
@@ -17,7 +33,8 @@ class SupplyTests(unittest.TestCase):
         stream.start(0,'training',[1])
         with stream.build(0,0,0):
             self.assertEqual(stream.snapshot()['active'],1)
-        self.assertEqual(stream.snapshot()['ready_depth'],[1])
+        self.assertEqual(stream.snapshot()['samples_built_complete'],[1])
+        self.assertEqual(stream.snapshot()['ready_depth'],[0])
         stream.finish(0,'training')
         self.assertEqual(stream.snapshot()['batch'],1)
         with stream.build(0,1,0):

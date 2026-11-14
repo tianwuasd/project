@@ -231,7 +231,8 @@ def _run_workers(payload,common,allocation):
     ready = CpuReady(context,allocation['world'],root)
     gate = OrderedSupply(context,allocation['shares'],allocation['supply']['reader_slots'],ready,root,
         capacity_bytes=allocation['supply']['breakdown']['case_workspaces_bytes'],
-        estimates=allocation['supply']['case_estimates'])
+        estimates=allocation['supply']['case_estimates'],
+        unit='sequence_batch' if payload['config']['model']=='medsam2' else 'case_entry')
     previous = dict(os.environ)
     with ExitStack() as cleanup:
         def restore_environment():

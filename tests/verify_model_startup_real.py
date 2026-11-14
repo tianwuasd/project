@@ -84,6 +84,15 @@ def run(args):
         record['resume'] = train(options(path),prepared_path,'base',resume=True)
         supply_events = [json.loads(line) for line in (stage/'events.jsonl').read_text(encoding='utf-8').splitlines()]
         write_json(workspace.report/'supply-events.json',supply_events)
+        ready_events = [value for value in supply_events if value['event']=='model_data_ready']
+        delivered_events = [value for value in supply_events if value['event']=='model_data_delivered']
+        expected = config['accumulation']*(1 if args.legacy_root else 2)
+        check.assertEqual(len(ready_events),expected)
+        check.assertEqual(len(delivered_events),expected)
+        check.assertTrue(all(value['ready_depth'][value['rank']]==1 for value in ready_events))
+        check.assertTrue(all(value['ready_depth'][value['rank']]==0 and value['consumer_active'][value['rank']]==1
+            for value in delivered_events))
+        record['actual_queue_states_verified']=True
         check.assertEqual(record['resume']['update'],2)
         check.assertTrue(record['resume']['restored_exact'])
         check.assertEqual(record['resume']['batch_layout'],record['retry']['batch_layout'])

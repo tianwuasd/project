@@ -45,7 +45,9 @@ class ConsumedLoader:
 
     def __iter__(self):
         for batch,value in enumerate(self.loader):
+            self.supply.mark_ready(self.rank)
             self.supply.ready.wait(self.rank,f'med-data:{self.epoch}:{batch}')
+            self.supply.deliver(self.rank)
             started = perf_counter()
             yield value
             self.supply.finish(self.rank,f'med-epoch:{self.epoch}',self.device)
