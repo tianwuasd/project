@@ -23,7 +23,7 @@ DEFAULTS = {
                   "reserve_ram_bytes": 4 * 1024 ** 3, "cpu_fraction": 0.8, "ram_fraction": 0.8,
                   "workers": "auto", "max_workers": 32, "prefetch": 2, "readers": "auto", "max_readers": 8,
                   "gpu_count": 1, "gpu_ids": None, "batch_layout": None, "cpu_processes": 1,
-                  "wait_seconds": 300, "poll_seconds": 2, "share": True,
+                  "wait_seconds": None, "poll_seconds": 2, "share": True,
                   "share_window_seconds": 30, "share_utilization": 50,
                   "vram_reserve_bytes": 4 * 1024 ** 3, "vram_reserve_fraction": 0.1,
                   "peak_margin": 1.2},
@@ -153,7 +153,11 @@ def load_config(path, overrides=None):
     if any(type(r[k]) is not int or r[k] < 1 for k in ("max_workers", "prefetch", "max_readers")) or \
             (r["readers"] != "auto" and (type(r["readers"]) is not int or r["readers"] < 1)):
         raise ValueError("worker 上限、预取与读盘并发必须为正整数")
-    if r["wait_seconds"] < 0 or r["poll_seconds"] <= 0 or r["share_window_seconds"] < 0:
+    if r["wait_seconds"] is not None and (type(r["wait_seconds"]) not in (int, float) or
+            not math.isfinite(r["wait_seconds"]) or r["wait_seconds"] < 0):
+        raise ValueError("wait_seconds 必须为非负秒数或 null（持续等待）")
+    if any(type(r[key]) not in (int, float) or not math.isfinite(r[key]) for key in ("poll_seconds", "share_window_seconds")) or \
+            r["poll_seconds"] <= 0 or r["share_window_seconds"] < 0:
         raise ValueError("资源等待时间无效")
     if not 0 <= r["share_utilization"] <= 100 or not 0 <= r["vram_reserve_fraction"] < 1 or r["peak_margin"] < 1:
         raise ValueError("GPU 共享阈值或显存预算无效")

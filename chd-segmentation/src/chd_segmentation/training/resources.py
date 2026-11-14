@@ -12,6 +12,7 @@ from filelock import FileLock
 import nibabel as nib
 import numpy as np
 import psutil
+from scipy.optimize import linear_sum_assignment
 
 from ..artifacts.store import digest, file_digest, read_json, write_json
 from ..observability.events import event
@@ -130,7 +131,7 @@ def process_vram(uuid, pid):
     return entries[0]
 
 
-def choose_gpus(config, spec, history, peaks, peers):
+def gpu_decision(config, spec, history, peaks, peers):
     r = config["resources"]
     current = history[-1][1]
     requested = r["gpu_ids"]
@@ -138,43 +139,63 @@ def choose_gpus(config, spec, history, peaks, peers):
                        or g["uuid"] == str(token)), None) for token in requested]
     if any(g is None for g in selected):
         raise ValueError("手动显卡超出 CUDA_VISIBLE_DEVICES 或当前服务器范围")
-    if len(selected) < r["gpu_count"]:
-        raise ValueError("可见显卡不足请求数量")
     reserved = {u for p in peers for u in p["uuids"]}
-    available = [g for g in selected if g["uuid"] not in reserved]
-    idle = [g for g in available if not g["busy"] and
-            g["free"] >= max(r["vram_reserve_bytes"], int(g["total"] * r["vram_reserve_fraction"]))]
-    if len(idle) >= r["gpu_count"]:
-        return idle[:r["gpu_count"]] if requested else sorted(idle, key=lambda g: -g["free"])[:r["gpu_count"]]
-    # 只在全部允许显卡均有任务时启用共享；存在空闲卡时等待足够数量的空闲卡。
-    if not r["share"] or not all(g["busy"] for g in current) or any(not g["busy"] for g in selected):
-        return None
-    if history[-1][0] - history[0][0] < r["share_window_seconds"]:
-        return None
     shares = layout(config["training"]["batch"], r["gpu_count"], r["batch_layout"])
-    admitted = []
+    reports = [{"index": g["index"], "uuid": g["uuid"], "busy": g["busy"], "free_bytes": g["free"],
+                "utilization": g["utilization"], "ranks": {}} for g in selected]
+    result = {"gpus": None, "candidates": reports, "visible_indices": [g["index"] for g in current],
+              "requested_ids": requested, "reason": "没有满足全部训练份额的显卡组合"}
+    if len(selected) < r["gpu_count"]:
+        result["reason"] = "当前可见显卡数量不足请求数量"
+        return result
+    allowed = np.zeros((len(shares), len(selected)), dtype=bool)
+    keys = {}
     for rank, local_batch in enumerate(shares):
-        candidates = []
-        for g in ([selected[rank]] if requested else available):
-            if g not in available:
-                continue
-            if g in admitted:
-                continue
-            key = capacity_key(config, spec, local_batch)
-            measured = peaks.get(g["uuid"], {}).get(key)
-            samples = [next((a for a in snapshot if a["uuid"] == g["uuid"]), None) for _, snapshot in history]
-            if measured is None or any(a is None or not a["busy"] for a in samples):
-                continue
+        for column, g in enumerate(selected):
             reserve = max(r["vram_reserve_bytes"], int(g["total"] * r["vram_reserve_fraction"]))
-            if (np.percentile([a["utilization"] for a in samples], 90) <= r["share_utilization"] and
-                    min(a["free"] for a in samples) >= measured * r["peak_margin"] + reserve):
-                candidates.append(g)
-        if not candidates:
-            return None
-        admitted.append(candidates[0] if requested else max(candidates, key=lambda g: g["free"]))
-    if requested and [g["uuid"] for g in admitted] != [g["uuid"] for g in selected]:
-        return None
-    return admitted
+            if requested is not None and column != rank:
+                reason = "手动显卡顺序对应其他训练进程"
+            elif g["uuid"] in reserved:
+                reason = "本项目其他活动任务已预留"
+            elif not g["busy"]:
+                reason = "eligible_idle" if g["free"] >= reserve else "空闲显卡未达到显存安全预留"
+            elif not r["share"]:
+                reason = "当前配置关闭显卡共享"
+            else:
+                if local_batch not in keys:
+                    keys[local_batch] = capacity_key(config, spec, local_batch)
+                measured = peaks.get(g["uuid"], {}).get(keys[local_batch])
+                samples = [next((a for a in snapshot if a["uuid"] == g["uuid"]), None) for _, snapshot in history]
+                if measured is None:
+                    reason = "缺少此显卡同配方的显存峰值记录"
+                elif type(measured) not in (int, float) or not math.isfinite(measured) or measured <= 0:
+                    raise ValueError("GPU 显存峰值记录必须为有限正数")
+                elif history[-1][0] - history[0][0] < r["share_window_seconds"] or any(a is None or not a["busy"] for a in samples):
+                    reason = "繁忙显卡的连续观察窗口不足"
+                elif np.percentile([a["utilization"] for a in samples], 90) > r["share_utilization"]:
+                    reason = "繁忙显卡的窗口利用率超过共享阈值"
+                elif min(a["free"] for a in samples) < measured * r["peak_margin"] + reserve:
+                    reason = "繁忙显卡的窗口剩余显存不足"
+                else:
+                    reason = "eligible_shared"
+            reports[column]["ranks"][str(rank)] = {"batch": local_batch, "reason": reason}
+            allowed[rank, column] = reason in ("eligible_idle", "eligible_shared")
+    # 有效组合先最少使用繁忙卡，再比较空闲显存；同时解决不同每卡 batch 的完整匹配。
+    size = len(shares)
+    maximum_free = max(1, max(g["free"] for g in selected))
+    costs = np.full(allowed.shape, (size + 1) ** 3, dtype=float)
+    for column, g in enumerate(selected):
+        costs[allowed[:, column], column] = (size + 1 if g["busy"] else 0) - g["free"] / maximum_free
+    ranks, columns = linear_sum_assignment(costs)
+    if not allowed[ranks, columns].all():
+        return result
+    result["gpus"] = [selected[column] for column in columns]
+    result["reason"] = "eligible"
+    return result
+
+
+def choose_gpus(config, spec, history, peaks, peers):
+    return gpu_decision(config, spec, history, peaks, peers)["gpus"]
 
 
 def alive(record):
@@ -215,10 +236,13 @@ def resource_lease(config, prepared, spec, stage="train"):
     root.mkdir(parents=True, exist_ok=True)
     registry, lock = root / "active.json", root / ".resource.lock"
     me = psutil.Process()
-    started, history = time.monotonic(), []
+    started, history, last_log = time.monotonic(), [], None
+    resources = config["resources"]
+    limit = resources["wait_seconds"]
     event(config["run_dir"], "resources_requested", stage=stage, device=config["resources"]["device"],
           gpu_count=config["resources"]["gpu_count"], gpu_ids=config["resources"]["gpu_ids"],
-          workers=config["resources"]["workers"], batch=config["training"]["batch"])
+          workers=resources["workers"], batch=config["training"]["batch"], wait_seconds=limit,
+          inherited_visible_devices=os.environ.get("CUDA_VISIBLE_DEVICES"))
     while True:
         if config["resources"]["device"] == "cuda":
             history.append((time.monotonic(), inventory()))
@@ -231,7 +255,8 @@ def resource_lease(config, prepared, spec, stage="train"):
             peaks = read_json(peaks_path) if peaks_path.exists() else {}
             if history:
                 history.append((time.monotonic(), inventory()))
-            gpus = choose_gpus(config, spec, history, peaks, peers) if history else []
+            decision = gpu_decision(config, spec, history, peaks, peers) if history else {"gpus": []}
+            gpus = decision["gpus"]
             if gpus is not None:
                 world = len(gpus) or config["resources"]["cpu_processes"]
                 supply = cpu_plan(config, prepared, world, peers, stage)
@@ -242,12 +267,16 @@ def resource_lease(config, prepared, spec, stage="train"):
                       cpu=supply, world_size=world, seconds=time.monotonic() - started)
                 break
         elapsed = time.monotonic() - started
-        if elapsed >= config["resources"]["wait_seconds"]:
-            raise TimeoutError("没有符合条件的显卡：空闲优先；全部繁忙时需要同配方实测显存及低负载窗口")
-        event(config["run_dir"], "waiting_resources", stage=stage, seconds=elapsed,
-              timeout_seconds=config["resources"]["wait_seconds"], observed_gpus=history[-1][1],
-              reason="空闲卡数量不足，或繁忙卡未满足共享准入条件")
-        time.sleep(min(config["resources"]["poll_seconds"], config["resources"]["wait_seconds"] - elapsed))
+        interval = config.get("logging", {}).get("heartbeat_seconds", 15)
+        if last_log is None or elapsed - last_log >= interval:
+            event(config["run_dir"], "waiting_resources", stage=stage, seconds=elapsed, timeout_seconds=limit,
+                  waiting_forever=limit is None, observed_gpus=history[-1][1], candidates=decision["candidates"],
+                  visible_indices=decision["visible_indices"], requested_ids=decision["requested_ids"], reason=decision["reason"])
+            last_log = elapsed
+        if limit is not None and elapsed >= limit:
+            raise TimeoutError("已达到手动设置的显卡等待时限；具体候选卡条件见 waiting_resources 日志")
+        delay = resources["poll_seconds"] if limit is None else min(resources["poll_seconds"], limit - elapsed)
+        time.sleep(delay)
     try:
         yield {"gpus": gpus, "supply": supply, "world": world, "owner": {"pid": me.pid, "birth": me.create_time()}}
     finally:
