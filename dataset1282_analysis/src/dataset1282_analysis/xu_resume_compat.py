@@ -6,6 +6,9 @@ from .contracts import atomic_json, digest, read_json, sha256_file
 
 AUDIT_PATH = Path(__file__).resolve().parents[2]/'configs/xu-resume-compat.json'
 SCHEMA = 'xu-resume-compat-1'
+GPU_SHARING_PATH = Path(__file__).resolve().parents[2]/'configs/xu-gpu-sharing-compat.json'
+GPU_SHARING_SCHEMA = 'xu-gpu-sharing-compat-1'
+GPU_SHARING_SHA256 = sha256_file(GPU_SHARING_PATH)
 
 
 def _source_map(value):
@@ -41,6 +44,27 @@ def _audit(path):
     return audit
 
 
+def _gpu_sharing_audit(path):
+    if sha256_file(path) != GPU_SHARING_SHA256:
+        raise ValueError('GPU sharing compatibility audit changed while running')
+    audit = read_json(path)
+    required = {'schema', 'id', 'review', 'changes'}
+    paths = {'src/dataset1282_analysis/xu_fleet.py',
+             'src/dataset1282_analysis/xu_resources.py',
+             'src/dataset1282_analysis/xu_runtime_guard.py',
+             'src/dataset1282_analysis/xu_resume_compat.py'}
+    if (set(audit) != required or audit['schema'] != GPU_SHARING_SCHEMA
+            or not isinstance(audit['id'], str) or not audit['id'].strip()
+            or not isinstance(audit['review'], str) or not audit['review'].strip()
+            or not isinstance(audit['changes'], dict) or set(audit['changes']) != paths):
+        raise ValueError('Invalid GPU sharing compatibility audit')
+    for values in audit['changes'].values():
+        if not isinstance(values, dict) or set(values) != {'stored', 'current'}:
+            raise ValueError('Invalid GPU sharing source pair')
+        _source_map({'stored': values['stored'], 'current': values['current']})
+    return audit
+
+
 def _matching_transition(stored_map, current_map, path_prefix, audit_path):
     _source_map(stored_map)
     _source_map(current_map)
@@ -48,11 +72,26 @@ def _matching_transition(stored_map, current_map, path_prefix, audit_path):
         raise ValueError('Unknown source compatibility path prefix')
     if not audit_path.is_file():
         return None
-    for edge in _audit(audit_path)['transitions']:
+    audit = _audit(audit_path)
+    for edge in audit['transitions']:
         for maps in edge['sources']:
             if (maps['path_prefix'] == path_prefix and maps['stored'] == stored_map
                     and maps['current'] == current_map):
                 return edge['id']
+    if path_prefix != '':
+        return None
+    patch = _gpu_sharing_audit(GPU_SHARING_PATH)
+    previous = dict(current_map)
+    for name, versions in patch['changes'].items():
+        if current_map.get(name) != versions['current']:
+            return None
+        previous[name] = versions['stored']
+    if stored_map == previous:
+        return patch['id']
+    for edge in audit['transitions']:
+        for maps in edge['sources']:
+            if maps['path_prefix'] == path_prefix and maps['stored'] == stored_map and maps['current'] == previous:
+                return edge['id'] + '+' + patch['id']
     return None
 
 
@@ -72,15 +111,18 @@ def preserve_contract(stored, current, out, *, field='implementation', path_pref
         raise ValueError('Use --resume with identical inputs and model settings')
     audit_path = Path(audit_path)
     audit_sha = sha256_file(audit_path) if audit_path.is_file() else None
+    sharing_sha = GPU_SHARING_SHA256
     transition = _matching_transition(stored[field], current[field], path_prefix, audit_path)
     if transition is None:
         raise ValueError('Use --resume with identical inputs and audited implementation changes')
     if sha256_file(audit_path) != audit_sha:
         raise ValueError('Source compatibility audit changed while checking the contract')
+    if sha256_file(GPU_SHARING_PATH) != sharing_sha:
+        raise ValueError('GPU sharing compatibility audit changed while checking the contract')
     evidence = dict(schema=SCHEMA, transition=transition, field=field, path_prefix=path_prefix,
                     frozen_contract=digest(stored), execution_contract=digest(current),
                     stored_sources=stored[field], execution_sources=current[field],
-                    audit_sha256=audit_sha)
+                    audit_sha256=audit_sha, gpu_sharing_audit_sha256=sharing_sha)
     path = Path(out)/'.runtime/resume-compat'/(digest(evidence)+'.json')
     if path.exists():
         if read_json(path) != evidence:
@@ -95,3 +137,4 @@ def assert_execution_sources(expected, current, audit_sha256=None, *, audit_path
         raise ValueError('Implementation changed while the pipeline was running')
     if audit_sha256 is not None and sha256_file(audit_path) != audit_sha256:
         raise ValueError('Source compatibility audit changed while the pipeline was running')
+    _gpu_sharing_audit(GPU_SHARING_PATH)

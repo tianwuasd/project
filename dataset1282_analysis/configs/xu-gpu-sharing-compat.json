@@ -1,0 +1,23 @@
+{
+  "schema": "xu-gpu-sharing-compat-1",
+  "id": "gpu-sharing-memory-admission",
+  "review": "精确源码审核：GPU准入和运行监测按剩余显存判断，记录外部进程；模型、损失、优化器、采样、数据和检查点格式不变。",
+  "changes": {
+    "src/dataset1282_analysis/xu_fleet.py": {
+      "stored": "eb325e0e110870f227b8953d7f13108f54b22207453bd28107988205d7aa2f9b",
+      "current": "53cf3838ddc44958d4a02343507456741830b8cd0fc4f2ebdbb49287871815fb"
+    },
+    "src/dataset1282_analysis/xu_resources.py": {
+      "stored": "512b1a132da13b5057e24b8d7aed51f4a62087cd2bb6c001c9d636429595b79f",
+      "current": "1f5e493f5e223a2596663728734a84f2f1c2ab0f831d0d5a8f357682310e327c"
+    },
+    "src/dataset1282_analysis/xu_runtime_guard.py": {
+      "stored": "8c81a6113822316c2e1c01f2669581822fcdaf4deac21a159f50a2591898eb53",
+      "current": "a5a8bc712bfe15f571f47463589a12456c5cfd1a3ec4757491dd8cc54249cb84"
+    },
+    "src/dataset1282_analysis/xu_resume_compat.py": {
+      "stored": "1d5944526f44d33e0c5cdb66f05d2fbffb46d7fbd3d3269a3b23985e450399e6",
+      "current": "fea726d3601f079beca7d31c3248b1b71a187504a256539e37315a20fbf73406"
+    }
+  }
+}
