@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 
@@ -15,7 +16,7 @@ def _adopt_unlocked(source, destination, experiment):
     receipt_path = destination / '.storage-relocation.json'
     if receipt_path.exists():
         raise ValueError('This process directory already has a relocation receipt')
-    if source.exists():
+    if os.path.exists(source):
         raise ValueError('Original process directory still exists; use verified copy migration')
     inventory = _inventory(destination)
     run_relative = Path('experiments') / experiment / 'run.json'
