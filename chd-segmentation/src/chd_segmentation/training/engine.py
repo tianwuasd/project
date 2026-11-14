@@ -37,6 +37,20 @@ def code_identity():
     return hashes.hexdigest()
 
 
+def validate_initialization_restart(output, scientific):
+    output = Path(output)
+    previous = read_json(output / "run.json")
+    expected = {**scientific, "code_identity": previous["scientific"]["code_identity"]}
+    if digest(previous["scientific"]) != digest(expected) or previous["identity"] != digest(expected) or not compatible_code(
+            previous["scientific"]["code_identity"], scientific["code_identity"]):
+        raise ValueError("初始化重试的配置、数据、代码或依赖版本改变")
+    if (output / "latest.json").exists() or (output / "summary.json").exists() or any(output.glob("state-*.pt*")):
+        raise FileExistsError("运行目录已有检查点、写入中的状态或训练摘要，请使用 --resume")
+    event(output, "initialization_restarted", previous_identity=previous["identity"],
+          identity=digest(scientific), previous_code=previous["scientific"]["code_identity"],
+          applied_code=scientific["code_identity"], reason="已核对输入，尚无任何检查点或训练摘要")
+
+
 def device_for(config):
     if config["resources"]["device"] == "cuda":
         if not torch.cuda.is_available():
@@ -421,7 +435,7 @@ def train(config, prepared_path, resume=False, stop_after=None):
                       target=scientific["code_identity"], training_identity=identity)
             load_checkpoint(output, identity)
         elif (output / "run.json").exists():
-            raise FileExistsError("运行目录已存在，请选择恢复训练或新目录")
+            validate_initialization_restart(output, scientific)
         pressure_retries = 0
         while True:
             admission = deepcopy(config)
