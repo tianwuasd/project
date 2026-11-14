@@ -8,6 +8,10 @@ from .config import load_config
 from .observability.events import event, log_directory, stage
 
 
+def wait_seconds(value):
+    return None if value.lower() == "forever" else float(value)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="先心分割处理")
     parser.add_argument("--version", action="version", version=__version__)
@@ -27,6 +31,8 @@ def main(argv=None):
     train.add_argument("--batch-layout", help="手动每卡 batch，例如 2,1,1")
     train.add_argument("--epochs", type=int)
     train.add_argument("--workers", help="全组供数进程上限：auto 或整数")
+    train.add_argument("--wait-seconds", type=wait_seconds, default=argparse.SUPPRESS,
+                       help="显卡等待秒数；forever 表示持续等待，默认持续等待")
     predict = commands.add_parser("predict")
     predict.add_argument("--config", required=True)
     predict.add_argument("--output", required=True)
@@ -77,6 +83,8 @@ def main(argv=None):
                 parser.error("--gpus 与 --gpu-ids 数量不同")
         if args.batch_layout:
             resources["batch_layout"] = [int(value) for value in args.batch_layout.split(",")]
+        if hasattr(args, "wait_seconds"):
+            resources["wait_seconds"] = args.wait_seconds
         for key, value in (("batch", args.batch), ("epochs", args.epochs)):
             if value is not None:
                 training[key] = value

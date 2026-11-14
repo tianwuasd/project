@@ -23,6 +23,20 @@
         "training/resources.py"
       ],
       "added_files": ["compatibility.py"]
+    },
+    {
+      "source": "42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa",
+      "target": "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952",
+      "baseline_public_commit": "575b07524ef2f8bec99671ce9a7e0f4e6e43a580",
+      "reason": "默认持续等待显卡，空闲优先并允许合格繁忙卡组合，保留完整训练组、每卡 batch 和手动显卡顺序；训练计算及检查点协议不变",
+      "changed_files": ["cli.py", "config.py", "training/resources.py"]
+    },
+    {
+      "source": "afffd433e388f93fe5d840ba6a899cb2b814c81804e59d4b02c310cb47cf8dde",
+      "target": "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952",
+      "baseline_public_commit": "6ef3fd4c51eb53da26faa54a147fc35ae15ebc40",
+      "via": ["42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa"],
+      "reason": "累计覆盖已审计日志更新及显卡等待更新；数据、模型、训练参数、损失、抽样、优化器和检查点内容协议保持相同"
     }
   ]
 }
