@@ -11,6 +11,7 @@ import shutil
 import subprocess
 from time import monotonic
 from urllib.parse import urlsplit
+from uuid import uuid4
 
 
 REPOSITORY = "tianwuasd/project"
@@ -23,7 +24,7 @@ ROOT_FILES = {".gitignore", ".gitattributes", "README.md", "pyproject.toml", "ru
 def public_environment():
     env = dict(os.environ)
     for name in list(env):
-        if name in {"GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT", "GIT_ASKPASS", "SSH_ASKPASS", "GIT_DIR", "GIT_WORK_TREE", "GIT_SSL_NO_VERIFY"} or name.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_")):
+        if name in {"GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT", "GIT_ASKPASS", "SSH_ASKPASS", "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_SSL_NO_VERIFY"} or name.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_")):
             env.pop(name)
     env.update({"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1", "GIT_TERMINAL_PROMPT": "0", "GIT_NO_LAZY_FETCH": "1"})
     return env
@@ -131,7 +132,7 @@ class GitRepository:
         self.network_info = None
         self.public_options = []
 
-    def run(self, *args, data=None, absent=False, network=False):
+    def run(self, *args, data=None, absent=False, network=False, index=None):
         remaining = self.deadline - monotonic()
         if remaining <= 0:
             raise TimeoutError("代码同步超过总时间限制")
@@ -139,6 +140,9 @@ class GitRepository:
         if not network:
             command += ["-c", "protocol.allow=never"]
         env = public_environment() if self.network_info else {**os.environ, "GIT_NO_LAZY_FETCH": "1", "GIT_TERMINAL_PROMPT": "0"}
+        env.pop("GIT_INDEX_FILE", None)
+        if index is not None:
+            env["GIT_INDEX_FILE"] = str(index)
         result = subprocess.run(command + list(args), input=data, stdout=subprocess.PIPE, env=env, timeout=remaining, check=False)
         if not (absent and result.returncode == 1):
             result.check_returncode()
@@ -153,14 +157,18 @@ class GitRepository:
             raise ValueError("需要独立的普通 Git 工作目录")
         if self.run("symbolic-ref", "--short", "HEAD").decode().strip() != "main":
             raise ValueError("当前分支必须为 main")
-        if set(path.name for path in self.path.iterdir()) - {".git", SUBDIRECTORY}:
-            raise ValueError("仓库中存在其他文件夹或文件，拒绝更改检出范围")
+        code = self.path / SUBDIRECTORY
+        if code.is_symlink() or (code.exists() and not code.is_dir()):
+            raise ValueError("本项目代码路径必须为普通目录")
         initial = not self.run("ls-files", "-z")
         if initial:
-            if any(path.name != ".git" for path in self.path.iterdir()):
-                raise ValueError("未初始化索引的目录包含已有文件")
-        elif self.run("status", "--porcelain=v1", "-z", "--untracked-files=all") or self.run("ls-files", "--others", "-z"):
-            raise ValueError("工作目录存在本地修改或未跟踪文件，停止更新")
+            if code.exists() and any(code.iterdir()):
+                raise ValueError("本项目未初始化索引，代码目录包含已有文件")
+        elif (self.run("status", "--porcelain=v1", "-z", "--untracked-files=all", "--", SUBDIRECTORY)
+              or self.run("ls-files", "--others", "-z", "--", SUBDIRECTORY)):
+            raise ValueError("chd-segmentation 存在本地修改或未跟踪文件，停止更新")
+        if code.exists() and any(path.is_symlink() for path in code.rglob("*")):
+            raise ValueError("本项目代码目录包含符号链接")
         return initial
 
     def choose_source(self, candidates, *, expected=None, timeout=10, official=None):
@@ -207,6 +215,102 @@ class GitRepository:
         for start in range(0, len(missing), 64):
             data = ("\n".join(missing[start:start + 64]) + "\n").encode()
             self.run("-c", "fetch.negotiationAlgorithm=noop", "fetch", self.transport, "--no-tags", "--no-write-fetch-head", "--recurse-submodules=no", "--filter=blob:none", "--stdin", data=data, network=True)
+
+    def staged_overrides(self, head, commit):
+        names = set(filter(None, self.run("diff", "--cached", "--no-renames", "--no-ext-diff", "--no-textconv", "--name-only", "-z", head, "--", ".", ":(exclude)" + SUBDIRECTORY).split(b"\0")))
+        if not names:
+            return b""
+        entries = {}
+        for row in filter(None, self.run("ls-files", "--stage", "-z").split(b"\0")):
+            header, name = row.split(b"\t", 1)
+            if name in names:
+                mode, blob, stage = header.split()
+                if stage != b"0":
+                    raise ValueError("其他项目的 Git 索引存在未解决冲突")
+                entries[name] = (mode, blob, row)
+        trees = []
+        for revision in (head, commit):
+            tree = {}
+            for row in filter(None, self.run("ls-tree", "-r", "-z", revision).split(b"\0")):
+                header, name = row.split(b"\t", 1)
+                if name in names:
+                    mode, _, blob = header.split()
+                    tree[name] = (mode, blob)
+            trees.append(tree)
+        overrides = []
+        for name in sorted(names):
+            entry = entries.get(name)
+            staged = entry[:2] if entry else None
+            if trees[0].get(name) != trees[1].get(name) and staged != trees[1].get(name):
+                raise ValueError("其他项目的暂存内容与远端冲突，保留原索引：" + name.decode("utf-8"))
+            overrides.append(entry[2] if entry else b"0 " + b"0" * 40 + b"\t" + name)
+        return b"\0".join(overrides) + b"\0"
+
+    def update_project(self, head, commit, files, initial):
+        gitdir = self.path / ".git"
+        actual_index, index_lock = gitdir / "index", gitdir / "index.lock"
+        candidate = gitdir / ("chd-index-" + uuid4().hex)
+        old_index = actual_index.read_bytes() if actual_index.exists() else None
+        old_files = self.inventory(head)
+        code = self.path / SUBDIRECTORY
+        for name, blob in old_files.items():
+            path = code / name
+            if path.exists() and self.run("hash-object", "--no-filters", "--", str(path)).decode().strip() != blob:
+                raise ValueError("本项目已有文件被修改：" + name)
+        owned_lock = False
+        try:
+            # 从目标树取得索引元数据，保留其他项目的暂存内容，不读取其文件对象。
+            overrides = b"" if initial else self.staged_overrides(head, commit)
+            self.run("read-tree", "--no-sparse-checkout", "--index-output=" + str(candidate), commit)
+            if overrides:
+                self.run("update-index", "-z", "--index-info", data=overrides, index=candidate)
+            names = list(filter(None, self.run("ls-files", "-z", index=candidate).split(b"\0")))
+            outside = [name for name in names if not name.startswith((SUBDIRECTORY + "/").encode())
+                       and not (self.path / name.decode("utf-8")).exists()]
+            if outside:
+                self.run("update-index", "--skip-worktree", "-z", "--stdin", data=b"\0".join(outside) + b"\0", index=candidate)
+            project_names = [(SUBDIRECTORY + "/" + name).encode() for name in files]
+            self.run("update-index", "--no-skip-worktree", "-z", "--stdin", data=b"\0".join(project_names) + b"\0", index=candidate)
+            changed = [(SUBDIRECTORY + "/" + name).encode() for name, blob in files.items()
+                       if old_files.get(name) != blob or not (code / name).is_file()]
+            with index_lock.open("xb") as stream:
+                owned_lock = True
+                if (actual_index.read_bytes() if actual_index.exists() else None) != old_index:
+                    raise ValueError("Git 索引被其他操作修改，停止同步")
+                require_head(head, self.run("rev-parse", "HEAD").decode().strip())
+                directories = set()
+                for name in old_files.keys() - files.keys():
+                    path = code / name
+                    if path.is_file():
+                        path.unlink()
+                    parent = path.parent
+                    while parent != code:
+                        directories.add(parent)
+                        parent = parent.parent
+                for path in sorted(directories, key=lambda value: len(value.parts), reverse=True):
+                    if path.is_dir() and not any(path.iterdir()):
+                        path.rmdir()
+                if changed:
+                    self.run("checkout-index", "--force", "-z", "--stdin", data=b"\0".join(changed) + b"\0", index=candidate)
+                for name, blob in files.items():
+                    path = code / name
+                    if path.is_symlink() or self.run("hash-object", "--no-filters", "--", str(path)).decode().strip() != blob:
+                        raise ValueError("检出代码与 Git 提交不一致：" + name)
+                stream.write(candidate.read_bytes())
+                stream.flush()
+                os.fsync(stream.fileno())
+                tracking = self.run("rev-parse", "refs/remotes/origin/main").decode().strip()
+                updates = ("start\nupdate refs/heads/main " + commit + " " + head
+                           + "\nupdate refs/remotes/origin/main " + commit + " " + tracking + "\nprepare\ncommit\n")
+                self.run("update-ref", "--stdin", data=updates.encode())
+            os.replace(index_lock, actual_index)
+            owned_lock = False
+        finally:
+            if owned_lock and index_lock.exists():
+                index_lock.unlink()
+            for owned in (candidate, candidate.with_name(candidate.name + ".lock")):
+                if owned.exists():
+                    owned.unlink()
 
 
 def legacy_files(repo, runtime):
@@ -260,8 +364,6 @@ def synchronize(repo, runtime, commit, remove_legacy=False):
         repo.run("merge-base", "--is-ancestor", head, commit)
         files = repo.inventory(commit)
         repo.fetch_files(files)
-        if initial:
-            repo.fetch_files(repo.inventory(head))
         for name, blob in files.items():
             if name.endswith(".py"):
                 compile(repo.run("cat-file", "blob", blob), name, "exec")
@@ -269,12 +371,7 @@ def synchronize(repo, runtime, commit, remove_legacy=False):
         require_head(commit, repo.remote_head())
         mark = monotonic()
         repo.validate()
-        repo.run("sparse-checkout", "set", "--no-cone", "/" + SUBDIRECTORY + "/")
-        if initial:
-            repo.run("read-tree", "-m", "-u", "HEAD")
-        repo.run("merge", "--ff-only", "--no-edit", "--no-autostash", commit)
-        old_tracking = repo.run("rev-parse", "refs/remotes/origin/main").decode().strip()
-        repo.run("update-ref", "refs/remotes/origin/main", commit, old_tracking)
+        repo.update_project(head, commit, files, initial)
         repo.run("config", "branch.main.remote", "origin")
         repo.run("config", "branch.main.merge", "refs/heads/main")
         require_head(commit, repo.run("rev-parse", "HEAD").decode().strip())

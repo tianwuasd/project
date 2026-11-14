@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -46,8 +47,10 @@ def source_tree(origin):
     return subtree("")
 
 
-def fixture_commit(origin, tree, outside, parent=None):
-    root = git(origin, "mktree", data=("040000 tree " + tree + "\tchd-segmentation\n100644 blob " + outside + "\tunrelated.md\n").encode()).decode().strip()
+def fixture_commit(origin, tree, outside, unchanged, parent=None):
+    other = git(origin, "mktree", data=("100644 blob " + outside + "\tREADME.md\n").encode()).decode().strip()
+    root = git(origin, "mktree", data=("040000 tree " + tree + "\tchd-segmentation\n040000 tree " + other
+               + "\tdataset1282_analysis\n100644 blob " + unchanged + "\tunrelated.md\n").encode()).decode().strip()
     args = ("commit-tree", root) + (() if parent is None else ("-p", parent))
     return git(origin, *args, data=b"Actual application source snapshot\n").decode().strip()
 
@@ -71,13 +74,21 @@ def run(root, report):
         git(origin, "fetch", "--no-tags", str(PROJECT), BASE)
         outside_data = git(PROJECT, "show", "48048b1d84592ba3080d83dfe8352185ca1a6a5f:README.md")
         outside = git(origin, "hash-object", "-w", "--stdin", data=outside_data).decode().strip()
-        first = fixture_commit(origin, git(origin, "rev-parse", BASE + "^{tree}").decode().strip(), outside)
+        next_outside_data = git(PROJECT, "show", "80d96b1ee92665dc20237ce2afd47d3bb2956079:README.md")
+        next_outside = git(origin, "hash-object", "-w", "--stdin", data=next_outside_data).decode().strip()
+        first = fixture_commit(origin, git(origin, "rev-parse", BASE + "^{tree}").decode().strip(), outside, outside)
         target_tree = source_tree(origin)
-        second = fixture_commit(origin, target_tree, outside, first)
+        second = fixture_commit(origin, target_tree, next_outside, outside, first)
         git(origin, "update-ref", "refs/heads/main", first)
         repo_path, url = root / "code" / "git", origin.as_uri()
         subprocess.run(["git", "clone", "--no-checkout", "--filter=blob:none", "--no-tags", "--branch", "main", url, str(repo_path)], check=True, stdout=subprocess.PIPE, timeout=60)
         repo = updater.GitRepository(repo_path, expected_urls={url})
+        sibling = root / "code" / "dataset1282_analysis" / "README.md"
+        untracked = repo_path / "local-project" / "README.md"
+        for path in (sibling, untracked):
+            path.parent.mkdir(parents=True)
+            path.write_bytes(outside_data)
+        untouched = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in (sibling, untracked)}
         case.assertTrue(repo.validate())
         case.assertEqual(repo.choose_source([(root / "missing-mirror").as_uri(), url], expected=first, timeout=5), first)
         with case.assertRaises(ConnectionError):
@@ -108,9 +119,26 @@ def run(root, report):
         case.assertFalse(legacy.exists())
         case.assertGreater(installed["legacy_cleanup"]["deleted_files"], 0)
         case.assertFalse(repo.validate())
-        case.assertFalse(repo.run("status", "--porcelain=v1"))
+        case.assertFalse(repo.run("status", "--porcelain=v1", "--", "chd-segmentation"))
         case.assertEqual(repo.run("rev-parse", "HEAD").decode().strip(), first)
         checks.append("empty no-checkout index becomes a clean sparse working tree and verified old installation is removed")
+        for path, snapshot in untouched.items():
+            case.assertEqual((path.read_bytes(), path.stat().st_mtime_ns), snapshot)
+        checks.append("sibling projects and untracked projects inside the Git directory are preserved during initial migration")
+        case.assertNotIn(outside, set(repo.run("cat-file", "--batch-all-objects", "--batch-check=%(objectname)").decode().splitlines()))
+        # 显式准备其他项目的真实文件及本地改动，验证后续同步不会写入它们。
+        repo.run("fetch", repo.transport, "--no-tags", "--no-write-fetch-head", "--filter=blob:none", "--stdin", data=(outside + "\n").encode(), network=True)
+        other_names = b"dataset1282_analysis/README.md\0unrelated.md\0"
+        repo.run("update-index", "--no-skip-worktree", "-z", "--stdin", data=other_names)
+        repo.run("checkout-index", "-z", "--stdin", data=other_names)
+        tracked = repo_path / "dataset1282_analysis" / "README.md"
+        staged = repo_path / "unrelated.md"
+        tracked.write_bytes(tracked.read_bytes() + b"\nLocal working change\n")
+        staged.write_bytes(staged.read_bytes() + b"\nLocal staged change\n")
+        git(repo_path, "add", "--", "unrelated.md")
+        staged_blob = repo.run("rev-parse", ":unrelated.md")
+        for path in (tracked, staged):
+            untouched[path] = (path.read_bytes(), path.stat().st_mtime_ns)
         timings["fixture_and_migration_seconds"] = perf_counter() - mark
 
         mark = perf_counter()
@@ -120,6 +148,15 @@ def run(root, report):
                 with case.assertRaises(OSError):
                     updater.synchronize(repo, runtime, first)
         checks.append("active legacy entry, training task, and Git code lock prevent updates")
+        index_lock = repo_path / ".git" / "index.lock"
+        with index_lock.open("xb") as stream:
+            stream.write(b"Existing external Git operation")
+        with case.assertRaises(subprocess.CalledProcessError):
+            updater.synchronize(repo, runtime, first)
+        case.assertEqual(index_lock.read_bytes(), b"Existing external Git operation")
+        case.assertEqual(repo.run("rev-parse", "HEAD"), before)
+        index_lock.unlink()
+        checks.append("an existing external Git index lock is preserved and prevents synchronization")
         readme = repo_path / "chd-segmentation" / "README.md"
         original = readme.read_bytes()
         readme.write_bytes(original + b"\nLocal edit\n")
@@ -142,20 +179,36 @@ def run(root, report):
 
         mark = perf_counter()
         repo.choose_source([url], expected=second, timeout=5)
+        git(repo_path, "add", "--", "dataset1282_analysis/README.md")
+        staged_before = repo.run("ls-files", "--stage", "-z")
+        with case.assertRaises(ValueError):
+            updater.synchronize(repo, runtime, second)
+        case.assertEqual(repo.run("rev-parse", "HEAD"), before)
+        case.assertEqual(repo.run("ls-files", "--stage", "-z"), staged_before)
+        for path, snapshot in untouched.items():
+            case.assertEqual((path.read_bytes(), path.stat().st_mtime_ns), snapshot)
+        # 仅恢复该测试夹具的暂存记录，保留工作文件，以继续检查普通同步。
+        repo.run("update-index", "--cacheinfo", "100644," + outside + ",dataset1282_analysis/README.md")
+        checks.append("a conflicting staged change in another project preserves HEAD, index entries, and all working files")
         updated = updater.synchronize(repo, runtime, second)
         case.assertEqual(updated["head"], second)
         case.assertEqual(repo.run("rev-parse", "HEAD").decode().strip(), second)
         case.assertEqual(repo.run("rev-parse", "origin/main").decode().strip(), second)
         case.assertEqual(repo.remote_head(), second)
-        case.assertFalse(repo.run("status", "--porcelain=v1"))
-        case.assertEqual({p.name for p in repo_path.iterdir()}, {".git", "chd-segmentation"})
+        case.assertFalse(repo.run("status", "--porcelain=v1", "--", "chd-segmentation"))
+        case.assertEqual({p.name for p in repo_path.iterdir()}, {".git", "chd-segmentation", "dataset1282_analysis", "local-project", "unrelated.md"})
+        for path, snapshot in untouched.items():
+            case.assertEqual((path.read_bytes(), path.stat().st_mtime_ns), snapshot)
+        case.assertEqual(repo.run("rev-parse", ":unrelated.md"), staged_blob)
+        case.assertIn(b"M dataset1282_analysis/README.md", repo.run("status", "--porcelain=v1", "--", "dataset1282_analysis"))
+        checks.append("tracked working changes and staged changes of other projects retain identical content and modification times")
         case.assertFalse((readme.parent / "launcher.py").exists())
         case.assertFalse((readme.parent / "code_versions").exists())
         checks.append("fast-forward makes HEAD, origin/main and remote main identical with only the requested folder checked out")
         local_objects = set(repo.run("cat-file", "--batch-all-objects", "--batch-check=%(objectname)").decode().splitlines())
-        case.assertNotIn(outside, local_objects)
+        case.assertNotIn(next_outside, local_objects)
         with case.assertRaises(subprocess.CalledProcessError):
-            repo.run("cat-file", "blob", outside)
+            repo.run("cat-file", "blob", next_outside)
         checks.append("unrelated repository blob is absent and cannot be lazily fetched by offline commands")
         entry = readme.parent / "run.py"
         with updater.code_guard(entry):
@@ -171,9 +224,13 @@ def run(root, report):
         repeated = updater.synchronize(repo, runtime, second, remove_legacy=True)
         case.assertEqual(repeated["sha"], second)
         case.assertEqual(repeated["legacy_cleanup"]["deleted_files"], 0)
+        for path, snapshot in untouched.items():
+            case.assertEqual((path.read_bytes(), path.stat().st_mtime_ns), snapshot)
+        case.assertFalse(list((repo_path / ".git").glob("chd-index-*")))
+        case.assertFalse((repo_path / ".git" / "index.lock").exists())
         checks.append("repeated update reuses one fixed code directory without producing another code copy")
         timings["upgrade_and_entry_seconds"] = perf_counter() - mark
-        result.update({"state": "passed", "fixture_commits": [first, second], "target_source_tree": target_tree, "check_count": len(checks)})
+        result.update({"state": "passed", "fixture_commits": [first, second], "target_source_tree": target_tree, "check_count": len(checks), "preserved_files": [{"path": str(path.relative_to(root)), "sha256": hashlib.sha256(snapshot[0]).hexdigest(), "mtime_ns": snapshot[1]} for path, snapshot in untouched.items()]})
     finally:
         if sys.exception() is not None:
             result.update({"state": "failed", "error": str(sys.exception())})
