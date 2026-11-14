@@ -34,7 +34,9 @@ class StunetAdapter:
 
     @staticmethod
     def stages(config):
-        return (StageSpec("segmentation", config["training"]["attempts"], config["training"]["batch"], config["dataset"]),)
+        settings = config["training"]
+        attempts = settings["epochs"] * settings["steps_per_epoch"] if settings["epochs"] else settings["attempts"]
+        return (StageSpec("segmentation", attempts, settings["batch"], config["dataset"]),)
 
     @staticmethod
     def load_pretrained(model, path):

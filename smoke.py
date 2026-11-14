@@ -2,6 +2,7 @@ from copy import deepcopy
 import atexit
 import gc
 import json
+import multiprocessing as mp
 from pathlib import Path
 import shutil
 import sys
@@ -11,9 +12,10 @@ from uuid import uuid4
 
 from update import code_guard
 
-_code_guard = code_guard(__file__)
-_code_guard.__enter__()
-atexit.register(_code_guard.__exit__, None, None, None)
+if mp.current_process().name == "MainProcess":
+    _code_guard = code_guard(__file__)
+    _code_guard.__enter__()
+    atexit.register(_code_guard.__exit__, None, None, None)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
@@ -38,6 +40,7 @@ class SmokeWorkspace:
         self.birth = self.process.create_time()
         self.started = perf_counter()
         self.peak_rss, self.min_available = 0, psutil.virtual_memory().available
+        self.peak_group_rss, self.device = 0, "cpu"
         self.stop = threading.Event()
         self.results = []
 
@@ -45,6 +48,16 @@ class SmokeWorkspace:
         while not self.stop.wait(.2):
             self.peak_rss = max(self.peak_rss, self.process.memory_info().rss)
             self.min_available = min(self.min_available, psutil.virtual_memory().available)
+            processes = {p.info["pid"]: p.info for p in psutil.process_iter(["pid", "ppid", "memory_info"])}
+            family, pending = {self.process.pid}, [self.process.pid]
+            while pending:
+                parent = pending.pop()
+                children = {pid for pid, p in processes.items() if p["ppid"] == parent} - family
+                family.update(children)
+                pending.extend(children)
+            group = sum(processes[pid]["memory_info"].rss for pid in family
+                        if pid in processes and processes[pid]["memory_info"] is not None)
+            self.peak_group_rss = max(self.peak_group_rss, group)
 
     def __enter__(self):
         if self.root == self.report or self.report.is_relative_to(self.root) or self.root.is_relative_to(self.report):
@@ -69,8 +82,9 @@ class SmokeWorkspace:
         result = {"state": "passed" if exception is None else "failed", "scope": "technical",
                   "error": None if exception is None else str(exception), "experiments": self.results,
                   "seconds": perf_counter() - self.started, "peak_rss_bytes": self.peak_rss,
+                  "peak_process_group_rss_bytes": self.peak_group_rss,
                   "minimum_available_ram_bytes": self.min_available, "peak_vram_bytes": None,
-                  "device": "cpu", "artifacts_before_cleanup": files,
+                  "device": self.device, "artifacts_before_cleanup": files,
                   "artifact_count": len(files), "artifact_bytes": sum(row["bytes"] for row in files),
                   "work_root": str(self.root), "report_root": str(self.report)}
         write_json(self.report / "acceptance.json", result)
