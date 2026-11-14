@@ -1,11 +1,11 @@
 # zmic 项目代码同步
 
-根目录为 `/data4/zhangruichen`。Git 仓库固定在 `code/git`，采用部分克隆，只下载和写入 `chd-segmentation/`。code 下和 Git 仓库内部均允许存在其他项目；更新器保留它们的工作文件、未知文件及现有稀疏配置。服务器操作由用户执行，实际状态以执行回执为准。
+根目录为 `/data4/zhangruichen`。项目实体目录为 `code/chd-segmentation`，其中直接保存全部代码和配置。Git 工作根为 code，code/.git 关联已有 code/git/.git 元数据，只下载和写入 chd-segmentation。其他项目的工作文件和暂存记录保留。服务器操作由用户执行，实际状态以执行回执为准。
 
 | 职责 | 位置 |
 | --- | --- |
-| Git 仓库 | `code/git`，官方 origin 为 `https://github.com/tianwuasd/project.git` |
-| 代码、入口、默认配置、文档 | `code/git/chd-segmentation` |
+| Git 元数据 | `code/git/.git`，`code/.git` 为元数据链接；官方 origin 为 `https://github.com/tianwuasd/project.git` |
+| 代码、入口、默认配置、文档 | `code/chd-segmentation`，实体目录 |
 | 私有配置、清单、计划、预处理描述、检查点 | `course/chd-segmentation` |
 | 更新配置与最近一次成功回执 | `course/chd-segmentation/update_network.json`、`updates/latest.json` |
 | 最终掩膜和评价 | `result/chd-segmentation/<dataset>/<fold>/<run_id>` |
@@ -17,22 +17,22 @@
 Python 3.11+ 和系统 Git 即可执行更新，不依赖训练环境。在服务器执行：
 
 ```bash
-python3 -B /data4/zhangruichen/code/git/chd-segmentation/update.py
+python3 -B /data4/zhangruichen/code/chd-segmentation/update.py
 ```
 
 仅查询当前和远端提交：
 
 ```bash
-python3 -B /data4/zhangruichen/code/git/chd-segmentation/update.py --check
+python3 -B /data4/zhangruichen/code/chd-segmentation/update.py --check
 ```
 
 用户明确允许以远端代码覆盖本项目时使用：
 
 ```bash
-python3 -B /data4/zhangruichen/code/git/chd-segmentation/update.py --force
+python3 -B /data4/zhangruichen/code/chd-segmentation/update.py --force
 ```
 
-`--force` 修复已有其他条目的部分索引、本项目暂存删除和缺失工作文件，并将本项目已跟踪代码以远端为准同步；这些文件的本地修改会被覆盖。目标源码列表之外的未知文件保留，其他项目的文件及原有暂存记录保留。强制同步仍要求主分支快进、文件校验通过，并遵守任务锁、外部 Git 索引锁、目录及链接边界。未变化的源码不重复写出。成功回执包含 forced 和 tracked_code_clean；保留的未知文件可能继续显示为未跟踪项。
+`--force` 修复部分索引、本项目暂存删除和缺失工作文件，允许切换到重写后的远端 main，并将目标源码以远端为准同步。目标源码的本地修改会被覆盖；其他项目的文件及既有暂存记录、非目标未知文件保留。任务锁、外部 Git 索引锁、目录和链接边界继续生效。未变化的源码不重复写出。回执包含 forced、tracked_code_clean 和实际 code 路径。
 
 更新开始时固定 main 的完整提交号。只下载本项目缺失的文件对象；语法和快进关系检查通过后，通过候选 Git 索引和限定路径的检出更新本项目。HEAD、origin/main 和核对时的远端 main 必须一致，本项目目录保持干净，实际代码逐文件核对 Git blob。其他项目的工作文件不会被下载、检出、覆盖或删除；必要的提交、索引及分支元数据属于整个仓库。其他项目可以保留本地工作修改和不冲突的暂存内容，因此整个仓库的 status 允许显示其他项目的差异。
 
@@ -42,9 +42,9 @@ python3 -B /data4/zhangruichen/code/git/chd-segmentation/update.py --force
 
 ## 首次切换
 
-使用本次交付的 `服务器代码部署_20261113.sh`。它取得固定版本的独立更新文件并执行 `--force --remove-legacy`，沿用已有 `code/git`，支持未初始化及部分初始化索引的 no-checkout 克隆，并只检出本项目。其他项目已存在时原样保留。
+使用交付的 `服务器代码部署_20261113.sh`。它执行 `--force --relocate`，关联已有 Git 元数据，随后在代码锁和索引锁内将 code/git/chd-segmentation 原目录移动到 code/chd-segmentation。实体目录只保留一份，code/git 中的其他项目和元数据保留。目标已存在且旧目录也存在时停止迁移；旧目录已移走时重复执行仅更新现有项目。
 
-`--remove-legacy` 只处理 `code/chd-segmentation`：先检查登记信息、每份源码清单、根入口及逐文件摘要；同步成功后删除已核验的旧项目代码目录。任何未知文件、本地修改、链接或活动任务都会阻止删除。数据、环境、过程产物、训练检查点及最终结果均保留。重复执行时，已不存在的旧目录无需再次处理。
+目录移动在目标代码下载及语法检查之后执行。数据、环境、course 中的日志和检查点、result 中的结果保持原路径。默认 --repo 为 /data4/zhangruichen/code；迁移命令不使用 --remove-legacy。
 
 ## 镜像配置
 
@@ -65,11 +65,11 @@ python3 -B /data4/zhangruichen/code/git/chd-segmentation/update.py --force
 环境和代码分别维护。先核对实际解释器，再执行：
 
 ```bash
-/data4/zhangruichen/env/chd-segmentation/bin/python -B /data4/zhangruichen/code/git/chd-segmentation/setup_env.py --check
-python3 -B /data4/zhangruichen/code/git/chd-segmentation/run.py --code-info
-/data4/zhangruichen/env/chd-segmentation/bin/python -B /data4/zhangruichen/code/git/chd-segmentation/run.py --version
+/data4/zhangruichen/env/chd-segmentation/bin/python -B /data4/zhangruichen/code/chd-segmentation/setup_env.py --check
+python3 -B /data4/zhangruichen/code/chd-segmentation/run.py --code-info
+/data4/zhangruichen/env/chd-segmentation/bin/python -B /data4/zhangruichen/code/chd-segmentation/run.py --version
 ```
 
 `--code-info` 仅使用标准库，显示当前 Git HEAD、本项目的本地修改标记、实际代码目录和调用解释器；业务命令必须使用训练环境。私有实验配置填写 course 中的 work_root、run_dir 和 result 中的 result_root，data_root 指向 data 中的真实数据集。具体数据子目录、清单、拟合计划和解释器仍需按服务器现有文件核对。
 
-本地短测验证两份真实代码的迁移、快进、重复同步、指针与文件一致性、锁和本地修改保护。它不连接 zmic，不执行病例处理或训练；服务器部署及 CUDA/DDP 仍需实际回执核验。
+本次目录调整按用户要求未运行本地测试。服务器迁移结果以实际回执中的 code、relocated_from、sha、head 和 origin_main 为准；CUDA/DDP 与正式训练仍需独立验收。

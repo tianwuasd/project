@@ -123,6 +123,19 @@ def require_head(expected, actual):
         raise ValueError("远端 main 已变化，停止本次同步")
 
 
+def prepare_code_root(path):
+    root = Path(path).resolve(strict=True)
+    metadata = root / "git" / ".git"
+    entry = root / ".git"
+    if not metadata.is_dir():
+        raise FileNotFoundError("已有 Git 元数据目录不存在：" + str(metadata))
+    if entry.exists() or entry.is_symlink():
+        if not entry.is_dir() or entry.resolve() != metadata.resolve():
+            raise ValueError("code 目录已有其他 Git 元数据入口，停止迁移")
+    else:
+        entry.symlink_to(metadata, target_is_directory=True)
+
+
 class GitRepository:
     def __init__(self, path, expected_urls=None, timeout=900):
         self.path = Path(path).resolve(strict=True)
@@ -246,7 +259,7 @@ class GitRepository:
             overrides.append(entry[2] if entry else b"0 " + b"0" * 40 + b"\t" + name)
         return b"\0".join(overrides) + b"\0"
 
-    def update_project(self, head, commit, files, initial, force=False):
+    def update_project(self, head, commit, files, initial, force=False, relocate_from=None):
         gitdir = self.path / ".git"
         actual_index, index_lock = gitdir / "index", gitdir / "index.lock"
         candidate = gitdir / ("chd-index-" + uuid4().hex)
@@ -271,14 +284,18 @@ class GitRepository:
                 self.run("update-index", "--skip-worktree", "-z", "--stdin", data=b"\0".join(outside) + b"\0", index=candidate)
             project_names = [(SUBDIRECTORY + "/" + name).encode() for name in files]
             self.run("update-index", "--no-skip-worktree", "-z", "--stdin", data=b"\0".join(project_names) + b"\0", index=candidate)
-            changed = [(SUBDIRECTORY + "/" + name).encode() for name, blob in files.items()
-                       if old_files.get(name) != blob or not (code / name).is_file()
-                       or (force and self.run("hash-object", "--no-filters", "--", str(code / name)).decode().strip() != blob)]
             with index_lock.open("xb") as stream:
                 owned_lock = True
                 if (actual_index.read_bytes() if actual_index.exists() else None) != old_index:
                     raise ValueError("Git 索引被其他操作修改，停止同步")
                 require_head(head, self.run("rev-parse", "HEAD").decode().strip())
+                if relocate_from is not None:
+                    if code.exists():
+                        raise FileExistsError("目标项目目录已经存在，停止迁移：" + str(code))
+                    relocate_from.rename(code)
+                changed = [(SUBDIRECTORY + "/" + name).encode() for name, blob in files.items()
+                           if old_files.get(name) != blob or not (code / name).is_file()
+                           or (force and self.run("hash-object", "--no-filters", "--", str(code / name)).decode().strip() != blob)]
                 directories = set()
                 for name in old_files.keys() - files.keys():
                     path = code / name
@@ -348,13 +365,23 @@ def legacy_files(repo, runtime):
     return code, [path for path in code.rglob("*") if path.is_file()]
 
 
-def synchronize(repo, runtime, commit, remove_legacy=False, force=False):
+def synchronize(repo, runtime, commit, remove_legacy=False, force=False, relocate=False):
     started, runtime = monotonic(), Path(runtime).resolve()
     if runtime.is_relative_to(repo.path) or repo.path.is_relative_to(runtime):
         raise ValueError("代码与过程目录必须独立")
     with file_lock(runtime / ".code.lock"), file_lock(repo.path / ".git" / "chd-code.lock"), ExitStack() as locks:
         for path in sorted((runtime / "runs").rglob(".run.lock")):
             locks.enter_context(file_lock(path))
+        relocate_from = None
+        old_code = repo.path / "git" / SUBDIRECTORY
+        if relocate and old_code.exists():
+            if (old_code.is_symlink() or not old_code.is_dir()
+                    or any(path.is_symlink() for path in old_code.rglob("*"))
+                    or (repo.path / ".git").resolve() != (repo.path / "git" / ".git").resolve()):
+                raise ValueError("旧项目目录或 Git 元数据路径异常，停止迁移")
+            if (repo.path / SUBDIRECTORY).exists():
+                raise FileExistsError("code 下已有同名项目目录，停止迁移")
+            relocate_from = old_code
         initial = repo.validate(force=force)
         legacy, obsolete = legacy_files(repo, runtime) if remove_legacy else (None, [])
         head = repo.run("rev-parse", "HEAD").decode().strip()
@@ -362,7 +389,8 @@ def synchronize(repo, runtime, commit, remove_legacy=False, force=False):
         mark = monotonic()
         repo.run("fetch", "--no-tags", "--filter=blob:none", repo.transport, "main", network=True)
         require_head(commit, repo.run("rev-parse", "FETCH_HEAD").decode().strip())
-        repo.run("merge-base", "--is-ancestor", head, commit)
+        if not force:
+            repo.run("merge-base", "--is-ancestor", head, commit)
         files = repo.inventory(commit)
         repo.fetch_files(files)
         for name, blob in files.items():
@@ -372,7 +400,7 @@ def synchronize(repo, runtime, commit, remove_legacy=False, force=False):
         require_head(commit, repo.remote_head())
         mark = monotonic()
         repo.validate(force=force)
-        repo.update_project(head, commit, files, initial, force=force)
+        repo.update_project(head, commit, files, initial, force=force, relocate_from=relocate_from)
         repo.run("config", "branch.main.remote", "origin")
         repo.run("config", "branch.main.merge", "refs/heads/main")
         require_head(commit, repo.run("rev-parse", "HEAD").decode().strip())
@@ -392,21 +420,27 @@ def synchronize(repo, runtime, commit, remove_legacy=False, force=False):
             legacy_files(repo, runtime)
             shutil.rmtree(legacy)
         result = {"state": "synchronized", "forced": force, "tracked_code_clean": True, "sha": commit, "head": commit, "origin_main": commit, "code": str(repo.path / SUBDIRECTORY), "repository": REPOSITORY, "network": repo.network_info, "file_count": len(files), "code_bytes": size, "download_seconds": downloaded, "checkout_verify_seconds": checkout_seconds, "seconds": monotonic() - started, "checked_at": datetime.now(timezone.utc).isoformat(), "legacy_cleanup": {"deleted_files": len(obsolete), "released_bytes": deleted_bytes}}
+        result["relocated_from"] = str(relocate_from) if relocate_from is not None else None
         write_json(runtime / "updates" / "latest.json", result)
         return result
 
 
 def main():
     parser = argparse.ArgumentParser(description="只检出先心分割目录，将本地 main 快进到远端 main")
-    parser.add_argument("--repo", default="/data4/zhangruichen/code/git")
+    parser.add_argument("--repo", default="/data4/zhangruichen/code")
     parser.add_argument("--runtime", default="/data4/zhangruichen/course/chd-segmentation")
     parser.add_argument("--sha")
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--force", action="store_true", help="本项目代码以远端为准，修复未完整检出的索引，保留其他项目的文件和暂存记录")
+    parser.add_argument("--relocate", action="store_true", help="将实体项目从 code/git/chd-segmentation 移到 code/chd-segmentation，复用 Git 元数据")
     parser.add_argument("--remove-legacy", action="store_true", help="核验并删除本项目旧版本安装目录")
     parser.add_argument("--mirror", action="append")
     parser.add_argument("--network-config")
     args = parser.parse_args()
+    if args.relocate:
+        if not args.force or args.remove_legacy:
+            raise ValueError("目录迁移请使用 --force --relocate")
+        prepare_code_root(args.repo)
     repo = GitRepository(args.repo)
     repo.validate(force=args.force)
     settings_path = Path(args.network_config) if args.network_config else Path(args.runtime) / "update_network.json"
