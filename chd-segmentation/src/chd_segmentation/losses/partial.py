@@ -1,5 +1,11 @@
 import torch
+import torch.distributed as dist
+from torch.distributed.nn.functional import all_reduce
 from torch.nn import functional as F
+
+
+def global_sum(value):
+    return all_reduce(value, op=dist.ReduceOp.SUM) if dist.is_initialized() else value
 
 
 def _target(logits, target):
@@ -44,7 +50,9 @@ def marginal_loss(logits, target, unknown_classes, smooth=1e-5):
             dice.append((2 * (probability * truth).sum() + smooth) /
                         (probability.sum() + truth.sum() + smooth))
         results.append(ce + 1 - torch.stack(dice).mean())
-    return torch.stack(results).mean() if results else logits.sum() * 0
+    total = torch.stack(results).sum() if results else logits.sum() * 0
+    count = logits.new_tensor(len(results))
+    return global_sum(total) / global_sum(count).clamp_min(1)
 
 
 def imagechd_loss(logits, target, unknown_classes, smooth=1e-5):
@@ -66,15 +74,15 @@ def imagechd_loss(logits, target, unknown_classes, smooth=1e-5):
     selected = logp.gather(1, safe[:, None])[:, 0]
     missing_myo = (~available[:, 4]).view(-1, *([1] * (target.ndim - 1)))
     merged = torch.logsumexp(logp[:, [0, 5]], dim=1)
-    ce = (-torch.where((target == 0) & missing_myo, merged, selected) * valid).sum() / valid.sum().clamp_min(1)
+    ce = global_sum((-torch.where((target == 0) & missing_myo, merged, selected) * valid).sum()) / global_sum(valid.sum()).clamp_min(1)
     truth = F.one_hot(safe, 8).movedim(-1, 1)[:, 1:]
     probability = logp[:, 1:].exp()
     axes = tuple(range(2, logits.ndim))
     intersect = (probability * truth * valid[:, None]).sum(axes) * available
     predicted = (probability * valid[:, None]).sum(axes) * available
     reference = (truth * valid[:, None]).sum(axes) * available
-    active = (available & valid.flatten(1).any(1)[:, None]).any(0)
-    dice = (2 * intersect.sum(0) + smooth) / (predicted.sum(0) + reference.sum(0) + smooth)
+    active = global_sum((available & valid.flatten(1).any(1)[:, None]).sum(0)) > 0
+    dice = (2 * global_sum(intersect.sum(0)) + smooth) / (global_sum(predicted.sum(0)) + global_sum(reference.sum(0)) + smooth)
     return ce - (dice * active).sum() / active.sum().clamp_min(1)
 
 

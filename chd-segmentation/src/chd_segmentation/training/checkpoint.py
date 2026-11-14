@@ -4,7 +4,7 @@ from pathlib import Path
 
 import torch
 
-from ..artifacts.store import file_digest, operation_lock, read_json, write_json
+from ..artifacts.store import digest, file_digest, operation_lock, read_json, write_json
 
 
 def tensors_equal(left, right):
@@ -45,9 +45,10 @@ def prediction_snapshot(directory):
 def save_checkpoint(directory, state):
     directory = Path(directory)
     previous = read_json(directory / "latest.json") if (directory / "latest.json").exists() else None
-    if previous and previous["attempts"] == state["attempts"]:
+    progress = state.get("progress", {"attempts": state["attempts"]})
+    if previous and previous.get("progress", {"attempts": previous["attempts"]}) == progress:
         return previous
-    filename = f"state-{state['attempts']:09d}.pt"
+    filename = f"state-{state['attempts']:09d}-{digest(progress)[:8]}.pt"
     path = directory / filename
     pending = path.with_name(path.name + ".pending")
     with pending.open("wb") as stream:
@@ -59,7 +60,8 @@ def save_checkpoint(directory, state):
         raise ValueError("新检查点独立读回与保存状态不一致")
     del loaded
     os.replace(pending, path)
-    pointer = {"file": filename, "sha256": file_digest(path), "attempts": state["attempts"], "updates": state["updates"]}
+    pointer = {"file": filename, "sha256": file_digest(path), "attempts": state["attempts"],
+               "updates": state["updates"], "progress": progress}
     write_json(directory / "latest.json", pointer)
     if previous and previous["file"] != filename:
         old = directory / previous["file"]

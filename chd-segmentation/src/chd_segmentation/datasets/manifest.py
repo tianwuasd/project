@@ -10,7 +10,7 @@ LABELS = {
 }
 
 
-def load_manifest(path, dataset, scope):
+def load_manifest(path, dataset, scope, allow_unassigned=False):
     path = Path(path).resolve(strict=True)
     value = yaml.safe_load(path.read_text(encoding="utf-8"))
     if value["dataset"] != dataset or value["scope"] != scope:
@@ -22,7 +22,8 @@ def load_manifest(path, dataset, scope):
     for row in records:
         if not row["case_id"].replace("_", "").replace("-", "").isalnum():
             raise ValueError("病例编号包含不允许的字符")
-        if not set(row["roles"]) <= {"train", "validation", "test", "predict"} or not row["roles"]:
+        row.setdefault("roles", [])
+        if not set(row["roles"]) <= {"train", "validation", "test", "predict"} or (not row["roles"] and not allow_unassigned):
             raise ValueError("病例角色无效")
         for kind in ("image", "label"):
             if row.get(kind) is None:
@@ -47,7 +48,7 @@ def load_manifest(path, dataset, scope):
             raise ValueError("ImageCHD 仅接收完整或缺 MYO 的监督协议")
         if set(row.get("known_absent_classes", [])) & unknown:
             raise ValueError("真实缺如与未知类别不能重叠")
-        if scope == "formal" and "predict" not in row["roles"] and not row.get("patient"):
+        if scope == "formal" and not allow_unassigned and "predict" not in row["roles"] and not row.get("patient"):
             raise ValueError("正式划分缺少患者身份")
         expected = "shared_index_excel" if dataset == "chd1282" else "matching_affine_author_spacing"
         if row["geometry_policy"] != expected:

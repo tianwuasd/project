@@ -16,12 +16,36 @@ from ..models.stunet.adapter import StunetAdapter
 from ..observability.events import event
 from ..training.checkpoint import load_checkpoint, prediction_snapshot
 from ..training.engine import code_identity, device_for
+from ..training.resources import resource_lease
 from ..preprocessing.prepare import validate_prepared_config
 from .metrics import case_data_identity
 from .restore import restore
 
 
 def predict(config, output, inputs=None, case_ids=None):
+    if config["resources"]["device"] == "cpu":
+        return _predict(config, output, inputs, case_ids)
+    if torch.cuda.is_initialized():
+        raise RuntimeError("GPU 预测需要新的命令进程，以使用准入后的可见设备")
+    runtime = deepcopy(config)
+    runtime["resources"].update(gpu_count=1, batch_layout=None, share=False, workers=0)
+    if runtime["resources"]["gpu_ids"] is not None and len(runtime["resources"]["gpu_ids"]) != 1:
+        raise ValueError("单次预测仅使用一张卡，请配置一个 gpu_ids 或使用自动选卡")
+    training = read_json(Path(config["run_dir"]) / "run.json")
+    previous = os.environ.get("CUDA_VISIBLE_DEVICES")
+    with resource_lease(runtime, training["prepared"], training["scientific"]["spec"]) as allocation:
+        os.environ["CUDA_VISIBLE_DEVICES"] = allocation["gpus"][0]["uuid"]
+        try:
+            return _predict(runtime, output, inputs, case_ids)
+        finally:
+            torch.cuda.empty_cache()
+            if previous is None:
+                os.environ.pop("CUDA_VISIBLE_DEVICES", None)
+            else:
+                os.environ["CUDA_VISIBLE_DEVICES"] = previous
+
+
+def _predict(config, output, inputs=None, case_ids=None):
     started = perf_counter()
     training = read_json(Path(config["run_dir"]) / "run.json")
     prepared = deepcopy(training["prepared"])

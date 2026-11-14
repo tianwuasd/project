@@ -2,17 +2,21 @@ from pathlib import Path
 
 from ..artifacts.store import digest, file_digest, operation_lock, read_json, require_output, write_json
 from ..datasets.manifest import LABELS, load_manifest
+from ..datasets.splits import apply_split
 from .planning import resolve_plan, validate_auto_plan
 
 
 def prepare(config, output):
-    manifest = load_manifest(config["manifest"], config["dataset"], config["scope"])
+    manifest = apply_split(load_manifest(config["manifest"], config["dataset"], config["scope"],
+                                        allow_unassigned=config["split"]["path"] is not None), config)
     if config["scope"] == "formal" and config["planning"]["mode"] == "existing" and manifest.get("plan_scope") != "formal":
         raise ValueError("正式任务需要声明正式拟合计划的来源")
     rows = manifest["cases"]
-    if config["scope"] == "formal":
+    if config["scope"] == "formal" and manifest.get("split_source", {}).get("unit", "patient") == "patient":
         by_patient = {}
         for row in rows:
+            if not row.get("patient"):
+                raise ValueError("正式划分缺少已核实患者身份")
             roles = set(row["roles"]) - {"predict"}
             previous = by_patient.setdefault(row["patient"], set())
             previous.update(roles)
@@ -62,6 +66,19 @@ def validate_prepared_config(record, config):
     for key in ("manifest", "plan"):
         if file_digest(config[key]) != record["source_identity"][key]:
             raise ValueError("当前输入内容与预处理描述不一致：" + key)
+    source = record["manifest"].get("split_source")
+    if source is not None:
+        if config["split"]["path"] != source["path"] or config["fold"] != source["fold"] or \
+                config["split"]["id_field"] != source["id_field"] or file_digest(source["path"]) != source["sha256"]:
+            raise ValueError("数据划分文件或选折设置已改变，请重新准备")
+        unit = config["split"]["unit"]
+        if unit != "auto" and unit != source["unit"]:
+            raise ValueError("划分独立性设置已改变，请重新准备")
+        fmt = config["split"]["format"]
+        if fmt != "auto" and fmt != source["format"]:
+            raise ValueError("划分格式设置已改变，请重新准备")
+    elif config["split"]["path"] is not None:
+        raise ValueError("当前预处理描述未使用所选划分")
     if config.get("planning", {}).get("mode") == "auto":
         validate_auto_plan(record["plan"], config, record["manifest"])
     for row in record["manifest"]["cases"]:
