@@ -60,18 +60,18 @@ ImageCHD 原流程先对完整标注的历史 97 例按种子 42 排序，分配
 
 ## 服务器用法
 
-在已激活的环境中，从 `/data4/zhangruichen/code/chd-segmentation` 执行。将私有配置中的 manifest、split.path 指向服务器已有审计清单和旧划分文件后，准备每折描述：
+在已激活的环境中，从项目根目录执行。将私有配置中的 manifest、split.path 指向服务器已有审计清单和旧划分文件，设置 `COURSE` 为配置中的过程目录后，准备每折描述：
 
 ```bash
 python -B run.py prepare --config configs/experiments/imagechd_stunet.yaml \
-  --output /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0.json
+  --output "$COURSE/prepared/imagechd_fold0.json"
 ```
 
 自动选择两卡、全局 batch 4、200 epoch：
 
 ```bash
 python -B run.py train --config configs/experiments/imagechd_stunet.yaml \
-  --prepared /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0.json \
+  --prepared "$COURSE/prepared/imagechd_fold0.json" \
   --device cuda --gpus 2 --batch 4 --epochs 200 --workers auto
 ```
 
