@@ -9,6 +9,7 @@ import yaml
 DEFAULTS = {
     "model": "stunet", "scope": "formal", "fold": 0, "result_root": None, "plan": None,
     "split": {"path": None, "format": "auto", "id_field": "case_id", "unit": "auto"},
+    "logging": {"heartbeat_seconds": 15, "case_details": True},
     "planning": {"mode": "auto", "samples_per_case": 100000, "max_samples": 2000000,
                  "seed": 1234, "target_spacing_xyz": None, "clip_range": None,
                  "mean": None, "std": None},
@@ -56,6 +57,11 @@ def load_config(path, overrides=None):
         raise ValueError("当前实现支持 chd1282/imagechd 的 STU-Net")
     if config["scope"] not in ("formal", "technical"):
         raise ValueError("scope 必须是 formal 或 technical")
+    logging = config["logging"]
+    if type(logging["heartbeat_seconds"]) not in (int, float) or not math.isfinite(logging["heartbeat_seconds"]) or logging["heartbeat_seconds"] <= 0:
+        raise ValueError("日志心跳间隔必须为有限正数，单位为秒")
+    if type(logging["case_details"]) is not bool:
+        raise ValueError("logging.case_details 必须为布尔值")
     if config["scope"] == "formal" and (config["technical"]["roi_xyz"] or config["technical"]["allow_role_overlap"]):
         raise ValueError("正式任务不能使用技术子区域或角色重叠")
     for key in required - {"dataset"}:

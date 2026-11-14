@@ -9,6 +9,7 @@ import sys
 import threading
 from time import perf_counter
 from uuid import uuid4
+from unittest import TestCase
 
 from update import code_guard
 
@@ -26,10 +27,12 @@ import yaml
 from chd_segmentation.artifacts.store import file_digest, read_json, write_json
 from chd_segmentation.config import DEFAULTS, load_config
 from chd_segmentation.data.dataset import CaseDataset
+from chd_segmentation.compatibility import compatible_code
+from chd_segmentation.observability.events import Stage, event
 from chd_segmentation.prediction.infer import predict
 from chd_segmentation.prediction.metrics import evaluate
 from chd_segmentation.preprocessing.prepare import prepare
-from chd_segmentation.training.engine import train
+from chd_segmentation.training.engine import code_identity, train
 
 
 class SmokeWorkspace:
@@ -97,13 +100,18 @@ class SmokeWorkspace:
         return False
 
 
-def run(spec_path, root, report, validate_only=False):
+def run(spec_path, root, report, validate_only=False, check_logging=False, startup_receipt=None):
     experiments = yaml.safe_load(Path(spec_path).read_text(encoding="utf-8"))["experiments"]
     if not 1 <= len(experiments) <= 2 or len({row["case"]["image"] for row in experiments}) != len(experiments):
         raise ValueError("短测只允许总计一至两个不同真实病例")
     with SmokeWorkspace(root, report) as workspace:
         for experiment in experiments:
             started = perf_counter()
+            only_validate = validate_only or experiment.get("validate_only", False)
+            attempts = experiment.get("attempts", 2)
+            if type(attempts) is not int or not 1 <= attempts <= 2:
+                raise ValueError("每例短测只允许一至两次训练更新")
+            first_stop = 0 if attempts == 1 else 1
             name = experiment["dataset"]
             directory = workspace.root / name
             directory.mkdir(exist_ok=False)
@@ -121,14 +129,20 @@ def run(spec_path, root, report, validate_only=False):
             config["planning"].update(experiment.get("planning", {}))
             if config["planning"]["mode"] != "auto":
                 raise ValueError("短测必须从所选真实病例自动生成技术计划")
-            config["training"].update({"patch": [32, 32, 32], "attempts": 2, "batch": 1,
+            config["training"].update({"patch": [32, 32, 32], "attempts": attempts, "batch": 1,
                                        "save_every_attempts": 2, "foreground_fraction": 1.})
             config["technical"] = {"roi_xyz": experiment["roi_xyz"], "allow_role_overlap": True}
+            config["resources"].update(workers=1, max_workers=1, readers=1)
+            config["resources"].update(experiment.get("resources", {}))
+            if config["resources"]["device"] != "cpu":
+                raise ValueError("本地短测只允许 CPU，CUDA 验收需要独立授权")
             write_json(directory / "config.json", config)
             config = load_config(directory / "config.json")
             record = {"dataset": name, "case_id": row["case_id"], "source_identity": row["sha256"],
                       "roi_xyz": experiment["roi_xyz"], "patch": config["training"]["patch"], "device": "cpu"}
             workspace.results.append(record)
+            event(config["run_dir"], "smoke_case_started", dataset=name, case_id=row["case_id"],
+                  optimizer_update_limit=0 if only_validate else attempts)
             mark = perf_counter()
             prepared = prepare(config, process / "prepared.json")
             record["prepare_seconds"] = perf_counter() - mark
@@ -143,7 +157,7 @@ def run(spec_path, root, report, validate_only=False):
             if repeated != prepared or Path(config["plan"]).stat().st_mtime_ns != plan_stamp:
                 raise ValueError("自动计划未按相同身份复用")
             record["planning"]["reused_without_write"] = True
-            dataset = CaseDataset(prepared, config["resources"])
+            dataset = CaseDataset(prepared, config["resources"], log_dir=config["run_dir"], logging=config.get("logging"))
             first = dataset.get(row["case_id"])
             if not (first["label"] > 0).any():
                 raise ValueError("所选技术子区域没有真实前景标签")
@@ -156,13 +170,13 @@ def run(spec_path, root, report, validate_only=False):
             dataset.clear()
             del first, second, dataset
             gc.collect()
-            record["first_train"] = train(config, process / "prepared.json", stop_after=0 if validate_only else 1)
+            record["first_train"] = train(config, process / "prepared.json", stop_after=0 if only_validate else first_stop)
             record["resume_train"] = train(config, process / "prepared.json", resume=True,
-                                           stop_after=0 if validate_only else None)
-            expected_updates = 0 if validate_only else 2
+                                           stop_after=0 if only_validate else None)
+            expected_updates = 0 if only_validate else attempts
             if not record["resume_train"]["restored_exact"] or record["resume_train"]["updates"] != expected_updates:
                 raise ValueError("训练恢复状态或更新数未通过")
-            if not validate_only and (not record["first_train"]["parameters_changed_this_invocation"] or not record["resume_train"]["parameters_changed_this_invocation"]):
+            if not only_validate and ((first_stop and not record["first_train"]["parameters_changed_this_invocation"]) or not record["resume_train"]["parameters_changed_this_invocation"]):
                 raise ValueError("训练更新没有改变实际模型参数")
             record["optimizer_updates_in_this_test"] = expected_updates
             predictions = results / "prediction"
@@ -171,9 +185,56 @@ def run(spec_path, root, report, validate_only=False):
             if record["prediction_reuse"]["reused"] != 1 or record["prediction_reuse"]["new"] != 0:
                 raise ValueError("重复预测没有复用完成结果")
             record["evaluation"] = evaluate(predictions, prepared, results / "evaluation.json", config)
+            if check_logging:
+                check = TestCase()
+                repeated_evaluation = evaluate(predictions, prepared, results / "evaluation.json", config)
+                check.assertTrue(repeated_evaluation["reused"])
+                check.assertEqual(startup_receipt["first_event"], "command_starting")
+                check.assertTrue(startup_receipt["flushed_before_exit"])
+                with Stage(config["run_dir"], "log_heartbeat_verify", heartbeat_seconds=.001, console=False):
+                    for _ in range(4):
+                        check.assertEqual(file_digest(row["image"]), row["sha256"]["image"])
+                with check.assertRaises(FileNotFoundError), Stage(config["run_dir"], "log_failure_verify"):
+                    file_digest(directory / "missing-input-for-log-check.nii.gz")
+                logs_path = Path(config["run_dir"]) / "events.jsonl"
+                before_bytes = logs_path.stat().st_size
+                silent = CaseDataset(prepared, config["resources"], log_dir=config["run_dir"],
+                                     logging={"case_details": False})
+                silent.get(row["case_id"])
+                silent.clear()
+                check.assertEqual(logs_path.stat().st_size, before_bytes)
+                current = code_identity()
+                baseline = "afffd433e388f93fe5d840ba6a899cb2b814c81804e59d4b02c310cb47cf8dde"
+                check.assertTrue(compatible_code(baseline, current))
+                check.assertFalse(compatible_code("0" * 64, current))
+                check.assertFalse(compatible_code(baseline, "0" * 64))
             events = [json.loads(line) for line in (process / "training" / "events.jsonl").read_text(encoding="utf-8").splitlines()]
             if (predictions / "events.jsonl").exists() or not any(row["event"] == "prediction" for row in events):
                 raise ValueError("预测事件日志未保存到过程目录")
+            if check_logging:
+                kinds = {r["event"] for r in events}
+                stages = {r.get("stage") for r in events}
+                required_events = {"plan_case_completed", "plan_reused", "resources_allocated", "checkpoint_committed",
+                                   "checkpoint_loaded", "train", "validation", "prediction", "prediction_reused",
+                                   "evaluation_completed", "evaluation_reused"}
+                required_stages = {"prepare", "source_verify", "read_decompress", "crop_normalize_resample", "batch_supply",
+                                   "training_inputs", "model_build", "pretrained_load", "sliding_window", "prediction_restore"}
+                if only_validate:
+                    required_events -= {"train", "validation"}
+                    required_stages -= {"batch_supply"}
+                check.assertTrue(required_events <= kinds, required_events - kinds)
+                check.assertTrue(required_stages <= stages, required_stages - stages)
+                check.assertTrue(any(r["event"] == "heartbeat" and r["stage"] == "log_heartbeat_verify" for r in events))
+                failed = next(r for r in events if r["event"] == "stage_failed" and r["stage"] == "log_failure_verify")
+                check.assertIn("FileNotFoundError", failed["traceback"])
+                check.assertGreaterEqual(len({r["pid"] for r in events}), 2)
+                check.assertTrue(all(r["time_utc"].endswith("+00:00") and type(r["pid"]) is int for r in events))
+                shutil.copyfile(process / "training" / "events.jsonl", workspace.report / f"{name}-events.jsonl")
+                record["logging"] = {"events": len(events), "processes": len({r["pid"] for r in events}),
+                                     "bytes": (process / "training" / "events.jsonl").stat().st_size,
+                                     "required_events": sorted(required_events), "required_stages": sorted(required_stages),
+                                     "heartbeat": True, "failure_traceback": True, "flushed_before_command_exit": True,
+                                     "case_details_can_be_disabled": True, "code_compatibility_exact_pair": True}
             record["storage"] = {"work_root": str(process), "result_root": str(results),
                                  "prediction_events_in_course": True, "result_events_absent": True}
             for kind in ("image", "label"):
@@ -182,6 +243,8 @@ def run(spec_path, root, report, validate_only=False):
             record["seconds"] = perf_counter() - started
             record["source_unchanged"] = True
             write_json(workspace.report / f"{name}.json", record)
+            event(config["run_dir"], "smoke_case_completed", dataset=name, case_id=row["case_id"],
+                  seconds=record["seconds"], updates=expected_updates)
             gc.collect()
 
 

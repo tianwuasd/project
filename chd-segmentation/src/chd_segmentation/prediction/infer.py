@@ -10,10 +10,11 @@ import psutil
 import torch
 
 from ..artifacts.store import digest, file_digest, operation_lock, read_json, require_output, require_result_output, write_json
+from ..compatibility import compatible_code
 from ..data.dataset import CaseDataset
 from ..datasets.manifest import load_manifest
 from ..models.stunet.adapter import StunetAdapter
-from ..observability.events import event
+from ..observability.events import event, logged, stage
 from ..training.checkpoint import load_checkpoint, prediction_snapshot
 from ..training.engine import code_identity, device_for
 from ..training.resources import resource_lease
@@ -22,6 +23,7 @@ from .metrics import case_data_identity
 from .restore import restore
 
 
+@logged("prediction")
 def predict(config, output, inputs=None, case_ids=None, manifest=None):
     if inputs is not None and manifest is not None:
         raise ValueError("预测输入文件与已验证清单只能指定一种")
@@ -55,8 +57,12 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None):
     training = read_json(Path(config["run_dir"]) / "run.json")
     prepared = deepcopy(training["prepared"])
     validate_prepared_config(prepared, config)
-    if code_identity() != training["scientific"]["code_identity"]:
+    current_code = code_identity()
+    if not compatible_code(training["scientific"]["code_identity"], current_code):
         raise ValueError("预测代码与训练记录不一致，需要经过验证的兼容记录")
+    if current_code != training["scientific"]["code_identity"]:
+        event(config["run_dir"], "code_compatibility_verified", source=training["scientific"]["code_identity"],
+              target=current_code, training_identity=training["identity"])
     if inputs is not None:
         prepared["manifest"] = load_manifest(inputs, prepared["dataset"], prepared["scope"])
     if manifest is not None:
@@ -76,13 +82,15 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None):
     device = device_for(config)
     with operation_lock(output), prediction_snapshot(config["run_dir"]) as pointer:
         completed = read_json(output / "predictions.json") if (output / "predictions.json").exists() else {"cases": {}}
-        dataset = CaseDataset(prepared, config["resources"], with_label=False)
+        dataset = CaseDataset(prepared, config["resources"], with_label=False, log_dir=log_dir,
+                              logging=config.get("logging"))
         model, state = None, None
         results, reused = [], 0
         for row in prepared["manifest"]["cases"]:
             name = row["case_id"]
             if name not in requested:
                 continue
+            event(log_dir, "prediction_case_started", case_id=name, completed=len(results), total=len(requested))
             source_stat = Path(row["image"]).stat()
             identity = digest({"checkpoint": pointer["sha256"], "plan": training["scientific"]["prepared_identity"],
                                "row": row, "source_stamp": [source_stat.st_size, source_stat.st_mtime_ns],
@@ -94,17 +102,20 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None):
                     raise ValueError("已有预测损坏，拒绝将其作为完成结果")
                 reused += 1
                 results.append({**previous, "reused": True})
+                event(log_dir, "prediction_reused", case_id=name, completed=len(results), total=len(requested), file=str(path))
                 continue
             if path.exists() or previous:
                 raise FileExistsError("已有预测的身份不同，请使用新的预测目录")
             mark = perf_counter()
-            entry = dataset.get(name)
+            with stage(config, "prediction_case_load", case_id=name):
+                entry = dataset.get(name)
             if model is None:
-                state = load_checkpoint(config["run_dir"], training["identity"], pointer=pointer)
-                model = StunetAdapter.build(state["spec"]).to(device).eval()
-                model.load_state_dict(state["model"], strict=True)
-                spec = state["spec"]
-                del state
+                with stage(config, "prediction_model_load", device=str(device)):
+                    state = load_checkpoint(config["run_dir"], training["identity"], pointer=pointer)
+                    model = StunetAdapter.build(state["spec"]).to(device).eval()
+                    model.load_state_dict(state["model"], strict=True)
+                    spec = state["spec"]
+                    del state
             footprint = int(entry["image"].size * (spec["num_classes"] * 12 + 8))
             if psutil.virtual_memory().available < config["resources"]["reserve_ram_bytes"] + footprint:
                 raise MemoryError("整例概率融合内存不足")
@@ -115,7 +126,8 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None):
                 values = model(image)
                 return values[0] if isinstance(values, (tuple, list)) else values
 
-            with torch.inference_mode():
+            with stage(config, "sliding_window", case_id=name, shape=list(entry["image"].shape),
+                       patch=spec["patch"], overlap=options["overlap"], window_batch=options["window_batch"]), torch.inference_mode():
                 logits = sliding_window_inference(
                     torch.from_numpy(entry["image"])[None], roi_size=tuple(spec["patch"]),
                     sw_batch_size=options["window_batch"], predictor=predictor, overlap=options["overlap"],
@@ -125,11 +137,13 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None):
                 probabilities = logits[0].float().softmax(0).numpy()
             compute_seconds = perf_counter() - mark
             mark = perf_counter()
-            native = restore(probabilities, entry, prepared["plan"])
+            with stage(config, "prediction_restore", case_id=name, target_shape_xyz=entry["source_shape_xyz"]):
+                native = restore(probabilities, entry, prepared["plan"])
             affine = entry["source_affine"] if options["export_space"] == "source" else entry["working_affine"]
             image = nib.Nifti1Image(native, np.asarray(affine))
             image.header.set_xyzt_units(entry["source_units"] if options["export_space"] == "source" else "mm")
             pending = path.with_name(path.stem + ".pending.nii.gz")
+            event(log_dir, "prediction_writing", case_id=name, file=str(path))
             nib.save(image, pending)
             check = nib.load(pending)
             observed = np.asanyarray(check.dataobj)
@@ -150,11 +164,14 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None):
                                   "restore_write_seconds": perf_counter() - mark, **entry["timing"]}}
             completed["cases"][name] = receipt
             write_json(output / "predictions.json", completed)
-            event(log_dir, "prediction", case_id=name, scope=prepared["scope"], timing=receipt["timing"])
+            event(log_dir, "prediction", case_id=name, scope=prepared["scope"], timing=receipt["timing"],
+                  completed=len(results) + 1, total=len(requested), bytes=path.stat().st_size)
             results.append(receipt)
             del native, probabilities, logits, entry
             dataset.clear()
         summary = {"state": "completed", "scope": prepared["scope"], "cases": results,
                    "new": len(results) - reused, "reused": reused, "seconds": perf_counter() - started}
         write_json(output / "summary.json", summary)
+        event(log_dir, "prediction_completed", cases=len(results), new=summary["new"], reused=reused,
+              seconds=summary["seconds"], output=str(output))
         return summary

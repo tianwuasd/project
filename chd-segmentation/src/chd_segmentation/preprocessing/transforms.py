@@ -8,6 +8,7 @@ from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
 import psutil
 
 from ..artifacts.store import file_digest
+from ..observability.events import Stage
 
 
 def bounded_locations(seg, classes_or_regions, seed=1234, verbose=False, min_num_samples=10000, min_percent_coverage=.01):
@@ -41,9 +42,15 @@ class BoundedPreprocessor(DefaultPreprocessor):
 
 
 class CaseTransform:
-    def __init__(self, prepared, reserve_ram_bytes, with_label=True):
+    def __init__(self, prepared, reserve_ram_bytes, with_label=True, log_dir=None, logging=None):
         self.prepared, self.reserve, self.with_label = prepared, reserve_ram_bytes, with_label
         self.checked = {}
+        self.log_dir, self.logging = log_dir, logging or {}
+
+    def stage(self, name, **fields):
+        # 外层的病例/供数阶段负责心跳；细节记录不单独创建计时线程。
+        return Stage(self.log_dir, name, heartbeat_seconds=0, console=False,
+                     enabled=self.log_dir is not None and self.logging.get("case_details", True), **fields)
 
     def _source(self, row, kind):
         from pathlib import Path
@@ -59,8 +66,9 @@ class CaseTransform:
         if key in self.checked and self.checked[key] != stamp:
             raise ValueError("运行期间原始文件发生变化")
         if key not in self.checked:
-            if file_digest(path) != expected:
-                raise ValueError("原始文件摘要与清单不一致")
+            with self.stage("source_verify", case_id=row["case_id"], source=kind, bytes=stat.st_size):
+                if file_digest(path) != expected:
+                    raise ValueError("原始文件摘要与清单不一致")
             after = path.stat()
             if stamp != (after.st_size, after.st_mtime_ns):
                 raise ValueError("核验期间原始文件发生变化")
@@ -100,8 +108,10 @@ class CaseTransform:
         estimate = int(np.prod(shape) * 32)
         if psutil.virtual_memory().available < self.reserve + estimate:
             raise MemoryError("病例构建所需内存超出安全余量")
-        data = np.asarray(image.dataobj[region], dtype=np.float32)
-        segmentation = np.asanyarray(label.dataobj[region]) if label is not None else None
+        with self.stage("read_decompress", case_id=row["case_id"], shape_xyz=shape.tolist(),
+                        spacing_xyz=native_spacing.tolist(), with_label=self.with_label):
+            data = np.asarray(image.dataobj[region], dtype=np.float32)
+            segmentation = np.asanyarray(label.dataobj[region]) if label is not None else None
         if not np.isfinite(data).all() or data.min() == data.max():
             raise ValueError("图像包含非有限数值或无灰度变化")
         if segmentation is not None:
@@ -132,9 +142,11 @@ class CaseTransform:
         manager = PlansManager(deepcopy(plan))
         configuration = manager.get_configuration("3d_fullres")
         transform_started = perf_counter()
-        values, targets, properties = BoundedPreprocessor(verbose=False).run_case_npy(
-            data.transpose(2, 1, 0)[None], None if segmentation is None else segmentation.transpose(2, 1, 0)[None],
-            properties, manager, configuration, self.prepared["dataset_json"])
+        with self.stage("crop_normalize_resample", case_id=row["case_id"], native_shape_xyz=list(data.shape),
+                        target_spacing=target_spacing.tolist(), estimated_shape=planned_shape.astype(int).tolist()):
+            values, targets, properties = BoundedPreprocessor(verbose=False).run_case_npy(
+                data.transpose(2, 1, 0)[None], None if segmentation is None else segmentation.transpose(2, 1, 0)[None],
+                properties, manager, configuration, self.prepared["dataset_json"])
         if not np.isfinite(values).all() or values.shape != targets.shape:
             raise ValueError("确定性预处理输出无效")
         if segmentation is not None:

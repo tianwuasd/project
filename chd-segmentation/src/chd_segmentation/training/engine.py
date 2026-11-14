@@ -16,9 +16,10 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel
 
 from ..artifacts.store import digest, operation_lock, read_json, require_output, write_json
+from ..compatibility import compatible_code
 from ..data.supply import BatchSupply
 from ..models.stunet.adapter import StunetAdapter, WEIGHT_SHA256
-from ..observability.events import event
+from ..observability.events import event, logged, stage
 from ..preprocessing.prepare import load_prepared, validate_prepared_config
 from .checkpoint import load_checkpoint, save_checkpoint, tensors_equal
 from .resources import close_members, host_capacity, layout, process_vram, record_peaks, register_member, resource_lease
@@ -80,6 +81,7 @@ def checkpoint(output, model, optimizer, scaler, progress, job, receipt, device,
     return all_objects(pointer, job["world"])[0]
 
 
+@logged("training_rank", config_argument=1, config_key="config")
 def run_rank(rank, job, gate, stop_event):
     config, world, output = job["config"], job["world"], Path(job["config"]["run_dir"])
     settings, resources = config["training"], config["resources"]
@@ -95,15 +97,17 @@ def run_rank(rank, job, gate, stop_event):
         torch.cuda.reset_peak_memory_stats(device)
     if world > 1:
         binding = {"device_id": device} if device.type == "cuda" else {}
-        dist.init_process_group("nccl" if job["gpus"] else "gloo", init_method=job["rendezvous"],
-                                rank=rank, world_size=world, timeout=timedelta(seconds=180), **binding)
+        with stage(config, "distributed_init", rank=rank, world_size=world, backend="nccl" if job["gpus"] else "gloo"):
+            dist.init_process_group("nccl" if job["gpus"] else "gloo", init_method=job["rendezvous"],
+                                    rank=rank, world_size=world, timeout=timedelta(seconds=180), **binding)
     try:
         with ExitStack() as cleanup:
             old_handlers = {sig: signal.signal(sig, lambda *_: stop_event.set()) for sig in (signal.SIGINT, signal.SIGTERM)}
             for sig, handler in old_handlers.items():
                 cleanup.callback(signal.signal, sig, handler)
             torch.manual_seed(settings["seed"])
-            model = StunetAdapter.build(job["spec"]).to(device)
+            with stage(config, "model_build", rank=rank, device=str(device), spec=job["spec"]):
+                model = StunetAdapter.build(job["spec"]).to(device)
             optimizer = torch.optim.SGD(model.parameters(), lr=settings["learning_rate"], momentum=settings["momentum"],
                                         nesterov=True, weight_decay=settings["weight_decay"])
             scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda" and settings["precision"] == "fp16")
@@ -129,12 +133,14 @@ def run_rank(rank, job, gate, stop_event):
                 progress, receipt = state["progress"], state["pretrained_receipt"]
                 del state
             else:
-                receipt = StunetAdapter.load_pretrained(model, config["pretrained"])
+                with stage(config, "pretrained_load", rank=rank, path=config["pretrained"]):
+                    receipt = StunetAdapter.load_pretrained(model, config["pretrained"])
                 progress = {"attempts": 0, "updates": 0, "skipped": 0, "epoch": 0, "phase": "train", "val_step": 0,
                             "val_sum": 0., "validation_loss": None}
             before_parameter = next(model.parameters()).detach().cpu().clone()
-            wrapped = (DistributedDataParallel(model, device_ids=[rank] if job["gpus"] else None,
-                        broadcast_buffers=False, find_unused_parameters=True) if world > 1 else model)
+            with stage(config, "model_ready", rank=rank, distributed=world > 1):
+                wrapped = (DistributedDataParallel(model, device_ids=[rank] if job["gpus"] else None,
+                            broadcast_buffers=False, find_unused_parameters=True) if world > 1 else model)
             # 最后一个深监督输出权重为零，DDP 需要识别没有梯度的参数。
             rows = job["prepared"]["manifest"]["cases"]
             train_ids = [r["case_id"] for r in rows if "train" in r["roles"]]
@@ -185,6 +191,9 @@ def run_rank(rank, job, gate, stop_event):
                             phase_end = min(phase_end, job["stop_after"])
                     else:
                         phase_end = settings["validation_steps"] if settings["epochs"] else 1
+                    if rank == 0:
+                        event(output, "phase_started", phase=phase, epoch=progress["epoch"] + 1,
+                              epochs=settings["epochs"], completed=cursor, total=phase_end)
                 depth = max(resources["prefetch"], job["supply"]["workers"][rank])
                 while submitted < phase_end and len(supply.queue) < depth:
                     sample_index = submitted if phase == "train" else progress["epoch"] * settings["validation_steps"] + submitted
@@ -194,7 +203,9 @@ def run_rank(rank, job, gate, stop_event):
                     reason = "bounded_stop"
                     break
                 mark = perf_counter()
-                batch = supply.take(device)
+                with stage(config, "batch_supply", console=False, rank=rank, phase=phase,
+                           epoch=progress["epoch"] + 1, step=cursor + 1, total=phase_end):
+                    batch = supply.take(device)
                 timings["input_wait_seconds"] += perf_counter() - mark
                 mark = perf_counter()
                 if phase == "train":
@@ -245,7 +256,10 @@ def run_rank(rank, job, gate, stop_event):
                     event(output, phase, attempts=progress["attempts"], updates=progress["updates"], epoch=progress["epoch"],
                           skipped=progress["skipped"],
                           loss=float(loss.detach()), local_cases=batch["case_ids"], learning_rate=optimizer.param_groups[0]["lr"],
-                          input_wait_seconds=timings["input_wait_seconds"], compute_seconds=elapsed)
+                          input_wait_seconds=timings["input_wait_seconds"], compute_seconds=elapsed,
+                          local_cache_hits=batch["cache_hits"], local_cache_misses=batch["cache_misses"],
+                          local_supply_seconds=batch["supply_seconds"], validation_step=progress["val_step"],
+                          total_attempts=total, validation_steps=settings["validation_steps"] if settings["epochs"] else 1)
                 del batch, loss
                 if settings["epochs"] and phase == "train" and progress["attempts"] % settings["steps_per_epoch"] == 0:
                     progress.update(phase="validation", val_step=0, val_sum=0.)
@@ -286,9 +300,11 @@ def run_rank(rank, job, gate, stop_event):
             dist.destroy_process_group()
 
 
+@logged("training")
 def train(config, prepared_path, resume=False, stop_after=None):
-    prepared = load_prepared(prepared_path)
-    validate_prepared_config(prepared, config)
+    with stage(config, "training_inputs", prepared=str(prepared_path), resume=resume):
+        prepared = load_prepared(prepared_path)
+        validate_prepared_config(prepared, config)
     output = require_output(config["run_dir"], config["work_root"], [prepared["manifest"]["data_root"]])
     rows = prepared["manifest"]["cases"]
     if not all(any(role in r["roles"] for r in rows) for role in ("train", "validation")) or \
@@ -301,8 +317,15 @@ def train(config, prepared_path, resume=False, stop_after=None):
     identity = digest(scientific)
     with operation_lock(output), resource_lease(config, prepared, spec) as allocation:
         if resume:
-            if read_json(output / "run.json")["identity"] != identity:
+            previous = read_json(output / "run.json")
+            expected = {**scientific, "code_identity": previous["scientific"]["code_identity"]}
+            if digest(previous["scientific"]) != digest(expected) or previous["identity"] != digest(expected) or not compatible_code(
+                    previous["scientific"]["code_identity"], scientific["code_identity"]):
                 raise ValueError("恢复训练的配置、数据、代码或依赖版本改变")
+            identity = previous["identity"]
+            if previous["scientific"]["code_identity"] != scientific["code_identity"]:
+                event(output, "code_compatibility_verified", source=previous["scientific"]["code_identity"],
+                      target=scientific["code_identity"], training_identity=identity)
             load_checkpoint(output, identity)
         elif (output / "run.json").exists():
             raise FileExistsError("运行目录已存在，请选择恢复训练或新目录")

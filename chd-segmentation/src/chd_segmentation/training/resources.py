@@ -14,6 +14,7 @@ import numpy as np
 import psutil
 
 from ..artifacts.store import digest, file_digest, read_json, write_json
+from ..observability.events import event
 
 GIB = 1024 ** 3
 
@@ -215,6 +216,9 @@ def resource_lease(config, prepared, spec, stage="train"):
     registry, lock = root / "active.json", root / ".resource.lock"
     me = psutil.Process()
     started, history = time.monotonic(), []
+    event(config["run_dir"], "resources_requested", stage=stage, device=config["resources"]["device"],
+          gpu_count=config["resources"]["gpu_count"], gpu_ids=config["resources"]["gpu_ids"],
+          workers=config["resources"]["workers"], batch=config["training"]["batch"])
     while True:
         if config["resources"]["device"] == "cuda":
             history.append((time.monotonic(), inventory()))
@@ -234,17 +238,22 @@ def resource_lease(config, prepared, spec, stage="train"):
                 record = {"pid": me.pid, "birth": me.create_time(), "uuids": [g["uuid"] for g in gpus],
                           "cpu_slots": supply["cpu_slots"], "ram_bytes": supply["ram_bytes"]}
                 write_json(registry, [*peers, record])
+                event(config["run_dir"], "resources_allocated", stage=stage, devices=gpus,
+                      cpu=supply, world_size=world, seconds=time.monotonic() - started)
                 break
         elapsed = time.monotonic() - started
         if elapsed >= config["resources"]["wait_seconds"]:
             raise TimeoutError("没有符合条件的显卡：空闲优先；全部繁忙时需要同配方实测显存及低负载窗口")
-        print(f"等待显卡资源，已等待 {elapsed:.0f} 秒", file=sys.stderr, flush=True)
+        event(config["run_dir"], "waiting_resources", stage=stage, seconds=elapsed,
+              timeout_seconds=config["resources"]["wait_seconds"], observed_gpus=history[-1][1],
+              reason="空闲卡数量不足，或繁忙卡未满足共享准入条件")
         time.sleep(min(config["resources"]["poll_seconds"], config["resources"]["wait_seconds"] - elapsed))
     try:
         yield {"gpus": gpus, "supply": supply, "world": world, "owner": {"pid": me.pid, "birth": me.create_time()}}
     finally:
         with FileLock(str(lock)):
             write_json(registry, [p for p in active_peers(registry) if p["pid"] != me.pid or p["birth"] != me.create_time()])
+        event(config["run_dir"], "resources_released", stage=stage, seconds=time.monotonic() - started)
 
 
 def record_peaks(config, spec, gpus, shares, measurements):

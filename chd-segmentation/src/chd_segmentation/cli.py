@@ -5,6 +5,7 @@ from pathlib import Path
 from . import __version__
 from .artifacts.store import read_json
 from .config import load_config
+from .observability.events import event, log_directory, stage
 
 
 def main(argv=None):
@@ -80,6 +81,11 @@ def main(argv=None):
             if value is not None:
                 training[key] = value
         overrides.update(resources=resources, training=training)
+    if args.command not in ("status", "bind-inputs"):
+        config = load_config(args.config, overrides)
+        event(log_directory(config), "command_ready", command=args.command, dataset=config["dataset"],
+              fold=config["fold"], config=str(Path(args.config).resolve()),
+              run_dir=config["run_dir"], work_root=config["work_root"])
     if args.command == "bind-inputs":
         from .datasets.transfer import bind_inputs
         roots = {name: value for name, value in (("chd1282", args.chd_root), ("imagechd", args.image_root)) if value is not None}
@@ -87,9 +93,9 @@ def main(argv=None):
     elif args.command == "status":
         result = read_json(Path(args.run) / "summary.json")
     elif args.command == "prepare":
-        from .preprocessing.prepare import prepare
         from time import perf_counter
-        config = load_config(args.config, overrides)
+        with stage(config, "load_prepare_modules"):
+            from .preprocessing.prepare import prepare
         existed = Path(config["plan"]).is_file()
         started = perf_counter()
         result = prepare(config, args.output)
@@ -98,19 +104,23 @@ def main(argv=None):
                   "plan_reused": existed, "fit_ids": result["plan"].get("fit_ids"),
                   "seconds": perf_counter() - started}
     elif args.command == "train":
-        from .training.engine import train
-        result = train(load_config(args.config, overrides), args.prepared, args.resume, args.stop_after)
+        with stage(config, "load_training_modules"):
+            from .training.engine import train
+        result = train(config, args.prepared, args.resume, args.stop_after)
     elif args.command == "predict":
-        from .prediction.infer import predict
-        result = predict(load_config(args.config, overrides), args.output, args.inputs, args.case)
+        with stage(config, "load_prediction_modules"):
+            from .prediction.infer import predict
+        result = predict(config, args.output, args.inputs, args.case)
     elif args.command == "test":
-        from .prediction.testing import run_test
-        result = run_test(load_config(args.config, overrides), args.test_set, args.group, args.case)
+        with stage(config, "load_test_modules"):
+            from .prediction.testing import run_test
+        result = run_test(config, args.test_set, args.group, args.case)
     else:
-        from .prediction.metrics import evaluate
-        from .preprocessing.prepare import load_prepared
-        result = evaluate(args.predictions, load_prepared(args.prepared), args.output, load_config(args.config, overrides))
-    print(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False))
+        with stage(config, "load_evaluation_modules"):
+            from .prediction.metrics import evaluate
+            from .preprocessing.prepare import load_prepared
+        result = evaluate(args.predictions, load_prepared(args.prepared), args.output, config)
+    print(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False), flush=True)
 
 
 if __name__ == "__main__":

@@ -17,3 +17,6 @@ inputs = ["openpyxl>=3.1"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+chd_segmentation = ["code_compatibility.json"]
