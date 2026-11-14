@@ -14,180 +14,175 @@ PROJECT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("chd_code_update", PROJECT / "update.py")
 updater = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(updater)
-SOURCE_VERSIONS = ["48048b1d84592ba3080d83dfe8352185ca1a6a5f", "80d96b1ee92665dc20237ce2afd47d3bb2956079"]
-DEPLOYMENT_BASE = "6620887dc7d6f9cc54b39d4e8caf2b79d6898be6"
+BASE = "78e7ef6ec8620779c2e06200400822f293287f90"
 
 
 def git(directory, *args, data=None):
-    return subprocess.run(["git", "-C", str(directory), "-c", "user.name=Codex", "-c", "user.email=codex@local", *args],
-                          input=data, stdout=subprocess.PIPE, timeout=60, check=True).stdout
+    return subprocess.run(["git", "-C", str(directory), "-c", "user.name=Codex", "-c", "user.email=codex@local", *args], input=data, stdout=subprocess.PIPE, timeout=60, check=True).stdout
 
 
-def fixture_commit(origin, source, parent=None):
-    entries = {}
-    for row in filter(None, git(origin, "ls-tree", "-z", source).split(b"\0")):
-        header, name = row.split(b"\t", 1)
-        entries[name] = header
-    for name in ("update.py", "launcher.py"):
-        content = git(PROJECT, "show", DEPLOYMENT_BASE + ":" + name) if parent is None else (PROJECT / name).read_bytes()
-        blob = git(origin, "hash-object", "-w", "--stdin", data=content).strip()
-        entries[name.encode()] = b"100644 blob " + blob
-    body = b"".join(header + b"\t" + name + b"\0" for name, header in sorted(entries.items()))
-    subtree = git(origin, "mktree", "-z", data=body).strip()
-    outside = git(origin, "hash-object", "-w", "--stdin", data=Path(__file__).read_bytes()).strip()
-    tree = git(origin, "mktree", data=b"040000 tree " + subtree + b"\tchd-segmentation\n100644 blob " + outside + b"\tunrelated.md\n").strip()
-    args = ("commit-tree", tree.decode()) + (() if parent is None else ("-p", parent))
-    commit = git(origin, *args, data=("Actual source version " + source + "\n").encode()).decode().strip()
-    return commit, outside.decode()
+def source_tree(origin):
+    files = {}
+    for name in filter(None, git(PROJECT, "ls-files", "-z").decode().split("\0")):
+        path = PROJECT / name
+        if path.is_file():
+            files[name] = git(origin, "hash-object", "-w", "--stdin", data=path.read_bytes()).decode().strip()
+
+    def subtree(prefix):
+        entries = {}
+        directories = set()
+        for name, blob in files.items():
+            if name.startswith(prefix):
+                leaf, separator, _ = name[len(prefix):].partition("/")
+                if separator:
+                    directories.add(leaf)
+                else:
+                    entries[leaf] = "100644 blob " + blob
+        for leaf in directories:
+            entries[leaf] = "040000 tree " + subtree(prefix + leaf + "/")
+        body = b"".join((value + "\t" + name).encode() + b"\0" for name, value in sorted(entries.items()))
+        return git(origin, "mktree", "-z", data=body).decode().strip()
+
+    return subtree("")
+
+
+def fixture_commit(origin, tree, outside, parent=None):
+    root = git(origin, "mktree", data=("040000 tree " + tree + "\tchd-segmentation\n100644 blob " + outside + "\tunrelated.md\n").encode()).decode().strip()
+    args = ("commit-tree", root) + (() if parent is None else ("-p", parent))
+    return git(origin, *args, data=b"Actual application source snapshot\n").decode().strip()
 
 
 def run(root, report):
     root, report = Path(root).resolve(), Path(report).resolve()
-    if root.exists() or root == report or report.is_relative_to(root) or root.is_relative_to(report):
-        raise ValueError("需要未使用的独立验证目录与外部报告")
+    if root.exists() or report.is_relative_to(root) or root.is_relative_to(report):
+        raise ValueError("测试目录必须独立且尚未使用")
     root.mkdir(parents=True)
     marker = root / "owner.json"
     updater.write_json(marker, {"scope": "code-sync", "pid": os.getpid()})
     started, checks, timings = perf_counter(), [], {}
     case = unittest.TestCase()
-    result = {"state": "running", "source_versions": SOURCE_VERSIONS, "scope": "two code snapshots; no medical data or optimizer updates",
-              "peak_rss_bytes": None, "peak_vram_bytes": None, "checks": checks, "timing": timings}
+    result = {"state": "running", "source_versions": [BASE, "current working source"], "scope": "two actual code snapshots; no medical data or optimizer updates", "peak_rss_bytes": None, "peak_vram_bytes": None, "checks": checks, "timing": timings}
     try:
         mark = perf_counter()
         origin = root / "origin.git"
         subprocess.run(["git", "init", "--bare", str(origin)], check=True, stdout=subprocess.PIPE)
         git(origin, "config", "uploadpack.allowFilter", "true")
         git(origin, "config", "uploadpack.allowAnySHA1InWant", "true")
-        git(origin, "fetch", "--no-tags", str(PROJECT), *SOURCE_VERSIONS)
-        first, _ = fixture_commit(origin, SOURCE_VERSIONS[0])
-        second, outside = fixture_commit(origin, SOURCE_VERSIONS[1], first)
+        git(origin, "fetch", "--no-tags", str(PROJECT), BASE)
+        outside_data = git(PROJECT, "show", "48048b1d84592ba3080d83dfe8352185ca1a6a5f:README.md")
+        outside = git(origin, "hash-object", "-w", "--stdin", data=outside_data).decode().strip()
+        first = fixture_commit(origin, git(origin, "rev-parse", BASE + "^{tree}").decode().strip(), outside)
+        target_tree = source_tree(origin)
+        second = fixture_commit(origin, target_tree, outside, first)
         git(origin, "update-ref", "refs/heads/main", first)
-        cache_path, url = root / "git-cache", origin.as_uri()
-        subprocess.run(["git", "clone", "--no-checkout", "--filter=blob:none", "--no-tags", "--branch", "main", url, str(cache_path)],
-                       check=True, stdout=subprocess.PIPE, timeout=60)
-        cache = updater.GitCache(cache_path, expected_urls={url})
-        code, runtime = root / "code", root / "course"
-        selected = cache.choose_source([(root / "missing-mirror").as_uri(), url], expected=first, timeout=5)
-        case.assertEqual(selected, first)
-        case.assertEqual(cache.transport, url)
-        case.assertEqual(sum(row["ok"] for row in cache.network_info["probes"]), 1)
-        checks.append("real Git probing skips an unavailable mirror and selects a working filtered source")
-        failed = updater.GitCache(cache_path, expected_urls={url})
+        repo_path, url = root / "code" / "git", origin.as_uri()
+        subprocess.run(["git", "clone", "--no-checkout", "--filter=blob:none", "--no-tags", "--branch", "main", url, str(repo_path)], check=True, stdout=subprocess.PIPE, timeout=60)
+        repo = updater.GitRepository(repo_path, expected_urls={url})
+        case.assertTrue(repo.validate())
+        case.assertEqual(repo.choose_source([(root / "missing-mirror").as_uri(), url], expected=first, timeout=5), first)
         with case.assertRaises(ConnectionError):
-            failed.choose_source([(root / "missing-mirror").as_uri()], timeout=5)
+            repo.choose_source([(root / "missing-mirror").as_uri()], timeout=5)
         with case.assertRaises(ValueError):
             updater.mirror_url("https://credential@mirror.example")
-        checks.append("all failed mirrors and credential-bearing mirror addresses are rejected")
-        with case.assertRaises(subprocess.CalledProcessError):
-            updater.install(cache, code, runtime, first)
-        case.assertFalse((code / "current.json").exists())
-        checks.append("missing blobs cannot trigger network access during offline archive")
+        repo.choose_source([url], expected=first, timeout=5)
+        checks.append("actual filtered Git endpoint selection and unavailable or credential-bearing endpoint rejection")
+
+        # 使用真实旧更新器产生旧安装，覆盖首次迁移与删除流程。
+        old_path = root / "legacy_update.py"
+        old_path.write_bytes(git(PROJECT, "show", BASE + ":update.py"))
+        old_spec = importlib.util.spec_from_file_location("actual_old_update", old_path)
+        old = importlib.util.module_from_spec(old_spec)
+        old_spec.loader.exec_module(old)
+        runtime, legacy = root / "course", root / "code" / "chd-segmentation"
+        cache = old.GitCache(repo_path, expected_urls={url})
         cache.obtain(first)
-        pointer = updater.install(cache, code, runtime, first)
-        case.assertEqual(pointer["state"], "installed_not_activated")
-        case.assertFalse((code / "current.json").exists())
-        case.assertTrue((code / "code_versions" / first / "run.py").is_file())
-        checks.append("first installation from a no-checkout Git cache")
-        timings["first_install_seconds"] = perf_counter() - mark
+        old.install(cache, legacy, runtime, first)
+        retained = legacy / "keep.txt"
+        retained.write_text("Existing user file", encoding="utf-8")
+        with case.assertRaises(ValueError):
+            updater.synchronize(repo, runtime, first, remove_legacy=True)
+        case.assertTrue(retained.exists())
+        retained.unlink()
+        checks.append("unknown files in the actual old installation prevent deletion")
+        installed = updater.synchronize(repo, runtime, first, remove_legacy=True)
+        case.assertFalse(legacy.exists())
+        case.assertGreater(installed["legacy_cleanup"]["deleted_files"], 0)
+        case.assertFalse(repo.validate())
+        case.assertFalse(repo.run("status", "--porcelain=v1"))
+        case.assertEqual(repo.run("rev-parse", "HEAD").decode().strip(), first)
+        checks.append("empty no-checkout index becomes a clean sparse working tree and verified old installation is removed")
+        timings["fixture_and_migration_seconds"] = perf_counter() - mark
 
         mark = perf_counter()
-        active = updater.install(cache, code, runtime, first, activate=True, python=sys.executable)
-        case.assertEqual(active["active_sha"], first)
-        readback = subprocess.run([sys.executable, "-B", str(code / "run.py"), "--code-info"],
-                                  check=True, stdout=subprocess.PIPE, timeout=60)
-        case.assertEqual(json.loads(readback.stdout)["sha"], first)
-        version = subprocess.run([sys.executable, "-B", str(code / "run.py"), "--version"],
-                                 check=True, stdout=subprocess.PIPE, timeout=60)
-        case.assertEqual(version.stdout.decode().strip(), "0.1.0")
-        checks.append("real environment API check and actual managed entry")
-        timings["activation_seconds"] = perf_counter() - mark
-
-        current = (code / "current.json").read_bytes()
-        inventory_before = sorted(path.relative_to(code).as_posix() for path in code.rglob("*") if path.is_file())
-        reused = updater.install(cache, code, runtime, first)
-        case.assertEqual(reused["state"], "installed_current")
-        case.assertEqual(inventory_before, sorted(path.relative_to(code).as_posix() for path in code.rglob("*") if path.is_file()))
-        case.assertEqual(current, (code / "current.json").read_bytes())
-        checks.append("repeat installation reuses the existing release")
-
-        with updater.deployment_lock(runtime, shared=True):
-            with case.assertRaises(OSError):
-                updater.install(cache, code, runtime, first)
-        with updater.file_lock(runtime / "runs" / "existing" / ".run.lock"):
-            with case.assertRaises(OSError):
-                updater.install(cache, code, runtime, first)
-        checks.append("active managed entry and existing training locks refuse updates")
-
-        readme = code / "code_versions" / first / "README.md"
+        before = repo.run("rev-parse", "HEAD")
+        for lock in (runtime / ".code.lock", runtime / "runs" / "existing" / ".run.lock", repo_path / ".git" / "chd-code.lock"):
+            with updater.file_lock(lock):
+                with case.assertRaises(OSError):
+                    updater.synchronize(repo, runtime, first)
+        checks.append("active legacy entry, training task, and Git code lock prevent updates")
+        readme = repo_path / "chd-segmentation" / "README.md"
         original = readme.read_bytes()
         readme.write_bytes(original + b"\nLocal edit\n")
         with case.assertRaises(ValueError):
-            updater.inspect_release(code, updater.read_json(code / "current.json"))
-        with case.assertRaises(ValueError):
-            updater.install(cache, code, runtime, first)
-        case.assertEqual(current, (code / "current.json").read_bytes())
+            updater.synchronize(repo, runtime, first)
         readme.write_bytes(original)
-        checks.append("local source edits are rejected while the pointer stays unchanged")
-
+        private = readme.parent / "local.yaml"
+        private.write_text("Existing user configuration", encoding="utf-8")
         with case.assertRaises(ValueError):
-            cache.obtain(second)
-        case.assertEqual(current, (code / "current.json").read_bytes())
-        checks.append("remote branch mismatch refuses a changed target")
+            updater.synchronize(repo, runtime, first)
+        private.unlink()
+        case.assertEqual(repo.run("rev-parse", "HEAD"), before)
+        checks.append("local modifications and untracked files are preserved without moving HEAD")
+        git(origin, "update-ref", "refs/heads/main", second, first)
+        with case.assertRaises(ValueError):
+            updater.synchronize(repo, runtime, first)
+        case.assertEqual(repo.run("rev-parse", "HEAD"), before)
+        checks.append("remote movement rejects a stale target without changing the working tree")
+        timings["protection_seconds"] = perf_counter() - mark
 
         mark = perf_counter()
-        git(origin, "update-ref", "refs/heads/main", second, first)
-        cache.obtain(second)
-        local = set(cache.run("cat-file", "--batch-all-objects", "--batch-check=%(objectname)").decode().splitlines())
-        case.assertNotIn(outside, local)
-        staged = updater.install(cache, code, runtime, second)
-        case.assertEqual((code / "update.py").read_bytes(), (PROJECT / "update.py").read_bytes())
-        checks.append("an audited old updater upgrades atomically while the old release remains intact")
-        case.assertEqual(staged["state"], "installed_not_activated")
-        case.assertEqual(current, (code / "current.json").read_bytes())
-        with case.assertRaises(FileNotFoundError):
-            updater.install(cache, code, runtime, second, activate=True, python=root / "missing-python")
-        case.assertEqual(current, (code / "current.json").read_bytes())
-        checks.append("a new version and missing environment keep the old active pointer")
-        # 本地基底环境已核对缺少 MONAI，用实际依赖失败验证激活边界。
+        repo.choose_source([url], expected=second, timeout=5)
+        updated = updater.synchronize(repo, runtime, second)
+        case.assertEqual(updated["head"], second)
+        case.assertEqual(repo.run("rev-parse", "HEAD").decode().strip(), second)
+        case.assertEqual(repo.run("rev-parse", "origin/main").decode().strip(), second)
+        case.assertEqual(repo.remote_head(), second)
+        case.assertFalse(repo.run("status", "--porcelain=v1"))
+        case.assertEqual({p.name for p in repo_path.iterdir()}, {".git", "chd-segmentation"})
+        case.assertFalse((readme.parent / "launcher.py").exists())
+        case.assertFalse((readme.parent / "code_versions").exists())
+        checks.append("fast-forward makes HEAD, origin/main and remote main identical with only the requested folder checked out")
+        local_objects = set(repo.run("cat-file", "--batch-all-objects", "--batch-check=%(objectname)").decode().splitlines())
+        case.assertNotIn(outside, local_objects)
         with case.assertRaises(subprocess.CalledProcessError):
-            updater.install(cache, code, runtime, second, activate=True, python=sys._base_executable)
-        case.assertEqual(current, (code / "current.json").read_bytes())
-        checks.append("a real missing-MONAI environment cannot change the active pointer")
-        upgraded = updater.install(cache, code, runtime, second, activate=True, python=sys.executable)
-        case.assertEqual(upgraded["active_sha"], second)
-        case.assertTrue((code / "code_versions" / first).is_dir())
-        readback = subprocess.run([sys.executable, "-B", str(code / "run.py"), "--code-info"],
-                                  check=True, stdout=subprocess.PIPE, timeout=60)
-        case.assertEqual(json.loads(readback.stdout)["sha"], second)
-        checks.append("fast-forward activation and real entry select the new immutable version")
-        checks.append("unrelated repository blobs were never downloaded")
-        timings["upgrade_seconds"] = perf_counter() - mark
-
-        foreign = root / "foreign-code"
-        foreign.mkdir()
-        (foreign / "keep.txt").write_text("Existing user file", encoding="utf-8")
-        with case.assertRaises(FileExistsError):
-            updater.install(cache, foreign, runtime, second)
-        case.assertEqual((foreign / "keep.txt").read_text(encoding="utf-8"), "Existing user file")
-        checks.append("unknown target files are preserved")
-        case.assertFalse(list((runtime / "updates").glob("stage-*")))
-        case.assertFalse(list((code / "code_versions").glob(".candidate-*")))
-        checks.append("update staging is cleaned after success and failure")
-        result.update({"state": "passed", "fixture_commits": [first, second], "check_count": len(checks)})
+            repo.run("cat-file", "blob", outside)
+        checks.append("unrelated repository blob is absent and cannot be lazily fetched by offline commands")
+        entry = readme.parent / "run.py"
+        with updater.code_guard(entry):
+            with case.assertRaises(OSError):
+                updater.synchronize(repo, runtime, second)
+        info = subprocess.run([sys.executable, "-B", str(entry), "--code-info"], check=True, stdout=subprocess.PIPE, timeout=60)
+        case.assertEqual(json.loads(info.stdout)["sha"], second)
+        case.assertFalse(json.loads(info.stdout)["modified"])
+        case.assertEqual(Path(json.loads(info.stdout)["code"]), readme.parent)
+        version = subprocess.run([sys.executable, "-B", str(entry), "--version"], check=True, stdout=subprocess.PIPE, timeout=60)
+        case.assertEqual(version.stdout.decode().strip(), "0.1.0")
+        checks.append("actual business entry reads the synchronized code path and SHA and holds the update guard")
+        repeated = updater.synchronize(repo, runtime, second, remove_legacy=True)
+        case.assertEqual(repeated["sha"], second)
+        case.assertEqual(repeated["legacy_cleanup"]["deleted_files"], 0)
+        checks.append("repeated update reuses one fixed code directory without producing another code copy")
+        timings["upgrade_and_entry_seconds"] = perf_counter() - mark
+        result.update({"state": "passed", "fixture_commits": [first, second], "target_source_tree": target_tree, "check_count": len(checks)})
     finally:
         if sys.exception() is not None:
             result.update({"state": "failed", "error": str(sys.exception())})
         result["seconds"] = perf_counter() - started
-        files = [{"path": str(path.relative_to(root)), "bytes": path.stat().st_size}
-                 for path in root.rglob("*") if path.is_file()]
-        result.update({"files_before_cleanup": files, "file_count": len(files),
-                       "bytes_before_cleanup": sum(row["bytes"] for row in files),
-                       "technical_snapshots_per_second": 2 / result["seconds"] if result["state"] == "passed" else None})
+        files = [{"path": str(path.relative_to(root)), "bytes": path.stat().st_size} for path in root.rglob("*") if path.is_file()]
+        result.update({"files_before_cleanup": files, "file_count": len(files), "bytes_before_cleanup": sum(row["bytes"] for row in files), "technical_snapshots_per_second": 2 / result["seconds"] if result["state"] == "passed" else None})
         updater.write_json(report, result)
-        if root.parent != Path(os.environ["CHD_CODE_TEST_ROOT"]).resolve().parent or root.is_symlink():
-            raise ValueError("测试清理目录归属异常")
-        if updater.read_json(marker) != {"scope": "code-sync", "pid": os.getpid()}:
-            raise ValueError("测试目录归属记录变化")
+        if root != Path(os.environ["CHD_CODE_TEST_ROOT"]).resolve() or root.is_symlink() or updater.read_json(marker) != {"scope": "code-sync", "pid": os.getpid()}:
+            raise ValueError("测试目录归属变化，停止清理")
         if os.name == "nt":
             for path in root.rglob("*"):
                 if path.is_file():

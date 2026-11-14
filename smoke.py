@@ -1,4 +1,5 @@
 from copy import deepcopy
+import atexit
 import gc
 import json
 from pathlib import Path
@@ -7,6 +8,12 @@ import sys
 import threading
 from time import perf_counter
 from uuid import uuid4
+
+from update import code_guard
+
+_code_guard = code_guard(__file__)
+_code_guard.__enter__()
+atexit.register(_code_guard.__exit__, None, None, None)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
