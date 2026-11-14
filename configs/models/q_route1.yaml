@@ -15,8 +15,8 @@ max_candidates: 24
 pretrained: /path/to/data/model_weights/small_ep4k.model
 groups: /path/to/course/q-groups.yaml
 parents:
-  base: /path/to/course/q-r2/base/latest.pt
-  localizer: /path/to/course/q-r2/localizer/latest.pt
+  base: /path/to/course/q-r2/base/best.pt
+  localizer: /path/to/course/q-r2/localizer/best.pt
 work_root: /path/to/course/chd-segmentation
 execution:
   gpu_count: 2

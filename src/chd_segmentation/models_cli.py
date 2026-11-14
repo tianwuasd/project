@@ -42,6 +42,10 @@ def main(argv=None):
         command.add_argument('--gpu-ids')
         command.add_argument('--batch-layout')
         command.add_argument('--workers')
+        sharing = command.add_mutually_exclusive_group()
+        sharing.add_argument('--share-gpu',dest='share_gpu',action='store_true')
+        sharing.add_argument('--no-share-gpu',dest='share_gpu',action='store_false')
+        command.set_defaults(share_gpu=None)
         command.add_argument('--wait-seconds',type=wait_seconds,default=argparse.SUPPRESS,
             help='显卡等待秒数；forever持续等待，默认持续等待')
     train.add_argument('--batch',type=int)
@@ -65,6 +69,8 @@ def main(argv=None):
         execution['workers'] = 'auto' if args.workers=='auto' else int(args.workers)
     if hasattr(args,'wait_seconds'):
         execution['wait_seconds'] = args.wait_seconds
+    if args.share_gpu is not None:
+        execution['share'] = args.share_gpu
     overrides = dict(execution=execution)
     if args.device is not None:
         overrides['device'] = args.device

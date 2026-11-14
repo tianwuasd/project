@@ -11,6 +11,7 @@ from ..artifacts.store import digest, file_digest, write_json
 from ..datasets.splits import select_test
 from ..observability.events import event
 from ..prediction.dice import supervised_dice
+from ..prediction.metrics import case_data_identity
 from ..prediction.restore import restore
 from ..preprocessing.prepare import load_prepared
 
@@ -57,7 +58,7 @@ def predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=No
                     box_max_shift=box_max_shift, official_weights=official_weights,
                     test_set=test_set, test_group=test_group)
     applied = deepcopy(config)
-    applied['execution'].update(gpu_count=1, cpu_processes=1, batch_layout=None, workers=0)
+    applied['execution'].update(gpu_count=1, min_gpus=None, cpu_processes=1, batch_layout=None, workers=0)
     if applied['execution'].get('gpu_ids'):
         applied['execution']['gpu_ids'] = applied['execution']['gpu_ids'][:1]
     key = digest(dict(checkpoint=file_digest(checkpoint), prepared=prepared['identity'],
@@ -75,7 +76,7 @@ def predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=No
 def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=None,
              prompt_mode='external', label_classes=None, box_seed=2024, box_max_shift=20,
              official_weights=False, test_set=None, test_group=None):
-    from .workflow import resources, load_state, adapter, model_identity, dataset_for
+    from .workflow import resources, load_state, adapter, checked_identity, dataset_for
     started = perf_counter()
     resources(config)
     prepared = load_prepared(prepared_path)
@@ -99,11 +100,13 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
         trained = state['prepared']
         if prepared['dataset'] != trained['dataset'] or digest(prepared['plan']) != digest(trained['plan']):
             raise ValueError('新预测输入必须使用训练时的同一数据集语义与拟合计划')
-        if state['identity'] != model_identity(config, trained, state['stage'], state['initialization_sha256']):
-            raise ValueError('预测配置、源码或上游检查点与训练身份不同')
+        checked_identity(config,trained,state['stage'],state['initialization_sha256'],state['identity'])
         bundle = adapter(config, trained, state['stage'], initialize=False)
         initialization = dict(kind='trained_checkpoint', identity=state['identity'])
     bundle.model.load_state_dict(state['model'], strict=True)
+    from ..training.checkpoint import tensors_equal
+    if not tensors_equal(bundle.model.state_dict(),state['model']):
+        raise ValueError('预测权重的数值或精度未完整加载')
     del state
     bundle.model.to(config['device']).eval()
     rows = prediction_rows(config, prepared, case_ids, test_set, test_group)
@@ -111,9 +114,10 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
     if config['model'] == 'medsam2':
         from .medsam2.data import NativeCases
         dataset = NativeCases(prepared, with_label=label_mode, log_dir=Path(config['run_dir'])/'prediction',
-                              logging=config['logging'])
+                              logging=config['logging'],reserve_ram_bytes=config['execution']['reserve_ram_bytes'])
     else:
-        dataset = dataset_for(prepared, False)
+        dataset = dataset_for(prepared, False,dict(reserve_ram_bytes=config['execution']['reserve_ram_bytes'],
+            cache_bytes=config['execution']['cache_bytes']),Path(config['run_dir'])/'prediction',config['logging'])
     root.mkdir(parents=True)
     results = []
     classes = len(prepared['dataset_json']['labels'])
@@ -139,6 +143,8 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
             else:
                 probability, diagnostics = bundle.predict(inference_entry, case_prompts)
         inference_seconds = perf_counter()-inference_started
+        if probability.shape!=(classes,*entry['image'].shape[1:]) or not np.isfinite(probability).all():
+            raise ValueError('模型概率的类别、网格或有限性无效')
         metrics = supervised_dice(probability.argmax(0), truth, classes, entry['unknown_classes'],
             protocol['prompted_classes']) if label_mode else None
         if config['model'] == 'medsam2':
@@ -175,5 +181,12 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
             case_classes={r['case_id']: r['classes'] for r in results}, aggregate=aggregates)
         write_json(root/'evaluation.json', evaluation)
         summary['evaluation'] = evaluation
+    else:
+        by_id = {row['case_id']:row for row in rows}
+        records = {result['case_id']:dict(file=Path(result['file']).name,sha256=result['sha256'],
+            checkpoint_sha256=summary['checkpoint_sha256'],scope=prepared['scope'],roi_xyz=result['roi_xyz'],
+            data_identity=case_data_identity(prepared,by_id[result['case_id']]),
+            reference_sha256=by_id[result['case_id']]['sha256'].get('label')) for result in results}
+        write_json(root/'predictions.json',dict(model=config['model'],prompt_mode='external',cases=records))
     write_json(root/'summary.json', summary)
     return summary

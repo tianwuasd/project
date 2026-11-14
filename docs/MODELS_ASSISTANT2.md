@@ -20,7 +20,7 @@
 
 ## 输入与类别
 
-本分支已继承助手1公开main的6ef3fd4项目内容，对应本地c28e191。两个模型通过training/resources.py共用资源登记和准入策略，实际进程、批量份额和供数配置写入resources.json；完整恢复同时核对execution-topology.json。显卡与材料说明见 [服务器文件与GPU设置](ASSISTANT2_SERVER_FILES.md)。
+本分支继承助手1资源提交210d80b及设备修复e5264c2，对应公开main 303540f。两个模型通过training/resources.py共用资源登记和准入策略，实际进程、批量份额和供数配置写入resources.json；完整恢复同时核对execution-topology.json。默认只使用空闲GPU，数量不足持续等待。显卡与材料说明见[服务器文件与GPU设置](ASSISTANT2_SERVER_FILES.md)。
 
 先通过原有 `prepare` 生成准备描述，模型命令读取同一记录与实际计划；影像和标签原件只读。Q内部类别顺序固定为背景、LV、RV、LA、RA、Myo、AO、PA、PV、SVC、IVC。CHD1282原始类别显式映射；ImageCHD输出回到其原始8类，PV/SVC/IVC保留未知监督，输出时其概率并入背景。
 
@@ -45,11 +45,13 @@ MedSAM2保存官方 `checkpoints/checkpoint.pt`，同一文件包含模型、优
 Q基座配置的updates填写40000，定位器填写5000，局部网络填写20000；正式累积次数为4。基座学习率预热1000次、其他阶段500次，之后采用r2余弦日程。局部前2000次只监督初始分割及q，后18000次加入三步求解。`method`支持M07及同监督M02；候选按真实错误、正确关键结构及其他候选分层，空层重新归一化，概率扰动比例为20%。`key_references`可登记候选与独立关键结构参考，没有该参考时不会将候选登记为已正确关键结构。候选抽样和扰动随机状态均保存恢复。
 
 ```text
-python -B run.py models predict --config /path/to/q-local.yaml --prepared /path/to/prepared.json --checkpoint /path/to/q/local/latest.pt --output /path/to/result/q
+python -B run.py models predict --config /path/to/q-local.yaml --prepared /path/to/prepared.json --checkpoint /path/to/q/local/best.pt --output /path/to/result/q
 python -B run.py models predict --config /path/to/medsam2.yaml --prepared /path/to/prepared.json --checkpoint /path/to/medsam2/sequence/latest.pt --prompts /path/to/prompts.yaml --output /path/to/result/medsam2
 ```
 
 普通预测数据加载器不读取标签数组。新病例使用包含新清单的准备描述，训练计划和数据集语义需与检查点一致。Q根据CT定位器产生候选。MedSAM2普通提示文件登记人工或图像定位器来源；自动提示登记定位器检查点摘要。显式`--prompt-mode label-box`从标签生成框并输出有提示评价，规则和命令见[1282组合与标签框](Q1282_AND_LABEL_BOX.md)。MedSAM2提示坐标使用原图所选范围的DHW网格，二维框以XYXY记录，frame指D轴切片，提示文件的space字段为 `native_dhw`。结构冲突按最高logit选择，背景logit固定为0。输出恢复到源数组尺寸与affine。
+
+普通预测生成predictions.json，包含源图身份、检查点摘要、输出摘要、技术范围及相对文件名，可使用共享evaluate入口计算已知类别指标。标签框模式生成独立的evaluation.json并登记有提示类别，保持该模式的评价含义。资源、日志改动的旧检查点兼容只接受code_compatibility.json中完整源码摘要对应的精确身份；配置、数据、拟合计划、分组、上游权重和初始化权重继续逐项核对。
 
 ```yaml
 case_id:

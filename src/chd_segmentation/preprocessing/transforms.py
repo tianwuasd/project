@@ -9,6 +9,8 @@ import psutil
 
 from ..artifacts.store import file_digest
 from ..observability.events import Stage
+from ..observability.events import event
+from ..training.host import host_capacity
 
 
 def bounded_locations(seg, classes_or_regions, seed=1234, verbose=False, min_num_samples=10000, min_percent_coverage=.01):
@@ -106,7 +108,7 @@ class CaseTransform:
         shape = np.array([end - begin for begin, end in roi])
         native_spacing = np.asarray(row["spacing_xyz"], dtype=np.float32).astype(float)
         estimate = int(np.prod(shape) * 32)
-        if psutil.virtual_memory().available < self.reserve + estimate:
+        if host_capacity()["available_bytes"] < self.reserve + estimate:
             raise MemoryError("病例构建所需内存超出安全余量")
         with self.stage("read_decompress", case_id=row["case_id"], shape_xyz=shape.tolist(),
                         spacing_xyz=native_spacing.tolist(), with_label=self.with_label):
@@ -136,7 +138,7 @@ class CaseTransform:
         transposed_spacing = native_spacing[::-1][plan["transpose_forward"]]
         planned_shape = np.ceil(np.asarray(data.shape)[::-1][plan["transpose_forward"]] *
                                 transposed_spacing / target_spacing)
-        if psutil.virtual_memory().available < self.reserve + int(np.prod(planned_shape) * 24):
+        if host_capacity()["available_bytes"] < self.reserve + int(np.prod(planned_shape) * 24):
             raise MemoryError("重采样所需内存超出安全余量")
         properties = {"spacing": native_spacing[::-1].tolist()}
         manager = PlansManager(deepcopy(plan))
@@ -149,6 +151,12 @@ class CaseTransform:
                 properties, manager, configuration, self.prepared["dataset_json"])
         if not np.isfinite(values).all() or values.shape != targets.shape:
             raise ValueError("确定性预处理输出无效")
+        if self.log_dir is not None and self.logging.get("case_details", True):
+            event(self.log_dir, "case_geometry", console=False, case_id=row["case_id"],
+                  raw_shape_xyz=list(image.shape), input_shape_xyz=list(data.shape),
+                  cropped_shape=properties["shape_after_cropping_and_before_resampling"],
+                  resampled_shape=list(values.shape[1:]), rss_bytes=psutil.Process().memory_info().rss,
+                  elapsed_seconds=perf_counter() - transform_started)
         if segmentation is not None:
             present = set(map(int, np.unique(segmentation))) - {-1, 0}
             remaining = set(map(int, np.unique(targets)))

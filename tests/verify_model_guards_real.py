@@ -17,6 +17,7 @@ from chd_segmentation.config import DEFAULTS, load_config
 from chd_segmentation.datasets.splits import apply_split
 from chd_segmentation.models.workflow import options, training_names, train
 from chd_segmentation.preprocessing.prepare import prepare
+from chd_segmentation.training.resources import host_capacity
 
 
 def run(args):
@@ -75,14 +76,22 @@ def run(args):
                     patch=32, local_size=32, accumulation=1, batch=1, workers=0,
                     official_root=str(ROOT/'vendor/MedSAM2'), dependency_root=str(ROOT/'env/medsam2'),
                     pretrained=str(ROOT/'data/model_weights/MedSAM2_latest.pt') if model == 'medsam2' else experiment['pretrained'],
-                    execution=dict(cpu_processes=1, workers=0, cpu_fraction=.0001, wait_seconds=0))
+                    execution=dict(cpu_processes=1, workers=0,
+                        reserve_ram_bytes=host_capacity()['total_bytes']+2**30,wait_seconds=0))
                 path = workspace.root/(model+'.json')
                 write_json(path, spec)
                 for attempt in range(2):
-                    with check.assertRaises(MemoryError):
+                    with check.assertRaises(TimeoutError):
                         train(options(path), prepared_path, stage)
                     check.assertFalse((Path(spec['run_dir'])/stage).exists())
                 record['rejected_starts'][model] = 2
+                import json
+                events = [json.loads(line) for line in
+                    (Path(spec['run_dir'])/'admission'/stage/'events.jsonl').read_text(encoding='utf-8').splitlines()]
+                waits = [event for event in events if event['event']=='waiting_resources']
+                check.assertEqual(len(waits),2)
+                check.assertTrue(all(event['cpu']['admitted'] is False and
+                    event['cpu']['model_memory']['model']==model for event in waits))
             assert all(file_digest(row[kind]) == row['sha256'][kind] for kind in ('image', 'label'))
             record.update(source_unchanged=True, seconds=perf_counter()-started)
 

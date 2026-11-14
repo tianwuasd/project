@@ -33,8 +33,11 @@ def main(payload,rank,common,allocation,gate):
     recipe['scratch']['num_train_workers'] = allocation['supply']['workers'][rank]
     recipe['trainer']['data']['train']['batch_sizes'] = [allocation['shares'][rank]]
     recipe['trainer']['data']['train']['num_workers'] = allocation['supply']['workers'][rank]
+    raw_dataset = recipe['trainer']['data']['train']['datasets'][0]['dataset']['datasets'][0]['video_dataset']
+    raw_dataset['reserve_ram_bytes'] = common['resources']['reserve_ram_bytes']
     if rank:
         recipe['trainer']['logging']['log_dir'] = str(root/f'logs/rank{rank}')
+    write_json(root/f'official-config-rank{rank}.json',recipe)
 
     history = []
     observed_peak = 0
@@ -71,7 +74,7 @@ def main(payload,rank,common,allocation,gate):
     del arguments['_target_']
     trainer = CheckpointTrainer(**arguments)
     applied_workers = allocation['supply']['workers'][rank]
-    set_read_gate(gate,max(common['resources']['prefetch'],applied_workers))
+    set_read_gate(gate,max(allocation['supply']['prefetch'],applied_workers))
     trainer.train_dataset.worker_init_fn = ResourceWorkerInit(common,allocation['owner'],gate)
     restored_exact = None
     if payload['resume']:
@@ -82,7 +85,8 @@ def main(payload,rank,common,allocation,gate):
             extra['batch_layout']!=allocation['shares'] or extra['workers']!=allocation['supply']['workers']):
             raise ValueError('MedSAM2官方检查点与运行身份不一致')
         state = extra['rank_states'][rank]
-        from ...training.checkpoint import tensors_equal
+        from ...training.checkpoint import tensors_equal,verify_optimizer_device
+        verify_optimizer_device(trainer.optim.optimizer)
         restored_exact = (tensors_equal(trainer.model.module.state_dict(),current['model']) and
                           tensors_equal(trainer.optim.optimizer.state_dict(),current['optimizer']))
         if not restored_exact:
@@ -95,11 +99,21 @@ def main(payload,rank,common,allocation,gate):
         trainer.model.module.rng.bit_generator.state = state['prompt_rng']
         if trainer.device.type=='cuda':
             torch.cuda.set_rng_state(state['cuda_rng'],trainer.device)
+        observed_numpy = np.random.get_state()
+        restored_exact = (restored_exact and random.getstate()==state['python_rng'] and
+            observed_numpy[0]==numpy_rng[0] and np.array_equal(observed_numpy[1],np.asarray(numpy_rng[1],dtype=np.uint32)) and
+            observed_numpy[2:]==tuple(numpy_rng[2:]) and
+            torch.equal(torch.get_rng_state(),state['torch_rng']) and
+            trainer.model.module.rng.bit_generator.state==state['prompt_rng'] and
+            (trainer.device.type!='cuda' or torch.equal(torch.cuda.get_rng_state(trainer.device),state['cuda_rng'])))
+        if not restored_exact:
+            raise ValueError('MedSAM2逐进程随机状态未完整恢复')
         history = extra['history']
         del state
     else:
         initialized = torch.load(config['pretrained'],map_location='cpu',weights_only=True)['model']
-        if not all(torch.equal(value.detach().cpu(),initialized[key]) for key,value in trainer.model.module.state_dict().items()):
+        from ...training.checkpoint import tensors_equal
+        if not tensors_equal(trainer.model.module.state_dict(),initialized):
             raise ValueError('官方初始化权重未逐值加载')
         del initialized
     limit = payload['stop_after']

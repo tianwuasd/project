@@ -27,6 +27,7 @@ class IdentityGuardTests(unittest.TestCase):
             config = options(root/name)
             common = execution_config(config)
             self.assertIsNone(common['resources']['wait_seconds'])
+            self.assertFalse(common['resources']['share'])
             self.assertEqual(common['run_dir'],config['run_dir'])
             self.assertEqual(common['logging']['heartbeat_seconds'],15)
             overridden = options(root/name,dict(execution=dict(wait_seconds=wait_seconds('2.5')),

@@ -12,7 +12,7 @@ import psutil
 import torch
 import yaml
 
-from ..artifacts.store import digest, file_digest, write_json
+from ..artifacts.store import digest, file_digest, read_json, write_json
 from ..data.dataset import CaseDataset
 from ..preprocessing.prepare import load_prepared
 
@@ -168,8 +168,10 @@ def training_names(config, prepared, stage):
     return names
 
 
-def dataset_for(prepared, with_label):
-    return CaseDataset(prepared,dict(reserve_ram_bytes=4*2**30,cache_bytes=512*2**20),with_label=with_label)
+def dataset_for(prepared, with_label, resources=None, log_dir=None, logging=None):
+    if resources is None:
+        resources = dict(reserve_ram_bytes=4*2**30,cache_bytes=512*2**20)
+    return CaseDataset(prepared,resources,with_label=with_label,log_dir=log_dir,logging=logging)
 
 
 def load_state(path):
@@ -185,14 +187,34 @@ def save_state(path, state):
     os.replace(pending,path)
 
 
-def model_identity(config,prepared,stage,initialization_sha256=None):
+def model_identity(config,prepared,stage,initialization_sha256=None,code=None):
     scientific = {key:value for key,value in config.items() if key not in
                   ('run_dir','threads','dependency_root','official_root','execution','work_root','device','logging')}
-    return digest(dict(config=scientific,prepared=prepared['identity'],stage=stage,code=source_identity(config),
+    return digest(dict(config=scientific,prepared=prepared['identity'],stage=stage,
+        code=source_identity(config) if code is None else code,
         parents={key:file_digest(value) for key,value in config['parents'].items()},
         pretrained=initialization_digest(config,initialization_sha256),
         groups=file_digest(config['groups']) if config['groups'] else None,
         key_references=file_digest(config['key_references']) if config['key_references'] else None))
+
+
+def checked_identity(config,prepared,stage,initialization_sha256=None,previous=None):
+    current = model_identity(config,prepared,stage,initialization_sha256)
+    if previous is None or previous==current:
+        return current
+    audit = read_json(Path(__file__).with_name('code_compatibility.json'))
+    if audit['schema']!=1:
+        raise ValueError('模型代码兼容审计格式无效')
+    target = digest({name.replace('\\','/'):value for name,value in source_identity(config).items()})
+    for edge in audit['edges']:
+        if edge['target']!=target or config['model'] not in edge['models']:
+            continue
+        # 两种路径分隔符覆盖原检查点所在平台，完整文件摘要仍须匹配审计记录。
+        for separator in ('/','\\'):
+            code = {name.replace('/',separator):value for name,value in edge['source_files'].items()}
+            if previous==model_identity(config,prepared,stage,initialization_sha256,code):
+                return previous
+    raise ValueError('模型配置、数据、源码或上游检查点身份不同')
 
 
 def initialization_digest(config,previous=None):
@@ -219,11 +241,13 @@ def train(config, prepared_path, stage, resume=False, stop_after=None):
         raise ValueError('stop-after超出预算')
     root.parent.mkdir(parents=True,exist_ok=True)
     with FileLock(root.parent/(stage+'.lock'),timeout=0):
-        if root.exists() and not resume:
-            raise FileExistsError('阶段目录已存在，使用resume或新目录')
+        if not resume:
+            from .startup import check_start
+            check_start(root,config['model'],prepared['identity'],stage)
         if resume and not (root/'latest.pt').is_file():
             raise FileNotFoundError('阶段缺少完整检查点')
-        with admitted(config,prepared,stage) as (common,allocation):
+        topology = read_json(root/'execution-topology.json') if resume else None
+        with admitted(config,prepared,stage,topology) as (common,allocation):
             return run_workers(dict(config=config,prepared=prepared,stage=stage,
                 resume=resume,stop_after=stop_after),common,allocation)
 
@@ -242,12 +266,15 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
     np.random.seed(seed)
     rng = np.random.default_rng(np.random.SeedSequence([seed,rank]))
     previous = load_state(root/'latest.pt') if resume else None
+    if previous:
+        from ..training.checkpoint import require_resume_device
+        require_resume_device(previous['config']['device'],device)
     initial_sha = initialization_digest(config,previous['initialization_sha256'] if previous else None)
     bundle = adapter(dict(config,device=str(device),seed=seed+rank),prepared,stage,initialize=not resume)
     model = bundle.model.to(device)
     model.train()
     optimizer = bundle.optimizer()
-    identity = model_identity(config,prepared,stage,initial_sha)
+    identity = checked_identity(config,prepared,stage,initial_sha,previous['identity'] if previous else None)
     class AdmittedCases(CaseDataset):
         def get(self,name):
             with gate:
@@ -264,6 +291,8 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
             raise ValueError('恢复的配置、数据、源码或上游身份不同')
         model.load_state_dict(state['model'],strict=True)
         optimizer.load_state_dict(state['optimizer'])
+        from ..training.checkpoint import verify_optimizer_device
+        verify_optimizer_device(optimizer)
         if len(state['rank_states'])!=allocation['world'] or state['batch_layout']!=allocation['shares']:
             raise ValueError('Q恢复需要相同进程数量与批量份额')
         local_state = state['rank_states'][rank]
@@ -278,6 +307,11 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
         restored = (tensors_equal(model.state_dict(),state['model']) and
             tensors_equal(optimizer.state_dict(),state['optimizer']) and
             torch.equal(torch.get_rng_state(),local_state['torch_rng']) and
+            random.getstate()==local_state['python_rng'] and
+            np.random.get_state()[0]==local_state['numpy_rng'][0] and
+            np.array_equal(np.random.get_state()[1],local_state['numpy_rng'][1]) and
+            np.random.get_state()[2:]==local_state['numpy_rng'][2:] and
+            (device.type!='cuda' or torch.equal(torch.cuda.get_rng_state(device),local_state['cuda_rng'])) and
             tensors_equal(bundle.extra_state(),local_state['extra']) and
             rng.bit_generator.state==local_state['data_rng'])
         if not restored:

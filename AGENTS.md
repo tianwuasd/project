@@ -6,7 +6,7 @@
 - 所有编辑、暂存与提交在本工作目录执行。原目录 `D:/projects/project/chd-segmentation` 由先心代码助手1维护。
 - 保留本目录自己的 Git index；不切换原目录分支，不暂存原目录内容，不调用项目 update.py。用户已要求继承助手1已发布main：远端6ef3fd4c51eb53da26faa54a147fc35ae15ebc40的chd-segmentation子树与本地助手1提交c28e191逐文件相同。
 - 共享GPU分配、资源登记和CPU预算沿用助手1的training/resources.py。MedSAM2和Q分别接入模型入口，保留各自训练方法、预算和数据分组。
-- 已整合助手1日志c57c52c及GPU等待95660ae：空闲优先、可组合满足共享条件的繁忙卡、默认持续等待。模型资源等待日志保存在run_dir/admission/<阶段>，执行日志保存在run_dir/<阶段>，未启动任务可在资源不足后重试。
+- 已整合助手1确定提交210d80b的资源预算、病例构建门控和日志，以及e5264c2的CPU/CUDA权重检查与STU初始化重试；对应公开main 303540f。默认只使用空闲GPU，数量不足持续等待，共享功能需明确启用。模型专属预算区分Q重采样/概率融合与MedSAM2原生序列；恢复保留原进程、批量份额及MedSAM2 worker数量。模型资源等待日志保存在run_dir/admission/<阶段>，执行日志保存在run_dir/<阶段>，未启动任务可在资源不足后重试。
 - Q保留r2的类别、网络、损失、求解和一次整例融合。用户已要求基于原1282冻结划分生成Q组合：仅原训练患者按r2的A:B=2:1进一步分组，C保留原验证，D保留原内部及外部测试身份；统计仅在A拟合。
 - MedSAM2使用官方序列训练及记忆传播。用户已授权标签自动生成框的正式评测；该入口明确登记标签访问及框生成规则。普通无标签预测继续只接受人工或图像定位器提示。
 - 本次已获准在 `D:/projects/back/t17/chd-segmentation-assistant2` 使用最多2例真实病例，每阶段最多2次更新，最多200个验证文件、峰值8 GiB，结束清理副产物。验收报告保留在 `D:/projects/back/sync-reports/chd-segmentation-assistant2`，不超过10 MiB。

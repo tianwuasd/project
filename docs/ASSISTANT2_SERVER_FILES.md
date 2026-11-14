@@ -2,7 +2,7 @@
 
 ## 本次代码
 
-代码保存在D:/projects/project/chd-segmentation-assistant2，独立分支codex/chd-segmentation-assistant2-medsam2-q-r2。继承助手1公开main的6ef3fd4，对应本地项目提交c28e191；继续整合其已提交日志c57c52c及GPU等待95660ae。代码提交包含模型实现、共享资源调用、配置、测试和说明。
+代码保存在D:/projects/project/chd-segmentation-assistant2，独立分支codex/chd-segmentation-assistant2-medsam2-q-r2。共享资源来源为助手1确定提交210d80b026996a266597d08afdb2edb0ad3bab3e，并整合e5264c29cad7991e40c9024434fa0707ddebcca4的权重与初始化修复；当前对应公开main 303540f5a4d335df3e3274a82a2e23cbfe51cdc6。代码提交包含模型实现、共享资源调用、配置、测试和说明。
 
 向GitHub发布时只提交上述源码；官方权重、依赖目录、病例清单、患者分组、预测和训练检查点分别管理。当前本地分支通过main继承并保留助手2模型修改，服务器update.py仍以已发布远端main为准；只有本分支内容正式发布后，服务器日常更新才会包含这些模型修改。
 
@@ -28,9 +28,11 @@ MedSAM2依赖清单中的TensorDict0.15.6要求PyTorch2.11及以上，本机已�
 
 Q的A训练上游、B训练局部、C用于选模、D独立评价，四组患者相互独立；预处理统计拟合限于A。1282私有输入包已保留原验证、内部测试和两个外部子组，仅将原训练患者按2:1分成A/B，具体命令见[1282组合与标签框](Q1282_AND_LABEL_BOX.md)。local阶段读取已完成的base和localizer的best.pt；base和localizer阶段parents为空。
 
+MedSAM2沿用原CHD1282准备描述和原训练590、验证128、内部测试127及外部298/31的角色。Q使用独立的A组拟合计划；命令中的PREP与Q_PREP分别填写对应准备描述。选择Q准备描述会使通用train角色仅包含A组，需要按实际研究设计明确选择。
+
 ## GPU及运行设置
 
-两模型的execution字段复用助手1资源配置。work_root需与同一项目其他任务一致，使resources目录统一登记设备、CPU和RAM。支持1—4张卡、自动选择或gpu_ids手动选择；优先空闲卡，数量不足时允许组合满足共享条件的繁忙卡。繁忙卡需要本模型、阶段、数据身份、尺寸及本卡batch的真实显存记录，并满足连续观察窗口、负载与显存安全余量。等待期间整体取得所需设备，候选卡逐项原因写入日志。
+两模型的execution字段复用助手1资源配置。work_root需与同一项目其他任务一致，使resources目录统一登记设备、CPU和RAM。支持1—4张卡、自动选择或gpu_ids手动选择；默认share为false，仅使用空闲卡，数量不足持续等待。共享需明确设置execution.share为true或传入--share-gpu；--no-share-gpu可覆盖已有配置。繁忙卡需要本模型、阶段、数据身份、尺寸及本卡batch的真实显存记录，并满足连续观察窗口、负载与显存安全余量。等待期间整体取得所需设备，候选卡逐项原因写入日志。
 
 默认execution.wait_seconds为null，持续等待；可用`--wait-seconds 300`设置本次时限，`--wait-seconds forever`持续等待。手动停止可终止等待。logging.heartbeat_seconds默认15秒，case_details默认true；主进程输出阶段心跳。资源等待日志保存在run_dir/admission/<阶段>/events.jsonl，执行日志及rank日志在run_dir/<阶段>；资源不足且尚未启动的任务可使用原目录重新尝试。Q记录每次完整更新，MedSAM2记录完整epoch，病例读取、标签框和预测结束分别记录。
 
@@ -38,7 +40,13 @@ MedSAM2的batch是全局序列数，默认2，两卡各1；四卡时需显式设
 
 MedSAM2保留官方8帧512训练、75epoch日程和官方损失优化器。实际DataLoader进程数量来自共享CPU预算，每个worker的prefetch_factor受已准入队列上限约束，并登记实际值。Q在每个训练进程内同步读取和缓存病例，共享预算限制缓存及读盘并发。训练进程内部单线程；GPU计算由各获准设备并行执行。
 
-完整恢复要求相同进程数量和批量份额；MedSAM2还要求相同数据worker数量，以保留随机抽样过程。可重新选择同数量物理显卡。Q每次完整更新、MedSAM2每个完整epoch保存检查点；压力中断后从最近完整边界恢复，未提交的计算重新执行。
+共享budget.py读取模型专属memory.py：Q计算原图读取、计划重采样、整例概率、融合及各rank保留的数组；MedSAM2计算原生网格病例、每个Dataset保留的一例、官方8帧队列和预测传播记忆。病例构建并发与已保留病例分别计入。MedSAM2原生病例缓存不使用通用LRU额度，实际LRU额度为零；CPU完整训练按此前batch1实测峰值设置每份额18GiB的模型预算，另计协调进程、病例、worker和队列，容量不足时等待。预算属于估算，正式网格和CUDA容量另行实测。
+
+resources.json分别保存请求值、解析值和实际分配；rank日志登记实际预留内存、缓存、worker、预取和病例并发。MedSAM2每个rank另外写出official-config-rankN.json，保留各rank实际应用的官方配方。
+
+完整恢复要求相同进程数量和批量份额；MedSAM2还要求相同数据worker数量，以保留随机抽样过程。恢复准入固定原拓扑，资源不足时等待，原worker额度不足时也等待。可重新选择同数量物理显卡。Q每次完整更新、MedSAM2每个完整epoch保存检查点；压力中断后从最近完整边界恢复，未提交的计算重新执行。两模型在本次执行期间保持训练进程和worker数量，启动时按各自预算选择供数配置；STU运行期间的动态供数和变卡验收范围见RESOURCE_SCHEDULING.md。
+
+完整训练恢复保留原CPU或CUDA执行类型，以保存对应随机流；CPU与CUDA之间可迁移权重用于预测。模型及优化器状态核对数值、dtype和实际设备；AdamW的step计数按PyTorch自身规定保留。初始化异常结束且没有检查点、写入中的模型状态或训练摘要时，startup.json保存失败文件清单，核对后允许在同一阶段目录重新初始化。额外文件或已有文件变化会阻止重试；已有检查点继续要求resume。初始化重试保留各次请求配置和失败记录。
 
 从项目根目录执行，路径配置和准备描述需事先填写完成：
 

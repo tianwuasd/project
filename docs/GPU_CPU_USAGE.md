@@ -18,11 +18,14 @@
 | 限制全组供数进程 | `--workers 8` |
 | 持续等待显卡 | `--wait-seconds forever` |
 | 指定等待时限 | `--wait-seconds 600` |
+| 关闭繁忙卡共享 | `--no-share-gpu`（默认） |
+| 手动开启繁忙卡共享 | `--share-gpu` |
+| 允许在一至两卡间调整 | `--gpus 2 --min-gpus 1` |
 | 恢复同一任务 | `--resume` |
 
-`gpu_ids` 中的整数使用 `nvidia-smi` 的物理编号，也支持完整 GPU UUID；继承的 `CUDA_VISIBLE_DEVICES` 限制仍有效。启动后核对实际 UUID。恢复要求相同进程数量，允许重新选择同数量的卡。
+`gpu_ids` 中的整数使用 `nvidia-smi` 的物理编号，也支持完整 GPU UUID；继承的 `CUDA_VISIBLE_DEVICES` 限制仍有效。启动后核对实际 UUID。epoch 内的检查点恢复要求相同进程数量；完整 epoch 边界允许在配置范围内调整，保留完整训练状态。
 
-优先选择空闲卡，数量不足时允许与满足共享条件的繁忙卡组合。每张繁忙卡分别核对同设备、同实现、同环境、同规格、每卡 batch 和精度的显存记录，以及默认 30 秒连续观察窗口、利用率 P90 ≤50% 和显存余量。分配完整组合时优先减少繁忙卡数量，再比较空闲显存；三卡不等份 batch 会同时匹配各卡容量。手动 `gpu_ids` 保持指定顺序。
+默认关闭共享，只使用空闲卡；数量不足时持续等待。显式设置 `--share-gpu` 才允许满足条件的繁忙卡参与组合。每张繁忙卡分别核对同设备、同实现、同环境、同规格、每卡 batch 和精度的显存记录，以及默认 30 秒观察窗口、利用率 P90 ≤50% 和显存余量。手动 `gpu_ids` 保持指定顺序。
 
 默认 `resources.wait_seconds: null`，持续等待直到凑齐所需显卡；等待期间不登记部分显卡占用。`--wait-seconds forever` 可以覆盖旧配置中的有限等待值，整数或小数秒数可以设置等待时限，`0` 只检查一次。Ctrl+C 可以停止等待。配置、数据或驱动错误仍直接报错，CPU/内存准入保护保持生效。
 
@@ -30,6 +33,8 @@
 
 ```yaml
 resources:
+  share: false
+  min_gpus: null
   wait_seconds: null
   poll_seconds: 2
 ```
@@ -46,7 +51,7 @@ resources:
 
 `workers: auto` 根据预算增加供数进程，默认 `max_workers: 32`，可修改；`workers: 0` 串行供数，整数表示整组上限。供数进程持续驻留，内部单线程，队列有界。缓存为各供数进程的 RAM 缓存，容量在统一预算中计算；不会自动生成全量预处理副本。
 
-`prefetch` 控制最低预取深度，深度同时覆盖实际供数进程；`readers: auto` 按实际进程数分配读盘/构建并发，默认 `max_readers: 8`，可以手动修改 `readers`。多个本项目任务共用 `work_root/resources` 登记预算与显卡占用。运行中检查实时 RAM/VRAM 余量，压力出现后在完整更新边界保存并停止；使用相同命令加 `--resume` 继续。进程数量在任务启动时计算，重启恢复时重新计算 CPU 供数预算。
+`prefetch` 和 `readers` 是可调上限，实际深度保证供数进程有任务，并受内存预算限制；`readers: auto` 默认最多 8 个病例构建名额。多个本项目任务共用 `work_root/resources` 登记预算与显卡占用。运行中自动调整 worker、缓存、预取和病例构建并发，保留 GPU 模型与全局采样游标。安全预留触发时保存完整状态、释放本组并缩小供数重新准入，默认最多三次。详细预算、等待、GPU 卡数调整及验证边界见 [资源调度](RESOURCE_SCHEDULING.md)。
 
 异常会直接终止同组训练；恢复使用最近完整检查点，尚未提交的更新会重算。只处理本任务已登记的进程，外部任务保持运行。
 
@@ -86,7 +91,7 @@ python -B run.py prepare --config configs/experiments/imagechd_stunet.yaml \
 ```bash
 python -B run.py train --config configs/experiments/imagechd_stunet.yaml \
   --prepared "$COURSE/prepared/imagechd_fold0.json" \
-  --device cuda --gpus 2 --batch 4 --epochs 200 --workers auto
+  --device cuda --gpus 2 --batch 4 --epochs 200 --workers auto --no-share-gpu
 ```
 
 手动选卡将 `--gpus 2` 替换为 `--gpu-ids 0,2`；修改 batch 使用 `--batch 8`。修改后的训练配置是新任务，需选择新的 run_dir。继续同一任务追加 `--resume`。命令行设置 split/fold 时，prepare 与 train 均传入相同设置。GPU 预测单次使用一张通过空闲准入的显卡；共享容量证据按训练阶段记录。

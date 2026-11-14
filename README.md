@@ -67,7 +67,7 @@ cases:
 
 正式训练还需独立validation病例。1282按患者划分；ImageCHD导入原划分时保留病例级独立性，有可靠患者映射时可明确要求患者级检查。Q的A/B/C/D仍需患者级独立性。示例数字仅解释字段，实际值必须来自审核记录。ImageCHD的未知类别仅允许缺MYO（编号5）；1282使用其原始0—10编号和shared_index_excel空间规则。未标注和已确认缺如分别记录。额外标签仅按显式ignore_label_ids屏蔽。plan_scope仅用于显式读取既有计划的来源声明，不能代替对拟合病例的核查。
 
-图像和标签原件只读。prepare按病例顺序读取主训练数据，在RAM中进行有界前景采样，保存紧凑计划与描述，不输出整套重采样副本；训练和预测使用MONAI Dataset/Compose在RAM处理。STU持久供数进程使用各自有界LRU缓存，按整组预算核算；进程数量在启动和恢复时根据CPU/RAM计算，读盘并发与预取均可修改。MedSAM2使用官方DataLoader供数，Q在各训练进程内读取及缓存病例。
+图像和标签原件只读。prepare按病例顺序读取主训练数据，在RAM中进行有界前景采样，保存紧凑计划与描述，不输出整套重采样副本；训练和预测使用MONAI Dataset/Compose在RAM处理。STU持久供数进程使用各自有界LRU缓存，CPU供数、缓存、读盘并发和预取在安全边界按实时余量调整。默认只使用空闲显卡，卡数不足持续等待；STU显式设置最少卡数可启用epoch边界的GPU卡数调整，见[资源调度](docs/RESOURCE_SCHEDULING.md)。MedSAM2使用官方DataLoader，Q在各训练进程内读取及缓存病例；这两个模型启动时使用各自内存预算，恢复保留原运行拓扑，见[模型资源设置](docs/ASSISTANT2_SERVER_FILES.md)。
 
 ## 运行
 

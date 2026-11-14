@@ -13,7 +13,7 @@ import yaml
 
 from ..artifacts.store import digest,file_digest,read_json,write_json
 from ..config import DEFAULTS,_merge,validate_resources
-from ..observability.events import Stage
+from ..observability.events import Stage,event
 from ..training.resources import resource_lease,layout,register_member,close_members,host_capacity,process_vram,record_peaks
 
 
@@ -53,26 +53,41 @@ def resource_spec(config,prepared,stage):
 
 
 @contextmanager
-def admitted(config,prepared,stage):
+def admitted(config,prepared,stage,topology=None):
     common = execution_config(config)
     common['run_dir'] = str(Path(config['run_dir'])/'admission'/stage)
     common['technical'] = prepared['technical']
+    common['model_stage'] = stage
+    if stage=='prediction':
+        common['training']['batch'] = 1
+    if topology is not None:
+        requested_layout = common['resources']['batch_layout']
+        if requested_layout is not None and requested_layout!=topology['shares']:
+            raise ValueError('模型恢复需要检查点原批量份额')
+        common['model_topology'] = topology
+        common['resources']['batch_layout'] = layout(common['training']['batch'],topology['world'],topology['shares'])
+        common['resources'].update(gpu_count=topology['world'],cpu_processes=topology['world'],
+            min_gpus=topology['world'] if common['resources']['device']=='cuda' else None)
+        if common['resources']['gpu_ids'] is not None and len(common['resources']['gpu_ids'])!=topology['world']:
+            raise ValueError('恢复时指定显卡数量必须与模型检查点一致')
     root = Path(common['work_root']).resolve()
     source = Path(prepared['manifest']['data_root']).resolve()
     if root==source or root.is_relative_to(source) or source.is_relative_to(root):
         raise ValueError('资源登记目录与原始数据重叠')
     spec = resource_spec(config,prepared,stage)
     budget = prepared
-    if config['model']=='q_route1' and stage!='prediction':
+    if stage!='prediction':
         from .workflow import training_names,validated_q_groups
         names = set(training_names(config,prepared,stage))
-        if not config['technical']:
+        if config['model']=='q_route1' and not config['technical']:
             names.update(validated_q_groups(config,prepared)['C'])
         budget = deepcopy(prepared)
         budget['manifest']['cases'] = [dict(row,roles=['train']) for row in prepared['manifest']['cases']
                                       if row['case_id'] in names]
     with resource_lease(common,budget,spec,stage='prediction' if stage=='prediction' else 'train') as allocation:
         allocation['shares'] = layout(common['training']['batch'],allocation['world'],common['resources']['batch_layout'])
+        if config['model']=='medsam2' and len(set(allocation['shares']))!=1:
+            raise ValueError('MedSAM2官方训练要求各进程均分全局batch')
         allocation['spec'] = spec
         yield common,allocation
 
@@ -126,6 +141,9 @@ def rank_measurement(device,allocation,rank):
 
 
 def rank_entry(rank,payload,common,allocation,gate,port):
+    payload = deepcopy(payload)
+    payload['config']['execution'] = dict(common['resources'],workers=sum(allocation['supply']['workers']))
+    payload['config']['execution']['cache_bytes'] = allocation['supply']['cache_bytes'][rank]
     root = Path(payload['config']['run_dir'])/payload['stage']
     with (root/f'rank{rank}.log').open('a',encoding='utf-8') as log,redirect_stdout(log),redirect_stderr(log), \
             Stage(root,'model_worker',heartbeat_seconds=common['logging']['heartbeat_seconds'],
@@ -134,6 +152,11 @@ def rank_entry(rank,payload,common,allocation,gate,port):
         os.environ.update(MASTER_ADDR='127.0.0.1',MASTER_PORT=str(port),RANK=str(rank),LOCAL_RANK=str(rank),
                           WORLD_SIZE=str(allocation['world']))
         torch.set_num_threads(1)
+        event(root,'model_runtime_applied',model=payload['config']['model'],rank=rank,
+            local_batch=allocation['shares'][rank],workers=allocation['supply']['workers'][rank],
+            reserve_ram_bytes=common['resources']['reserve_ram_bytes'],
+            cache_bytes=allocation['supply']['cache_bytes'][rank],
+            reader_slots=allocation['supply']['reader_slots'],prefetch=allocation['supply']['prefetch'],threads=1)
         if payload.get('operation')=='predict':
             device = torch.device('cuda',rank) if allocation['gpus'] else torch.device('cpu')
             verify_device(device,allocation,rank)
@@ -160,8 +183,21 @@ def rank_entry(rank,payload,common,allocation,gate,port):
 
 
 def run_workers(payload,common,allocation):
+    if payload.get('operation')=='predict':
+        return _run_workers(payload,common,allocation)
+    from .startup import initialization_attempt
+    root = Path(payload['config']['run_dir'])/payload['stage']
+    with initialization_attempt(root,payload['config'],payload['prepared']['identity'],payload['stage'],payload['resume']):
+        return _run_workers(payload,common,allocation)
+
+
+def _run_workers(payload,common,allocation):
     root = Path(payload['config']['run_dir'])/payload['stage']
     root.mkdir(parents=True,exist_ok=True)
+    if payload['config']['model']=='medsam2' and payload.get('operation')!='predict':
+        write_json(root/'worker-input.json',payload)
+        write_json(root/'identity.json',dict(identity=payload['identity']))
+        write_json(root/'official-config.json',payload['recipe'])
     topology = dict(world=allocation['world'],shares=allocation['shares'],
         workers=allocation['supply']['workers'] if payload['config']['model']=='medsam2' else [])
     if payload.get('resume'):
@@ -169,7 +205,8 @@ def run_workers(payload,common,allocation):
             raise ValueError('恢复需要相同的进程、批量份额及数据worker数量')
     else:
         write_json(root/'execution-topology.json',topology)
-    write_json(root/'resources.json',dict(requested=payload['config']['execution'],applied=allocation,threads_per_rank=1))
+    write_json(root/'resources.json',dict(requested=payload['config']['execution'],resolved=common['resources'],
+        applied=allocation,threads_per_rank=1))
     runtime = root/'runtime'
     runtime.mkdir(exist_ok=True)
     with socket.socket() as rendezvous:

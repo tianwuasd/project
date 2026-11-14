@@ -4,11 +4,12 @@ import subprocess
 import sys
 
 import numpy as np
-import psutil
 import torch
 import torch.nn.functional as F
 
 from ...datasets.manifest import LABELS
+from ...training.resources import host_capacity
+from ...training.checkpoint import tensors_equal
 from . import UPSTREAM_COMMIT
 
 
@@ -30,10 +31,10 @@ def activate(config):
 
 
 class FrameSequence:
-    def __init__(self,image,resolution,window):
+    def __init__(self,image,resolution,window,reserve_ram_bytes=4*2**30):
         from .data import window_image
         self.image,self.resolution = image[0],resolution
-        if psutil.virtual_memory().available < 4*2**30+self.image.nbytes*3:
+        if host_capacity()['available_bytes'] < reserve_ram_bytes+self.image.nbytes*3:
             raise MemoryError('MedSAM2灰度统计超出主机内存预算')
         self.image = window_image(self.image,window)
 
@@ -68,6 +69,8 @@ class MedSAM2Adapter:
         if config['pretrained'] and initialize:
             source = torch.load(config['pretrained'],map_location='cpu',weights_only=True)
             self.model.load_state_dict(source['model'],strict=True)
+            if not tensors_equal(self.model.state_dict(),source['model']):
+                raise ValueError('MedSAM2初始化参数的数值或精度不同')
         elif initialize and not config['technical']:
             raise ValueError('MedSAM2正式训练需要登记官方预训练权重')
 
@@ -87,9 +90,12 @@ class MedSAM2Adapter:
         model_config['fill_hole_area'] = 0
         predictor = instantiate(OmegaConf.create(model_config),_recursive_=True).to(self.device).eval()
         predictor.load_state_dict(self.model.state_dict(),strict=True)
+        if not tensors_equal(predictor.state_dict(),self.model.state_dict()):
+            raise ValueError('MedSAM2预测参数未完整复制')
         stats = self.prepared['plan']['foreground_intensity_properties_per_channel']['0']
         window = self.config['gray_window'] or [stats['percentile_00_5'],stats['percentile_99_5']]
-        image = FrameSequence(entry['image'],self.config['resolution'],window)
+        image = FrameSequence(entry['image'],self.config['resolution'],window,
+            self.config['execution'].get('reserve_ram_bytes',4*2**30))
         depth,height,width = entry['image'].shape[1:]
         state = predictor.init_state(image,height,width,offload_video_to_cpu=True,offload_state_to_cpu=True)
         classes = len(LABELS[self.prepared['dataset']])

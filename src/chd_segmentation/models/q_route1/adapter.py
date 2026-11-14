@@ -3,12 +3,14 @@ from pathlib import Path
 
 from monai.inferers import sliding_window_inference
 import numpy as np
-import psutil
 import torch
 import torch.nn.functional as F
 
 from ..stunet.adapter import StunetAdapter
 from ...data.dataset import sample_patch
+from ...observability.events import event
+from ...training.resources import host_capacity
+from ...training.checkpoint import tensors_equal
 from .events import CLASSES
 from .network import LocalNetwork
 from .localizer import Localizer
@@ -71,7 +73,7 @@ class QAdapter:
         elif stage=='localizer':
             self.model = Localizer()
         else:
-            from ..workflow import load_state
+            from ..workflow import load_state,checked_identity,training_names
             if set(config['parents'])!={'base','localizer'}:
                 raise ValueError('Q局部模型需要base与localizer检查点')
             parents = {key:load_state(value) for key,value in config['parents'].items()}
@@ -80,15 +82,25 @@ class QAdapter:
                     raise ValueError('Q上游阶段或预处理来源不匹配')
                 if state['scope']!=prepared['scope']:
                     raise ValueError('Q上游范围不匹配')
+                parent_config = state['config']
+                if parent_config['model']!='q_route1' or state['training_cases']!=training_names(parent_config,prepared,key):
+                    raise ValueError('Q上游实际训练名单与配置不同')
+                checked_identity(parent_config,prepared,key,state['initialization_sha256'],state['identity'])
                 if not config['technical']:
                     import yaml
                     groups = yaml.safe_load(Path(config['groups']).read_text(encoding='utf-8'))
                     if not set(state['training_cases'])<=set(groups['A']):
                         raise ValueError('Q上游使用了A组以外的训练患者')
+                    selected = state['history'][-1].get('validation_loss')
+                    if selected is None or not np.isfinite(selected) or selected!=state['best']:
+                        raise ValueError('Q上游需要由C组选择的最佳完整检查点')
             self.base = StunetAdapter.build(parents['base']['spec']).to(self.device).eval().requires_grad_(False)
             self.base.load_state_dict(parents['base']['model'],strict=True)
             self.locator = Localizer().to(self.device).eval().requires_grad_(False)
             self.locator.load_state_dict(parents['localizer']['model'],strict=True)
+            if not tensors_equal(self.base.state_dict(),parents['base']['model']) or not tensors_equal(
+                    self.locator.state_dict(),parents['localizer']['model']):
+                raise ValueError('Q上游权重的数值或精度未完整加载')
             self.model = LocalNetwork(method=config['method'])
         self.model.to(self.device)
 
@@ -155,7 +167,7 @@ class QAdapter:
         references = yaml.safe_load(Path(self.config['key_references']).read_text(encoding='utf-8')) if self.config['key_references'] else {}
         records = []
         rows = {row['case_id']:row for row in self.prepared['manifest']['cases']}
-        for name in names:
+        for completed,name in enumerate(names,1):
             entry = dataset.get(name)
             probability,features,candidates = self.frozen(entry)
             for index,candidate in enumerate(candidates):
@@ -171,6 +183,9 @@ class QAdapter:
                 records.append(CandidateRecord(name,rows[name].get('patient') or name,self.prepared['dataset'],index,
                     has_error,bool(reference.get('correct_key_structure',False)),
                     bool(reference.get('contains_correct_anomaly',False)),int(supervised.sum())))
+            if self.config['logging']['case_details']:
+                event(Path(self.config['run_dir'])/self.stage,'q_candidates_completed',case_id=name,
+                    cases_completed=completed,cases_total=len(names),candidates=len(candidates),records=len(records))
         self.sampler = CandidateSampler(records,self.config['seed'])
 
     def sample(self,dataset,names,rng):
@@ -186,7 +201,8 @@ class QAdapter:
 
     def base_probability(self,entry):
         required = int(entry['image'].size*(11*24+16))
-        if psutil.virtual_memory().available < 4*2**30+required:
+        reserve = self.config['execution'].get('reserve_ram_bytes',4*2**30)
+        if host_capacity()['available_bytes'] < reserve+required:
             raise MemoryError('Q整例概率与融合工作区超出主机内存预算')
         model = self.model if self.stage=='base' else self.base
         with torch.no_grad():
@@ -264,7 +280,7 @@ class QAdapter:
     def validate(self,dataset,names):
         patients = {}
         rows = {row['case_id']:row for row in self.prepared['manifest']['cases']}
-        for name in names:
+        for completed,name in enumerate(names,1):
             entry = dataset.get(name)
             support = allowed(entry['label'],entry['unknown_classes'],self.prepared['dataset'])
             valid = torch.from_numpy(entry['label']>=0)[None,None]
@@ -277,4 +293,7 @@ class QAdapter:
                 logits = torch.from_numpy(probability).clamp_min(1e-8).log()[None]
                 value = segmentation_loss(logits,torch.from_numpy(support)[None],valid)
             patients.setdefault(rows[name]['patient'],[]).append(float(value))
+            if self.config['logging']['case_details']:
+                event(Path(self.config['run_dir'])/self.stage,'q_validation_case_completed',case_id=name,
+                    cases_completed=completed,cases_total=len(names),loss=float(value))
         return float(np.mean([np.mean(values) for values in patients.values()]))

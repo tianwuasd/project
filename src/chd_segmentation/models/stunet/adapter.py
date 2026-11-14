@@ -53,7 +53,9 @@ class StunetAdapter:
         missing, unexpected = model.load_state_dict({key: source[key] for key in names}, strict=False)
         if unexpected or set(missing) != set(own) - names:
             raise ValueError("预训练骨干加载不完整")
-        if any(not torch.equal(model.state_dict()[key], source[key]) for key in names):
+        loaded = model.state_dict()
+        if any(loaded[key].dtype != source[key].dtype or
+               not torch.equal(loaded[key].detach().cpu(), source[key]) for key in names):
             raise ValueError("预训练骨干数值不一致")
         return {"sha256": WEIGHT_SHA256, "loaded_tensors": len(names), "reset_head_tensors": len(missing)}
 
