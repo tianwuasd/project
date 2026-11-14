@@ -27,10 +27,15 @@ def options(path):
                     pretrained=None, parents={}, groups=None, technical=False,
                     official_root=None, dependency_root=None, freeze_image_encoder=False,
                     max_candidates=24, warmup_updates=2000,method='M07',key_references=None,
-                    validate_every=1000)
+                    validate_every=1000,batch=2,workers=15,epochs=None,gray_window=None)
     if not isinstance(raw, dict) or set(raw)-set(defaults):
         raise ValueError('模型配置字段无效')
     config = {**defaults, **raw}
+    if config['model']=='medsam2':
+        if 'learning_rate' not in raw:
+            config['learning_rate'] = .00005
+        if 'seed' not in raw:
+            config['seed'] = 123
     if config['model'] not in ('medsam2', 'q_route1') or not config['run_dir']:
         raise ValueError('必须指定模型与独立运行目录')
     for key in ('updates', 'accumulation', 'threads', 'patch', 'local_size', 'frames', 'resolution', 'max_candidates'):
@@ -44,6 +49,10 @@ def options(path):
         raise ValueError('Q正式任务固定128读取尺寸')
     if config['model']=='medsam2' and config['resolution'] != 512:
         raise ValueError('MedSAM2当前配方固定官方512分辨率')
+    if config['model']=='medsam2' and (type(config['batch']) is not int or config['batch']<1 or
+        type(config['workers']) is not int or config['workers']<0 or config['epochs'] is not None and
+        (type(config['epochs']) is not int or config['epochs']<1)):
+        raise ValueError('MedSAM2的batch、worker和epoch数量无效')
     if config['max_candidates'] > 24:
         raise ValueError('Q候选数量上限为24')
     if config['model']=='q_route1' and config['method'] not in ('M02','M07'):
@@ -157,6 +166,9 @@ def initialization_digest(config,previous=None):
 
 
 def train(config, prepared_path, stage, resume=False, stop_after=None):
+    if config['model']=='medsam2':
+        from .medsam2.official import train_official
+        return train_official(config,prepared_path,stage,resume,stop_after)
     started = perf_counter()
     device = resources(config)
     prepared = load_prepared(prepared_path)
@@ -278,7 +290,11 @@ def predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=No
     names = [row['case_id'] for row in rows] if case_ids is None else case_ids
     if not names or not set(names)<={row['case_id'] for row in rows}:
         raise ValueError('预测病例未登记')
-    dataset = dataset_for(prepared,False)
+    if config['model']=='medsam2':
+        from .medsam2.data import NativeCases
+        dataset = NativeCases(prepared,with_label=False)
+    else:
+        dataset = dataset_for(prepared,False)
     root.mkdir(parents=True)
     results = []
     for name in names:
@@ -286,7 +302,11 @@ def predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=No
         mark = perf_counter()
         with torch.inference_mode():
             probability,diagnostics = bundle.predict(entry,prompts)
-        native = restore(probability,entry,prepared['plan'])
+        if config['model']=='medsam2':
+            from .medsam2.data import restore_native
+            native = restore_native(probability,entry)
+        else:
+            native = restore(probability,entry,prepared['plan'])
         path = root/(name+'.nii.gz')
         image = nib.Nifti1Image(native,np.asarray(entry['source_affine']))
         image.header.set_xyzt_units(entry['source_units'])

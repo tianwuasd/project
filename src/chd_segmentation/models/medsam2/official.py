@@ -1,0 +1,107 @@
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+from filelock import FileLock
+
+from ...artifacts.store import read_json,write_json
+from ...preprocessing.prepare import load_prepared
+from .adapter import activate
+from .weights import verify_official_weight
+
+
+OFFICIAL_CONFIG = 'sam2/configs/sam2.1_hiera_tiny512_FLARE_RECIST.yaml'
+
+
+def effective_config(config,prepared,prepared_path,root,names):
+    official = activate(config)
+    from omegaconf import OmegaConf
+    from training.utils.train_utils import register_omegaconf_resolvers
+    if not OmegaConf.has_resolver('times'):
+        register_omegaconf_resolvers()
+    recipe = OmegaConf.load(official/OFFICIAL_CONFIG)
+    recipe.launcher.experiment_log_dir = str(root)
+    recipe.scratch.train_video_batch_size = config['batch']
+    recipe.scratch.num_train_workers = config['workers']
+    recipe.scratch.base_lr = config['learning_rate']
+    recipe.scratch.vision_lr = config['learning_rate']*.6
+    recipe.trainer.seed_value = config['seed']
+    recipe.trainer.accelerator = 'cpu' if config['device']=='cpu' else 'cuda'
+    recipe.trainer.distributed.backend = 'gloo' if config['device']=='cpu' else 'nccl'
+    recipe.trainer.optim.amp.enabled = config['device']!='cpu'
+    recipe.trainer.optim.amp.amp_dtype = 'bfloat16'
+    if config['precision']=='fp32':
+        recipe.trainer.optim.amp.enabled = False
+    recipe.trainer.checkpoint.save_freq = 0
+    recipe.trainer.checkpoint.model_weight_initializer.state_dict.checkpoint_path = config['pretrained']
+    recipe.trainer.logging.tensorboard_writer.should_log = False
+    if config['epochs'] is not None:
+        recipe.scratch.num_epochs = config['epochs']
+    stats = prepared['plan']['foreground_intensity_properties_per_channel']['0']
+    window = config['gray_window'] or [stats['percentile_00_5'],stats['percentile_99_5']]
+    raw = dict(_target_='chd_segmentation.models.medsam2.data.ManifestRawDataset',
+               prepared_path=str(Path(prepared_path).resolve()),names=names,window=window)
+    leaf = recipe.trainer.data.train.datasets[0].dataset.datasets[0]
+    leaf._target_ = 'chd_segmentation.models.medsam2.data.HeartVOSDataset'
+    leaf.video_dataset = OmegaConf.create(raw)
+    resolved = OmegaConf.to_container(recipe,resolve=True)
+    # 数据、资源和保存位置是本工程的接口；模型、增强、采样和优化配置保留官方定义。
+    return resolved
+
+
+def train_official(config,prepared_path,stage,resume=False,stop_after=None):
+    if stage!='sequence':
+        raise ValueError('MedSAM2阶段必须为sequence')
+    prepared = load_prepared(prepared_path)
+    root = (Path(config['run_dir'])/stage).resolve()
+    protected = [Path(prepared['manifest']['data_root']).resolve(),
+                 Path(config['official_root']).resolve(),Path(config['dependency_root']).resolve(),
+                 Path(config['pretrained']).resolve().parent]
+    if any(root==path or root.is_relative_to(path) or path.is_relative_to(root) for path in protected):
+        raise ValueError('MedSAM2训练目录与原始数据或复用依赖重叠')
+    root.parent.mkdir(parents=True,exist_ok=True)
+    with FileLock(root.parent/(stage+'.lock'),timeout=0):
+        return _train_locked(config,prepared,prepared_path,root,stage,resume,stop_after)
+
+
+def _train_locked(config,prepared,prepared_path,root,stage,resume,stop_after):
+    if config['frames']!=8 or config['resolution']!=512 or config['accumulation']!=1 or config['freeze_image_encoder']:
+        raise ValueError('MedSAM2官方配方需要8帧、512分辨率、无梯度累积且训练全部模型')
+    receipt = verify_official_weight(config['pretrained'])
+    from ..workflow import training_names,model_identity
+    names = training_names(config,prepared,stage)
+    if config['technical'] and config['updates']>2:
+        raise ValueError('MedSAM2技术验证最多两次更新')
+    if root.exists() and not resume:
+        raise FileExistsError('MedSAM2训练目录已存在')
+    if resume and not (root/'checkpoints/checkpoint.pt').is_file():
+        raise FileNotFoundError('MedSAM2恢复需要完整官方检查点')
+    recipe = effective_config(config,prepared,prepared_path,root,names)
+    identity = model_identity(config,prepared,stage)
+    payload = dict(config=config,prepared=prepared,recipe=recipe,identity=identity,weight=receipt,
+                   prepared_path=str(Path(prepared_path).resolve()),resume=resume,stop_after=stop_after)
+    if resume and read_json(root/'identity.json')!={'identity':identity}:
+        raise ValueError('MedSAM2恢复的输入、配置或源码身份不同')
+    root.mkdir(parents=True,exist_ok=True)
+    write_json(root/'worker-input.json',payload)
+    write_json(root/'identity.json',dict(identity=identity))
+    write_json(root/'official-config.json',recipe)
+    project = Path(__file__).resolve().parents[4]
+    keep = {'PATH','SYSTEMROOT','WINDIR','COMSPEC','PATHEXT','USERPROFILE','APPDATA','LOCALAPPDATA',
+            'PROGRAMDATA','PROGRAMFILES','PROGRAMFILES(X86)','SYSTEMDRIVE','NUMBER_OF_PROCESSORS',
+            'USERNAME','USER','LOGNAME'}
+    environment = {key:value for key,value in os.environ.items() if key.upper() in keep}
+    environment.update(PYTHONDONTWRITEBYTECODE='1',PYTHONPATH=os.pathsep.join([str(project/'src'),
+        config['dependency_root'],config['official_root']]),TEMP=str(root/'runtime'),TMP=str(root/'runtime'),
+        USE_LIBUV='0',OMP_NUM_THREADS=str(config['threads']),MKL_NUM_THREADS=str(config['threads']))
+    environment['CUDA_VISIBLE_DEVICES'] = '' if config['device']=='cpu' else config['device'].split(':')[-1]
+    environment['TORCHINDUCTOR_CACHE_DIR'] = str(root/'runtime/torch')
+    (root/'runtime').mkdir(exist_ok=True)
+    with (root/'official-console.log').open('ab') as log:
+        result = subprocess.run([sys.executable,'-B','-m','chd_segmentation.models.medsam2.worker',
+            str(root/'worker-input.json')],env=environment,cwd=project,stdout=log,stderr=subprocess.STDOUT,check=False)
+    if result.returncode:
+        tail = (root/'official-console.log').read_text(encoding='utf-8',errors='replace')[-6000:]
+        raise RuntimeError('MedSAM2官方训练失败：\n'+tail)
+    return read_json(root/'summary.json')

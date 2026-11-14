@@ -1,6 +1,6 @@
 # 先心代码助手2接续
 
-工作目录：`D:/projects/back/deliverables/chd-segmentation-assistant2`。
+工作目录：`D:/projects/project/chd-segmentation-assistant2`。
 工作分支：`codex/chd-segmentation-assistant2-medsam2-q-r2`。
 基点：`298a75a50e18117bd62c741ebbc328b89dc8e7ad`。
 
@@ -10,10 +10,12 @@
 
 Q科学模块保留原网络、事件、求解、融合、定位目标与允许集合监督。统一入口保留M02/M07，正式训练使用A/B/C/D患者分组、分层候选和20%概率扰动、预热余弦及C组选模。关系R辅助头和独立临床参考未在本次输入中配置。
 
-MedSAM2固定官方提交332f30d，使用真实SAM2Train、官方损失与NPZ传播器。序列连续，帧按需转换；提示式预测支持人工框或外部图像定位器提供的框。外部定位器需要自身已验证的检查点与提示来源登记。本次技术验收使用训练标签模拟提示，官方结构随机初始化，尚未下载官方预训练权重。
+MedSAM2固定官方提交332f30d，使用官方Trainer、VOS采样/增强、模型、损失、优化器及检查点。初始化权重为官方MedSAM2_latest.pt，固定来源、容量和SHA-256在weights.py登记。序列为8帧、最多3目标、512分辨率，正式预算75epoch；提示式预测支持人工框或外部图像定位器提供的框，提示坐标为native_dhw。技术验收使用训练标签模拟提示并单独登记来源。
 
 本地环境额外依赖与官方源码分别在env/medsam2、vendor/MedSAM2，均被Git忽略并保留复用。原始病例与验收报告在工作目录外；公开源码不包含病例文件或患者名单。
 
-验收报告：`D:/projects/back/sync-reports/chd-segmentation-assistant2`。真实验收程序每数据集使用一例病例、每阶段最多两次更新，保存后重载继续并导出原空间。Q使用96³视野和32³网络技术尺寸，MedSAM2使用32³视野及2帧512分辨率训练。报告限定于本地CPU技术功能；目标服务器CUDA/DDP、正式患者分组准入、长训练、心脏分割效果及临床终点仍需各自实际验收。
+本机验证解释器为 `D:/projects/project/chd-segmentation/.venv/Scripts/python.exe`，基础环境只读复用。MedSAM2新增依赖仅在本目录env/medsam2，官方权重在data/model_weights/MedSAM2_latest.pt。移交到其他机器时需要按pyproject.toml、requirements-medsam2.txt和固定官方提交独立安装。入口为 `run.py models`；配置中的运行目录需要指向该任务的过程目录。
+
+验收报告：`D:/projects/back/sync-reports/chd-segmentation-assistant2`，MedSAM2官方权重与训练器的两数据集记录位于medsam-official；单例完整检查点、并发保护及native_dhw预测回归记录位于medsam-atomic。真实验收程序每数据集使用一例病例、每阶段最多两次更新，保存后重载继续并导出原空间。Q使用96³视野和32³网络技术尺寸，MedSAM2使用32³视野及官方8帧512分辨率训练。报告限定于本地CPU技术功能；目标服务器CUDA/DDP、正式患者分组准入、长训练、心脏分割效果及临床终点仍需各自实际验收。
 
 本分支按用户要求独立保留。后续合并与服务器发布使用明确的目标提交和单独的整合验收。

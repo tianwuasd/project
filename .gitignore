@@ -11,3 +11,4 @@ outputs/
 env/
 vendor/MedSAM2/
 assistant2.local.yaml
+data/model_weights/

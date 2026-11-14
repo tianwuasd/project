@@ -14,7 +14,7 @@ python -B run.py --help
 python -B run.py --version
 ```
 
-本机的 `.venv` 复用既有研究依赖并安装 MONAI 1.5.2；其本地依赖引用不用于服务器部署。服务器需要独立安装 `pyproject.toml` 声明的依赖并验证对应 PyTorch 构建。代码不自动安装依赖，也不自动更换已有环境。
+本机验收通过已有研究解释器只读复用基础依赖；MedSAM2额外依赖、官方源码及权重由本工作目录独立保存，位置见模型说明。服务器需要独立安装 `pyproject.toml` 声明的依赖并验证对应 PyTorch 构建。代码不自动安装依赖，也不自动更换已有环境。
 
 zmic 使用 `/data4/zhangruichen`：项目实体目录固定在 `code/chd-segmentation`，包含全部入口、src、configs 和 docs。Git 元数据复用 `code/git/.git`，`code/.git` 关联该元数据；本项目仅同步 chd-segmentation，其他项目文件保留。过程产物在 `course/chd-segmentation`，最终结果在 `result/chd-segmentation`，独立环境计划放在 `env/chd-segmentation`，原始数据从 `data` 读取。部署、配置及更新命令见 [zmic 部署说明](docs/ZMIC_DEPLOYMENT.md)。
 
