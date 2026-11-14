@@ -9,10 +9,10 @@ from ..preprocessing.transforms import CaseTransform
 
 
 class CaseDataset:
-    def __init__(self, prepared, resources, with_label=True):
+    def __init__(self, prepared, resources, with_label=True, log_dir=None, logging=None):
         self.rows = prepared["manifest"]["cases"]
         self.by_id = {row["case_id"]: index for index, row in enumerate(self.rows)}
-        self.transform = CaseTransform(prepared, resources["reserve_ram_bytes"], with_label)
+        self.transform = CaseTransform(prepared, resources["reserve_ram_bytes"], with_label, log_dir, logging)
         self.dataset = Dataset(self.rows, transform=Compose([self.transform]))
         self.cache, self.cached_bytes = OrderedDict(), 0
         self.budget = resources["cache_bytes"]

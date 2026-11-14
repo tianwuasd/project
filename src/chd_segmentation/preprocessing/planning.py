@@ -9,6 +9,7 @@ import psutil
 
 from ..artifacts.store import digest, operation_lock, read_json, require_output, write_json
 from ..datasets.manifest import LABELS
+from ..observability.events import event, stage
 from .transforms import CaseTransform
 
 
@@ -66,19 +67,25 @@ def fit_plan(config, manifest, request):
         raise MemoryError("计划灰度采样超出 RAM 安全余量")
     prepared = {"technical": config["technical"],
                 "dataset_json": {"labels": {name: i for i, name in enumerate(LABELS[config["dataset"]])}}}
-    reader = CaseTransform(prepared, reserve)
+    reader = CaseTransform(prepared, reserve, log_dir=config["run_dir"], logging=config.get("logging"))
     samples, spacings, shapes, timings = [], [], [], []
-    for row in rows:
+    event(config["run_dir"], "plan_fit_started", cases=len(rows), samples_per_case=count,
+          execution="sequential_cpu", scope=config["scope"])
+    for index, row in enumerate(rows, 1):
         mark = perf_counter()
-        data, label, image, spacing, roi, read_seconds = reader.read_case(row)
-        data, label, _ = crop_to_nonzero(data[None], label[None])
-        samples.append(foreground_sample(data[0], label[0], count,
-                                        np.random.default_rng(settings["seed"])))
+        with stage(config, "plan_case", case_id=row["case_id"], completed=index - 1, total=len(rows)):
+            data, label, image, spacing, roi, read_seconds = reader.read_case(row)
+            data, label, _ = crop_to_nonzero(data[None], label[None])
+            samples.append(foreground_sample(data[0], label[0], count,
+                                            np.random.default_rng(settings["seed"])))
         shapes.append(list(data.shape[1:][::-1]))
         spacings.append(spacing[::-1].tolist())
         reader.check_sources(row)
         timings.append({"case_id": row["case_id"], "read_seconds": read_seconds,
                         "seconds": perf_counter() - mark})
+        event(config["run_dir"], "plan_case_completed", case_id=row["case_id"], completed=index,
+              total=len(rows), seconds=timings[-1]["seconds"], read_seconds=read_seconds,
+              cases_per_second=index / (perf_counter() - started))
         del data, label, image
     values = np.concatenate(samples)
     low, median, high = np.percentile(values, [0.5, 50, 99.5])
@@ -116,11 +123,14 @@ def fit_plan(config, manifest, request):
     plan["generation"] = {"request": request, "request_identity": digest(request), "content_identity": digest(plan),
                           "samples_per_case_applied": count, "total_samples": len(values),
                           "case_timings": timings, "seconds": perf_counter() - started}
+    event(config["run_dir"], "plan_fit_completed", cases=len(rows), seconds=perf_counter() - started,
+          target_spacing=spacing[forward].tolist(), intensity=stats, total_samples=len(values))
     return plan
 
 
 def resolve_plan(config, manifest):
     if config["planning"]["mode"] == "existing":
+        event(config["run_dir"], "plan_existing", path=config["plan"])
         return read_json(config["plan"])
     request = plan_request(config, manifest)
     path = require_output(config["plan"], config["work_root"],
@@ -129,9 +139,14 @@ def resolve_plan(config, manifest):
         if path.exists():
             plan = read_json(path)
             validate_auto_plan(plan, config, manifest)
-            reader = CaseTransform({}, config["resources"]["reserve_ram_bytes"])
-            for row in request["training_cases"]:
-                reader.check_sources(row)
+            reader = CaseTransform({}, config["resources"]["reserve_ram_bytes"], log_dir=config["run_dir"],
+                                   logging=config.get("logging"))
+            rows = request["training_cases"]
+            for index, row in enumerate(rows, 1):
+                with stage(config, "plan_reuse_verify", case_id=row["case_id"], completed=index - 1, total=len(rows)):
+                    reader.check_sources(row)
+                event(config["run_dir"], "plan_reuse_case_verified", case_id=row["case_id"], completed=index, total=len(rows))
+            event(config["run_dir"], "plan_reused", path=str(path), cases=len(rows))
             return plan
         plan = fit_plan(config, manifest, request)
         write_json(path, plan)
