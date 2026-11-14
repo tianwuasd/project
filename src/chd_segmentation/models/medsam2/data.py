@@ -11,12 +11,17 @@ from training.dataset.vos_dataset import VOSDataset
 
 _read_gate = None
 _prefetch_depth = 2
+_rank = 0
 
 
 class BudgetDataLoader(torch.utils.data.DataLoader):
     def __init__(self,dataset,**kwargs):
         workers = kwargs['num_workers']
         kwargs['prefetch_factor'] = max(1,_prefetch_depth//workers) if workers else None
+        if _read_gate is not None:
+            from .supply import OrderedDataset,TaggedBatches
+            dataset = OrderedDataset(dataset,_read_gate,_rank)
+            kwargs['batch_sampler'] = TaggedBatches(kwargs['batch_sampler'])
         super().__init__(dataset,**kwargs)
 
 
@@ -25,19 +30,23 @@ class ResourceWorkerInit:
         self.common,self.owner,self.gate = common,owner,gate
 
     def __call__(self,worker_id):
-        global _read_gate
         from ...training.resources import register_member
         register_member(self.common,self.owner)
         torch.set_num_threads(1)
-        _read_gate = self.gate
 
 
-def set_read_gate(gate,prefetch_depth):
-    global _read_gate,_prefetch_depth
+def set_read_gate(gate,prefetch_depth,rank=0):
+    global _read_gate,_prefetch_depth,_rank
     _read_gate = gate
     _prefetch_depth = prefetch_depth
+    _rank = rank
     import training.dataset.sam2_datasets as official_data
     official_data.DataLoader = BudgetDataLoader
+
+
+def sample_supply(gate,rank):
+    global _read_gate,_rank
+    _read_gate,_rank = gate,rank
 
 
 def window_image(image,window):
@@ -59,10 +68,7 @@ class NativeCases:
         self.current_name,self.current = None,None
 
     def get(self,name):
-        if _read_gate is None:
-            return self._get(name)
-        with _read_gate:
-            return self._get(name)
+        return self._get(name)
 
     def _get(self,name):
         row = self.rows[name]
@@ -105,6 +111,8 @@ class ManifestRawDataset(VOSRawDataset):
         return len(self.names)
 
     def get_video(self,index):
+        if _read_gate is not None:
+            _read_gate.reserve(_rank,self.names[index])
         entry = self.cases.get(self.names[index])
         label = entry['label']
         if (label<0).any() or any((label==value).any() for value in entry['unknown_classes']):

@@ -43,10 +43,26 @@ def main(payload,rank,common,allocation,gate):
     observed_peak = 0
 
     class CheckpointTrainer(official.Trainer):
+        def _setup_torch_dist_and_backend(self,*args,**kwargs):
+            gate.ready.wait(rank,'med-distributed-entry',self.device)
+            return super()._setup_torch_dist_and_backend(*args,**kwargs)
+
+        def _setup_ddp_distributed_training(self,*args,**kwargs):
+            gate.ready.wait(rank,'med-model-initialized',self.device)
+            return super()._setup_ddp_distributed_training(*args,**kwargs)
+
         def _run_step(self,*args,**kwargs):
+            gate.ready.wait(rank,f'med-transfer:{self.epoch}:{self.steps["train"]}',self.device)
             if pressure(common,self.device):
                 raise MemoryError('MedSAM2在批次边界检测到主机或显存压力，保留最近完整epoch检查点')
-            return super()._run_step(*args,**kwargs)
+            mark = perf_counter()
+            result = super()._run_step(*args,**kwargs)
+            if self.device.type=='cuda':
+                torch.cuda.synchronize(self.device)
+            from ...observability.events import event
+            event(root,'model_forward_backward',rank=rank,epoch=self.epoch,update=self.steps['train'],
+                  seconds=perf_counter()-mark,includes_ddp_communication=True,nccl_wait_seconds=None)
+            return result
 
         def _save_checkpoint(self,checkpoint,checkpoint_path):
             # 将恢复所需状态放入同一文件，完整写入后原子替换。
@@ -74,7 +90,7 @@ def main(payload,rank,common,allocation,gate):
     del arguments['_target_']
     trainer = CheckpointTrainer(**arguments)
     applied_workers = allocation['supply']['workers'][rank]
-    set_read_gate(gate,max(allocation['supply']['prefetch'],applied_workers))
+    set_read_gate(gate,max(allocation['supply']['prefetch'],applied_workers),rank)
     trainer.train_dataset.worker_init_fn = ResourceWorkerInit(common,allocation['owner'],gate)
     restored_exact = None
     if payload['resume']:
@@ -125,13 +141,17 @@ def main(payload,rank,common,allocation,gate):
     reason = None
     actual_prefetch = None
     initial_update = trainer.steps['train']
+    gate.ready.wait(rank,'med-state-restored',device)
     while trainer.epoch<trainer.max_epochs:
         if limit is not None and trainer.steps['train']>=limit:
             break
+        gate.ready.wait(rank,f'med-epoch-boundary:{trainer.epoch}',device)
         if pressure(common,trainer.device):
             reason = 'resource_pressure'
             break
-        loader = trainer.train_dataset.get_loader(epoch=trainer.epoch)
+        gate.start(rank,f'med-epoch:{trainer.epoch}',allocation['shares'],device)
+        from .supply import ConsumedLoader
+        loader = ConsumedLoader(trainer.train_dataset.get_loader(epoch=trainer.epoch),gate,rank,trainer.epoch,device)
         actual_prefetch = loader.dataloaders[0].prefetch_factor
         if len(loader)<1 or limit is not None and trainer.steps['train']+len(loader)>limit:
             raise ValueError('停止更新数需要位于官方完整epoch边界')
@@ -147,11 +167,13 @@ def main(payload,rank,common,allocation,gate):
         from ...observability.events import event
         event(root,'model_epoch_completed',model='medsam2',rank=rank,**history[-1])
         numpy_rng = np.random.get_state()
+        gate.ready.wait(rank,f'med-checkpoint-state:{trainer.epoch}',device)
         rank_states = all_states(dict(python_rng=random.getstate(),
             numpy_rng=(numpy_rng[0],numpy_rng[1].tolist(),*numpy_rng[2:]),torch_rng=torch.get_rng_state(),
             prompt_rng=deepcopy(trainer.model.module.rng.bit_generator.state),
             cuda_rng=torch.cuda.get_rng_state(trainer.device) if trainer.device.type=='cuda' else None))
         trainer.save_checkpoint(trainer.epoch,checkpoint_names=['checkpoint'])
+        gate.ready.wait(rank,f'med-checkpoint-written:{trainer.epoch}',device)
         dist.barrier()
         del loader
         gc.collect()
@@ -167,6 +189,7 @@ def main(payload,rank,common,allocation,gate):
         update=trainer.steps['train'],history=history,official=True)
     if rank==0:
         save_state(root/'latest.pt',state)
+    gate.ready.wait(rank,'med-export-written',device)
     dist.barrier()
     measurement = rank_measurement(trainer.device,allocation,rank)
     if trainer.device.type=='cuda':

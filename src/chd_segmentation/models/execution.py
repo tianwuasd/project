@@ -174,6 +174,7 @@ def rank_entry(rank,payload,common,allocation,gate,port):
         else:
             device = torch.device('cuda',rank) if allocation['gpus'] else torch.device('cpu')
             verify_device(device,allocation,rank)
+            gate.ready.wait(rank,'q-distributed-entry',device)
             dist.init_process_group('nccl' if allocation['gpus'] else 'gloo',rank=rank,
                 world_size=allocation['world'],timeout=timedelta(seconds=180),
                 **({'device_id':device} if allocation['gpus'] else {}))
@@ -226,7 +227,11 @@ def _run_workers(payload,common,allocation):
         OMP_NUM_THREADS='1',MKL_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1',NUMEXPR_NUM_THREADS='1',
         CUDA_VISIBLE_DEVICES=','.join(g['uuid'] for g in allocation['gpus']))
     context = torch.multiprocessing.get_context('spawn')
-    gate = context.BoundedSemaphore(allocation['supply']['reader_slots'])
+    from .supply import CpuReady,OrderedSupply
+    ready = CpuReady(context,allocation['world'],root)
+    gate = OrderedSupply(context,allocation['shares'],allocation['supply']['reader_slots'],ready,root,
+        capacity_bytes=allocation['supply']['breakdown']['case_workspaces_bytes'],
+        estimates=allocation['supply']['case_estimates'])
     previous = dict(os.environ)
     with ExitStack() as cleanup:
         def restore_environment():

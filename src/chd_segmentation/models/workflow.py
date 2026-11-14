@@ -276,13 +276,23 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
     optimizer = bundle.optimizer()
     identity = checked_identity(config,prepared,stage,initial_sha,previous['identity'] if previous else None)
     class AdmittedCases(CaseDataset):
+        position = 0
+        mode = 'candidates'
+
         def get(self,name):
-            with gate:
-                return super().get(name)
+            if self.mode=='candidates':
+                gate.ready.wait(rank,f'q-candidate:{self.position}:{name}',device)
+            with gate.build(rank,gate.batch.value,self.position):
+                gate.reserve(rank,name)
+                entry = super().get(name)
+            self.position += 1
+            return entry
     dataset = AdmittedCases(prepared,dict(reserve_ram_bytes=common['resources']['reserve_ram_bytes'],
         cache_bytes=allocation['supply']['cache_bytes'][rank]),with_label=True,
         log_dir=root,logging=config['logging'])
+    gate.start(rank,'q-candidates',[len(names) if stage=='local' else 0]*allocation['world'],device)
     bundle.prepare_training(dataset,names)
+    gate.finish(rank,'q-candidates',device)
     update,history,best = 0,[],None
     restored = False
     if resume:
@@ -323,13 +333,16 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
     with torch.enable_grad():
         while update < (config['updates'] if stop_after is None else stop_after):
             mark = perf_counter()
+            gate.start(rank,f'q-update:{update}',allocation['shares'],device)
+            dataset.mode,dataset.position = 'training',0
             if pressure(common,device):
                 reason = 'resource_pressure'
                 break
             optimizer.zero_grad(set_to_none=True)
             bundle.schedule(optimizer,update)
             loss_sum = 0.
-            for _ in range(allocation['shares'][rank]):
+            for micro in range(allocation['shares'][rank]):
+                sample_started = perf_counter()
                 entry = bundle.sample(dataset,names,rng)
                 with torch.autocast(device.type,dtype=torch.bfloat16,enabled=config['precision']=='bf16'):
                     loss = bundle.loss(entry,rng,update)
@@ -337,9 +350,18 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
                     raise FloatingPointError('模型训练损失非有限')
                 (loss/config['accumulation']).backward()
                 loss_sum += float(loss.detach())/config['accumulation']
-                del loss
+                del loss,entry
+                from ..observability.events import event
+                event(root,'model_sample_consumed',rank=rank,batch=update,position=micro,
+                    seconds=perf_counter()-sample_started,cuda_completion_checked_at='batch_boundary')
+            gate.finish(rank,f'q-update:{update}',device)
+            communication_started = perf_counter()
             synchronize_gradients(model)
             loss_sum = sum(all_states(loss_sum))
+            if device.type=='cuda':
+                torch.cuda.synchronize(device)
+            event(root,'model_gradient_communication',rank=rank,batch=update,
+                seconds=perf_counter()-communication_started,all_ranks_data_consumed=True)
             norm = torch.nn.utils.clip_grad_norm_(model.parameters(),5.,error_if_nonfinite=True)
             optimizer.step()
             if config['technical']:
@@ -347,6 +369,7 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
                 checksum = hashlib.sha256()
                 for value in model.state_dict().values():
                     checksum.update(value.detach().cpu().contiguous().reshape(-1).view(torch.uint8).numpy().tobytes())
+                gate.ready.wait(rank,f'q-parameters:{update}',device)
                 replicas_equal = len(set(all_states(checksum.hexdigest())))==1
                 if not replicas_equal:
                     raise ValueError('Q各进程更新后的模型参数不一致')
@@ -361,8 +384,11 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
                 if not validation_names:
                     raise ValueError('正式选模需要独立验证病例')
                 model.eval()
+                gate.start(rank,f'q-validation:{update}',[len(validation_names)]+[0]*(allocation['world']-1),device)
+                dataset.mode,dataset.position = 'validation',0
                 with torch.no_grad():
                     value = bundle.validate(dataset,validation_names) if rank==0 else None
+                gate.finish(rank,f'q-validation:{update}',device)
                 value = all_states(value)[0]
                 model.train()
                 improved = best is None or value<best
@@ -372,6 +398,7 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
             local_state = dict(torch_rng=torch.get_rng_state(),python_rng=random.getstate(),numpy_rng=np.random.get_state(),
                 data_rng=rng.bit_generator.state,cuda_rng=torch.cuda.get_rng_state(device) if device.type=='cuda' else None,
                 extra=bundle.extra_state())
+            gate.ready.wait(rank,f'q-checkpoint-state:{update}',device)
             rank_states = all_states(local_state)
             state = dict(identity=identity,model=model.state_dict(),optimizer=optimizer.state_dict(),rank_states=rank_states,
                 batch_layout=allocation['shares'],
@@ -384,10 +411,11 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
                     save_state(root/'best.pt',state)
                 from ..observability.events import event
                 event(root,'model_update_completed',model=config['model'],stage=stage,**history[-1])
-            all_states(update)
+            gate.ready.wait(rank,f'q-checkpoint-written:{update}',device)
         measurement = rank_measurement(device,allocation,rank)
         if device.type=='cuda':
             measurement['peak_vram_bytes'] = max(measurement['peak_vram_bytes'],peak_vram)
+        gate.ready.wait(rank,f'q-summary:{update}',device)
         measurements = all_states(measurement)
         summary = dict(model=config['model'],stage=stage,scope=prepared['scope'],update=update,history=history,
                        checkpoint=str(root/'latest.pt'),

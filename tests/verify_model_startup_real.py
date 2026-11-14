@@ -1,6 +1,9 @@
 import argparse
 from copy import deepcopy
+import json
 from pathlib import Path
+import os
+import subprocess
 import sys
 from time import perf_counter
 from unittest import TestCase
@@ -24,6 +27,8 @@ def run(args):
     item = next(row for row in yaml.safe_load(Path(args.spec).read_text(encoding='utf-8'))['experiments']
                 if row['dataset']=='imagechd')
     check = TestCase()
+    if args.legacy_root and args.world!=1:
+        raise ValueError('旧版恢复检查限定一个CPU进程')
     with SmokeWorkspace(args.work_root,args.report) as workspace:
         started = perf_counter()
         row = deepcopy(item['case'])
@@ -60,7 +65,14 @@ def run(args):
         check.assertTrue(note.exists())
         note.unlink()
         record['unknown_file_preserved'] = True
-        record['retry'] = train(options(path),prepared_path,'base',stop_after=1)
+        if args.legacy_root:
+            environment = dict(os.environ,TEMP=str(workspace.root),TMP=str(workspace.root),USE_LIBUV='0',PYTHONDONTWRITEBYTECODE='1')
+            subprocess.run([sys.executable,'-B',str(ROOT/'tests/legacy_q_worker.py'),'--source',args.legacy_root,
+                '--config',str(path),'--prepared',str(prepared_path),'--stage','base'],env=environment,check=True)
+            record['retry'] = read_json(stage/'summary.json')
+            record['legacy_source'] = args.legacy_root
+        else:
+            record['retry'] = train(options(path),prepared_path,'base',stop_after=1)
         check.assertEqual(record['retry']['update'],1)
         startup = read_json(stage/'startup.json')
         check.assertEqual([item['state'] for item in startup['attempts']],['failed','finished'])
@@ -70,6 +82,8 @@ def run(args):
             config['execution']['batch_layout'] = None
             write_json(path,config)
         record['resume'] = train(options(path),prepared_path,'base',resume=True)
+        supply_events = [json.loads(line) for line in (stage/'events.jsonl').read_text(encoding='utf-8').splitlines()]
+        write_json(workspace.report/'supply-events.json',supply_events)
         check.assertEqual(record['resume']['update'],2)
         check.assertTrue(record['resume']['restored_exact'])
         check.assertEqual(record['resume']['batch_layout'],record['retry']['batch_layout'])
@@ -93,4 +107,5 @@ if __name__=='__main__':
     parser.add_argument('--world',type=int,choices=(1,2),default=1)
     parser.add_argument('--batch-layout')
     parser.add_argument('--forget-layout-on-resume',action='store_true')
+    parser.add_argument('--legacy-root')
     run(parser.parse_args())

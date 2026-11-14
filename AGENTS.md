@@ -12,4 +12,5 @@
 - 本次已获准在 `D:/projects/back/t17/chd-segmentation-assistant2` 使用最多2例真实病例，每阶段最多2次更新，最多200个验证文件、峰值8 GiB，结束清理副产物。验收报告保留在 `D:/projects/back/sync-reports/chd-segmentation-assistant2`，不超过10 MiB。
 - 已获准将固定提交的 MedSAM2 官方源码保存在 `vendor/MedSAM2`、独立Python依赖保存在 `env/medsam2`，合计最多1 GiB、约1万个文件，保留复用。用户已指定使用官方权重及训练方法，MedSAM2_latest.pt保存在data/model_weights，容量156040129字节，保留供后续微调；每次训练核对官方SHA-256。
 - 最终源码按用户要求放在 `D:/projects/project/chd-segmentation-assistant2`，继续保留助手2的独立工作目录和分支。
+- Q与MedSAM2使用models/supply.py约束当前批次构建、公平样本顺序和病例字节预算；数据、验证及保存完成后通过CPU就绪检查进入设备通信。MedSAM2包装官方索引与数据集，保留官方训练主体；当前批次完成设备消费后才开放后续构建，日志及边界见docs/MODEL_ORDERED_SUPPLY.md。
 - 原始病例、个人路径配置、验证产物、环境和权重不提交。

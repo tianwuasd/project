@@ -67,6 +67,8 @@ def verify(spec_path,work_root,report_root,selected_model,dataset=None,world=1,l
                 frames=8,resolution=512,freeze_image_encoder=False,batch=1,workers=0,
                 work_root=str(directory/'course'),execution=dict(cpu_processes=world,
                     workers=1 if selected_model=='medsam2' else 0,prefetch=1))
+            if selected_model=='q_route1' and world==2:
+                config['execution'].update(batch_layout=[1,3],readers=1,max_readers=1)
             write_json(model_path,config)
             if selected_model=='medsam2':
                 from chd_segmentation.models.execution import admitted,execution_config
@@ -143,6 +145,12 @@ def verify(spec_path,work_root,report_root,selected_model,dataset=None,world=1,l
                     raise ValueError('实际参数更新与保存恢复未通过')
                 record['models'][selected_model][stage]=dict(first=first,resume=continued,parameters_changed=changed,
                     legacy_source='0d6a4bc' if legacy_root else None)
+                events_path = Path(config['run_dir'])/stage/'events.jsonl'
+                supply_events = [json.loads(line) for line in events_path.read_text(encoding='utf-8').splitlines()
+                    if json.loads(line)['event'].startswith('model_')]
+                write_json(workspace.report/(name+'-'+stage+'-supply.json'),supply_events)
+                if not any(value['event']=='model_batch_released' for value in supply_events):
+                    raise ValueError('缺少实际批次消费与释放日志')
                 del parameters,current
                 gc.collect()
             prompts=None
