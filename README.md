@@ -24,6 +24,16 @@ zmic 使用 `/data4/zhangruichen`：项目实体目录固定在 `code/chd-segmen
 
 用户明确允许本项目以远端为准时，执行 `python3 -B update.py --force`。它修复部分索引、本项目暂存删除和缺失文件，并允许同步到重写后的远端 main；目标源码的本地修改会被覆盖。首次切换执行 `--force --relocate`，持有任务锁后将实体项目从 code/git/chd-segmentation 移到 code/chd-segmentation，再同步代码。数据、环境、运行结果、其他项目和非目标未知文件保留。
 
+## 日常更新
+
+服务器同步 GitHub main 的最新代码：
+
+```bash
+python3 -B /data4/zhangruichen/code/chd-segmentation/update.py
+```
+
+默认不启用强制同步；需要覆盖本项目受 Git 管理的本地代码修改时，在命令末尾添加 `--force`。该参数只对本次执行生效。更新成功后，回执中的 `sha`、`head`、`origin_main` 应一致，`tracked_code_clean` 应为 `true`。
+
 ## 准备私有输入
 
 实验配置示例在 `configs/experiments/`，机器路径集中填写。每套数据需要既有拟合计划、官方 `small_ep4k.model` 以及私有清单。相对病例路径按清单的 `data_root` 解析。
