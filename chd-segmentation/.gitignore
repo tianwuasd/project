@@ -8,3 +8,9 @@ outputs/
 *.pt
 *.model
 *.nii*
+server-inputs/
+*_manifest.json
+*_cohort.json
+*_policy.json
+bundle.json
+binding.json

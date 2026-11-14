@@ -18,6 +18,8 @@ def prepare(config, output):
             if not row.get("patient"):
                 raise ValueError("正式划分缺少已核实患者身份")
             roles = set(row["roles"]) - {"predict"}
+            if roles == {"test"}:
+                roles = {row.get("test_group", "test")}
             previous = by_patient.setdefault(row["patient"], set())
             previous.update(roles)
             if len(previous) > 1:

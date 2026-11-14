@@ -2,7 +2,9 @@ dataset: chd1282
 model: stunet
 scope: formal
 # 这些输入位置是部署约定，使用前核对实际文件；数据子目录由私有清单声明。
-manifest: /data4/zhangruichen/course/chd-segmentation/inputs/chd1282_manifest.yaml
+manifest: /data4/zhangruichen/course/chd-segmentation/inputs/chd1282_manifest.json
+split:
+  path: /data4/zhangruichen/course/chd-segmentation/inputs/chd1282_cohort.json
 planning:
   mode: auto
 pretrained: /data4/zhangruichen/data/pretrained/STU-Net/small_ep4k.model

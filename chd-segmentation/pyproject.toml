@@ -12,5 +12,8 @@ dependencies = ["torch>=2.8", "monai==1.5.2", "nnunetv2==2.8.1", "nibabel>=5.3",
 [project.scripts]
 chd-segmentation = "chd_segmentation.cli:main"
 
+[project.optional-dependencies]
+inputs = ["openpyxl>=3.1"]
+
 [tool.setuptools.packages.find]
 where = ["src"]

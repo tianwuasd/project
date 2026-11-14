@@ -43,7 +43,7 @@ def host_capacity():
     return {"cores": cores, "total_bytes": total, "available_bytes": available}
 
 
-def cpu_plan(config, prepared, world, peers=()):
+def cpu_plan(config, prepared, world, peers=(), stage="train"):
     r = config["resources"]
     facts = host_capacity()
     cores = max(1, math.floor(facts["cores"] * r["cpu_fraction"])) - sum(p["cpu_slots"] for p in peers)
@@ -55,7 +55,10 @@ def cpu_plan(config, prepared, world, peers=()):
     roi = config["technical"]["roi_xyz"]
     target = np.array(prepared["plan"]["configurations"]["3d_fullres"]["spacing"])
     estimates = []
-    for row in prepared["manifest"]["cases"]:
+    rows = prepared["manifest"]["cases"]
+    if stage == "train":
+        rows = [row for row in rows if set(row["roles"]) & {"train", "validation"}]
+    for row in rows:
         shape = np.array([end - begin for begin, end in roi] if roi else nib.load(row["image"]).shape)
         output_shape = np.ceil(shape[::-1][prepared["plan"]["transpose_forward"]] *
             np.array(row["spacing_xyz"])[::-1][prepared["plan"]["transpose_forward"]] / target)
@@ -206,7 +209,7 @@ def close_members(config, owner):
 
 
 @contextmanager
-def resource_lease(config, prepared, spec):
+def resource_lease(config, prepared, spec, stage="train"):
     root = Path(config["work_root"]) / "resources"
     root.mkdir(parents=True, exist_ok=True)
     registry, lock = root / "active.json", root / ".resource.lock"
@@ -227,7 +230,7 @@ def resource_lease(config, prepared, spec):
             gpus = choose_gpus(config, spec, history, peaks, peers) if history else []
             if gpus is not None:
                 world = len(gpus) or config["resources"]["cpu_processes"]
-                supply = cpu_plan(config, prepared, world, peers)
+                supply = cpu_plan(config, prepared, world, peers, stage)
                 record = {"pid": me.pid, "birth": me.create_time(), "uuids": [g["uuid"] for g in gpus],
                           "cpu_slots": supply["cpu_slots"], "ram_bytes": supply["ram_bytes"]}
                 write_json(registry, [*peers, record])

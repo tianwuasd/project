@@ -36,16 +36,27 @@ def main(argv=None):
     evaluate.add_argument("--prepared", required=True)
     evaluate.add_argument("--predictions", required=True)
     evaluate.add_argument("--output", required=True)
+    test = commands.add_parser("test", help="使用训练冻结计划运行内部或外部测试")
+    test.add_argument("--config", required=True)
+    test.add_argument("--set", dest="test_set", required=True, choices=("internal", "external"))
+    test.add_argument("--group", choices=("target_primary", "target_secondary"))
+    test.add_argument("--case", action="append")
     status = commands.add_parser("status")
     status.add_argument("--run", required=True)
-    for command in (prepare, train, predict, evaluate):
+    bind = commands.add_parser("bind-inputs", help="将私有迁移包绑定到本机已有数据，不复制原始数据")
+    bind.add_argument("--directory", required=True)
+    bind.add_argument("--root", required=True)
+    bind.add_argument("--chd-root")
+    bind.add_argument("--image-root")
+    bind.add_argument("--pretrained", help="已有权重的实际位置")
+    for command in (prepare, train, predict, evaluate, test):
         command.add_argument("--split", help="旧工程或手动选择的划分文件")
         command.add_argument("--split-format", choices=("auto", "imagechd", "imagechd_roles", "chd1282_cohort", "folds", "roles"))
         command.add_argument("--split-id-field", help="清单中的精确映射字段，默认 case_id")
         command.add_argument("--fold", type=int)
     args = parser.parse_args(argv)
     overrides = {}
-    if args.command != "status":
+    if args.command not in ("status", "bind-inputs"):
         split = {k: v for k, v in {"path": args.split, "format": args.split_format,
                                    "id_field": args.split_id_field}.items() if v is not None}
         if split:
@@ -69,7 +80,11 @@ def main(argv=None):
             if value is not None:
                 training[key] = value
         overrides.update(resources=resources, training=training)
-    if args.command == "status":
+    if args.command == "bind-inputs":
+        from .datasets.transfer import bind_inputs
+        roots = {name: value for name, value in (("chd1282", args.chd_root), ("imagechd", args.image_root)) if value is not None}
+        result = bind_inputs(args.directory, args.root, roots, args.pretrained)
+    elif args.command == "status":
         result = read_json(Path(args.run) / "summary.json")
     elif args.command == "prepare":
         from .preprocessing.prepare import prepare
@@ -88,6 +103,9 @@ def main(argv=None):
     elif args.command == "predict":
         from .prediction.infer import predict
         result = predict(load_config(args.config, overrides), args.output, args.inputs, args.case)
+    elif args.command == "test":
+        from .prediction.testing import run_test
+        result = run_test(load_config(args.config, overrides), args.test_set, args.group, args.case)
     else:
         from .prediction.metrics import evaluate
         from .preprocessing.prepare import load_prepared
