@@ -223,8 +223,8 @@
     "tests/fixtures/xu_pair_child.py": "f11a332cfb091d3fa0cc2637ffb46101e48428eec1ed0cb65a545798597cf77e",
     "tests/fixtures/xu_supply_child.py": "0f447ddf0e9e7a8cfe38abbba51165450215a29c60992b7bb30407ab7f08dfb9",
     "configs/xu-gpu-sharing-compat.json": "0adb81d9728e2ebeba2ac8b0aa0e9f465480afdde07e8d10fdd8e4f8620f2564",
-    "src/dataset1282_analysis/storage_adoption.py": "a5020e7bf54f0d0e9a4f7f9a5e3880a324a010ce9b0fe23cd1ce6b8da9de0f70",
-    "tests/test_storage_adoption.py": "3424268f7e59c0aa67adbffe4b9e6413ae37211aa81251b71e3385fb5c3b4f05",
+    "src/dataset1282_analysis/storage_adoption.py": "efaeeaaa18e2ff8d5723fe2b44a3d6b9355eadf70bf8742b24fd5cb5d7f2c666",
+    "tests/test_storage_adoption.py": "81dd4ebaf7408d82b19617b7bb675f76f10b1dd8c1b9023dc18b183c4b457911",
     "tests/test_xu_gpu_sharing_live.py": "8b7d7142a6214d6526fba6de01b1d350e2344fb1b923d3662de9fb5348f94053",
     "tests/test_xu_gpu_sharing_compat.py": "79848da3032f1b34b9f7968e3440e506e80a0bf17ef24542111f58329ff14cbc"
   }
