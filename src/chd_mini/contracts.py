@@ -128,8 +128,19 @@ def confined(path, root):
 
 def load_settings(path):
     value = validate_settings(read_json(path))
-    if value.get("schema") != 1:
-        raise ValueError("配置schema必须为1")
+    if value.get("schema") != 2 or value.get("data_mode") != "offline":
+        raise ValueError("配置需要schema 2和明确的offline数据模式")
+    allowed = {"schema", "engine_root", "engine_commit", "engine_public_commit", "python", "manifest", "split",
+               "data_root", "pretrained", "dataset", "fold", "seed", "profile", "device", "epochs",
+               "steps_per_epoch", "batch", "data_mode", "simulator_root", "cuda_weights_check"}
+    if set(value) - allowed:
+        raise ValueError("未知工具配置字段：" + ", ".join(sorted(set(value) - allowed)))
+    if type(value.get("cuda_weights_check")) is not bool:
+        raise ValueError("cuda_weights_check必须明确为布尔值")
+    if value.get("simulator_root") is not None:
+        value["simulator_root"] = str(Path(value["simulator_root"]).resolve(strict=True))
+    if value["cuda_weights_check"] and value.get("simulator_root") is None:
+        raise ValueError("CUDA权重专项需要已有仿真环境的实际接口目录")
     for name in ("engine_root", "python", "manifest", "split", "data_root", "pretrained"):
         value[name] = str(Path(value[name]).resolve(strict=True))
     for name in ("data_root", "engine_root"):

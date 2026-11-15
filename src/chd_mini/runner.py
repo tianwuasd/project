@@ -245,6 +245,10 @@ class RunWorkspace:
         frozen_inputs_unchanged = current_inputs == self.input_snapshot
         training_path = self.logs / "train_resume.json"
         training = read_json(training_path)["result"] if training_path.exists() else None
+        data_health_path = self.logs / "data_verify.json"
+        data_health = read_json(data_health_path)["result"] if data_health_path.exists() else None
+        cuda_path = self.logs / "cuda_weights.json"
+        cuda = read_json(cuda_path)["result"] if cuda_path.exists() else None
         rows = inventory(self.work)
         before = sum(r["bytes"] for r in rows)
         summary = {"run_id": self.run_id, "state": "PASS" if kind is None and source_unchanged and engine_unchanged and frozen_inputs_unchanged else "FAIL",
@@ -258,6 +262,7 @@ class RunWorkspace:
                    "ram_sampling_seconds": 0.25, "production_stage_totals": totals,
                    "stage_total_note": "含嵌套、重复读取及并行阶段，不能相加替代总墙钟", 
                    "training": training,
+                   "data_health": data_health, "cuda_weights": cuda,
                    "updates_per_second": training["updates"] / sum(s["wall_seconds"] for s in self.stages if s["stage"].startswith("train_")) if training else None,
                    "work_peak_sampled_bytes": self.peak_bytes, "work_peak_sampled_files": self.peak_files,
                    "error": None if kind is None else "".join(traceback.format_exception(kind, error, trace)),
@@ -296,6 +301,6 @@ def run(config_path, run_id):
     runs.mkdir(exist_ok=True)
     with FileLock(str(runs / ".tool.lock"), timeout=0):
         with RunWorkspace(settings, run_id) as task:
-            for name in ("select", "fit", "prepare", "preprocess", "train_start", "train_resume", "test"):
+            for name in ("select", "simulation", "fit", "prepare", "preprocess", "train_start", "train_resume", "test", "cuda_weights", "data_verify"):
                 task.stage(name)
     return read_json(task.logs / "summary.json")

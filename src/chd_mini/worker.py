@@ -1,9 +1,11 @@
 from copy import deepcopy
 from hashlib import sha256
 from importlib.metadata import version
+from importlib import import_module
 from pathlib import Path
 import sys
 from time import perf_counter
+from types import SimpleNamespace
 
 from .contracts import file_sha, read_json, select_cases, verify_engine, write_json
 
@@ -25,7 +27,7 @@ def select_inputs(request):
     root = Path(settings["data_root"])
     for row in rows:
         for kind in ("image", "label"):
-            relative = row.get("preferred_files", {}).get(kind, row[kind])
+            relative = row.get("preferred_files", {}).get(kind, row[kind]) if source.get("binding_required") else row[kind]
             path = (root / relative).resolve(strict=True)
             if not path.is_relative_to(root) or not path.is_file() or path.is_symlink():
                 raise ValueError("病例路径不在原始数据根目录")
@@ -54,6 +56,7 @@ def select_inputs(request):
               "pretrained": settings["pretrained"], "work_root": str(workspace),
               "run_dir": str(workspace / "training"), "result_root": str(workspace / "results"),
               "fold": settings["fold"], "planning": {"mode": "existing"},
+              "preprocessing": {"root": str(work / "data"), "statistics_source": "main-train"},
               "training": {"patch": [32, 32, 32] if scope == "technical" else [128, 128, 128],
                            "batch": 4, "epochs": settings["epochs"], "steps_per_epoch": settings["steps_per_epoch"],
                            "validation_steps": 1, "save_every_attempts": 1, "seed": settings["seed"],
@@ -88,8 +91,30 @@ def execute(request_path, name):
     sys.path.insert(0, str(Path(settings["engine_root"]) / "src"))
     baseline = verify_engine(settings["engine_root"], settings["engine_commit"])
     started = perf_counter()
+    allowed = {"select", "simulation", "fit", "prepare", "preprocess", "train_start", "train_resume", "test", "cuda_weights", "data_verify"}
+    if name not in allowed:
+        raise ValueError("未知工作阶段：" + name)
     if name == "select":
         result = select_inputs(request)
+    elif name == "simulation":
+        if settings.get("simulator_root") is None:
+            result = {"state": "NOT_REQUESTED", "scope": "virtual_resource_contract_only", "training_updates": 0}
+        else:
+            from .simulation import check_resources
+            result = check_resources(settings, work, logs)
+    elif name == "cuda_weights":
+        if not settings["cuda_weights_check"]:
+            result = {"state": "NOT_REQUESTED", "scope": "actual_single_gpu_weights_only", "training_updates": 0}
+        else:
+            root = Path(settings["simulator_root"])
+            sys.path.insert(0, str(root))
+            module = import_module("device_check")
+            if Path(module.__file__).resolve() != root / "device_check.py":
+                raise ValueError("CUDA专项接口来自其他目录")
+            target = logs / "cuda-measured.json"
+            module.run(SimpleNamespace(project=settings["engine_root"], pretrained=settings["pretrained"], output=target))
+            result = {"state": "PASS", "scope": "actual_single_gpu_weights_only", "training_updates": 0,
+                      "tested_adapter_classes": 8, "actual": read_json(target)}
     else:
         from chd_segmentation.config import load_config
         from chd_segmentation.preprocessing.prepare import prepare, load_prepared
@@ -101,26 +126,16 @@ def execute(request_path, name):
             result = {"fit_ids": prepared["plan"]["fit_ids"], "scope": prepared["scope"],
                       "generation": prepared["plan"]["generation"], "plan_sha256": file_sha(config["plan"])}
         elif name == "prepare":
-            prepared = prepare(config, prepared_path)
-            expected = sorted(r["case_id"] for r in prepared["manifest"]["cases"] if r["roles"] == ["train"])
-            if sorted(prepared["plan"]["fit_ids"]) != expected:
-                raise ValueError("拟合病例包含所选训练病例以外的病例")
+            from .offline import verify_selected_statistics
+            prepared = prepare(config, work / "workspace" / "source.json")
+            expected = verify_selected_statistics(prepared)
             result = {"identity": prepared["identity"], "fit_ids": expected, "cases": len(prepared["manifest"]["cases"])}
         elif name == "preprocess":
-            import gc
-            from chd_segmentation.data.dataset import CaseDataset
-            prepared = load_prepared(prepared_path)
-            dataset = CaseDataset(prepared, config["resources"], log_dir=config["run_dir"], logging=config["logging"])
-            result = {"cases": []}
-            for row in prepared["manifest"]["cases"]:
-                mark = perf_counter()
-                entry = dataset.get(row["case_id"])
-                result["cases"].append({"case_id": row["case_id"], "roles": row["roles"],
-                                        "shape": list(entry["image"].shape), "timing": entry["timing"],
-                                        "seconds": perf_counter() - mark})
-                dataset.clear()
-                del entry
-                gc.collect()
+            from .offline import run_checks
+            result = run_checks(config, work / "workspace" / "source.json", prepared_path, work)
+        elif name == "data_verify":
+            from .offline import verify_consumption
+            result = verify_consumption(config, prepared_path, read_json(logs / "preprocess.json")["result"])
         elif name in ("train_start", "train_resume"):
             from chd_segmentation.training.engine import train
             result = train(config, prepared_path, resume=name == "train_resume", stop_after=1 if name == "train_start" else None)

@@ -1,7 +1,8 @@
 {
-  "schema": 1,
+  "schema": 2,
   "engine_root": "PATH_TO_ASSISTANT1",
-  "engine_commit": "60d6e5f17c81f1fea78690021fbf403b1ee61f37",
+  "engine_commit": "277c11a97ab0f2d666d1d8e669fcdb6c9900c611",
+  "engine_public_commit": "277c11a97ab0f2d666d1d8e669fcdb6c9900c611",
   "python": "PATH_TO_PRODUCTION_PYTHON",
   "manifest": "PATH_TO_AUDITED_MANIFEST.json",
   "split": "PATH_TO_FROZEN_PATIENT_SPLIT.json",
@@ -11,8 +12,11 @@
   "fold": 0,
   "seed": 20261115,
   "profile": "technical",
-  "device": "cuda",
-  "epochs": 2,
+  "device": "cpu",
+  "epochs": 1,
   "steps_per_epoch": 2,
-  "batch": 4
+  "batch": 4,
+  "data_mode": "offline",
+  "simulator_root": null,
+  "cuda_weights_check": false
 }
