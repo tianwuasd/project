@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
-**Goal:** 保持两模型科学方法，继承确定公共资源合同，并交付一两次拖拽和一条安装命令。
+**Goal:** 保持两模型科学方法，继承确定公共资源合同，并以一条安装命令复用已有材料，尽量实现零手动上传。
 
-**Architecture:** 交付模块与模型处理解耦，公开代码生成机器配置并从已有冻结输入重建Q，必要私有资料通过小型ZIP清单核对。官方源码与权重自动取得；模型只继承已发布公共组件，资源和日志沿用统一入口。
+**Architecture:** 公开交付代码生成机器配置并从已有冻结输入重建Q，官方源码与权重按固定身份自动取得。模型只继承已发布公共组件，资源和日志沿用统一入口。
 
-**Tech Stack:** Python3.11、ZipFile、hashlib、PyYAML、现有Git及模型依赖。
+**Tech Stack:** Python3.11、hashlib、PyYAML、现有Git及模型依赖。
 
 **Spec:** docs/superpowers/specs/2026-11-15-model-resource-delivery-design.md
 
@@ -23,32 +23,32 @@
 
 - 已绑定清单与原包仅机器路径不同：保留绑定和mtime。
 - 同名目标内容不同或目标指向原始数据：安装前拒绝，既有文件不变。
-- ZIP重复条目、链接、越界路径、超量解压：写入前拒绝。
+- 官方下载摘要错误、源码目标冲突或路径越界：保留已有内容，清理本次pending。
 - 官方源码/权重在旧服务器路径：核对身份后直接引用，保留原位置。
 - 两模型在实时共同预算下降及恢复时：保留全局batch/RNG与同数量进程，不冒充已验证CUDA。
 
-### Task 1: 集中包与配置生成
+### Task 1: 模型配置生成
 
-**Files:** 新增src/chd_segmentation/delivery/{__init__,archive,configs}.py，tests/test_delivery.py；复用公开configs/models模板。
+**Files:** 新增src/chd_segmentation/delivery/{__init__,configs}.py，tests/test_delivery.py；复用公开configs/models模板。
 
-**Interfaces:** build_package(entries, output, kind)输出带内容去重清单的ZIP；read_package(path)核对包身份及逐对象摘要；model_configs(root, code, assets)返回五份实际配置及目标路径。
+**Interfaces:** model_configs(root, code, assets)返回五份实际模型配置及目标路径，供Task2补充三个准备配置。
 
-- [ ] 写真实ZIP和配置行为检查，先观察缺少实现失败。
-- [ ] 实现去重清单、摘要/边界检查和数据集模型路径生成。
-- [ ] 实际包重复构建保留mtime；损坏、重复路径和冲突检查通过。
-- [ ] 提交并记录结果和产物清理。
+- [x] 写配置行为检查，先观察缺少实现失败。
+- [x] 实现数据集模型路径生成及各模型固定科学预算。
+- [x] 实际检查统一资源根及局部模型的上游检查点路径。
+- [x] 提交并记录结果和产物清理。
 
 ### Task 2: 单命令安装及实际正式交付
 
 **Files:** 新增delivery/{install,assets,__main__}.py，scripts/CHD1282-Q-MedSAM2-20261115_install.sh，tests/verify_delivery_real.py；修改模型运行脚本的默认数据集模型路径。
 
-**Interfaces:** install(upload,root,code,check=False,...)返回created/reused/missing/conflicts及实际资产位置；复用bind_inputs和manifest_identity，生成Task1的配置。
+**Interfaces:** install(root, code, source, assets, check=False, dataset_roots=None)返回创建/缺失记录及实际资产位置；inspect_inputs与ensure_q_inputs核对并精确重建Q；复用bind_inputs和manifest_identity，生成Task1的配置。
 
-- [ ] 写两例真实元数据及已有真实权重引用的安装检查，观察未实现失败。
-- [ ] 实现只读缺失核对、资产身份、全部目标预检查、安装/路径绑定和重复复用。
-- [ ] 实际检查已有绑定保护、冲突无写入、包内容完整和配置能由生产options读取。
-- [ ] 核对服务器已有源数据能否重建完整Q组合；准备正式小型Q冻结核对ZIP并标明是否必需，记录实际大小和SHA，不重复打包已上传材料或公开大文件。
-- [ ] 提交并清理测试目录，保留正式包与报告。
+- [x] 写真实冻结元数据及已有真实权重引用的安装检查，观察未实现失败。
+- [x] 实现只读缺失核对、资产身份、全部目标预检查、安装/路径绑定和重复复用。
+- [x] 实际检查已有绑定保护、冲突无写入、生成配置、实际CLI与Bash入口；模型生产解析及运行在Task3继续验证。
+- [x] 核对服务器已有源数据精确重建完整Q组合，明确零新增手动上传，不打包已上传材料、公开大文件或ct_1126数组。
+- [x] 提交并清理测试目录，保留正式安装说明与报告。
 
 ### Task 3: 确定上游合同与模型适配
 

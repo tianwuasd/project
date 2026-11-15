@@ -29,7 +29,8 @@ def run(args):
     row = deepcopy(item['case'])
     row['roles'] = ['train', 'validation']
     course = root/'course/chd-segmentation'
-    inputs, configs, old = course/'inputs/q1282', course/'assistant2/configs', course/'runs/existing-stu-task'
+    label = 'CHD1282-Q' if args.model == 'q' else 'ImageCHD-MedSAM2'
+    inputs, configs, old = course/'inputs/q1282', course/'configs'/label/'20261115', course/'runs/existing-stu-task'
     write_json(old/'protected.json', dict(owner='independent-existing-task'))
     before = {p.name:file_digest(p) for p in old.iterdir()}
     write_json(root/'manifest.json', dict(dataset='imagechd', scope='technical',
@@ -41,29 +42,28 @@ def run(args):
     config['planning']['mode'] = 'existing'
     config['technical'] = dict(roi_xyz=item['roi_xyz'], allow_role_overlap=True)
     config['resources'].update(device='cpu', workers=0, reserve_ram_bytes=2**30)
-    source_config = inputs/'q1282_prepare.yaml'
+    source_config = configs/'prepare.yaml'
     source_config.parent.mkdir(parents=True)
     source_config.write_text(yaml.safe_dump(config, sort_keys=False), encoding='utf-8')
     model = 'q_route1' if args.model=='q' else 'medsam2'
     model_config = dict(model=model, technical=True, device='cpu', updates=2, patch=32, local_size=32,
-        run_dir=str(course/'assistant2/runs'/model), work_root=str(course), batch=1, workers=0,
+        run_dir=str(course/'runs'/label/'20261115-offline'), work_root=str(course), batch=1, workers=0,
         pretrained=item['pretrained'] if model=='q_route1' else str(ROOT/'data/model_weights/MedSAM2_latest.pt'),
         official_root=str(ROOT/'vendor/MedSAM2'), dependency_root=str(ROOT/'env/medsam2'))
-    model_path = configs/'q1282_base.yaml' if args.model=='q' else configs/'imagechd_medsam2.yaml'
+    model_path = configs/'base.yaml' if args.model=='q' else configs/'model.yaml'
     model_path.parent.mkdir(parents=True, exist_ok=True)
     model_path.write_text(yaml.safe_dump(model_config, sort_keys=False), encoding='utf-8')
     script = ROOT/'scripts'/('CHD1282-Q-20261115_run.sh' if args.model=='q' else 'ImageCHD-CHD1282-MedSAM2-20261115_run.sh')
     previous = dict(os.environ)
     os.environ['PATH'] = str(Path(args.bash).parent)+os.pathsep+previous['PATH']
     os.environ.update(CHD_ROOT=root.as_posix(), CHD_PYTHON=Path(sys.executable).as_posix(),
-        Q_INPUTS=inputs.as_posix(), Q_CONFIG_DIR=configs.as_posix(),
+        Q_PREPARE_CONFIG=source_config.as_posix(), Q_CONFIG_DIR=configs.as_posix(),
         MEDSAM2_CONFIG=model_path.as_posix(), MEDSAM2_PREPARE_CONFIG=source_config.as_posix())
     try:
         words = ['prepare'] if args.model=='q' else ['imagechd', 'prepare']
         result = supervise([args.bash, '--noprofile', '--norc', script.as_posix(), *words], ROOT, root, report, timeout=240)
         assert before=={p.name:file_digest(p) for p in old.iterdir()}, '来源准备改写了原任务日志目录'
-        name = 'CHD1282-Q-20261115' if args.model=='q' else 'ImageCHD-MedSAM2-20261115'
-        ready = read_json(course/'assistant2/prepared'/(name+'_offline.json'))
+        ready = read_json(course/'prepared'/label/'20261115/offline.json')
         assert ready['storage']['complete']
         files = files_under(root)
         write_json(report/'acceptance.json', dict(state='passed', case_id=row['case_id'],
