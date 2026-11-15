@@ -1,6 +1,7 @@
 from hashlib import sha256
 import io
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -100,7 +101,8 @@ def delivery_manifest(destination, dataset, method, date, references, new_files,
               "human_naming": "日期用于辨识；轮数、GPU数量和普通日志修改不单独触发数据重建"}
     path = destination / f"{dataset}-{method}-{date}_交付总清单.json"
     for _ in range(8):
-        size = len(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False).encode("utf-8"))
+        serialized = json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False)
+        size = len(serialized.replace("\n", os.linesep).encode("utf-8"))
         if result["metadata_manifest_bytes"] == size and result["actual_new_bytes"] == new_bytes + size:
             break
         result.update(metadata_manifest_bytes=size, actual_new_bytes=new_bytes + size)
