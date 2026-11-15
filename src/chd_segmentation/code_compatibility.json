@@ -2,35 +2,229 @@
   "schema": 1,
   "edges": [
     {
+      "source": "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "baseline_public_commit": "b1552e305f71939da1be114115e26aa4a36352bb",
+      "reason": "预训练骨干在 CPU 逐层严格校验 dtype 和数值；无检查点的初始化失败可核验身份后重试。模型、权重、损失、优化器、抽样和完整检查点协议保持相同",
+      "changed_files": [
+        "models/stunet/adapter.py",
+        "training/engine.py"
+      ]
+    },
+    {
+      "source": "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "via": [
+        "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4"
+      ],
+      "reason": "累计覆盖已审计的资源调整、跨设备权重校验及无检查点初始化重试；训练计算和完整状态协议保持相同"
+    },
+    {
+      "source": "42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "via": [
+        "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4"
+      ],
+      "reason": "累计覆盖已审计的等待、资源调整、跨设备权重校验及无检查点初始化重试；训练计算和完整状态协议保持相同"
+    },
+    {
+      "source": "afffd433e388f93fe5d840ba6a899cb2b814c81804e59d4b02c310cb47cf8dde",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "via": [
+        "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4"
+      ],
+      "reason": "累计覆盖已审计的日志、等待、资源调整、跨设备权重校验及无检查点初始化重试；训练计算和完整状态协议保持相同"
+    },
+    {
+      "source": "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "baseline_public_commit": "163917bfb00c5974bd1c8de0246a0161c965037b",
+      "reason": "资源预算与供数调整、cgroup 限额、默认独占空闲卡和可选完整轮次重组；数据计划、模型、损失、全局采样、优化器及完整检查点协议保持相同；固定进程数量恢复校验完整 RNG，改变数量单独记录随机映射和浮点归约边界",
+      "changed_files": [
+        "cli.py",
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "prediction/infer.py",
+        "preprocessing/transforms.py",
+        "training/engine.py",
+        "training/resources.py"
+      ],
+      "added_files": [
+        "training/budget.py",
+        "training/build_gate.py",
+        "training/host.py"
+      ]
+    },
+    {
+      "source": "42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "baseline_public_commit": "575b07524ef2f8bec99671ce9a7e0f4e6e43a580",
+      "via": [
+        "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952"
+      ],
+      "reason": "累计覆盖已审计的等待及资源调整；固定训练参数和完整检查点协议，按实际进程数量执行恢复校验"
+    },
+    {
+      "source": "afffd433e388f93fe5d840ba6a899cb2b814c81804e59d4b02c310cb47cf8dde",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "baseline_public_commit": "6ef3fd4c51eb53da26faa54a147fc35ae15ebc40",
+      "via": [
+        "42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa",
+        "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952"
+      ],
+      "reason": "累计覆盖已审计的日志、等待及资源调整；原数据计划、模型、损失、全局采样和优化器保持相同"
+    },
+    {
+      "source": "afffd433e388f93fe5d840ba6a899cb2b814c81804e59d4b02c310cb47cf8dde",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "baseline_public_commit": "6ef3fd4c51eb53da26faa54a147fc35ae15ebc40",
+      "reason": "阶段日志、进度、心跳、并发轮转与精确源码兼容检查；模型、损失、抽样、优化器和检查点内容协议保持相同",
+      "changed_files": [
+        "cli.py",
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "observability/events.py",
+        "prediction/infer.py",
+        "prediction/metrics.py",
+        "prediction/testing.py",
+        "preprocessing/planning.py",
+        "preprocessing/prepare.py",
+        "preprocessing/transforms.py",
+        "training/checkpoint.py",
+        "training/engine.py",
+        "training/resources.py"
+      ],
+      "added_files": [
+        "compatibility.py"
+      ]
+    },
+    {
+      "source": "42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "baseline_public_commit": "575b07524ef2f8bec99671ce9a7e0f4e6e43a580",
+      "reason": "默认持续等待显卡，空闲优先并允许合格繁忙卡组合，保留完整训练组、每卡 batch 和手动显卡顺序；训练计算及检查点协议不变",
+      "changed_files": [
+        "cli.py",
+        "config.py",
+        "training/resources.py"
+      ]
+    },
+    {
+      "source": "afffd433e388f93fe5d840ba6a899cb2b814c81804e59d4b02c310cb47cf8dde",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "baseline_public_commit": "6ef3fd4c51eb53da26faa54a147fc35ae15ebc40",
+      "via": [
+        "42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa"
+      ],
+      "reason": "累计覆盖已审计日志更新及显卡等待更新；数据、模型、训练参数、损失、抽样、优化器和检查点内容协议保持相同"
+    },
+    {
+      "source": "7c52966d5bd3ed7af73f2454b34b66400dc6b8e1435e0929e7c9f74b70dd61f1",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "baseline_local_commit": "0d6a4bc6fae574900f19b34ed5760774ab16fdcc",
+      "reason": "继承已审计共享资源及CPU/CUDA权重检查，助手2模型模块、模型预算和恢复设备保护不改变STU-Net科学配置或状态协议；完整源码摘要精确对应"
+    },
+    {
+      "source": "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "baseline_local_commit": "e5264c29cad7991e40c9024434fa0707ddebcca4",
+      "reason": "继承已审计共享资源及CPU/CUDA权重检查，助手2模型模块、模型预算和恢复设备保护不改变STU-Net科学配置或状态协议；完整源码摘要精确对应"
+    },
+    {
+      "source": "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "baseline_local_commit": "e5264c29cad7991e40c9024434fa0707ddebcca4",
+      "reason": "继承已审计共享资源及CPU/CUDA权重检查，助手2模型模块、模型预算和恢复设备保护不改变STU-Net科学配置或状态协议；完整源码摘要精确对应"
+    },
+    {
+      "source": "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "baseline_local_commit": "e5264c29cad7991e40c9024434fa0707ddebcca4",
+      "reason": "继承已审计共享资源及CPU/CUDA权重检查，助手2模型模块、模型预算和恢复设备保护不改变STU-Net科学配置或状态协议；完整源码摘要精确对应"
+    },
+    {
+      "source": "42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "baseline_local_commit": "e5264c29cad7991e40c9024434fa0707ddebcca4",
+      "reason": "继承已审计共享资源及CPU/CUDA权重检查，助手2模型模块、模型预算和恢复设备保护不改变STU-Net科学配置或状态协议；完整源码摘要精确对应"
+    },
+    {
+      "source": "afffd433e388f93fe5d840ba6a899cb2b814c81804e59d4b02c310cb47cf8dde",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "baseline_local_commit": "e5264c29cad7991e40c9024434fa0707ddebcca4",
+      "reason": "继承已审计共享资源及CPU/CUDA权重检查，助手2模型模块、模型预算和恢复设备保护不改变STU-Net科学配置或状态协议；完整源码摘要精确对应"
+    },
+    {
+      "source": "48fae4f30bf7127760e71079ea3faf2199a4ef8cbc6d449f95afd7d6be1f69d2",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "reason": "Assistant2 model supply and CPU readiness; STU algorithm unchanged"
+    },
+    {
+      "source": "72c96526257124ace440ef461c55f62b11876a798065ad7ff29e340fd4e071d1",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "reason": "Model queue state logging; STU algorithm unchanged"
+    },
+    {
+      "source": "7fc72920281d8e45adf361fa8f967da43d04021481b06d69f45e5db8878f0136",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "reason": "Verified ordered-supply integration; scientific method unchanged"
+    },
+    {
+      "source": "7c39a0d1d7158a86ece9717464652b4567d2f4bcec0416ae02e9c9d0b4eb1964",
+      "target": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "reason": "Verified ordered-supply integration; scientific method unchanged"
+    },
+    {
       "source": "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d",
       "target": "7fc72920281d8e45adf361fa8f967da43d04021481b06d69f45e5db8878f0136",
       "baseline_public_commit": "303540f5a4d335df3e3274a82a2e23cbfe51cdc6",
       "reason": "单批按消费顺序派发、逐病例构建额度及主机就绪协调；模型、损失、优化器、全局 slot 随机抽样、科学训练配置及完整检查点协议保持相同。两例真实病例的两进程恢复和单卡传输通过；服务器 CUDA/NCCL 与正式吞吐待验证",
-      "changed_files": ["config.py", "data/supply.py", "training/budget.py", "training/build_gate.py", "training/engine.py"],
-      "added_files": ["training/coordinator.py"]
+      "changed_files": [
+        "config.py",
+        "data/supply.py",
+        "training/budget.py",
+        "training/build_gate.py",
+        "training/engine.py"
+      ],
+      "added_files": [
+        "training/coordinator.py"
+      ]
     },
     {
       "source": "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4",
       "target": "7fc72920281d8e45adf361fa8f967da43d04021481b06d69f45e5db8878f0136",
-      "via": ["f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d"],
+      "via": [
+        "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d"
+      ],
       "reason": "累计保留已审计的预训练校验及初始化重试；单批供数和主机协调保持原模型计算、采样及完整状态恢复协议"
     },
     {
       "source": "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952",
       "target": "7fc72920281d8e45adf361fa8f967da43d04021481b06d69f45e5db8878f0136",
-      "via": ["295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4", "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d"],
+      "via": [
+        "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4",
+        "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d"
+      ],
       "reason": "累计保留已审计的资源调整和权重校验；单批供数和主机协调保持原模型计算、采样及完整状态恢复协议"
     },
     {
       "source": "42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa",
       "target": "7fc72920281d8e45adf361fa8f967da43d04021481b06d69f45e5db8878f0136",
-      "via": ["295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4", "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d"],
+      "via": [
+        "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4",
+        "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d"
+      ],
       "reason": "累计保留已审计的显卡等待、资源调整及权重校验；单批供数和主机协调保持原模型计算、采样及完整状态恢复协议"
     },
     {
       "source": "afffd433e388f93fe5d840ba6a899cb2b814c81804e59d4b02c310cb47cf8dde",
       "target": "7fc72920281d8e45adf361fa8f967da43d04021481b06d69f45e5db8878f0136",
-      "via": ["295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4", "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d"],
+      "via": [
+        "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4",
+        "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d"
+      ],
       "reason": "累计保留已审计的日志、显卡等待、资源调整及权重校验；单批供数和主机协调保持原模型计算、采样及完整状态恢复协议"
     },
     {
@@ -38,24 +232,33 @@
       "target": "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d",
       "baseline_public_commit": "b1552e305f71939da1be114115e26aa4a36352bb",
       "reason": "预训练骨干在 CPU 逐层严格校验 dtype 和数值；无检查点的初始化失败可核验身份后重试。模型、权重、损失、优化器、抽样和完整检查点协议保持相同",
-      "changed_files": ["models/stunet/adapter.py", "training/engine.py"]
+      "changed_files": [
+        "models/stunet/adapter.py",
+        "training/engine.py"
+      ]
     },
     {
       "source": "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952",
       "target": "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d",
-      "via": ["295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4"],
+      "via": [
+        "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4"
+      ],
       "reason": "累计覆盖已审计的资源调整、跨设备权重校验及无检查点初始化重试；训练计算和完整状态协议保持相同"
     },
     {
       "source": "42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa",
       "target": "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d",
-      "via": ["295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4"],
+      "via": [
+        "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4"
+      ],
       "reason": "累计覆盖已审计的等待、资源调整、跨设备权重校验及无检查点初始化重试；训练计算和完整状态协议保持相同"
     },
     {
       "source": "afffd433e388f93fe5d840ba6a899cb2b814c81804e59d4b02c310cb47cf8dde",
       "target": "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d",
-      "via": ["295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4"],
+      "via": [
+        "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4"
+      ],
       "reason": "累计覆盖已审计的日志、等待、资源调整、跨设备权重校验及无检查点初始化重试；训练计算和完整状态协议保持相同"
     },
     {
@@ -63,21 +266,39 @@
       "target": "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4",
       "baseline_public_commit": "163917bfb00c5974bd1c8de0246a0161c965037b",
       "reason": "资源预算与供数调整、cgroup 限额、默认独占空闲卡和可选完整轮次重组；数据计划、模型、损失、全局采样、优化器及完整检查点协议保持相同；固定进程数量恢复校验完整 RNG，改变数量单独记录随机映射和浮点归约边界",
-      "changed_files": ["cli.py", "config.py", "data/dataset.py", "data/supply.py", "prediction/infer.py", "preprocessing/transforms.py", "training/engine.py", "training/resources.py"],
-      "added_files": ["training/budget.py", "training/build_gate.py", "training/host.py"]
+      "changed_files": [
+        "cli.py",
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "prediction/infer.py",
+        "preprocessing/transforms.py",
+        "training/engine.py",
+        "training/resources.py"
+      ],
+      "added_files": [
+        "training/budget.py",
+        "training/build_gate.py",
+        "training/host.py"
+      ]
     },
     {
       "source": "42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa",
       "target": "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4",
       "baseline_public_commit": "575b07524ef2f8bec99671ce9a7e0f4e6e43a580",
-      "via": ["844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952"],
+      "via": [
+        "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952"
+      ],
       "reason": "累计覆盖已审计的等待及资源调整；固定训练参数和完整检查点协议，按实际进程数量执行恢复校验"
     },
     {
       "source": "afffd433e388f93fe5d840ba6a899cb2b814c81804e59d4b02c310cb47cf8dde",
       "target": "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4",
       "baseline_public_commit": "6ef3fd4c51eb53da26faa54a147fc35ae15ebc40",
-      "via": ["42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa", "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952"],
+      "via": [
+        "42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa",
+        "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952"
+      ],
       "reason": "累计覆盖已审计的日志、等待及资源调整；原数据计划、模型、损失、全局采样和优化器保持相同"
     },
     {
@@ -101,21 +322,181 @@
         "training/engine.py",
         "training/resources.py"
       ],
-      "added_files": ["compatibility.py"]
+      "added_files": [
+        "compatibility.py"
+      ]
     },
     {
       "source": "42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa",
       "target": "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952",
       "baseline_public_commit": "575b07524ef2f8bec99671ce9a7e0f4e6e43a580",
       "reason": "默认持续等待显卡，空闲优先并允许合格繁忙卡组合，保留完整训练组、每卡 batch 和手动显卡顺序；训练计算及检查点协议不变",
-      "changed_files": ["cli.py", "config.py", "training/resources.py"]
+      "changed_files": [
+        "cli.py",
+        "config.py",
+        "training/resources.py"
+      ]
     },
     {
       "source": "afffd433e388f93fe5d840ba6a899cb2b814c81804e59d4b02c310cb47cf8dde",
       "target": "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952",
       "baseline_public_commit": "6ef3fd4c51eb53da26faa54a147fc35ae15ebc40",
-      "via": ["42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa"],
+      "via": [
+        "42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa"
+      ],
       "reason": "累计覆盖已审计日志更新及显卡等待更新；数据、模型、训练参数、损失、抽样、优化器和检查点内容协议保持相同"
+    },
+    {
+      "source": "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4",
+      "target": "bce6c67174dac7688b62abb49206274d126fbd9ee06ddfba9818b0badea753e5",
+      "reason": "精确整包源码审阅；STU计算、抽样与完整状态保持，新增模型入口及离线只读消费者。数据及处理合同另行核验，在线描述继续拒绝离线训练。",
+      "validation": [
+        "lifecycle",
+        "q-flow",
+        "medpredict",
+        "shared-offline"
+      ]
+    },
+    {
+      "source": "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952",
+      "target": "bce6c67174dac7688b62abb49206274d126fbd9ee06ddfba9818b0badea753e5",
+      "reason": "精确整包源码审阅；STU计算、抽样与完整状态保持，新增模型入口及离线只读消费者。数据及处理合同另行核验，在线描述继续拒绝离线训练。",
+      "validation": [
+        "lifecycle",
+        "q-flow",
+        "medpredict",
+        "shared-offline"
+      ]
+    },
+    {
+      "source": "42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa",
+      "target": "bce6c67174dac7688b62abb49206274d126fbd9ee06ddfba9818b0badea753e5",
+      "reason": "精确整包源码审阅；STU计算、抽样与完整状态保持，新增模型入口及离线只读消费者。数据及处理合同另行核验，在线描述继续拒绝离线训练。",
+      "validation": [
+        "lifecycle",
+        "q-flow",
+        "medpredict",
+        "shared-offline"
+      ]
+    },
+    {
+      "source": "afffd433e388f93fe5d840ba6a899cb2b814c81804e59d4b02c310cb47cf8dde",
+      "target": "bce6c67174dac7688b62abb49206274d126fbd9ee06ddfba9818b0badea753e5",
+      "reason": "精确整包源码审阅；STU计算、抽样与完整状态保持，新增模型入口及离线只读消费者。数据及处理合同另行核验，在线描述继续拒绝离线训练。",
+      "validation": [
+        "lifecycle",
+        "q-flow",
+        "medpredict",
+        "shared-offline"
+      ]
+    },
+    {
+      "source": "7c52966d5bd3ed7af73f2454b34b66400dc6b8e1435e0929e7c9f74b70dd61f1",
+      "target": "bce6c67174dac7688b62abb49206274d126fbd9ee06ddfba9818b0badea753e5",
+      "reason": "精确整包源码审阅；STU计算、抽样与完整状态保持，新增模型入口及离线只读消费者。数据及处理合同另行核验，在线描述继续拒绝离线训练。",
+      "validation": [
+        "lifecycle",
+        "q-flow",
+        "medpredict",
+        "shared-offline"
+      ]
+    },
+    {
+      "source": "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d",
+      "target": "bce6c67174dac7688b62abb49206274d126fbd9ee06ddfba9818b0badea753e5",
+      "reason": "精确整包源码审阅；STU计算、抽样与完整状态保持，新增模型入口及离线只读消费者。数据及处理合同另行核验，在线描述继续拒绝离线训练。",
+      "validation": [
+        "lifecycle",
+        "q-flow",
+        "medpredict",
+        "shared-offline"
+      ]
+    },
+    {
+      "source": "48fae4f30bf7127760e71079ea3faf2199a4ef8cbc6d449f95afd7d6be1f69d2",
+      "target": "bce6c67174dac7688b62abb49206274d126fbd9ee06ddfba9818b0badea753e5",
+      "reason": "精确整包源码审阅；STU计算、抽样与完整状态保持，新增模型入口及离线只读消费者。数据及处理合同另行核验，在线描述继续拒绝离线训练。",
+      "validation": [
+        "lifecycle",
+        "q-flow",
+        "medpredict",
+        "shared-offline"
+      ]
+    },
+    {
+      "source": "72c96526257124ace440ef461c55f62b11876a798065ad7ff29e340fd4e071d1",
+      "target": "bce6c67174dac7688b62abb49206274d126fbd9ee06ddfba9818b0badea753e5",
+      "reason": "精确整包源码审阅；STU计算、抽样与完整状态保持，新增模型入口及离线只读消费者。数据及处理合同另行核验，在线描述继续拒绝离线训练。",
+      "validation": [
+        "lifecycle",
+        "q-flow",
+        "medpredict",
+        "shared-offline"
+      ]
+    },
+    {
+      "source": "7fc72920281d8e45adf361fa8f967da43d04021481b06d69f45e5db8878f0136",
+      "target": "bce6c67174dac7688b62abb49206274d126fbd9ee06ddfba9818b0badea753e5",
+      "reason": "精确整包源码审阅；STU计算、抽样与完整状态保持，新增模型入口及离线只读消费者。数据及处理合同另行核验，在线描述继续拒绝离线训练。",
+      "validation": [
+        "lifecycle",
+        "q-flow",
+        "medpredict",
+        "shared-offline"
+      ]
+    },
+    {
+      "source": "7c39a0d1d7158a86ece9717464652b4567d2f4bcec0416ae02e9c9d0b4eb1964",
+      "target": "bce6c67174dac7688b62abb49206274d126fbd9ee06ddfba9818b0badea753e5",
+      "reason": "精确整包源码审阅；STU计算、抽样与完整状态保持，新增模型入口及离线只读消费者。数据及处理合同另行核验，在线描述继续拒绝离线训练。",
+      "validation": [
+        "lifecycle",
+        "q-flow",
+        "medpredict",
+        "shared-offline"
+      ]
+    },
+    {
+      "source": "837242370777633814ef8619c2f93e825afe7508436b60b377ded402266ef797",
+      "target": "bce6c67174dac7688b62abb49206274d126fbd9ee06ddfba9818b0badea753e5",
+      "reason": "精确整包源码审阅；STU计算、抽样与完整状态保持，新增模型入口及离线只读消费者。数据及处理合同另行核验，在线描述继续拒绝离线训练。",
+      "validation": [
+        "lifecycle",
+        "q-flow",
+        "medpredict",
+        "shared-offline"
+      ],
+      "source_local_commit": "7b50f5f7f64f9b3bd47b43fed6ea8e173dc649a8"
+    },
+    {
+      "source": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "target": "bce6c67174dac7688b62abb49206274d126fbd9ee06ddfba9818b0badea753e5",
+      "reason": "精确整包源码审阅；STU计算、抽样与完整状态保持，新增模型入口及离线只读消费者。数据及处理合同另行核验，在线描述继续拒绝离线训练。",
+      "validation": [
+        "lifecycle",
+        "q-flow",
+        "medpredict",
+        "shared-offline"
+      ]
+    },
+    {
+      "source": "837242370777633814ef8619c2f93e825afe7508436b60b377ded402266ef797",
+      "target": "6d47690294f048ef783fb26ec8a876fd25a6a98aff0f116b94322169a2e35f63",
+      "reason": "STU-Net冻结计划、损失、采样顺序和完整训练状态保持；离线分块使用相同全局坐标与插值。准入、资源保留及进度记录更新，离线数据身份仍须独立完整核验。",
+      "validation": ["two-real-imagechd-roi32-numeric-bitwise", "two-rank-gloo-batch4-two-updates-exact-resume", "offline-reuse", "real-owner-exit-and-checkpoint-reserve"],
+      "scope": "STU-Net；Linux正式大病例和CUDA/NCCL运行未在本机验收"
+    },
+    {
+      "source": "bce6c67174dac7688b62abb49206274d126fbd9ee06ddfba9818b0badea753e5",
+      "target": "6d47690294f048ef783fb26ec8a876fd25a6a98aff0f116b94322169a2e35f63",
+      "reason": "精确整包源码审阅，保留main的其他模型源码。STU-Net数值及完整恢复协议保持，新增有界分块、真实内存保护和进度记录。仅用于STU训练入口的源码相容核验。",
+      "validation": ["two-real-imagechd-roi32-numeric-bitwise", "two-rank-gloo-batch4-two-updates-exact-resume", "offline-reuse", "real-owner-exit-and-checkpoint-reserve"]
+    },
+    {
+      "source": "48b47624afc776809111fa6616950c06d2a99bf168628ecbf759129a258b504e",
+      "target": "6d47690294f048ef783fb26ec8a876fd25a6a98aff0f116b94322169a2e35f63",
+      "reason": "已验收两次真实更新版本的数值流程保持；只增加协调进程退出检查、独立检查点内存保留与中文阶段名称。",
+      "validation": ["real-owner-exit-and-checkpoint-reserve", "actual-progress-record-format", "python-ast"]
     }
   ]
 }

@@ -1,0 +1,193 @@
+from copy import deepcopy
+from pathlib import Path
+from time import perf_counter
+
+import nibabel as nib
+import numpy as np
+import torch
+import yaml
+
+from ..artifacts.store import digest, file_digest, write_json
+from ..datasets.splits import select_test
+from ..observability.events import event
+from ..prediction.dice import supervised_dice
+from ..prediction.metrics import case_data_identity
+from ..prediction.restore import restore
+from ..preprocessing.prepare import load_prepared
+
+
+def prediction_rows(config, prepared, case_ids, test_set, test_group):
+    if test_group is not None and test_set is None:
+        raise ValueError('测试子组需要同时指定内部或外部测试入口')
+    if test_set is not None:
+        rows = select_test(prepared['manifest'], test_set, test_group, case_ids)['cases']
+        if config['model'] == 'q_route1' and not config['technical']:
+            groups = yaml.safe_load(Path(config['groups']).read_text(encoding='utf-8'))
+            if not {row['case_id'] for row in rows} <= set(groups['D']):
+                raise ValueError('Q测试病例必须属于D组')
+    else:
+        rows = prepared['manifest']['cases']
+        if case_ids is not None:
+            if not case_ids or len(set(case_ids)) != len(case_ids) or not set(case_ids) <= {r['case_id'] for r in rows}:
+                raise ValueError('预测病例为空、重复或未登记')
+            rows = [row for row in rows if row['case_id'] in case_ids]
+    if not rows:
+        raise ValueError('没有选中的预测病例')
+    return rows
+
+
+def predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=None,
+            prompt_mode='external', label_classes=None, box_seed=2024, box_max_shift=20,
+            official_weights=False, test_set=None, test_group=None):
+    from .execution import admitted, run_workers
+    from .offline import model_storage_lease
+    prepared = load_prepared(prepared_path)
+    if prompt_mode not in ('external', 'label-box') or prompt_mode == 'label-box' and config['model'] != 'medsam2':
+        raise ValueError('标签框模式仅适用于MedSAM2')
+    if official_weights and config['model'] != 'medsam2':
+        raise ValueError('直接发布权重入口仅适用于MedSAM2')
+    if prompt_mode == 'label-box' and prompts is not None or prompt_mode == 'external' and label_classes is not None:
+        raise ValueError('标签框与外部提示参数不能混用')
+    if config['technical'] != (prepared['scope'] == 'technical'):
+        raise ValueError('模型配置与准备描述的正式或技术范围不同')
+    rows = prediction_rows(config, prepared, case_ids, test_set, test_group)
+    names = [row['case_id'] for row in rows]
+    if config['model'] == 'medsam2' and prompt_mode == 'external' and (
+            not prompts or any(not prompts.get(name) for name in names)):
+        raise ValueError('MedSAM2普通预测需要每例的人工或图像定位器提示')
+    protocol = dict(prompt_mode=prompt_mode, label_classes=label_classes, box_seed=box_seed,
+                    box_max_shift=box_max_shift, official_weights=official_weights,
+                    test_set=test_set, test_group=test_group)
+    applied = deepcopy(config)
+    applied['execution'].update(gpu_count=1, min_gpus=None, cpu_processes=1, batch_layout=None, workers=0)
+    if applied['execution'].get('gpu_ids'):
+        applied['execution']['gpu_ids'] = applied['execution']['gpu_ids'][:1]
+    key = digest(dict(checkpoint=file_digest(checkpoint), prepared=prepared['identity'],
+        output=str(Path(output).resolve()), names=names, prompts=prompts, protocol=protocol))[:16]
+    applied['run_dir'] = str(Path(config['work_root'] or Path(config['run_dir']).parent)/'model-predictions'/key)
+    budget = deepcopy(prepared)
+    budget['manifest']['cases'] = rows
+    with model_storage_lease(applied,prepared,'prediction'), admitted(applied, budget, 'prediction') as (common, allocation):
+        return run_workers(dict(operation='predict', config=applied, prepared=prepared, stage='prediction',
+            prepared_path=str(Path(prepared_path).resolve()), checkpoint=str(Path(checkpoint).resolve()),
+            output=str(Path(output).resolve()), case_ids=names, prompts=prompts,
+            prediction_options=protocol), common, allocation)
+
+
+def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=None,
+             prompt_mode='external', label_classes=None, box_seed=2024, box_max_shift=20,
+             official_weights=False, test_set=None, test_group=None):
+    from .workflow import resources, load_state, adapter, checked_identity, dataset_for
+    started = perf_counter()
+    resources(config)
+    prepared = load_prepared(prepared_path)
+    root = Path(output).resolve()
+    if root.exists():
+        raise FileExistsError('预测目录已存在')
+    if root.is_relative_to(Path(prepared['manifest']['data_root']).resolve()):
+        raise ValueError('预测输出不能位于原始数据目录内')
+    if official_weights:
+        from .medsam2.weights import verify_official_weight
+        released = verify_official_weight(checkpoint)
+        state = load_state(checkpoint)
+        bundle = adapter(config, prepared, 'sequence', initialize=False)
+        initialization = dict(kind='official_pretrained', weight=released, optimizer_updates=0)
+    else:
+        state = load_state(checkpoint)
+        if state['config']['model'] != config['model'] or state['scope'] != prepared['scope']:
+            raise ValueError('预测模型或范围与检查点不同')
+        if not config['technical'] and state['scope'] != 'formal':
+            raise ValueError('正式预测禁止技术检查点')
+        trained = state['prepared']
+        if prepared['dataset'] != trained['dataset'] or digest(prepared['plan']) != digest(trained['plan']):
+            raise ValueError('新预测输入必须使用训练时的同一数据集语义与拟合计划')
+        checked_identity(config,trained,state['stage'],state['initialization_sha256'],state['identity'])
+        bundle = adapter(config, trained, state['stage'], initialize=False)
+        initialization = dict(kind='trained_checkpoint', identity=state['identity'])
+    bundle.model.load_state_dict(state['model'], strict=True)
+    from ..training.checkpoint import tensors_equal
+    if not tensors_equal(bundle.model.state_dict(),state['model']):
+        raise ValueError('预测权重的数值或精度未完整加载')
+    del state
+    bundle.model.to(config['device']).eval()
+    rows = prediction_rows(config, prepared, case_ids, test_set, test_group)
+    label_mode = prompt_mode == 'label-box'
+    if config['model'] == 'medsam2':
+        from .medsam2.data import NativeCases
+        dataset = NativeCases(prepared, with_label=label_mode, log_dir=Path(config['run_dir'])/'prediction',
+                              logging=config['logging'],reserve_ram_bytes=config['execution']['reserve_ram_bytes'])
+    else:
+        dataset = dataset_for(prepared, False,dict(reserve_ram_bytes=config['execution']['reserve_ram_bytes'],
+            cache_bytes=config['execution']['cache_bytes']),Path(config['run_dir'])/'prediction',config['logging'])
+    root.mkdir(parents=True)
+    results = []
+    classes = len(prepared['dataset_json']['labels'])
+    log_dir = Path(config['run_dir'])/'prediction'
+    for row in rows:
+        mark = perf_counter()
+        name = row['case_id']
+        event(log_dir, 'model_case_started', case_id=name, model=config['model'], prompt_mode=prompt_mode)
+        entry = dataset.get(name)
+        case_prompts, protocol = prompts, None
+        truth = entry['label'] if label_mode else None
+        if label_mode:
+            from .medsam2.prompts import label_box_prompts
+            case_prompts, protocol = label_box_prompts(entry, row['sha256']['label'], classes,
+                label_classes, box_seed, box_max_shift)
+            event(log_dir, 'label_box_generated', case_id=name, protocol=protocol)
+        # 传播模型只接收图像与显式提示；参考标签只用于生成框和计算指标。
+        inference_entry = dict(entry, label=None)
+        inference_started = perf_counter()
+        with torch.inference_mode():
+            if config['model'] == 'medsam2':
+                probability, diagnostics = bundle.predict(inference_entry, case_prompts, label_box=label_mode)
+            else:
+                probability, diagnostics = bundle.predict(inference_entry, case_prompts)
+        inference_seconds = perf_counter()-inference_started
+        if probability.shape!=(classes,*entry['image'].shape[1:]) or not np.isfinite(probability).all():
+            raise ValueError('模型概率的类别、网格或有限性无效')
+        metrics = supervised_dice(probability.argmax(0), truth, classes, entry['unknown_classes'],
+            protocol['prompted_classes']) if label_mode else None
+        if config['model'] == 'medsam2':
+            from .medsam2.data import restore_native
+            native = restore_native(probability, entry)
+        else:
+            native = restore(probability, entry, prepared['plan'])
+        path = root/(name+'.nii.gz')
+        image = nib.Nifti1Image(native, np.asarray(entry['source_affine']))
+        image.header.set_xyzt_units(entry['source_units'])
+        nib.save(image, path)
+        check = nib.load(path)
+        if check.shape != tuple(entry['source_shape_xyz']) or not np.array_equal(np.asanyarray(check.dataobj), native) or \
+                not np.allclose(check.affine, entry['source_affine'], atol=1e-5, rtol=0):
+            raise ValueError('预测保存后网格、空间或内容读回不一致')
+        results.append(dict(case_id=name, file=str(path), sha256=file_digest(path), diagnostics=diagnostics,
+            seconds=perf_counter()-mark, inference_seconds=inference_seconds, shape=list(check.shape),
+            timing=entry['timing'], roi_xyz=entry['roi_xyz'], prompt_protocol=protocol, classes=metrics,
+            test_set=row.get('test_set'), test_group=row.get('test_group')))
+        event(log_dir, 'model_case_completed', case_id=name, seconds=perf_counter()-mark,
+              inference_seconds=inference_seconds, shape=list(check.shape), classes=metrics)
+        dataset.clear()
+    summary = dict(model=config['model'], scope=prepared['scope'], checkpoint_sha256=file_digest(checkpoint),
+        initialization=initialization, prompt_mode=prompt_mode, test_set=test_set, test_group=test_group,
+        cases=results, seconds=perf_counter()-started)
+    if label_mode:
+        aggregates = {}
+        for class_id in range(1, classes):
+            values = [r['classes'][str(class_id)]['dice'] for r in results if str(class_id) in r['classes']]
+            if values:
+                aggregates[str(class_id)] = dict(cases=len(values), mean_dice=float(np.mean(values)))
+        evaluation = dict(scope=prepared['scope'], metric='prompted_known_present_class_dice',
+            interpretation='参考标签框提示下的分割结果；不代表自动定位效果',
+            case_classes={r['case_id']: r['classes'] for r in results}, aggregate=aggregates)
+        write_json(root/'evaluation.json', evaluation)
+        summary['evaluation'] = evaluation
+    else:
+        by_id = {row['case_id']:row for row in rows}
+        records = {result['case_id']:dict(file=Path(result['file']).name,sha256=result['sha256'],
+            checkpoint_sha256=summary['checkpoint_sha256'],scope=prepared['scope'],roi_xyz=result['roi_xyz'],
+            data_identity=case_data_identity(prepared,by_id[result['case_id']]),
+            reference_sha256=by_id[result['case_id']]['sha256'].get('label')) for result in results}
+        write_json(root/'predictions.json',dict(model=config['model'],prompt_mode='external',cases=records))
+    write_json(root/'summary.json', summary)
+    return summary

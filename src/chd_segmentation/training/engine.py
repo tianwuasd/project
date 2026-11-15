@@ -1,4 +1,4 @@
-from contextlib import ExitStack, nullcontext
+from contextlib import ExitStack, nullcontext, contextmanager
 from copy import deepcopy
 from dataclasses import asdict
 from datetime import timedelta
@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import signal
 import socket
+import sys
 from time import perf_counter
 
 import psutil
@@ -21,11 +22,14 @@ from ..compatibility import compatible_code
 from ..data.supply import BatchSupply, batch_index
 from ..models.stunet.adapter import StunetAdapter, WEIGHT_SHA256
 from ..observability.events import event, logged, stage
+from ..observability.progress import Progress
 from ..preprocessing.prepare import load_prepared, validate_prepared_config
 from ..preprocessing.offline_store import storage_lease, validate_storage
-from .checkpoint import load_checkpoint, save_checkpoint, tensors_equal
+from .checkpoint import load_checkpoint, save_checkpoint, tensors_equal,require_resume_device,verify_optimizer_device
 from .build_gate import BuildGate
 from .coordinator import HostCoordinator
+from .memory_guard import MemoryGuard, alive
+from .stage_memory import stage_memory
 from .resources import (available_world, close_members, host_capacity, layout, process_vram,
                         record_peaks, refresh_supply, register_member, resource_lease)
 
@@ -98,10 +102,34 @@ def next_batch_index(progress, settings):
     return batch_index(settings, 1, progress["epoch"] * validation + progress["val_step"])
 
 
+def require_owner(job):
+    if not alive(job["owner"]):
+        raise RuntimeError("训练协调进程已经退出，停止等待与派发")
+
+
 def host_wait(job, rank, index, phase):
     with stage(job["config"], "host_rendezvous", console=False, rank=rank, batch_index=index,
                reason=phase) as feedback:
-        job["coordinator"].wait(rank, index, phase, feedback.update)
+        def update(**fields):
+            require_owner(job)
+            feedback.update(**fields)
+        require_owner(job)
+        job["coordinator"].wait(rank, index, phase, update)
+
+
+@contextmanager
+def group_memory(job, rank, index, amount):
+    with ExitStack() as cleanup:
+        if rank == 0:
+            memory = cleanup.enter_context(MemoryGuard(job["config"], "training_batch", owner=job["owner"]))
+            granted = cleanup.enter_context(memory.admit(amount, label="global_batch_host_buffers"))
+            job["memory_granted"].value = granted is not None
+        host_wait(job, rank, index, "group_memory_ready")
+        try:
+            yield bool(job["memory_granted"].value)
+        finally:
+            if sys.exc_info()[0] is None:
+                host_wait(job, rank, index, "group_memory_released")
 
 
 def rebalance_supply(job, supply, gate, device, rank, stop_event):
@@ -182,6 +210,7 @@ def run_rank(rank, job, gate, stop_event):
             state = load_checkpoint(output, job["identity"]) if job["resume"] else None
             restored = False
             if state:
+                require_resume_device(state['config']['resources']['device'],device)
                 if "progress" not in state or not state.get("rank_rng"):
                     raise ValueError("恢复训练需要完整进度及逐 rank 随机状态")
                 old_world = len(state["rank_rng"])
@@ -193,6 +222,7 @@ def run_rank(rank, job, gate, stop_event):
                     raise ValueError("进程数量变化需要完整 epoch 检查点")
                 model.load_state_dict(state["model"], strict=True)
                 optimizer.load_state_dict(state["optimizer"])
+                verify_optimizer_device(optimizer)
                 scaler.load_state_dict(state["scaler"])
                 rng = state["rank_rng"][rank] if rank < old_world else None
                 if rng is None:
@@ -239,6 +269,7 @@ def run_rank(rank, job, gate, stop_event):
             slots = list(range(offset, offset + job["shares"][rank]))
             supply = cleanup.enter_context(BatchSupply(job["prepared"], config, slots,
                 job["supply"]["workers"][rank], job["supply"]["cache_bytes"][rank], gate, job["owner"], rank))
+            batch_cleanup = cleanup.enter_context(ExitStack())
             if rank == 0:
                 event(output, "resume" if job["resume"] else "start", identity=job["identity"], restored_exact=restored,
                       attempts=progress["attempts"], global_batch=settings["batch"], layout=job["shares"],
@@ -253,10 +284,18 @@ def run_rank(rank, job, gate, stop_event):
             next_adapt = perf_counter() + resources["adapt_seconds"]
             next_growth = perf_counter() + resources["growth_seconds"]
             total = settings["epochs"] * settings["steps_per_epoch"] if settings["epochs"] else settings["attempts"]
+            feedback = Progress(config, "train", total=total) if rank == 0 else None
+            resumed_attempts = progress["attempts"]
             while True:
                 completed = progress["epoch"] >= (settings["epochs"] or 1)
                 if completed:
                     break
+                host_wait(job, rank, next_batch_index(progress, settings), "memory_boundary")
+                with stage(config, "memory_wait", console=False, rank=rank, reason="整机或项目内存暂停准入"):
+                    while job["pause_event"].is_set() and not stop_event.is_set():
+                        require_owner(job)
+                        stop_event.wait(.25)
+                host_wait(job, rank, next_batch_index(progress, settings), "memory_admitted")
                 if any_rank(stop_event.is_set(), device, world):
                     reason = "resource_pressure" if job["pressure_event"].is_set() else "signal"
                     break
@@ -318,12 +357,20 @@ def run_rank(rank, job, gate, stop_event):
                            epoch=progress["epoch"] + 1, step=cursor + 1, total=phase_end):
                     batch = supply.take_cpu()
                 host_wait(job, rank, batch["batch_index"], "data_ready")
-                if any_rank(stop_event.is_set(), device, world):
+                if any_rank(batch.get("cancelled", False) or stop_event.is_set(), device, world):
+                    memory_pressure = any_rank(batch.get("cancelled", False) or job["pressure_event"].is_set(), device, world)
                     supply.mark_consumed(discarded=True)
+                    reason = "resource_pressure" if memory_pressure else "signal"
                     del batch
-                    reason = "resource_pressure" if job["pressure_event"].is_set() else "signal"
                     break
                 with stage(config, "batch_transfer", console=False, rank=rank, batch_index=batch["batch_index"]):
+                    accepted = batch_cleanup.enter_context(group_memory(job, rank, batch["batch_index"], job["stage_memory"]["batch_bytes"]))
+                    if not accepted:
+                        supply.mark_consumed(discarded=True)
+                        batch_cleanup.close()
+                        del batch
+                        reason = "resource_pressure"
+                        break
                     batch = supply.transfer(batch, device)
                 host_wait(job, rank, batch["batch_index"], "transfer_ready")
                 timings["input_wait_seconds"] += perf_counter() - mark
@@ -373,6 +420,10 @@ def run_rank(rank, job, gate, stop_event):
                 elapsed = perf_counter() - mark
                 timings["compute_seconds" if phase == "train" else "validation_seconds"] += elapsed
                 if rank == 0:
+                    feedback.update(done=progress["attempts"], new=progress["attempts"] - resumed_attempts,
+                                    epoch=progress["epoch"] + 1, step=progress["attempts"] % settings["steps_per_epoch"],
+                                    pending=total - progress["attempts"], active=world)
+                    feedback.snapshot()
                     event(output, phase, attempts=progress["attempts"], updates=progress["updates"], epoch=progress["epoch"],
                           skipped=progress["skipped"],
                           loss=float(loss.detach()), local_cases=batch["case_ids"], learning_rate=optimizer.param_groups[0]["lr"],
@@ -384,6 +435,7 @@ def run_rank(rank, job, gate, stop_event):
                 del batch, loss
                 host_wait(job, rank, consumed, "consumed")
                 supply.mark_consumed()
+                batch_cleanup.close()
                 if settings["epochs"] and phase == "train" and progress["attempts"] % settings["steps_per_epoch"] == 0:
                     progress.update(phase="validation", val_step=0, val_sum=0.)
                 if not settings["epochs"] and phase == "train" and progress["attempts"] == total:
@@ -421,6 +473,7 @@ def run_rank(rank, job, gate, stop_event):
                                        "peak_vram_bytes": peak_reserved + peak_non_allocator if job["gpus"] else None,
                                        "peak_reserved_bytes": peak_reserved if job["gpus"] else None}, world)
             if rank == 0:
+                feedback.close()
                 record_peaks(config, job["spec"], job["gpus"], job["shares"],
                              [row["peak_vram_bytes"] for row in measurements] if job["gpus"] and completed else [])
                 summary = {"state": "completed" if completed else "stopped", "reason": reason, "scope": config["scope"],
@@ -441,6 +494,8 @@ def run_rank(rank, job, gate, stop_event):
 
 @logged("training")
 def train(config, prepared_path, resume=False, stop_after=None):
+    from ..preflight import quick_check
+    event(config["run_dir"], "quick_check", report=quick_check(config, "train", prepared_path))
     with stage(config, "training_inputs", prepared=str(prepared_path), resume=resume):
         prepared = load_prepared(prepared_path)
         validate_prepared_config(prepared, config)
@@ -519,12 +574,15 @@ def launch_group(config, prepared, spec, identity, allocation, resume, stop_afte
         port = rendezvous.getsockname()[1]
     job = {**allocation, "config": config, "prepared": prepared, "spec": spec, "identity": identity,
            "shares": shares, "resume": resume, "stop_after": stop_after, "rendezvous": f"tcp://127.0.0.1:{port}"}
+    job["stage_memory"] = stage_memory(config, prepared)
     context = mp.get_context("spawn")
     gate = BuildGate(context, allocation["supply"]["reader_slots"], allocation["supply"]["workspace_capacity_bytes"],
                      allocation["supply"]["case_estimates"])
     stop_event = context.Event()
     job["coordinator"] = HostCoordinator(context, world)
     job["pressure_event"] = context.Event()
+    job["pause_event"] = context.Event()
+    job["memory_granted"] = context.Value("b", False)
     previous_visible = os.environ.get("CUDA_VISIBLE_DEVICES")
     job["allowed_visible_devices"] = previous_visible
     if allocation["gpus"]:
@@ -536,15 +594,28 @@ def launch_group(config, prepared, spec, identity, allocation, resume, stop_afte
         os.environ[key] = "1"
     previous_handlers = {sig: signal.signal(sig, lambda *_: stop_event.set()) for sig in (signal.SIGINT, signal.SIGTERM)}
     try:
-        processes = torch.multiprocessing.spawn(run_rank, args=(job, gate, stop_event), nprocs=world, join=False)
-        while not processes.join(timeout=1):
-            facts = host_capacity()
-            if facts["available_bytes"] < config["resources"]["reserve_ram_bytes"]:
-                if not job["pressure_event"].is_set():
-                    event(config["run_dir"], "host_pressure_detected", facts=facts,
-                          reserve_bytes=config["resources"]["reserve_ram_bytes"])
-                job["pressure_event"].set()
-                stop_event.set()
+        with MemoryGuard(config, "training", owner=allocation["owner"]) as memory:
+            with memory.admit(job["stage_memory"]["checkpoint_reserve_bytes"],
+                              label="checkpoint_reserve", reserve=True) as reserve:
+                if reserve is None:
+                    raise MemoryError("训练启动前缺少完整检查点写出余量")
+                ready = memory.admit(world * job["stage_memory"]["model_load_per_rank_bytes"], label="model_load")
+                with ready as admitted:
+                    if admitted is None:
+                        raise MemoryError("训练启动前持续内存压力，保留已有完整检查点")
+                    processes = torch.multiprocessing.spawn(run_rank, args=(job, gate, stop_event), nprocs=world, join=False)
+                    while not processes.join(timeout=1):
+                        facts = memory.boundary()
+                        if facts["paused"]:
+                            job["pause_event"].set()
+                        else:
+                            job["pause_event"].clear()
+                        if facts["stop_requested"]:
+                            if not job["pressure_event"].is_set():
+                                event(config["run_dir"], "host_pressure_detected", memory=facts,
+                                      action="停止派发，在共同批次边界保存完整状态")
+                            job["pressure_event"].set()
+                            stop_event.set()
     finally:
         close_members(config, allocation["owner"])
         for sig, handler in previous_handlers.items():

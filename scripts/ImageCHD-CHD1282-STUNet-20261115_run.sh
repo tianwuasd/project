@@ -35,8 +35,13 @@ run_tests() {
   "$py" -u -B "$code/run.py" test "${common[@]}" --set internal
   if [ "$dataset" = chd1282 ]; then "$py" -u -B "$code/run.py" test "${common[@]}" --set external; fi
 }
+preprocess_data() {
+  "$py" -u -B "$code/run.py" preprocess "${common[@]}" --prepared "$source_file" --output "$ready" --root "$data"
+}
 case "$action" in
   prepare) prepare_data ;;
+  preprocess) preprocess_data ;;
+  check) "$py" -B "$code/run.py" check "${common[@]}" --stage preprocess --prepared "$source_file" ;;
   train) "$py" -u -B "$code/run.py" train "${common[@]}" --prepared "$ready" "${training[@]}" ;;
   resume) "$py" -u -B "$code/run.py" train "${common[@]}" --prepared "$ready" "${training[@]}" --resume ;;
   predict) "$py" -u -B "$code/run.py" predict "${common[@]}" --output "$result/predictions" ;;
@@ -48,5 +53,5 @@ case "$action" in
     "$py" -u -B "$code/run.py" train "${common[@]}" --prepared "$ready" "${training[@]}"
     run_tests
     ;;
-  *) printf '阶段允许 prepare/train/resume/predict/evaluate/test/info/all\n' >&2; exit 2 ;;
+  *) printf '阶段允许 prepare/preprocess/check/train/resume/predict/evaluate/test/info/all\n' >&2; exit 2 ;;
 esac

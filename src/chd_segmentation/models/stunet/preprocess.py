@@ -1,4 +1,5 @@
 from copy import deepcopy
+from contextlib import nullcontext
 from time import perf_counter
 
 import numpy as np
@@ -14,29 +15,34 @@ from ...training.host import host_capacity
 CONTRACT = "stunet-ct-nnunet-bounded-v1"
 
 
-def bounded_locations(seg, classes_or_regions, seed=1234, verbose=False, min_num_samples=10000, min_percent_coverage=.01):
-    flat, block, result = seg[0].ravel(), 1_000_000, {}
+def bounded_locations(seg, classes_or_regions, seed=1234, verbose=False, min_num_samples=10000, min_percent_coverage=.01, workspace=None):
+    flat, block, result = seg[0].ravel(), 1_000_000 if workspace is None else min(1_000_000, workspace.block_bytes // 32), {}
+    def parts():
+        for start in range(0, len(flat), block):
+            with nullcontext() if workspace is None else workspace.allocation(block * 24, "locations_scan"):
+                yield start
     rng = np.random.default_rng(seed)
     for value in classes_or_regions:
         labels = tuple(value) if isinstance(value, (tuple, list)) else (int(value),)
         key = labels if isinstance(value, (tuple, list)) else int(value)
-        counts = [int(np.isin(flat[start:start + block], labels).sum()) for start in range(0, len(flat), block)]
+        counts = [int(np.isin(flat[start:start + block], labels).sum()) for start in parts()]
         total = sum(counts)
         if not total:
             result[key] = []
             continue
         size = min(total, max(min(min_num_samples, total), int(np.ceil(total * min_percent_coverage))))
-        offsets = np.sort(rng.choice(total, size, replace=False, shuffle=False))
-        indices, seen = np.empty(size, dtype=np.int64), 0
-        for index, count in enumerate(counts):
-            left, right = np.searchsorted(offsets, [seen, seen + count])
-            if right > left:
-                start = index * block
-                positions = np.flatnonzero(np.isin(flat[start:start + block], labels))
-                indices[left:right] = start + positions[offsets[left:right] - seen]
-            seen += count
-        coordinates = np.column_stack(np.unravel_index(indices, seg.shape[1:]))
-        result[key] = np.column_stack((np.zeros(size, dtype=np.int32), coordinates)).astype(np.int32)
+        with nullcontext() if workspace is None else workspace.allocation(size * 192, "locations_sample"):
+            offsets = np.sort(rng.choice(total, size, replace=False, shuffle=False))
+            indices, seen = np.empty(size, dtype=np.int64), 0
+            for index, start in enumerate(parts()):
+                count = counts[index]
+                left, right = np.searchsorted(offsets, [seen, seen + count])
+                if right > left:
+                    positions = np.flatnonzero(np.isin(flat[start:start + block], labels))
+                    indices[left:right] = start + positions[offsets[left:right] - seen]
+                seen += count
+            coordinates = np.column_stack(np.unravel_index(indices, seg.shape[1:]))
+            result[key] = np.column_stack((np.zeros(size, dtype=np.int32), coordinates)).astype(np.int32)
     return result
 
 

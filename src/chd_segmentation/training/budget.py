@@ -23,6 +23,9 @@ def private_bytes(records):
 
 
 def case_estimates(config, prepared, stage):
+    if config.get('model') in ('medsam2','q_route1'):
+        from ..models.memory import case_estimates as model_estimates
+        return model_estimates(config,prepared,config['model_stage'])
     roi = config["technical"]["roi_xyz"]
     target = np.array(prepared["plan"]["configurations"]["3d_fullres"]["spacing"])
     order = prepared["plan"]["transpose_forward"]
@@ -40,10 +43,15 @@ def case_estimates(config, prepared, stage):
         native = list(nib.load(row["image"]).shape)
         shape = np.array([end - begin for begin, end in roi] if roi else native)
         output = np.ceil(shape[::-1][order] * np.array(row["spacing_xyz"])[::-1][order] / target).astype(int)
+        legacy_bytes = int(np.prod(shape)) * 32 + int(np.prod(output)) * 64
+        streamed = stage == "preprocess"
         reports.append({"case_id": row["case_id"], "raw_shape_xyz": native, "input_shape_xyz": shape.tolist(),
                         "cropped_shape": None, "resampled_upper_shape": output.tolist(),
-                        "raw_workspace_bytes": int(np.prod(shape)) * 32,
-                        "resample_workspace_bytes": int(np.prod(output)) * 64})
+                        "legacy_whole_case_bytes": legacy_bytes, "storage": "bounded_disk_blocks" if streamed else "source",
+                        "threshold_exceeded": legacy_bytes > config["preprocessing"]["block_threshold_bytes"],
+                        "raw_workspace_bytes": 2 * GIB if streamed else int(np.prod(shape)) * 32,
+                        "resample_workspace_bytes": config["preprocessing"]["block_bytes"] * 4 if streamed else int(np.prod(output)) * 64,
+                        "output_array_bytes": int(np.prod(output)) * 5})
     if not reports:
         raise ValueError("资源规划没有可用病例")
     for row in reports:
@@ -83,44 +91,81 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
                                      "cache_total_bytes": 0, "cache_instances": 0})
             break
         return result
+    profile = None
+    retained,worker_bytes,cache_limit = 0,GIB,r['cache_bytes']
+    fixed_workers = None
     # 队列结果、堆叠批次和 pinned/传输中的副本分别占用内存。
     patch_bytes = int(np.prod(config["training"]["patch"])) * 16 * config["training"]["batch"]
     cap = r["max_workers"] if r["workers"] == "auto" else min(r["workers"], r["max_workers"])
-    batch = config["training"]["batch"]
-    cap = max(0, min(cap, cores - world, batch))
-    shares = r["batch_layout"] or [batch // world + int(rank < batch % world) for rank in range(world)]
+    cap = max(0, min(cap, cores - world))
+    batch = config['training']['batch']
+    shares = r['batch_layout'] if r['batch_layout'] is not None else [batch//world+int(rank<batch%world) for rank in range(world)]
     readers_cap = r["max_readers"] if r["readers"] == "auto" else min(r["readers"], r["max_readers"])
     base = (world + 1) * GIB
-    minimum = base + case_bytes + patch_bytes * 3
+    stage_reserve = None
+    if config.get("model", "stunet") == "stunet":
+        from .stage_memory import stage_memory
+        stage_reserve = stage_memory(config, prepared)
+        base += stage_reserve["checkpoint_reserve_bytes"] + world * stage_reserve["model_load_per_rank_bytes"]
+        if r["device"] == "cpu":
+            base += stage_reserve["batch_bytes"]
+    if config.get('model') in ('medsam2','q_route1'):
+        from ..models.memory import memory_profile
+        profile = memory_profile(config,prepared,config['model_stage'],shares,reports)
+        base = profile['coordinator_bytes']+sum(profile['rank_fixed_bytes'])+sum(profile['rank_case_bytes'])
+        retained,worker_bytes = profile['retained_case_bytes'],profile['worker_fixed_bytes']
+        patch_bytes = profile['queue_per_sample_bytes']*batch
+        cache_limit = min(cache_limit,profile['cache_limit_bytes'])
+        fixed_workers = profile['worker_layout']
+        if fixed_workers is not None and (len(fixed_workers)!=world or any(type(w) is not int or w<0 for w in fixed_workers)):
+            raise ValueError('模型恢复的worker布局无效')
+    if fixed_workers is None:
+        cap = min(cap,batch)
+    minimum_workers = fixed_workers if fixed_workers is not None else [0]*world
+    minimum = (base+sum(minimum_workers)*worker_bytes+sum(max(1,w) for w in minimum_workers)*retained+
+               case_bytes+patch_bytes*3)
     result = {"admitted": False, "facts": facts, "budget_bytes": budget, "own_uss_credit_bytes": credit,
               "peer_pending_bytes": pending, "minimum_bytes": minimum, "case_estimate_bytes": case_bytes,
               "case_estimates": reports, "requested": {key: r[key] for key in
                  ("workers", "max_workers", "cache_bytes", "prefetch", "readers", "max_readers")}}
+    if profile is not None:
+        result['model_memory'] = {key:value for key,value in profile.items() if key!='records'}
+    if stage_reserve is not None:
+        result["stage_memory"] = stage_reserve
     if budget < minimum:
         result["reason"] = "单个病例构建及零 worker 的最小预算仍不足，等待主机内存释放"
         return result
-    for count in range(cap, -1, -1):
-        workers = [0] * world
-        for _ in range(count):
-            candidates = [i for i in range(world) if workers[i] < shares[i]]
-            index = min(candidates, key=lambda i: (workers[i], i))
-            workers[index] += 1
+    if fixed_workers is not None and sum(fixed_workers)>cap:
+        result['reason'] = '模型恢复需要原worker数量，等待相应CPU供数额度'
+        return result
+    counts = [sum(fixed_workers)] if fixed_workers is not None else range(cap,-1,-1)
+    for count in counts:
+        if fixed_workers is not None:
+            workers = fixed_workers
+        else:
+            workers = [0]*world
+            for _ in range(count):
+                candidates = [rank for rank in range(world) if workers[rank]<shares[rank]]
+                index = min(candidates,key=lambda rank:(workers[rank],rank))
+                workers[index] += 1
         instances = sum(max(1, w) for w in workers)
-        fixed = base + count * GIB
-        queues = patch_bytes * 3
+        fixed = base + count * worker_bytes + instances * retained
+        queues = patch_bytes*3
         if fixed + case_bytes + queues > budget:
             continue
-        readers = max(1, min(readers_cap, instances, batch))
-        cache = max(0, min(r["cache_bytes"], (budget - fixed - queues - case_bytes) // instances))
-        workspace = min(readers * case_bytes, budget - fixed - queues - instances * cache)
-        used = fixed + queues + workspace + instances * cache
+        readers = max(1,min(readers_cap,instances,batch))
+        cache = max(0,min(cache_limit,(budget-fixed-queues-case_bytes)//instances))
+        workspace = min(readers*case_bytes,budget-fixed-queues-instances*cache)
+        used = fixed+queues+workspace+instances*cache
         if used > budget:
             raise AssertionError("供数预算计算未闭合")
         result.update(admitted=True, reason="资源预算允许", workers=workers, cache_bytes=[int(cache)] * world,
                       max_workers=count, cpu_slots=world + count, ram_bytes=int(used), reader_slots=int(readers),
-                      prefetch=1, workspace_capacity_bytes=int(workspace),
-                      breakdown={"processes_bytes": fixed, "queue_bytes": int(queues),
+                      prefetch=1,workspace_capacity_bytes=int(workspace), breakdown={"processes_bytes": fixed, "queue_bytes": int(queues),
                       "case_builds": int(readers), "case_workspaces_bytes": int(workspace),
                       "cache_instances": instances, "cache_total_bytes": int(instances * cache)})
+        if profile is not None:
+            result['breakdown'].update(retained_case_instances=instances,retained_cases_bytes=instances*retained,
+                rank_prediction_bytes=sum(profile['rank_case_bytes']))
         return result
     raise AssertionError("零 worker 最小预算未被实际规划覆盖")

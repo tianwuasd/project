@@ -43,3 +43,7 @@ Linux 使用 systemd 获取当前进程的 cgroup，并通过 util-linux 的 fin
 `tests/verify_ordered_supply.py` 限定两个真实 ImageCHD 病例的 32³ 区域、两个 CPU/Gloo 进程、全局 batch 4，总计两次训练更新及对应验证，检查恢复、每个全局 slot 恰好消费一次、单批队列上限和真实供数等待超过通信超时时仍能继续。显式 `--cuda-transfer` 使用一张通过空闲准入的显卡检查小块复制完成和缓冲释放，不进行 GPU 训练。
 
 `tests/verify_offline.py` 在两例真实病例上检查离线处理、只读 mmap、完整复用、仅补缺失病例、稳定数据身份、两次更新/恢复、预测/评价和折统计隔离。`--preprocess-only` 只验证离线及共享资源登记，不执行训练。仿真选卡明确使用虚拟 GPU；真实计算使用 CPU/Gloo，不代表真实多卡 CUDA/NCCL 已验收。
+
+## Q与MedSAM2接口
+
+两模型共用资源登记与安全预算，保留各自内存模型、全局批量份额和恢复拓扑。Q只消费A组统计来源的对应标准化数据，MedSAM2消费原生灰度窗配方及官方序列。新任务worker数量受批量限制；MedSAM2恢复保留原worker布局。离线输入、模型计算和数据引用分别登记；模型专用日志及验收边界见[模型供数说明](MODEL_ORDERED_SUPPLY.md)。

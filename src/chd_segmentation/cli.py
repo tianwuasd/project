@@ -13,6 +13,11 @@ def wait_seconds(value):
 
 
 def main(argv=None):
+    import sys
+    actual = sys.argv[1:] if argv is None else argv
+    if actual and actual[0] == 'models':
+        from .models_cli import main as model_main
+        return model_main(actual[1:])
     parser = argparse.ArgumentParser(description="先心分割处理")
     parser.add_argument("--version", action="version", version=__version__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -26,6 +31,10 @@ def main(argv=None):
     preprocess.add_argument("--root", help="data 内专用预处理根目录")
     info = commands.add_parser("data-info", help="查看数据版本容量及任务引用，不删除数据")
     info.add_argument("--prepared", required=True)
+    check = commands.add_parser("check", help="必要文件、分组、环境API、路径与离线身份快速检查")
+    check.add_argument("--config", required=True)
+    check.add_argument("--stage", choices=("prepare", "preprocess", "train"), required=True)
+    check.add_argument("--prepared")
     train = commands.add_parser("train")
     train.add_argument("--config", required=True)
     train.add_argument("--prepared", required=True)
@@ -66,10 +75,10 @@ def main(argv=None):
     bind.add_argument("--chd-root")
     bind.add_argument("--image-root")
     bind.add_argument("--pretrained", help="已有权重的实际位置")
-    for command in (prepare, preprocess, train, predict, evaluate, test):
+    for command in (prepare, preprocess, train, predict, evaluate, test, check):
         command.add_argument("--run-dir", help="本次独立任务目录，旧在线任务目录保留")
         command.add_argument("--split", help="旧工程或手动选择的划分文件")
-        command.add_argument("--split-format", choices=("auto", "imagechd", "imagechd_roles", "chd1282_cohort", "folds", "roles"))
+        command.add_argument("--split-format", choices=("auto", "imagechd", "imagechd_roles", "chd1282_cohort", "q1282", "folds", "roles"))
         command.add_argument("--split-id-field", help="清单中的精确映射字段，默认 case_id")
         command.add_argument("--fold", type=int)
     args = parser.parse_args(argv)
@@ -113,6 +122,9 @@ def main(argv=None):
     if args.command == "data-info":
         from .preprocessing.offline import data_info
         result = data_info(args.prepared)
+    elif args.command == "check":
+        from .preflight import quick_check
+        result = quick_check(config, args.stage, args.prepared)
     elif args.command == "bind-inputs":
         from .datasets.transfer import bind_inputs
         roots = {name: value for name, value in (("chd1282", args.chd_root), ("imagechd", args.image_root)) if value is not None}

@@ -26,6 +26,8 @@ def apply_split(manifest, config):
             fmt = "folds"
         elif isinstance(value, dict) and value.get("protocol") == "dataset1282-scheme-a-preprocess-1":
             fmt = "chd1282_cohort"
+        elif isinstance(value, dict) and value.get("protocol") == "chd1282-q-scheme-a-v1":
+            fmt = "q1282"
         elif isinstance(value, dict) and "roles" in value and "folds" in value:
             fmt = "imagechd_roles"
         elif isinstance(value, dict) and "aux_train" in value:
@@ -59,6 +61,21 @@ def apply_split(manifest, config):
                     for role in ("train", "development", "source_test", "target_primary", "target_secondary")}
         roles_map = {"train": "train", "development": "validation", "source_test": "test",
                      "target_primary": "test", "target_secondary": "test"}
+    elif fmt == "q1282":
+        if manifest['dataset'] != 'chd1282' or value['protocol'] != 'chd1282-q-scheme-a-v1' or fold != 0:
+            raise ValueError('1282 Q组合使用固定fold 0')
+        metadata, selected = value['cases'], value['groups']
+        if set(selected) != set('ABCD') or any(not ids for ids in selected.values()):
+            raise ValueError('Q组合必须包含非空A/B/C/D组')
+        roles_map = dict(A='train', B='predict', C='validation', D='test')
+        for group, ids in selected.items():
+            for key in ids:
+                record = metadata[key]
+                expected = {'A': {'train'}, 'B': {'train'}, 'C': {'development'},
+                            'D': {'source_test', 'target_primary', 'target_secondary'}}[group]
+                if record['q_group'] != group or record['source_role'] not in expected or \
+                        not record.get('included', True) or not record.get('index_scan', True):
+                    raise ValueError('Q组别与冻结来源角色不符')
     elif fmt == "imagechd_roles":
         selected = {role: [key for key, roles in value["roles"].items() if roles[str(fold)] == role]
                     for role in ("train", "val", "test", "aux_train")}
@@ -110,9 +127,11 @@ def apply_split(manifest, config):
             continue
         updated = dict(row)
         updated["roles"] = [assigned[case_key]]
-        if fmt == "chd1282_cohort":
-            source_role = source_roles[case_key]
+        if fmt in ("chd1282_cohort", "q1282"):
+            source_role = metadata[case_key]['source_role'] if fmt == 'q1282' else source_roles[case_key]
             updated["source_role"] = source_role
+            if fmt == 'q1282':
+                updated['q_group'] = metadata[case_key]['q_group']
             if assigned[case_key] == "test":
                 updated["test_set"] = "internal" if source_role == "source_test" else "external"
                 updated["test_group"] = source_role
@@ -126,6 +145,13 @@ def apply_split(manifest, config):
             updated["patient"] = patient
         rows.append(updated)
     result["cases"] = rows
+    if fmt == 'q1282':
+        seen = {}
+        for row in rows:
+            patient, group = row['patient'], row['q_group']
+            if not patient or patient in seen and seen[patient] != group:
+                raise ValueError('Q组合存在患者重叠或患者身份缺失')
+            seen[patient] = group
     if not rows:
         raise ValueError("划分未选择任何病例")
     result["split_source"] = {"path": str(path), "sha256": hashlib.sha256(raw).hexdigest(),

@@ -1,0 +1,22 @@
+model: medsam2
+run_dir: /path/to/course/medsam2
+official_root: ../../vendor/MedSAM2
+dependency_root: ../../env/medsam2
+device: cuda
+precision: bf16
+threads: 2
+seed: 123
+technical: false
+accumulation: 1
+batch: 2
+workers: 15
+epochs: 75
+frames: 8
+resolution: 512
+learning_rate: 0.00005
+freeze_image_encoder: false
+pretrained: ../../data/model_weights/MedSAM2_latest.pt
+work_root: /path/to/course/chd-segmentation
+execution:
+  gpu_count: 2
+  workers: auto
