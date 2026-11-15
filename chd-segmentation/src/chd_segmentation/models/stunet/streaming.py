@@ -8,6 +8,7 @@ from pathlib import Path
 from time import perf_counter
 
 from batchgenerators.augmentations.utils import _resample_seg_by_argmax
+from filelock import FileLock
 import nibabel as nib
 import numpy as np
 from scipy.ndimage import binary_propagation, map_coordinates, spline_filter1d
@@ -15,7 +16,7 @@ from nnunetv2.preprocessing.resampling.default_resampling import compute_new_sha
 
 from ...observability.events import event
 from ...observability.progress import console_progress, resource_summary
-from ...artifacts.store import read_json
+from ...artifacts.store import read_json, write_json
 from ...artifacts.cache import release_private_mapping, discard_file_pages
 from ...preprocessing.validation import SourceReader
 from .preprocess import bounded_locations
@@ -110,17 +111,19 @@ class BlockWorkspace:
         if now - self.last_log < self.config["logging"]["heartbeat_seconds"] and done != total:
             return
         path = Path(self.config["run_dir"]) / "progress-preprocess.json"
-        overall = read_json(path) if path.exists() else {"total": None, "done": 0, "new": 0, "reused": 0, "failures": 0}
         memory = self.guard.snapshot()
         owned = [*self.path.iterdir(), *self.path.parent.iterdir()]
         if len(owned) > 512:
             raise ValueError("单病例工作目录超过已声明的有界文件数量")
         disk = {"task_storage_bytes": sum(p.stat().st_size for p in owned if p.is_file()),
                 "data_free_bytes": shutil.disk_usage(self.path).free}
-        record = {**overall, "stage": "preprocess", "current_case": self.case_id, "phase": phase,
-                  "block_done": done, "block_total": total, "block_remaining": None if total is None else total - done,
-                  "resource": resource_summary(memory), "disk": disk, "elapsed_seconds": now - self.started,
-                  "peak_block_bytes": self.peak_block}
+        with FileLock(str(path.parent / '.progress-preprocess.lock')):
+            overall = read_json(path) if path.exists() else {"total": None, "done": 0, "new": 0, "reused": 0, "failures": 0}
+            record = {**overall, "stage": "preprocess", "current_case": self.case_id, "phase": phase,
+                      "block_done": done, "block_total": total, "block_remaining": None if total is None else total - done,
+                      "resource": resource_summary(memory), "disk": disk, "elapsed_seconds": now - self.started,
+                      "peak_block_bytes": self.peak_block}
+            write_json(path, record)
         event(self.config["run_dir"], "preprocess_blocks", console=False, **record)
         console_progress(record)
         self.last_log = now

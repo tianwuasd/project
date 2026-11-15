@@ -49,7 +49,7 @@ def selection(request):
 def make_patch(dataset, gate, config, rank, request):
     amount = int(np.prod(config["training"]["patch"])) * 16 * 3
     with MemoryGuard(config, "patch", owner=config.get("memory_owner")) as memory:
-        with memory.admit(amount, label="sample_patch") as allowance:
+        with memory.admit(amount, label="sample_patch", release=dataset.clear) as allowance:
             if allowance is None:
                 dataset.clear()
                 return None
@@ -80,18 +80,21 @@ def patch_task(request):
 
 
 class BatchSupply:
-    def __init__(self, prepared, config, slots, workers, cache_bytes, gate, owner, rank=0):
+    def __init__(self, prepared, config, slots, workers, cache_bytes, gate, owner, rank=0, cancel=None):
         self.prepared, self.config, self.slots = prepared, config, slots
         self.workers, self.cache_bytes, self.gate = workers, cache_bytes, gate
         self.owner = owner
         self.rank = rank
+        self.external_cancel = cancel
         self.pool = None
         self.local = None
         self.queue = deque()
         self.inflight = None
 
     def __enter__(self):
-        self.config = {**self.config, "memory_owner": self.owner}
+        self.cancel = mp.get_context('spawn').Event()
+        self.signals = (self.cancel,) if self.external_cancel is None else (self.cancel, self.external_cancel)
+        self.config = {**self.config, "memory_owner": self.owner, 'memory_cancel': self.signals}
         resources = {**self.config["resources"], "cache_bytes": self.cache_bytes}
         if self.workers:
             self.pool = ProcessPoolExecutor(self.workers, mp_context=mp.get_context("spawn"),
@@ -168,6 +171,7 @@ class BatchSupply:
         self.inflight = None
 
     def __exit__(self, *_):
+        self.cancel.set()
         if self.pool:
             self.pool.shutdown(wait=True, cancel_futures=True)
             self.pool = None

@@ -1,6 +1,6 @@
 # MedSAM2 与 Q 模型
 
-研究编号 Q-20261108-路线一，版本 q-route1-20261111-r2。助手2工作目录为D:/projects/project/chd-segmentation-assistant2，离线开发分支为codex/chd-assistant2-offline-preprocess-20261115，验收后整合main。在线版本冻结于69289532a3da2c94bc72769f5726ca260f6980a7。
+研究编号 Q-20261108-路线一，版本 q-route1-20261111-r2。助手2工作目录为D:/projects/project/chd-segmentation-assistant2，当前开发分支为codex/chd-assistant2-resource-delivery-20261115，验收后整合main。在线版本冻结于69289532a3da2c94bc72769f5726ca260f6980a7。
 
 ## 文件职责
 

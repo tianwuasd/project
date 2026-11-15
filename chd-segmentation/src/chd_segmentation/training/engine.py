@@ -268,7 +268,7 @@ def run_rank(rank, job, gate, stop_event):
             offset = sum(job["shares"][:rank])
             slots = list(range(offset, offset + job["shares"][rank]))
             supply = cleanup.enter_context(BatchSupply(job["prepared"], config, slots,
-                job["supply"]["workers"][rank], job["supply"]["cache_bytes"][rank], gate, job["owner"], rank))
+                job["supply"]["workers"][rank], job["supply"]["cache_bytes"][rank], gate, job["owner"], rank, cancel=stop_event))
             batch_cleanup = cleanup.enter_context(ExitStack())
             if rank == 0:
                 event(output, "resume" if job["resume"] else "start", identity=job["identity"], restored_exact=restored,
@@ -594,7 +594,7 @@ def launch_group(config, prepared, spec, identity, allocation, resume, stop_afte
         os.environ[key] = "1"
     previous_handlers = {sig: signal.signal(sig, lambda *_: stop_event.set()) for sig in (signal.SIGINT, signal.SIGTERM)}
     try:
-        with MemoryGuard(config, "training", owner=allocation["owner"]) as memory:
+        with MemoryGuard(config, "training", owner=allocation["owner"], cancel=stop_event) as memory:
             with memory.admit(job["stage_memory"]["checkpoint_reserve_bytes"],
                               label="checkpoint_reserve", reserve=True) as reserve:
                 if reserve is None:
@@ -617,6 +617,7 @@ def launch_group(config, prepared, spec, identity, allocation, resume, stop_afte
                             job["pressure_event"].set()
                             stop_event.set()
     finally:
+        stop_event.set()
         close_members(config, allocation["owner"])
         for sig, handler in previous_handlers.items():
             signal.signal(sig, handler)

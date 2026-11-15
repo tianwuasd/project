@@ -19,5 +19,45 @@
     "Model-specific memory profiles and existing optimizer/device resume checks",
     "Independent models CLI dispatch and frozen Q1282 split support"
   ],
-  "publication": "main; only chd-segmentation code; independent assistant2 deployment paths"
+  "publication": "main; only chd-segmentation code; shared code root and dataset-model runtime paths",
+  "memory_contract": {
+    "source_public_commit": "8b5b51e53e09d207474a1cc1044134beeafd8c1b",
+    "source_public_subtree": "2baeb774f9798dd0926dbf3aa0a9d763c2247669",
+    "source_local_commit": "b66d10817188e272f787296c31a74aec7939a82b",
+    "inherited_files": {
+      "README.md": "9bf501a05d2951d1a3a279b96bcddbf78aa19d97",
+      "docs/MEMORY_BOUNDED_PREPROCESS.md": "3cb6f1010daf372c261b63f9293ab8e58373ad2a",
+      "docs/PROGRESS.md": "0c9fd87d9ec21bba69b0ab08452f5ca71e8c778e",
+      "docs/QUICK_CHECKS.md": "bc8a0676c144c2923a1251bf5ede10393943ba79",
+      "docs/STUNET_MEMORY_VALIDATION_20261115.md": "5eb359885a431d613232568ff9076d8776eead03",
+      "docs/STUNET_SERVER_COMMANDS.md": "e04c4190bf8d1549906811777f0d71286a6c6ee6",
+      "docs/ZMIC_DEPLOYMENT.md": "c242c446957a1dbae6f8cd1ae5caae6e6fb42432",
+      "docs/superpowers/plans/2026-11-15-memory-bounded-preprocess.md": "7c17ac8f416936efce532122fa053957858cf74b",
+      "scripts/ImageCHD-CHD1282-STUNet-20261115_run.sh": "67f12a61621cbb12553706856f30245c5f8a2e62",
+      "src/chd_segmentation/artifacts/cache.py": "202cf8b3bf2693d19334ef84a1d63eea535ff94f",
+      "src/chd_segmentation/artifacts/store.py": "ec55ce45f3da013764e8f67f6e543e37f38d3495",
+      "src/chd_segmentation/cli.py": "7fcce332ee2147269668c13f856523171e9e4453",
+      "src/chd_segmentation/code_compatibility.json": "342780362a50f9ec73f0f79b1e73f58e4cec4700",
+      "src/chd_segmentation/config.py": "143cdcad8da588c8be3295d71b9be694ee683d15",
+      "src/chd_segmentation/data/supply.py": "11c71c5564acfeaec69dbfc1c83a0515f7603257",
+      "src/chd_segmentation/models/stunet/preprocess.py": "5d66403328d947d84c6f17d3b7e60bfc5fa642ea",
+      "src/chd_segmentation/models/stunet/streaming.py": "e4f5aac5c6a5f349cdb6a44ee82b83f77e231809",
+      "src/chd_segmentation/observability/progress.py": "05b3369a182fa9dca45c2f70b7bc0139f391bdb1",
+      "src/chd_segmentation/preflight.py": "1f3c8dbc42707d7271796508912cb446965279cb",
+      "src/chd_segmentation/preprocessing/offline.py": "23f69fa3621c5cb01a00b9a200bcea82afc785ad",
+      "src/chd_segmentation/preprocessing/offline_store.py": "e4ba9496096b0e5289bd3e7e13a7a57461556d8d",
+      "src/chd_segmentation/preprocessing/validation.py": "25bea7215d33636c46c532296e19d49ae0a03d90",
+      "src/chd_segmentation/training/budget.py": "795319f333145013fca9a86c86fbf3eb354854b7",
+      "src/chd_segmentation/training/coordinator.py": "bb80279f2290c8f635415f9bb188e1ed2a0a8d18",
+      "src/chd_segmentation/training/engine.py": "7186cfcb3cd5d4978878da4717a828a2beb4730d",
+      "src/chd_segmentation/training/host.py": "b62316fe8a041728624b2d660498fd0c46a3023d",
+      "src/chd_segmentation/training/memory_guard.py": "e4df93b898820b9d384f492364af5ee66444adeb",
+      "src/chd_segmentation/training/resources.py": "17329351fa15d7b921ec50e635d048c9a929baee",
+      "src/chd_segmentation/training/stage_memory.py": "2385ccfaa72a6e7247c2607de7e8c775823f36ec",
+      "tests/verify_memory_guard_real.py": "b154947db940ba44fc54c23533ed2babffdab4f9",
+      "tests/verify_memory_streaming.py": "c254b12abe81f1e74347ceb473615ce0759a236c",
+      "update.py": "1c81f127cd3ed3eaf4943b755d046b9270a5fe17"
+    },
+    "verified_all_32_git_blobs": true
+  }
 }

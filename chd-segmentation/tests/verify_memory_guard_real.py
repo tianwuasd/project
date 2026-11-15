@@ -22,6 +22,10 @@ def orphan_worker(config, owner, connection):
             assert ticket is None
         with unittest.TestCase().assertRaisesRegex(RuntimeError, "协调进程"):
             require_owner({"owner": owner})
+        from chd_segmentation.models.supply import CpuReady
+        ready = CpuReady(mp.get_context('spawn'), 2, config['run_dir'], owner=owner)
+        with unittest.TestCase().assertRaisesRegex(RuntimeError, '协调进程'):
+            ready.wait(0, 'owner_already_exited')
     connection.send({"owner_exit_stopped_admission": True, "host_wait_refuses_missing_owner": True})
 
 

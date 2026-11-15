@@ -3,6 +3,7 @@ from copy import deepcopy
 from datetime import datetime
 import multiprocessing as mp
 import os
+import sys
 from pathlib import Path
 from time import perf_counter, sleep
 
@@ -23,6 +24,13 @@ from .offline_store import (FORMAT, case_directory, case_key, inspect_case, live
 from .prepare import load_prepared, validate_prepared_config
 
 
+_WORKER_CANCEL = None
+
+
+def worker_cancel(config):
+    return config.get('memory_cancel', _WORKER_CANCEL)
+
+
 def produce_case(prepared, config, root, name, key, recipe_identity):
     torch.set_num_threads(1)
     began = perf_counter()
@@ -30,7 +38,7 @@ def produce_case(prepared, config, root, name, key, recipe_identity):
     event(config["run_dir"], "preprocess_case_started", case_id=name, file=str(Path(root) / key))
     directory = case_directory(root, key)
     pending = begin_case(directory, key, recipe_identity)
-    with MemoryGuard(config, "preprocess_case", owner=config.get("memory_owner")) as guard:
+    with MemoryGuard(config, "preprocess_case", owner=config.get("memory_owner"), cancel=worker_cancel(config)) as guard:
         entry, workspace = stream_case(prepared, row, config, pending, guard)
         try:
             with stage(config, "preprocess_case_save", case_id=name):
@@ -49,7 +57,9 @@ def case_pointer(record):
             "locations_bytes": record["files"]["locations.npz"]["stamp"][0]}
 
 
-def initialize_worker(config, owner):
+def initialize_worker(config, owner, cancel):
+    global _WORKER_CANCEL
+    _WORKER_CANCEL = cancel
     torch.set_num_threads(1)
     register_member(config, owner)
 
@@ -60,6 +70,8 @@ def process_pending(config, prepared, root, identity, pending, pointers, catalog
     estimates = {r["case_id"]: r["workspace_bytes"] for r in case_estimates(config, prepared, "preprocess")}
     began, last_log, pool, next_adapt = perf_counter(), 0., None, 0.
     with resource_lease(runtime, prepared, {}, stage="preprocess") as allocation:
+        cancel = mp.get_context('spawn').Event()
+        runtime['memory_cancel'] = cancel
         runtime["memory_owner"] = allocation["owner"]
         completed_before = len(pointers)
         progress = Progress(config, "preprocess", total=len(prepared["manifest"]["cases"]), reused=completed_before)
@@ -87,7 +99,7 @@ def process_pending(config, prepared, root, identity, pending, pointers, catalog
                         workers = min(plan["workers"][0], len(pending))
                         if workers:
                             pool = ProcessPoolExecutor(workers, mp_context=mp.get_context("spawn"),
-                                initializer=initialize_worker, initargs=(runtime, allocation["owner"]))
+                                initializer=initialize_worker, initargs=(runtime, allocation["owner"], cancel))
                         next_adapt = perf_counter() + config["resources"]["adapt_seconds"]
                         event(config["run_dir"], "preprocess_supply_applied", workers=workers, cpu=plan)
                     facts, r = host_capacity(), config["resources"]
@@ -115,7 +127,8 @@ def process_pending(config, prepared, root, identity, pending, pointers, catalog
                             catalog["cases"][pointer["key"]] = pointer
                             write_json(root / "catalog.json", catalog)
                         else:
-                            future = pool.submit(producer, prepared, runtime, str(root), name, key, identity)
+                            task_config = {key: value for key, value in runtime.items() if key != 'memory_cancel'}
+                            future = pool.submit(producer, prepared, task_config, str(root), name, key, identity)
                             running[future], names[future] = estimates[name], name
                         continue
                     done, _ = wait(running, timeout=.5, return_when=FIRST_COMPLETED) if running else (set(), set())
@@ -144,6 +157,8 @@ def process_pending(config, prepared, root, identity, pending, pointers, catalog
                     if not running and pending:
                         sleep(r["poll_seconds"])
             finally:
+                if sys.exc_info()[0] is not None or pending or running:
+                    cancel.set()
                 if pool is not None:
                     pool.shutdown(wait=True, cancel_futures=True)
                 progress.update(done=len(pointers), new=len(pointers) - completed_before,

@@ -28,7 +28,7 @@ zmic 使用 `/data4/zhangruichen`：项目实体目录固定在 `code/chd-segmen
 
 独立 `update.py` 只使用 Python 3.11+ 标准库与系统 Git。它取得本项目需要的文件对象，检查语法，再将本地 main 快进到固定的远端提交；成功后 HEAD、origin/main 和核对时的远端 main 一致，并逐文件核验本项目内容。`run.py --code-info` 显示实际代码、提交与解释器，本地修改标记只检查本项目。运行任务请统一使用 `run.py` 或 `smoke.py`，它们持有代码锁；本项目的本地修改、未知文件或活动任务会阻止更新。其他项目的工作文件保留；若其暂存内容与远端提交冲突，Git 会停止更新并保留暂存内容。更新不会安装环境或启动训练。
 
-公开仓库更新默认探测 `ghfast.top`、`gh-proxy.com` 与 GitHub，选择提交匹配、支持按需下载且响应较快的镜像。地址和超时保存在 `course/chd-segmentation/update_network.json`，可以手动修改；也可使用 `--mirror 地址` 或 `--mirror direct`。镜像请求不携带 Git 凭据，选定来源与探测结果记录到过程目录。文件内容校验失败时停止本次更新。
+公开仓库更新默认直连 GitHub。显式 `--mirror auto` 时探测配置镜像与 GitHub，选择提交匹配、支持按需下载且响应较快的来源；也可使用 `--mirror 地址` 或 `--mirror direct`。地址和超时保存在 `course/chd-segmentation/update_network.json`。镜像请求不携带 Git 凭据，选定来源与探测结果记录到过程目录。文件内容校验失败时停止本次更新。旧更新器的200文件限制需要按[发布说明](docs/ASSISTANT2_PUBLICATION.md)先取得固定版本更新器。
 
 用户明确允许本项目以远端为准时，执行 `python3 -B update.py --force`。它修复部分索引、本项目暂存删除和缺失文件，并允许同步到重写后的远端 main；目标源码的本地修改会被覆盖。首次切换执行 `--force --relocate`，持有任务锁后将实体项目从 code/git/chd-segmentation 移到 code/chd-segmentation，再同步代码。数据、环境、运行结果、其他项目和非目标未知文件保留。
 

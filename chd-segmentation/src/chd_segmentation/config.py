@@ -31,6 +31,7 @@ DEFAULTS = {
                   "pressure_retries": 3,
                   "memory_limit_bytes": 100_000_000_000, "memory_sample_seconds": 1.,
                   "memory_snapshot_seconds": 15., "memory_pressure_seconds": 90.,
+                  "memory_pressure_action": "wait",
                   "memory_resume_seconds": 5., "memory_resume_fraction": .02,
                   "collective_timeout_seconds": 180,
                   "share_window_seconds": 30, "share_utilization": 50,
@@ -156,6 +157,8 @@ def load_config(path, overrides=None):
 
 
 def validate_resources(r,batch):
+    if r['memory_pressure_action'] not in ('wait', 'stop'):
+        raise ValueError('memory_pressure_action必须为wait或stop')
     if type(r["memory_limit_bytes"]) is not int or not 0 < r["memory_limit_bytes"] <= 100_000_000_000:
         raise ValueError("项目内存上限必须为正整数字节，最多100GB十进制")
     if r["memory_sample_seconds"] != 1 or min(r["memory_snapshot_seconds"], r["memory_pressure_seconds"], r["memory_resume_seconds"]) <= 0:

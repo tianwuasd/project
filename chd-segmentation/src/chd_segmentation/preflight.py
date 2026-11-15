@@ -41,17 +41,8 @@ def _path_check(path, writable=False, require_file=False):
             "readable": True, "writable": bool(writable), "free_bytes": usage.free}
 
 
-def quick_check(config, stage, prepared=None):
-    """执行不读取影像、不初始化模型的配置与输入检查。"""
-    if stage not in ("prepare", "preprocess", "train"):
-        raise ValueError("stage 必须为 prepare、preprocess 或 train")
-    if stage == "train" and prepared is None:
-        raise ValueError("train 快速检查必须提供 prepared 描述")
-    report = {"ok": False, "stage": stage, "checks": {}, "limits": [
-        "未读取 CT 或标签体素", "离线病例仅检查元数据和文件 stamp，未重算数组摘要"]}
-    checks = report["checks"]
-    checks["configuration"] = {"dataset": config["dataset"], "scope": config["scope"],
-                                "fold": config["fold"], "statistics_source": config["preprocessing"]["statistics_source"]}
+def environment_check(resources):
+    checks = {}
     checks["dependencies"] = {name: version(name) for name in ("torch", "monai", "nnunetv2", "numpy", "scipy", "nibabel", "psutil")}
     from scipy.ndimage import map_coordinates, spline_filter1d
     from batchgenerators.augmentations.utils import _resample_seg_by_argmax
@@ -64,12 +55,50 @@ def quick_check(config, stage, prepared=None):
         if not required <= signature(function).parameters.keys():
             raise RuntimeError("当前环境的必要预处理 API 不兼容：" + function.__name__)
     checks["apis"] = [function.__name__ for function, _ in functions]
-    if config["resources"]["device"] == "cuda":
+    if resources["device"] == "cuda":
         if not torch.cuda.is_available():
             raise RuntimeError("配置要求 CUDA，当前环境无法使用 CUDA")
         checks["cuda"] = {"available": True, "device_count": torch.cuda.device_count()}
     else:
         checks["cuda"] = {"available": torch.cuda.is_available(), "required": False}
+    return checks
+
+
+def preprocessing_disk_check(config, record, content=None):
+    from .training.budget import case_estimates
+    estimates = case_estimates(config, record, 'preprocess')
+    identity = digest(recipe(record, config) if content is None else content)
+    base = Path(config['preprocessing']['root'])
+    index = read_json(base/'index.json') if (base/'index.json').is_file() else {}
+    root = (base/index[identity]).resolve() if identity in index else None
+    needed = []
+    for row, estimate in zip(record['manifest']['cases'], estimates):
+        key = case_key(row, identity)
+        if root is None or inspect_case(case_directory(root, key), key, identity, full=False) is None:
+            needed.append(estimate)
+    final = sum(value['output_array_bytes'] for value in needed)
+    intermediate = max((value['output_array_bytes']+32*math.prod(value['input_shape_xyz']) for value in needed), default=0)
+    required = 0 if not needed else final+intermediate*min(len(needed), config['resources']['max_readers'])+config['preprocessing']['block_bytes']*8
+    path = _path_check(base, writable=True)
+    result = dict(pending_cases=len(needed), estimated_remaining_bytes=required,
+                  free_bytes=path['free_bytes'], basis='未复用病例输出上界、分块中间文件和实际读盘并发')
+    if path['free_bytes'] < required:
+        raise OSError('data目标磁盘剩余空间不足，保留已有数据并释放其他空间后重试')
+    return result
+
+
+def quick_check(config, stage, prepared=None):
+    """执行不读取影像、不初始化模型的配置与输入检查。"""
+    if stage not in ("prepare", "preprocess", "train"):
+        raise ValueError("stage 必须为 prepare、preprocess 或 train")
+    if stage == "train" and prepared is None:
+        raise ValueError("train 快速检查必须提供 prepared 描述")
+    report = {"ok": False, "stage": stage, "checks": {}, "limits": [
+        "未读取 CT 或标签体素", "离线病例仅检查元数据和文件 stamp，未重算数组摘要"]}
+    checks = report["checks"]
+    checks["configuration"] = {"dataset": config["dataset"], "scope": config["scope"],
+                                "fold": config["fold"], "statistics_source": config["preprocessing"]["statistics_source"]}
+    checks.update(environment_check(config['resources']))
 
     manifest = apply_split(load_manifest(config["manifest"], config["dataset"], config["scope"],
                                          allow_unassigned=config["split"]["path"] is not None), config)
@@ -109,25 +138,6 @@ def quick_check(config, stage, prepared=None):
                               "offline_root": None if storage_root is None else str(storage_root),
                               "offline_validation": "metadata_and_file_stamps" if storage_root is not None else "not_applicable"}
         if stage == "preprocess" and config["preprocessing"]["root"]:
-            from .training.budget import case_estimates
-            estimates = case_estimates(config, record, "preprocess")
-            identity = digest(recipe(record, config))
-            base = Path(config["preprocessing"]["root"])
-            index = read_json(base / "index.json") if (base / "index.json").is_file() else {}
-            root = (base / index[identity]).resolve() if identity in index else None
-            needed = []
-            for row, estimate in zip(record["manifest"]["cases"], estimates):
-                key = case_key(row, identity)
-                if root is None or inspect_case(case_directory(root, key), key, identity, full=False) is None:
-                    needed.append(estimate)
-            final = sum(value["output_array_bytes"] for value in needed)
-            intermediate = max((value["output_array_bytes"] + 32 * math.prod(value["input_shape_xyz"])
-                                for value in needed), default=0)
-            required = 0 if not needed else final + intermediate * min(len(needed), config["resources"]["max_readers"]) + config["preprocessing"]["block_bytes"] * 8
-            available = checks["paths"]["preprocessing_root"]["free_bytes"]
-            checks["disk_plan"] = {"pending_cases": len(needed), "estimated_remaining_bytes": required,
-                                   "free_bytes": available, "basis": "未复用病例的裁剪前输出上界、分块中间文件及读盘并发"}
-            if available < required:
-                raise OSError("data 目标磁盘剩余空间不足；保留已有数据并释放其他空间后重试")
+            checks['disk_plan'] = preprocessing_disk_check(config, record)
     report["ok"] = True
     return report
