@@ -18,6 +18,7 @@
 | 两数据集审计清单及冻结划分 | 助手1既有私有server-inputs | course/chd-segmentation/inputs | 复用已有材料及bind-inputs入口 |
 | Q1282私有输入包 | D:/projects/back/deliverables/chd-segmentation-assistant2-inputs | course/chd-segmentation/inputs/q1282 | 已生成393/197/128/456例组合、来源证据和三个阶段配置；迁移后bind-inputs |
 | 两模型实际路径配置 | configs/models中的模板复制后填写 | course/chd-segmentation/configs/models | 需按服务器路径填写 |
+| 本轮五份离线配置 | 集中交付assistant2目录：Q三个阶段及MedSAM2两个数据集 | course/chd-segmentation/assistant2/configs | 新增小文件；Q独立run_dir/parents，保留旧输入包 |
 | MedSAM2预测提示 | 人工框、图像定位器输出或显式label-box评测 | course/chd-segmentation/inputs/prompts.yaml | 标签框模式无需另交提示文件；需要测试标签；训练提示由训练标签产生 |
 
 env/medsam2是本机额外Python包，服务器应按依赖清单安装并实际导入核验。既有Windows解释器和环境文件供本机使用。原始影像继续读取服务器既有data目录。
@@ -27,6 +28,8 @@ MedSAM2依赖清单中的TensorDict0.15.6要求PyTorch2.11及以上，本机已�
 将模型配置复制到course目录后，需要重新填写official_root、dependency_root、pretrained、run_dir和work_root。模板中的相对路径供本机工程目录使用，服务器配置应填写服务器上的实际路径。
 
 Q的A训练上游、B训练局部、C用于选模、D独立评价，四组患者相互独立；预处理统计拟合限于A。1282私有输入包已保留原验证、内部测试和两个外部子组，仅将原训练患者按2:1分成A/B，具体命令见[1282组合与标签框](Q1282_AND_LABEL_BOX.md)。local阶段读取已完成的base和localizer的best.pt；base和localizer阶段parents为空。
+
+离线运行脚本默认读取assistant2/configs/q1282_base.yaml、q1282_localizer.yaml、q1282_local.yaml。集中交付中对应的CHD1282-Q-20261115阶段配置需按此名称上传；run_dir统一为course/chd-segmentation/assistant2/runs/CHD1282-Q-20261115。输入包原阶段配置和旧在线任务目录保持原位置。两模型prepare命令明确覆盖到assistant2/prepare下的来源日志目录，避免写入旧STU运行记录。
 
 MedSAM2沿用原CHD1282准备描述和原训练590、验证128、内部测试127及外部298/31的角色。Q使用独立的A组拟合计划；命令中的PREP与Q_PREP分别填写对应准备描述。正式MedSAM2入口拒绝Q组别准备描述。prepare保存来源描述，models preprocess生成各模型独立处理合同的离线描述，模型训练只读取后者。
 

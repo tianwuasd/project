@@ -34,7 +34,7 @@ git -C "$REPO" sparse-checkout set chd-segmentation
 
 ## 数据和运行目录
 
-两个模型的work_root仍使用/data4/zhangruichen/course/chd-segmentation，以共享resources登记CPU、RAM及GPU额度。助手2的准备描述和专用配置保存在其assistant2子目录，Q绑定配置的run_dir及parents由私有Q包绑定结果确定。MedSAM2的run_dir使用独立assistant2/runs目录。更新回执的RUNTIME与模型资源work_root分别指定。
+两个模型的work_root仍使用/data4/zhangruichen/course/chd-segmentation，以共享resources登记CPU、RAM及GPU额度。助手2的准备描述、来源日志和专用配置保存在其assistant2子目录。Q使用本次新增的三个阶段配置，统一run_dir为assistant2/runs/CHD1282-Q-20261115，parents指向该目录的上游best.pt；原私有包只提供冻结组别和prepare配置。Q_CONFIG_DIR可明确选择模型配置目录。MedSAM2的run_dir也使用独立assistant2/runs目录。更新回执的RUNTIME与模型资源work_root分别指定。
 
 离线数组统一位于/data4/zhangruichen/data/chd-segmentation/preprocessed，按处理合同、折、统计来源及内容身份管理。模型训练命令见MODELS_ASSISTANT2.md，完整准备与运行脚本为scripts/CHD1282-Q-20261115_run.sh及scripts/ImageCHD-CHD1282-MedSAM2-20261115_run.sh。官方源码、依赖、权重和私有Q材料按ASSISTANT2_SERVER_FILES.md分别迁移；代码更新不会传输这些材料，也不会启动正式训练。
 

@@ -209,7 +209,7 @@ def run(spec_path, root, report, validate_only=False, check_logging=False, start
                 current = code_identity()
                 check.assertTrue(compatible_code(current, current))
                 check.assertFalse(compatible_code("0" * 64, current))
-                check.assertFalse(compatible_code(baseline, "0" * 64))
+                check.assertFalse(compatible_code(current, "0" * 64))
             events = [json.loads(line) for line in (process / "training" / "events.jsonl").read_text(encoding="utf-8").splitlines()]
             if (predictions / "events.jsonl").exists() or not any(row["event"] == "prediction" for row in events):
                 raise ValueError("预测事件日志未保存到过程目录")

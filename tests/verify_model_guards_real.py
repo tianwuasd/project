@@ -78,7 +78,8 @@ def run(args):
                     official_root=str(ROOT/'vendor/MedSAM2'), dependency_root=str(ROOT/'env/medsam2'),
                     pretrained=str(ROOT/'data/model_weights/MedSAM2_latest.pt') if model == 'medsam2' else experiment['pretrained'],
                     execution=dict(cpu_processes=1, workers=0,
-                        reserve_ram_bytes=host_capacity()['total_bytes']+2**30,wait_seconds=0))
+                        reserve_ram_bytes=DEFAULTS['resources']['reserve_ram_bytes'] if model=='medsam2' else
+                            host_capacity()['total_bytes']+2**30,wait_seconds=0))
                 path = workspace.root/(model+'.json')
                 write_json(path, spec)
                 offline_path = workspace.root/'course'/(model+'-offline.json')
@@ -95,6 +96,10 @@ def run(args):
                 check.assertEqual(len(waits),2)
                 check.assertTrue(all(event['cpu']['admitted'] is False and
                     event['cpu']['model_memory']['model']==model for event in waits))
+                if model=='medsam2':
+                    check.assertTrue(all(event['cpu']['minimum_bytes']>event['cpu']['budget_bytes'] and
+                        event['cpu']['model_memory']['rank_fixed_bytes']==[18*2**30] for event in waits))
+                    record['medsam_actual_training_budget_rejected']=True
             assert all(file_digest(row[kind]) == row['sha256'][kind] for kind in ('image', 'label'))
             record.update(source_unchanged=True, seconds=perf_counter()-started)
 

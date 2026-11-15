@@ -6,29 +6,31 @@ code=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 py=${CHD_PYTHON:-"$root/env/chd-segmentation/bin/python"}
 course="$root/course/chd-segmentation"
 inputs=${Q_INPUTS:-"$course/inputs/q1282"}
+models=${Q_CONFIG_DIR:-"$course/assistant2/configs"}
 source_file="$course/assistant2/prepared/CHD1282-Q-20261115_source.json"
 ready="$course/assistant2/prepared/CHD1282-Q-20261115_offline.json"
 data=${CHD_PREPROCESSED_ROOT:-"$root/data/chd-segmentation/preprocessed"}
 
 case "$action" in
   prepare)
-    "$py" -u -B "$code/run.py" prepare --config "$inputs/q1282_prepare.yaml" --output "$source_file"
-    "$py" -u -B "$code/run.py" models preprocess --config "$inputs/q1282_base.yaml" \
+    "$py" -u -B "$code/run.py" prepare --config "$inputs/q1282_prepare.yaml" \
+      --run-dir "$course/assistant2/prepare/CHD1282-Q-20261115" --output "$source_file"
+    "$py" -u -B "$code/run.py" models preprocess --config "$models/q1282_base.yaml" \
       --prepare-config "$inputs/q1282_prepare.yaml" --prepared "$source_file" --root "$data" --output "$ready"
     ;;
   base|localizer|local)
-    "$py" -u -B "$code/run.py" models train --config "$inputs/q1282_${action}.yaml" \
+    "$py" -u -B "$code/run.py" models train --config "$models/q1282_${action}.yaml" \
       --prepared "$ready" --stage "$action" --device cuda --gpus "${CHD_GPUS:-2}" --no-share-gpu
     ;;
   resume)
     stage=${2:?请指定base、localizer或local}
     case "$stage" in base|localizer|local) ;; *) exit 2 ;; esac
-    "$py" -u -B "$code/run.py" models train --config "$inputs/q1282_${stage}.yaml" \
+    "$py" -u -B "$code/run.py" models train --config "$models/q1282_${stage}.yaml" \
       --prepared "$ready" --stage "$stage" --device cuda --gpus "${CHD_GPUS:-2}" --no-share-gpu --resume
     ;;
   internal|external)
     checkpoint=${Q_CHECKPOINT:?请填写局部阶段best.pt的完整路径}
-    "$py" -u -B "$code/run.py" models predict --config "$inputs/q1282_local.yaml" \
+    "$py" -u -B "$code/run.py" models predict --config "$models/q1282_local.yaml" \
       --prepared "$ready" --checkpoint "$checkpoint" --test-set "$action" \
       --output "$root/result/chd-segmentation/assistant2/CHD1282-Q-20261115/$action" --no-share-gpu
     ;;

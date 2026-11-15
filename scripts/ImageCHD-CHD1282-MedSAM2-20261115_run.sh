@@ -14,7 +14,8 @@ ready="$course/assistant2/prepared/${label}-MedSAM2-20261115_offline.json"
 data=${CHD_PREPROCESSED_ROOT:-"$root/data/chd-segmentation/preprocessed"}
 case "$action" in
   prepare)
-    "$py" -u -B "$code/run.py" prepare --config "$prepare_config" --output "$source_file"
+    "$py" -u -B "$code/run.py" prepare --config "$prepare_config" \
+      --run-dir "$course/assistant2/prepare/${label}-MedSAM2-20261115" --output "$source_file"
     "$py" -u -B "$code/run.py" models preprocess --config "$model" --prepare-config "$prepare_config" \
       --prepared "$source_file" --root "$data" --output "$ready"
     ;;
