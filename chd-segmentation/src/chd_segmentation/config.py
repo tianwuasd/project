@@ -8,7 +8,9 @@ import yaml
 
 DEFAULTS = {
     "model": "stunet", "scope": "formal", "fold": 0, "result_root": None, "plan": None,
-    "preprocessing": {"root": None, "statistics_source": "main-train"},
+    "preprocessing": {"root": None, "statistics_source": "main-train", "block_bytes": 64 * 1024 ** 2,
+                      "read_block_bytes": 64 * 1024 ** 2,
+                      "block_threshold_bytes": 100_000_000_000},
     "split": {"path": None, "format": "auto", "id_field": "case_id", "unit": "auto"},
     "logging": {"heartbeat_seconds": 15, "case_details": True},
     "planning": {"mode": "auto", "samples_per_case": 100000, "max_samples": 2000000,
@@ -27,6 +29,9 @@ DEFAULTS = {
                   "wait_seconds": None, "poll_seconds": 2, "share": False,
                   "min_gpus": None, "adapt_seconds": 30, "growth_seconds": 60,
                   "pressure_retries": 3,
+                  "memory_limit_bytes": 100_000_000_000, "memory_sample_seconds": 1.,
+                  "memory_snapshot_seconds": 15., "memory_pressure_seconds": 90.,
+                  "memory_resume_seconds": 5., "memory_resume_fraction": .02,
                   "collective_timeout_seconds": 180,
                   "share_window_seconds": 30, "share_utilization": 50,
                   "vram_reserve_bytes": 4 * 1024 ** 3, "vram_reserve_fraction": 0.1,
@@ -59,6 +64,9 @@ def load_config(path, overrides=None):
         config = _merge(config, overrides)
     if not isinstance(config["preprocessing"]["statistics_source"], str) or not config["preprocessing"]["statistics_source"].strip():
         raise ValueError("预处理统计来源必须使用明确名称")
+    for key in ("block_bytes", "read_block_bytes", "block_threshold_bytes"):
+        if type(config["preprocessing"][key]) is not int or config["preprocessing"][key] < 1024:
+            raise ValueError("预处理块预算及分块阈值必须为至少 1024 字节的整数")
     if config["preprocessing"]["root"] is not None:
         target = Path(config["preprocessing"]["root"]).expanduser()
         config["preprocessing"]["root"] = str((path.parent / target).resolve() if not target.is_absolute() else target.resolve())
@@ -148,6 +156,12 @@ def load_config(path, overrides=None):
 
 
 def validate_resources(r,batch):
+    if type(r["memory_limit_bytes"]) is not int or not 0 < r["memory_limit_bytes"] <= 100_000_000_000:
+        raise ValueError("项目内存上限必须为正整数字节，最多100GB十进制")
+    if r["memory_sample_seconds"] != 1 or min(r["memory_snapshot_seconds"], r["memory_pressure_seconds"], r["memory_resume_seconds"]) <= 0:
+        raise ValueError("内存采样最多间隔1秒，快照、压力和恢复窗口必须为正数")
+    if not 0 < r["memory_resume_fraction"] < .2:
+        raise ValueError("内存恢复迟滞比例必须位于[0,0.2)")
     if r["device"] not in ("cpu", "cuda"):
         raise ValueError("device 必须为 cpu 或 cuda；具体显卡使用 gpu_ids 选择")
     if not 1 <= r["gpu_count"] <= 4 or not 1 <= r["cpu_processes"] <= 4:

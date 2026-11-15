@@ -18,19 +18,19 @@
 Python 3.11+ 和系统 Git 即可执行更新，不依赖训练环境。在服务器执行：
 
 ```bash
-python3 -B /data4/zhangruichen/code/chd-segmentation/update.py
+env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy python3 -B /data4/zhangruichen/code/chd-segmentation/update.py --mirror direct
 ```
 
 仅查询当前和远端提交：
 
 ```bash
-python3 -B /data4/zhangruichen/code/chd-segmentation/update.py --check
+env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy python3 -B /data4/zhangruichen/code/chd-segmentation/update.py --check --mirror direct
 ```
 
 用户明确允许以远端代码覆盖本项目时使用：
 
 ```bash
-python3 -B /data4/zhangruichen/code/chd-segmentation/update.py --force
+env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy python3 -B /data4/zhangruichen/code/chd-segmentation/update.py --force --mirror direct
 ```
 
 `--force` 修复部分索引、本项目暂存删除和缺失工作文件，允许切换到重写后的远端 main，并将目标源码以远端为准同步。目标源码的本地修改会被覆盖；其他项目的文件及既有暂存记录、非目标未知文件保留。任务锁、外部 Git 索引锁、目录和链接边界继续生效。未变化的源码不重复写出。回执包含 forced、tracked_code_clean 和实际 code 路径。
@@ -47,7 +47,9 @@ python3 -B /data4/zhangruichen/code/chd-segmentation/update.py --force
 
 目录移动在目标代码下载及语法检查之后执行。数据、环境、course 中的日志和检查点、result 中的结果保持原路径。默认 --repo 为 /data4/zhangruichen/code；迁移命令不使用 --remove-legacy。
 
-## 镜像配置
+## 下载来源
+
+zmic 服务器通过现有网络直接联网，当前命令显式使用 `--mirror direct` 并清除本次进程继承的代理变量。Git 下载忽略代理配置，不修改系统或用户的全局设置。
 
 公开仓库默认并行探测 ghfast.top、gh-proxy.com 和 GitHub。候选必须支持部分下载、提交匹配，优先选择响应较快的可用镜像。GitHub 可达时以官方提交核对候选；官方不可达时要求可用镜像引用一致，回执标注 `mirror_agreement`，该状态不能代替官方实时核验。
 

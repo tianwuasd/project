@@ -27,6 +27,8 @@ def public_environment():
     for name in list(env):
         if name in {"GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT", "GIT_ASKPASS", "SSH_ASKPASS", "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_SSL_NO_VERIFY"} or name.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_")):
             env.pop(name)
+        elif os.name != "nt" and name.lower() in {"http_proxy", "https_proxy", "all_proxy"}:
+            env.pop(name)
     env.update({"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1", "GIT_TERMINAL_PROMPT": "0", "GIT_NO_LAZY_FETCH": "1"})
     return env
 
@@ -199,6 +201,9 @@ class GitRepository:
         selected = min([row for row in good if row["url"] != official] or good, key=lambda row: row["seconds"])
         keys = self.run("config", "--includes", "--name-only", "--get-regexp", r"^(http\..*(extraheader|cookiefile|savecookies)|credential\..*helper)$", absent=True).decode().splitlines()
         self.public_options = ["-c", "credential.helper=", "-c", "http.extraHeader=", "-c", "http.cookieFile=", "-c", "http.saveCookies=false", "-c", "http.sslVerify=true"]
+        if os.name != "nt":
+            keys += self.run("config", "--includes", "--name-only", "--get-regexp", r"^http\..*proxy$", absent=True).decode().splitlines()
+            self.public_options += ["-c", "http.proxy="]
         for key in keys:
             self.public_options += ["-c", key + "="]
         self.transport = selected["url"]

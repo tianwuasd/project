@@ -46,8 +46,7 @@ class SourceReader:
         if self.with_label and row.get("label"):
             self._source(row, "label")
 
-    def read_case(self, row):
-        started = perf_counter()
+    def read_metadata(self, row):
         image = nib.load(self._source(row, "image"))
         if len(image.shape) != 3:
             raise ValueError("原图必须是三维")
@@ -68,9 +67,14 @@ class SourceReader:
         roi = roi if roi is not None else [[0, int(size)] for size in image.shape]
         if len(roi) != 3 or any(not (0 <= begin < end <= size) for (begin, end), size in zip(roi, image.shape)):
             raise ValueError("技术子区域超出真实图像范围")
+        native_spacing = np.asarray(row["spacing_xyz"], dtype=np.float32).astype(float)
+        return image, label, native_spacing, roi
+
+    def read_case(self, row):
+        started = perf_counter()
+        image, label, native_spacing, roi = self.read_metadata(row)
         region = tuple(slice(begin, end) for begin, end in roi)
         shape = np.array([end - begin for begin, end in roi])
-        native_spacing = np.asarray(row["spacing_xyz"], dtype=np.float32).astype(float)
         if host_capacity()["available_bytes"] < self.reserve + int(np.prod(shape) * 32):
             raise MemoryError("病例构建所需内存超出安全余量")
         with self.stage("read_decompress", case_id=row["case_id"], shape_xyz=shape.tolist(),

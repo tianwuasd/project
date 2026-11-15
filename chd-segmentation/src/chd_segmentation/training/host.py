@@ -1,3 +1,4 @@
+import ctypes
 from ctypes import CDLL, POINTER, byref, c_char_p, c_int, c_void_p
 from ctypes.util import find_library
 from functools import lru_cache
@@ -9,6 +10,55 @@ import sys
 
 import numpy as np
 import psutil
+
+
+def windows_job_capacity():
+    if sys.platform != "win32":
+        return None
+    from ctypes import wintypes
+
+    class BasicLimits(ctypes.Structure):
+        _fields_ = [("process_time", ctypes.c_int64), ("job_time", ctypes.c_int64),
+                    ("flags", wintypes.DWORD), ("min_working_set", ctypes.c_size_t),
+                    ("max_working_set", ctypes.c_size_t), ("active_processes", wintypes.DWORD),
+                    ("affinity", ctypes.c_size_t), ("priority", wintypes.DWORD),
+                    ("scheduling", wintypes.DWORD)]
+
+    class IoCounters(ctypes.Structure):
+        _fields_ = [(name, ctypes.c_uint64) for name in
+                    ("read_operations", "write_operations", "other_operations", "read_bytes", "write_bytes", "other_bytes")]
+
+    class ExtendedLimits(ctypes.Structure):
+        _fields_ = [("basic", BasicLimits), ("io", IoCounters),
+                    ("process_memory", ctypes.c_size_t), ("job_memory", ctypes.c_size_t),
+                    ("peak_process_memory", ctypes.c_size_t), ("peak_job_memory", ctypes.c_size_t)]
+
+    class MemoryUsage(ctypes.Structure):
+        _fields_ = [("current", ctypes.c_uint64), ("peak", ctypes.c_uint64)]
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.GetCurrentProcess.restype = wintypes.HANDLE
+    kernel.IsProcessInJob.argtypes = [wintypes.HANDLE, wintypes.HANDLE, POINTER(wintypes.BOOL)]
+    kernel.IsProcessInJob.restype = wintypes.BOOL
+    kernel.QueryInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, c_void_p,
+                                                wintypes.DWORD, POINTER(wintypes.DWORD)]
+    kernel.QueryInformationJobObject.restype = wintypes.BOOL
+    included = wintypes.BOOL()
+    if not kernel.IsProcessInJob(kernel.GetCurrentProcess(), None, byref(included)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    if not included.value:
+        return None
+    limits, usage = ExtendedLimits(), MemoryUsage()
+    if not kernel.QueryInformationJobObject(None, 9, byref(limits), ctypes.sizeof(limits), None):
+        raise ctypes.WinError(ctypes.get_last_error())
+    if not kernel.QueryInformationJobObject(None, 28, byref(usage), ctypes.sizeof(usage), None):
+        raise ctypes.WinError(ctypes.get_last_error())
+    job_limit = int(limits.job_memory) if limits.basic.flags & 0x200 else None
+    process_limit = int(limits.process_memory) if limits.basic.flags & 0x100 else None
+    current_process = psutil.Process().memory_info().private
+    return {"limit_bytes": job_limit, "current_bytes": int(usage.current),
+            "peak_bytes": int(usage.peak), "process_limit_bytes": process_limit,
+            "process_current_bytes": current_process, "scope": "current_job"}
 
 
 @lru_cache(maxsize=1)
@@ -90,6 +140,13 @@ def host_capacity():
                 row["cpu_quota"] = int(values[0]) / int(values[1])
                 quota = min(quota, row["cpu_quota"])
         groups.append(row)
+    job = windows_job_capacity()
+    if job is not None:
+        for limit, used in ((job["limit_bytes"], job["current_bytes"]),
+                            (job["process_limit_bytes"], job["process_current_bytes"])):
+            if limit is not None:
+                total = min(total, limit)
+                available = min(available, max(0, limit - used))
     return {"cores": max(1, int(quota)), "cpu_quota": quota, "affinity_cores": cores,
             "host_total_bytes": memory.total, "host_available_bytes": memory.available,
-            "total_bytes": total, "available_bytes": available, "cgroups": groups}
+            "total_bytes": total, "available_bytes": available, "cgroups": groups, "windows_job": job}

@@ -478,6 +478,25 @@
         "medpredict",
         "shared-offline"
       ]
+    },
+    {
+      "source": "837242370777633814ef8619c2f93e825afe7508436b60b377ded402266ef797",
+      "target": "6d47690294f048ef783fb26ec8a876fd25a6a98aff0f116b94322169a2e35f63",
+      "reason": "STU-Net冻结计划、损失、采样顺序和完整训练状态保持；离线分块使用相同全局坐标与插值。准入、资源保留及进度记录更新，离线数据身份仍须独立完整核验。",
+      "validation": ["two-real-imagechd-roi32-numeric-bitwise", "two-rank-gloo-batch4-two-updates-exact-resume", "offline-reuse", "real-owner-exit-and-checkpoint-reserve"],
+      "scope": "STU-Net；Linux正式大病例和CUDA/NCCL运行未在本机验收"
+    },
+    {
+      "source": "bce6c67174dac7688b62abb49206274d126fbd9ee06ddfba9818b0badea753e5",
+      "target": "6d47690294f048ef783fb26ec8a876fd25a6a98aff0f116b94322169a2e35f63",
+      "reason": "精确整包源码审阅，保留main的其他模型源码。STU-Net数值及完整恢复协议保持，新增有界分块、真实内存保护和进度记录。仅用于STU训练入口的源码相容核验。",
+      "validation": ["two-real-imagechd-roi32-numeric-bitwise", "two-rank-gloo-batch4-two-updates-exact-resume", "offline-reuse", "real-owner-exit-and-checkpoint-reserve"]
+    },
+    {
+      "source": "48b47624afc776809111fa6616950c06d2a99bf168628ecbf759129a258b504e",
+      "target": "6d47690294f048ef783fb26ec8a876fd25a6a98aff0f116b94322169a2e35f63",
+      "reason": "已验收两次真实更新版本的数值流程保持；只增加协调进程退出检查、独立检查点内存保留与中文阶段名称。",
+      "validation": ["real-owner-exit-and-checkpoint-reserve", "actual-progress-record-format", "python-ast"]
     }
   ]
 }

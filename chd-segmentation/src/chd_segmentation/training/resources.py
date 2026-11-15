@@ -16,6 +16,8 @@ from ..artifacts.store import digest, file_digest, read_json, write_json
 from ..observability.events import event
 from .budget import case_estimates, cpu_plan
 from .host import host_capacity
+from .memory_guard import (MEMORY_LIMIT_BYTES, alive as memory_alive, fresh_snapshot,
+                           memory_decision, pending_bytes, same_process, system_headroom)
 
 GIB = 1024 ** 3
 
@@ -29,12 +31,12 @@ def layout(batch, world, manual=None):
 
 def inventory(owned_pids=(), visible_devices="inherited"):
     raw = subprocess.run(["nvidia-smi", "--query-gpu=index,uuid,memory.total,memory.free,utilization.gpu",
-                          "--format=csv,noheader,nounits"], check=True, capture_output=True, text=True).stdout
+                          "--format=csv,noheader,nounits"], check=True, capture_output=True, text=True, timeout=5).stdout
     rows = [{"index": int(i), "uuid": u.strip(), "total": int(t) * 1024 ** 2,
              "free": int(f) * 1024 ** 2, "utilization": int(v)}
             for i, u, t, f, v in csv.reader(io.StringIO(raw))]
     apps = subprocess.run(["nvidia-smi", "--query-compute-apps=gpu_uuid,pid", "--format=csv,noheader,nounits"],
-                          check=True, capture_output=True, text=True).stdout
+                          check=True, capture_output=True, text=True, timeout=5).stdout
     applications = list(csv.reader(io.StringIO(apps)))
     busy = {row[0].strip() for row in applications if row and int(row[1]) not in owned_pids}
     owned = {row[0].strip() for row in applications if row and int(row[1]) in owned_pids}
@@ -62,7 +64,7 @@ def capacity_key(config, spec, local_batch, world=None):
 
 def process_vram(uuid, pid):
     raw = subprocess.run(["nvidia-smi", "--query-compute-apps=gpu_uuid,pid,used_gpu_memory",
-                          "--format=csv,noheader,nounits"], check=True, capture_output=True, text=True).stdout
+                          "--format=csv,noheader,nounits"], check=True, capture_output=True, text=True, timeout=5).stdout
     entries = [int(amount) * 1024 ** 2 for gpu, process, amount in csv.reader(io.StringIO(raw))
                if gpu.strip() == uuid and int(process) == pid]
     if len(entries) != 1:
@@ -178,11 +180,18 @@ def refresh_supply(config, prepared, allocation, apply=False):
         if len(own) != 1:
             raise RuntimeError("训练资源所有权已经失效")
         peers = [p for p in rows if p not in own]
-        result = cpu_plan(config, prepared, allocation["world"], peers, own=own,
+        bounded = memory_planning_config(config, rows, owner)
+        result = cpu_plan(bounded, prepared, allocation["world"], peers, own=own,
                           stage=allocation.get("stage", "train"), estimates=allocation["supply"]["case_estimates"])
+        if result["admitted"]:
+            proposed = [{**p, "ram_bytes": result["ram_bytes"]} if p in own else p for p in rows]
+            decision = memory_decision(config, proposed, fresh_snapshot(proposed), owner)
+            result["memory"] = decision
+            if not decision["admitted"]:
+                result.update(admitted=False, reason="实时整机或项目进程组内存余量不足")
         if apply and result["admitted"]:
             own[0].update(cpu_slots=result["cpu_slots"], ram_bytes=result["ram_bytes"])
-            write_json(root / "active.json", rows)
+            write_json(root / "active.json", rows, durable=False)
         return result
 
 
@@ -190,18 +199,25 @@ def available_world(config, spec, allocation):
     if not allocation["gpus"]:
         return allocation["world"]
     root = Path(config["work_root"]) / "resources"
+    owner = dict(allocation["owner"])
     with FileLock(str(root / ".resource.lock")):
         rows = active_peers(root / "active.json")
-        owner = allocation["owner"]
         own = [p for p in rows if p["pid"] == owner["pid"] and p["birth"] == owner["birth"]]
         if len(own) != 1:
             raise RuntimeError("训练资源所有权已经失效")
-        peers = [p for p in rows if p not in own]
         owned = {m["pid"] for p in own for m in [p, *p.get("members", [])] if alive(m)}
+    observed = inventory(owned, allocation.get("allowed_visible_devices"))
+    sampled_at = time.monotonic()
+    with FileLock(str(root / ".resource.lock")):
+        rows = active_peers(root / "active.json")
+        own = [p for p in rows if p["pid"] == owner["pid"] and p["birth"] == owner["birth"]]
+        if allocation["owner"] != owner or len(own) != 1:
+            raise RuntimeError("GPU 查询期间训练资源所有权已经失效")
+        peers = [p for p in rows if p not in own]
         peaks_path = root / "gpu-peaks.json"
         peaks = read_json(peaks_path) if peaks_path.exists() else {}
         history = allocation.setdefault("fleet_history", [])
-        history.append((time.monotonic(), inventory(owned, allocation.get("allowed_visible_devices"))))
+        history.append((sampled_at, observed))
         window = config["resources"]["share_window_seconds"]
         while len(history) > 1 and history[-1][0] - history[1][0] >= window:
             history.pop(0)
@@ -214,23 +230,33 @@ def available_world(config, spec, allocation):
             previous = own[0].get("growth_candidate")
             if previous is None or previous["uuids"] != signature:
                 own[0]["growth_candidate"] = {"uuids": signature, "since": time.monotonic()}
-                write_json(root / "active.json", rows)
+                write_json(root / "active.json", rows, durable=False)
                 return allocation["world"]
             if time.monotonic() - previous["since"] < config["resources"]["growth_seconds"]:
                 return allocation["world"]
         elif own and "growth_candidate" in own[0]:
             del own[0]["growth_candidate"]
-            write_json(root / "active.json", rows)
+            write_json(root / "active.json", rows, durable=False)
     return desired
 
 
 def alive(record):
-    return psutil.pid_exists(record["pid"]) and psutil.Process(record["pid"]).create_time() == record["birth"]
+    return memory_alive(record)
 
 
 def active_peers(path):
     values = read_json(path) if path.exists() else []
-    return [row for row in values if alive(row) or any(alive(m) for m in row.get("members", []))]
+    rows = [row for row in values if alive(row) or any(alive(m) for m in row.get("members", []))]
+    for row in rows:
+        row["members"] = [member for member in row.get("members", []) if alive(member)]
+        state = row.get("memory_guard")
+        if state is not None:
+            previous = state.get("claims", [])
+            state["claims"] = [claim for claim in previous if alive(claim)]
+            state["waiting"] = [request for request in state.get("waiting", []) if alive(request)]
+            if not state["claims"] or len(previous) != len(state["claims"]):
+                state.pop("claim_baseline_uss_bytes", None)
+    return rows
 
 
 def register_member(config, owner):
@@ -239,8 +265,32 @@ def register_member(config, owner):
         rows = active_peers(root / "active.json")
         record = next(p for p in rows if p["pid"] == owner["pid"] and p["birth"] == owner["birth"])
         me = psutil.Process()
-        record.setdefault("members", []).append({"pid": me.pid, "birth": me.create_time()})
-        write_json(root / "active.json", rows)
+        member = {"pid": me.pid, "birth": me.create_time()}
+        record["members"] = [value for value in record.get("members", []) if alive(value)]
+        if member not in record["members"] and member != owner:
+            record["members"].append(member)
+        write_json(root / "active.json", rows, durable=False)
+
+
+def memory_planning_config(config, records, owner):
+    from .memory_guard import target_fraction
+    snapshot = fresh_snapshot(records)
+    resources = config["resources"]
+    target = target_fraction(config)
+    headroom, _ = system_headroom(snapshot["host"], target, resources["reserve_ram_bytes"])
+    own = next(value for value in snapshot["tasks"] if same_process(value["owner"], owner))
+    credit = own["uss_bytes"] or 0
+    actual = snapshot["project"]["accounted_bytes"]
+    limit = min([MEMORY_LIMIT_BYTES, int(snapshot["host"]["total_bytes"] * target),
+                 resources.get("memory_limit_bytes", MEMORY_LIMIT_BYTES),
+                 *(row.get("memory_limit_bytes", MEMORY_LIMIT_BYTES) for row in records)])
+    extra_pending = sum(max(0, pending_bytes(record, measurement) -
+                            max(0, record["ram_bytes"] - (measurement["uss_bytes"] or 0)))
+                        for record, measurement in zip(records, snapshot["tasks"])
+                        if not same_process(record, owner))
+    budget = 0 if not snapshot["project"]["complete"] else max(0, min(headroom, limit - actual) + credit - extra_pending)
+    return {**config, "resources": {**resources,
+            "ram_fraction": min(target, budget / snapshot["host"]["total_bytes"])}}
 
 
 def close_members(config, owner):
@@ -272,30 +322,38 @@ def resource_lease(config, prepared, spec, stage="train", previous_world=None):
           inherited_visible_devices=os.environ.get("CUDA_VISIBLE_DEVICES"))
     while True:
         if config["resources"]["device"] == "cuda":
-            history.append((time.monotonic(), inventory()))
+            observed = inventory()
+            history.append((time.monotonic(), observed))
             window = config["resources"]["share_window_seconds"]
             while len(history) > 1 and history[-1][0] - history[1][0] >= window:
                 history.pop(0)
         with FileLock(str(lock)):
             peers = active_peers(registry)
+            owner = {"pid": me.pid, "birth": me.create_time()}
+            candidate = {**owner, "members": [], "ram_bytes": 0, "cpu_slots": 0, "uuids": []}
             peaks_path = root / "gpu-peaks.json"
             peaks = read_json(peaks_path) if peaks_path.exists() else {}
-            if history:
-                history.append((time.monotonic(), inventory()))
             decision = fleet_decision(config, spec, history, peaks, peers, previous_world) if history else {
                 "gpus": [], "candidates": [], "visible_indices": [], "requested_ids": None, "reason": "CPU 准入"}
             gpus = decision["gpus"]
             supply = None
             if gpus is not None:
                 world = len(gpus) or config["resources"]["cpu_processes"]
-                supply = cpu_plan(config, prepared, world, peers, stage, estimates=estimates)
+                bounded = memory_planning_config(config, [*peers, candidate], owner)
+                supply = cpu_plan(bounded, prepared, world, peers, stage, estimates=estimates)
             if supply is not None and supply["admitted"]:
                 record = {"pid": me.pid, "birth": me.create_time(), "uuids": [g["uuid"] for g in gpus],
-                          "cpu_slots": supply["cpu_slots"], "ram_bytes": supply["ram_bytes"]}
-                write_json(registry, [*peers, record])
-                event(config["run_dir"], "resources_allocated", stage=stage, devices=gpus,
-                      cpu=supply, world_size=world, seconds=time.monotonic() - started)
-                break
+                          "cpu_slots": supply["cpu_slots"], "ram_bytes": supply["ram_bytes"],
+                          "memory_limit_bytes": resources.get("memory_limit_bytes", MEMORY_LIMIT_BYTES)}
+                proposed = [*peers, record]
+                memory = memory_decision(config, proposed, fresh_snapshot(proposed), owner)
+                supply["memory"] = memory
+                if memory["admitted"]:
+                    write_json(registry, proposed, durable=False)
+                    event(config["run_dir"], "resources_allocated", stage=stage, devices=gpus,
+                          cpu=supply, world_size=world, seconds=time.monotonic() - started)
+                    break
+                supply.update(admitted=False, reason="实时整机或项目进程组内存余量不足")
         elapsed = time.monotonic() - started
         interval = config.get("logging", {}).get("heartbeat_seconds", 15)
         if last_log is None or elapsed - last_log >= interval:
@@ -313,7 +371,7 @@ def resource_lease(config, prepared, spec, stage="train", previous_world=None):
         yield {"gpus": gpus, "supply": supply, "world": world, "stage": stage, "owner": {"pid": me.pid, "birth": me.create_time()}}
     finally:
         with FileLock(str(lock)):
-            write_json(registry, [p for p in active_peers(registry) if p["pid"] != me.pid or p["birth"] != me.create_time()])
+            write_json(registry, [p for p in active_peers(registry) if p["pid"] != me.pid or p["birth"] != me.create_time()], durable=False)
         event(config["run_dir"], "resources_released", stage=stage, seconds=time.monotonic() - started)
 
 

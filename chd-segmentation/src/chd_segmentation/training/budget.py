@@ -43,10 +43,15 @@ def case_estimates(config, prepared, stage):
         native = list(nib.load(row["image"]).shape)
         shape = np.array([end - begin for begin, end in roi] if roi else native)
         output = np.ceil(shape[::-1][order] * np.array(row["spacing_xyz"])[::-1][order] / target).astype(int)
+        legacy_bytes = int(np.prod(shape)) * 32 + int(np.prod(output)) * 64
+        streamed = stage == "preprocess"
         reports.append({"case_id": row["case_id"], "raw_shape_xyz": native, "input_shape_xyz": shape.tolist(),
                         "cropped_shape": None, "resampled_upper_shape": output.tolist(),
-                        "raw_workspace_bytes": int(np.prod(shape)) * 32,
-                        "resample_workspace_bytes": int(np.prod(output)) * 64})
+                        "legacy_whole_case_bytes": legacy_bytes, "storage": "bounded_disk_blocks" if streamed else "source",
+                        "threshold_exceeded": legacy_bytes > config["preprocessing"]["block_threshold_bytes"],
+                        "raw_workspace_bytes": 2 * GIB if streamed else int(np.prod(shape)) * 32,
+                        "resample_workspace_bytes": config["preprocessing"]["block_bytes"] * 4 if streamed else int(np.prod(output)) * 64,
+                        "output_array_bytes": int(np.prod(output)) * 5})
     if not reports:
         raise ValueError("资源规划没有可用病例")
     for row in reports:
@@ -97,6 +102,13 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
     shares = r['batch_layout'] if r['batch_layout'] is not None else [batch//world+int(rank<batch%world) for rank in range(world)]
     readers_cap = r["max_readers"] if r["readers"] == "auto" else min(r["readers"], r["max_readers"])
     base = (world + 1) * GIB
+    stage_reserve = None
+    if config.get("model", "stunet") == "stunet":
+        from .stage_memory import stage_memory
+        stage_reserve = stage_memory(config, prepared)
+        base += stage_reserve["checkpoint_reserve_bytes"] + world * stage_reserve["model_load_per_rank_bytes"]
+        if r["device"] == "cpu":
+            base += stage_reserve["batch_bytes"]
     if config.get('model') in ('medsam2','q_route1'):
         from ..models.memory import memory_profile
         profile = memory_profile(config,prepared,config['model_stage'],shares,reports)
@@ -118,6 +130,8 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
                  ("workers", "max_workers", "cache_bytes", "prefetch", "readers", "max_readers")}}
     if profile is not None:
         result['model_memory'] = {key:value for key,value in profile.items() if key!='records'}
+    if stage_reserve is not None:
+        result["stage_memory"] = stage_reserve
     if budget < minimum:
         result["reason"] = "单个病例构建及零 worker 的最小预算仍不足，等待主机内存释放"
         return result

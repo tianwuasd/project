@@ -37,7 +37,7 @@ zmic 使用 `/data4/zhangruichen`：项目实体目录固定在 `code/chd-segmen
 服务器同步 GitHub main 的最新代码：
 
 ```bash
-python3 -B /data4/zhangruichen/code/chd-segmentation/update.py
+env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy python3 -B /data4/zhangruichen/code/chd-segmentation/update.py --mirror direct
 ```
 
 默认不启用强制同步；需要覆盖本项目受 Git 管理的本地代码修改时，在命令末尾添加 `--force`。该参数只对本次执行生效。更新成功后，回执中的 `branch` 应为 `main`，`sha`、`head`、`origin_branch` 应一致，`tracked_code_clean` 应为 `true`。
@@ -72,6 +72,8 @@ cases:
 正式训练还需独立 validation 病例。1282 按患者划分；ImageCHD 导入原划分时保留病例级独立性，有可靠患者映射时可明确要求患者级检查。示例数字仅解释字段，实际值必须来自审核记录。ImageCHD 的未知类别仅允许缺 MYO（编号 5）；1282 使用其原始 0—10 编号和 `shared_index_excel` 空间规则。未标注和已确认缺如分别记录。额外标签仅按显式 `ignore_label_ids` 屏蔽。plan_scope 仅用于显式读取既有计划的来源声明，不能代替对拟合病例的核查。
 
 图像和标签原件只读。prepare 按病例顺序读取主训练数据，在 RAM 中进行有界前景采样，保存紧凑计划与来源描述。preprocess 按 CPU/RAM 预算并行转换全部所需病例，逐例核验后写入 data，重复执行只补缺失或核验失败病例。训练和预测通过 MONAI Dataset/Compose 读取只读 mmap 数组；供数进程的 LRU 缓存保存映射及位置，训练不重复整例重采样。默认只使用空闲显卡，卡数不足持续等待；显式设置最少卡数可启用 epoch 边界的 GPU 卡数调整。详见 [资源调度](docs/RESOURCE_SCHEDULING.md)。
+
+STU-Net 大病例采用 [分块预处理与内存保护](docs/MEMORY_BOUNDED_PREPROCESS.md)，日志同时显示 [病例和块进度](docs/PROGRESS.md)。运行入口包含 [快速检查](docs/QUICK_CHECKS.md)；zmic 已有冻结输入的更新、重启预处理和两张显卡训练命令见 [服务器运行入口](docs/STUNET_SERVER_COMMANDS.md)。
 
 ## 运行
 

@@ -5,21 +5,30 @@ import os
 from pathlib import Path
 
 from filelock import FileLock
+from .cache import discard_file_pages
 
 
 def digest(value):
     return sha256(json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
 
 
-def file_digest(path):
+def file_digest(path, *, evict=False, boundary=None):
     with Path(path).open("rb") as stream:
-        return sha256_file(stream)
+        return sha256_file(stream, evict=evict, boundary=boundary)
 
 
-def sha256_file(stream):
+def sha256_file(stream, *, evict=False, boundary=None):
     value = sha256()
-    for block in iter(lambda: stream.read(4 * 1024 ** 2), b""):
+    while True:
+        if boundary is not None:
+            boundary()
+        begin = stream.tell() if evict else 0
+        block = stream.read(4 * 1024 ** 2)
+        if not block:
+            break
         value.update(block)
+        if evict:
+            discard_file_pages(stream, begin, len(block))
     return value.hexdigest()
 
 
@@ -27,14 +36,15 @@ def read_json(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def write_json(path, value):
+def write_json(path, value, *, durable=True):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     pending = path.with_name(path.name + ".pending")
     with pending.open("w", encoding="utf-8", newline="\n") as stream:
         json.dump(value, stream, ensure_ascii=False, indent=2, allow_nan=False)
         stream.flush()
-        os.fsync(stream.fileno())
+        if durable:
+            os.fsync(stream.fileno())
     os.replace(pending, path)
 
 

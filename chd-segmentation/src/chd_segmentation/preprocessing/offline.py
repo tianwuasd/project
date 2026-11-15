@@ -11,12 +11,15 @@ import torch
 
 from ..artifacts.store import digest, operation_lock, read_json, require_output, write_json
 from ..models.stunet.preprocess import StunetTransform
+from ..models.stunet.streaming import stream_case
 from ..observability.events import event, logged, stage
+from ..observability.progress import Progress
+from ..training.memory_guard import MemoryGuard
 from ..training.budget import case_estimates, private_bytes
 from ..training.host import host_capacity
 from ..training.resources import refresh_supply, register_member, resource_lease
 from .offline_store import (FORMAT, case_directory, case_key, inspect_case, live_references, owned_remove,
-                            recipe, save_case, validate_storage)
+                            recipe, save_case, validate_storage, begin_case)
 from .prepare import load_prepared, validate_prepared_config
 
 
@@ -25,12 +28,15 @@ def produce_case(prepared, config, root, name, key, recipe_identity):
     began = perf_counter()
     row = next(r for r in prepared["manifest"]["cases"] if r["case_id"] == name)
     event(config["run_dir"], "preprocess_case_started", case_id=name, file=str(Path(root) / key))
-    transform = StunetTransform(prepared, config["resources"]["reserve_ram_bytes"], with_label=row.get("label") is not None,
-                               log_dir=config["run_dir"], logging=config["logging"])
-    transform.console = True
-    entry = transform(row)
-    with stage(config, "preprocess_case_save", case_id=name):
-        record = save_case(case_directory(root, key), key, recipe_identity, entry)
+    directory = case_directory(root, key)
+    pending = begin_case(directory, key, recipe_identity)
+    with MemoryGuard(config, "preprocess_case", owner=config.get("memory_owner")) as guard:
+        entry, workspace = stream_case(prepared, row, config, pending, guard)
+        try:
+            with stage(config, "preprocess_case_save", case_id=name):
+                record = save_case(directory, key, recipe_identity, entry, workspace)
+        finally:
+            workspace.release_handles()
     pointer = case_pointer(record)
     event(config["run_dir"], "preprocess_case_completed", case_id=name, seconds=perf_counter() - began,
           timing=entry["timing"], bytes=sum(v["stamp"][0] for v in record["files"].values()))
@@ -54,68 +60,102 @@ def process_pending(config, prepared, root, identity, pending, pointers, catalog
     estimates = {r["case_id"]: r["workspace_bytes"] for r in case_estimates(config, prepared, "preprocess")}
     began, last_log, pool, next_adapt = perf_counter(), 0., None, 0.
     with resource_lease(runtime, prepared, {}, stage="preprocess") as allocation:
-        running = {}
-        try:
-            while pending or running:
-                if not running and perf_counter() >= next_adapt:
-                    if pool is not None:
-                        pool.shutdown(wait=True, cancel_futures=True)
-                        pool = None
-                    plan = refresh_supply(runtime, prepared, allocation, apply=True)
-                    if not plan["admitted"]:
-                        event(config["run_dir"], "preprocess_waiting", reason=plan["reason"], cpu=plan)
-                        sleep(config["resources"]["poll_seconds"])
+        runtime["memory_owner"] = allocation["owner"]
+        completed_before = len(pointers)
+        progress = Progress(config, "preprocess", total=len(prepared["manifest"]["cases"]), reused=completed_before)
+        running, names, failures = {}, {}, set()
+        with MemoryGuard(runtime, "preprocess", owner=allocation["owner"]) as memory:
+            try:
+                while pending or running:
+                    observation = memory.boundary()
+                    progress.update(done=len(pointers), new=len(pointers) - completed_before, pending=len(pending), active=len(running),
+                                    current_case=", ".join(names.values()) or None,
+                                    storage_bytes=sum(p["array_bytes"] + p["locations_bytes"] for p in pointers.values()), resource=observation)
+                    progress.snapshot()
+                    if observation["stop_requested"] and not running:
+                        raise MemoryError("预处理因持续内存压力安全停止；已经完整提交的病例保留")
+                    if not running and perf_counter() >= next_adapt:
+                        if pool is not None:
+                            pool.shutdown(wait=True, cancel_futures=True)
+                            pool = None
+                        plan = refresh_supply(runtime, prepared, allocation, apply=True)
+                        if not plan["admitted"]:
+                            event(config["run_dir"], "preprocess_waiting", reason=plan["reason"], cpu=plan)
+                            sleep(config["resources"]["poll_seconds"])
+                            continue
+                        allocation["supply"] = plan
+                        workers = min(plan["workers"][0], len(pending))
+                        if workers:
+                            pool = ProcessPoolExecutor(workers, mp_context=mp.get_context("spawn"),
+                                initializer=initialize_worker, initargs=(runtime, allocation["owner"]))
+                        next_adapt = perf_counter() + config["resources"]["adapt_seconds"]
+                        event(config["run_dir"], "preprocess_supply_applied", workers=workers, cpu=plan)
+                    facts, r = host_capacity(), config["resources"]
+                    reserved = sum(running.values())
+                    children = [{"pid": p.pid, "birth": p.create_time(), "members": []} for p in psutil.Process().children()]
+                    credited = private_bytes(children)
+                    spare = facts["available_bytes"] - r["reserve_ram_bytes"] - max(0, reserved - credited)
+                    capacity = allocation["supply"]["workspace_capacity_bytes"]
+                    possible = [] if observation["paused"] or observation["stop_requested"] else [item for item in pending
+                        if estimates[item[0]] <= capacity - reserved and estimates[item[0]] <= spare]
+                    if possible and len(running) < max(1, workers):
+                        name, key = possible[0]
+                        pending.remove((name, key))
+                        event(config["run_dir"], "preprocess_admitted", case_id=name, workers=workers,
+                              active=len(running) + 1, reserved_bytes=reserved + estimates[name], capacity_bytes=capacity)
+                        if pool is None:
+                            succeeded = False
+                            try:
+                                completed_name, pointer = producer(prepared, runtime, str(root), name, key, identity)
+                                succeeded = True
+                            finally:
+                                if not succeeded:
+                                    failures.add(name)
+                            pointers[completed_name] = pointer
+                            catalog["cases"][pointer["key"]] = pointer
+                            write_json(root / "catalog.json", catalog)
+                        else:
+                            future = pool.submit(producer, prepared, runtime, str(root), name, key, identity)
+                            running[future], names[future] = estimates[name], name
                         continue
-                    allocation["supply"] = plan
-                    workers = min(plan["workers"][0], len(pending))
-                    if workers:
-                        pool = ProcessPoolExecutor(workers, mp_context=mp.get_context("spawn"),
-                            initializer=initialize_worker, initargs=(runtime, allocation["owner"]))
-                    next_adapt = perf_counter() + config["resources"]["adapt_seconds"]
-                    event(config["run_dir"], "preprocess_supply_applied", workers=workers, cpu=plan)
-                facts = host_capacity()
-                r = config["resources"]
-                reserved = sum(running.values())
-                children = [{"pid": p.pid, "birth": p.create_time(), "members": []} for p in psutil.Process().children()]
-                credited = private_bytes(children)
-                spare = facts["available_bytes"] - r["reserve_ram_bytes"] - max(0, reserved - credited)
-                capacity = allocation["supply"]["workspace_capacity_bytes"]
-                possible = [item for item in pending if estimates[item[0]] <= capacity - reserved and estimates[item[0]] <= spare]
-                if possible and len(running) < max(1, workers):
-                    name, key = possible[0]
-                    pending.remove((name, key))
-                    event(config["run_dir"], "preprocess_admitted", case_id=name, workers=workers,
-                          active=len(running) + 1, reserved_bytes=reserved + estimates[name], capacity_bytes=capacity)
-                    if pool is None:
-                        completed_name, pointer = producer(prepared, config, str(root), name, key, identity)
-                        pointers[completed_name] = pointer
+                    done, _ = wait(running, timeout=.5, return_when=FIRST_COMPLETED) if running else (set(), set())
+                    for future in done:
+                        succeeded = False
+                        try:
+                            with stage(config, "preprocess_case_result", case_id=names[future]):
+                                name, pointer = future.result()
+                            succeeded = True
+                        finally:
+                            if not succeeded:
+                                failures.add(names[future])
+                        running.pop(future)
+                        names.pop(future)
+                        pointers[name] = pointer
                         catalog["cases"][pointer["key"]] = pointer
                         write_json(root / "catalog.json", catalog)
-                    else:
-                        running[pool.submit(producer, prepared, config, str(root), name, key, identity)] = estimates[name]
-                    continue
-                done, _ = wait(running, timeout=.5, return_when=FIRST_COMPLETED) if running else (set(), set())
-                for future in done:
-                    name, pointer = future.result()
-                    running.pop(future)
-                    pointers[name] = pointer
-                    catalog["cases"][pointer["key"]] = pointer
-                    write_json(root / "catalog.json", catalog)
-                    event(config["run_dir"], "preprocess_progress", completed=len(pointers),
-                          total=len(prepared["manifest"]["cases"]), seconds=perf_counter() - began)
-                if not done and perf_counter() - last_log >= config["logging"]["heartbeat_seconds"]:
-                    event(config["run_dir"], "preprocess_waiting", pending=len(pending), active=len(running),
-                          available_bytes=facts["available_bytes"], reserved_bytes=reserved, capacity_bytes=capacity)
-                    last_log = perf_counter()
-                if not running and pending:
-                    sleep(r["poll_seconds"])
-        finally:
-            if pool is not None:
-                pool.shutdown(wait=True, cancel_futures=True)
+                        event(config["run_dir"], "preprocess_progress", completed=len(pointers),
+                              total=len(prepared["manifest"]["cases"]), seconds=perf_counter() - began)
+                        progress.update(done=len(pointers), new=len(pointers) - completed_before)
+                        progress.snapshot(force=True)
+                    if not done and perf_counter() - last_log >= config["logging"]["heartbeat_seconds"]:
+                        event(config["run_dir"], "preprocess_waiting", pending=len(pending), active=len(running),
+                              available_bytes=facts["available_bytes"], reserved_bytes=reserved, capacity_bytes=capacity)
+                        last_log = perf_counter()
+                    if not running and pending:
+                        sleep(r["poll_seconds"])
+            finally:
+                if pool is not None:
+                    pool.shutdown(wait=True, cancel_futures=True)
+                progress.update(done=len(pointers), new=len(pointers) - completed_before,
+                    failures=len(failures), pending=len(prepared["manifest"]["cases"]) - len(pointers) - len(failures), active=0)
+                progress.close()
 
 
 @logged("preprocess")
 def preprocess(config, prepared_path, output, *, producer=produce_case, recipe_builder=recipe, method_label="STUNet"):
+    if method_label == "STUNet":
+        from ..preflight import quick_check
+        event(config["run_dir"], "quick_check", report=quick_check(config, "preprocess", prepared_path))
     prepared = load_prepared(prepared_path)
     validate_prepared_config(prepared, config)
     if "storage" in prepared:
@@ -198,6 +238,10 @@ def preprocess(config, prepared_path, output, *, producer=produce_case, recipe_b
             write_json(output, result)
     event(config["run_dir"], "preprocess_completed", cases=len(pointers), reused=reused,
           new=len(pointers) - reused, output=str(output), data=str(root), seconds=perf_counter() - began)
+    final = Progress(config, "preprocess", total=len(pointers), reused=reused, started=began)
+    final.update(done=len(pointers), new=len(pointers) - reused, pending=0, active=0,
+                 storage_bytes=sum(p["array_bytes"] + p["locations_bytes"] for p in pointers.values()))
+    final.close()
     return result
 
 

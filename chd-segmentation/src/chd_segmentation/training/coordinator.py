@@ -5,7 +5,8 @@ import psutil
 
 class HostCoordinator:
     PHASES = {name: number for number, name in enumerate(("startup_ready", "model_ready", "data_ready", "transfer_ready",
-        "consumed", "pool_closed", "pool_applied", "checkpoint_saved", "summary_saved"))}
+        "consumed", "pool_closed", "pool_applied", "checkpoint_saved", "summary_saved", "memory_boundary", "memory_admitted",
+        "group_memory_ready", "group_memory_released"))}
 
     def __init__(self, context, world):
         self.world = world
