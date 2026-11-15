@@ -73,4 +73,4 @@ python3 -B /data4/zhangruichen/code/chd-segmentation/run.py --code-info
 
 `--code-info` 仅使用标准库，显示当前 Git HEAD、本项目的本地修改标记、实际代码目录和调用解释器；业务命令必须使用训练环境。私有实验配置填写 course 中的 work_root、run_dir 和 result 中的 result_root，data_root 指向 data 中的真实数据集。默认自动拟合训练病例生成计划，无需上传旧计划；清单和权重位置仍需按服务器现有文件核对。用法见 [自动预处理计划](PREPROCESSING.md)。
 
-本次目录调整按用户要求未运行本地测试。服务器迁移结果以实际回执中的 code、relocated_from、sha、head 和 origin_main 为准；CUDA/DDP 与正式训练仍需独立验收。
+服务器迁移结果以实际回执中的 code、relocated_from、branch、sha、head 和 origin_branch 为准；branch 应为 main，sha、head 和 origin_branch 应一致。CUDA/DDP 与正式训练仍需独立验收。
