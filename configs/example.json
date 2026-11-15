@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "engine_root": "PATH_TO_ASSISTANT1",
+  "engine_commit": "60d6e5f17c81f1fea78690021fbf403b1ee61f37",
+  "python": "PATH_TO_PRODUCTION_PYTHON",
+  "manifest": "PATH_TO_AUDITED_MANIFEST.json",
+  "split": "PATH_TO_FROZEN_PATIENT_SPLIT.json",
+  "data_root": "PATH_TO_ORIGINAL_CHD1282",
+  "pretrained": "PATH_TO_small_ep4k.model",
+  "dataset": "chd1282",
+  "fold": 0,
+  "seed": 20261115,
+  "profile": "technical",
+  "device": "cuda",
+  "epochs": 2,
+  "steps_per_epoch": 2,
+  "batch": 4
+}

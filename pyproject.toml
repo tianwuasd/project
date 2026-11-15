@@ -1,0 +1,5 @@
+[project]
+name = "chd-mini-workflow"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["psutil>=7", "filelock>=3"]
