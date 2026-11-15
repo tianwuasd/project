@@ -5,18 +5,27 @@ from time import perf_counter
 import torch
 
 from ..observability.events import event
+from ..training.memory_guard import alive
 
 
 class CpuReady:
-    def __init__(self,context,world,root):
+    def __init__(self,context,world,root,owner=None,cancel=None):
         self.world,self.root = world,root
+        self.owner,self.cancel = owner,cancel
         self.condition = context.Condition()
         self.generation = context.Value('q',0)
         self.arrived = context.Array('q',[-1]*world)
         self.phases = context.Array('q',[0]*world)
 
+    def require_active(self):
+        if self.owner is not None and not alive(self.owner):
+            raise RuntimeError('模型协调进程已经退出，停止CPU等候')
+        if self.cancel is not None and self.cancel.is_set():
+            raise RuntimeError('模型任务已取消，停止CPU等候')
+
     def wait(self,rank,phase,device=None):
         started = perf_counter()
+        self.require_active()
         if device is not None and device.type=='cuda':
             torch.cuda.synchronize(device)
         completed = perf_counter()
@@ -32,6 +41,7 @@ class CpuReady:
                 self.generation.value += 1
                 self.condition.notify_all()
             while self.generation.value==generation:
+                self.require_active()
                 self.condition.wait(timeout=5)
                 if self.generation.value==generation:
                     event(self.root,'model_cpu_wait',rank=rank,phase=phase,
@@ -101,12 +111,16 @@ class OrderedSupply:
         event(self.root,'model_data_delivered',rank=rank,**self.snapshot())
 
     def reserve(self,rank,name):
+        self.ready.require_active()
         amount = self.estimates[name]
         started = perf_counter()
         with self.condition:
             if self.reserved[rank] or amount<1 or amount>self.capacity:
                 raise MemoryError('病例工作空间预留无效或超过已准入预算')
-            self.condition.wait_for(lambda: sum(self.reserved)+amount<=self.capacity)
+            while sum(self.reserved)+amount>self.capacity:
+                self.ready.require_active()
+                self.condition.wait(timeout=1)
+            self.ready.require_active()
             self.reserved[rank] = amount
         event(self.root,'model_case_workspace',rank=rank,case_id=name,case_estimate_bytes=amount,
               workspace_wait_seconds=perf_counter()-started,**self.snapshot())
@@ -114,6 +128,7 @@ class OrderedSupply:
     @contextmanager
     def build(self,rank,batch,position):
         started = perf_counter()
+        self.ready.require_active()
         with self.condition:
             if not 0<=position<self.quotas[rank] or batch<self.batch.value:
                 raise ValueError('病例构建序号超出当前供数计划')
@@ -123,6 +138,7 @@ class OrderedSupply:
             while not (batch==self.batch.value and position==self.built[rank] and
                        all(b>=min(position,q) for b,q in zip(self.built,self.quotas)) and
                        self.active.value<self.slots):
+                self.ready.require_active()
                 self.condition.wait(timeout=5)
             self.waiting[rank] -= 1
             self.active.value += 1

@@ -3,12 +3,15 @@ from copy import deepcopy
 from importlib.metadata import version
 import os
 from pathlib import Path
+import re
 import shutil
+from contextlib import nullcontext
 
 import numpy as np
 import psutil
 
 from ..artifacts.store import digest, file_digest, operation_lock, read_json, write_json
+from ..artifacts.cache import release_private_mapping
 from ..models.stunet.preprocess import CONTRACT
 
 
@@ -70,12 +73,24 @@ def record_identity(record):
 def owned_remove(path):
     path = Path(path)
     allowed = {"image.npy", "label.npy", "locations.npz", "case.json", "case.json.pending", "owner.json"}
-    if path.is_symlink() or any(p.is_symlink() or not p.is_file() or p.name not in allowed for p in path.iterdir()):
+    work_allowed = {"source", "source-seg", "mask", "outside", "normalized", "labels", "result-image",
+                    "result-label", "coeff", "coeff-z", "separate", "indicator", "indicator-coeff"}
+    def known(p):
+        if p.is_symlink():
+            return False
+        if p.is_file():
+            return p.name in allowed
+        if p.name != "work" or not p.is_dir():
+            return False
+        return all(c.is_file() and not c.is_symlink() and
+            (c.name in ("image.nii", "label.nii") or c.suffix == ".npy" and
+             (c.stem in work_allowed or re.fullmatch(r"label-coeff-\d+", c.stem))) for c in p.iterdir())
+    if path.is_symlink() or any(not known(p) for p in path.iterdir()):
         raise ValueError("病例目录包含未知文件或链接，拒绝清理")
     shutil.rmtree(path)
 
 
-def inspect_case(directory, key, recipe_identity, full=False):
+def inspect_case(directory, key, recipe_identity, full=False, *, evict=False, boundary=None):
     directory = Path(directory)
     if directory.is_symlink() or not directory.is_dir() or not (directory / "case.json").is_file():
         return None
@@ -91,12 +106,12 @@ def inspect_case(directory, key, recipe_identity, full=False):
         path = directory / name
         if path.is_symlink() or not path.is_file() or stamp(path) != expected["stamp"]:
             return None
-        if full and file_digest(path) != expected["sha256"]:
+        if full and file_digest(path, evict=evict, boundary=boundary) != expected["sha256"]:
             return None
     return record
 
 
-def save_case(directory, key, recipe_identity, entry):
+def begin_case(directory, key, recipe_identity):
     directory = Path(directory)
     pending = directory.with_name(directory.name + ".pending")
     if pending.exists():
@@ -106,19 +121,49 @@ def save_case(directory, key, recipe_identity, entry):
         owned_remove(pending)
     pending.mkdir(parents=True, exist_ok=False)
     write_json(pending / "owner.json", {"case_key": key, "recipe_identity": recipe_identity})
+    return pending
+
+
+def save_case(directory, key, recipe_identity, entry, workspace=None):
+    directory = Path(directory)
+    pending = begin_case(directory, key, recipe_identity) if workspace is None else directory.with_name(directory.name + ".pending")
+    if read_json(pending / "owner.json") != {"case_key": key, "recipe_identity": recipe_identity}:
+        raise ValueError("病例提交目录归属不符")
     metadata = {k: deepcopy(v) for k, v in entry.items() if k not in ("image", "label", "properties")}
     metadata["properties"] = {k: v for k, v in entry["properties"].items() if k != "class_locations"}
     arrays = {"image.npy": entry["image"]}
     if entry["label"] is not None:
         arrays["label.npy"] = entry["label"]
     for name, array in arrays.items():
-        with (pending / name).open("wb") as stream:
-            np.save(stream, array, allow_pickle=False)
-            stream.flush()
-            os.fsync(stream.fileno())
+        if workspace is None:
+            with (pending / name).open("wb") as stream:
+                np.save(stream, array, allow_pickle=False)
+                stream.flush()
+                os.fsync(stream.fileno())
+        else:
+            target = np.lib.format.open_memmap(pending / name, mode="w+", dtype=array.dtype, shape=array.shape)
+            size = max(1, workspace.block_bytes // (array.dtype.itemsize * 8))
+            for start in range(0, array.size, size):
+                with workspace.allocation(size * array.dtype.itemsize * 4, "write_array"):
+                    target.reshape(-1)[start:start + size] = array.reshape(-1)[start:start + size]
+                    release_private_mapping(target)
+                workspace.report("write_array", min((start // size) + 1, (array.size + size - 1) // size), (array.size + size - 1) // size)
+            target._mmap.close()
+            del target
+            with (pending / name).open("r+b") as stream:
+                os.fsync(stream.fileno())
         check = np.load(pending / name, mmap_mode="r", allow_pickle=False)
-        if check.shape != array.shape or check.dtype != array.dtype or not np.array_equal(check, array):
+        if check.shape != array.shape or check.dtype != array.dtype:
             raise ValueError("离线数组独立读回不一致")
+        chunk = max(1, (workspace.block_bytes if workspace else 16 * 1024 ** 2) // max(1, array.dtype.itemsize * 4))
+        for start in range(0, array.size, chunk):
+            with nullcontext() if workspace is None else workspace.allocation(chunk * array.dtype.itemsize * 4, "readback"):
+                if not np.array_equal(check.reshape(-1)[start:start + chunk], array.reshape(-1)[start:start + chunk]):
+                    raise ValueError("离线数组逐块读回不一致")
+                if workspace is not None:
+                    release_private_mapping(check)
+            if workspace is not None:
+                workspace.report("readback", start // chunk + 1, (array.size + chunk - 1) // chunk)
         del check
     locations = entry["properties"].get("class_locations", {})
     keys = list(locations)
@@ -129,13 +174,17 @@ def save_case(directory, key, recipe_identity, entry):
     names = [*arrays, "locations.npz"]
     record = {"format": FORMAT, "case_key": key, "recipe_identity": recipe_identity,
               "entry": json_value(metadata), "location_keys": json_value(keys),
-              "files": {n: {"stamp": stamp(pending / n), "sha256": file_digest(pending / n)} for n in names}}
+              "files": {n: {"stamp": stamp(pending / n), "sha256": file_digest(pending / n,
+                  evict=workspace is not None, boundary=None if workspace is None else workspace.checkpoint)} for n in names}}
     for name, array in arrays.items():
         record["files"][name].update(shape=list(array.shape), dtype=str(array.dtype), array_bytes=array.nbytes)
     record["identity"] = record_identity(record)
     write_json(pending / "case.json", record)
-    if inspect_case(pending, key, recipe_identity, full=True) != record:
+    if inspect_case(pending, key, recipe_identity, full=True, evict=workspace is not None,
+                    boundary=None if workspace is None else workspace.checkpoint) != record:
         raise ValueError("病例提交前独立核验失败")
+    if workspace is not None:
+        workspace.close()
     os.replace(pending, directory)
     return record
 

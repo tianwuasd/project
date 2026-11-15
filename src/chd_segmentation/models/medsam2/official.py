@@ -52,6 +52,9 @@ def train_official(config,prepared_path,stage,resume=False,stop_after=None):
     if stage!='sequence':
         raise ValueError('MedSAM2阶段必须为sequence')
     prepared = load_prepared(prepared_path)
+    from ..offline import quick_check_model
+    from ...observability.events import event
+    event(Path(config['run_dir'])/'admission'/stage, 'quick_check', report=quick_check_model(config, prepared, 'train'))
     from ..offline import model_storage_lease
     root = (Path(config['run_dir'])/stage).resolve()
     protected = [Path(prepared['manifest']['data_root']).resolve(),

@@ -478,6 +478,265 @@
         "medpredict",
         "shared-offline"
       ]
+    },
+    {
+      "source": "837242370777633814ef8619c2f93e825afe7508436b60b377ded402266ef797",
+      "target": "6d47690294f048ef783fb26ec8a876fd25a6a98aff0f116b94322169a2e35f63",
+      "reason": "STU-Net冻结计划、损失、采样顺序和完整训练状态保持；离线分块使用相同全局坐标与插值。准入、资源保留及进度记录更新，离线数据身份仍须独立完整核验。",
+      "validation": ["two-real-imagechd-roi32-numeric-bitwise", "two-rank-gloo-batch4-two-updates-exact-resume", "offline-reuse", "real-owner-exit-and-checkpoint-reserve"],
+      "scope": "STU-Net；Linux正式大病例和CUDA/NCCL运行未在本机验收"
+    },
+    {
+      "source": "bce6c67174dac7688b62abb49206274d126fbd9ee06ddfba9818b0badea753e5",
+      "target": "6d47690294f048ef783fb26ec8a876fd25a6a98aff0f116b94322169a2e35f63",
+      "reason": "精确整包源码审阅，保留main的其他模型源码。STU-Net数值及完整恢复协议保持，新增有界分块、真实内存保护和进度记录。仅用于STU训练入口的源码相容核验。",
+      "validation": ["two-real-imagechd-roi32-numeric-bitwise", "two-rank-gloo-batch4-two-updates-exact-resume", "offline-reuse", "real-owner-exit-and-checkpoint-reserve"]
+    },
+    {
+      "source": "48b47624afc776809111fa6616950c06d2a99bf168628ecbf759129a258b504e",
+      "target": "6d47690294f048ef783fb26ec8a876fd25a6a98aff0f116b94322169a2e35f63",
+      "reason": "已验收两次真实更新版本的数值流程保持；只增加协调进程退出检查、独立检查点内存保留与中文阶段名称。",
+      "validation": ["real-owner-exit-and-checkpoint-reserve", "actual-progress-record-format", "python-ast"]
+    },
+    {
+      "source": "378884ca3b5b18d270a6fc21545b0f7719695407d7dfab470e840baf1d91a94e",
+      "target": "c10f06373f8f5858f12bc19963a9f23c86b7be8647e24f7ba453302b3c7c33d3",
+      "reason": "完整源码精确核验；STU-Net模型、抽样、损失、冻结配方及完整状态保持。增加默认资源等待、取消退出、共享块进度及独立模型准备；数据身份继续严格核验。",
+      "validation": [
+        "upstream-8b5b51e-187-blobs",
+        "memory-wait-complete",
+        "memory-owner-final",
+        "hysteresis-green",
+        "supply-green",
+        "blocks-green",
+        "q-runtime-96",
+        "med-runtime-final"
+      ]
+    },
+    {
+      "source": "6d47690294f048ef783fb26ec8a876fd25a6a98aff0f116b94322169a2e35f63",
+      "target": "c10f06373f8f5858f12bc19963a9f23c86b7be8647e24f7ba453302b3c7c33d3",
+      "reason": "完整源码精确核验；STU-Net模型、抽样、损失、冻结配方及完整状态保持。增加默认资源等待、取消退出、共享块进度及独立模型准备；数据身份继续严格核验。",
+      "validation": [
+        "upstream-8b5b51e-187-blobs",
+        "memory-wait-complete",
+        "memory-owner-final",
+        "hysteresis-green",
+        "supply-green",
+        "blocks-green",
+        "q-runtime-96",
+        "med-runtime-final"
+      ]
+    },
+    {
+      "source": "837242370777633814ef8619c2f93e825afe7508436b60b377ded402266ef797",
+      "target": "c10f06373f8f5858f12bc19963a9f23c86b7be8647e24f7ba453302b3c7c33d3",
+      "reason": "完整源码精确核验；STU-Net模型、抽样、损失、冻结配方及完整状态保持。增加默认资源等待、取消退出、共享块进度及独立模型准备；数据身份继续严格核验。",
+      "validation": [
+        "upstream-8b5b51e-187-blobs",
+        "memory-wait-complete",
+        "memory-owner-final",
+        "hysteresis-green",
+        "supply-green",
+        "blocks-green",
+        "q-runtime-96",
+        "med-runtime-final"
+      ]
+    },
+    {
+      "source": "bce6c67174dac7688b62abb49206274d126fbd9ee06ddfba9818b0badea753e5",
+      "target": "c10f06373f8f5858f12bc19963a9f23c86b7be8647e24f7ba453302b3c7c33d3",
+      "reason": "完整源码精确核验；STU-Net模型、抽样、损失、冻结配方及完整状态保持。增加默认资源等待、取消退出、共享块进度及独立模型准备；数据身份继续严格核验。",
+      "validation": [
+        "upstream-8b5b51e-187-blobs",
+        "memory-wait-complete",
+        "memory-owner-final",
+        "hysteresis-green",
+        "supply-green",
+        "blocks-green",
+        "q-runtime-96",
+        "med-runtime-final"
+      ]
+    },
+    {
+      "source": "48b47624afc776809111fa6616950c06d2a99bf168628ecbf759129a258b504e",
+      "target": "c10f06373f8f5858f12bc19963a9f23c86b7be8647e24f7ba453302b3c7c33d3",
+      "reason": "完整源码精确核验；STU-Net模型、抽样、损失、冻结配方及完整状态保持。增加默认资源等待、取消退出、共享块进度及独立模型准备；数据身份继续严格核验。",
+      "validation": [
+        "upstream-8b5b51e-187-blobs",
+        "memory-wait-complete",
+        "memory-owner-final",
+        "hysteresis-green",
+        "supply-green",
+        "blocks-green",
+        "q-runtime-96",
+        "med-runtime-final"
+      ]
+    },
+    {
+      "source": "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4",
+      "target": "c10f06373f8f5858f12bc19963a9f23c86b7be8647e24f7ba453302b3c7c33d3",
+      "reason": "完整源码精确核验；STU-Net模型、抽样、损失、冻结配方及完整状态保持。增加默认资源等待、取消退出、共享块进度及独立模型准备；数据身份继续严格核验。",
+      "validation": [
+        "upstream-8b5b51e-187-blobs",
+        "memory-wait-complete",
+        "memory-owner-final",
+        "hysteresis-green",
+        "supply-green",
+        "blocks-green",
+        "q-runtime-96",
+        "med-runtime-final"
+      ]
+    },
+    {
+      "source": "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952",
+      "target": "c10f06373f8f5858f12bc19963a9f23c86b7be8647e24f7ba453302b3c7c33d3",
+      "reason": "完整源码精确核验；STU-Net模型、抽样、损失、冻结配方及完整状态保持。增加默认资源等待、取消退出、共享块进度及独立模型准备；数据身份继续严格核验。",
+      "validation": [
+        "upstream-8b5b51e-187-blobs",
+        "memory-wait-complete",
+        "memory-owner-final",
+        "hysteresis-green",
+        "supply-green",
+        "blocks-green",
+        "q-runtime-96",
+        "med-runtime-final"
+      ]
+    },
+    {
+      "source": "42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa",
+      "target": "c10f06373f8f5858f12bc19963a9f23c86b7be8647e24f7ba453302b3c7c33d3",
+      "reason": "完整源码精确核验；STU-Net模型、抽样、损失、冻结配方及完整状态保持。增加默认资源等待、取消退出、共享块进度及独立模型准备；数据身份继续严格核验。",
+      "validation": [
+        "upstream-8b5b51e-187-blobs",
+        "memory-wait-complete",
+        "memory-owner-final",
+        "hysteresis-green",
+        "supply-green",
+        "blocks-green",
+        "q-runtime-96",
+        "med-runtime-final"
+      ]
+    },
+    {
+      "source": "afffd433e388f93fe5d840ba6a899cb2b814c81804e59d4b02c310cb47cf8dde",
+      "target": "c10f06373f8f5858f12bc19963a9f23c86b7be8647e24f7ba453302b3c7c33d3",
+      "reason": "完整源码精确核验；STU-Net模型、抽样、损失、冻结配方及完整状态保持。增加默认资源等待、取消退出、共享块进度及独立模型准备；数据身份继续严格核验。",
+      "validation": [
+        "upstream-8b5b51e-187-blobs",
+        "memory-wait-complete",
+        "memory-owner-final",
+        "hysteresis-green",
+        "supply-green",
+        "blocks-green",
+        "q-runtime-96",
+        "med-runtime-final"
+      ]
+    },
+    {
+      "source": "7c52966d5bd3ed7af73f2454b34b66400dc6b8e1435e0929e7c9f74b70dd61f1",
+      "target": "c10f06373f8f5858f12bc19963a9f23c86b7be8647e24f7ba453302b3c7c33d3",
+      "reason": "完整源码精确核验；STU-Net模型、抽样、损失、冻结配方及完整状态保持。增加默认资源等待、取消退出、共享块进度及独立模型准备；数据身份继续严格核验。",
+      "validation": [
+        "upstream-8b5b51e-187-blobs",
+        "memory-wait-complete",
+        "memory-owner-final",
+        "hysteresis-green",
+        "supply-green",
+        "blocks-green",
+        "q-runtime-96",
+        "med-runtime-final"
+      ]
+    },
+    {
+      "source": "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d",
+      "target": "c10f06373f8f5858f12bc19963a9f23c86b7be8647e24f7ba453302b3c7c33d3",
+      "reason": "完整源码精确核验；STU-Net模型、抽样、损失、冻结配方及完整状态保持。增加默认资源等待、取消退出、共享块进度及独立模型准备；数据身份继续严格核验。",
+      "validation": [
+        "upstream-8b5b51e-187-blobs",
+        "memory-wait-complete",
+        "memory-owner-final",
+        "hysteresis-green",
+        "supply-green",
+        "blocks-green",
+        "q-runtime-96",
+        "med-runtime-final"
+      ]
+    },
+    {
+      "source": "48fae4f30bf7127760e71079ea3faf2199a4ef8cbc6d449f95afd7d6be1f69d2",
+      "target": "c10f06373f8f5858f12bc19963a9f23c86b7be8647e24f7ba453302b3c7c33d3",
+      "reason": "完整源码精确核验；STU-Net模型、抽样、损失、冻结配方及完整状态保持。增加默认资源等待、取消退出、共享块进度及独立模型准备；数据身份继续严格核验。",
+      "validation": [
+        "upstream-8b5b51e-187-blobs",
+        "memory-wait-complete",
+        "memory-owner-final",
+        "hysteresis-green",
+        "supply-green",
+        "blocks-green",
+        "q-runtime-96",
+        "med-runtime-final"
+      ]
+    },
+    {
+      "source": "72c96526257124ace440ef461c55f62b11876a798065ad7ff29e340fd4e071d1",
+      "target": "c10f06373f8f5858f12bc19963a9f23c86b7be8647e24f7ba453302b3c7c33d3",
+      "reason": "完整源码精确核验；STU-Net模型、抽样、损失、冻结配方及完整状态保持。增加默认资源等待、取消退出、共享块进度及独立模型准备；数据身份继续严格核验。",
+      "validation": [
+        "upstream-8b5b51e-187-blobs",
+        "memory-wait-complete",
+        "memory-owner-final",
+        "hysteresis-green",
+        "supply-green",
+        "blocks-green",
+        "q-runtime-96",
+        "med-runtime-final"
+      ]
+    },
+    {
+      "source": "7fc72920281d8e45adf361fa8f967da43d04021481b06d69f45e5db8878f0136",
+      "target": "c10f06373f8f5858f12bc19963a9f23c86b7be8647e24f7ba453302b3c7c33d3",
+      "reason": "完整源码精确核验；STU-Net模型、抽样、损失、冻结配方及完整状态保持。增加默认资源等待、取消退出、共享块进度及独立模型准备；数据身份继续严格核验。",
+      "validation": [
+        "upstream-8b5b51e-187-blobs",
+        "memory-wait-complete",
+        "memory-owner-final",
+        "hysteresis-green",
+        "supply-green",
+        "blocks-green",
+        "q-runtime-96",
+        "med-runtime-final"
+      ]
+    },
+    {
+      "source": "7c39a0d1d7158a86ece9717464652b4567d2f4bcec0416ae02e9c9d0b4eb1964",
+      "target": "c10f06373f8f5858f12bc19963a9f23c86b7be8647e24f7ba453302b3c7c33d3",
+      "reason": "完整源码精确核验；STU-Net模型、抽样、损失、冻结配方及完整状态保持。增加默认资源等待、取消退出、共享块进度及独立模型准备；数据身份继续严格核验。",
+      "validation": [
+        "upstream-8b5b51e-187-blobs",
+        "memory-wait-complete",
+        "memory-owner-final",
+        "hysteresis-green",
+        "supply-green",
+        "blocks-green",
+        "q-runtime-96",
+        "med-runtime-final"
+      ]
+    },
+    {
+      "source": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "target": "c10f06373f8f5858f12bc19963a9f23c86b7be8647e24f7ba453302b3c7c33d3",
+      "reason": "完整源码精确核验；STU-Net模型、抽样、损失、冻结配方及完整状态保持。增加默认资源等待、取消退出、共享块进度及独立模型准备；数据身份继续严格核验。",
+      "validation": [
+        "upstream-8b5b51e-187-blobs",
+        "memory-wait-complete",
+        "memory-owner-final",
+        "hysteresis-green",
+        "supply-green",
+        "blocks-green",
+        "q-runtime-96",
+        "med-runtime-final"
+      ]
     }
   ]
 }

@@ -14,7 +14,7 @@ from ...artifacts.store import file_digest,write_json
 from .adapter import activate
 
 
-def main(payload,rank,common,allocation,gate):
+def main(payload,rank,common,allocation,gate,memory):
     config,recipe = payload['config'],deepcopy(payload['recipe'])
     root = Path(config['run_dir'])/'sequence'
     torch.set_num_threads(1)
@@ -53,10 +53,14 @@ def main(payload,rank,common,allocation,gate):
 
         def _run_step(self,*args,**kwargs):
             gate.ready.wait(rank,f'med-transfer:{self.epoch}:{self.steps["train"]}',self.device)
-            if pressure(common,self.device):
+            if pressure(common,self.device,gate.ready,rank,f'med-step:{self.epoch}:{self.steps["train"]}',memory,
+                        release=lambda: self.optim.optimizer.zero_grad(set_to_none=True)):
                 raise MemoryError('MedSAM2在批次边界检测到主机或显存压力，保留最近完整epoch检查点')
             mark = perf_counter()
             result = super()._run_step(*args,**kwargs)
+            if rank == 0:
+                feedback.update(epoch=self.epoch, step=self.steps['train'])
+                feedback.snapshot()
             if self.device.type=='cuda':
                 torch.cuda.synchronize(self.device)
             from ...observability.events import event
@@ -141,12 +145,19 @@ def main(payload,rank,common,allocation,gate):
     reason = None
     actual_prefetch = None
     initial_update = trainer.steps['train']
+    from ...observability.progress import Progress
+    feedback = Progress(dict(common, run_dir=str(root)), 'train', total=trainer.max_epochs, unit='epochs') if rank == 0 else None
+    resumed_epoch = trainer.epoch
+    if rank == 0:
+        feedback.update(done=trainer.epoch, new=0, epoch=trainer.epoch, step=trainer.steps['train'])
+        feedback.snapshot(force=True)
     gate.ready.wait(rank,'med-state-restored',device)
     while trainer.epoch<trainer.max_epochs:
         if limit is not None and trainer.steps['train']>=limit:
             break
         gate.ready.wait(rank,f'med-epoch-boundary:{trainer.epoch}',device)
-        if pressure(common,trainer.device):
+        if pressure(common,trainer.device,gate.ready,rank,f'med-epoch:{trainer.epoch}',memory,
+                    release=lambda: trainer.optim.optimizer.zero_grad(set_to_none=True)):
             reason = 'resource_pressure'
             break
         gate.start(rank,f'med-epoch:{trainer.epoch}',allocation['shares'],device)
@@ -174,6 +185,10 @@ def main(payload,rank,common,allocation,gate):
             cuda_rng=torch.cuda.get_rng_state(trainer.device) if trainer.device.type=='cuda' else None))
         trainer.save_checkpoint(trainer.epoch,checkpoint_names=['checkpoint'])
         gate.ready.wait(rank,f'med-checkpoint-written:{trainer.epoch}',device)
+        if rank == 0:
+            feedback.update(done=trainer.epoch, new=trainer.epoch-resumed_epoch,
+                epoch=trainer.epoch, step=trainer.steps['train'])
+            feedback.snapshot(force=True)
         dist.barrier()
         del loader
         gc.collect()
@@ -209,6 +224,7 @@ def main(payload,rank,common,allocation,gate):
         world_size=allocation['world'],batch_layout=allocation['shares'],ranks=measurements,reason=reason,
         data_workers=allocation['supply']['workers'],prefetch_factor=actual_prefetch)
     if rank==0:
+        feedback.close()
         write_json(root/'summary.json',summary)
         if reason is None:
             record_peaks(common,allocation['spec'],allocation['gpus'],allocation['shares'],

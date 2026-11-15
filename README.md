@@ -28,7 +28,7 @@ zmic 使用 `/data4/zhangruichen`：项目实体目录固定在 `code/chd-segmen
 
 独立 `update.py` 只使用 Python 3.11+ 标准库与系统 Git。它取得本项目需要的文件对象，检查语法，再将本地 main 快进到固定的远端提交；成功后 HEAD、origin/main 和核对时的远端 main 一致，并逐文件核验本项目内容。`run.py --code-info` 显示实际代码、提交与解释器，本地修改标记只检查本项目。运行任务请统一使用 `run.py` 或 `smoke.py`，它们持有代码锁；本项目的本地修改、未知文件或活动任务会阻止更新。其他项目的工作文件保留；若其暂存内容与远端提交冲突，Git 会停止更新并保留暂存内容。更新不会安装环境或启动训练。
 
-公开仓库更新默认探测 `ghfast.top`、`gh-proxy.com` 与 GitHub，选择提交匹配、支持按需下载且响应较快的镜像。地址和超时保存在 `course/chd-segmentation/update_network.json`，可以手动修改；也可使用 `--mirror 地址` 或 `--mirror direct`。镜像请求不携带 Git 凭据，选定来源与探测结果记录到过程目录。文件内容校验失败时停止本次更新。
+公开仓库更新默认直连 GitHub。显式 `--mirror auto` 时探测配置镜像与 GitHub，选择提交匹配、支持按需下载且响应较快的来源；也可使用 `--mirror 地址` 或 `--mirror direct`。地址和超时保存在 `course/chd-segmentation/update_network.json`。镜像请求不携带 Git 凭据，选定来源与探测结果记录到过程目录。文件内容校验失败时停止本次更新。旧更新器的200文件限制需要按[发布说明](docs/ASSISTANT2_PUBLICATION.md)先取得固定版本更新器。
 
 用户明确允许本项目以远端为准时，执行 `python3 -B update.py --force`。它修复部分索引、本项目暂存删除和缺失文件，并允许同步到重写后的远端 main；目标源码的本地修改会被覆盖。首次切换执行 `--force --relocate`，持有任务锁后将实体项目从 code/git/chd-segmentation 移到 code/chd-segmentation，再同步代码。数据、环境、运行结果、其他项目和非目标未知文件保留。
 
@@ -37,7 +37,7 @@ zmic 使用 `/data4/zhangruichen`：项目实体目录固定在 `code/chd-segmen
 服务器同步 GitHub main 的最新代码：
 
 ```bash
-python3 -B /data4/zhangruichen/code/chd-segmentation/update.py
+env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy python3 -B /data4/zhangruichen/code/chd-segmentation/update.py --mirror direct
 ```
 
 默认不启用强制同步；需要覆盖本项目受 Git 管理的本地代码修改时，在命令末尾添加 `--force`。该参数只对本次执行生效。更新成功后，回执中的 `branch` 应为 `main`，`sha`、`head`、`origin_branch` 应一致，`tracked_code_clean` 应为 `true`。
@@ -72,6 +72,8 @@ cases:
 正式训练还需独立 validation 病例。1282 按患者划分；ImageCHD 导入原划分时保留病例级独立性，有可靠患者映射时可明确要求患者级检查。示例数字仅解释字段，实际值必须来自审核记录。ImageCHD 的未知类别仅允许缺 MYO（编号 5）；1282 使用其原始 0—10 编号和 `shared_index_excel` 空间规则。未标注和已确认缺如分别记录。额外标签仅按显式 `ignore_label_ids` 屏蔽。plan_scope 仅用于显式读取既有计划的来源声明，不能代替对拟合病例的核查。
 
 图像和标签原件只读。prepare 按病例顺序读取主训练数据，在 RAM 中进行有界前景采样，保存紧凑计划与来源描述。preprocess 按 CPU/RAM 预算并行转换全部所需病例，逐例核验后写入 data，重复执行只补缺失或核验失败病例。训练和预测通过 MONAI Dataset/Compose 读取只读 mmap 数组；供数进程的 LRU 缓存保存映射及位置，训练不重复整例重采样。默认只使用空闲显卡，卡数不足持续等待；显式设置最少卡数可启用 epoch 边界的 GPU 卡数调整。详见 [资源调度](docs/RESOURCE_SCHEDULING.md)。
+
+STU-Net 大病例采用 [分块预处理与内存保护](docs/MEMORY_BOUNDED_PREPROCESS.md)，日志同时显示 [病例和块进度](docs/PROGRESS.md)。运行入口包含 [快速检查](docs/QUICK_CHECKS.md)；zmic 已有冻结输入的更新、重启预处理和两张显卡训练命令见 [服务器运行入口](docs/STUNET_SERVER_COMMANDS.md)。
 
 ## 运行
 

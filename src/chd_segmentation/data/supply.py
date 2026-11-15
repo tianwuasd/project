@@ -11,6 +11,7 @@ import torch
 from .dataset import CaseDataset, sample_patch
 from ..training.resources import register_member
 from ..observability.events import event
+from ..training.memory_guard import MemoryGuard
 
 _dataset = None
 _gate = None
@@ -46,6 +47,16 @@ def selection(request):
 
 
 def make_patch(dataset, gate, config, rank, request):
+    amount = int(np.prod(config["training"]["patch"])) * 16 * 3
+    with MemoryGuard(config, "patch", owner=config.get("memory_owner")) as memory:
+        with memory.admit(amount, label="sample_patch", release=dataset.clear) as allowance:
+            if allowance is None:
+                dataset.clear()
+                return None
+            return admitted_patch(dataset, gate, config, rank, request)
+
+
+def admitted_patch(dataset, gate, config, rank, request):
     _, settings, phase, _, _ = request
     name, rng, context = selection(request)
     context["rank"] = rank
@@ -69,17 +80,21 @@ def patch_task(request):
 
 
 class BatchSupply:
-    def __init__(self, prepared, config, slots, workers, cache_bytes, gate, owner, rank=0):
+    def __init__(self, prepared, config, slots, workers, cache_bytes, gate, owner, rank=0, cancel=None):
         self.prepared, self.config, self.slots = prepared, config, slots
         self.workers, self.cache_bytes, self.gate = workers, cache_bytes, gate
         self.owner = owner
         self.rank = rank
+        self.external_cancel = cancel
         self.pool = None
         self.local = None
         self.queue = deque()
         self.inflight = None
 
     def __enter__(self):
+        self.cancel = mp.get_context('spawn').Event()
+        self.signals = (self.cancel,) if self.external_cancel is None else (self.cancel, self.external_cancel)
+        self.config = {**self.config, "memory_owner": self.owner, 'memory_cancel': self.signals}
         resources = {**self.config["resources"], "cache_bytes": self.cache_bytes}
         if self.workers:
             self.pool = ProcessPoolExecutor(self.workers, mp_context=mp.get_context("spawn"),
@@ -98,6 +113,7 @@ class BatchSupply:
         else:
             self.queue.append(requests)
         contexts = [selection(request)[2] for request in requests]
+        self.pending_index = contexts[0]["batch_index"]
         event(self.config["run_dir"], "batch_enqueued", console=False, rank=self.rank,
               batch_index=contexts[0]["batch_index"], samples=contexts, queue_capacity=1, occupied_batches=1)
 
@@ -109,7 +125,15 @@ class BatchSupply:
             results = [future.result() for future in requests]
         else:
             results = [make_patch(self.local, self.gate, self.config, self.rank, request) for request in requests]
-        tensors = [torch.from_numpy(np.stack(values)) for values in zip(*(r[0] for r in results))]
+        if any(result is None for result in results):
+            self.inflight = {"batch_index": self.pending_index, "case_ids": [], "slots": self.slots}
+            return {"cancelled": True, "batch_index": self.inflight["batch_index"]}
+        with MemoryGuard(self.config, "batch_stack", owner=self.owner) as memory:
+            with memory.admit(sum(a.nbytes for r in results for a in r[0]) * 2, label="batch_stack") as allowed:
+                if allowed is None:
+                    self.inflight = {"batch_index": self.pending_index, "case_ids": [], "slots": self.slots}
+                    return {"cancelled": True, "batch_index": self.pending_index}
+                tensors = [torch.from_numpy(np.stack(values)) for values in zip(*(r[0] for r in results))]
         self.inflight = {"batch_index": results[0][5]["batch_index"], "case_ids": [r[2] for r in results],
                          "slots": self.slots}
         event(self.config["run_dir"], "cpu_batch_dequeued", console=False, rank=self.rank, **self.inflight,
@@ -147,6 +171,7 @@ class BatchSupply:
         self.inflight = None
 
     def __exit__(self, *_):
+        self.cancel.set()
         if self.pool:
             self.pool.shutdown(wait=True, cancel_futures=True)
             self.pool = None

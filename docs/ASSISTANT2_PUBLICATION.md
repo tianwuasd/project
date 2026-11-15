@@ -4,17 +4,21 @@
 
 ## 固定版本更新
 
-先从发布回执取得完整PUBLIC_SHA。在服务器执行：
+先从发布回执取得完整PUBLIC_SHA和UPDATER_SHA256。旧更新器最多接收200个源码文件；本轮完整源码超过该数量，首次更新先取得并核验本轮标准库更新器，保存在course专用bootstrap目录供复用，容量小于32KiB。使用系统curl与sha256sum，在服务器执行：
 
 ```bash
 PUBLIC_SHA='<发布回执中的完整main提交>'
+UPDATER_SHA256='<发布回执中的update.py SHA256>'
 CODE=/data4/zhangruichen/code/chd-segmentation
-python3 -B "$CODE/update.py" --sha "$PUBLIC_SHA" --mirror direct --check
-python3 -B "$CODE/update.py" --sha "$PUBLIC_SHA" --mirror direct --force
+UPDATER=/data4/zhangruichen/course/chd-segmentation/bootstrap/update-$PUBLIC_SHA.py
+mkdir -p /data4/zhangruichen/course/chd-segmentation/bootstrap
+curl --noproxy '*' --proto '=https' -fL "https://raw.githubusercontent.com/tianwuasd/project/$PUBLIC_SHA/chd-segmentation/update.py" -o "$UPDATER"
+printf '%s  %s\n' "$UPDATER_SHA256" "$UPDATER" | sha256sum -c -
+env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u all_proxy python3 -B "$UPDATER" --sha "$PUBLIC_SHA" --mirror direct --force
 python3 -B "$CODE/run.py" --code-info
 ```
 
-共同更新器默认repo为/data4/zhangruichen/code、runtime为/data4/zhangruichen/course/chd-segmentation，固定读取main。--force保留分支、活动代码锁、路径和内容核验。回执branch为main，sha、head、origin_branch及核对时的官方main应一致。本会话不登录服务器，实际安装以用户执行回执为准。
+仅在curl和摘要检查都成功后执行更新命令；任一步骤失败即停止。共同更新器默认repo为/data4/zhangruichen/code、runtime为/data4/zhangruichen/course/chd-segmentation，固定读取main，源码清单上限256文件。--force保留分支、活动代码锁、路径和内容核验。回执branch为main，sha、head、origin_branch及核对时的官方main应一致。本会话不登录服务器，实际安装以用户执行回执为准。
 
 发布前以最新main为父提交，只整合本项目受管理文件；其他项目和助手1已发布实现保留。逐文件核对Git blob，以期望旧SHA非强制更新，发布后重新查询main与源码树。患者清单、权重、依赖、报告和结果不进入公开源码。
 

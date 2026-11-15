@@ -125,8 +125,39 @@ def run(args):
                     path.chmod(stat.S_IREAD | stat.S_IWRITE)
 
 
+def inventory_run(args):
+    with SmokeWorkspace(args.work_root, args.report) as workspace:
+        origin = workspace.root/'inventory.git'
+        subprocess.run(['git', '-c', 'init.templateDir=', 'clone', '--bare', '--shared',
+            '--single-branch', str(ROOT), str(origin)], check=True, stdout=subprocess.PIPE, timeout=60)
+        names = git(ROOT, 'ls-files', '--cached', '--others', '--exclude-standard', '-z').decode().split('\0')
+        files = {name: git(origin, 'hash-object', '-w', '--stdin', data=(ROOT/name).read_bytes()).decode().strip()
+                 for name in sorted(set(names)) if name and updater.allowed(name) and (ROOT/name).is_file()}
+        def tree(prefix):
+            entries = {}
+            for name, blob in files.items():
+                if name.startswith(prefix):
+                    leaf, separator, _ = name[len(prefix):].partition('/')
+                    entries[leaf] = ('040000 tree '+tree(prefix+leaf+'/')) if separator and leaf not in entries else entries.get(leaf, '100644 blob '+blob)
+            return git(origin, 'mktree', '-z', data=b''.join(
+                (value+'\t'+name).encode()+b'\0' for name,value in sorted(entries.items()))).decode().strip()
+        root = git(origin, 'mktree', data=('040000 tree '+tree('')+'\tchd-segmentation\n').encode()).decode().strip()
+        head = git(origin, 'commit-tree', root, data=b'Actual managed source inventory\n').decode().strip()
+        repo = updater.GitRepository(origin, expected_urls={str(ROOT)})
+        try:
+            actual = repo.inventory(head)
+            assert len(actual) > 200 and actual == files
+            workspace.results.append(dict(source_files=len(actual), actual_git_inventory=True, optimizer_updates=0))
+        finally:
+            for path in workspace.root.rglob('*'):
+                if path.is_file():
+                    path.chmod(stat.S_IREAD | stat.S_IWRITE)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--work-root', required=True)
     parser.add_argument('--report', required=True)
-    run(parser.parse_args())
+    parser.add_argument('--inventory-only', action='store_true')
+    args = parser.parse_args()
+    (inventory_run if args.inventory_only else run)(args)

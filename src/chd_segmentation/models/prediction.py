@@ -64,7 +64,8 @@ def predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=No
         applied['execution']['gpu_ids'] = applied['execution']['gpu_ids'][:1]
     key = digest(dict(checkpoint=file_digest(checkpoint), prepared=prepared['identity'],
         output=str(Path(output).resolve()), names=names, prompts=prompts, protocol=protocol))[:16]
-    applied['run_dir'] = str(Path(config['work_root'] or Path(config['run_dir']).parent)/'model-predictions'/key)
+    label = ('ImageCHD' if prepared['dataset'] == 'imagechd' else 'CHD1282')+'-'+('Q' if config['model'] == 'q_route1' else 'MedSAM2')
+    applied['run_dir'] = str(Path(config['work_root'] or Path(config['run_dir']).parent)/'runs'/label/'predictions'/key)
     budget = deepcopy(prepared)
     budget['manifest']['cases'] = rows
     with model_storage_lease(applied,prepared,'prediction'), admitted(applied, budget, 'prediction') as (common, allocation):
@@ -76,7 +77,7 @@ def predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=No
 
 def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=None,
              prompt_mode='external', label_classes=None, box_seed=2024, box_max_shift=20,
-             official_weights=False, test_set=None, test_group=None):
+             official_weights=False, test_set=None, test_group=None, *, memory):
     from .workflow import resources, load_state, adapter, checked_identity, dataset_for
     started = perf_counter()
     resources(config)
@@ -123,10 +124,17 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
     results = []
     classes = len(prepared['dataset_json']['labels'])
     log_dir = Path(config['run_dir'])/'prediction'
+    from ..observability.progress import Progress
+    feedback = Progress(memory.config, 'predict', total=len(rows), unit='cases')
     for row in rows:
         mark = perf_counter()
         name = row['case_id']
         event(log_dir, 'model_case_started', case_id=name, model=config['model'], prompt_mode=prompt_mode)
+        feedback.update(done=len(results), new=len(results), current_case=name, pending=len(rows)-len(results), active=1)
+        feedback.snapshot()
+        with memory.admit(0, label='prediction_case:'+name, release=dataset.clear) as ticket:
+            if ticket is None:
+                raise RuntimeError('预测在明确取消或停止后结束，已有输出保持原位置')
         entry = dataset.get(name)
         case_prompts, protocol = prompts, None
         truth = entry['label'] if label_mode else None
@@ -168,6 +176,10 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
         event(log_dir, 'model_case_completed', case_id=name, seconds=perf_counter()-mark,
               inference_seconds=inference_seconds, shape=list(check.shape), classes=metrics)
         dataset.clear()
+        del probability, native, image, check, entry, inference_entry, truth
+        feedback.update(done=len(results), new=len(results), pending=len(rows)-len(results), active=0)
+        feedback.snapshot(force=True)
+    feedback.close()
     summary = dict(model=config['model'], scope=prepared['scope'], checkpoint_sha256=file_digest(checkpoint),
         initialization=initialization, prompt_mode=prompt_mode, test_set=test_set, test_group=test_group,
         cases=results, seconds=perf_counter()-started)
