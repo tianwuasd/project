@@ -18,9 +18,13 @@
 
 病例工作空间使用真实 NIfTI 头、清单确认的间距及冻结计划推导。初次估算采用裁剪前上限，日志中的 `cropped_shape: null` 表示尚未实际处理。病例运行日志另外记录实际裁剪和重采样尺寸。估算值与进程 RSS 读数分别标明，预算不是硬内存限额。
 
-所有 rank 共用 `BuildGate`，同时构建的病例数可减少到一例。未缓存的大数组在释放构建名额前解除引用。缓存按实际供数进程数计算，包括前景位置数组；零 worker 时使用 rank 内本地 Dataset，也纳入预算。最低配置仍不能容纳一例时等待，日志列出 `minimum_bytes`、`budget_bytes`、主机及 cgroup 来源。
+所有 rank 共用 `BuildGate`，按当前病例各自的工作空间估算领取内存额度，同时限制构建病例数。小病例的额度之和允许时可以并行处理；实际并发可以减少到一例。未缓存的大数组在释放额度前解除引用。缓存按实际供数进程数计算，包括前景位置数组；零 worker 时使用 rank 内本地 Dataset，也纳入预算。最低配置仍不能容纳一例时等待，日志列出 `minimum_bytes`、`budget_bytes`、主机及 cgroup 来源。
 
-worker 数量受 `workers`/`max_workers`、CPU 比例及内存共同约束；worker 内部数值库单线程。两个训练 rank 可以在少量 CPU 配额上共享 CPU 时间，不要求额外一颗专用协调核心。默认最多 32 个供数进程、8 个病例构建名额，实际准入数量可以减少到零 worker、一例构建。
+worker 数量受 `workers`/`max_workers`、当前全局 batch、各 rank 份额、CPU 比例及内存共同约束；worker 内部数值库单线程。两个训练 rank 可以在少量 CPU 配额上共享 CPU 时间，不要求额外一颗专用协调核心。配置上限为 32 个供数进程、8 个病例构建名额；全局 batch 4 时实际最多 4 个供数进程，每个 rank 最多使用自身份额数量的 worker。实际准入数量可以减少到零 worker、一例构建。
+
+每个 rank 仅保留一个尚未消费的批次，应用后的 `prefetch` 固定为 1。当前全局批次需要的所有样本完成计算并释放输入后，才派发下一批次；病例和取块随机数仍由原全局 slot 协议决定。两卡、全局 batch 4 时，每个 rank 为当前批次准备两块数据。当前批次最多涉及四个病例，也可能重复抽到同一病例。
+
+`HostCoordinator` 使用主机进程间条件变量协调进程启动、模型加载、CPU 数据就绪、GPU 传输完成、批次消费、供数池调整及检查点写入。所有 rank 完成启动后再建立通信组。数据准备期间，各 rank 在主机上等待，尚未进入训练 collective。只有全部 rank 的当前数据准备完成且传输完成，才进入模型计算。CUDA 异步复制通过事件确认完成后释放 pinned 输入；计算结束同步设备，再释放当前批次。NCCL/Gloo 通信超时由 `resources.collective_timeout_seconds` 设置，默认 180 秒，不用这个超时限制 CPU 预处理。
 
 运行中默认每 30 秒重新规划，增加供数前至少间隔 60 秒。调整时停止派发，结束旧供数池，清理未消费预取和缓存，再检查实时余量并启动新池。GPU 模型、优化器和 scaler 保持驻留，全局采样游标保持不变。`supply_resize_proposed`、`supply_resize_applied` 分别记录提出及实际应用的配置。
 
@@ -30,6 +34,8 @@ Linux 使用 systemd 获取当前进程的 cgroup，并通过 util-linux 的 fin
 
 ## 日志与验收
 
-事件保存在运行目录的 `events.jsonl`，单份 16 MiB，加三份轮转；详细病例信息不会反复打印到终端。记录 requested/applied、主机和有效 cgroup 容量、逐病例工作空间、并发乘数、缓存实例、队列、实际 USS 抵扣及等待原因。训练记录供数、计算、验证、检查点耗时；短测另外记录进程组 RSS 峰值。未实际执行的 CUDA/NCCL 和 Linux cgroup 分支单独标明。
+事件保存在运行目录的 `events.jsonl`，单份 16 MiB，加三份轮转；详细病例信息不会反复打印到终端。记录 requested/applied、主机和有效 cgroup 容量、逐病例工作空间、并发乘数、缓存实例、队列、实际 USS 抵扣及等待原因。`batch_enqueued`、`case_build_started/completed`、`cpu_batch_dequeued`、`batch_transfer_completed`、`batch_consumed` 包含批次序号、rank、病例或全局 slot；病例事件另含额度、缓存及耗时。`host_rendezvous` 心跳列出当前等待原因和已经就绪的 rank。训练记录供数、计算、验证、检查点耗时；短测另外记录进程组 RSS 峰值。未实际执行的 CUDA/NCCL 和 Linux cgroup 分支单独标明。
 
 `tests/verify_resource_adaptation.py` 限定一个真实 ImageCHD 病例的 32³ 区域、全局 batch 4、总计两次更新，覆盖供数 1→0→1、确定性重放、内存不足准入、同进程恢复、完整轮次边界 1→2 个 CPU/Gloo 进程恢复及预测复用。临时文件由独占工作区自动清理，保留报告独立于工作区。
+
+`tests/verify_ordered_supply.py` 限定两个真实 ImageCHD 病例的 32³ 区域、两个 CPU/Gloo 进程、全局 batch 4，总计两次训练更新及对应验证，检查恢复、每个全局 slot 恰好消费一次、单批队列上限和真实供数等待超过通信超时时仍能继续。显式 `--cuda-transfer` 使用一张通过空闲准入的显卡检查小块复制完成和缓冲释放，不进行 GPU 训练。

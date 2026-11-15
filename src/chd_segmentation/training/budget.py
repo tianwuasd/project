@@ -57,7 +57,9 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
     # 队列结果、堆叠批次和 pinned/传输中的副本分别占用内存。
     patch_bytes = int(np.prod(config["training"]["patch"])) * 16 * config["training"]["batch"]
     cap = r["max_workers"] if r["workers"] == "auto" else min(r["workers"], r["max_workers"])
-    cap = max(0, min(cap, cores - world))
+    batch = config["training"]["batch"]
+    cap = max(0, min(cap, cores - world, batch))
+    shares = r["batch_layout"] or [batch // world + int(rank < batch % world) for rank in range(world)]
     readers_cap = r["max_readers"] if r["readers"] == "auto" else min(r["readers"], r["max_readers"])
     base = (world + 1) * GIB
     minimum = base + case_bytes + patch_bytes * 3
@@ -69,26 +71,27 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
         result["reason"] = "单个病例构建及零 worker 的最小预算仍不足，等待主机内存释放"
         return result
     for count in range(cap, -1, -1):
-        workers = [count // world + int(rank < count % world) for rank in range(world)]
+        workers = [0] * world
+        for _ in range(count):
+            candidates = [i for i in range(world) if workers[i] < shares[i]]
+            index = min(candidates, key=lambda i: (workers[i], i))
+            workers[index] += 1
         instances = sum(max(1, w) for w in workers)
-        depth = max(r["prefetch"], max(workers))
-        # 先确保每个实际 worker 能取得任务，再按 RAM 减少预取。
-        minimum_depth = max(1, max(workers))
         fixed = base + count * GIB
-        if fixed + case_bytes + patch_bytes * (minimum_depth + 2) > budget:
+        queues = patch_bytes * 3
+        if fixed + case_bytes + queues > budget:
             continue
-        depth = max(minimum_depth, min(depth, (budget - fixed - case_bytes) // patch_bytes - 2))
-        queues = patch_bytes * (depth + 2)
-        readers = max(1, min(readers_cap, instances, (budget - fixed - queues) // case_bytes))
-        remaining = budget - fixed - queues - readers * case_bytes
-        cache = max(0, min(r["cache_bytes"], remaining // instances))
-        used = fixed + queues + readers * case_bytes + instances * cache
+        readers = max(1, min(readers_cap, instances, batch))
+        cache = max(0, min(r["cache_bytes"], (budget - fixed - queues - case_bytes) // instances))
+        workspace = min(readers * case_bytes, budget - fixed - queues - instances * cache)
+        used = fixed + queues + workspace + instances * cache
         if used > budget:
             raise AssertionError("供数预算计算未闭合")
         result.update(admitted=True, reason="资源预算允许", workers=workers, cache_bytes=[int(cache)] * world,
                       max_workers=count, cpu_slots=world + count, ram_bytes=int(used), reader_slots=int(readers),
-                      prefetch=int(depth), breakdown={"processes_bytes": fixed, "queue_bytes": int(queues),
-                      "case_builds": int(readers), "case_workspaces_bytes": int(readers * case_bytes),
+                      prefetch=1, workspace_capacity_bytes=int(workspace),
+                      breakdown={"processes_bytes": fixed, "queue_bytes": int(queues),
+                      "case_builds": int(readers), "case_workspaces_bytes": int(workspace),
                       "cache_instances": instances, "cache_total_bytes": int(instances * cache)})
         return result
     raise AssertionError("零 worker 最小预算未被实际规划覆盖")
