@@ -39,6 +39,8 @@ def validate_settings(value):
             raise ValueError("小样本轮次和每轮尝试次数必须为1或2")
     if type(value["batch"]) is not int or value["batch"] != 4:
         raise ValueError("小样本流程保持全局batch 4")
+    if value["epochs"] * value["steps_per_epoch"] < 2:
+        raise ValueError("保存后继续更新需要至少两次有界尝试")
     if value["profile"] not in ("technical", "full128") or value["device"] not in ("cpu", "cuda"):
         raise ValueError("需要明确技术范围和设备")
     return value

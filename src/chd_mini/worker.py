@@ -57,7 +57,7 @@ def select_inputs(request):
               "training": {"patch": [32, 32, 32] if scope == "technical" else [128, 128, 128],
                            "batch": 4, "epochs": settings["epochs"], "steps_per_epoch": settings["steps_per_epoch"],
                            "validation_steps": 1, "save_every_attempts": 1, "seed": settings["seed"],
-                           "precision": "fp32" if scope == "technical" else "fp16"},
+                           "precision": "fp16" if scope == "formal" and settings["device"] == "cuda" else "fp32"},
               "resources": {"device": settings["device"], "gpu_count": 1, "min_gpus": 1,
                             "cpu_threads": 2, "cpu_processes": 1, "workers": 0, "max_workers": 2,
                             "prefetch": 1, "readers": 1, "max_readers": 1, "cache_bytes": 64 * 1024 ** 2,

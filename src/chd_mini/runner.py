@@ -143,6 +143,8 @@ class RunWorkspace:
                    TORCHINDUCTOR_CACHE_DIR=str(cache / "inductor"), TEMP=str(cache), TMP=str(cache),
                    OMP_NUM_THREADS="2", MKL_NUM_THREADS="2")
         mark = perf_counter()
+        invocation = {"stage": name, "state": "started", "command": command}
+        self.stages.append(invocation)
         print(json.dumps({"stage": name, "state": "started", "time_utc": datetime.now(timezone.utc).isoformat()}, ensure_ascii=False), flush=True)
         with (self.logs / (name + ".log")).open("w", encoding="utf-8") as output:
             child = subprocess.Popen(command, cwd=self.work, env=env, stdout=output, stderr=subprocess.STDOUT)
@@ -159,13 +161,14 @@ class RunWorkspace:
             finally:
                 self.group.stop()
                 child.wait()
+                invocation.update(wall_seconds=perf_counter() - mark, returncode=child.returncode,
+                                  state="completed" if child.returncode == 0 else "failed")
         elapsed = perf_counter() - mark
         self.budget()
         if verify_engine(self.settings["engine_root"], self.settings["engine_commit"]) != self.baseline:
             raise ValueError("阶段后的生产依赖已经改变")
         record = read_json(self.logs / (name + ".json"))
-        self.stages.append({"stage": name, "wall_seconds": elapsed, "worker_seconds": record["worker_seconds"],
-                            "startup_and_exit_seconds": elapsed - record["worker_seconds"], "command": command})
+        invocation.update(worker_seconds=record["worker_seconds"], startup_and_exit_seconds=elapsed - record["worker_seconds"])
         print(json.dumps({"stage": name, "state": "completed", "wall_seconds": elapsed}, ensure_ascii=False), flush=True)
 
     def __exit__(self, kind, error, trace):

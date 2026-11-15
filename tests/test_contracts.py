@@ -12,6 +12,8 @@ class Contracts(unittest.TestCase):
             broken = {**cfg, key: value}
             with self.assertRaises(ValueError):
                 validate_settings(broken)
+        with self.assertRaises(ValueError):
+            validate_settings({**cfg, "epochs": 1, "steps_per_epoch": 1})
 
     def test_selection_keeps_roles_and_seed(self):
         rows = [{"case_id": str(i), "patient": str(i), "roles": [role], "cohort": "main"}
