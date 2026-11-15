@@ -27,6 +27,33 @@ def run(args):
     with MetadataWorkspace(args.work_root, args.report, clean_owned, files_under) as workspace:
         config, source, source_path = source_config(workspace, item, baseline['plan'])
         config['resources'].update(ram_fraction=.95, reserve_ram_bytes=1024**3)
+        if args.q_generated:
+            from chd_segmentation.delivery.configs import model_configs
+            from chd_segmentation.models.workflow import options
+            from chd_segmentation.models.offline import quick_check_model
+            from chd_segmentation.models.execution import execution_config
+            from chd_segmentation.models.memory import memory_profile
+            generated = model_configs(workspace.root, PROJECT, dict(stunet=item['pretrained'],
+                medsam2=PROJECT/'data/model_weights/MedSAM2_latest.pt', official=PROJECT/'vendor/MedSAM2',
+                dependencies=PROJECT/'env/medsam2'))
+            for stage in ('localizer', 'local'):
+                raw = generated[f'configs/CHD1282-Q/20261115/{stage}.yaml']
+                assert raw['pretrained'] is None
+                raw.update(technical=True, patch=32, local_size=32, updates=2, device='cpu', parents={})
+                raw['execution'].update(cpu_processes=1, ram_fraction=.95, reserve_ram_bytes=1024**3)
+                path = workspace.root/(stage+'.json')
+                write_json(path, raw)
+                model = options(path)
+                if args.q_generated == 'preflight':
+                    assert quick_check_model(model, source, 'train')['ok']
+                    result = dict(quick_check=True)
+                else:
+                    common = execution_config(model)
+                    result = memory_profile(common, source, stage, [4])
+                    assert result['checkpoint_reserve_bytes'] >= 64*1024**2
+                workspace.results.append(dict(stage=stage, no_initialization_weight=True,
+                    check=args.q_generated, result=result, optimizer_updates=0))
+            return
         config['preprocessing'].update(block_bytes=256*1024, read_block_bytes=256*1024)
         write_json(workspace.root/'source-config.json', config)
         path, model = model_config(workspace, 'medsam2', str(PROJECT/'data/model_weights/MedSAM2_latest.pt'))
@@ -72,4 +99,5 @@ if __name__ == '__main__':
     for name in ('spec', 'baseline', 'work-root', 'report'):
         parser.add_argument('--'+name, required=True)
     parser.add_argument('--simulator', default='D:/projects/test')
+    parser.add_argument('--q-generated', choices=('preflight', 'budget'))
     run(parser.parse_args())

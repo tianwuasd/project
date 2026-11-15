@@ -98,7 +98,7 @@ def quick_check_model(model, prepared, stage, prepare_config=None):
         checks['environment'] = dependency_status(Path(__file__).resolve().parents[3], Path(model['dependency_root']))
         if checks['environment']['missing'] or not checks['environment']['torch_compatible']:
             raise ValueError('MedSAM2固定依赖或PyTorch版本不兼容')
-    else:
+    elif model['pretrained'] is not None:
         from .stunet.adapter import WEIGHT_SHA256
         if file_digest(model['pretrained']) != WEIGHT_SHA256:
             raise ValueError('Q的STU初始化权重摘要不符')

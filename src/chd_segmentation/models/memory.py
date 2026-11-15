@@ -74,7 +74,8 @@ def memory_profile(config,prepared,stage,shares,records=None):
         rank_case=[prediction if stage=='prediction' else 0 for _ in shares]
     else:
         patch=math.prod(config['training']['patch'])
-        checkpoint_weight = Path(config['pretrained']).stat().st_size if stage != 'prediction' else 0
+        # 无初始化权重的定位器和局部阶段按128MiB状态规划，包含其完整保存及历史余量。
+        checkpoint_weight = (Path(config['pretrained']).stat().st_size if config['pretrained'] is not None else 128*2**20) if stage != 'prediction' else 0
         fixed=[GIB+4*checkpoint_weight+(patch*512*batch if config['resources']['device']=='cpu' and stage!='prediction' else 0)
                for batch in shares]
         queue_per_sample=patch*16
@@ -85,7 +86,7 @@ def memory_profile(config,prepared,stage,shares,records=None):
             rank_case=[prediction if rank==0 else 0 for rank in range(len(shares))]
         else:
             rank_case=[prediction//5 for _ in shares]
-    checkpoint = 0 if stage == 'prediction' else (6 if config['model'] == 'medsam2' else 4)*Path(config['pretrained']).stat().st_size+16*2**20
+    checkpoint = 0 if stage == 'prediction' else (6*Path(config['pretrained']).stat().st_size if config['model'] == 'medsam2' else 4*checkpoint_weight)+16*2**20
     return dict(protocol='chd-model-memory-v2',model=config['model'],stage=stage,
         coordinator_bytes=GIB+checkpoint,checkpoint_reserve_bytes=checkpoint,
         rank_fixed_bytes=fixed,worker_fixed_bytes=GIB,rank_case_bytes=rank_case,

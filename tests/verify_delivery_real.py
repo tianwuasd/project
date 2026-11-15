@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 import os
 import sys
+import subprocess
 from time import perf_counter
 import unittest
 from uuid import uuid4
@@ -55,6 +56,31 @@ def run(args):
     source = Path(args.inputs)
     baseline = {p.name: (file_digest(p), p.stat().st_mtime_ns) for p in source.iterdir() if p.is_file()}
     with MetadataWorkspace(args.work_root, args.report, clean_owned, files_under) as workspace:
+        if args.linked_destination:
+            server = workspace.root/'server'
+            course = server/'course/chd-segmentation'
+            protected = workspace.root/'protected-dataset'
+            protected.mkdir()
+            course.mkdir(parents=True)
+            relative = {'inputs': 'inputs', 'q': 'inputs/q1282',
+                'bound': 'inputs/CHD1282-ImageCHD', 'receipt': 'installations',
+                'configs': 'configs'}[args.linked_destination]
+            link = course/relative
+            link.parent.mkdir(parents=True, exist_ok=True)
+            subprocess.run(['cmd', '/c', 'mklink', '/J', str(link), str(protected)],
+                           check=True, stdout=subprocess.PIPE)
+            assets = dict(stunet=Path(args.stu), medsam2=Path(args.med),
+                          official=Path(args.official), dependencies=Path(args.dependencies))
+            try:
+                with unittest.TestCase().assertRaises(ValueError):
+                    install(server, PROJECT, source, assets, check=True,
+                        dataset_roots=dict(chd1282=protected, imagechd=Path(args.image_root)))
+                assert not list(protected.iterdir())
+                workspace.results.append(dict(linked_destination=relative, rejected_before_write=True,
+                    original_inputs_unchanged=True, ct_voxels_read=0, optimizer_updates=0))
+            finally:
+                os.rmdir(link)
+            return
         started = perf_counter()
         installation_source = source
         if args.nested_inputs:
@@ -143,6 +169,7 @@ if __name__ == '__main__':
     for name in ('inputs', 'stu', 'med', 'official', 'dependencies', 'chd-root', 'image-root', 'work-root', 'report'):
         parser.add_argument('--'+name, required=True)
     parser.add_argument('--nested-inputs', action='store_true')
+    parser.add_argument('--linked-destination', choices=('inputs', 'q', 'bound', 'receipt', 'configs'))
     parser.add_argument('--bash', default='C:/msys64/usr/bin/bash.exe')
     parser.add_argument('--simulator', default='D:/projects/test')
     run(parser.parse_args())

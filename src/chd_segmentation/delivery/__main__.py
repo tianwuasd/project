@@ -15,7 +15,7 @@ from packaging.utils import canonicalize_name
 from packaging.version import Version
 
 from .assets import MED_COMMIT, MED_SHA, MED_URL, clone_official, download_file
-from .install import install
+from .install import install, validate_asset_destination
 from .network import subprocess_environment
 
 
@@ -97,6 +97,8 @@ def main():
     roots = {key: Path(value).resolve() for key, value in [('chd1282', args.chd_root), ('imagechd', args.image_root)] if value}
     preview = install(root, code, source, assets, check=True, dataset_roots=roots)
     dependencies = dependency_status(code, assets['dependencies'])
+    if dependencies['missing']:
+        validate_asset_destination(root, code, source, assets['dependencies'], roots)
     preview['environment'] = dependencies
     preview['network'] = dict(mode='explicit_proxy' if args.proxy else 'direct', inherited_proxy=False)
     if args.command == 'check':

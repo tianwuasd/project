@@ -128,6 +128,24 @@ def copy_input_metadata(source, target, descriptor):
         shutil.copy2(source/name, target/name)
 
 
+def validate_destination(path, within, protected):
+    raw, anchor = Path(path), Path(within).resolve()
+    resolved = raw.resolve()
+    if raw.is_symlink() or resolved == anchor or not resolved.is_relative_to(anchor):
+        raise ValueError('安装写入目标越界：'+str(raw))
+    for original in protected:
+        original = Path(original).resolve()
+        if resolved.is_relative_to(original) or original.is_relative_to(resolved):
+            raise ValueError('安装写入目标与受保护资料重叠：'+str(raw))
+
+
+def validate_asset_destination(root, code, source, target, dataset_roots=None):
+    roots = dict(chd1282=Path(root)/'data/dataset1282_CHD_CT_back', imagechd=Path(root)/'data/ImageCHD_dataset')
+    roots.update(dataset_roots or {})
+    validate_destination(target, root, [code, source, *roots.values()])
+    validate_destination(Path(target).with_name(Path(target).name+'.pending'), root, [code, source, *roots.values()])
+
+
 def install(root, code, source, assets, check=False, dataset_roots=None):
     root, code, source = [Path(p).resolve(strict=True) for p in (root, code, source)]
     info = inspect_inputs(source)
@@ -147,6 +165,26 @@ def install(root, code, source, assets, check=False, dataset_roots=None):
         else course/'inputs/CHD1282-ImageCHD'
     configs = model_configs(root, code, assets)
     configs.update(prepare_configs(root, source, bound, qdir, assets['stunet']))
+    protected = [code, *roots.values(), *[path for path in source.iterdir() if path.is_file()]]
+    targets = [qdir, course/'installations/CHD1282-Q-MedSAM2-20261115.json',
+               course/'.model-install.lock', course/'.model-assets.lock', course/'installation-work',
+               *[course/name for name in configs]]
+    if bound != source:
+        targets.append(bound)
+    for directory in (qdir, bound if bound != source else qdir):
+        validate_destination(directory, course, protected)
+        if directory.exists():
+            targets.extend(directory.iterdir())
+            checked_bundle(directory, Q_ID if directory == qdir else SOURCE_ID)
+    for target in targets:
+        validate_destination(target, course, protected)
+        pending = target.with_name(target.name+'.pending')
+        validate_destination(pending, course, protected)
+        if pending.exists():
+            raise FileExistsError('安装目标存在未完成文件：'+str(pending))
+    for target in assets.values():
+        if target is not None and not Path(target).exists():
+            validate_asset_destination(root, code, source, target, roots)
     check_configs(course, configs)
     missing = verify_assets(assets)
     missing.extend(dict(asset=dataset, path=str(path), preparation='existing_dataset')

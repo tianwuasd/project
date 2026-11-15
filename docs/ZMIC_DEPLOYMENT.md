@@ -51,7 +51,7 @@ env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY -u http_proxy -u https_proxy -u al
 
 zmic 服务器通过现有网络直接联网，当前命令显式使用 `--mirror direct` 并清除本次进程继承的代理变量。Git 下载忽略代理配置，不修改系统或用户的全局设置。
 
-公开仓库默认并行探测 ghfast.top、gh-proxy.com 和 GitHub。候选必须支持部分下载、提交匹配，优先选择响应较快的可用镜像。GitHub 可达时以官方提交核对候选；官方不可达时要求可用镜像引用一致，回执标注 `mirror_agreement`，该状态不能代替官方实时核验。
+公开仓库默认直连GitHub。显式使用 `--mirror auto` 时并行探测 ghfast.top、gh-proxy.com 和 GitHub，候选必须支持部分下载、提交匹配，优先选择响应较快的可用镜像。GitHub 可达时以官方提交核对候选；官方不可达时要求可用镜像引用一致，回执标注 `mirror_agreement`，该状态不能代替官方实时核验。
 
 首次更新在过程目录生成可手动修改的 `update_network.json`：
 
