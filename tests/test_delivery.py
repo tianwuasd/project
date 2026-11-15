@@ -6,7 +6,7 @@ from uuid import uuid4
 import zipfile
 
 from chd_mini.contracts import TOOL_ROOT, confined, file_sha, write_json
-from chd_mini.delivery import code_archive, reference_file, delivery_manifest
+from chd_mini.delivery import code_archive, reference_file, delivery_manifest, from_spec
 from chd_mini.runner import inventory
 
 
@@ -58,6 +58,18 @@ class Delivery(unittest.TestCase):
         self.assertEqual(second["actual_new_bytes"], Path(second["manifest"]).stat().st_size)
         self.assertEqual(second["new_or_changed"], [])
         self.assertTrue(any(r.get("scope") == "public_code_only" for r in second["reuse_in_place"]))
+
+    def test_private_spec_builds_reference_only_delivery(self):
+        source = TOOL_ROOT / "configs" / "example.json"
+        spec = self.work / "delivery.local.json"
+        write_json(spec, {"destination": str(self.work / "delivery"), "dataset": "CHD1282", "method": "STUNet",
+                         "date": "20261115", "engine": {"public_commit": "pinned"}, "commit": "HEAD",
+                         "references": [{"path": str(source), "server_destination": "/inputs/config.json"}],
+                         "new_files": []})
+        result = from_spec(spec)
+        self.assertEqual(result["reuse_in_place"][0]["sha256"], file_sha(source))
+        self.assertEqual(result["large_files_copied"], 0)
+        self.assertEqual(len(list((self.work / "delivery").iterdir())), 2)
 
 
 if __name__ == "__main__":

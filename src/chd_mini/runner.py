@@ -323,6 +323,6 @@ def run(config_path, run_id):
     runs.mkdir(exist_ok=True)
     with FileLock(str(runs / ".tool.lock"), timeout=0):
         with RunWorkspace(settings, run_id) as task:
-            for name in ("select", "simulation", "fit", "prepare", "preprocess", "train_start", "train_resume", "test", "cuda_weights", "data_verify"):
+            for name in ("select", "simulation", "fit", "prepare", "preprocess", "train_start", "train_resume", "test", "data_verify", "cuda_weights"):
                 task.stage(name)
     return read_json(task.logs / "summary.json")

@@ -7,7 +7,7 @@ import re
 import subprocess
 import zipfile
 
-from .contracts import TOOL_ROOT, confined, file_sha, git, write_json
+from .contracts import TOOL_ROOT, confined, file_sha, git, read_json, write_json
 
 
 def public_paths(commit):
@@ -112,3 +112,15 @@ def delivery_manifest(destination, dataset, method, date, references, new_files,
     if path.stat().st_size != result["metadata_manifest_bytes"]:
         raise ValueError("交付清单实际容量与记录不符")
     return {**result, "manifest": str(path)}
+
+
+def from_spec(path):
+    spec = read_json(path)
+    expected = {"destination", "dataset", "method", "date", "references", "new_files", "engine", "commit"}
+    if set(spec) != expected:
+        raise ValueError("交付规格字段不完整或包含未知字段")
+    references = [reference_file(**row) for row in spec["references"]]
+    new_files = [{**reference_file(**row), "action": "upload_new_or_changed", "reused": False}
+                 for row in spec["new_files"]]
+    return delivery_manifest(spec["destination"], spec["dataset"], spec["method"], spec["date"],
+                             references, new_files, spec["engine"], spec["commit"])
