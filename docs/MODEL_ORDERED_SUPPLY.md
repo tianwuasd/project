@@ -6,7 +6,7 @@ Q 在同步读取中保持 sample、loss 交替调用。各阶段的候选索引
 
 MedSAM2 保留官方 DistributedSampler、BatchSampler、worker 随机种子、增强、八帧512序列与训练主循环。包装器仅给原始索引附加批次及样本位置，约束构建额度；整批数据齐备后才交给官方 Trainer。模型和初始化权重完成加载后构造 DDP，输入传输完成后执行官方步骤。消费结束会同步当前设备，再释放批次额度。官方源码保持固定提交且不修改。
 
-主机就绪检查采用 multiprocessing Condition，逐次核对全部 rank 的阶段。该检查不使用 NCCL collective 等待数据。通信本身的180秒超时保持原值。进程失败沿用 spawn 的失败传播和已登记进程清理，阶段不一致立即终止。
+主机就绪检查采用 multiprocessing Condition，逐次核对全部 rank 的阶段。该检查不使用 NCCL collective 等待数据。Q的通信超时由execution.collective_timeout_seconds设置，默认180秒；MedSAM2保留官方DistributedConf的30分钟默认值。进程失败沿用 spawn 的失败传播和已登记进程清理，阶段不一致立即终止。
 
 ## 日志
 

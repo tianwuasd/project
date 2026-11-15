@@ -67,16 +67,19 @@ def run(args):
                 # 只规划CUDA训练的主机内存，不申请或使用CUDA。
                 common['resources'].update(device='cuda',workers='auto')
                 common['model_stage'] = 'sequence'
-                common['model_topology'] = dict(world=1,shares=[1],workers=[1])
+                fresh = cpu_plan(common,prepared,1)
+                if not fresh['admitted'] or sum(fresh['workers'])>1:
+                    raise ValueError('新训练的worker数量需要受当前全局batch约束')
+                common['model_topology'] = dict(world=1,shares=[1],workers=[2])
                 frozen = cpu_plan(common,prepared,1)
-                if not frozen['admitted'] or frozen['workers']!=[1]:
+                if not frozen['admitted'] or frozen['workers']!=[2]:
                     raise ValueError('恢复规划没有保留原始worker布局')
                 common['resources']['workers'] = 0
                 restricted = cpu_plan(common,prepared,1)
                 if restricted['admitted']:
                     raise ValueError('恢复所需worker不足时应继续等待')
                 plans.append(dict(model=model,stage='resume_host_planning_without_cuda',plan=frozen,
-                    restricted=restricted))
+                    restricted=restricted,fresh=fresh))
         for kind in ('image','label'):
             if file_digest(row[kind])!=row['sha256'][kind]:
                 raise ValueError('短测改变了原始病例')

@@ -12,6 +12,16 @@ FIXTURE = Path(__file__).parent / "fixtures" / "exponent_config.json"
 
 
 class IdentityGuardTests(unittest.TestCase):
+    def test_model_collective_timeout_uses_shared_validation(self):
+        from chd_segmentation.models.workflow import options
+        from chd_segmentation.models.execution import execution_config
+        config = Path(__file__).resolve().parents[1]/'configs/models/q_base.yaml'
+        applied = options(config,dict(execution=dict(collective_timeout_seconds=5)))
+        self.assertEqual(execution_config(applied)['resources']['collective_timeout_seconds'],5)
+        for value in (-1,0,True,float('nan'),float('inf')):
+            with self.assertRaises(ValueError):
+                options(config,dict(execution=dict(collective_timeout_seconds=value)))
+
     def test_model_json_exponents_remain_numbers(self):
         from chd_segmentation.models.workflow import options
         config = options(Path(__file__).parent/'fixtures/model_exponent_config.json')

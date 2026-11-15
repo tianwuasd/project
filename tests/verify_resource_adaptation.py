@@ -21,6 +21,7 @@ from chd_segmentation.prediction.infer import predict
 from chd_segmentation.preprocessing.prepare import prepare
 from chd_segmentation.training.budget import cpu_plan
 from chd_segmentation.training.build_gate import BuildGate
+from chd_segmentation.training.coordinator import HostCoordinator
 from chd_segmentation.training.checkpoint import load_checkpoint
 from chd_segmentation.training.engine import rebalance_supply, train
 from chd_segmentation.training.resources import host_capacity, resource_lease
@@ -69,12 +70,16 @@ def run(manifest_path, data_root, pretrained, root, report):
         mark = perf_counter()
         with resource_lease(config, prepared, {}) as allocation:
             context = mp.get_context("spawn")
-            gate = BuildGate(context, allocation["supply"]["reader_slots"])
-            job = {**allocation, "config": config, "prepared": prepared}
+            gate = BuildGate(context, allocation["supply"]["reader_slots"],
+                             allocation["supply"]["workspace_capacity_bytes"], allocation["supply"]["case_estimates"])
+            coordinator = HostCoordinator(context, 1)
+            coordinator.register(0)
+            job = {**allocation, "config": config, "prepared": prepared, "coordinator": coordinator}
             with BatchSupply(prepared, config, [0], 1, allocation["supply"]["cache_bytes"][0], gate,
                              allocation["owner"]) as supply:
                 supply.submit([row["case_id"]], 0, 0)
                 reference = supply.take(torch.device("cpu"))
+                supply.mark_consumed()
                 supply.submit([row["case_id"]], 0, 1)
                 config["resources"]["workers"] = 0
                 check.assertEqual(rebalance_supply(job, supply, gate, torch.device("cpu"), 0, context.Event()), "applied")
@@ -84,12 +89,14 @@ def run(manifest_path, data_root, pretrained, root, report):
                 replay = supply.take(torch.device("cpu"))
                 check.assertTrue(torch.equal(reference["image"], replay["image"]))
                 check.assertTrue(torch.equal(reference["label"], replay["label"]))
+                supply.mark_consumed()
                 config["resources"]["workers"] = 1
                 check.assertEqual(rebalance_supply(job, supply, gate, torch.device("cpu"), 0, context.Event()), "applied")
                 check.assertEqual(supply.workers, 1)
                 supply.submit([row["case_id"]], 0, 0)
                 replay = supply.take(torch.device("cpu"))
                 check.assertTrue(torch.equal(reference["image"], replay["image"]))
+                supply.mark_consumed()
         record["supply_resize_seconds"] = perf_counter() - mark
         record["supply_resize"] = ["worker1_to0", "worker0_to1", "unconsumed_prefetch_replayed_exactly"]
         mark = perf_counter()

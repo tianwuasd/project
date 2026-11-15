@@ -2,7 +2,7 @@
 
 ## 本次代码
 
-代码保存在D:/projects/project/chd-segmentation-assistant2，独立分支codex/chd-segmentation-assistant2-medsam2-q-r2。共享资源来源为助手1确定提交210d80b026996a266597d08afdb2edb0ad3bab3e，并整合e5264c29cad7991e40c9024434fa0707ddebcca4的权重与初始化修复；当前对应公开main 303540f5a4d335df3e3274a82a2e23cbfe51cdc6。代码提交包含模型实现、共享资源调用、配置、测试和说明。
+代码保存在D:/projects/project/chd-segmentation-assistant2，独立分支codex/chd-segmentation-assistant2-medsam2-q-r2。公共供数、主机协调与资源策略继承助手1完成测试和发布的确定提交60d6e5f17c81f1fea78690021fbf403b1ee61f37，对应公开main 2269b26a4abc8a4952acacfab0611af4ce375d4f，来源子树cba6c019b1bc248262cdd5d70bd29be7aa6719ec。模型专属内存预算、官方训练与恢复检查保留。代码提交包含模型实现、共享资源调用、配置、测试和说明。
 
 向GitHub发布时只提交上述源码；官方权重、依赖目录、病例清单、患者分组、预测和训练检查点分别管理。当前本地分支通过main继承并保留助手2模型修改，服务器update.py仍以已发布远端main为准；只有本分支内容正式发布后，服务器日常更新才会包含这些模型修改。
 

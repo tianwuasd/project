@@ -64,12 +64,12 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
     patch_bytes = int(np.prod(config["training"]["patch"])) * 16 * config["training"]["batch"]
     cap = r["max_workers"] if r["workers"] == "auto" else min(r["workers"], r["max_workers"])
     cap = max(0, min(cap, cores - world))
+    batch = config['training']['batch']
+    shares = r['batch_layout'] if r['batch_layout'] is not None else [batch//world+int(rank<batch%world) for rank in range(world)]
     readers_cap = r["max_readers"] if r["readers"] == "auto" else min(r["readers"], r["max_readers"])
     base = (world + 1) * GIB
     if config.get('model') in ('medsam2','q_route1'):
         from ..models.memory import memory_profile
-        batch = config['training']['batch']
-        shares = r['batch_layout'] if r['batch_layout'] is not None else [batch//world+int(i<batch%world) for i in range(world)]
         profile = memory_profile(config,prepared,config['model_stage'],shares,reports)
         base = profile['coordinator_bytes']+sum(profile['rank_fixed_bytes'])+sum(profile['rank_case_bytes'])
         retained,worker_bytes = profile['retained_case_bytes'],profile['worker_fixed_bytes']
@@ -78,9 +78,11 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
         fixed_workers = profile['worker_layout']
         if fixed_workers is not None and (len(fixed_workers)!=world or any(type(w) is not int or w<0 for w in fixed_workers)):
             raise ValueError('模型恢复的worker布局无效')
+    if fixed_workers is None:
+        cap = min(cap,batch)
     minimum_workers = fixed_workers if fixed_workers is not None else [0]*world
     minimum = (base+sum(minimum_workers)*worker_bytes+sum(max(1,w) for w in minimum_workers)*retained+
-               case_bytes+patch_bytes*(max(1,max(minimum_workers))+2))
+               case_bytes+patch_bytes*3)
     result = {"admitted": False, "facts": facts, "budget_bytes": budget, "own_uss_credit_bytes": credit,
               "peer_pending_bytes": pending, "minimum_bytes": minimum, "case_estimate_bytes": case_bytes,
               "case_estimates": reports, "requested": {key: r[key] for key in
@@ -95,26 +97,29 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
         return result
     counts = [sum(fixed_workers)] if fixed_workers is not None else range(cap,-1,-1)
     for count in counts:
-        workers = fixed_workers if fixed_workers is not None else [count // world + int(rank < count % world) for rank in range(world)]
+        if fixed_workers is not None:
+            workers = fixed_workers
+        else:
+            workers = [0]*world
+            for _ in range(count):
+                candidates = [rank for rank in range(world) if workers[rank]<shares[rank]]
+                index = min(candidates,key=lambda rank:(workers[rank],rank))
+                workers[index] += 1
         instances = sum(max(1, w) for w in workers)
-        depth = max(r["prefetch"], max(workers))
-        # 先确保每个实际 worker 能取得任务，再按 RAM 减少预取。
-        minimum_depth = max(1, max(workers))
         fixed = base + count * worker_bytes + instances * retained
-        if fixed + case_bytes + patch_bytes * (minimum_depth + 2) > budget:
+        queues = patch_bytes*3
+        if fixed + case_bytes + queues > budget:
             continue
-        depth = max(minimum_depth, min(depth, (budget - fixed - case_bytes) // patch_bytes - 2))
-        queues = patch_bytes * (depth + 2)
-        readers = max(1, min(readers_cap, instances, (budget - fixed - queues) // case_bytes))
-        remaining = budget - fixed - queues - readers * case_bytes
-        cache = max(0, min(cache_limit, remaining // instances))
-        used = fixed + queues + readers * case_bytes + instances * cache
+        readers = max(1,min(readers_cap,instances,batch))
+        cache = max(0,min(cache_limit,(budget-fixed-queues-case_bytes)//instances))
+        workspace = min(readers*case_bytes,budget-fixed-queues-instances*cache)
+        used = fixed+queues+workspace+instances*cache
         if used > budget:
             raise AssertionError("供数预算计算未闭合")
         result.update(admitted=True, reason="资源预算允许", workers=workers, cache_bytes=[int(cache)] * world,
                       max_workers=count, cpu_slots=world + count, ram_bytes=int(used), reader_slots=int(readers),
-                      prefetch=int(depth), breakdown={"processes_bytes": fixed, "queue_bytes": int(queues),
-                      "case_builds": int(readers), "case_workspaces_bytes": int(readers * case_bytes),
+                      prefetch=1,workspace_capacity_bytes=int(workspace), breakdown={"processes_bytes": fixed, "queue_bytes": int(queues),
+                      "case_builds": int(readers), "case_workspaces_bytes": int(workspace),
                       "cache_instances": instances, "cache_total_bytes": int(instances * cache)})
         if profile is not None:
             result['breakdown'].update(retained_case_instances=instances,retained_cases_bytes=instances*retained,

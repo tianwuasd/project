@@ -176,7 +176,7 @@ def rank_entry(rank,payload,common,allocation,gate,port):
             verify_device(device,allocation,rank)
             gate.ready.wait(rank,'q-distributed-entry',device)
             dist.init_process_group('nccl' if allocation['gpus'] else 'gloo',rank=rank,
-                world_size=allocation['world'],timeout=timedelta(seconds=180),
+                world_size=allocation['world'],timeout=timedelta(seconds=common['resources']['collective_timeout_seconds']),
                 **({'device_id':device} if allocation['gpus'] else {}))
             from .workflow import _train_q_rank
             _train_q_rank(payload,rank,common,allocation,gate,device)

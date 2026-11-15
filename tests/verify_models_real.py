@@ -26,7 +26,7 @@ from chd_segmentation.models.q_route1.adapter import allowed,export_probabilitie
 from chd_segmentation.prediction.metrics import evaluate
 
 
-def verify(spec_path,work_root,report_root,selected_model,dataset=None,world=1,legacy_root=None):
+def verify(spec_path,work_root,report_root,selected_model,dataset=None,world=1,legacy_root=None,collective_timeout=180):
     if legacy_root and (selected_model!='q_route1' or world!=1):
         raise ValueError('旧版恢复短测只使用单进程Q')
     experiments = yaml.safe_load(Path(spec_path).read_text(encoding='utf-8'))['experiments']
@@ -66,7 +66,7 @@ def verify(spec_path,work_root,report_root,selected_model,dataset=None,world=1,l
                 official_root=str(ROOT/'vendor/MedSAM2'),dependency_root=str(ROOT/'env/medsam2'),
                 frames=8,resolution=512,freeze_image_encoder=False,batch=1,workers=0,
                 work_root=str(directory/'course'),execution=dict(cpu_processes=world,
-                    workers=1 if selected_model=='medsam2' else 0,prefetch=1))
+                    workers=1 if selected_model=='medsam2' else 0,prefetch=1,collective_timeout_seconds=collective_timeout))
             if selected_model=='q_route1' and world==2:
                 config['execution'].update(batch_layout=[1,3],readers=1,max_readers=1)
             write_json(model_path,config)
@@ -200,5 +200,6 @@ if __name__=='__main__':
     parser.add_argument('--dataset',choices=('chd1282','imagechd'))
     parser.add_argument('--world',type=int,choices=(1,2,3,4),default=1)
     parser.add_argument('--legacy-root')
+    parser.add_argument('--collective-timeout',type=float,default=180)
     args=parser.parse_args()
-    verify(args.spec,args.work_root,args.report_root,args.model,args.dataset,args.world,args.legacy_root)
+    verify(args.spec,args.work_root,args.report_root,args.model,args.dataset,args.world,args.legacy_root,args.collective_timeout)
