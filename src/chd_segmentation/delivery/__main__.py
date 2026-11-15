@@ -16,6 +16,7 @@ from packaging.version import Version
 
 from .assets import MED_COMMIT, MED_SHA, MED_URL, clone_official, download_file
 from .install import install
+from .network import subprocess_environment
 
 
 def dependency_status(code, target):
@@ -41,7 +42,8 @@ def prepare_dependencies(code, root, target, proxy, allowed):
         temp = root/'course/chd-segmentation/installation-work'/uuid4().hex
         temp.mkdir(parents=True)
         target.mkdir(parents=True, exist_ok=True)
-        env = dict(os.environ, TMPDIR=str(temp), TEMP=str(temp), TMP=str(temp), PYTHONDONTWRITEBYTECODE='1')
+        env = dict(subprocess_environment(proxy), TMPDIR=str(temp), TEMP=str(temp), TMP=str(temp),
+                   PYTHONDONTWRITEBYTECODE='1')
         command = [sys.executable, '-B', '-m', 'pip', 'install', '--no-deps', '--no-cache-dir',
                    '--index-url', 'https://pypi.org/simple', '--target', str(target),
                    '-r', str(code/'requirements-medsam2.txt')]
@@ -76,8 +78,9 @@ def main():
         child.add_argument('--root', default='/data4/zhangruichen')
         child.add_argument('--code', default=str(Path(__file__).resolve().parents[3]))
         for option in ('inputs', 'stu-weights', 'med-weights', 'official-root', 'dependency-root',
-                       'chd-root', 'image-root', 'proxy'):
+                       'chd-root', 'image-root'):
             child.add_argument('--'+option)
+        child.add_argument('--proxy', help='仅对本次准备指定代理；默认直连并排除旧代理设置')
         child.add_argument('--install-dependencies', action='store_true')
     args = parser.parse_args()
     root, code = Path(args.root).resolve(strict=True), Path(args.code).resolve(strict=True)
@@ -95,6 +98,7 @@ def main():
     preview = install(root, code, source, assets, check=True, dataset_roots=roots)
     dependencies = dependency_status(code, assets['dependencies'])
     preview['environment'] = dependencies
+    preview['network'] = dict(mode='explicit_proxy' if args.proxy else 'direct', inherited_proxy=False)
     if args.command == 'check':
         print(json.dumps(preview, ensure_ascii=False, indent=2))
         return 0 if not preview['missing'] and not dependencies['missing'] and dependencies['torch_compatible'] else 2

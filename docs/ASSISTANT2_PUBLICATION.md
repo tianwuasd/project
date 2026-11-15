@@ -9,8 +9,8 @@
 ```bash
 PUBLIC_SHA='<发布回执中的完整main提交>'
 CODE=/data4/zhangruichen/code/chd-segmentation
-python3 -B "$CODE/update.py" --sha "$PUBLIC_SHA" --check
-python3 -B "$CODE/update.py" --sha "$PUBLIC_SHA" --force
+python3 -B "$CODE/update.py" --sha "$PUBLIC_SHA" --mirror direct --check
+python3 -B "$CODE/update.py" --sha "$PUBLIC_SHA" --mirror direct --force
 python3 -B "$CODE/run.py" --code-info
 ```
 
@@ -25,10 +25,12 @@ python3 -B "$CODE/run.py" --code-info
 ```bash
 CHD_PYTHON=/data4/zhangruichen/env/chd-segmentation/bin/python \
   bash /data4/zhangruichen/code/chd-segmentation/scripts/CHD1282-Q-MedSAM2-20261115_install.sh \
-  --proxy http://127.0.0.1:17891 --install-dependencies
+  --install-dependencies
 ```
 
-17891为用户给出的服务器代理历史地址，实际可用性由服务器执行时核对；命令不修改全局代理。可以明确传入其他--proxy地址。既有完整材料直接复用，文件不匹配或环境不相容时停止并保留原件。额外Linux依赖仅放入env/medsam2，不升级共同训练解释器的PyTorch。固定TensorDict要求PyTorch至少2.11；不相容时需要使用满足条件的独立Linux解释器。Windows依赖不迁移。
+服务器默认直接连接GitHub、Hugging Face和PyPI。官方文件下载使用显式空代理配置；Git及pip子进程排除已有HTTP_PROXY、HTTPS_PROXY、ALL_PROXY及大小写变体，Git单次覆盖本地代理项，pip禁用已有代理配置文件。所有设置只作用于本次进程，不修改系统、用户或仓库网络配置，不启动代理。仅明确传入--proxy时对该次准备启用指定代理。Windows本机按本机网络约定执行验证。
+
+既有完整材料直接复用，文件不匹配或环境不相容时停止并保留原件。额外Linux依赖仅放入env/medsam2，不升级共同训练解释器的PyTorch。固定TensorDict要求PyTorch至少2.11；不相容时需要使用满足条件的独立Linux解释器。Windows依赖不迁移。
 
 只读核对使用PYTHONPATH指定共同源码的src，并执行python -B -m chd_segmentation.delivery check --root /data4/zhangruichen。可用--inputs、--stu-weights、--med-weights、--official-root、--dependency-root、--chd-root和--image-root明确引用实际既有位置；不自动搬动旧资料。
 

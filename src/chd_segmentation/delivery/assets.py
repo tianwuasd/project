@@ -8,6 +8,7 @@ from urllib.request import ProxyHandler, build_opener
 from uuid import uuid4
 
 from ..artifacts.store import file_digest
+from .network import subprocess_environment
 
 
 STU_SHA = 'f440f401bf4cac1d1d6f7c4635542ef057193a5f96c0b3c661a6179afeab7be6'
@@ -30,7 +31,7 @@ def download_file(url, target, size, sha, proxy=None):
     pending = target.with_name(target.name+'.pending')
     if pending.exists():
         raise FileExistsError('下载目标存在未完成文件：'+str(pending))
-    handler = ProxyHandler({'http': proxy, 'https': proxy}) if proxy else ProxyHandler()
+    handler = ProxyHandler({'http': proxy, 'https': proxy}) if proxy else ProxyHandler({})
     opener = build_opener(handler)
     try:
         count = 0
@@ -54,15 +55,17 @@ def download_file(url, target, size, sha, proxy=None):
 
 
 def git_command(path, arguments, proxy=None):
-    env = dict(os.environ)
-    for name in list(env):
-        if name.startswith('GIT_') or name in ('SSH_ASKPASS',):
-            env.pop(name)
-    env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM='1', GIT_TERMINAL_PROMPT='0')
+    env = subprocess_environment(proxy)
+    configured = subprocess.run(['git', '-C', str(path), 'config', '--includes', '--name-only',
+                                 '--get-regexp', r'^(http\..*proxy|remote\..*\.proxy)$'],
+                                env=env, capture_output=True, text=True, check=False)
+    if configured.returncode not in (0, 1):
+        configured.check_returncode()
     command = ['git', '-c', 'credential.helper=', '-c', 'http.extraHeader=',
-               '-c', 'http.sslVerify=true', '-c', 'core.autocrlf=false', '-c', 'core.hooksPath='+os.devnull]
-    if proxy:
-        command.extend(['-c', 'http.proxy='+proxy])
+               '-c', 'http.sslVerify=true', '-c', 'core.autocrlf=false', '-c', 'core.hooksPath='+os.devnull,
+               '-c', 'http.proxy='+(proxy or ''), '-c', 'remote.origin.proxy='+(proxy or '')]
+    for name in configured.stdout.splitlines():
+        command.extend(['-c', name+'='+(proxy or '')])
     return subprocess.run([*command, '-C', str(path), *arguments], env=env,
                           check=True, capture_output=True, text=True)
 

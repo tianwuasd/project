@@ -8,20 +8,19 @@
 
 正式组合为A 393、B 197、C 128、D 456例，每例对应一名患者。D包含source_test 127、target_primary 298、target_secondary 31例。A训练基座与定位器，B训练局部模型，C选择检查点，D评价。预处理清单将A登记为train、B登记为predict并保留标签、C为validation、D为test，因此自动统计仅拟合A。B局部训练通过显式Q分组读取。
 
-生成独立私有包，再绑定机器路径：
+复用服务器已有的原冻结输入，由安装入口精确生成Q组合、绑定机器路径及准备配置：
 
 ```bash
-python -B run.py models split-q1282 --source /path/to/original/server-inputs --output /path/to/q-inputs
-python -B run.py bind-inputs --directory /path/to/q-inputs --root /data4/zhangruichen
-python -B run.py prepare --config /path/to/q-inputs/q1282_prepare.yaml --output /data4/zhangruichen/course/chd-segmentation/assistant2/prepared/q1282-source.json
-python -B run.py models preprocess --config /path/to/q-inputs/q1282_base.yaml --prepare-config /path/to/q-inputs/q1282_prepare.yaml --prepared /data4/zhangruichen/course/chd-segmentation/assistant2/prepared/q1282-source.json --root /data4/zhangruichen/data/chd-segmentation/preprocessed --output /data4/zhangruichen/course/chd-segmentation/assistant2/prepared/q1282.json
+CHD_PYTHON=/data4/zhangruichen/env/chd-segmentation/bin/python \
+  bash /data4/zhangruichen/code/chd-segmentation/scripts/CHD1282-Q-MedSAM2-20261115_install.sh \
+  --install-dependencies
 ```
 
-数据或权重位置有差异时可在bind-inputs提供`--chd-root`、`--pretrained`。绑定会填写prepare及三个模型配置的机器路径，已有训练预算等手动配置保留。三个阶段依次使用q1282_base.yaml、q1282_localizer.yaml、q1282_local.yaml；局部阶段读取上游best.pt。
+安装默认直连，原输入及STU权重通过身份核验后引用，不需要再次上传。位置有差异时可明确提供--inputs、--chd-root或--stu-weights。Q配置位于course/chd-segmentation/configs/CHD1282-Q/20261115，三个阶段依次使用base.yaml、localizer.yaml、local.yaml；局部阶段读取上游best.pt。已有配置不同会停止，保留用户文件。安装不会启动预处理或训练，运行入口见[发布说明](ASSISTANT2_PUBLICATION.md)。
 
 原STU-Net完整训练集的计划与检查点属于独立基线。Q需要自己的A组拟合计划和A组上游权重。Q正式训练逐项核对外部A/B/C/D完整名单与准备描述中的冻结组别、来源角色、重复或遗漏病例、患者互斥、拟合病例及上游训练名单。
 
-本机私有包位于D:/projects/back/deliverables/chd-segmentation-assistant2-inputs，含冻结来源证据、可迁移影像清单、q1282_split.json、q_groups.json、配置及q_split_audit.json。影像原件保持原位置。患者名单和清单只按私有材料迁移。
+本机冻结Q参考保存在D:/projects/back/deliverables/chd-segmentation-assistant2-inputs，作为重建结果的核对依据。服务器从既有输入生成course/chd-segmentation/inputs/q1282，必须保持相同冻结身份及名单。影像原件保持原位置，患者材料不进入公开代码。
 
 ## MedSAM2标签框
 
