@@ -15,6 +15,7 @@ from uuid import uuid4
 
 
 REPOSITORY = "tianwuasd/project"
+BRANCH = "codex/chd-assistant2-offline-preprocess-20261115"
 SUBDIRECTORY = "chd-segmentation"
 OFFICIAL = "https://github.com/" + REPOSITORY + ".git"
 DEFAULT_NETWORK = {"mirrors": ["https://ghfast.top", "https://gh-proxy.com"], "probe_timeout_seconds": 10}
@@ -101,14 +102,14 @@ def network_settings(path):
 
 def probe_source(url, timeout):
     started = monotonic()
-    command = ["git", "-c", "protocol.version=2", "-c", "credential.helper=", "-c", "http.extraHeader=", "-c", "http.sslVerify=true", "-c", "http.followRedirects=false", "ls-remote", "--exit-code", url, "refs/heads/main"]
+    command = ["git", "-c", "protocol.version=2", "-c", "credential.helper=", "-c", "http.extraHeader=", "-c", "http.sslVerify=true", "-c", "http.followRedirects=false", "ls-remote", "--exit-code", url, "refs/heads/" + BRANCH]
     # 用户允许探测多个镜像；只在探测阶段记录超时并检查其他来源。
     try:
         result = subprocess.run(command, cwd=Path.cwd().anchor, env={**public_environment(), "GIT_TRACE_PACKET": "1"}, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout, check=False)
     except subprocess.TimeoutExpired:
         return {"url": url, "ok": False, "seconds": monotonic() - started, "error": "probe_timeout"}
     rows = result.stdout.decode("utf-8", "replace").splitlines()
-    valid = result.returncode == 0 and len(rows) == 1 and re.fullmatch(r"[0-9a-f]{40}\s+refs/heads/main", rows[0])
+    valid = result.returncode == 0 and len(rows) == 1 and re.fullmatch(r"[0-9a-f]{40}\s+" + re.escape("refs/heads/" + BRANCH), rows[0])
     filtered = bool(re.search(rb"fetch=[^\r\n]*\bfilter\b", result.stderr))
     return {"url": url, "ok": bool(valid and filtered), "sha": rows[0].split()[0] if valid else None, "seconds": monotonic() - started, "partial_fetch": filtered}
 
@@ -121,7 +122,7 @@ def allowed(path):
 
 def require_head(expected, actual):
     if expected != actual:
-        raise ValueError("远端 main 已变化，停止本次同步")
+        raise ValueError("助手2目标提交已变化，停止本次同步")
 
 
 def prepare_code_root(path):
@@ -169,8 +170,8 @@ class GitRepository:
             raise ValueError("存在 Git URL 重写，请先移除本项目的重写配置")
         if Path(self.run("rev-parse", "--show-toplevel").decode().strip()).resolve() != self.path or not (self.path / ".git").is_dir():
             raise ValueError("需要独立的普通 Git 工作目录")
-        if self.run("symbolic-ref", "--short", "HEAD").decode().strip() != "main":
-            raise ValueError("当前分支必须为 main")
+        if self.run("symbolic-ref", "--short", "HEAD").decode().strip() != BRANCH:
+            raise ValueError("助手2更新要求独立分支：" + BRANCH)
         code = self.path / SUBDIRECTORY
         if code.is_symlink() or (code.exists() and not code.is_dir()):
             raise ValueError("本项目代码路径必须为普通目录")
@@ -203,9 +204,9 @@ class GitRepository:
         return selected["sha"]
 
     def remote_head(self):
-        rows = self.run("ls-remote", "--exit-code", self.transport, "refs/heads/main", network=True).decode().splitlines()
+        rows = self.run("ls-remote", "--exit-code", self.transport, "refs/heads/" + BRANCH, network=True).decode().splitlines()
         if len(rows) != 1:
-            raise ValueError("不能唯一确定远端 main")
+            raise ValueError("不能唯一确定助手2远端分支")
         return rows[0].split()[0]
 
     def inventory(self, commit):
@@ -318,9 +319,9 @@ class GitRepository:
                 stream.write(candidate.read_bytes())
                 stream.flush()
                 os.fsync(stream.fileno())
-                tracking = self.run("rev-parse", "refs/remotes/origin/main").decode().strip()
-                updates = ("start\nupdate refs/heads/main " + commit + " " + head
-                           + "\nupdate refs/remotes/origin/main " + commit + " " + tracking + "\nprepare\ncommit\n")
+                tracking = self.run("rev-parse", "refs/remotes/origin/" + BRANCH).decode().strip()
+                updates = ("start\nupdate refs/heads/" + BRANCH + " " + commit + " " + head
+                           + "\nupdate refs/remotes/origin/" + BRANCH + " " + commit + " " + tracking + "\nprepare\ncommit\n")
                 self.run("update-ref", "--stdin", data=updates.encode())
             os.replace(index_lock, actual_index)
             owned_lock = False
@@ -388,7 +389,7 @@ def synchronize(repo, runtime, commit, remove_legacy=False, force=False, relocat
         head = repo.run("rev-parse", "HEAD").decode().strip()
         require_head(commit, repo.remote_head())
         mark = monotonic()
-        repo.run("fetch", "--no-tags", "--filter=blob:none", repo.transport, "main", network=True)
+        repo.run("fetch", "--no-tags", "--filter=blob:none", repo.transport, BRANCH, network=True)
         require_head(commit, repo.run("rev-parse", "FETCH_HEAD").decode().strip())
         if not force:
             repo.run("merge-base", "--is-ancestor", head, commit)
@@ -402,10 +403,10 @@ def synchronize(repo, runtime, commit, remove_legacy=False, force=False, relocat
         mark = monotonic()
         repo.validate(force=force)
         repo.update_project(head, commit, files, initial, force=force, relocate_from=relocate_from)
-        repo.run("config", "branch.main.remote", "origin")
-        repo.run("config", "branch.main.merge", "refs/heads/main")
+        repo.run("config", "branch." + BRANCH + ".remote", "origin")
+        repo.run("config", "branch." + BRANCH + ".merge", "refs/heads/" + BRANCH)
         require_head(commit, repo.run("rev-parse", "HEAD").decode().strip())
-        require_head(commit, repo.run("rev-parse", "origin/main").decode().strip())
+        require_head(commit, repo.run("rev-parse", "refs/remotes/origin/" + BRANCH).decode().strip())
         repo.validate(force=force)
         size = 0
         for name, blob in files.items():
@@ -420,16 +421,16 @@ def synchronize(repo, runtime, commit, remove_legacy=False, force=False, relocat
             # 已逐文件核验、持有任务锁，且路径严格限定为代码目录下的旧项目。
             legacy_files(repo, runtime)
             shutil.rmtree(legacy)
-        result = {"state": "synchronized", "forced": force, "tracked_code_clean": True, "sha": commit, "head": commit, "origin_main": commit, "code": str(repo.path / SUBDIRECTORY), "repository": REPOSITORY, "network": repo.network_info, "file_count": len(files), "code_bytes": size, "download_seconds": downloaded, "checkout_verify_seconds": checkout_seconds, "seconds": monotonic() - started, "checked_at": datetime.now(timezone.utc).isoformat(), "legacy_cleanup": {"deleted_files": len(obsolete), "released_bytes": deleted_bytes}}
+        result = {"state": "synchronized", "forced": force, "tracked_code_clean": True, "sha": commit, "head": commit, "branch": BRANCH, "origin_branch": commit, "code": str(repo.path / SUBDIRECTORY), "repository": REPOSITORY, "network": repo.network_info, "file_count": len(files), "code_bytes": size, "download_seconds": downloaded, "checkout_verify_seconds": checkout_seconds, "seconds": monotonic() - started, "checked_at": datetime.now(timezone.utc).isoformat(), "legacy_cleanup": {"deleted_files": len(obsolete), "released_bytes": deleted_bytes}}
         result["relocated_from"] = str(relocate_from) if relocate_from is not None else None
         write_json(runtime / "updates" / "latest.json", result)
         return result
 
 
 def main():
-    parser = argparse.ArgumentParser(description="只检出先心分割目录，将本地 main 快进到远端 main")
-    parser.add_argument("--repo", default="/data4/zhangruichen/code")
-    parser.add_argument("--runtime", default="/data4/zhangruichen/course/chd-segmentation")
+    parser = argparse.ArgumentParser(description="只更新助手2独立分支的先心分割源码")
+    parser.add_argument("--repo", default="/data4/zhangruichen/code/chd-segmentation-assistant2-repo")
+    parser.add_argument("--runtime", default="/data4/zhangruichen/course/chd-segmentation-assistant2")
     parser.add_argument("--sha")
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--force", action="store_true", help="本项目代码以远端为准，修复未完整检出的索引，保留其他项目的文件和暂存记录")
@@ -450,7 +451,7 @@ def main():
     candidates = [OFFICIAL] if choice == ["direct"] else [mirror_url(prefix) for prefix in (settings["mirrors"] if choice == ["auto"] else choice)] + [OFFICIAL]
     commit = repo.choose_source(candidates, expected=args.sha, timeout=settings["probe_timeout_seconds"], official=OFFICIAL)
     if args.check:
-        result = {"head": repo.run("rev-parse", "HEAD").decode().strip(), "remote_sha": commit, "code": str(repo.path / SUBDIRECTORY)}
+        result = {"head": repo.run("rev-parse", "HEAD").decode().strip(), "remote_sha": commit, "branch": BRANCH, "code": str(repo.path / SUBDIRECTORY)}
     else:
         if not settings_path.exists():
             write_json(settings_path, settings)
