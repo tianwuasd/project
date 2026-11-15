@@ -1,41 +1,41 @@
 # 助手2代码发布与服务器读取路径
 
-助手2在D:/projects/project/chd-segmentation-assistant2的独立工作树维护，功能及发布分支codex/chd-assistant2-offline-preprocess-20261115。在线流程冻结在codex/chd-assistant2-online-frozen-20261115，提交69289532a3da2c94bc72769f5726ca260f6980a7。该工作树与助手1共用Git对象，分别使用工作目录、分支和Git索引；助手2索引位于助手1.git/worktrees/chd-segmentation-assistant2。该本地Git仓库的根为分割源码。共享发布仓库为tianwuasd/project，发布目标子目录为chd-segmentation。
+助手2在D:/projects/project/chd-segmentation-assistant2的独立工作树维护，工作分支codex/chd-assistant2-offline-preprocess-20261115。在线流程冻结在codex/chd-assistant2-online-frozen-20261115，提交69289532a3da2c94bc72769f5726ca260f6980a7。共享发布仓库为tianwuasd/project，发布目标为main中的chd-segmentation目录。工作树分别使用分支及Git索引，发布不修改助手1和助手3工作目录。
 
-## 发布步骤
+## 发布与核验
 
-1. 在助手2分支完成修改、真实有界检查和本地提交，记录完整SHA、源码文件清单及报告范围。
-2. 用户已授权仅发布助手2独立分支。读取共享仓库当前main，在该确定树上建立同名助手2发布分支；发布分支保留整个共享仓库结构，将助手2受管理源码放在chd-segmentation子目录。远端对象接口可直接创建树及提交，无需复制整套共享仓库。
-3. 逐文件审查该子目录中的新增、修改与删除，保留main中其他项目文件；患者清单、分组、权重、vendor依赖、env、私有配置、运行记录和报告不进入代码分支。特别核对全部待发布提交的新增文件及内容。
-4. 推送前再次读取远端发布分支与main的实际SHA，核对快进关系。存在并发更新时重新审查，不强制推送。推送后重新查询远端分支，保存实际SHA和本地源码子树对应关系。
-5. 交付确定分支及完整提交，保持共享main不变。后续合并main需用户另行授权，当前任务不执行该操作。
+完成实际有界验收及一次整体审阅后，在最新公开main树上整合本项目源码。助手1已发布的离线合同及其他项目保留；逐文件检查新增、修改与删除。公开文件必须符合update.py白名单及200个源码文件上限。私人AGENTS、患者分组、清单、配置、报告、权重、vendor、env和结果不进入公开树。
 
-助手2的平铺源码提交用于本地开发和来源追踪，不能直接作为共享仓库main的整个根目录发布。公开发布分支必须含chd-segmentation这一子目录。
+发布前重新查询main，使用该完整提交作为父提交，并以期望旧SHA更新main；拒绝并发推进，不强制重写。发布后重新查询main及源码子树，核对每个Git blob和其余项目。公开提交是整个共享仓库的提交，本地开发提交是平铺分割源码提交，两者分别记录。
 
-## 服务器更新
+## 切换到main的独立部署
 
-助手2的update.py固定读取tianwuasd/project的codex/chd-assistant2-offline-preprocess-20261115分支及chd-segmentation子目录。所有下载、比较、激活和更新后远端查询使用同一分支。本地Git分支必须与其相同，--force不能绕过此要求。部署使用独立普通Git仓库/data4/zhangruichen/code/chd-segmentation-assistant2-repo和独立过程目录/data4/zhangruichen/course/chd-segmentation-assistant2，默认值也指向这两处。助手1的main更新入口及代码目录保持独立。
+本次发布的update.py固定读取main。它核对本地分支也是main，--force仍保留分支与活动代码锁检查。助手1默认部署参数继续为/data4/zhangruichen/code及/data4/zhangruichen/course/chd-segmentation。
 
-首次安装时在不存在的助手2目录取得指定分支；命令由用户在服务器执行，当前会话不运行：
+助手2使用新的独立普通Git仓库/data4/zhangruichen/code/chd-segmentation-assistant2-main-repo，更新回执及代码锁目录为/data4/zhangruichen/course/chd-segmentation-assistant2。原助手2功能分支检出继续保留，不在其上调用原来的固定分支更新器。新启动命令明确使用新main检出中的入口。原任务需要其冻结代码、原环境、数据描述及检查点。
+
+以下命令由用户在服务器执行；PUBLIC_SHA使用交付回执中的完整公开提交。本会话不登录服务器。
 
 ```bash
-BRANCH=codex/chd-assistant2-offline-preprocess-20261115
-REPO=/data4/zhangruichen/code/chd-segmentation-assistant2-repo
-git clone --filter=blob:none --sparse --branch "$BRANCH" https://github.com/tianwuasd/project.git "$REPO"
+PUBLIC_SHA='<交付回执中的完整main提交>'
+REPO=/data4/zhangruichen/code/chd-segmentation-assistant2-main-repo
+RUNTIME=/data4/zhangruichen/course/chd-segmentation-assistant2
+PYTHON=/data4/zhangruichen/env/chd-segmentation/bin/python
+
+# 首次安装：目标目录必须不存在。
+git clone --filter=blob:none --sparse --branch main https://github.com/tianwuasd/project.git "$REPO"
 git -C "$REPO" sparse-checkout set chd-segmentation
-python3 -B "$REPO/chd-segmentation/run.py" --code-info
+"$PYTHON" -B "$REPO/chd-segmentation/update.py" --repo "$REPO" --runtime "$RUNTIME" --sha "$PUBLIC_SHA" --check
+"$PYTHON" -B "$REPO/chd-segmentation/update.py" --repo "$REPO" --runtime "$RUNTIME" --sha "$PUBLIC_SHA" --force
+"$PYTHON" -B "$REPO/chd-segmentation/run.py" --code-info
 ```
 
-后续更新固定为本次交付的完整公开提交；PUBLIC_SHA填写发布回执中的SHA：
+后续更新使用最后三条命令，PUBLIC_SHA改为相应确定提交。共享main更新器默认参数保持助手1现有用法；助手2必须保留显式repo/runtime。--force仅令本项目受管理源码使用远端内容，保留其他项目文件及暂存记录，并拒绝活动计算期间更新。更新器在安装后再次查询官方main；若远端推进则停止并报告该状态。
 
-```bash
-REPO=/data4/zhangruichen/code/chd-segmentation-assistant2-repo
-COURSE=/data4/zhangruichen/course/chd-segmentation-assistant2
-python3 -B "$REPO/chd-segmentation/update.py" --repo "$REPO" --runtime "$COURSE" --sha "$PUBLIC_SHA" --check
-python3 -B "$REPO/chd-segmentation/update.py" --repo "$REPO" --runtime "$COURSE" --sha "$PUBLIC_SHA" --force
-python3 -B "$REPO/chd-segmentation/run.py" --code-info
-```
+## 数据和运行目录
 
-默认不改有本地变更的代码；--force明确以已核验远端替换本项目受管理源码，仍保留其他项目、私有文件及活动任务保护。源文件、本项目状态、分支回执及实际入口均需核对，活动任务继续使用原代码。Q/MedSAM2的数据配方、官方权重、Q私有包和机器配置按ASSISTANT2_SERVER_FILES.md分别迁移。代码更新不启动正式训练。
+两个模型的work_root仍使用/data4/zhangruichen/course/chd-segmentation，以共享resources登记CPU、RAM及GPU额度。助手2的准备描述和专用配置保存在其assistant2子目录，Q绑定配置的run_dir及parents由私有Q包绑定结果确定。MedSAM2的run_dir使用独立assistant2/runs目录。更新回执的RUNTIME与模型资源work_root分别指定。
 
-本会话不登录服务器，也不据本地验收声称服务器已经更新。远端发布与服务器实际运行状态分别记录，服务器安装和运行版本等待用户核验。
+离线数组统一位于/data4/zhangruichen/data/chd-segmentation/preprocessed，按处理合同、折、统计来源及内容身份管理。模型训练命令见MODELS_ASSISTANT2.md，完整准备与运行脚本为scripts/CHD1282-Q-20261115_run.sh及scripts/ImageCHD-CHD1282-MedSAM2-20261115_run.sh。官方源码、依赖、权重和私有Q材料按ASSISTANT2_SERVER_FILES.md分别迁移；代码更新不会传输这些材料，也不会启动正式训练。
+
+服务器实际部署状态待核验。只有用户执行更新并返回实际入口及回执后，才能确认服务器运行版本与当时远端main一致。

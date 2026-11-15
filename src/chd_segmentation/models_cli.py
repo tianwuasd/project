@@ -16,6 +16,9 @@ def main(argv=None):
     split.add_argument('--source',required=True)
     split.add_argument('--output',required=True)
     split.add_argument('--seed',type=int,default=20261104)
+    preprocess = commands.add_parser('preprocess',help='按Q或MedSAM2配方保存一次离线输入')
+    for name in ('config','prepare-config','prepared','root','output'):
+        preprocess.add_argument('--'+name,required=True)
     train = commands.add_parser('train')
     train.add_argument('--config',required=True)
     train.add_argument('--prepared',required=True)
@@ -53,6 +56,12 @@ def main(argv=None):
     if args.command=='split-q1282':
         from .datasets.q_split import create_q_bundle
         print(json.dumps(create_q_bundle(args.source,args.output,args.seed),ensure_ascii=False,allow_nan=False))
+        return
+    if args.command=='preprocess':
+        from .models.offline import preprocess_model
+        result = preprocess_model(args.config,args.prepare_config,args.prepared,args.root,args.output)
+        print(json.dumps(dict(identity=result['identity'],data=result['storage']['root'],
+            cases=len(result['storage']['cases']),complete=True),ensure_ascii=False,allow_nan=False))
         return
     from .models.workflow import options,train as train_model,predict as predict_model
     execution = {}

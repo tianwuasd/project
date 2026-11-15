@@ -18,6 +18,7 @@ from chd_segmentation.datasets.splits import apply_split
 from chd_segmentation.models.workflow import options, training_names, train
 from chd_segmentation.preprocessing.prepare import prepare
 from chd_segmentation.training.resources import host_capacity
+from model_offline_helpers import offline_model
 
 
 def run(args):
@@ -80,9 +81,11 @@ def run(args):
                         reserve_ram_bytes=host_capacity()['total_bytes']+2**30,wait_seconds=0))
                 path = workspace.root/(model+'.json')
                 write_json(path, spec)
+                offline_path = workspace.root/'course'/(model+'-offline.json')
+                offline_model(path, workspace.root/'prepare.json', prepared_path, offline_path)
                 for attempt in range(2):
                     with check.assertRaises(TimeoutError):
-                        train(options(path), prepared_path, stage)
+                        train(options(path), offline_path, stage)
                     check.assertFalse((Path(spec['run_dir'])/stage).exists())
                 record['rejected_starts'][model] = 2
                 import json

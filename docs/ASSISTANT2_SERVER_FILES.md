@@ -2,9 +2,9 @@
 
 ## 本次代码
 
-代码保存在D:/projects/project/chd-segmentation-assistant2，独立分支codex/chd-segmentation-assistant2-medsam2-q-r2。公共供数、主机协调与资源策略继承助手1完成测试和发布的确定提交60d6e5f17c81f1fea78690021fbf403b1ee61f37，对应公开main 2269b26a4abc8a4952acacfab0611af4ce375d4f，来源子树cba6c019b1bc248262cdd5d70bd29be7aa6719ec。模型专属内存预算、官方训练与恢复检查保留。代码提交包含模型实现、共享资源调用、配置、测试和说明。
+代码保存在D:/projects/project/chd-segmentation-assistant2，开发分支codex/chd-assistant2-offline-preprocess-20261115，验收后整合main。公共离线实现继承d68e11c11bd854c436ee45f29eeddf3aae0038be/公开277c11a，脚本白名单继承7b50f5f/a0750b3。模型专属内存预算、官方训练与恢复检查保留。代码提交包含模型实现、共享资源调用、配置、测试和说明。
 
-向GitHub发布时只提交上述源码；官方权重、依赖目录、病例清单、患者分组、预测和训练检查点分别管理。当前本地分支通过main继承并保留助手2模型修改，服务器update.py仍以已发布远端main为准；只有本分支内容正式发布后，服务器日常更新才会包含这些模型修改。
+向GitHub发布时只提交上述源码；官方权重、依赖目录、病例清单、患者分组、预测和训练检查点分别管理。服务器更新固定读取main；助手2使用独立main检出/data4/zhangruichen/code/chd-segmentation-assistant2-main-repo及显式更新参数，命令见ASSISTANT2_PUBLICATION.md。实际发布提交以交付回执为准。
 
 ## 需要上传到服务器的材料
 
@@ -28,7 +28,7 @@ MedSAM2依赖清单中的TensorDict0.15.6要求PyTorch2.11及以上，本机已�
 
 Q的A训练上游、B训练局部、C用于选模、D独立评价，四组患者相互独立；预处理统计拟合限于A。1282私有输入包已保留原验证、内部测试和两个外部子组，仅将原训练患者按2:1分成A/B，具体命令见[1282组合与标签框](Q1282_AND_LABEL_BOX.md)。local阶段读取已完成的base和localizer的best.pt；base和localizer阶段parents为空。
 
-MedSAM2沿用原CHD1282准备描述和原训练590、验证128、内部测试127及外部298/31的角色。Q使用独立的A组拟合计划；命令中的PREP与Q_PREP分别填写对应准备描述。选择Q准备描述会使通用train角色仅包含A组，需要按实际研究设计明确选择。
+MedSAM2沿用原CHD1282准备描述和原训练590、验证128、内部测试127及外部298/31的角色。Q使用独立的A组拟合计划；命令中的PREP与Q_PREP分别填写对应准备描述。正式MedSAM2入口拒绝Q组别准备描述。prepare保存来源描述，models preprocess生成各模型独立处理合同的离线描述，模型训练只读取后者。
 
 ## GPU及运行设置
 

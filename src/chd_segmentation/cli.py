@@ -24,6 +24,13 @@ def main(argv=None):
     prepare = commands.add_parser("prepare")
     prepare.add_argument("--config", required=True)
     prepare.add_argument("--output", required=True)
+    preprocess = commands.add_parser("preprocess", help="统一离线处理病例，完成后供训练读取")
+    preprocess.add_argument("--config", required=True)
+    preprocess.add_argument("--prepared", required=True, help="prepare 生成的来源描述")
+    preprocess.add_argument("--output", required=True, help="完整离线描述的保存位置")
+    preprocess.add_argument("--root", help="data 内专用预处理根目录")
+    info = commands.add_parser("data-info", help="查看数据版本容量及任务引用，不删除数据")
+    info.add_argument("--prepared", required=True)
     train = commands.add_parser("train")
     train.add_argument("--config", required=True)
     train.add_argument("--prepared", required=True)
@@ -64,20 +71,25 @@ def main(argv=None):
     bind.add_argument("--chd-root")
     bind.add_argument("--image-root")
     bind.add_argument("--pretrained", help="已有权重的实际位置")
-    for command in (prepare, train, predict, evaluate, test):
+    for command in (prepare, preprocess, train, predict, evaluate, test):
+        command.add_argument("--run-dir", help="本次独立任务目录，旧在线任务目录保留")
         command.add_argument("--split", help="旧工程或手动选择的划分文件")
         command.add_argument("--split-format", choices=("auto", "imagechd", "imagechd_roles", "chd1282_cohort", "q1282", "folds", "roles"))
         command.add_argument("--split-id-field", help="清单中的精确映射字段，默认 case_id")
         command.add_argument("--fold", type=int)
     args = parser.parse_args(argv)
     overrides = {}
-    if args.command not in ("status", "bind-inputs"):
+    if args.command not in ("status", "bind-inputs", "data-info"):
+        if args.run_dir is not None:
+            overrides["run_dir"] = args.run_dir
         split = {k: v for k, v in {"path": args.split, "format": args.split_format,
                                    "id_field": args.split_id_field}.items() if v is not None}
         if split:
             overrides["split"] = split
         if args.fold is not None:
             overrides["fold"] = args.fold
+    if args.command == "preprocess" and args.root is not None:
+        overrides["preprocessing"] = {"root": args.root}
     if args.command == "train":
         resources, training = {}, {}
         for key, value in (("device", args.device), ("gpu_count", args.gpus),
@@ -98,12 +110,15 @@ def main(argv=None):
             if value is not None:
                 training[key] = value
         overrides.update(resources=resources, training=training)
-    if args.command not in ("status", "bind-inputs"):
+    if args.command not in ("status", "bind-inputs", "data-info"):
         config = load_config(args.config, overrides)
         event(log_directory(config), "command_ready", command=args.command, dataset=config["dataset"],
               fold=config["fold"], config=str(Path(args.config).resolve()),
               run_dir=config["run_dir"], work_root=config["work_root"])
-    if args.command == "bind-inputs":
+    if args.command == "data-info":
+        from .preprocessing.offline import data_info
+        result = data_info(args.prepared)
+    elif args.command == "bind-inputs":
         from .datasets.transfer import bind_inputs
         roots = {name: value for name, value in (("chd1282", args.chd_root), ("imagechd", args.image_root)) if value is not None}
         result = bind_inputs(args.directory, args.root, roots, args.pretrained)
@@ -120,6 +135,11 @@ def main(argv=None):
                   "plan": config["plan"], "planning_mode": config["planning"]["mode"],
                   "plan_reused": existed, "fit_ids": result["plan"].get("fit_ids"),
                   "seconds": perf_counter() - started}
+    elif args.command == "preprocess":
+        from .preprocessing.offline import preprocess
+        record = preprocess(config, args.prepared, args.output)
+        result = {"identity": record["identity"], "data": record["storage"]["root"],
+                  "cases": len(record["storage"]["cases"]), "complete": True}
     elif args.command == "train":
         with stage(config, "load_training_modules"):
             from .training.engine import train

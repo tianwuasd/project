@@ -8,6 +8,7 @@ import yaml
 
 DEFAULTS = {
     "model": "stunet", "scope": "formal", "fold": 0, "result_root": None, "plan": None,
+    "preprocessing": {"root": None, "statistics_source": "main-train"},
     "split": {"path": None, "format": "auto", "id_field": "case_id", "unit": "auto"},
     "logging": {"heartbeat_seconds": 15, "case_details": True},
     "planning": {"mode": "auto", "samples_per_case": 100000, "max_samples": 2000000,
@@ -56,6 +57,11 @@ def load_config(path, overrides=None):
     config = _merge({**DEFAULTS, **{key: None for key in required}}, source)
     if overrides:
         config = _merge(config, overrides)
+    if not isinstance(config["preprocessing"]["statistics_source"], str) or not config["preprocessing"]["statistics_source"].strip():
+        raise ValueError("预处理统计来源必须使用明确名称")
+    if config["preprocessing"]["root"] is not None:
+        target = Path(config["preprocessing"]["root"]).expanduser()
+        config["preprocessing"]["root"] = str((path.parent / target).resolve() if not target.is_absolute() else target.resolve())
     if config["model"] != "stunet" or config["dataset"] not in ("chd1282", "imagechd"):
         raise ValueError("当前实现支持 chd1282/imagechd 的 STU-Net")
     if config["scope"] not in ("formal", "technical"):

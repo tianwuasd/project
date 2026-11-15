@@ -1,6 +1,6 @@
 # MedSAM2 与 Q 模型
 
-研究编号 Q-20261108-路线一，版本 q-route1-20261111-r2。工作目录由先心代码助手2维护，分支 `codex/chd-segmentation-assistant2-medsam2-q-r2`，起点298a75a。原工程目录与 GPU/CPU 调度分支由先心代码助手1维护。
+研究编号 Q-20261108-路线一，版本 q-route1-20261111-r2。助手2工作目录为D:/projects/project/chd-segmentation-assistant2，离线开发分支为codex/chd-assistant2-offline-preprocess-20261115，验收后整合main。在线版本冻结于69289532a3da2c94bc72769f5726ca260f6980a7。
 
 ## 文件职责
 
@@ -20,9 +20,15 @@
 
 ## 输入与类别
 
-本分支继承助手1资源提交210d80b及设备修复e5264c2，对应公开main 303540f。两个模型通过training/resources.py共用资源登记和准入策略，实际进程、批量份额和供数配置写入resources.json；完整恢复同时核对execution-topology.json。默认只使用空闲GPU，数量不足持续等待。显卡与材料说明见[服务器文件与GPU设置](ASSISTANT2_SERVER_FILES.md)。
+公共离线合同继承助手1确定提交d68e11c，对应公开main 277c11a；脚本更新白名单继承7b50f5f/a0750b3。两个模型通过training/resources.py共用资源登记和准入策略，实际进程、批量份额和供数配置写入resources.json；完整恢复同时核对execution-topology.json。默认只使用空闲GPU，数量不足持续等待。显卡与材料说明见[服务器文件与GPU设置](ASSISTANT2_SERVER_FILES.md)。
 
-先通过原有 `prepare` 生成准备描述，模型命令读取同一记录与实际计划；影像和标签原件只读。Q内部类别顺序固定为背景、LV、RV、LA、RA、Myo、AO、PA、PV、SVC、IVC。CHD1282原始类别显式映射；ImageCHD输出回到其原始8类，PV/SVC/IVC保留未知监督，输出时其概率并入背景。
+先通过`prepare`生成来源描述，再使用`models preprocess`生成完整离线描述。训练和预测只读取兼容离线输入，影像和标签原件保持只读。Q内部类别顺序固定为背景、LV、RV、LA、RA、Myo、AO、PA、PV、SVC、IVC。CHD1282原始类别显式映射；ImageCHD输出回到其原始8类，PV/SVC/IVC保留未知监督，输出时其概率并入背景。
+
+Q与STU共享`stunet-ct-nnunet-bounded-v1`固定转换：float32影像、转换输出标签、前景位置和完整空间恢复信息。复用要求原件摘要、间距/裁剪/灰度/标签参数、折、完整计划、依赖版本及拟合病例身份全部相同，统计来源明确为Q-A。普通STU用590人拟合的版本与Q-A393人版本分别保存。已按同一Q-A配方生成的STU离线结果可以直接共用；日期、run目录、GPU数量和日志不改变身份。Q的定位目标、候选、上游冻结预测和局部求解仍由Q阶段按r2处理，通用离线数组不包含这些训练材料。
+
+MedSAM2使用`medsam2-native-window-uint8-v1`，保持原生网格uint8窗图像、int16标签及原空间信息。实际gray_window写入配方；null时记录训练计划百分位及拟合来源，显式窗口不依赖训练统计。正式CHD1282沿用原590人训练划分，拒绝Q组合描述。官方八帧采样、增强和512缩放在训练时执行。两种处理合同互相拒绝，正式数据按配方存放data并登记所有训练/预测引用。
+
+新预测病例先使用冻结训练计划和新清单运行prepare，再运行对应models preprocess。普通预测的离线数据可只包含图像；标签框评测需要单独声明带标签输入。
 
 正式Q训练需要 `groups` 文件，以 A、B、C、D 为键、病例ID列表为值。预处理统计拟合病例限于A；基座和定位器训练A，局部网络训练B。各组患者身份需要独立。上游检查点保存训练病例和准备描述身份；局部阶段核对这两项。1282组合已按原训练患者A:B=2:1生成，A/B/C/D分别393/197/128/456例，操作见[1282组合与标签框](Q1282_AND_LABEL_BOX.md)。
 
@@ -32,6 +38,8 @@
 
 ```text
 python -B run.py models --help
+python -B run.py prepare --config /path/to/prepare.yaml --output /path/to/source.json
+python -B run.py models preprocess --config /path/to/model.yaml --prepare-config /path/to/prepare.yaml --prepared /path/to/source.json --root /data4/zhangruichen/data/chd-segmentation/preprocessed --output /path/to/prepared.json
 python -B run.py models train --config /path/to/q-base.yaml --prepared /path/to/prepared.json --stage base
 python -B run.py models train --config /path/to/q-localizer.yaml --prepared /path/to/prepared.json --stage localizer
 python -B run.py models train --config /path/to/q-local.yaml --prepared /path/to/prepared.json --stage local

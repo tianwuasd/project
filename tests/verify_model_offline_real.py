@@ -1,6 +1,7 @@
 import argparse
 from copy import deepcopy
 import hashlib
+import gc
 from pathlib import Path
 import subprocess
 import sys
@@ -14,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT/'src'))
 
 from smoke import SmokeWorkspace
-from chd_segmentation.artifacts.store import file_digest, read_json, write_json
+from chd_segmentation.artifacts.store import digest, file_digest, read_json, write_json
 from chd_segmentation.config import DEFAULTS, load_config
 from chd_segmentation.preprocessing.prepare import prepare
 from chd_segmentation.preprocessing.transforms import CaseTransform
@@ -111,28 +112,102 @@ def run(args):
             baseline = read_json(args.baseline)
             config, prepared, source_path = source_config(workspace, item, baseline['plan'])
             check.assertEqual(prepared['manifest']['cases'][0]['sha256'], baseline['sha256'])
-            from chd_segmentation.models.offline import preprocess_model
-            from chd_segmentation.preprocessing.offline_store import OfflineTransform
+            from chd_segmentation.models.offline import model_storage_lease, preprocess_model, validate_model_storage
+            from chd_segmentation.preprocessing.offline import data_info, preprocess
+            from chd_segmentation.preprocessing.offline_store import OfflineTransform, case_directory, storage_lease
             for model in ('q_route1', 'medsam2'):
                 weight = item['pretrained'] if model=='q_route1' else str(ROOT/'data/model_weights/MedSAM2_latest.pt')
-                model_path, _ = model_config(workspace, model, weight)
+                model_path, model_options = model_config(workspace, model, weight)
                 output = workspace.root/'course'/(model+'-offline.json')
                 prepared = preprocess_model(model_path, workspace.root/'source-config.json',
                     source_path, workspace.root/'data', output)
                 row = prepared['manifest']['cases'][0]
-                if model=='q_route1':
-                    entry = OfflineTransform(prepared, True)(row)
-                    check.assertEqual(signature({key:entry[key] for key in Q_FIELDS}), baseline['q'])
-                else:
-                    from chd_segmentation.models.medsam2.native import NativeCases
-                    entry = NativeCases(prepared).get(row['case_id'])
-                    check.assertEqual(signature(entry['image']), baseline['medsam2']['image'])
-                    check.assertEqual(signature(entry['label']), baseline['medsam2']['label'])
-                    check.assertEqual(entry['gray_window'], baseline['medsam2']['gray_window'])
-                    check.assertEqual(entry['source_shape_xyz'], baseline['medsam2']['source_shape_xyz'])
-                    check.assertEqual(entry['source_affine'], baseline['medsam2']['source_affine'])
+                entry, reader = None, None
+                try:
+                    if model=='q_route1':
+                        entry = OfflineTransform(prepared, True)(row)
+                        check.assertEqual(signature({key:entry[key] for key in Q_FIELDS}), baseline['q'])
+                    else:
+                        from chd_segmentation.models.medsam2.native import NativeCases
+                        reader = NativeCases(prepared)
+                        entry = reader.get(row['case_id'])
+                        check.assertEqual(signature(entry['image']), baseline['medsam2']['image'])
+                        check.assertEqual(signature(entry['label']), baseline['medsam2']['label'])
+                        check.assertEqual(entry['gray_window'], baseline['medsam2']['gray_window'])
+                        check.assertEqual(entry['source_shape_xyz'], baseline['medsam2']['source_shape_xyz'])
+                        check.assertEqual(entry['source_affine'], baseline['medsam2']['source_affine'])
+                finally:
+                    if reader is not None:
+                        reader.clear()
+                    if entry is not None:
+                        entry.clear()
+                    gc.collect()
+                pointer = prepared['storage']['cases'][row['case_id']]
+                case_root = case_directory(prepared['storage']['root'], pointer['key'])
+                before = {p.name: p.stat().st_mtime_ns for p in case_root.iterdir()}
+                changed = read_json(model_path)
+                changed.update(run_dir=str(workspace.root/'course'/(model+'-another-run')), updates=1, threads=1)
+                changed['logging'] = dict(heartbeat_seconds=0, case_details=False)
+                write_json(workspace.root/(model+'-reuse.json'), changed)
+                reused = preprocess_model(workspace.root/(model+'-reuse.json'), workspace.root/'source-config.json',
+                    source_path, workspace.root/'data', workspace.root/'course'/(model+'-reused.json'))
+                check.assertEqual(reused, prepared)
+                check.assertEqual(before, {p.name:p.stat().st_mtime_ns for p in case_root.iterdir()})
+                with model_storage_lease(model_options, prepared, 'consumer-one'):
+                    if model=='q_route1':
+                        common = deepcopy(config)
+                        common['preprocessing'].update(root=str(workspace.root/'data'), statistics_source='Q-A-technical')
+                        shared = preprocess(common, source_path, workspace.root/'course/stu-shared.json')
+                        check.assertEqual(shared, prepared)
+                        common.update(model='stunet', run_dir=str(workspace.root/'course/stu-consumer'))
+                        with storage_lease(shared, common):
+                            info = data_info(output)
+                            check.assertEqual(len(info['active_references']), 2)
+                            check.assertTrue(info['cleanup_blocked'])
+                        changed_stats = deepcopy(common)
+                        changed_stats['preprocessing']['statistics_source'] = 'STU-590'
+                        with check.assertRaises(ValueError):
+                            with storage_lease(shared, changed_stats):
+                                check.fail('错误统计来源被接受')
+                        check.assertEqual(before, {p.name:p.stat().st_mtime_ns for p in case_root.iterdir()})
+                    else:
+                        wrong_window = dict(model_options, gray_window=[0, 1])
+                        with check.assertRaises(ValueError):
+                            validate_model_storage(wrong_window, prepared)
+                    (case_root/'locations.npz').unlink()
+                    with check.assertRaises(ValueError):
+                        validate_model_storage(model_options, prepared)
+                    with check.assertRaises(RuntimeError):
+                        preprocess_model(model_path, workspace.root/'source-config.json', source_path,
+                            workspace.root/'data', output)
+                repaired = preprocess_model(model_path, workspace.root/'source-config.json', source_path,
+                    workspace.root/'data', output)
+                check.assertEqual(repaired['identity'], prepared['identity'])
+                check.assertEqual(len(data_info(output)['active_references']), 0)
+                wrong = deepcopy(prepared)
+                wrong['storage']['complete'] = False
+                wrong.pop('identity')
+                wrong['identity'] = digest(wrong)
+                wrong_path = workspace.root/'course'/(model+'-incomplete.json')
+                write_json(wrong_path, wrong)
+                from chd_segmentation.models.workflow import train
+                with check.assertRaisesRegex(ValueError, '需要先运行 preprocess'):
+                    train(model_options, wrong_path, 'base' if model=='q_route1' else 'sequence', stop_after=1)
+                reader = OfflineTransform(repaired, False)
+                entry = reader(row)
+                try:
+                    check.assertIsNone(entry['label'])
+                    check.assertEqual(entry['properties']['class_locations'], {})
+                finally:
+                    entry.clear()
+                    del reader, entry
+                    gc.collect()
                 workspace.results.append(dict(model=model, case_id=row['case_id'],
-                    offline_identity=prepared['identity'], baseline_exact=True, optimizer_updates=0))
+                    offline_identity=prepared['identity'], baseline_exact=True, optimizer_updates=0,
+                    reused_without_rewrite=True, active_repair_blocked=True, missing_case_repaired=True,
+                    incomplete_training_rejected=True, unlabeled_array_read=True,
+                    exact_STU_Q_shared=model=='q_route1', wrong_statistics_rejected=model=='q_route1',
+                    wrong_window_rejected=model=='medsam2'))
         for kind in ('image', 'label'):
             check.assertEqual(file_digest(item['case'][kind]), item['case']['sha256'][kind])
 

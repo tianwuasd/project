@@ -40,6 +40,7 @@ def predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=No
             prompt_mode='external', label_classes=None, box_seed=2024, box_max_shift=20,
             official_weights=False, test_set=None, test_group=None):
     from .execution import admitted, run_workers
+    from .offline import model_storage_lease
     prepared = load_prepared(prepared_path)
     if prompt_mode not in ('external', 'label-box') or prompt_mode == 'label-box' and config['model'] != 'medsam2':
         raise ValueError('标签框模式仅适用于MedSAM2')
@@ -66,7 +67,7 @@ def predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=No
     applied['run_dir'] = str(Path(config['work_root'] or Path(config['run_dir']).parent)/'model-predictions'/key)
     budget = deepcopy(prepared)
     budget['manifest']['cases'] = rows
-    with admitted(applied, budget, 'prediction') as (common, allocation):
+    with model_storage_lease(applied,prepared,'prediction'), admitted(applied, budget, 'prediction') as (common, allocation):
         return run_workers(dict(operation='predict', config=applied, prepared=prepared, stage='prediction',
             prepared_path=str(Path(prepared_path).resolve()), checkpoint=str(Path(checkpoint).resolve()),
             output=str(Path(output).resolve()), case_ids=names, prompts=prompts,

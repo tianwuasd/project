@@ -31,12 +31,16 @@ def activate(config):
 
 
 class FrameSequence:
-    def __init__(self,image,resolution,window,reserve_ram_bytes=4*2**30):
+    def __init__(self,image,resolution,window,reserve_ram_bytes=4*2**30,windowed=False):
         from .data import window_image
         self.image,self.resolution = image[0],resolution
         if host_capacity()['available_bytes'] < reserve_ram_bytes+self.image.nbytes*3:
             raise MemoryError('MedSAM2灰度统计超出主机内存预算')
-        self.image = window_image(self.image,window)
+        if windowed:
+            if self.image.dtype != np.uint8:
+                raise ValueError('已完成灰度窗的序列必须为uint8')
+        else:
+            self.image = window_image(self.image,window)
 
     def __len__(self):
         return len(self.image)
@@ -92,10 +96,12 @@ class MedSAM2Adapter:
         predictor.load_state_dict(self.model.state_dict(),strict=True)
         if not tensors_equal(predictor.state_dict(),self.model.state_dict()):
             raise ValueError('MedSAM2预测参数未完整复制')
-        stats = self.prepared['plan']['foreground_intensity_properties_per_channel']['0']
-        window = self.config['gray_window'] or [stats['percentile_00_5'],stats['percentile_99_5']]
+        from .native import resolve_window
+        window = resolve_window(self.config,self.prepared)
+        if entry['gray_window'] != window:
+            raise ValueError('MedSAM2预测窗口与离线数据不同')
         image = FrameSequence(entry['image'],self.config['resolution'],window,
-            self.config['execution'].get('reserve_ram_bytes',4*2**30))
+            self.config['execution'].get('reserve_ram_bytes',4*2**30),windowed=True)
         depth,height,width = entry['image'].shape[1:]
         state = predictor.init_state(image,height,width,offload_video_to_cpu=True,offload_state_to_cpu=True)
         classes = len(LABELS[self.prepared['dataset']])

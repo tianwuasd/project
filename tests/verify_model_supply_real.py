@@ -25,6 +25,7 @@ from chd_segmentation.preprocessing.prepare import prepare
 from chd_segmentation.models.workflow import options
 from chd_segmentation.models.supply import CpuReady,OrderedSupply
 from chd_segmentation.training.resources import host_capacity
+from model_offline_helpers import offline_model
 
 
 def fingerprint(batch):
@@ -36,8 +37,8 @@ def fingerprint(batch):
     return checksum.hexdigest()
 
 
-def worker(rank,config,recipe,stream,root,port):
-    os.environ.update(MASTER_ADDR='127.0.0.1',MASTER_PORT=str(port),WORLD_SIZE='2',RANK=str(rank),LOCAL_RANK=str(rank),USE_LIBUV='0')
+def worker(rank,config,recipe,stream,root,port,world):
+    os.environ.update(MASTER_ADDR='127.0.0.1',MASTER_PORT=str(port),WORLD_SIZE=str(world),RANK=str(rank),LOCAL_RANK=str(rank),USE_LIBUV='0')
     torch.set_num_threads(1)
     from chd_segmentation.models.medsam2.adapter import activate
     activate(config)
@@ -45,12 +46,12 @@ def worker(rank,config,recipe,stream,root,port):
     from omegaconf import OmegaConf
     from chd_segmentation.models.medsam2.data import set_read_gate
     from chd_segmentation.models.medsam2.supply import ConsumedLoader
-    dist.init_process_group('gloo',rank=rank,world_size=2,timeout=timedelta(seconds=180))
+    dist.init_process_group('gloo',rank=rank,world_size=world,timeout=timedelta(seconds=180))
     rows = []
     for ordered in (False,True):
         random.seed(301+rank);np.random.seed(301+rank);torch.manual_seed(301+rank)
         data = instantiate(OmegaConf.create(recipe['trainer']['data']['train']))
-        stream.start(rank,'official-data',[1,1])
+        stream.start(rank,'official-data',[1]*world)
         set_read_gate(stream if ordered else None,2,rank)
         loader = data.get_loader(0)
         indices = list(loader.dataloaders[0].batch_sampler)
@@ -82,7 +83,7 @@ def worker(rank,config,recipe,stream,root,port):
     from chd_segmentation.models.medsam2.data import NativeCases
     from chd_segmentation.preprocessing.prepare import load_prepared
     raw = recipe['trainer']['data']['train']['datasets'][0]['dataset']['datasets'][0]['video_dataset']
-    stream.start(rank,'rank0-case',[1,0])
+    stream.start(rank,'rank0-case',[1]+[0]*(world-1))
     value = torch.tensor(0.)
     if rank==0:
         cases = NativeCases(load_prepared(raw['prepared_path']),log_dir=root)
@@ -106,8 +107,10 @@ def worker(rank,config,recipe,stream,root,port):
 
 def run(args):
     available = host_capacity()['available_bytes']
-    if available<11*2**30:
-        raise MemoryError('真实供数验证需为七个CPU进程及四GiB余量保留至少十一GiB可用内存')
+    processes = 3 if args.world==1 else 3*args.world+1
+    required = (processes+4)*2**30
+    if available<required:
+        raise MemoryError(f'真实供数验证需要{processes}个CPU进程及四GiB余量，至少{required}字节可用内存')
     selected = [e for e in yaml.safe_load(Path(args.spec).read_text(encoding='utf-8'))['experiments'] if e['dataset']=='imagechd']
     if len(selected)!=1:
         raise ValueError('供数检查只允许一个真实ImageCHD病例')
@@ -129,15 +132,18 @@ def run(args):
             pretrained=str(ROOT/'data/model_weights/MedSAM2_latest.pt'),official_root=str(ROOT/'vendor/MedSAM2'),
             dependency_root=str(ROOT/'env/medsam2')))
         config = options(directory/'model.json')
+        prepared = offline_model(directory/'model.json', directory/'base.json', prepared_path,
+                                 directory/'course/offline.json')
+        prepared_path = directory/'course/offline.json'
         from chd_segmentation.models.medsam2.official import effective_config
         recipe = effective_config(config,prepared,prepared_path,directory/'course/med',[row['case_id']])
         recipe['trainer']['data']['train']['batch_sizes']=[1]
         recipe['trainer']['data']['train']['num_workers']=2
-        recipe['trainer']['data']['train']['datasets'][0]['dataset']['datasets'][0]['multiplier']=4
+        recipe['trainer']['data']['train']['datasets'][0]['dataset']['datasets'][0]['multiplier']=2*args.world
         context = torch.multiprocessing.get_context('spawn')
         from chd_segmentation.models.memory import case_estimates
         estimates = case_estimates(dict(model='medsam2'),prepared,'sequence')
-        stream = OrderedSupply(context,[1,1],1,CpuReady(context,2,directory),directory,
+        stream = OrderedSupply(context,[1]*args.world,1,CpuReady(context,args.world,directory),directory,
             capacity_bytes=max(v['workspace_bytes'] for v in estimates),estimates=estimates,unit='sequence_batch')
         with socket.socket() as rendezvous:
             rendezvous.bind(('127.0.0.1',0));port = rendezvous.getsockname()[1]
@@ -146,26 +152,29 @@ def run(args):
             TEMP=str(directory),TMP=str(directory),PYTHONDONTWRITEBYTECODE='1',OMP_NUM_THREADS='1',MKL_NUM_THREADS='1',
             OPENBLAS_NUM_THREADS='1',NUMEXPR_NUM_THREADS='1',USE_LIBUV='0',CUDA_VISIBLE_DEVICES='')
         try:
-            torch.multiprocessing.spawn(worker,args=(config,recipe,stream,str(directory),port),nprocs=2,join=True)
+            if args.world==1:
+                worker(0,config,recipe,stream,str(directory),port,1)
+            else:
+                torch.multiprocessing.spawn(worker,args=(config,recipe,stream,str(directory),port,args.world),nprocs=args.world,join=True)
         finally:
             os.environ.clear();os.environ.update(previous)
         logs = [json.loads(line) for line in (directory/'events.jsonl').read_text(encoding='utf-8').splitlines()]
         starts = [value for value in logs if value['event']=='model_build_started']
-        if len(starts)!=5 or any(v['active']>1 or max(v['ready_depth'])>1 for v in starts):
+        if len(starts)!=2*args.world+1 or any(v['active']>1 or max(v['ready_depth'])>1 for v in starts):
             raise ValueError('实际病例构建并发或队列深度超过界限')
         ready_events = [v for v in logs if v['event']=='model_data_ready']
         delivered = [v for v in logs if v['event']=='model_data_delivered']
-        if len(ready_events)!=5 or len(delivered)!=5:
+        if len(ready_events)!=2*args.world+1 or len(delivered)!=2*args.world+1:
             raise ValueError('整批就绪与交付事件不完整')
         if any(v['ready_depth'][v['rank']]!=1 for v in ready_events):
             raise ValueError('整批就绪事件没有登记实际等待交付的数据')
         if any(v['ready_depth'][v['rank']] or not v['consumer_active'][v['rank']] for v in delivered):
             raise ValueError('交付后队列与消费状态不一致')
-        records = [json.loads((directory/f'rank{rank}.json').read_text(encoding='utf-8')) for rank in range(2)]
+        records = [json.loads((directory/f'rank{rank}.json').read_text(encoding='utf-8')) for rank in range(args.world)]
         write_json(workspace.report/'supply-events.json',logs)
         workspace.results.append(dict(case_id=row['case_id'],ranks=records,frames=8,resolution=512,
             workers_per_rank=2,batches_per_rank=2,reader_slots=1,ready_depth_max=1,optimizer_updates=0,
-            admission_available_bytes=available,data_only_required_bytes=11*2**30,
+            admission_available_bytes=available,data_only_required_bytes=required,world_size=args.world,
             trainer_model_created=False,CUDA_used=False,source_unchanged=all(file_digest(row[k])==row['sha256'][k] for k in ('image','label'))))
 
 
@@ -175,4 +184,5 @@ if __name__=='__main__':
     parser.add_argument('--spec',required=True)
     parser.add_argument('--work-root',required=True)
     parser.add_argument('--report',required=True)
+    parser.add_argument('--world',type=int,choices=(1,2),default=2)
     run(parser.parse_args())

@@ -24,6 +24,7 @@ from chd_segmentation.preprocessing.prepare import prepare
 from chd_segmentation.models.workflow import options,train,predict,load_state,dataset_for
 from chd_segmentation.models.q_route1.adapter import allowed,export_probabilities
 from chd_segmentation.prediction.metrics import evaluate
+from model_offline_helpers import offline_model, unlabeled_model
 
 
 def verify(spec_path,work_root,report_root,selected_model,dataset=None,world=1,legacy_root=None,collective_timeout=180):
@@ -70,6 +71,9 @@ def verify(spec_path,work_root,report_root,selected_model,dataset=None,world=1,l
             if selected_model=='q_route1' and world==2:
                 config['execution'].update(batch_layout=[1,3],readers=1,max_readers=1)
             write_json(model_path,config)
+            prepared = offline_model(model_path, directory/'base.json', directory/'course/prepared.json',
+                                     directory/'course/offline.json')
+            prepared_path = directory/'course/offline.json'
             if selected_model=='medsam2':
                 from chd_segmentation.models.execution import admitted,execution_config
                 probe = deepcopy(prepared)
@@ -94,7 +98,7 @@ def verify(spec_path,work_root,report_root,selected_model,dataset=None,world=1,l
                     Path(config['run_dir']).mkdir(parents=True,exist_ok=True)
                     with FileLock(Path(config['run_dir'])/(stage+'.lock'),timeout=0):
                         with unittest.TestCase().assertRaises(Timeout):
-                            train(applied,directory/'course/prepared.json',stage,stop_after=1)
+                            train(applied,prepared_path,stage,stop_after=1)
                     record['models'][selected_model]['concurrent_training_rejected']=True
                 if legacy_root:
                     environment = dict(os.environ,PYTHONDONTWRITEBYTECODE='1',PYTHONIOENCODING='utf-8',
@@ -105,7 +109,7 @@ def verify(spec_path,work_root,report_root,selected_model,dataset=None,world=1,l
                         env=environment,check=True)
                     first = json.loads((Path(config['run_dir'])/stage/'summary.json').read_text(encoding='utf-8'))
                 else:
-                    first = train(applied,directory/'course/prepared.json',stage,stop_after=1)
+                    first = train(applied,prepared_path,stage,stop_after=1)
                 prior = load_state(first['checkpoint'])
                 if legacy_root:
                     from chd_segmentation.models.workflow import checked_identity
@@ -123,9 +127,9 @@ def verify(spec_path,work_root,report_root,selected_model,dataset=None,world=1,l
                     changed_layout = deepcopy(applied)
                     changed_layout['execution']['batch_layout']=[1,2,1]
                     with unittest.TestCase().assertRaises(ValueError):
-                        train(changed_layout,directory/'course/prepared.json',stage,resume=True)
+                        train(changed_layout,prepared_path,stage,resume=True)
                     record['models'][selected_model]['changed_layout_rejected']=True
-                continued = train(applied,directory/'course/prepared.json',stage,resume=True)
+                continued = train(applied,prepared_path,stage,resume=True)
                 if selected_model=='medsam2':
                     native = torch.load(continued['official_checkpoint'],map_location='cpu',weights_only=True)
                     if continued['restored_exact'] is not True or native['epoch']!=2 or native['steps']['train']!=2 or len(native['_chd']['history'])!=2:
@@ -166,17 +170,8 @@ def verify(spec_path,work_root,report_root,selected_model,dataset=None,world=1,l
                           box_xyxy=[int(xx.min()),int(yy.min()),int(xx.max())+1,int(yy.max())+1])]}
                 record['models'][selected_model]['prompt_protocol']='技术验收用训练标签模拟人工框；不属于正式自动预测'
                 data.clear();del data,entry
-            independent = deepcopy(prepared)
-            independent['manifest'] = deepcopy(prepared['manifest'])
-            for prediction_row in independent['manifest']['cases']:
-                prediction_row['roles']=['predict']
-                prediction_row['label']=None
-                prediction_row['source_stamp'].pop('label',None)
-                prediction_row['sha256'].pop('label',None)
-            independent.pop('identity')
-            independent['identity']=digest(independent)
-            write_json(directory/'course/prediction-input.json',independent)
-            record['models'][selected_model]['predict']=predict(options(model_path),directory/'course/prediction-input.json',
+            prediction_path = unlabeled_model(model_path, directory/'base.json', prepared, directory)
+            record['models'][selected_model]['predict']=predict(options(model_path),prediction_path,
                 Path(config['run_dir'])/stages[-1]/'latest.pt',directory/'result'/selected_model,prompts=prompts)
             record['models'][selected_model]['new_manifest_without_labels']=True
             record['models'][selected_model]['evaluation']=evaluate(directory/'result'/selected_model,prepared,

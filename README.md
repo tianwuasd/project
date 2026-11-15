@@ -1,12 +1,16 @@
 # 先心分割处理
 
-版本 0.1.0。当前接入STU-Net-S的CHD1282（11类）和ImageCHD（8类）流程：准备描述、训练、完整状态恢复、MONAI滑窗预测、原数组网格导出、独立评价和短测。两数据集共用网络代码，分别训练权重。训练支持CPU、1–4卡CUDA/DDP、自动或手动选卡、固定全局batch分担和有界CPU供数。
+MedSAM2官方序列及Q路线一r2使用独立的`run.py models`入口。模型数据配方与STU处理分别核对，训练前通过模型离线入口保存对应输入；模型说明见[模型入口与验收](docs/MODELS_ASSISTANT2.md)，分组及提示规则见[1282组合与标签框](docs/Q1282_AND_LABEL_BOX.md)。发布使用main，助手2部署目录及更新参数见[发布与更新](docs/ASSISTANT2_PUBLICATION.md)。
 
-本分支由先心代码助手2维护，增加 MedSAM2 官方序列模型及 Q 路线一 r2，使用独立 `run.py models` 入口，说明见 [模型入口与验收](docs/MODELS_ASSISTANT2.md)。短测限定每数据集一例真实病例、每阶段最多两次更新，包含保存后继续更新。完整病例训练效果、正式尺寸容量、CUDA/DDP 和资源自动调度按各模型的实际验收记录判断。prepare 默认根据当前训练清单生成预处理计划，短测生成独立技术计划。
+版本 0.1.0。当前接入 STU-Net-S 的 CHD1282（11 类）和 ImageCHD（8 类）流程：准备计划、统一离线预处理、训练、完整状态恢复、MONAI 滑窗预测、原数组网格导出、独立评价和短测。两数据集共用网络代码，分别训练权重。训练支持 CPU、1–4 卡 CUDA/DDP、自动或手动选卡、固定全局 batch 分担和有界 CPU 供数。
 
-Q的1282组合已按原冻结训练患者2:1生成A/B，验证和测试身份保留。MedSAM2支持显式标签框提示评测及直接官方发布权重预测，见[1282组合与标签框](docs/Q1282_AND_LABEL_BOX.md)。模型入口继承助手1的阶段日志和GPU持续等待；资源不足时定期记录候选卡条件，满足要求后启动。日志与心跳设置见[日志说明](docs/LOGGING.md)。
+完整离线数据合同、冻结在线版本、每折独立统计、数据复用/引用和服务器全流程命令见 [离线预处理](docs/OFFLINE_DATA_CONTRACT.md)。`prepare` 保存来源描述，`preprocess` 将固定转换写入 data 专用目录，`train` 仅接受完整离线描述。旧在线任务使用冻结分支和原目录继续；离线训练使用新的 run_dir。
 
-1282保留训练、验证、内部测试及两个外部设备子组，通过 `test --set internal`、`test --set external` 两个入口运行。旧审核排除、患者索引及冻结角色一并读取。私有清单和配置可集中迁移，再用 `bind-inputs` 绑定服务器既有数据；具体命令见 [测试与输入迁移](docs/TESTING_AND_TRANSFER.md)。资源参数和旧划分读取见 [GPU/CPU使用说明](docs/GPU_CPU_USAGE.md)。
+1282 保留训练、验证、内部测试及两个外部设备子组，通过 `test --set internal`、`test --set external` 两个入口运行。旧审核排除、患者索引及冻结角色一并读取。私有清单和配置可集中迁移，再用 `bind-inputs` 绑定服务器既有数据；具体命令见 [测试与输入迁移](docs/TESTING_AND_TRANSFER.md)。
+
+各阶段实时记录进度、耗时、资源、复用和异常；长步骤默认每 15 秒输出心跳，详细日志统一保存在过程目录的 `run_dir/events.jsonl`，并限制轮转容量。设置与查看方式见 [运行日志](docs/LOGGING.md)。
+
+短测限定一至两例真实病例、32³ 技术子区域、每组合两次更新，包含保存后继续更新。当前离线完整短测覆盖两个 CPU/Gloo 进程、完整恢复和预测复用；目标 Linux CUDA/NCCL、共享显卡实况、正式尺寸容量和持续性能待服务器验收。prepare 默认根据当前主训练清单生成预处理计划，短测生成独立技术计划。资源参数和旧划分读取见 [GPU/CPU 使用说明](docs/GPU_CPU_USAGE.md)。Xu、MedSAM2、Q 的后续接入见整体开发计划。
 
 ## 环境与入口
 
@@ -18,7 +22,7 @@ python -B run.py --help
 python -B run.py --version
 ```
 
-本机验收通过已有研究解释器只读复用基础依赖；MedSAM2额外依赖、官方源码及权重由本工作目录独立保存，位置见模型说明。服务器需要独立安装 `pyproject.toml` 声明的依赖并验证对应 PyTorch 构建。代码不自动安装依赖，也不自动更换已有环境。
+本机的 `.venv` 复用既有研究依赖并安装 MONAI 1.5.2；其本地依赖引用不用于服务器部署。服务器需要独立安装 `pyproject.toml` 声明的依赖并验证对应 PyTorch 构建。代码不自动安装依赖，也不自动更换已有环境。
 
 zmic 使用 `/data4/zhangruichen`：项目实体目录固定在 `code/chd-segmentation`，包含全部入口、src、configs 和 docs。Git 元数据复用 `code/git/.git`，`code/.git` 关联该元数据；本项目仅同步 chd-segmentation，其他项目文件保留。过程产物在 `course/chd-segmentation`，最终结果在 `result/chd-segmentation`，独立环境计划放在 `env/chd-segmentation`，原始数据从 `data` 读取。部署、配置及更新命令见 [zmic 部署说明](docs/ZMIC_DEPLOYMENT.md)。
 
@@ -65,14 +69,15 @@ cases:
       label: actual_label_sha256
 ```
 
-正式训练还需独立validation病例。1282按患者划分；ImageCHD导入原划分时保留病例级独立性，有可靠患者映射时可明确要求患者级检查。Q的A/B/C/D仍需患者级独立性。示例数字仅解释字段，实际值必须来自审核记录。ImageCHD的未知类别仅允许缺MYO（编号5）；1282使用其原始0—10编号和shared_index_excel空间规则。未标注和已确认缺如分别记录。额外标签仅按显式ignore_label_ids屏蔽。plan_scope仅用于显式读取既有计划的来源声明，不能代替对拟合病例的核查。
+正式训练还需独立 validation 病例。1282 按患者划分；ImageCHD 导入原划分时保留病例级独立性，有可靠患者映射时可明确要求患者级检查。示例数字仅解释字段，实际值必须来自审核记录。ImageCHD 的未知类别仅允许缺 MYO（编号 5）；1282 使用其原始 0—10 编号和 `shared_index_excel` 空间规则。未标注和已确认缺如分别记录。额外标签仅按显式 `ignore_label_ids` 屏蔽。plan_scope 仅用于显式读取既有计划的来源声明，不能代替对拟合病例的核查。
 
-图像和标签原件只读。prepare按病例顺序读取主训练数据，在RAM中进行有界前景采样，保存紧凑计划与描述，不输出整套重采样副本；训练和预测使用MONAI Dataset/Compose在RAM处理。STU持久供数进程使用各自有界LRU缓存，CPU供数、缓存、读盘并发和预取在安全边界按实时余量调整。默认只使用空闲显卡，卡数不足持续等待；STU显式设置最少卡数可启用epoch边界的GPU卡数调整，见[资源调度](docs/RESOURCE_SCHEDULING.md)。MedSAM2使用官方DataLoader，Q在各训练进程内读取及缓存病例；这两个模型启动时使用各自内存预算，恢复保留原运行拓扑，见[模型资源设置](docs/ASSISTANT2_SERVER_FILES.md)。
+图像和标签原件只读。prepare 按病例顺序读取主训练数据，在 RAM 中进行有界前景采样，保存紧凑计划与来源描述。preprocess 按 CPU/RAM 预算并行转换全部所需病例，逐例核验后写入 data，重复执行只补缺失或核验失败病例。训练和预测通过 MONAI Dataset/Compose 读取只读 mmap 数组；供数进程的 LRU 缓存保存映射及位置，训练不重复整例重采样。默认只使用空闲显卡，卡数不足持续等待；显式设置最少卡数可启用 epoch 边界的 GPU 卡数调整。详见 [资源调度](docs/RESOURCE_SCHEDULING.md)。
 
 ## 运行
 
 ```text
-python -B run.py prepare --config /data4/zhangruichen/course/chd-segmentation/configs/imagechd_stunet.yaml --output /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0.json
+python -B run.py prepare --config /data4/zhangruichen/course/chd-segmentation/configs/imagechd_stunet.yaml --output /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0_source.json
+python -B run.py preprocess --config /data4/zhangruichen/course/chd-segmentation/configs/imagechd_stunet.yaml --prepared /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0_source.json --output /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0.json --root /data4/zhangruichen/data/chd-segmentation/preprocessed
 python -B run.py train --config /data4/zhangruichen/course/chd-segmentation/configs/imagechd_stunet.yaml --prepared /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0.json
 python -B run.py train --config /data4/zhangruichen/course/chd-segmentation/configs/imagechd_stunet.yaml --prepared /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0.json --resume
 python -B run.py status --run /data4/zhangruichen/course/chd-segmentation/runs/imagechd_stunet_fold0
@@ -82,7 +87,7 @@ python -B run.py evaluate --config /data4/zhangruichen/course/chd-segmentation/c
 
 预测通过 `--inputs` 读取相同数据协议的新清单，通过 `--case` 选择病例。推断不读取标签数组；评价独立执行。导出默认恢复原始数组尺寸与 source affine，同时在结果记录保留工作毫米网格的来源。选择 `export_space: working` 时使用衍生毫米网格。新任务应使用新目录，完成结果按身份复用。
 
-STU训练配置支持固定尝试预算或epoch预算、SGD、深监督及显式学习率；正式示例默认200epoch，每轮250次训练尝试、50次验证，使用poly学习率。save_every_attempts控制周期保存，轮次边界、正常停止与结束都会保存。最新完整状态包含模型、优化器、scaler、逐进程随机状态、消费和验证进度；恢复拒绝缺失检查点、代码或输入身份变化。MedSAM2和Q各自的训练预算及选模方式见模型说明。
+训练配置支持固定尝试预算或 epoch 预算、SGD、深监督及显式学习率；正式示例默认 200 epoch，每轮 250 次训练尝试、50 次验证，使用 poly 学习率。`save_every_attempts` 控制周期保存，轮次边界、正常停止与结束都会保存。最新完整状态包含模型、优化器、scaler、逐进程随机状态、消费和验证进度；恢复拒绝缺失检查点、代码或输入身份变化。当前保留 latest，不提供 best 选模或旧工程检查点导入。
 
 ## 短测与保留
 

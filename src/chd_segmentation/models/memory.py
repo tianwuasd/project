@@ -17,26 +17,31 @@ def case_estimates(config,prepared,stage):
     records=[]
     classes=len(LABELS[prepared['dataset']])
     for row in rows:
-        shape=np.asarray([end-begin for begin,end in roi] if roi else nib.load(row['image']).shape,dtype=np.int64)
+        stored = prepared.get('storage',{}).get('cases',{}).get(row['case_id'])
+        shape=np.asarray(stored['shape_czyx'][1:][::-1] if stored is not None else
+            [end-begin for begin,end in roi] if roi else nib.load(row['image']).shape,dtype=np.int64)
         if shape.shape!=(3,) or (shape<=0).any():
             raise ValueError('模型内存预算需要有效三维网格')
         native=math.prod(map(int,shape))
         if config['model']=='q_route1':
             spacing=np.asarray(prepared['plan']['configurations']['3d_fullres']['spacing'])
             order=prepared['plan']['transpose_forward']
-            target=np.ceil(shape[::-1][order]*np.asarray(row['spacing_xyz'])[::-1][order]/spacing).astype(np.int64)
+            target=np.asarray(stored['shape_czyx'][1:]) if stored is not None else np.ceil(
+                shape[::-1][order]*np.asarray(row['spacing_xyz'])[::-1][order]/spacing).astype(np.int64)
             voxels=math.prod(map(int,target))
-            working=voxels*64
-            case=native*32+working
+            working=0 if stored is not None else voxels*64
+            case=max(1,stored['locations_bytes']*2) if stored is not None else native*32+working
             records.append(dict(case_id=row['case_id'],native_shape_xyz=shape.tolist(),working_shape=target.tolist(),
-                native_read_bytes=native*32,working_bytes=working,workspace_bytes=case,
-                retained_case_bytes=voxels*6,rank_prediction_bytes=voxels*320))
+                native_read_bytes=0 if stored is not None else native*32,working_bytes=working,workspace_bytes=case,
+                retained_case_bytes=max(voxels*6,stored['array_bytes']+stored['locations_bytes']) if stored is not None else voxels*6,
+                mapped_file_bytes=stored['array_bytes'] if stored is not None else 0,rank_prediction_bytes=voxels*320))
         else:
             # 原生序列不进入nnU-Net重采样；视频帧按需转换，传播记忆按层保留。
-            working=native*32
+            working=native*(8 if stored is not None else 32)
             history=int(shape[2])*max(1,classes-1)*2**20 if stage=='prediction' else 0
             records.append(dict(case_id=row['case_id'],native_shape_xyz=shape.tolist(),
-                native_read_bytes=native*32,working_bytes=working,workspace_bytes=working,
+                native_read_bytes=0 if stored is not None else native*32,working_bytes=working,workspace_bytes=working,
+                mapped_file_bytes=stored['array_bytes'] if stored is not None else 0,
                 retained_case_bytes=native*10,rank_prediction_bytes=native*8*classes+history,
                 propagation_history_bytes=history))
     return records

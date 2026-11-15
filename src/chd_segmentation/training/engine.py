@@ -22,6 +22,7 @@ from ..data.supply import BatchSupply, batch_index
 from ..models.stunet.adapter import StunetAdapter, WEIGHT_SHA256
 from ..observability.events import event, logged, stage
 from ..preprocessing.prepare import load_prepared, validate_prepared_config
+from ..preprocessing.offline_store import storage_lease, validate_storage
 from .checkpoint import load_checkpoint, save_checkpoint, tensors_equal,require_resume_device,verify_optimizer_device
 from .build_gate import BuildGate
 from .coordinator import HostCoordinator
@@ -445,6 +446,7 @@ def train(config, prepared_path, resume=False, stop_after=None):
     with stage(config, "training_inputs", prepared=str(prepared_path), resume=resume):
         prepared = load_prepared(prepared_path)
         validate_prepared_config(prepared, config)
+        validate_storage(prepared, config=config)
     output = require_output(config["run_dir"], config["work_root"], [prepared["manifest"]["data_root"]])
     rows = prepared["manifest"]["cases"]
     if not all(any(role in r["roles"] for r in rows) for role in ("train", "validation")) or \
@@ -455,7 +457,7 @@ def train(config, prepared_path, resume=False, stop_after=None):
         "training": config["training"], "pretrained": WEIGHT_SHA256, "code_identity": code_identity(),
         "versions": {n: version(n) for n in ("torch", "monai", "nnunetv2", "numpy", "scipy")}}
     identity = digest(scientific)
-    with operation_lock(output):
+    with operation_lock(output), storage_lease(prepared, config):
         if resume:
             previous = read_json(output / "run.json")
             expected = {**scientific, "code_identity": previous["scientific"]["code_identity"]}

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Q与MedSAM2消费一次生成的兼容离线数据，并完成独立分支发布、资源及材料交付。
+**Goal:** Q与MedSAM2消费一次生成的兼容离线数据，并完成main发布、独立部署、资源及材料交付。
 
 **Architecture:** 先记录当前可用版本的真实数值基线。助手1最终发布后继承其SourceReader、离线存储、资源及引用合同；Q复用STU数值处理并核验A统计，MedSAM2提供原生灰度窗配方。模型训练、预测和恢复核对具体数据身份。
 
@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- 冻结69289532a3da2c94bc72769f5726ca260f6980a7；工作/公开分支codex/chd-assistant2-offline-preprocess-20261115；不合main。
+- 冻结69289532a3da2c94bc72769f5726ca260f6980a7；工作分支codex/chd-assistant2-offline-preprocess-20261115；用户最新授权验收后整合main。
 - 助手1完成测试发布后核对最终提交与公开子树，才继承数据代码；当前开发文件仅用于接口审阅。
 - Q r2、A393/B197/C128/D456、A拟合和上游冻结、科学计算及随机顺序保持。
 - MedSAM2官方332f30d、权重SHA、八帧512、完整编码器、原生网格与当前灰度窗规则保持。null灰度窗来自正确训练来源计划。
@@ -42,8 +42,8 @@
 
 **Interfaces:** 消费助手1最终公开提交对应的SourceReader、offline.preprocess、offline_store的存储、校验、只读加载及引用接口。核对实际签名后，计划中对应接口变化记入ledger；开发中实现不作为来源。保留助手2validate_resources出口、模型memory_profile及恢复设备检查。
 
-- [ ] 核对最终本地/公开提交和完整子树，读取已提交源码及其验收记录。
-- [ ] 通过文件编辑工具继承公共实现，逐项保留模型接口与独立update.py；标明允许的模型配方扩展。
+- [x] 核对最终本地/公开提交和完整子树，读取已提交源码及其验收记录。
+- [x] 通过文件编辑工具继承公共实现，逐项保留模型接口；标明允许的模型配方扩展。
 - [ ] 公共STU真实有界入口通过，原模型预算和资源验证出口通过。
 
 ### Task 3: 模型配方、入口与复用
@@ -52,9 +52,9 @@
 
 **Interfaces:** preprocess_model使用模型配置和来源prepare配置。Q调用公共STU处理并核验A组统计；MedSAM2解析gray_window或训练计划百分位，保存uint8原生图像及int16标签。native.resolve_window(config, prepared)；native.NativeCases(prepared, with_label, ...)只读对应原生配方。CLI为models preprocess --config MODEL --prepare-config SOURCE_CFG --prepared SOURCE_JSON --root DATA --output OFFLINE_JSON。
 
-- [ ] 实现完整数据配方和只读消费者，数值摘要必须与Task1冻结基线相同；正式Q统计限定A，正式MedSAM2使用原冻结训练身份。
-- [ ] 测试同一配方复用、仅损坏病例重建、不同窗/统计来源隔离、不完整数据拒绝和普通无标签读取。
-- [ ] 测试共享引用和目录删除影响；保持数据与run身份分开，正式数据不自动删除。
+- [x] 实现完整数据配方和只读消费者，数值摘要必须与Task1冻结基线相同；正式Q统计限定A，正式MedSAM2使用原冻结训练身份。
+- [x] 测试同一配方复用、仅损坏病例重建、不同窗/统计来源隔离、不完整数据拒绝和普通无标签读取。
+- [x] 测试共享引用和目录删除影响；保持数据与run身份分开，正式数据不自动删除。
 
 ### Task 4: 训练、预测与恢复
 
@@ -71,11 +71,11 @@
 
 **Files:** Windows实际监督器适配短测、服务器资源说明、集中交付清单和最终验收报告。
 
-**Interfaces:** 只读复用D:/projects/test/common.py的实际supervise/目录采样及其正式入口；固定模型生产源码，真实CPU与虚拟资源分别记录。公开代码树以最终确定main为父树，仅替换助手2源码子目录并创建自己的分支。
+**Interfaces:** 只读复用D:/projects/test/common.py的实际supervise/目录采样及其正式入口；固定模型生产源码，真实CPU与虚拟资源分别记录。公开代码树以最新确定main为父树，按项目路径整合经过审阅和验收的代码，核对main既有文件和其他项目。
 
 - [ ] 运行真实模型入口和仿真资源控制，记录分阶段时间、速度单位、RAM及磁盘采样峰值，显存未测量时明确标记。
 - [ ] 提供数据/模型/检查点最终及写出峰值估算，给出数量、dtype、形状、保留份数与服务器条件时长依据。
 - [ ] 更新材料新增/复用清单、实际容量、摘要、服务器路径和上传状态；不复制大文件。
 - [ ] 一次新上下文整体审阅覆盖6928953以来全部分支变更；修复重要发现并运行针对性检查和单元检查。
-- [ ] 本地提交、只发布助手2分支；重新查询分支SHA及源码子树，核对其他项目不变，不合main、不登录服务器。
+- [ ] 本地提交并整合main；重新查询main SHA及源码子树，核对其他项目不变，不登录服务器。
 - [ ] 自动清理本次副产物并核验，交付冻结/本地/公开提交、独立更新与完整运行命令、日志和清理回执。

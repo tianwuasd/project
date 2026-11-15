@@ -16,7 +16,7 @@ from smoke import SmokeWorkspace
 spec = importlib.util.spec_from_file_location('assistant2_updater', ROOT/'update.py')
 updater = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(updater)
-BRANCH = 'codex/chd-assistant2-offline-preprocess-20261115'
+BRANCH = 'main'
 
 
 def git(path, *args, data=None):
@@ -42,6 +42,7 @@ def run(args):
     with SmokeWorkspace(args.work_root, args.report) as workspace:
         started, peaks = perf_counter(), []
         try:
+            check.assertEqual(updater.BRANCH, 'main')
             origin = workspace.root/'origin.git'
             origin.mkdir()
             git(origin, 'init', '--bare', '--template=')
@@ -51,7 +52,7 @@ def run(args):
             first = commit(origin, old_readme)
             second = commit(origin, (ROOT/'README.md').read_bytes(), first)
             git(origin, 'update-ref', 'refs/heads/main', first)
-            git(origin, 'update-ref', 'refs/heads/'+BRANCH, first)
+            git(origin, 'update-ref', 'refs/heads/codex/chd-assistant2-offline-preprocess-20261115', first)
             url = origin.as_uri()
             deployment, protected = workspace.root/'assistant2-repo', workspace.root/'assistant1-repo'
             for branch, path in ((BRANCH, deployment), ('main', protected)):
@@ -63,13 +64,16 @@ def run(args):
             protected_before = (git(protected, 'rev-parse', 'HEAD'), keep.read_bytes(), keep.stat().st_mtime_ns)
             git(origin, 'update-ref', 'refs/heads/'+BRANCH, second, first)
             repo = updater.GitRepository(deployment, expected_urls={url})
-            check.assertEqual(repo.remote_head(), second, '更新必须读取助手2分支，不能读取main')
-            check.assertEqual(git(origin, 'rev-parse', 'refs/heads/main').decode().strip(), first)
-            checks.append('remote target follows assistant2 while main retains another commit')
+            check.assertEqual(repo.remote_head(), second, '更新必须读取main')
+            check.assertEqual(git(origin, 'rev-parse', 'refs/heads/codex/chd-assistant2-offline-preprocess-20261115').decode().strip(), first)
+            checks.append('remote target follows main while the frozen assistant2 branch remains unchanged')
             initial = updater.GitRepository(protected, expected_urls={url})
+            git(protected, 'update-ref', 'refs/heads/other', first)
+            git(protected, 'symbolic-ref', 'HEAD', 'refs/heads/other')
             for force in (False, True):
                 with check.assertRaises(ValueError):
                     initial.validate(force=force)
+            git(protected, 'symbolic-ref', 'HEAD', 'refs/heads/main')
             checks.append('another local branch is rejected including force mode')
             runtime = workspace.root/'assistant2-course'
             choice = repo.choose_source([url], expected=second, timeout=5, official=url)
@@ -103,7 +107,7 @@ def run(args):
                 updater.synchronize(repo, runtime, second)
             check.assertEqual(repo.run('rev-parse', 'HEAD').decode().strip(), second)
             check.assertEqual((git(protected, 'rev-parse', 'HEAD'), keep.read_bytes(), keep.stat().st_mtime_ns), protected_before)
-            check.assertEqual(git(origin, 'rev-parse', 'refs/heads/main').decode().strip(), first)
+            check.assertEqual(git(origin, 'rev-parse', 'refs/heads/main').decode().strip(), third)
             checks.append('remote advancement rejects the old target; independent main checkout remains unchanged')
             files = [p for p in workspace.root.rglob('*') if p.is_file()]
             peaks.append(len(files))

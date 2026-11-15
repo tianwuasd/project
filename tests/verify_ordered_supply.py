@@ -22,7 +22,7 @@ from chd_segmentation.artifacts.store import read_json, write_json
 from chd_segmentation.config import DEFAULTS, load_config
 from chd_segmentation.data.supply import BatchSupply, selection
 from chd_segmentation.models.stunet.adapter import StunetAdapter
-from chd_segmentation.preprocessing.prepare import prepare
+from offline_helpers import prepare_offline as prepare
 from chd_segmentation.training.build_gate import BuildGate
 from chd_segmentation.training.checkpoint import load_checkpoint
 from chd_segmentation.training.engine import train

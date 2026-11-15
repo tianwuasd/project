@@ -47,9 +47,9 @@ resources:
 
 ## CPU 和内存
 
-按整组读取 CPU affinity、Linux cgroup v2 CPU/RAM 限额与实时可用内存，默认 CPU/RAM 比例上限 80%，主机保留 4 GiB。协调进程、各训练进程、供数进程、重采样工作区、缓存、预取和传输输入均计入预算。
+按整组读取 CPU affinity、Linux cgroup v2 CPU/RAM 限额与实时可用内存，默认 CPU/RAM 比例上限 80%，主机保留 4 GiB。离线预处理计入原卷与重采样工作区；训练计入协调/训练/供数进程、取块与前景位置、缓存和传输副本。
 
-`workers: auto` 根据预算增加供数进程，配置 `max_workers: 32` 可修改，实际数量还受全局 batch 和每个 rank 份额限制。batch 4 最多使用 4 个供数进程，两卡各最多 2 个；`workers: 0` 在训练进程内串行供数，整数表示整组上限。供数进程持续驻留，内部单线程。缓存为各供数进程的 RAM 缓存，容量在统一预算中计算；不会自动生成全量预处理副本。
+`workers: auto` 根据预算增加供数进程，配置 `max_workers: 32` 可修改，实际数量还受全局 batch 和每个 rank 份额限制。batch 4 最多使用 4 个供数进程，两卡各最多 2 个；`workers: 0` 在训练进程内串行供数，整数表示整组上限。供数进程持续驻留，内部单线程。LRU 缓存包含只读 mmap 引用与位置数据，未命中时打开已有离线文件。固定转换由独立 preprocess 阶段保存，训练期间不生成或重建整例数据。
 
 每个 rank 只保留当前一个未消费批次，实际 `prefetch: 1`，完成当前全局批次后补入下一批。`readers: auto` 配置上限默认 8，实际受当前 batch、供数实例及内存限制。各病例按自身工作空间估算领取共享额度，额度允许时并行构建。CPU 数据及 GPU 传输全部就绪后才开始当前批次的模型计算，准备数据时通过主机协调等待。通信超时默认 `collective_timeout_seconds: 180`。
 
@@ -87,6 +87,8 @@ ImageCHD 原流程先对完整标注的历史 97 例按种子 42 排序，分配
 python -B run.py prepare --config configs/experiments/imagechd_stunet.yaml \
   --output "$COURSE/prepared/imagechd_fold0.json"
 ```
+
+上述 prepare 输出为来源描述，继续使用 `run.py preprocess --config <同一配置> --prepared <来源描述> --output <新的离线描述> --root <data内专用目录>` 完成固定转换。后续 train 的 --prepared 指向离线描述。完整命名、独立 run_dir 与单折命令见 [离线数据合同](OFFLINE_DATA_CONTRACT.md)。
 
 自动选择两卡、全局 batch 4、200 epoch：
 

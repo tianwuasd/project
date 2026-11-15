@@ -19,6 +19,7 @@ from chd_segmentation.preprocessing.prepare import prepare
 from chd_segmentation.models.workflow import options, predict
 from chd_segmentation.models.medsam2.adapter import activate
 from chd_segmentation.models.medsam2.prompts import label_box_prompts
+from model_offline_helpers import offline_model
 
 
 def run(args):
@@ -50,6 +51,9 @@ def run(args):
             execution=dict(cpu_processes=1, workers=0, prefetch=1))
         write_json(workspace.root/'model.json', model_config)
         applied = options(workspace.root/'model.json')
+        prepared = offline_model(workspace.root/'model.json', workspace.root/'prepare.json', prepared_path,
+                                 workspace.root/'course/offline.json')
+        prepared_path = workspace.root/'course/offline.json'
         activate(applied)
         from chd_segmentation.models.medsam2.data import NativeCases
         cases = NativeCases(prepared, with_label=True)
@@ -71,7 +75,7 @@ def run(args):
         with check.assertRaises(ValueError):
             label_box_prompts(entry, row['sha256']['label'], 8, [5])
         cases.clear()
-        del cases, entry
+        del cases, entry, label
         with check.assertRaises(ValueError):
             predict(applied, prepared_path, model_config['pretrained'], workspace.root/'ordinary', official_weights=True)
         predicted = predict(applied, prepared_path, model_config['pretrained'], workspace.root/'result',

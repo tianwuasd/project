@@ -232,6 +232,7 @@ def train(config, prepared_path, stage, resume=False, stop_after=None):
         from .medsam2.official import train_official
         return train_official(config,prepared_path,stage,resume,stop_after)
     from .execution import admitted,run_workers
+    from .offline import model_storage_lease
     prepared = load_prepared(prepared_path)
     training_names(config,prepared,stage)
     root = Path(config['run_dir'])/stage
@@ -240,7 +241,7 @@ def train(config, prepared_path, stage, resume=False, stop_after=None):
     if stop_after is not None and not 1<=stop_after<=config['updates']:
         raise ValueError('stop-after超出预算')
     root.parent.mkdir(parents=True,exist_ok=True)
-    with FileLock(root.parent/(stage+'.lock'),timeout=0):
+    with FileLock(root.parent/(stage+'.lock'),timeout=0), model_storage_lease(config,prepared,stage):
         if not resume:
             from .startup import check_start
             check_start(root,config['model'],prepared['identity'],stage)

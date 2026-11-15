@@ -13,7 +13,8 @@
 ```bash
 python -B run.py models split-q1282 --source /path/to/original/server-inputs --output /path/to/q-inputs
 python -B run.py bind-inputs --directory /path/to/q-inputs --root /data4/zhangruichen
-python -B run.py prepare --config /path/to/q-inputs/q1282_prepare.yaml --output /data4/zhangruichen/course/chd-segmentation/prepared/q1282.json
+python -B run.py prepare --config /path/to/q-inputs/q1282_prepare.yaml --output /data4/zhangruichen/course/chd-segmentation/assistant2/prepared/q1282-source.json
+python -B run.py models preprocess --config /path/to/q-inputs/q1282_base.yaml --prepare-config /path/to/q-inputs/q1282_prepare.yaml --prepared /data4/zhangruichen/course/chd-segmentation/assistant2/prepared/q1282-source.json --root /data4/zhangruichen/data/chd-segmentation/preprocessed --output /data4/zhangruichen/course/chd-segmentation/assistant2/prepared/q1282.json
 ```
 
 数据或权重位置有差异时可在bind-inputs提供`--chd-root`、`--pretrained`。绑定会填写prepare及三个模型配置的机器路径，已有训练预算等手动配置保留。三个阶段依次使用q1282_base.yaml、q1282_localizer.yaml、q1282_local.yaml；局部阶段读取上游best.pt。

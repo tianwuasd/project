@@ -35,8 +35,8 @@ def effective_config(config,prepared,prepared_path,root,names):
     recipe.trainer.logging.tensorboard_writer.should_log = False
     if config['epochs'] is not None:
         recipe.scratch.num_epochs = config['epochs']
-    stats = prepared['plan']['foreground_intensity_properties_per_channel']['0']
-    window = config['gray_window'] or [stats['percentile_00_5'],stats['percentile_99_5']]
+    from .native import resolve_window
+    window = resolve_window(config,prepared)
     raw = dict(_target_='chd_segmentation.models.medsam2.data.ManifestRawDataset',
                prepared_path=str(Path(prepared_path).resolve()),names=names,window=window,
                log_dir=str(root),logging=config['logging'])
@@ -52,6 +52,7 @@ def train_official(config,prepared_path,stage,resume=False,stop_after=None):
     if stage!='sequence':
         raise ValueError('MedSAM2阶段必须为sequence')
     prepared = load_prepared(prepared_path)
+    from ..offline import model_storage_lease
     root = (Path(config['run_dir'])/stage).resolve()
     protected = [Path(prepared['manifest']['data_root']).resolve(),
                  Path(config['official_root']).resolve(),Path(config['dependency_root']).resolve(),
@@ -59,7 +60,7 @@ def train_official(config,prepared_path,stage,resume=False,stop_after=None):
     if any(root==path or root.is_relative_to(path) or path.is_relative_to(root) for path in protected):
         raise ValueError('MedSAM2训练目录与原始数据或复用依赖重叠')
     root.parent.mkdir(parents=True,exist_ok=True)
-    with FileLock(root.parent/(stage+'.lock'),timeout=0):
+    with FileLock(root.parent/(stage+'.lock'),timeout=0), model_storage_lease(config,prepared,stage):
         return _train_locked(config,prepared,prepared_path,root,stage,resume,stop_after)
 
 

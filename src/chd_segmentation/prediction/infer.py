@@ -19,6 +19,7 @@ from ..training.checkpoint import load_checkpoint, prediction_snapshot
 from ..training.engine import code_identity, device_for
 from ..training.resources import resource_lease
 from ..preprocessing.prepare import validate_prepared_config
+from ..preprocessing.offline_store import storage_lease
 from .metrics import case_data_identity
 from .restore import restore
 
@@ -80,7 +81,7 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None):
     options = config["prediction"]
     torch.set_num_threads(config["resources"]["cpu_threads"])
     device = device_for(config)
-    with operation_lock(output), prediction_snapshot(config["run_dir"]) as pointer:
+    with operation_lock(output), storage_lease(prepared, config), prediction_snapshot(config["run_dir"]) as pointer:
         completed = read_json(output / "predictions.json") if (output / "predictions.json").exists() else {"cases": {}}
         dataset = CaseDataset(prepared, config["resources"], with_label=False, log_dir=log_dir,
                               logging=config.get("logging"))

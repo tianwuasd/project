@@ -15,7 +15,7 @@ from uuid import uuid4
 
 
 REPOSITORY = "tianwuasd/project"
-BRANCH = "codex/chd-assistant2-offline-preprocess-20261115"
+BRANCH = "main"
 SUBDIRECTORY = "chd-segmentation"
 OFFICIAL = "https://github.com/" + REPOSITORY + ".git"
 DEFAULT_NETWORK = {"mirrors": ["https://ghfast.top", "https://gh-proxy.com"], "probe_timeout_seconds": 10}
@@ -117,12 +117,14 @@ def probe_source(url, timeout):
 def allowed(path):
     parts = PurePosixPath(path).parts
     return (bool(parts) and not path.startswith("/") and ".." not in parts and "\\" not in path
-            and ((len(parts) == 1 and path in ROOT_FILES) or (parts[0] in {"src", "configs", "docs", "tests"} and PurePosixPath(path).suffix in {".py", ".md", ".toml", ".json", ".yaml", ".yml", ".txt"})))
+            and ((len(parts) == 1 and path in ROOT_FILES)
+                 or (parts[0] in {"src", "configs", "docs", "tests"} and PurePosixPath(path).suffix in {".py", ".md", ".toml", ".json", ".yaml", ".yml", ".txt"})
+                 or (parts[0] == "scripts" and PurePosixPath(path).suffix in {".sh", ".ps1"})))
 
 
 def require_head(expected, actual):
     if expected != actual:
-        raise ValueError("助手2目标提交已变化，停止本次同步")
+        raise ValueError("目标提交已变化，停止本次同步")
 
 
 def prepare_code_root(path):
@@ -171,7 +173,7 @@ class GitRepository:
         if Path(self.run("rev-parse", "--show-toplevel").decode().strip()).resolve() != self.path or not (self.path / ".git").is_dir():
             raise ValueError("需要独立的普通 Git 工作目录")
         if self.run("symbolic-ref", "--short", "HEAD").decode().strip() != BRANCH:
-            raise ValueError("助手2更新要求独立分支：" + BRANCH)
+            raise ValueError("更新要求本地分支：" + BRANCH)
         code = self.path / SUBDIRECTORY
         if code.is_symlink() or (code.exists() and not code.is_dir()):
             raise ValueError("本项目代码路径必须为普通目录")
@@ -206,7 +208,7 @@ class GitRepository:
     def remote_head(self):
         rows = self.run("ls-remote", "--exit-code", self.transport, "refs/heads/" + BRANCH, network=True).decode().splitlines()
         if len(rows) != 1:
-            raise ValueError("不能唯一确定助手2远端分支")
+            raise ValueError("不能唯一确定远端分支")
         return rows[0].split()[0]
 
     def inventory(self, commit):
@@ -428,9 +430,9 @@ def synchronize(repo, runtime, commit, remove_legacy=False, force=False, relocat
 
 
 def main():
-    parser = argparse.ArgumentParser(description="只更新助手2独立分支的先心分割源码")
-    parser.add_argument("--repo", default="/data4/zhangruichen/code/chd-segmentation-assistant2-repo")
-    parser.add_argument("--runtime", default="/data4/zhangruichen/course/chd-segmentation-assistant2")
+    parser = argparse.ArgumentParser(description="只更新main中的先心分割源码；部署目录由repo和runtime指定")
+    parser.add_argument("--repo", default="/data4/zhangruichen/code")
+    parser.add_argument("--runtime", default="/data4/zhangruichen/course/chd-segmentation")
     parser.add_argument("--sha")
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--force", action="store_true", help="本项目代码以远端为准，修复未完整检出的索引，保留其他项目的文件和暂存记录")

@@ -7,6 +7,9 @@ split:
   path: /data4/zhangruichen/course/chd-segmentation/inputs/imagechd_splits.json
 planning:
   mode: auto
+preprocessing:
+  root: /data4/zhangruichen/data/chd-segmentation/preprocessed
+  statistics_source: main-train
 pretrained: /data4/zhangruichen/data/pretrained/STU-Net/small_ep4k.model
 work_root: /data4/zhangruichen/course/chd-segmentation
 run_dir: /data4/zhangruichen/course/chd-segmentation/runs/imagechd_stunet_fold0

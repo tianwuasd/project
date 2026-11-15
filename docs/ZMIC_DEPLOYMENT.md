@@ -11,6 +11,7 @@
 | 最终掩膜和评价 | `result/chd-segmentation/<dataset>/<fold>/<run_id>` |
 | 项目环境的计划位置 | `env/chd-segmentation`，需要核对实际解释器 |
 | 原始数据 | `data/<实际数据集目录>`，只读 |
+| 固定离线预处理 | `data/chd-segmentation/preprocessed/<数据集-方法-首次日期>/fold_N/<配方版本>` |
 
 ## 更新入口
 

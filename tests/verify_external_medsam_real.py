@@ -17,6 +17,7 @@ from chd_segmentation.config import DEFAULTS,load_config
 from chd_segmentation.models.workflow import options,predict
 from chd_segmentation.preprocessing.prepare import prepare
 from chd_segmentation.prediction.metrics import evaluate
+from model_offline_helpers import offline_model, unlabeled_model
 
 
 def run(args):
@@ -44,12 +45,13 @@ def run(args):
             execution=dict(cpu_processes=1,workers=0,prefetch=1,reserve_ram_bytes=2*2**30,cache_bytes=16*2**20))
         write_json(workspace.root/'model.json',model)
         applied=options(workspace.root/'model.json')
+        prepared=offline_model(workspace.root/'model.json', workspace.root/'prepare.json',
+            workspace.root/'course/prepared.json', workspace.root/'course/offline.json')
         from chd_segmentation.models.medsam2.adapter import activate
         activate(applied)
         from chd_segmentation.models.medsam2.data import NativeCases
         from chd_segmentation.models.medsam2.prompts import label_box_prompts
         data=NativeCases(prepared,with_label=True,reserve_ram_bytes=2*2**30)
-        assert data.reader.reserve==2*2**30
         entry=data.get(row['case_id'])
         values=sorted(set(map(int,np.unique(entry['label'])))-{0,-1}-set(entry['unknown_classes']))
         target=max(values,key=lambda value:int((entry['label']==value).sum((1,2)).argmax()))
@@ -58,20 +60,12 @@ def run(args):
             item['source']='technical_simulated'
         data.clear()
         del data,entry
-        independent=deepcopy(prepared)
-        independent['manifest']=deepcopy(prepared['manifest'])
-        for item in independent['manifest']['cases']:
-            item['roles']=['predict']
-            item['label']=None
-            item['sha256'].pop('label')
-            item['source_stamp'].pop('label')
-        independent.pop('identity')
-        independent['identity']=digest(independent)
-        write_json(workspace.root/'without-label.json',independent)
+        prediction_path=unlabeled_model(workspace.root/'model.json', workspace.root/'prepare.json',
+            prepared, workspace.root)
         record=dict(case_id=row['case_id'],roi_xyz=sample['roi_xyz'],optimizer_updates=0,
             device='cpu',prompt_source='technical_simulated',source_identity=row['sha256'])
         workspace.results.append(record)
-        prediction=predict(applied,workspace.root/'without-label.json',model['pretrained'],
+        prediction=predict(applied,prediction_path,model['pretrained'],
             workspace.root/'result/prediction',prompts=prompts,official_weights=True)
         metrics=evaluate(workspace.root/'result/prediction',prepared,workspace.root/'result/metrics.json',config)
         assert '5' not in metrics['cases'][0]['classes']

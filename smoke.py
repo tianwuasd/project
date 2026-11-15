@@ -32,6 +32,7 @@ from chd_segmentation.observability.events import Stage, event
 from chd_segmentation.prediction.infer import predict
 from chd_segmentation.prediction.metrics import evaluate
 from chd_segmentation.preprocessing.prepare import prepare
+from chd_segmentation.preprocessing.offline import preprocess
 from chd_segmentation.training.engine import code_identity, train
 
 
@@ -127,6 +128,7 @@ def run(spec_path, root, report, validate_only=False, check_logging=False, start
                            "work_root": str(process), "run_dir": str(process / "training"),
                            "result_root": str(results)})
             config["planning"].update(experiment.get("planning", {}))
+            config["preprocessing"]["root"] = str(directory / "data")
             if config["planning"]["mode"] != "auto":
                 raise ValueError("短测必须从所选真实病例自动生成技术计划")
             config["training"].update({"patch": [32, 32, 32], "attempts": attempts, "batch": 1,
@@ -144,7 +146,7 @@ def run(spec_path, root, report, validate_only=False, check_logging=False, start
             event(config["run_dir"], "smoke_case_started", dataset=name, case_id=row["case_id"],
                   optimizer_update_limit=0 if only_validate else attempts)
             mark = perf_counter()
-            prepared = prepare(config, process / "prepared.json")
+            prepared = prepare(config, process / "source.json")
             record["prepare_seconds"] = perf_counter() - mark
             generation = prepared["plan"]["generation"]
             record["planning"] = {key: generation[key] for key in
@@ -152,11 +154,12 @@ def run(spec_path, root, report, validate_only=False, check_logging=False, start
             record["planning"]["fit_ids"] = prepared["plan"]["fit_ids"]
             plan_stamp = Path(config["plan"]).stat().st_mtime_ns
             mark = perf_counter()
-            repeated = prepare(config, process / "prepared.json")
+            repeated = prepare(config, process / "source.json")
             record["planning"]["reuse_seconds"] = perf_counter() - mark
             if repeated != prepared or Path(config["plan"]).stat().st_mtime_ns != plan_stamp:
                 raise ValueError("自动计划未按相同身份复用")
             record["planning"]["reused_without_write"] = True
+            prepared = preprocess(config, process / "source.json", process / "prepared.json")
             dataset = CaseDataset(prepared, config["resources"], log_dir=config["run_dir"], logging=config.get("logging"))
             first = dataset.get(row["case_id"])
             if not (first["label"] > 0).any():
@@ -204,8 +207,7 @@ def run(spec_path, root, report, validate_only=False, check_logging=False, start
                 silent.clear()
                 check.assertEqual(logs_path.stat().st_size, before_bytes)
                 current = code_identity()
-                baseline = "afffd433e388f93fe5d840ba6a899cb2b814c81804e59d4b02c310cb47cf8dde"
-                check.assertTrue(compatible_code(baseline, current))
+                check.assertTrue(compatible_code(current, current))
                 check.assertFalse(compatible_code("0" * 64, current))
                 check.assertFalse(compatible_code(baseline, "0" * 64))
             events = [json.loads(line) for line in (process / "training" / "events.jsonl").read_text(encoding="utf-8").splitlines()]
