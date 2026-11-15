@@ -25,7 +25,7 @@ $py = 'D:\projects\project\chd-segmentation\.venv\Scripts\python.exe'
 
 ## 有界配置
 
-- `epochs`为1或2，`steps_per_epoch`为1或2，全局`batch`固定4；累计训练尝试最多4次。AMP跳步单独记录，不追加尝试。
+- `epochs`为1或2，`steps_per_epoch`为1或2，全局`batch`固定4；累计训练尝试必须为2至4次，以验证恢复后继续更新。AMP跳步单独记录，不追加尝试。
 - 验证每轮一次，只使用所选验证病例；内部测试只预测并评价一个所选冻结测试病例。
 - `profile: technical`使用32³块和从所选图像尺寸得到的共同中心32³子区域，记录实际范围。这是技术检查，不能据此证明128³容量、完整体积速度或分割泛化。
 - `profile: full128`使用完整体积和128³训练块；保留小样本及更新次数限制。CUDA设置FP16；该配置需具备相应容量的设备。CPU配置使用FP32。

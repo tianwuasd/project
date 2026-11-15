@@ -76,7 +76,8 @@ def select_cases(rows, seed):
 
 
 def git(root, *args):
-    return subprocess.check_output(["git", "-C", str(root), *args], text=True, encoding="utf-8").strip()
+    return subprocess.check_output(["git", "-C", str(root), *args], text=True, encoding="utf-8",
+                                   env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"}).strip()
 
 
 def verify_engine(root, expected):

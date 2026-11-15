@@ -1,6 +1,9 @@
 import argparse
+import ast
 import json
+import os
 from pathlib import Path
+import stat
 import subprocess
 import sys
 import tomllib
@@ -39,11 +42,13 @@ def update(root, check=False, remote="origin", ref=None):
     if remote not in result["remotes"]:
         raise ValueError("尚未配置助手3自己的远端，不能使用生产项目远端代替")
     lock_root = root / ".runs"
-    if lock_root.is_symlink():
+    if lock_root.is_symlink() or (os.name == "nt" and lock_root.exists() and
+                                  lock_root.lstat().st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT):
         raise ValueError("运行目录不能是链接")
     lock_root.mkdir(exist_ok=True)
     with FileLock(str(lock_root / ".tool.lock"), timeout=0):
         target_ref = ref or branch
+        subprocess.run(["git", "check-ref-format", "--branch", target_ref], check=True, capture_output=True)
         subprocess.run(["git", "-C", str(root), "fetch", "--no-tags", remote, target_ref], check=True)
         target = git(root, "rev-parse", "FETCH_HEAD")
         metadata = tomllib.loads(git(root, "show", target + ":pyproject.toml"))
@@ -57,6 +62,11 @@ def update(root, check=False, remote="origin", ref=None):
         for entry in git(root, "ls-tree", "-r", "--format=%(objectmode)", target).splitlines():
             if entry not in ("100644", "100755"):
                 raise ValueError("工具发布不允许链接或子模块")
+        for path in paths:
+            if path.endswith(".py"):
+                ast.parse(git(root, "show", target + ":" + path), filename=path)
+        if git(root, "rev-parse", "HEAD") != before or git(root, "status", "--porcelain"):
+            raise ValueError("下载期间本工具内容已改变，拒绝覆盖")
         subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor", before, target], check=True)
         subprocess.run(["git", "-C", str(root), "merge", "--ff-only", "--no-edit", target], check=True)
         if git(root, "rev-parse", "HEAD") != target or git(root, "status", "--porcelain"):
