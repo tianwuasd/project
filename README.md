@@ -40,7 +40,7 @@ zmic 使用 `/data4/zhangruichen`：项目实体目录固定在 `code/chd-segmen
 python3 -B /data4/zhangruichen/code/chd-segmentation/update.py
 ```
 
-默认不启用强制同步；需要覆盖本项目受 Git 管理的本地代码修改时，在命令末尾添加 `--force`。该参数只对本次执行生效。更新成功后，回执中的 `sha`、`head`、`origin_main` 应一致，`tracked_code_clean` 应为 `true`。
+默认不启用强制同步；需要覆盖本项目受 Git 管理的本地代码修改时，在命令末尾添加 `--force`。该参数只对本次执行生效。更新成功后，回执中的 `branch` 应为 `main`，`sha`、`head`、`origin_branch` 应一致，`tracked_code_clean` 应为 `true`。
 
 ## 准备私有输入
 
