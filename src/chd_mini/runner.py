@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import threading
@@ -13,6 +14,7 @@ from time import perf_counter, sleep
 import traceback
 
 from filelock import FileLock
+from fsspec.implementations.local import LocalFileSystem
 import psutil
 
 from .contracts import (TOOL_ROOT, confined, file_sha, git, load_settings, read_json, reference_snapshot,
@@ -41,15 +43,35 @@ def copy_bounded(stream, destination, limit, overflow=None):
     return {"written_bytes": written, "omitted_bytes": omitted}
 
 
+class InventoryFileSystem(LocalFileSystem):
+    def info(self, path, **kwargs):
+        result = super().info(path, **kwargs)
+        result["reparse"] = (os.name == "nt" and isinstance(path, os.DirEntry) and
+                             bool(path.stat(follow_symlinks=False).st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT))
+        return result
+
+
+def inventory_missing(error):
+    if not isinstance(error, FileNotFoundError):
+        raise error
+
+
 def inventory(root):
-    root = Path(root)
-    if not root.exists():
-        return []
+    root = Path(root).resolve()
+    filesystem = InventoryFileSystem(skip_instance_cache=True)
     result = []
-    for path in root.rglob("*"):
-        confined(path, root)
-        if path.is_file():
-            result.append({"path": str(path.relative_to(root)), "bytes": path.stat().st_size})
+    pending = [str(root)]
+    while pending:
+        current = pending.pop()
+        for _, directories, files in filesystem.walk(current, maxdepth=1, detail=True, on_error=inventory_missing):
+            for entry in [*directories.values(), *files.values()]:
+                path = Path(entry["name"])
+                if not path.is_relative_to(root) or entry["islink"] or entry["reparse"]:
+                    raise ValueError("工作清单含越界路径或链接")
+                if entry["type"] == "directory":
+                    pending.append(str(path))
+                elif entry["type"] == "file":
+                    result.append({"path": str(path.relative_to(root)), "bytes": entry["size"]})
     return result
 
 

@@ -8,6 +8,7 @@ import threading
 from time import perf_counter
 import unittest
 from uuid import uuid4
+from concurrent.futures import ThreadPoolExecutor
 
 from chd_mini.contracts import TOOL_ROOT, confined, file_sha, load_settings, read_json, write_json
 from chd_mini.runner import RunWorkspace, inventory, copy_bounded
@@ -41,6 +42,20 @@ class FailureBoundaries(unittest.TestCase):
         write_json(path, {"roles": {"case": "test"}})
         with self.assertRaisesRegex(ValueError, "split"):
             verify_references(sources, original)
+
+    def test_inventory_during_real_owned_directory_replacement(self):
+        def replace():
+            for index in range(200):
+                folder = self.work / str(index)
+                folder.mkdir()
+                (folder / "array.bin").write_bytes(b"sample")
+                shutil.rmtree(folder)
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            mutation = pool.submit(replace)
+            while not mutation.done():
+                self.assertTrue(all(row["bytes"] >= 0 for row in inventory(self.work)))
+            mutation.result()
+        self.assertEqual(inventory(self.work), [])
 
     def test_stage_rejects_frozen_split_change_before_launch(self):
         path = self.work / "frozen.json"
