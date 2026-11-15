@@ -1,11 +1,12 @@
 from hashlib import sha256
 import io
+import json
 from pathlib import Path
 import re
 import subprocess
 import zipfile
 
-from .contracts import TOOL_ROOT, confined, file_sha, git
+from .contracts import TOOL_ROOT, confined, file_sha, git, write_json
 
 
 def public_paths(commit):
@@ -59,7 +60,8 @@ def code_archive(destination, dataset, method, date, commit="HEAD"):
     return {"path": str(path), "bytes": path.stat().st_size, "sha256": expected, "commit": commit,
             "source_files": len(paths), "reused": reused is not None, "scope": "public_code_only",
             "server_destination": "/data4/zhangruichen/code/chd-segmentation-assistant3",
-            "uploaded_status": "not_uploaded", "github_branch": "codex/chd-segmentation-mini-workflow"}
+            "uploaded_status": "unverified" if reused is not None else "not_uploaded",
+            "github_branch": "codex/chd-segmentation-mini-workflow"}
 
 
 def reference_file(path, server_destination, uploaded_status="unverified"):
@@ -71,3 +73,40 @@ def reference_file(path, server_destination, uploaded_status="unverified"):
     return {"path": str(path), "bytes": path.stat().st_size, "sha256": file_sha(path),
             "server_destination": server_destination, "uploaded_status": uploaded_status,
             "copy_created": False, "action": "reuse_in_place"}
+
+
+def delivery_manifest(destination, dataset, method, date, references, new_files, engine, commit="HEAD"):
+    destination = Path(destination).resolve()
+    destination.mkdir(parents=True, exist_ok=True)
+    code = code_archive(destination, dataset, method, date, commit)
+    for record in [*references, *new_files]:
+        path = Path(record["path"]).resolve(strict=True)
+        if path.stat().st_size != record["bytes"] or file_sha(path) != record["sha256"]:
+            raise ValueError("交付引用在登记后发生变化：" + str(path))
+    generated = [code, *new_files]
+    changed = [r for r in generated if not r.get("reused", False)]
+    reuse_entries = [*references, *(r for r in generated if r.get("reused", False))]
+    reused = {(r["path"], r["sha256"]): r["bytes"] for r in reuse_entries}
+    new_bytes = sum(r["bytes"] for r in changed)
+    result = {"schema": 1, "name": f"{dataset}-{method}-{date}_assistant3",
+              "code": code, "production_engine": engine,
+              "new_or_changed": changed, "reuse_in_place": reuse_entries,
+              "new_payload_bytes": new_bytes, "actual_new_bytes": new_bytes,
+              "metadata_manifest_bytes": 0, "referenced_unique_bytes": sum(reused.values()),
+              "large_files_copied": 0,
+              "github_scope": "仅助手3公开源码独立分支；私有清单、映射、权重和数据不上传GitHub",
+              "server_upload_state": "未核实，未登录服务器",
+              "data_reuse_contract": "原始数据摘要、空间/灰度/标签参数、统计来源及合同版本一致；只补缺失或核验失败病例",
+              "human_naming": "日期用于辨识；轮数、GPU数量和普通日志修改不单独触发数据重建"}
+    path = destination / f"{dataset}-{method}-{date}_交付总清单.json"
+    for _ in range(8):
+        size = len(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False).encode("utf-8"))
+        if result["metadata_manifest_bytes"] == size and result["actual_new_bytes"] == new_bytes + size:
+            break
+        result.update(metadata_manifest_bytes=size, actual_new_bytes=new_bytes + size)
+    else:
+        raise ValueError("交付清单容量未稳定，拒绝写出")
+    write_json(path, result)
+    if path.stat().st_size != result["metadata_manifest_bytes"]:
+        raise ValueError("交付清单实际容量与记录不符")
+    return {**result, "manifest": str(path)}
