@@ -2,6 +2,38 @@
   "schema": 1,
   "edges": [
     {
+      "source": "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d",
+      "target": "7fc72920281d8e45adf361fa8f967da43d04021481b06d69f45e5db8878f0136",
+      "baseline_public_commit": "303540f5a4d335df3e3274a82a2e23cbfe51cdc6",
+      "reason": "单批按消费顺序派发、逐病例构建额度及主机就绪协调；模型、损失、优化器、全局 slot 随机抽样、科学训练配置及完整检查点协议保持相同。两例真实病例的两进程恢复和单卡传输通过；服务器 CUDA/NCCL 与正式吞吐待验证",
+      "changed_files": ["config.py", "data/supply.py", "training/budget.py", "training/build_gate.py", "training/engine.py"],
+      "added_files": ["training/coordinator.py"]
+    },
+    {
+      "source": "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4",
+      "target": "7fc72920281d8e45adf361fa8f967da43d04021481b06d69f45e5db8878f0136",
+      "via": ["f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d"],
+      "reason": "累计保留已审计的预训练校验及初始化重试；单批供数和主机协调保持原模型计算、采样及完整状态恢复协议"
+    },
+    {
+      "source": "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952",
+      "target": "7fc72920281d8e45adf361fa8f967da43d04021481b06d69f45e5db8878f0136",
+      "via": ["295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4", "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d"],
+      "reason": "累计保留已审计的资源调整和权重校验；单批供数和主机协调保持原模型计算、采样及完整状态恢复协议"
+    },
+    {
+      "source": "42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa",
+      "target": "7fc72920281d8e45adf361fa8f967da43d04021481b06d69f45e5db8878f0136",
+      "via": ["295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4", "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d"],
+      "reason": "累计保留已审计的显卡等待、资源调整及权重校验；单批供数和主机协调保持原模型计算、采样及完整状态恢复协议"
+    },
+    {
+      "source": "afffd433e388f93fe5d840ba6a899cb2b814c81804e59d4b02c310cb47cf8dde",
+      "target": "7fc72920281d8e45adf361fa8f967da43d04021481b06d69f45e5db8878f0136",
+      "via": ["295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4", "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d"],
+      "reason": "累计保留已审计的日志、显卡等待、资源调整及权重校验；单批供数和主机协调保持原模型计算、采样及完整状态恢复协议"
+    },
+    {
       "source": "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4",
       "target": "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d",
       "baseline_public_commit": "b1552e305f71939da1be114115e26aa4a36352bb",

@@ -26,6 +26,7 @@ DEFAULTS = {
                   "wait_seconds": None, "poll_seconds": 2, "share": False,
                   "min_gpus": None, "adapt_seconds": 30, "growth_seconds": 60,
                   "pressure_retries": 3,
+                  "collective_timeout_seconds": 180,
                   "share_window_seconds": 30, "share_utilization": 50,
                   "vram_reserve_bytes": 4 * 1024 ** 3, "vram_reserve_fraction": 0.1,
                   "peak_margin": 1.2},
@@ -145,7 +146,7 @@ def load_config(path, overrides=None):
     if type(r["share"]) is not bool or type(r["pressure_retries"]) is not int or r["pressure_retries"] < 0:
         raise ValueError("共享开关或内存压力恢复次数无效")
     if any(type(r[k]) not in (int, float) or not math.isfinite(r[k]) or r[k] <= 0
-           for k in ("adapt_seconds", "growth_seconds")):
+           for k in ("adapt_seconds", "growth_seconds", "collective_timeout_seconds")):
         raise ValueError("资源调整及增长观察间隔必须为有限正数")
     if r["batch_layout"] is not None and r["min_gpus"] not in (None, r["gpu_count"]):
         raise ValueError("手动 batch_layout 需要固定进程数量")
