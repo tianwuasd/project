@@ -6,6 +6,7 @@ import stat
 import subprocess
 import sys
 from time import perf_counter
+import traceback
 import unittest
 
 sys.dont_write_bytecode = True
@@ -28,7 +29,7 @@ def verify(config_path):
     started = perf_counter()
     work.mkdir(parents=True)
     logs.mkdir()
-    record = {"samples": 0, "training_updates": 0, "scope": "维护及失败清理检查", "commands": []}
+    record = {"state": "RUNNING", "samples": 0, "training_updates": 0, "scope": "维护及失败清理检查", "commands": []}
     with FileLock(str(TOOL_ROOT / ".runs" / ".tool.lock"), timeout=0):
         try:
             failure_id = run_id + "-failure"
@@ -44,7 +45,7 @@ def verify(config_path):
             checkout = work / "tool-checkout"
             command = ["git", "clone", "--no-hardlinks", str(TOOL_ROOT), str(checkout)]
             record["commands"].append(command)
-            subprocess.run(command, check=True, capture_output=True)
+            subprocess.run(command, check=True, capture_output=True, text=True, encoding="utf-8")
             pin = git(TOOL_ROOT, "rev-parse", "HEAD")
             before = git(checkout, "rev-parse", "HEAD")
             checks.assertEqual(before, pin)
@@ -61,6 +62,11 @@ def verify(config_path):
                           update_check_output=check_output, update_stdout=completed.stdout, update_stderr=completed.stderr,
                           verified_tool_commit=pin)
         finally:
+            failure_info = sys.exc_info()
+            if failure_info[0] is not None:
+                record.update(state="FAIL", error="".join(traceback.format_exception(*failure_info)))
+                if isinstance(failure_info[1], subprocess.CalledProcessError):
+                    record.update(failed_stdout=failure_info[1].stdout, failed_stderr=failure_info[1].stderr)
             rows = inventory(work)
             record.update(seconds=perf_counter() - started, files=rows,
                           peak_work_bytes=sum(r["bytes"] for r in rows), peak_work_files=len(rows),
