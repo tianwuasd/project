@@ -115,7 +115,9 @@ def probe_source(url, timeout):
 def allowed(path):
     parts = PurePosixPath(path).parts
     return (bool(parts) and not path.startswith("/") and ".." not in parts and "\\" not in path
-            and ((len(parts) == 1 and path in ROOT_FILES) or (parts[0] in {"src", "configs", "docs", "tests"} and PurePosixPath(path).suffix in {".py", ".md", ".toml", ".json", ".yaml", ".yml", ".txt"})))
+            and ((len(parts) == 1 and path in ROOT_FILES)
+                 or (parts[0] == "scripts" and len(parts) > 1 and PurePosixPath(path).suffix == ".sh")
+                 or (parts[0] in {"src", "configs", "docs", "tests"} and PurePosixPath(path).suffix in {".py", ".md", ".toml", ".json", ".yaml", ".yml", ".txt"})))
 
 
 def require_head(expected, actual):
