@@ -18,7 +18,7 @@ from chd_segmentation.artifacts.store import read_json, write_json
 from chd_segmentation.config import DEFAULTS, load_config
 from chd_segmentation.data.supply import BatchSupply
 from chd_segmentation.prediction.infer import predict
-from chd_segmentation.preprocessing.prepare import prepare
+from offline_helpers import prepare_offline as prepare
 from chd_segmentation.training.budget import cpu_plan
 from chd_segmentation.training.build_gate import BuildGate
 from chd_segmentation.training.coordinator import HostCoordinator

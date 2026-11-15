@@ -5,7 +5,7 @@ from monai.data import Dataset
 from monai.transforms import Compose
 import numpy as np
 
-from ..preprocessing.transforms import CaseTransform
+from ..preprocessing.offline_store import OfflineTransform, validate_storage
 
 
 def array_bytes(value):
@@ -22,7 +22,8 @@ class CaseDataset:
     def __init__(self, prepared, resources, with_label=True, log_dir=None, logging=None):
         self.rows = prepared["manifest"]["cases"]
         self.by_id = {row["case_id"]: index for index, row in enumerate(self.rows)}
-        self.transform = CaseTransform(prepared, resources["reserve_ram_bytes"], with_label, log_dir, logging)
+        validate_storage(prepared)
+        self.transform = OfflineTransform(prepared, with_label)
         self.dataset = Dataset(self.rows, transform=Compose([self.transform]))
         self.cache, self.cached_bytes = OrderedDict(), 0
         self.budget = resources["cache_bytes"]

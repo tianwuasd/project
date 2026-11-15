@@ -11,7 +11,7 @@ from update import code_guard
 
 if __name__ == "__main__":
     started = perf_counter()
-    business = bool(sys.argv[1:]) and sys.argv[1] in ("prepare", "train", "predict", "evaluate", "test", "bind-inputs")
+    business = bool(sys.argv[1:]) and sys.argv[1] in ("prepare", "preprocess", "train", "predict", "evaluate", "test", "bind-inputs")
     if business:
         print(json.dumps({"event": "command_starting", "command": sys.argv[1], "pid": os.getpid(),
                           "time_utc": datetime.now(timezone.utc).isoformat(),

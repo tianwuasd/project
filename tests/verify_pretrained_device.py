@@ -19,7 +19,7 @@ from smoke import SmokeWorkspace
 from chd_segmentation.artifacts.store import read_json, write_json
 from chd_segmentation.config import DEFAULTS, load_config
 from chd_segmentation.models.stunet.adapter import StunetAdapter, WEIGHT_SHA256
-from chd_segmentation.preprocessing.prepare import prepare
+from offline_helpers import prepare_offline as prepare
 from chd_segmentation.training.engine import train
 from chd_segmentation.training.resources import inventory
 

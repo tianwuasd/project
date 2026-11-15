@@ -173,7 +173,7 @@ def refresh_supply(config, prepared, allocation, apply=False):
             raise RuntimeError("训练资源所有权已经失效")
         peers = [p for p in rows if p not in own]
         result = cpu_plan(config, prepared, allocation["world"], peers, own=own,
-                          estimates=allocation["supply"]["case_estimates"])
+                          stage=allocation.get("stage", "train"), estimates=allocation["supply"]["case_estimates"])
         if apply and result["admitted"]:
             own[0].update(cpu_slots=result["cpu_slots"], ram_bytes=result["ram_bytes"])
             write_json(root / "active.json", rows)
@@ -304,7 +304,8 @@ def resource_lease(config, prepared, spec, stage="train", previous_world=None):
         delay = resources["poll_seconds"] if limit is None else min(resources["poll_seconds"], limit - elapsed)
         time.sleep(delay)
     try:
-        yield {"gpus": gpus, "supply": supply, "world": world, "owner": {"pid": me.pid, "birth": me.create_time()}}
+        yield {"gpus": gpus, "supply": supply, "world": world, "stage": stage,
+               "owner": {"pid": me.pid, "birth": me.create_time()}}
     finally:
         with FileLock(str(lock)):
             write_json(registry, [p for p in active_peers(registry) if p["pid"] != me.pid or p["birth"] != me.create_time()])

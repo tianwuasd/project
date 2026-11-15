@@ -1,12 +1,14 @@
 # 先心分割处理
 
-版本 0.1.0。当前接入 STU-Net-S 的 CHD1282（11 类）和 ImageCHD（8 类）流程：准备描述、训练、完整状态恢复、MONAI 滑窗预测、原数组网格导出、独立评价和短测。两数据集共用网络代码，分别训练权重。训练支持 CPU、1–4 卡 CUDA/DDP、自动或手动选卡、固定全局 batch 分担和有界 CPU 供数。
+版本 0.1.0。当前接入 STU-Net-S 的 CHD1282（11 类）和 ImageCHD（8 类）流程：准备计划、统一离线预处理、训练、完整状态恢复、MONAI 滑窗预测、原数组网格导出、独立评价和短测。两数据集共用网络代码，分别训练权重。训练支持 CPU、1–4 卡 CUDA/DDP、自动或手动选卡、固定全局 batch 分担和有界 CPU 供数。
+
+完整离线数据合同、冻结在线版本、每折独立统计、数据复用/引用和服务器全流程命令见 [离线预处理](docs/OFFLINE_DATA_CONTRACT.md)。`prepare` 保存来源描述，`preprocess` 将固定转换写入 data 专用目录，`train` 仅接受完整离线描述。旧在线任务使用冻结分支和原目录继续；离线训练使用新的 run_dir。
 
 1282 保留训练、验证、内部测试及两个外部设备子组，通过 `test --set internal`、`test --set external` 两个入口运行。旧审核排除、患者索引及冻结角色一并读取。私有清单和配置可集中迁移，再用 `bind-inputs` 绑定服务器既有数据；具体命令见 [测试与输入迁移](docs/TESTING_AND_TRANSFER.md)。
 
 各阶段实时记录进度、耗时、资源、复用和异常；长步骤默认每 15 秒输出心跳，详细日志统一保存在过程目录的 `run_dir/events.jsonl`，并限制轮转容量。设置与查看方式见 [运行日志](docs/LOGGING.md)。
 
-短测限定每数据集一例真实病例、32³ 技术子区域、每组合两次更新，包含保存后继续更新。CPU/Gloo 的 1–4 进程分担、数值一致性、完整恢复和预测复用已验证；目标 Linux CUDA/NCCL、共享显卡实况、正式尺寸容量和持续性能待服务器验收。prepare 默认根据当前主训练清单生成预处理计划，短测生成独立技术计划。资源参数和旧划分读取见 [GPU/CPU 使用说明](docs/GPU_CPU_USAGE.md)。Xu、MedSAM2、Q 的后续接入见整体开发计划。
+短测限定一至两例真实病例、32³ 技术子区域、每组合两次更新，包含保存后继续更新。当前离线完整短测覆盖两个 CPU/Gloo 进程、完整恢复和预测复用；目标 Linux CUDA/NCCL、共享显卡实况、正式尺寸容量和持续性能待服务器验收。prepare 默认根据当前主训练清单生成预处理计划，短测生成独立技术计划。资源参数和旧划分读取见 [GPU/CPU 使用说明](docs/GPU_CPU_USAGE.md)。Xu、MedSAM2、Q 的后续接入见整体开发计划。
 
 ## 环境与入口
 
@@ -67,12 +69,13 @@ cases:
 
 正式训练还需独立 validation 病例。1282 按患者划分；ImageCHD 导入原划分时保留病例级独立性，有可靠患者映射时可明确要求患者级检查。示例数字仅解释字段，实际值必须来自审核记录。ImageCHD 的未知类别仅允许缺 MYO（编号 5）；1282 使用其原始 0—10 编号和 `shared_index_excel` 空间规则。未标注和已确认缺如分别记录。额外标签仅按显式 `ignore_label_ids` 屏蔽。plan_scope 仅用于显式读取既有计划的来源声明，不能代替对拟合病例的核查。
 
-图像和标签原件只读。prepare 按病例顺序读取主训练数据，在 RAM 中进行有界前景采样，保存紧凑计划与描述，不输出整套重采样副本；训练和预测使用 MONAI Dataset/Compose 在 RAM 处理。持久供数进程使用各自有界 LRU 缓存，按整组预算核算；CPU 供数、缓存、读盘并发和预取在安全边界按实时余量调整。默认只使用空闲显卡，卡数不足持续等待；显式设置最少卡数可启用 epoch 边界的 GPU 卡数调整。详见 [资源调度](docs/RESOURCE_SCHEDULING.md)。
+图像和标签原件只读。prepare 按病例顺序读取主训练数据，在 RAM 中进行有界前景采样，保存紧凑计划与来源描述。preprocess 按 CPU/RAM 预算并行转换全部所需病例，逐例核验后写入 data，重复执行只补缺失或核验失败病例。训练和预测通过 MONAI Dataset/Compose 读取只读 mmap 数组；供数进程的 LRU 缓存保存映射及位置，训练不重复整例重采样。默认只使用空闲显卡，卡数不足持续等待；显式设置最少卡数可启用 epoch 边界的 GPU 卡数调整。详见 [资源调度](docs/RESOURCE_SCHEDULING.md)。
 
 ## 运行
 
 ```text
-python -B run.py prepare --config /data4/zhangruichen/course/chd-segmentation/configs/imagechd_stunet.yaml --output /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0.json
+python -B run.py prepare --config /data4/zhangruichen/course/chd-segmentation/configs/imagechd_stunet.yaml --output /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0_source.json
+python -B run.py preprocess --config /data4/zhangruichen/course/chd-segmentation/configs/imagechd_stunet.yaml --prepared /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0_source.json --output /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0.json --root /data4/zhangruichen/data/chd-segmentation/preprocessed
 python -B run.py train --config /data4/zhangruichen/course/chd-segmentation/configs/imagechd_stunet.yaml --prepared /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0.json
 python -B run.py train --config /data4/zhangruichen/course/chd-segmentation/configs/imagechd_stunet.yaml --prepared /data4/zhangruichen/course/chd-segmentation/prepared/imagechd_fold0.json --resume
 python -B run.py status --run /data4/zhangruichen/course/chd-segmentation/runs/imagechd_stunet_fold0

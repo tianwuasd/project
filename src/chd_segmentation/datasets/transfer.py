@@ -82,6 +82,8 @@ def bind_inputs(directory, root, dataset_roots=None, pretrained=None):
         config.update(manifest=str(directory / descriptor["datasets"][dataset]["manifest"]),
                       pretrained=str(weight), work_root=str(course), result_root=str(results),
                       run_dir=str(course / "runs" / (experiment["run_name"] + "_" + descriptor["identity"][:8])))
+        config["preprocessing"] = {"root": str(root / "data" / "chd-segmentation" / "preprocessed"),
+                                   "statistics_source": "main-train"}
         if config.get("plan") is None:
             config["plan"] = str(course / "plans" / dataset / descriptor["identity"][:8] /
                                  f"fold_{config['fold']}" / "preprocessing_plan.json")
