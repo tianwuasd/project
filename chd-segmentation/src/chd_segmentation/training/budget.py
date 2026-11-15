@@ -30,6 +30,13 @@ def case_estimates(config, prepared, stage):
     for row in prepared["manifest"]["cases"]:
         if stage == "train" and not set(row["roles"]) & {"train", "validation"}:
             continue
+        if prepared.get("storage") is not None and stage in ("train", "predict"):
+            item = prepared["storage"]["cases"][row["case_id"]]
+            patch = int(np.prod(config["training"]["patch"])) * 16 * config["training"]["batch"]
+            reports.append({"case_id": row["case_id"], "storage": "readonly_mmap", "input_shape_xyz": item["shape_czyx"][1:][::-1],
+                            "raw_workspace_bytes": 0, "resample_workspace_bytes": 0,
+                            "mapped_file_bytes": item["array_bytes"], "workspace_bytes": patch * 3 + item["locations_bytes"]})
+            continue
         native = list(nib.load(row["image"]).shape)
         shape = np.array([end - begin for begin, end in roi] if roi else native)
         output = np.ceil(shape[::-1][order] * np.array(row["spacing_xyz"])[::-1][order] / target).astype(int)
@@ -40,7 +47,7 @@ def case_estimates(config, prepared, stage):
     if not reports:
         raise ValueError("资源规划没有可用病例")
     for row in reports:
-        row["workspace_bytes"] = row["raw_workspace_bytes"] + row["resample_workspace_bytes"]
+        row.setdefault("workspace_bytes", row["raw_workspace_bytes"] + row["resample_workspace_bytes"])
     return reports
 
 
@@ -54,6 +61,28 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
     cores = max(1, math.floor(facts["cores"] * r["cpu_fraction"]) - sum(p["cpu_slots"] for p in peers))
     reports = estimates if estimates is not None else case_estimates(config, prepared, stage)
     case_bytes = max(row["workspace_bytes"] for row in reports)
+    if stage == "preprocess":
+        requested = r["max_workers"] if r["workers"] == "auto" else r["workers"]
+        readers = r["max_readers"] if r["readers"] == "auto" else r["readers"]
+        cap = max(0, min(requested, readers, len(reports), cores - 1))
+        minimum = 2 * GIB + case_bytes
+        result = {"admitted": False, "facts": facts, "budget_bytes": budget, "own_uss_credit_bytes": credit,
+                  "peer_pending_bytes": pending, "minimum_bytes": minimum, "case_estimate_bytes": case_bytes,
+                  "case_estimates": reports, "requested": {"workers": r["workers"], "readers": r["readers"]},
+                  "reason": "离线预处理等待 CPU/RAM 安全余量"}
+        for count in range(cap, -1, -1):
+            fixed = (count + 2) * GIB
+            if fixed + case_bytes > budget:
+                continue
+            slots = max(1, count)
+            workspace = min(slots * case_bytes, budget - fixed)
+            result.update(admitted=True, reason="离线病例构建预算允许", workers=[count], cpu_slots=count + 1,
+                          ram_bytes=fixed + workspace, workspace_capacity_bytes=workspace,
+                          reader_slots=slots, prefetch=1, cache_bytes=[0], max_workers=count,
+                          breakdown={"processes_bytes": fixed, "case_workspaces_bytes": workspace, "queue_bytes": 0,
+                                     "cache_total_bytes": 0, "cache_instances": 0})
+            break
+        return result
     # 队列结果、堆叠批次和 pinned/传输中的副本分别占用内存。
     patch_bytes = int(np.prod(config["training"]["patch"])) * 16 * config["training"]["batch"]
     cap = r["max_workers"] if r["workers"] == "auto" else min(r["workers"], r["max_workers"])

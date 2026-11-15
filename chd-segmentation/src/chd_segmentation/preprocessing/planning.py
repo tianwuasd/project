@@ -10,7 +10,7 @@ import psutil
 from ..artifacts.store import digest, operation_lock, read_json, require_output, write_json
 from ..datasets.manifest import LABELS
 from ..observability.events import event, stage
-from .transforms import CaseTransform
+from .validation import SourceReader
 
 
 def plan_request(config, manifest):
@@ -67,7 +67,7 @@ def fit_plan(config, manifest, request):
         raise MemoryError("计划灰度采样超出 RAM 安全余量")
     prepared = {"technical": config["technical"],
                 "dataset_json": {"labels": {name: i for i, name in enumerate(LABELS[config["dataset"]])}}}
-    reader = CaseTransform(prepared, reserve, log_dir=config["run_dir"], logging=config.get("logging"))
+    reader = SourceReader(prepared, reserve, log_dir=config["run_dir"], logging=config.get("logging"))
     samples, spacings, shapes, timings = [], [], [], []
     event(config["run_dir"], "plan_fit_started", cases=len(rows), samples_per_case=count,
           execution="sequential_cpu", scope=config["scope"])
@@ -139,7 +139,7 @@ def resolve_plan(config, manifest):
         if path.exists():
             plan = read_json(path)
             validate_auto_plan(plan, config, manifest)
-            reader = CaseTransform({}, config["resources"]["reserve_ram_bytes"], log_dir=config["run_dir"],
+            reader = SourceReader({}, config["resources"]["reserve_ram_bytes"], log_dir=config["run_dir"],
                                    logging=config.get("logging"))
             rows = request["training_cases"]
             for index, row in enumerate(rows, 1):
