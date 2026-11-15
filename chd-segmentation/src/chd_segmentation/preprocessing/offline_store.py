@@ -140,7 +140,7 @@ def save_case(directory, key, recipe_identity, entry):
     return record
 
 
-def validate_storage(prepared, full=False, config=None):
+def validate_storage(prepared, full=False, config=None, expected_transform=CONTRACT):
     storage = prepared.get("storage")
     if storage is None or storage.get("format") != FORMAT or not storage.get("complete"):
         raise ValueError("需要先运行 preprocess 完成离线预处理；在线旧任务使用冻结版本继续")
@@ -148,6 +148,8 @@ def validate_storage(prepared, full=False, config=None):
     catalog = read_json(root / "catalog.json")
     if catalog["recipe_identity"] != storage["recipe_identity"] or digest(catalog["recipe"]) != storage["recipe_identity"]:
         raise ValueError("离线数据配方身份不一致")
+    if expected_transform is not None and catalog["recipe"]["transform"] != expected_transform:
+        raise ValueError("离线处理方式与模型输入要求不同")
     if config is not None and digest(recipe(prepared, config)) != storage["recipe_identity"]:
         raise ValueError("当前折数、统计来源或处理依赖与离线版本不一致")
     for row in prepared["manifest"]["cases"]:
@@ -173,8 +175,11 @@ def live_references(root):
 
 
 @contextmanager
-def storage_lease(prepared, config):
-    root = validate_storage(prepared, config=config)
+def storage_lease(prepared, config, *, expected_transform=CONTRACT, expected_recipe=None):
+    root = validate_storage(prepared, config=config if expected_recipe is None else None,
+                            expected_transform=expected_transform)
+    if expected_recipe is not None and read_json(root / "catalog.json")["recipe"] != expected_recipe:
+        raise ValueError("模型数据引用的完整配方不同")
     name = str(Path(config["run_dir"]).resolve())
     me = psutil.Process()
     with operation_lock(root):
@@ -214,7 +219,8 @@ class OfflineTransform:
         if self.with_label:
             with np.load(directory / "locations.npz", allow_pickle=False) as arrays:
                 for i, key in enumerate(record["location_keys"]):
-                    entry["properties"]["class_locations"][tuple(key) if isinstance(key, list) else key] = arrays[f"p{i}"]
+                    values = arrays[f"p{i}"]
+                    entry["properties"]["class_locations"][tuple(key) if isinstance(key, list) else key] = [] if values.size == 0 else values
         entry["preprocessing_timing"] = entry["timing"]
         entry["timing"] = {"read_decompress_seconds": 0., "deterministic_transform_seconds": 0.}
         return entry

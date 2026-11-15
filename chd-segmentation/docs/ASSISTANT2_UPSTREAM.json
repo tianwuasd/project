@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "date": "2026-11-15",
+  "source_local_commit": "7b50f5f7f64f9b3bd47b43fed6ea8e173dc649a8",
+  "source_public_commit": "a0750b31870686cb5b275be02ef956f35591452f",
+  "source_public_subtree": "bc69b99eac6c4d2c8c4167c76ad0fabf19454635",
+  "offline_contract_local_commit": "d68e11c11bd854c436ee45f29eeddf3aae0038be",
+  "offline_contract_public_commit": "277c11a97ab0f2d666d1d8e669fcdb6c9900c611",
+  "offline_contract_subtree": "e6d448ba75b25dd79c3ad078c7957c8c812d2845",
+  "format": "chd-offline-npy-v1",
+  "transforms": {
+    "stunet_and_q": "stunet-ct-nnunet-bounded-v1",
+    "medsam2": "medsam2-native-window-uint8-v1"
+  },
+  "shared_model_extensions": [
+    "Optional producer and recipe builder in preprocessing/offline.py",
+    "Expected model recipe and transform in preprocessing/offline_store.py leases",
+    "Empty foreground locations retain the original list representation",
+    "Model-specific memory profiles and existing optimizer/device resume checks",
+    "Independent models CLI dispatch and frozen Q1282 split support"
+  ],
+  "publication": "main; only chd-segmentation code; independent assistant2 deployment paths"
+}

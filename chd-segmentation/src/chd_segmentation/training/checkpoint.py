@@ -18,6 +18,22 @@ def tensors_equal(left, right):
     return left == right
 
 
+def require_resume_device(saved,device):
+    if torch.device(saved).type!=torch.device(device).type:
+        raise ValueError('完整训练恢复需要原CPU或CUDA类型；权重可用于跨设备预测')
+
+
+def verify_optimizer_device(optimizer):
+    count = 0
+    for parameter,values in optimizer.state.items():
+        for name,value in values.items():
+            if isinstance(value,torch.Tensor) and name!='step':
+                if value.device!=parameter.device or value.dtype!=parameter.dtype:
+                    raise ValueError('优化器状态的设备或精度与参数不同')
+                count += 1
+    return count
+
+
 @logged_directory("checkpoint_load")
 def load_checkpoint(directory, identity, pointer=None):
     directory = Path(directory)

@@ -25,7 +25,7 @@ def produce_case(prepared, config, root, name, key, recipe_identity):
     began = perf_counter()
     row = next(r for r in prepared["manifest"]["cases"] if r["case_id"] == name)
     event(config["run_dir"], "preprocess_case_started", case_id=name, file=str(Path(root) / key))
-    transform = StunetTransform(prepared, config["resources"]["reserve_ram_bytes"],
+    transform = StunetTransform(prepared, config["resources"]["reserve_ram_bytes"], with_label=row.get("label") is not None,
                                log_dir=config["run_dir"], logging=config["logging"])
     transform.console = True
     entry = transform(row)
@@ -48,7 +48,7 @@ def initialize_worker(config, owner):
     register_member(config, owner)
 
 
-def process_pending(config, prepared, root, identity, pending, pointers, catalog):
+def process_pending(config, prepared, root, identity, pending, pointers, catalog, producer=produce_case):
     runtime = deepcopy(config)
     runtime["resources"].update(device="cpu", cpu_processes=1)
     estimates = {r["case_id"]: r["workspace_bytes"] for r in case_estimates(config, prepared, "preprocess")}
@@ -87,12 +87,12 @@ def process_pending(config, prepared, root, identity, pending, pointers, catalog
                     event(config["run_dir"], "preprocess_admitted", case_id=name, workers=workers,
                           active=len(running) + 1, reserved_bytes=reserved + estimates[name], capacity_bytes=capacity)
                     if pool is None:
-                        completed_name, pointer = produce_case(prepared, config, str(root), name, key, identity)
+                        completed_name, pointer = producer(prepared, config, str(root), name, key, identity)
                         pointers[completed_name] = pointer
                         catalog["cases"][pointer["key"]] = pointer
                         write_json(root / "catalog.json", catalog)
                     else:
-                        running[pool.submit(produce_case, prepared, config, str(root), name, key, identity)] = estimates[name]
+                        running[pool.submit(producer, prepared, config, str(root), name, key, identity)] = estimates[name]
                     continue
                 done, _ = wait(running, timeout=.5, return_when=FIRST_COMPLETED) if running else (set(), set())
                 for future in done:
@@ -115,7 +115,7 @@ def process_pending(config, prepared, root, identity, pending, pointers, catalog
 
 
 @logged("preprocess")
-def preprocess(config, prepared_path, output):
+def preprocess(config, prepared_path, output, *, producer=produce_case, recipe_builder=recipe, method_label="STUNet"):
     prepared = load_prepared(prepared_path)
     validate_prepared_config(prepared, config)
     if "storage" in prepared:
@@ -130,13 +130,13 @@ def preprocess(config, prepared_path, output):
         if base == item or base.is_relative_to(item) or item.is_relative_to(base):
             raise ValueError("离线数据目录与原件、环境过程或源码重叠")
     output = require_output(output, config["work_root"], [base, *protected[:2]])
-    content = recipe(prepared, config)
+    content = recipe_builder(prepared, config)
     identity = digest(content)
     with operation_lock(base):
         index_path = base / "index.json"
         index = read_json(index_path) if index_path.exists() else {}
         if identity not in index:
-            label = ("ImageCHD" if prepared["dataset"] == "imagechd" else "CHD1282") + "-STUNet-" + datetime.now().strftime("%Y%m%d")
+            label = ("ImageCHD" if prepared["dataset"] == "imagechd" else "CHD1282") + "-" + method_label + "-" + datetime.now().strftime("%Y%m%d")
             index[identity] = str(Path(label) / f"fold_{prepared['fold']}" / identity[:16])
             write_json(index_path, index)
         root = (base / index[identity]).resolve()
@@ -177,7 +177,7 @@ def preprocess(config, prepared_path, output):
             os.environ[k] = "1"
         try:
             if pending:
-                process_pending(config, prepared, root, identity, pending, pointers, catalog)
+                process_pending(config, prepared, root, identity, pending, pointers, catalog, producer)
         finally:
             for k, value in environment.items():
                 if value is None:
@@ -191,7 +191,7 @@ def preprocess(config, prepared_path, output):
         result["storage"] = {"format": FORMAT, "root": str(root), "base_root": str(base),
                              "recipe_identity": identity, "complete": True, "cases": pointers}
         result["identity"] = digest(result)
-        validate_storage(result)
+        validate_storage(result, expected_transform=content["transform"])
         if output.exists() and read_json(output) != result:
             raise FileExistsError("已有离线描述属于不同输入或配方，请指定新的 output 和 run_dir")
         if not output.exists():
@@ -203,7 +203,7 @@ def preprocess(config, prepared_path, output):
 
 def data_info(prepared_path):
     prepared = load_prepared(prepared_path)
-    root = validate_storage(prepared)
+    root = validate_storage(prepared, expected_transform=None)
     with operation_lock(root):
         references, active = live_references(root)
         files = [p for p in root.rglob("*") if p.is_file()]

@@ -52,7 +52,7 @@ def inventory(owned_pids=(), visible_devices="inherited"):
 
 def capacity_key(config, spec, local_batch, world=None):
     from importlib.metadata import version
-    return digest({"model": "stunet", "spec": spec, "batch": local_batch,
+    return digest({"model": spec.get('resource_model','stunet'), "spec": spec, "batch": local_batch,
                    "precision": config["training"]["precision"],
                    "world": config["resources"]["gpu_count"] if world is None else world,
                    "implementation": [file_digest(Path(__file__).with_name("engine.py")),
@@ -151,7 +151,11 @@ def fleet_decision(config, spec, history, peaks, peers, previous_world=None):
     r = config["resources"]
     minimum = r["gpu_count"] if r["min_gpus"] is None else r["min_gpus"]
     decisions = []
+    decision = None
     for world in range(r["gpu_count"], minimum - 1, -1):
+        if spec.get('resource_model')=='medsam2' and config['training']['batch']%world:
+            decisions.append(dict(world=world,reason='MedSAM2全局batch不能均分到该进程数量',candidates=[]))
+            continue
         decision = gpu_decision(config, spec, history, peaks, peers, world,
                                 require_measured=world != r["gpu_count"] or
                                 previous_world is not None and world != previous_world)
@@ -159,6 +163,8 @@ def fleet_decision(config, spec, history, peaks, peers, previous_world=None):
         if decision["gpus"] is not None:
             decision["alternatives"] = decisions
             return decision
+    if decision is None:
+        raise ValueError('没有可以均分MedSAM2全局batch的进程数量')
     decision["alternatives"] = decisions
     return decision
 
@@ -304,8 +310,7 @@ def resource_lease(config, prepared, spec, stage="train", previous_world=None):
         delay = resources["poll_seconds"] if limit is None else min(resources["poll_seconds"], limit - elapsed)
         time.sleep(delay)
     try:
-        yield {"gpus": gpus, "supply": supply, "world": world, "stage": stage,
-               "owner": {"pid": me.pid, "birth": me.create_time()}}
+        yield {"gpus": gpus, "supply": supply, "world": world, "stage": stage, "owner": {"pid": me.pid, "birth": me.create_time()}}
     finally:
         with FileLock(str(lock)):
             write_json(registry, [p for p in active_peers(registry) if p["pid"] != me.pid or p["birth"] != me.create_time()])

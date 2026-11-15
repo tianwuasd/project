@@ -13,6 +13,11 @@ def wait_seconds(value):
 
 
 def main(argv=None):
+    import sys
+    actual = sys.argv[1:] if argv is None else argv
+    if actual and actual[0] == 'models':
+        from .models_cli import main as model_main
+        return model_main(actual[1:])
     parser = argparse.ArgumentParser(description="先心分割处理")
     parser.add_argument("--version", action="version", version=__version__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -69,7 +74,7 @@ def main(argv=None):
     for command in (prepare, preprocess, train, predict, evaluate, test):
         command.add_argument("--run-dir", help="本次独立任务目录，旧在线任务目录保留")
         command.add_argument("--split", help="旧工程或手动选择的划分文件")
-        command.add_argument("--split-format", choices=("auto", "imagechd", "imagechd_roles", "chd1282_cohort", "folds", "roles"))
+        command.add_argument("--split-format", choices=("auto", "imagechd", "imagechd_roles", "chd1282_cohort", "q1282", "folds", "roles"))
         command.add_argument("--split-id-field", help="清单中的精确映射字段，默认 case_id")
         command.add_argument("--fold", type=int)
     args = parser.parse_args(argv)

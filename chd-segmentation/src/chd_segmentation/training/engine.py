@@ -23,7 +23,7 @@ from ..models.stunet.adapter import StunetAdapter, WEIGHT_SHA256
 from ..observability.events import event, logged, stage
 from ..preprocessing.prepare import load_prepared, validate_prepared_config
 from ..preprocessing.offline_store import storage_lease, validate_storage
-from .checkpoint import load_checkpoint, save_checkpoint, tensors_equal
+from .checkpoint import load_checkpoint, save_checkpoint, tensors_equal,require_resume_device,verify_optimizer_device
 from .build_gate import BuildGate
 from .coordinator import HostCoordinator
 from .resources import (available_world, close_members, host_capacity, layout, process_vram,
@@ -182,6 +182,7 @@ def run_rank(rank, job, gate, stop_event):
             state = load_checkpoint(output, job["identity"]) if job["resume"] else None
             restored = False
             if state:
+                require_resume_device(state['config']['resources']['device'],device)
                 if "progress" not in state or not state.get("rank_rng"):
                     raise ValueError("恢复训练需要完整进度及逐 rank 随机状态")
                 old_world = len(state["rank_rng"])
@@ -193,6 +194,7 @@ def run_rank(rank, job, gate, stop_event):
                     raise ValueError("进程数量变化需要完整 epoch 检查点")
                 model.load_state_dict(state["model"], strict=True)
                 optimizer.load_state_dict(state["optimizer"])
+                verify_optimizer_device(optimizer)
                 scaler.load_state_dict(state["scaler"])
                 rng = state["rank_rng"][rank] if rank < old_world else None
                 if rng is None:

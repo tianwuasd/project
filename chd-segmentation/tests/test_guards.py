@@ -12,6 +12,52 @@ FIXTURE = Path(__file__).parent / "fixtures" / "exponent_config.json"
 
 
 class IdentityGuardTests(unittest.TestCase):
+    def test_model_collective_timeout_uses_shared_validation(self):
+        from chd_segmentation.models.workflow import options
+        from chd_segmentation.models.execution import execution_config
+        config = Path(__file__).resolve().parents[1]/'configs/models/q_base.yaml'
+        applied = options(config,dict(execution=dict(collective_timeout_seconds=5)))
+        self.assertEqual(execution_config(applied)['resources']['collective_timeout_seconds'],5)
+        for value in (-1,0,True,float('nan'),float('inf')):
+            with self.assertRaises(ValueError):
+                options(config,dict(execution=dict(collective_timeout_seconds=value)))
+
+    def test_model_json_exponents_remain_numbers(self):
+        from chd_segmentation.models.workflow import options
+        config = options(Path(__file__).parent/'fixtures/model_exponent_config.json')
+        self.assertEqual(config['learning_rate'],.0002)
+        self.assertEqual(config['execution']['cpu_fraction'],.000001)
+
+    def test_model_execution_inherits_continuous_wait_and_logs(self):
+        from chd_segmentation.models.workflow import options
+        from chd_segmentation.models.execution import execution_config
+        from chd_segmentation.models_cli import wait_seconds
+        root = Path(__file__).resolve().parents[1]/'configs/models'
+        for name in ('q_base.yaml','medsam2.yaml'):
+            config = options(root/name)
+            common = execution_config(config)
+            self.assertIsNone(common['resources']['wait_seconds'])
+            self.assertFalse(common['resources']['share'])
+            self.assertEqual(common['run_dir'],config['run_dir'])
+            self.assertEqual(common['logging']['heartbeat_seconds'],15)
+            overridden = options(root/name,dict(execution=dict(wait_seconds=wait_seconds('2.5')),
+                logging=dict(heartbeat_seconds=3)))
+            self.assertEqual(execution_config(overridden)['resources']['wait_seconds'],2.5)
+            self.assertEqual(overridden['logging'],dict(heartbeat_seconds=3,case_details=True))
+
+    def test_model_execution_rejects_invalid_wait_limits(self):
+        from chd_segmentation.models.workflow import options
+        config = Path(__file__).resolve().parents[1]/'configs/models/medsam2.yaml'
+        for value in (-1,float('inf'),float('nan'),True):
+            with self.assertRaises(ValueError):
+                options(config,dict(execution=dict(wait_seconds=value)))
+
+    def test_model_gpu_count_is_not_overwritten_by_indexed_device(self):
+        from chd_segmentation.models.workflow import options
+        config = Path(__file__).resolve().parents[1]/'configs/models/medsam2.yaml'
+        with self.assertRaisesRegex(ValueError,'cuda'):
+            options(config,dict(device='cuda:0',execution=dict(gpu_count=2)))
+
     def test_current_plan_must_match_prepared_source(self):
         from chd_segmentation.preprocessing.prepare import validate_prepared_config
         base = {"dataset": "chd1282", "scope": "technical", "fold": 0, "technical": {"roi_xyz": None}}

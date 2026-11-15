@@ -143,6 +143,11 @@ def load_config(path, overrides=None):
         raise ValueError("导出空间必须为 source 或 working")
     if r["cpu_threads"] < 1 or r["cache_bytes"] < 0 or r["reserve_ram_bytes"] < 0:
         raise ValueError("资源预算无效")
+    validate_resources(r,t['batch'])
+    return config
+
+
+def validate_resources(r,batch):
     if r["device"] not in ("cpu", "cuda"):
         raise ValueError("device 必须为 cpu 或 cuda；具体显卡使用 gpu_ids 选择")
     if not 1 <= r["gpu_count"] <= 4 or not 1 <= r["cpu_processes"] <= 4:
@@ -161,8 +166,8 @@ def load_config(path, overrides=None):
         raise ValueError("gpu_ids 必须为不重复的物理编号或 UUID 列表，数量等于 gpu_count")
     world = r["gpu_count"] if r["device"] == "cuda" else r["cpu_processes"]
     shares = r["batch_layout"]
-    if t["batch"] < world or (shares is not None and
-            (len(shares) != world or any(type(v) is not int or v < 1 for v in shares) or sum(shares) != t["batch"])):
+    if batch < world or (shares is not None and
+            (len(shares) != world or any(type(v) is not int or v < 1 for v in shares) or sum(shares) != batch)):
         raise ValueError("每个进程至少分配一个样本；batch_layout 的数量及合计必须匹配")
     if not 0 < r["cpu_fraction"] <= 1 or not 0 < r["ram_fraction"] <= 1:
         raise ValueError("CPU 和内存比例必须位于 (0, 1]")
@@ -179,4 +184,3 @@ def load_config(path, overrides=None):
         raise ValueError("资源等待时间无效")
     if not 0 <= r["share_utilization"] <= 100 or not 0 <= r["vram_reserve_fraction"] < 1 or r["peak_margin"] < 1:
         raise ValueError("GPU 共享阈值或显存预算无效")
-    return config
