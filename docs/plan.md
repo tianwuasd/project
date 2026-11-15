@@ -31,28 +31,28 @@
 **Files:** run.py、src/chd_mini/contracts.py、tests/test_contracts.py。
 **Interfaces:** validate_settings(dict)->dict；select_cases(manifest,seed)->list；verify_engine(root,commit)->dict。
 
-- [ ] 运行真实单元断言，确认缺少模块时失败。
-- [ ] 实现配置、冻结角色选择、患者互斥及版本检查。
-- [ ] 运行 `python -B -m unittest discover -s tests -v`，预期合同检查通过。
-- [ ] 提交本任务明确文件。
+- [x] 运行真实单元断言，确认缺少模块时失败。
+- [x] 实现配置、冻结角色选择、患者互斥及版本检查。
+- [x] 运行 `python -B -m unittest discover -s tests -v`，合同检查通过。
+- [x] 提交本任务明确文件。
 
 ### Task 2: 完整流程与收尾
 
 **Files:** src/chd_mini/worker.py、runner.py、cli.py、configs/example.json。
 **Interfaces:** worker.execute(request,stage)->JSON记录；runner.run(settings,run_id)->summary。
 
-- [ ] 先验证入口缺失时失败。
-- [ ] 接通选例、拟合、准备、逐例预处理、一次尝试保存、恢复到终点、测试预测评价。
-- [ ] 实际执行已批准的四例技术检查，保存计时、恢复和源摘要证据；失败时修复并在累计预算内重测。
-- [ ] 核对清理记录、资源退出和留下的日志容量。
-- [ ] 提交本任务明确文件。
+- [x] 先验证入口缺失时失败。
+- [x] 接通选例、拟合、准备、逐例预处理、一次尝试保存、恢复到终点、测试预测评价。
+- [x] 实际执行四例CPU技术检查，保存计时、恢复和来源证据；CUDA外部依赖异常单列。
+- [x] 核对清理记录、资源退出和留下的日志容量。
+- [x] 提交本任务明确文件。
 
 ### Task 3: 独立更新与交付
 
 **Files:** update.py、README.md、tests/test_update.py。
 **Interfaces:** update只接收独立Git根目录，拒绝生产项目和活动运行。
 
-- [ ] 验证真实生产目录被更新器拒绝。
-- [ ] 用本工具真实已提交版本在独立测试检出验证检查与同版本快进，结束清理测试检出。
-- [ ] 进行独立全分支审查，修复重要问题并运行针对性验证。
-- [ ] 记录独立分支、提交、运行命令与实际检查限制。
+- [x] 验证真实生产目录被更新器拒绝。
+- [x] 用本工具真实已提交版本在独立测试检出验证检查与同版本快进，结束清理测试检出。
+- [x] 进行独立全分支审查，修复重要问题并运行针对性验证。
+- [x] 记录独立分支、提交、运行命令与实际检查限制。

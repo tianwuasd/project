@@ -1,4 +1,5 @@
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import json
 import os
@@ -7,19 +8,37 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 from time import perf_counter, sleep
 import traceback
 
 from filelock import FileLock
 import psutil
 
-from .contracts import TOOL_ROOT, confined, file_sha, git, load_settings, read_json, verify_engine, write_json
+from .contracts import (TOOL_ROOT, confined, file_sha, git, load_settings, read_json, reference_snapshot,
+                        verify_engine, verify_references, write_json)
+from .processes import stop_owned
+from .retention import cap_logs
 
 
 MAX_FILES = 500
 MAX_WORK_BYTES = 4 * 1024 ** 3
 MAX_LOG_BYTES = 20 * 1024 ** 2
 STAGE_SECONDS = 900
+LOG_RESERVE = 1024 ** 2
+
+
+def copy_bounded(stream, destination, limit, overflow=None):
+    written, omitted = 0, 0
+    for block in iter(lambda: stream.read(4096), b""):
+        allowed = min(len(block), max(0, limit - written))
+        destination.write(block[:allowed])
+        destination.flush()
+        written += allowed
+        omitted += len(block) - allowed
+        if omitted and overflow is not None:
+            overflow.set()
+    return {"written_bytes": written, "omitted_bytes": omitted}
 
 
 def inventory(root):
@@ -67,16 +86,7 @@ class ProcessGroup:
         return live
 
     def stop(self):
-        table = processes()
-        live = [p for pid, p in table.items() if pid in self.owned and p.info["create_time"] == self.owned[pid]]
-        for proc in sorted(live, key=lambda p: p.info["create_time"], reverse=True):
-            proc.terminate()
-        _, alive = psutil.wait_procs(live, timeout=5)
-        for proc in alive:
-            proc.kill()
-        _, alive = psutil.wait_procs(alive, timeout=5)
-        if alive:
-            raise RuntimeError("本任务进程未退出，保留文件等待安全清理")
+        stop_owned(self.owned)
 
 
 def event_totals(path):
@@ -107,6 +117,8 @@ class RunWorkspace:
     def __enter__(self):
         self.started = perf_counter()
         self.baseline = verify_engine(self.settings["engine_root"], self.settings["engine_commit"])
+        self.references = {key: self.settings[key] for key in ("manifest", "split", "pretrained")}
+        self.input_snapshot = reference_snapshot(self.references)
         self.work.mkdir(parents=True)
         self.logs.mkdir()
         self.group = ProcessGroup(self.logs)
@@ -118,7 +130,7 @@ class RunWorkspace:
                     ("engine_root", "python", "manifest", "split", "data_root", "pretrained")},
                     "retention": {"work_files": MAX_FILES, "work_bytes": MAX_WORK_BYTES, "logs_bytes": MAX_LOG_BYTES,
                                   "cleanup": "完成或失败后自动清理工作文件，必要日志保留至用户主动删除"},
-                    "cleanup_state": "pending", "engine": self.baseline})
+                    "cleanup_state": "pending", "engine": self.baseline, "input_snapshot": self.input_snapshot})
         return self
 
     def budget(self):
@@ -131,6 +143,7 @@ class RunWorkspace:
             raise RuntimeError("本任务日志超过已批准容量")
 
     def stage(self, name):
+        verify_references(self.references, self.input_snapshot)
         if verify_engine(self.settings["engine_root"], self.settings["engine_commit"]) != self.baseline:
             raise ValueError("阶段前的生产依赖已经改变")
         command = [self.settings["python"], "-u", "-B", str(TOOL_ROOT / "run.py"), "_worker",
@@ -146,12 +159,19 @@ class RunWorkspace:
         invocation = {"stage": name, "state": "started", "command": command}
         self.stages.append(invocation)
         print(json.dumps({"stage": name, "state": "started", "time_utc": datetime.now(timezone.utc).isoformat()}, ensure_ascii=False), flush=True)
-        with (self.logs / (name + ".log")).open("w", encoding="utf-8") as output:
-            child = subprocess.Popen(command, cwd=self.work, env=env, stdout=output, stderr=subprocess.STDOUT)
+        available = MAX_LOG_BYTES - LOG_RESERVE - sum(r["bytes"] for r in inventory(self.logs))
+        if available <= 0:
+            raise RuntimeError("日志容量不足以启动下一个阶段")
+        overflow = threading.Event()
+        with (self.logs / (name + ".log")).open("wb") as output, ThreadPoolExecutor(max_workers=1) as pool:
+            child = subprocess.Popen(command, cwd=self.work, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            reader = pool.submit(copy_bounded, child.stdout, output, available, overflow)
             try:
                 while child.poll() is None:
                     self.group.sample(child.pid)
                     self.budget()
+                    if overflow.is_set():
+                        raise RuntimeError("阶段输出超过日志容量，已停止并保留有界诊断")
                     if perf_counter() - mark > STAGE_SECONDS:
                         raise TimeoutError("工作阶段超过900秒有界等待：" + name)
                     sleep(0.25)
@@ -162,9 +182,14 @@ class RunWorkspace:
                 self.group.stop()
                 child.wait()
                 invocation.update(wall_seconds=perf_counter() - mark, returncode=child.returncode,
-                                  state="completed" if child.returncode == 0 else "failed")
+                                  state="completed" if child.returncode == 0 and not overflow.is_set() else "failed",
+                                  console=reader.result())
+                child.stdout.close()
+        if overflow.is_set():
+            raise RuntimeError("阶段输出超过日志容量，已保留有界诊断")
         elapsed = perf_counter() - mark
         self.budget()
+        verify_references(self.references, self.input_snapshot)
         if verify_engine(self.settings["engine_root"], self.settings["engine_commit"]) != self.baseline:
             raise ValueError("阶段后的生产依赖已经改变")
         record = read_json(self.logs / (name + ".json"))
@@ -172,37 +197,63 @@ class RunWorkspace:
         print(json.dumps({"stage": name, "state": "completed", "wall_seconds": elapsed}, ensure_ascii=False), flush=True)
 
     def __exit__(self, kind, error, trace):
-        self.group.stop()
+        write_json(self.logs / "summary.json", {"state": "FAIL", "run_id": self.run_id,
+                   "error": None if kind is None else "".join(traceback.format_exception(kind, error, trace)),
+                   "stages": self.stages, "settings": self.settings, "input_snapshot": self.input_snapshot,
+                   "total_seconds": perf_counter() - self.started, "finalization": "pending"})
         try:
+            self.group.stop()
+            self.retain_raw_events()
             self.finish_report(kind, error, trace)
         finally:
             active_error = sys.exc_info()
             if active_error[0] is not None:
-                write_json(self.logs / "finalization-error.json", {"error": "".join(traceback.format_exception(*active_error))})
+                details = "".join(traceback.format_exception(*active_error))
+                previous = read_json(self.logs / "summary.json")
+                previous.update(state="FAIL", finalization="failed", finalization_error=details)
+                write_json(self.logs / "summary.json", previous)
+                write_json(self.logs / "finalization-error.json", {"error": details})
             self.cleanup()
         return False
+
+    def retain_raw_events(self):
+        source = self.work / "workspace" / "training" / "events.jsonl"
+        if not source.exists():
+            return
+        available = max(0, MAX_LOG_BYTES - LOG_RESERVE - sum(r["bytes"] for r in inventory(self.logs)))
+        omitted = 0
+        with (self.logs / "production-events.raw.log").open("wb") as output:
+            for segment in [*sorted(source.parent.glob("events.jsonl.[0-9]"), reverse=True), source]:
+                with segment.open("rb") as stream:
+                    receipt = copy_bounded(stream, output, available)
+                available -= receipt["written_bytes"]
+                omitted += receipt["omitted_bytes"]
+        if omitted:
+            raise RuntimeError("原始事件超出保留容量，已保留有界记录；省略字节数：" + str(omitted))
 
     def finish_report(self, kind, error, trace):
         events, totals = event_totals(self.work / "workspace" / "training" / "events.jsonl")
         if events:
-            with (self.logs / "production-events.jsonl").open("w", encoding="utf-8") as stream:
-                for row in events:
-                    stream.write(json.dumps(row, ensure_ascii=False, allow_nan=False) + "\n")
+            (self.logs / "production-events.raw.log").replace(self.logs / "production-events.jsonl")
         source_unchanged = None
         selected = self.work / "inputs" / "selected.json"
         if selected.exists():
             source_unchanged = all(file_sha(row[key]) == row["sha256"][key]
                                    for row in read_json(selected)["cases"] for key in ("image", "label"))
         engine_unchanged = verify_engine(self.settings["engine_root"], self.settings["engine_commit"]) == self.baseline
+        current_inputs = reference_snapshot(self.references)
+        frozen_inputs_unchanged = current_inputs == self.input_snapshot
         training_path = self.logs / "train_resume.json"
         training = read_json(training_path)["result"] if training_path.exists() else None
         rows = inventory(self.work)
         before = sum(r["bytes"] for r in rows)
-        summary = {"run_id": self.run_id, "state": "PASS" if kind is None and source_unchanged and engine_unchanged else "FAIL",
+        summary = {"run_id": self.run_id, "state": "PASS" if kind is None and source_unchanged and engine_unchanged and frozen_inputs_unchanged else "FAIL",
                    "settings": self.settings, "engine": self.baseline, "tool_commit": git(TOOL_ROOT, "rev-parse", "HEAD"),
                    "tool_modified": bool(git(TOOL_ROOT, "status", "--porcelain")),
                    "stages": self.stages, "total_seconds": perf_counter() - self.started,
                    "source_unchanged": source_unchanged, "engine_unchanged": engine_unchanged,
+                   "frozen_inputs_unchanged": frozen_inputs_unchanged, "input_snapshot": self.input_snapshot,
+                   "final_input_snapshot": current_inputs,
                    "sampled_process_group_peak_rss_bytes": self.group.peak_rss,
                    "ram_sampling_seconds": 0.25, "production_stage_totals": totals,
                    "stage_total_note": "含嵌套、重复读取及并行阶段，不能相加替代总墙钟", 
@@ -226,14 +277,16 @@ class RunWorkspace:
         if self.work.exists():
             raise RuntimeError("工作文件清理不完整")
         retained = inventory(self.logs)
-        write_json(self.logs / "cleanup.json", {"state": "completed", "deleted_files": len(rows), "released_bytes": before,
+        cleanup = {"state": "pending", "deleted_files": len(rows), "released_bytes": before,
                   "work_removed": True, "owned_processes_exited": True,
-                  "retained_files_before_receipt": len(retained), "retained_bytes_before_receipt": sum(r["bytes"] for r in retained)})
+                  "retained_files_before_receipt": len(retained), "retained_bytes_before_receipt": sum(r["bytes"] for r in retained)}
+        write_json(self.logs / "cleanup.json", cleanup)
+        cap_logs(self.logs)
+        cleanup["state"] = "completed"
+        write_json(self.logs / "cleanup.json", cleanup)
         ownership = read_json(self.logs / "ownership.json")
         ownership["cleanup_state"] = "completed"
         write_json(self.logs / "ownership.json", ownership)
-        if sum(r["bytes"] for r in inventory(self.logs)) > MAX_LOG_BYTES:
-            raise RuntimeError("保留日志超过批准容量")
 
 
 def run(config_path, run_id):

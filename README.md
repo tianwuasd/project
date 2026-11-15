@@ -8,11 +8,11 @@
 | 助手2 | `chd-segmentation-assistant2`，MedSAM2与Q | 由助手2自身配置指定 |
 | 助手3 | `chd-segmentation-assistant3`，本工具 | 私有`project.local.json`及本目录`.runs` |
 
-助手3的更新器只接受本工具自己的独立Git根目录。运行时核验生产项目完整提交及实际源码字节；生产项目更新后，需要重新核对接口兼容性，再明确修改依赖提交。本工具不切换、合并或更新助手1/2的工作目录。
+助手3的更新器只接受本工具自己的独立Git根目录。运行时核验生产项目完整提交及实际源码字节，并在各阶段前后和最终收尾核验原始清单、冻结划分及权重摘要；生产项目更新后，需要重新核对接口兼容性，再明确修改依赖提交。本工具不切换、合并或更新助手1/2的工作目录。
 
 ## 本机使用
 
-本项目沿用生产项目已有Python环境。`project.local.json`包含机器路径及输入来源，加入忽略清单。公开模板见`configs/example.json`。
+本项目沿用生产项目已有Python环境，工具自身使用psutil、filelock及joblib管理进程和运行记录。`project.local.json`包含机器路径及输入来源，加入忽略清单。公开模板见`configs/example.json`。
 
 ```powershell
 Set-Location D:\projects\project\chd-segmentation-assistant3
@@ -50,7 +50,7 @@ $py = 'D:\projects\project\chd-segmentation\.venv\Scripts\python.exe'
 
 ## 日志与清理
 
-所有工作文件和依赖缓存定向到`.runs/<run-id>/work`。监督进程记录PID及出生时间，按0.25秒采样所属进程组RSS；每阶段最多900秒。工作文件最多500个，工作占用最多4 GiB，必要日志最多20 MiB。运行前需按使用者规则取得这些中间产物的保存授权。
+所有工作文件和依赖缓存定向到`.runs/<run-id>/work`。监督进程记录PID及出生时间，按0.25秒采样所属进程组RSS；每阶段最多900秒。工作文件最多500个，工作占用最多4 GiB，必要日志最多20 MiB。标准输出通过有界写入保存，为失败和清理回执预留1 MiB；日志超过保留容量时明确记录截断、原始摘要及保留字节。运行前需按使用者规则取得这些中间产物的保存授权。
 
 成功、失败和正常中断后，记录实际文件清单与占用，核对所属进程退出，清理本次工作文件。必要日志保存在`.runs/<run-id>/logs`，保留至使用者主动删除。
 
@@ -60,10 +60,22 @@ $py = 'D:\projects\project\chd-segmentation\.venv\Scripts\python.exe'
 - `train_start.json`、`train_resume.json`：保存、恢复和累计尝试/更新。
 - `test.json`：单例预测、几何恢复及监督类别评价结果。
 - `production-events.jsonl`：生产接口阶段、供数、训练、验证、保存和预测事件。
+- `production-events.raw.log`：事件末行不完整等异常发生时保留的原始诊断；摘要明确标记失败。
+- `retention.json`：诊断截断及保留容量回执。
 - `processes.json`、`ownership.json`、`cleanup.json`：进程归属、保留规则、删除数量与释放字节。
 - 各阶段`.log`：完整标准输出和真实错误。
 
 并行与嵌套阶段时间分别统计，不能相加作为总墙钟。首次训练、恢复启动和稳定更新分别保留；原接口未单独提供的指标明确记为未测量。RSS是采样峰值，CUDA显存以生产训练实际记录为准。
+
+合同与异常检查：
+
+```powershell
+$env:PYTHONPATH = 'src'
+& $py -B -m unittest discover -s tests -v
+& $py -B tests/verify_runtime.py --config project.local.json
+```
+
+维护检查不执行训练更新；其独立工作文件同样记录并自动清理。本机已有CPU完整流程及CUDA异常证据见`.runs/acceptance-20261115-cpu/logs/验收报告.md`。
 
 ## 单独更新
 

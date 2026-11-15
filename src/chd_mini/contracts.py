@@ -26,6 +26,18 @@ def file_sha(path):
         return sha256_file(stream)
 
 
+def reference_snapshot(sources):
+    return {key: file_sha(path) for key, path in sources.items()}
+
+
+def verify_references(sources, expected):
+    current = reference_snapshot(sources)
+    changed = sorted(key for key in expected if current[key] != expected[key])
+    if changed:
+        raise ValueError("冻结输入发生变化：" + ", ".join(changed))
+    return current
+
+
 def sha256_file(stream):
     result = sha256()
     for block in iter(lambda: stream.read(4 * 1024 ** 2), b""):
