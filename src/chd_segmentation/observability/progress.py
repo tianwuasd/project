@@ -5,6 +5,7 @@ import threading
 from time import perf_counter
 
 import psutil
+from filelock import FileLock
 
 from ..artifacts.store import write_json, read_json
 from ..training.resources import inventory
@@ -33,6 +34,7 @@ def phase_name(phase):
              "prefilter_copy": "预滤波准备", "image_resample": "图像重采样", "label_resample": "标签重采样",
              "write_array": "写盘", "readback": "读回核验", "locations_scan": "前景位置扫描",
              "intensity_bounds": "灰度范围扫描", "label_values": "标签类别扫描",
+             "native_window_bounds": "原生灰度窗范围", "native_gray_window": "原生灰度窗转换",
              "image_inplane": "图像平面插值", "label_inplane": "标签平面插值"}
     labels = []
     for step in phase.split(":"):
@@ -50,7 +52,8 @@ def console_progress(record):
         return "未知" if value is None else f"{value / 1_000_000_000:.2f}GB"
     total = record.get("total")
     done = record.get("done", 0)
-    unit = "病例" if record.get("stage") == "preprocess" else "训练步"
+    unit = {'cases': '病例', 'steps': '训练步', 'updates': '训练更新', 'epochs': '训练轮次'}.get(
+        record.get('unit'), "病例" if record.get("stage") == "preprocess" else "训练步")
     parts = [f"[{record.get('stage')}] {unit} {done}/{total if total is not None else '未知'}",
         f"复用{record.get('reused', 0)} 新完成{record.get('new', 0)} 失败{record.get('failures', 0)} 剩余{record.get('remaining', '未知')}"]
     phase = record.get("phase")
@@ -58,9 +61,14 @@ def console_progress(record):
         parts.append(str(record["current_case"]))
     if phase:
         parts.append(phase_name(phase))
+    if record.get("plane_index") is not None:
+        parts.append(f"切片 {record['plane_index']}/{record['plane_total']}")
     if record.get("block_done") is not None:
         count, limit = record["block_done"], record.get("block_total")
         parts.append(f"块 {count}/{limit if limit is not None else '未知'} 剩余{limit - count if limit is not None else '未知'}")
+    execution = record.get("execution")
+    if execution:
+        parts.append(f"病例线程{execution['applied_case_threads']} 块预算{execution['applied_block_bytes'] / 1024 ** 2:.1f}MiB")
     if record.get("epoch") is not None:
         parts.append(f"epoch {record['epoch']} step {record.get('step')}")
     memory = record.get("resource", {})
@@ -74,7 +82,8 @@ def console_progress(record):
     if record.get("elapsed_seconds") is not None:
         parts.append(f"耗时{record['elapsed_seconds']:.1f}秒")
     reason = record.get("waiting_reason")
-    if reason or memory.get("paused"):
+    complete = total is not None and done == total and not record.get('active')
+    if not complete and (reason or memory.get("paused")):
         parts.append("等待：" + (reason or "整机或项目内存安全余量"))
     print(" | ".join(parts), flush=True)
 
@@ -85,7 +94,7 @@ def _raise_walk_error(error):
 
 class Progress:
     def __init__(self, config, stage, total=None, reused=0, interval_seconds=15,
-                 scan_run_dir=False, resource=None, started=None):
+                 scan_run_dir=False, resource=None, started=None, unit=None):
         if not isinstance(stage, str) or not stage:
             raise ValueError("stage 必须为非空名称")
         if total is not None and (type(total) is not int or total < 0):
@@ -96,6 +105,9 @@ class Progress:
             raise ValueError("进度写入间隔不得短于 15 秒")
         self.config = config
         self.stage = stage
+        self.unit = unit or ('cases' if stage == 'preprocess' else 'steps')
+        if self.unit not in ('cases', 'steps', 'updates', 'epochs'):
+            raise ValueError('进度单位必须为cases、steps、updates或epochs')
         self.directory = Path(config["run_dir"])
         self.started = perf_counter() if started is None else started
         self.last_snapshot = 0.0
@@ -203,11 +215,20 @@ class Progress:
                 disk["data_free_bytes"] = psutil.disk_usage(str(existing)).free
             record = {"schema": 1, "stage": self.stage, "time_utc": datetime.now(timezone.utc).isoformat(),
                       "elapsed_seconds": elapsed, "total": self.total, **self.values,
-                      "remaining": remaining, "rate_unit": "cases/second" if self.stage == "preprocess" else "steps/second",
+                      "remaining": remaining, 'unit': self.unit, "rate_unit": self.unit+'/second',
                       "storage_bytes_estimated": True,
                       "rate_new_per_second": rate, "eta_seconds": eta,
                       "resource": resource, "disk": disk}
-            write_json(self.directory / f"progress-{self.stage}.json", record)
+            path = self.directory / f"progress-{self.stage}.json"
+            with FileLock(str(self.directory / f".progress-{self.stage}.lock")):
+                previous = read_json(path) if path.exists() else {}
+                active_cases = (record.get('current_case') or '').split(', ')
+                if (self.stage == 'preprocess' and record['active'] and
+                        previous.get('current_case') in active_cases and previous.get('done') == record['done']):
+                    record.update({key: previous[key] for key in ('current_case', 'phase', 'block_done',
+                        'block_total', 'block_remaining', 'peak_block_bytes', 'execution', 'plane_index', 'plane_total') if key in previous})
+                    record['active_cases'] = active_cases
+                write_json(path, record)
             event(self.directory, "progress_snapshot", console=False, **record)
             console_progress(record)
             self.last_snapshot = now

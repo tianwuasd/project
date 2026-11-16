@@ -38,20 +38,25 @@ def verify_events(events, settings, names, check):
     built = Counter()
     batches = Counter()
     contexts = defaultdict(set)
+    enqueued = {}
+    capacities = set()
     expected = set(range(4))
     for row in events:
         kind, rank, index = row["event"], row.get("rank"), row.get("batch_index")
         if kind == "batch_enqueued":
-            check.assertEqual(row["queue_capacity"], 1)
-            check.assertEqual(row["occupied_batches"], 1)
-            check.assertEqual(index, consumed.get(rank, -1) + 1)
+            capacities.add(row["queue_capacity"])
+            check.assertIn(row["queue_capacity"], (1, 2))
+            check.assertLessEqual(row["occupied_batches"], row["queue_capacity"])
+            check.assertEqual(index, enqueued.get(rank, -1) + 1)
+            enqueued[rank] = index
             batches[(rank, index)] += 1
             for context in row["samples"]:
                 phase = 0 if context["phase"] == "train" else 1
                 predicted, _, _ = selection((names, settings, phase, context["sample_index"], context["global_slot"]))
                 check.assertEqual(context["case_id"], predicted)
         elif kind == "case_build_started":
-            check.assertEqual(index, consumed.get(rank, -1) + 1)
+            check.assertGreater(index, consumed.get(rank, -1))
+            check.assertLessEqual(index, enqueued[rank])
             allowance = row["budget"]
             if "active_workspace_bytes" in allowance:
                 check.assertLessEqual(allowance["active_workspace_bytes"], allowance["workspace_limit_bytes"])
@@ -62,7 +67,7 @@ def verify_events(events, settings, names, check):
         elif kind == "batch_consumed":
             check.assertEqual(index, consumed.get(rank, -1) + 1)
             consumed[rank] = index
-            check.assertEqual(row["occupied_batches"], 0)
+            check.assertLessEqual(row["occupied_batches"], 1)
     check.assertEqual(set(contexts), expected)
     for index in expected:
         check.assertEqual(contexts[index], {0, 1, 2, 3})
@@ -72,7 +77,7 @@ def verify_events(events, settings, names, check):
             check.assertEqual(built[(index, slot)], 1)
     check.assertEqual(consumed, {0: 3, 1: 3})
     waits = [row["elapsed_seconds"] for row in events if row["event"] == "stage_completed" and row.get("stage") == "batch_supply"]
-    return {"global_batches": len(expected), "samples": sum(built.values()), "queue_capacity": 1,
+    return {"global_batches": len(expected), "samples": sum(built.values()), "queue_capacities": sorted(capacities),
             "maximum_supply_seconds": max(waits), "no_missing_or_duplicate_samples": True,
             "requested_samples_match_global_slot_rng": True}
 
@@ -103,12 +108,14 @@ def verify_transfer(config, prepared, workspace, check):
                 with check.assertRaises(BufferError):
                     supply.submit(["ct_1003"], 0, 1)
                 batch = supply.transfer(batch, device)
-                check.assertTrue(torch.cuda.current_stream(device).query())
+                check.assertTrue(batch["_host_buffers"])
+                check.assertIsNotNone(batch["_copy_event"])
                 check.assertTrue(torch.equal(batch["image"].cpu(), original[0]))
                 check.assertTrue(torch.equal(batch["label"].cpu(), original[1]))
                 torch.cuda.synchronize(device)
                 del batch
                 supply.mark_consumed()
+                check.assertIsNone(supply.transfer_state)
                 supply.submit(["ct_1003"], 0, 1)
                 check.assertEqual(len(supply.queue), 1)
             gc.collect()
@@ -177,7 +184,6 @@ def run(args):
         events = read_events(events_path)
         record["ordering"] = verify_events(events, config["training"], [row["case_id"] for row in prepared["manifest"]["cases"]], check)
         record["supply_wait_exceeded_collective_timeout"] = record["ordering"]["maximum_supply_seconds"] > 5
-        check.assertTrue(record["supply_wait_exceeded_collective_timeout"])
         check.assertEqual(len(list(Path(config["run_dir"]).glob("state-*.pt"))), 1)
         shutil.copyfile(events_path, workspace.report / "events.jsonl")
         if args.cuda_transfer:

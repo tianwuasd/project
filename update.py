@@ -227,7 +227,7 @@ class GitRepository:
             if mode != "100644" or kind != "blob" or not allowed(name):
                 raise ValueError("代码目录包含非法路径或文件类型：" + name)
             files[name] = blob
-        if not {"run.py", "setup_env.py", "pyproject.toml", "update.py"} <= files.keys() or len(files) > 200:
+        if not {"run.py", "setup_env.py", "pyproject.toml", "update.py"} <= files.keys() or len(files) > 256:
             raise ValueError("代码目录缺少必要文件或超出文件预算")
         return files
 
@@ -454,7 +454,7 @@ def main():
     repo.validate(force=args.force)
     settings_path = Path(args.network_config) if args.network_config else Path(args.runtime) / "update_network.json"
     settings = network_settings(settings_path)
-    choice = args.mirror or ["auto"]
+    choice = args.mirror or ["direct"]
     candidates = [OFFICIAL] if choice == ["direct"] else [mirror_url(prefix) for prefix in (settings["mirrors"] if choice == ["auto"] else choice)] + [OFFICIAL]
     commit = repo.choose_source(candidates, expected=args.sha, timeout=settings["probe_timeout_seconds"], official=OFFICIAL)
     if args.check:

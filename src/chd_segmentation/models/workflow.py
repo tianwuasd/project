@@ -235,6 +235,9 @@ def train(config, prepared_path, stage, resume=False, stop_after=None):
     from .offline import model_storage_lease
     prepared = load_prepared(prepared_path)
     training_names(config,prepared,stage)
+    from .offline import quick_check_model
+    from ..observability.events import event
+    event(Path(config['run_dir'])/'admission'/stage, 'quick_check', report=quick_check_model(config, prepared, 'train'))
     root = Path(config['run_dir'])/stage
     if root.resolve().is_relative_to(Path(prepared['manifest']['data_root']).resolve()):
         raise ValueError('训练输出不能位于原始数据目录内')
@@ -253,7 +256,7 @@ def train(config, prepared_path, stage, resume=False, stop_after=None):
                 resume=resume,stop_after=stop_after),common,allocation)
 
 
-def _train_q_rank(payload,rank,common,allocation,gate,device):
+def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
     from .execution import all_states,synchronize_gradients,pressure,rank_measurement
     from ..training.resources import record_peaks
     config,prepared,stage = payload['config'],payload['prepared'],payload['stage']
@@ -333,15 +336,21 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
     reason = None
     peak_vram = 0
     replicas_equal = None
+    from ..observability.progress import Progress
+    feedback = Progress(dict(common, run_dir=str(root)), 'train', total=config['updates'], unit='updates') if rank == 0 else None
+    resumed_update = update
+    if rank == 0:
+        feedback.update(done=update, new=0, step=update)
+        feedback.snapshot(force=True)
     with torch.enable_grad():
         while update < (config['updates'] if stop_after is None else stop_after):
             mark = perf_counter()
             gate.start(rank,f'q-update:{update}',allocation['shares'],device)
             dataset.mode,dataset.position = 'training',0
-            if pressure(common,device):
+            optimizer.zero_grad(set_to_none=True)
+            if pressure(common,device,gate.ready,rank,f'q-update:{update}',memory,release=dataset.clear):
                 reason = 'resource_pressure'
                 break
-            optimizer.zero_grad(set_to_none=True)
             bundle.schedule(optimizer,update)
             loss_sum = 0.
             for micro in range(allocation['shares'][rank]):
@@ -415,6 +424,10 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
                 from ..observability.events import event
                 event(root,'model_update_completed',model=config['model'],stage=stage,**history[-1])
             gate.ready.wait(rank,f'q-checkpoint-written:{update}',device)
+            if rank == 0:
+                feedback.update(done=update, new=update-resumed_update, step=update,
+                    pending=config['updates']-update, active=0)
+                feedback.snapshot(force=True)
         measurement = rank_measurement(device,allocation,rank)
         if device.type=='cuda':
             measurement['peak_vram_bytes'] = max(measurement['peak_vram_bytes'],peak_vram)
@@ -436,6 +449,8 @@ def _train_q_rank(payload,rank,common,allocation,gate,device):
                 record_peaks(common,allocation['spec'],allocation['gpus'],allocation['shares'],
                     [m['peak_vram_bytes'] for m in measurements] if allocation['gpus'] else [])
     dataset.clear()
+    if rank == 0:
+        feedback.close()
     return summary
 
 

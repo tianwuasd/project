@@ -14,6 +14,8 @@ import yaml
 from ..artifacts.store import digest,file_digest,read_json,write_json
 from ..config import DEFAULTS,_merge,validate_resources
 from ..observability.events import Stage,event
+from ..observability.progress import console_progress
+from ..training.memory_guard import MemoryGuard
 from ..training.resources import resource_lease,layout,register_member,close_members,host_capacity,process_vram,record_peaks
 
 
@@ -39,6 +41,7 @@ def execution_config(config):
         raise ValueError('MedSAM2官方DistributedSampler要求全局batch可均分到各卡')
     patch = [config['frames'],config['resolution'],config['resolution']] if config['model']=='medsam2' else [config['patch']]*3
     return dict(model=config['model'],resources=resources,run_dir=config['run_dir'],
+        scope='technical' if config['technical'] else 'formal',pretrained=config['pretrained'],
         logging=config.get('logging',DEFAULTS['logging']),
         work_root=config['work_root'] or str(Path(config['run_dir']).parent),
         technical=dict(roi_xyz=None),training=dict(batch=batch,patch=patch,precision=config['precision']))
@@ -98,12 +101,14 @@ def all_states(value):
     return values
 
 
-def pressure(common,device):
+def pressure(common,device,ready,rank,phase,memory,release=None):
     r = common['resources']
-    low = host_capacity()['available_bytes']<r['reserve_ram_bytes']
+    with memory.admit(0, label=phase, release=release) as ticket:
+        low = ticket is None
     if device.type=='cuda':
         free,total = torch.cuda.mem_get_info(device)
         low |= free<max(r['vram_reserve_bytes'],total*r['vram_reserve_fraction'])
+    ready.wait(rank, 'resource-ready:'+phase, device)
     flag = torch.tensor(int(low),device=device)
     dist.all_reduce(flag,op=dist.ReduceOp.MAX)
     return bool(flag.item())
@@ -147,7 +152,8 @@ def rank_entry(rank,payload,common,allocation,gate,port):
     root = Path(payload['config']['run_dir'])/payload['stage']
     with (root/f'rank{rank}.log').open('a',encoding='utf-8') as log,redirect_stdout(log),redirect_stderr(log), \
             Stage(root,'model_worker',heartbeat_seconds=common['logging']['heartbeat_seconds'],
-                  model=payload['config']['model'],rank=rank,operation=payload.get('operation','train')):
+                  model=payload['config']['model'],rank=rank,operation=payload.get('operation','train')), \
+            MemoryGuard(common, 'model_rank', owner=allocation['owner']) as memory:
         register_member(common,allocation['owner'])
         os.environ.update(MASTER_ADDR='127.0.0.1',MASTER_PORT=str(port),RANK=str(rank),LOCAL_RANK=str(rank),
                           WORLD_SIZE=str(allocation['world']))
@@ -157,20 +163,23 @@ def rank_entry(rank,payload,common,allocation,gate,port):
             reserve_ram_bytes=common['resources']['reserve_ram_bytes'],
             cache_bytes=allocation['supply']['cache_bytes'][rank],
             reader_slots=allocation['supply']['reader_slots'],prefetch=allocation['supply']['prefetch'],threads=1)
+        with memory.admit(0, label='model_initialization') as ticket:
+            if ticket is None:
+                raise RuntimeError('模型启动在取消或明确停止后结束，保留已有材料')
         if payload.get('operation')=='predict':
             device = torch.device('cuda',rank) if allocation['gpus'] else torch.device('cpu')
             verify_device(device,allocation,rank)
             from .prediction import _predict
             applied = dict(payload['config'],device=str(device),threads=1)
             summary = _predict(applied,payload['prepared_path'],payload['checkpoint'],payload['output'],
-                payload['case_ids'],payload['prompts'],**payload.get('prediction_options',{}))
+                payload['case_ids'],payload['prompts'],memory=memory,**payload.get('prediction_options',{}))
             write_json(root/'summary.json',summary)
             measurement = rank_measurement(device,allocation,rank)
             record_peaks(common,allocation['spec'],allocation['gpus'],allocation['shares'],
                 [measurement['peak_vram_bytes']] if allocation['gpus'] else [])
         elif payload['config']['model']=='medsam2':
             from .medsam2.worker import main
-            main(payload,rank,common,allocation,gate)
+            main(payload,rank,common,allocation,gate,memory)
         else:
             device = torch.device('cuda',rank) if allocation['gpus'] else torch.device('cpu')
             verify_device(device,allocation,rank)
@@ -179,7 +188,7 @@ def rank_entry(rank,payload,common,allocation,gate,port):
                 world_size=allocation['world'],timeout=timedelta(seconds=common['resources']['collective_timeout_seconds']),
                 **({'device_id':device} if allocation['gpus'] else {}))
             from .workflow import _train_q_rank
-            _train_q_rank(payload,rank,common,allocation,gate,device)
+            _train_q_rank(payload,rank,common,allocation,gate,device,memory)
             dist.destroy_process_group()
 
 
@@ -223,12 +232,16 @@ def _run_workers(payload,common,allocation):
     if payload['config']['model']=='medsam2':
         paths += [payload['config']['dependency_root'],payload['config']['official_root']]
     environment.update(PYTHONDONTWRITEBYTECODE='1',PYTHONPATH=os.pathsep.join(paths),USE_LIBUV='0',
+        PYTHONUTF8='1',TMPDIR=str(runtime),MPLCONFIGDIR=str(runtime/'matplotlib'),
+        TORCH_HOME=str(runtime/'torch-home'),HF_HOME=str(runtime/'huggingface'),XDG_CACHE_HOME=str(runtime/'cache'),
         TEMP=str(runtime),TMP=str(runtime),TORCHINDUCTOR_CACHE_DIR=str(runtime/'torch'),
         OMP_NUM_THREADS='1',MKL_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1',NUMEXPR_NUM_THREADS='1',
         CUDA_VISIBLE_DEVICES=','.join(g['uuid'] for g in allocation['gpus']))
     context = torch.multiprocessing.get_context('spawn')
     from .supply import CpuReady,OrderedSupply
-    ready = CpuReady(context,allocation['world'],root)
+    cancel = context.Event()
+    common = dict(common, run_dir=str(root), memory_owner=allocation['owner'], memory_cancel=cancel)
+    ready = CpuReady(context,allocation['world'],root,owner=allocation['owner'],cancel=cancel)
     gate = OrderedSupply(context,allocation['shares'],allocation['supply']['reader_slots'],ready,root,
         capacity_bytes=allocation['supply']['breakdown']['case_workspaces_bytes'],
         estimates=allocation['supply']['case_estimates'],
@@ -242,6 +255,28 @@ def _run_workers(payload,common,allocation):
         cleanup.callback(close_members,common,allocation['owner'])
         os.environ.clear()
         os.environ.update(environment)
-        torch.multiprocessing.spawn(rank_entry,args=(payload,common,allocation,gate,port),
-                                   nprocs=allocation['world'],join=True)
+        memory = cleanup.enter_context(MemoryGuard(common, 'model_execution', owner=allocation['owner']))
+        reserve = allocation['supply']['model_memory']['checkpoint_reserve_bytes']
+        ticket = cleanup.enter_context(memory.admit(reserve, label='checkpoint_reserve', reserve=True))
+        if ticket is None:
+            raise RuntimeError('模型准备已取消，完整检查点保持原位置')
+        succeeded, last_console, last_done = False, 0., None
+        path = root/('progress-predict.json' if payload.get('operation') == 'predict' else 'progress-train.json')
+        try:
+            processes = torch.multiprocessing.spawn(rank_entry,args=(payload,common,allocation,gate,port),
+                                                    nprocs=allocation['world'],join=False)
+            from time import perf_counter
+            while not processes.join(timeout=1):
+                memory.boundary()
+                if path.is_file():
+                    progress = read_json(path)
+                    if progress['done'] != last_done or perf_counter()-last_console >= 15:
+                        console_progress(progress)
+                        last_console, last_done = perf_counter(), progress['done']
+            succeeded = True
+            if path.is_file():
+                console_progress(read_json(path))
+        finally:
+            if not succeeded:
+                cancel.set()
     return read_json(root/'summary.json')

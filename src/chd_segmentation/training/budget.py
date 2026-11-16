@@ -66,8 +66,15 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
     pending = sum(max(0, p["ram_bytes"] - private_bytes([p])) for p in peers)
     budget = max(0, min(int(facts["total_bytes"] * r["ram_fraction"]),
                         facts["available_bytes"] + credit - r["reserve_ram_bytes"]) - pending)
-    cores = max(1, math.floor(facts["cores"] * r["cpu_fraction"]) - sum(p["cpu_slots"] for p in peers))
+    cores = max(0, max(1, math.floor(facts["cores"] * r["cpu_fraction"])) - sum(p["cpu_slots"] for p in peers))
     reports = estimates if estimates is not None else case_estimates(config, prepared, stage)
+    if stage == "preprocess" and config.get("pending_case_ids") is not None:
+        reports = [row for row in reports if row["case_id"] in config["pending_case_ids"]]
+    if not reports:
+        raise ValueError("资源规划没有待处理病例")
+    if cores < (1 if stage == "preprocess" else world):
+        return {"admitted": False, "facts": facts, "case_estimates": reports,
+                "reason": "已登记CPU额度不足，等待其他任务释放", "available_cpu_slots": cores}
     case_bytes = max(row["workspace_bytes"] for row in reports)
     if stage == "preprocess":
         requested = r["max_workers"] if r["workers"] == "auto" else r["workers"]
@@ -105,7 +112,7 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
     stage_reserve = None
     if config.get("model", "stunet") == "stunet":
         from .stage_memory import stage_memory
-        stage_reserve = stage_memory(config, prepared)
+        stage_reserve = stage_memory(config, prepared, prefetch=1)
         base += stage_reserve["checkpoint_reserve_bytes"] + world * stage_reserve["model_load_per_rank_bytes"]
         if r["device"] == "cpu":
             base += stage_reserve["batch_bytes"]
@@ -150,7 +157,14 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
                 workers[index] += 1
         instances = sum(max(1, w) for w in workers)
         fixed = base + count * worker_bytes + instances * retained
+        prefetch = 1
         queues = patch_bytes*3
+        extra_stage = 0 if stage_reserve is None or r["device"] != "cpu" else (
+            stage_memory(config, prepared, prefetch=2)["batch_bytes"] - stage_reserve["batch_bytes"])
+        local_threads = sum(w == 0 for w in workers)
+        if (profile is None and r["prefetch"] >= 2 and world + count + local_threads <= cores and
+                fixed + extra_stage + case_bytes + patch_bytes * 4 <= budget):
+            prefetch, queues, fixed = 2, patch_bytes * 4, fixed + extra_stage
         if fixed + case_bytes + queues > budget:
             continue
         readers = max(1,min(readers_cap,instances,batch))
@@ -160,12 +174,15 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
         if used > budget:
             raise AssertionError("供数预算计算未闭合")
         result.update(admitted=True, reason="资源预算允许", workers=workers, cache_bytes=[int(cache)] * world,
-                      max_workers=count, cpu_slots=world + count, ram_bytes=int(used), reader_slots=int(readers),
-                      prefetch=1,workspace_capacity_bytes=int(workspace), breakdown={"processes_bytes": fixed, "queue_bytes": int(queues),
+                      max_workers=count, cpu_slots=world + count + (local_threads if prefetch == 2 else 0),
+                      ram_bytes=int(used), reader_slots=int(readers),
+                      prefetch=prefetch,workspace_capacity_bytes=int(workspace), breakdown={"processes_bytes": fixed, "queue_bytes": int(queues),
                       "case_builds": int(readers), "case_workspaces_bytes": int(workspace),
                       "cache_instances": instances, "cache_total_bytes": int(instances * cache)})
         if profile is not None:
             result['breakdown'].update(retained_case_instances=instances,retained_cases_bytes=instances*retained,
                 rank_prediction_bytes=sum(profile['rank_case_bytes']))
+        if stage_reserve is not None:
+            result["stage_memory"] = stage_memory(config, prepared, prefetch=prefetch)
         return result
     raise AssertionError("零 worker 最小预算未被实际规划覆盖")

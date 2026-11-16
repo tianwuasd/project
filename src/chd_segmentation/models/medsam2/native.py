@@ -8,9 +8,11 @@ import torch
 
 from ...artifacts.store import read_json
 from ...observability.events import event, stage
-from ...preprocessing.offline import case_pointer
-from ...preprocessing.offline_store import FORMAT, OfflineTransform, case_directory, recipe, save_case, validate_storage
+from ...preprocessing.offline import case_pointer, worker_cancel
+from ...preprocessing.offline_store import FORMAT, OfflineTransform, case_directory, recipe, save_case, validate_storage, begin_case
 from ...preprocessing.validation import SourceReader
+from ...models.stunet.streaming import BlockWorkspace, read_sources
+from ...training.memory_guard import MemoryGuard
 
 
 CONTRACT = 'medsam2-native-window-uint8-v1'
@@ -59,19 +61,39 @@ def produce_native_case(prepared, config, root, name, key, recipe_identity, *, w
     event(config['run_dir'], 'preprocess_case_started', case_id=name, method=CONTRACT)
     reader = SourceReader(prepared, config['resources']['reserve_ram_bytes'],
         with_label=row.get('label') is not None, log_dir=config['run_dir'], logging=config['logging'])
-    reader.console = True
-    data, label, image, spacing, roi, read_seconds = reader.read_case(row)
-    with stage(config, 'native_gray_window', case_id=name):
-        pixels = window_image(data.transpose(2, 1, 0), window)[None]
-        entry = dict(case_id=name, image=pixels,
-            label=np.ascontiguousarray(label.transpose(2, 1, 0)) if label is not None else None,
-            unknown_classes=row['unknown_classes'], source_shape_xyz=list(image.shape),
-            source_affine=image.affine.tolist(), source_units=image.header.get_xyzt_units()[0],
-            spacing_xyz=spacing.tolist(), roi_xyz=roi, properties=dict(class_locations={}),
-            medsam_native=True, medsam_windowed=True, gray_window=list(window),
-            timing=dict(read_decompress_seconds=read_seconds, native_seconds=perf_counter()-began))
-    with stage(config, 'preprocess_case_save', case_id=name):
-        record = save_case(case_directory(root, key), key, recipe_identity, entry)
+    native = deepcopy(prepared)
+    native['plan']['transpose_forward'] = [0, 1, 2]
+    reader.prepared = native
+    directory = case_directory(root, key)
+    pending = begin_case(directory, key, recipe_identity)
+    with MemoryGuard(config, 'preprocess_case', owner=config.get('memory_owner'), cancel=worker_cancel(config)) as guard:
+        workspace = BlockWorkspace(pending/'work', config, guard, name)
+        try:
+            image, spacing, roi, data, label, _, _, has_label = read_sources(reader, row, workspace)
+            read_seconds = perf_counter()-began
+            workspace.drop('mask')
+            minimum, maximum = np.inf, -np.inf
+            for part in workspace.blocks(data.shape, 16, label='native_window_bounds'):
+                values = np.clip(data[part], *window)
+                minimum, maximum = min(minimum, float(values.min())), max(maximum, float(values.max()))
+                del values
+            if maximum <= minimum:
+                raise ValueError('MedSAM2 CT窗内没有有效灰度变化')
+            pixels = workspace.create('result-image', (1, *data.shape), np.uint8)
+            for part in workspace.blocks(data.shape, 24, label='native_gray_window'):
+                values = np.clip(data[part], *window)
+                pixels[(0, *part)] = ((values-minimum)/(maximum-minimum)*255.).astype(np.uint8)
+                del values
+            entry = dict(case_id=name, image=pixels, label=label if has_label else None,
+                unknown_classes=row['unknown_classes'], source_shape_xyz=list(image.shape),
+                source_affine=image.affine.tolist(), source_units=image.header.get_xyzt_units()[0],
+                spacing_xyz=spacing.tolist(), roi_xyz=roi, properties=dict(class_locations={}),
+                medsam_native=True, medsam_windowed=True, gray_window=list(window),
+                timing=dict(read_decompress_seconds=read_seconds, native_seconds=perf_counter()-began))
+            with stage(config, 'preprocess_case_save', case_id=name):
+                record = save_case(directory, key, recipe_identity, entry, workspace)
+        finally:
+            workspace.release_handles()
     event(config['run_dir'], 'preprocess_case_completed', case_id=name, method=CONTRACT,
         seconds=perf_counter()-began, bytes=sum(v['stamp'][0] for v in record['files'].values()))
     return name, case_pointer(record)

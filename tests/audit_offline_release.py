@@ -49,7 +49,7 @@ def public_files(offset, limit):
         raise ValueError('发布读取仅接受已提交且干净的工作树')
     names = git('ls-tree', '-r', '--name-only', 'HEAD').decode().splitlines()
     names = [name for name in names if allowed(name)]
-    assert len(names)<=200
+    assert len(names)<=256
     entries = []
     for name in names[offset:offset+limit]:
         data = git('show', 'HEAD:'+name)
