@@ -22,6 +22,7 @@ from ..training.resources import refresh_supply, register_member, resource_lease
 from .offline_store import (FORMAT, case_directory, case_key, inspect_case, live_references, owned_remove,
                             recipe, save_case, validate_storage, begin_case)
 from .prepare import load_prepared, validate_prepared_config
+from .scheduling import update_case_slots
 
 
 _WORKER_CANCEL = None
@@ -67,6 +68,8 @@ def initialize_worker(config, owner, cancel):
 def process_pending(config, prepared, root, identity, pending, pointers, catalog, producer=produce_case):
     runtime = deepcopy(config)
     runtime["resources"].update(device="cpu", cpu_processes=1)
+    if producer is produce_case:
+        runtime["pending_case_ids"] = [name for name, _ in pending]
     estimates = {r["case_id"]: r["workspace_bytes"] for r in case_estimates(config, prepared, "preprocess")}
     began, last_log, pool, next_adapt = perf_counter(), 0., None, 0.
     with resource_lease(runtime, prepared, {}, stage="preprocess") as allocation:
@@ -80,6 +83,10 @@ def process_pending(config, prepared, root, identity, pending, pointers, catalog
             try:
                 while pending or running:
                     observation = memory.boundary()
+                    if producer is produce_case:
+                        runtime["pending_case_ids"] = [name for name, _ in pending] + list(names.values())
+                        slots = min(max(1, allocation["supply"]["workers"][0]), len(pending) + len(running))
+                        update_case_slots(runtime, allocation, slots)
                     progress.update(done=len(pointers), new=len(pointers) - completed_before, pending=len(pending), active=len(running),
                                     current_case=", ".join(names.values()) or None,
                                     storage_bytes=sum(p["array_bytes"] + p["locations_bytes"] for p in pointers.values()), resource=observation)

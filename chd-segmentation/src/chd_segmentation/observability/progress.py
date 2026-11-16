@@ -61,9 +61,14 @@ def console_progress(record):
         parts.append(str(record["current_case"]))
     if phase:
         parts.append(phase_name(phase))
+    if record.get("plane_index") is not None:
+        parts.append(f"切片 {record['plane_index']}/{record['plane_total']}")
     if record.get("block_done") is not None:
         count, limit = record["block_done"], record.get("block_total")
         parts.append(f"块 {count}/{limit if limit is not None else '未知'} 剩余{limit - count if limit is not None else '未知'}")
+    execution = record.get("execution")
+    if execution:
+        parts.append(f"病例线程{execution['applied_case_threads']} 块预算{execution['applied_block_bytes'] / 1024 ** 2:.1f}MiB")
     if record.get("epoch") is not None:
         parts.append(f"epoch {record['epoch']} step {record.get('step')}")
     memory = record.get("resource", {})
@@ -221,7 +226,7 @@ class Progress:
                 if (self.stage == 'preprocess' and record['active'] and
                         previous.get('current_case') in active_cases and previous.get('done') == record['done']):
                     record.update({key: previous[key] for key in ('current_case', 'phase', 'block_done',
-                        'block_total', 'block_remaining', 'peak_block_bytes') if key in previous})
+                        'block_total', 'block_remaining', 'peak_block_bytes', 'execution', 'plane_index', 'plane_total') if key in previous})
                     record['active_cases'] = active_cases
                 write_json(path, record)
             event(self.directory, "progress_snapshot", console=False, **record)

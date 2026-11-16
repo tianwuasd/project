@@ -25,7 +25,7 @@ def write_json(path, value):
 
 def target_fraction(config):
     # 技术短测可显式使用更高比例；正式任务始终保留至少20%有效内存。
-    ceiling = .95 if config.get("scope") == "technical" else .8
+    ceiling = 1. if config.get("scope") == "technical" else .8
     return min(ceiling, config["resources"]["ram_fraction"])
 
 
@@ -169,13 +169,14 @@ def memory_decision(config, records, snapshot, owner=None, additional=0):
                             *(row.get("memory_limit_bytes", MEMORY_LIMIT_BYTES) for row in records)])
     limit = min(MEMORY_LIMIT_BYTES, configured_limit, int(snapshot["host"]["total_bytes"] * target))
     headroom, scopes = system_headroom(snapshot["host"], target, resources["reserve_ram_bytes"])
-    pending, own, task_pending = 0, None, 0
+    pending, own, task_pending, own_claim_pending = 0, None, 0, 0
     for record, measurement in zip(records, snapshot["tasks"]):
         is_own = owner is not None and same_process(record, owner)
         value = pending_bytes(record, measurement, additional if is_own else 0)
         pending += value
         if is_own:
             own, task_pending = measurement, value
+            own_claim_pending = pending_bytes({**record, "ram_bytes": 0}, measurement, additional)
     project = snapshot["project"]
     complete = project["complete"] and (owner is None or own is not None)
     used = project["accounted_bytes"]
@@ -190,7 +191,8 @@ def memory_decision(config, records, snapshot, owner=None, additional=0):
             "system_headroom_bytes": headroom, "pending_bytes": pending,
             "target_fraction": target, "memory_limit_bytes": limit,
             "configured_memory_limit_bytes": configured_limit, "own": own,
-            "own_pending_bytes": task_pending, "project_remaining_bytes": project_spare,
+            "own_pending_bytes": task_pending, "own_claim_pending_bytes": own_claim_pending,
+            "project_remaining_bytes": project_spare,
             "scopes": scopes}
 
 
@@ -240,6 +242,8 @@ class MemoryGuard:
         self.entered = False
         self.created_record = False
         self.last_notified = None
+        self.tokens = set()
+        self.instance = uuid4().hex
 
     def _rows(self):
         records = read_json(self.registry) if self.registry.exists() else []
@@ -320,6 +324,7 @@ class MemoryGuard:
                         stop_requested="stop_requested_at" in state or cancelled,
                         stop_reason='cancelled' if cancelled else state.get("stop_reason"), pressure_since=state.get("pressure_since"),
                         peaks=dict(peaks), sample_seconds=SAMPLE_SECONDS, actual_interval_seconds=interval)
+        self.latest_snapshot = snapshot
         if now - state.get("last_snapshot_at", -math.inf) >= self.snapshot_seconds or snapshot["stop_requested"]:
             write_json(self.snapshot_path, bounded_snapshot(snapshot))
             state["last_snapshot_at"] = now
@@ -370,6 +375,14 @@ class MemoryGuard:
         self._notify(snapshot)
         return snapshot
 
+    def observed_boundary(self):
+        self._ensure_active()
+        snapshot = self.latest_snapshot
+        if time.monotonic() - snapshot["monotonic"] > SAMPLE_SECONDS:
+            snapshot = self.snapshot()
+        self._notify(snapshot)
+        return snapshot
+
     def checkpoint(self):
         return self.boundary()
 
@@ -404,7 +417,9 @@ class MemoryGuard:
                     previous = sum(value["bytes"] for value in claims if not value.get("reserve", False))
                     credited = min(previous, max(0, private - state.get("claim_baseline_uss_bytes", private)))
                     state["claim_baseline_uss_bytes"] = private - credited
-                    claims.append({**self.member, "token": token, "bytes": amount, "label": label[:256], "reserve": reserve})
+                    claims.append({**self.member, "token": token, "bytes": amount, "label": label[:256], "reserve": reserve,
+                                   "guard": self.instance})
+                    self.tokens.add(token)
                     acquired = True
                 if acquired or not wait or snapshot["stop_requested"]:
                     state["waiting"] = [value for value in requests if value["token"] != token]
@@ -439,6 +454,7 @@ class MemoryGuard:
                     else:
                         state["claim_baseline_uss_bytes"] = private - max(0, credited - (0 if reserve else amount))
                     write_json(self.registry, records)
+                    self.tokens.remove(token)
 
     def __enter__(self):
         if self.entered:
@@ -471,7 +487,7 @@ class MemoryGuard:
         with FileLock(str(self.lock)):
             records = self._rows()
             row = self._own(records)
-            if any(same_process(claim, self.member) for claim in row.get("memory_guard", {}).get("claims", [])):
+            if self.tokens or any(claim.get("guard") == self.instance for claim in row.get("memory_guard", {}).get("claims", [])):
                 raise RuntimeError("退出内存保护时仍有未释放的准入额度")
             if self.created_record:
                 records.remove(row)

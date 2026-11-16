@@ -132,10 +132,11 @@ def group_memory(job, rank, index, amount):
                 host_wait(job, rank, index, "group_memory_released")
 
 
-def rebalance_supply(job, supply, gate, device, rank, stop_event):
+def rebalance_supply(job, supply, gate, device, rank, stop_event, proposal=None):
     world, config = job["world"], job["config"]
-    proposal = refresh_supply(config, job["prepared"], job) if rank == 0 else None
-    proposal = all_objects(proposal, world)[0]
+    if proposal is None:
+        proposal = refresh_supply(config, job["prepared"], job) if rank == 0 else None
+        proposal = all_objects(proposal, world)[0]
     if proposal["admitted"] and supply_settings(proposal) == supply_settings(job["supply"]):
         return "unchanged"
     if rank == 0:
@@ -152,7 +153,9 @@ def rebalance_supply(job, supply, gate, device, rank, stop_event):
         gate.set_limit(proposal["reader_slots"], proposal["workspace_capacity_bytes"])
     host_wait(job, rank, control, "pool_applied")
     job["supply"] = proposal
+    job["stage_memory"] = stage_memory(config, job["prepared"], prefetch=proposal["prefetch"])
     supply.workers, supply.cache_bytes = proposal["workers"][rank], proposal["cache_bytes"][rank]
+    supply.prefetch = proposal["prefetch"]
     supply.__enter__()
     if rank == 0:
         event(config["run_dir"], "supply_resize_applied", applied=proposal,
@@ -268,7 +271,8 @@ def run_rank(rank, job, gate, stop_event):
             offset = sum(job["shares"][:rank])
             slots = list(range(offset, offset + job["shares"][rank]))
             supply = cleanup.enter_context(BatchSupply(job["prepared"], config, slots,
-                job["supply"]["workers"][rank], job["supply"]["cache_bytes"][rank], gate, job["owner"], rank, cancel=stop_event))
+                job["supply"]["workers"][rank], job["supply"]["cache_bytes"][rank], gate, job["owner"], rank,
+                cancel=stop_event, prefetch=job["supply"]["prefetch"]))
             batch_cleanup = cleanup.enter_context(ExitStack())
             if rank == 0:
                 event(output, "resume" if job["resume"] else "start", identity=job["identity"], restored_exact=restored,
@@ -277,9 +281,12 @@ def run_rank(rank, job, gate, stop_event):
             if not job["resume"]:
                 checkpoint(output, model, optimizer, scaler, progress, job, receipt, device, rank)
             started = perf_counter()
-            timings = {"input_wait_seconds": 0., "compute_seconds": 0., "validation_seconds": 0., "checkpoint_seconds": 0.}
+            timings = {"input_wait_seconds": 0., "compute_seconds": 0., "validation_seconds": 0.,
+                       "checkpoint_seconds": 0., "resource_query_seconds": 0.}
             last_loss, changed, reason, completed = None, False, None, False
             peak_reserved, peak_non_allocator = 0, 0
+            vram_sample_seconds = max(1., config.get("logging", {}).get("heartbeat_seconds", 15.))
+            next_vram_sample = 0.
             queued_phase, submitted, phase_end = None, 0, 0
             next_adapt = perf_counter() + resources["adapt_seconds"]
             next_growth = perf_counter() + resources["growth_seconds"]
@@ -318,10 +325,11 @@ def run_rank(rank, job, gate, stop_event):
                     candidate = all_objects(candidate, world)[0]
                     growing = candidate["admitted"] and (sum(candidate["workers"]) > sum(job["supply"]["workers"]) or
                         candidate["reader_slots"] > job["supply"]["reader_slots"] or
-                        sum(candidate["cache_bytes"]) > sum(job["supply"]["cache_bytes"]))
+                        sum(candidate["cache_bytes"]) > sum(job["supply"]["cache_bytes"]) or
+                        candidate["prefetch"] > job["supply"]["prefetch"])
                     permitted = rank == 0 and (not growing or perf_counter() >= next_growth)
                     if any_rank(permitted, device, world):
-                        resized = rebalance_supply(job, supply, gate, device, rank, stop_event)
+                        resized = rebalance_supply(job, supply, gate, device, rank, stop_event, candidate)
                         if resized == "pressure":
                             reason = "resource_pressure"
                             break
@@ -356,6 +364,8 @@ def run_rank(rank, job, gate, stop_event):
                 with stage(config, "batch_supply", console=False, rank=rank, phase=phase,
                            epoch=progress["epoch"] + 1, step=cursor + 1, total=phase_end):
                     batch = supply.take_cpu()
+                if batch["batch_index"] != next_batch_index(progress, settings):
+                    raise RuntimeError("出队批次与已消费的训练游标不一致")
                 host_wait(job, rank, batch["batch_index"], "data_ready")
                 if any_rank(batch.get("cancelled", False) or stop_event.is_set(), device, world):
                     memory_pressure = any_rank(batch.get("cancelled", False) or job["pressure_event"].is_set(), device, world)
@@ -374,6 +384,10 @@ def run_rank(rank, job, gate, stop_event):
                     batch = supply.transfer(batch, device)
                 host_wait(job, rank, batch["batch_index"], "transfer_ready")
                 timings["input_wait_seconds"] += perf_counter() - mark
+                if supply.prefetch == 2 and submitted < phase_end and not supply.queue and not stop_event.is_set():
+                    sample_index = submitted if phase == "train" else progress["epoch"] * settings["validation_steps"] + submitted
+                    supply.submit(train_ids if phase == "train" else val_ids, 0 if phase == "train" else 1, sample_index)
+                    submitted += 1
                 mark = perf_counter()
                 if phase == "train":
                     wrapped.train()
@@ -412,13 +426,16 @@ def run_rank(rank, job, gate, stop_event):
                         raise ValueError("验证损失出现非有限数值")
                     progress["val_sum"] += float(loss)
                     progress["val_step"] += 1
-                if device.type == "cuda":
-                    torch.cuda.synchronize(device)
-                    peak_reserved = max(peak_reserved, torch.cuda.max_memory_reserved(device))
-                    actual_vram = process_vram(job["gpus"][rank]["uuid"], os.getpid())
-                    peak_non_allocator = max(peak_non_allocator, actual_vram - torch.cuda.memory_reserved(device))
                 elapsed = perf_counter() - mark
                 timings["compute_seconds" if phase == "train" else "validation_seconds"] += elapsed
+                if device.type == "cuda":
+                    peak_reserved = max(peak_reserved, torch.cuda.max_memory_reserved(device))
+                    if perf_counter() >= next_vram_sample:
+                        query_started = perf_counter()
+                        actual_vram = process_vram(job["gpus"][rank]["uuid"], os.getpid())
+                        peak_non_allocator = max(peak_non_allocator, actual_vram - torch.cuda.memory_reserved(device))
+                        timings["resource_query_seconds"] += perf_counter() - query_started
+                        next_vram_sample = perf_counter() + vram_sample_seconds
                 if rank == 0:
                     feedback.update(done=progress["attempts"], new=progress["attempts"] - resumed_attempts,
                                     epoch=progress["epoch"] + 1, step=progress["attempts"] % settings["steps_per_epoch"],
@@ -468,6 +485,13 @@ def run_rank(rank, job, gate, stop_event):
             mark = perf_counter()
             pointer = checkpoint(output, model, optimizer, scaler, progress, job, receipt, device, rank)
             timings["checkpoint_seconds"] += perf_counter() - mark
+            if device.type == "cuda":
+                torch.cuda.synchronize(device)
+                peak_reserved = max(peak_reserved, torch.cuda.max_memory_reserved(device))
+                query_started = perf_counter()
+                actual_vram = process_vram(job["gpus"][rank]["uuid"], os.getpid())
+                peak_non_allocator = max(peak_non_allocator, actual_vram - torch.cuda.memory_reserved(device))
+                timings["resource_query_seconds"] += perf_counter() - query_started
             changed = changed and not torch.equal(next(model.parameters()).detach().cpu(), before_parameter)
             measurements = all_objects({"rank": rank, "timing": timings, "rss_bytes": psutil.Process().memory_info().rss,
                                        "peak_vram_bytes": peak_reserved + peak_non_allocator if job["gpus"] else None,
@@ -483,6 +507,8 @@ def run_rank(rank, job, gate, stop_event):
                     "seconds": perf_counter() - started, "timing": timings, "world_size": world,
                     "global_batch": settings["batch"], "batch_layout": job["shares"], "devices": job["gpus"],
                     "workers": job["supply"]["workers"], "ranks": measurements, "device": str(device),
+                    "prefetch": supply.prefetch, "vram_sample_seconds": vram_sample_seconds if job["gpus"] else None,
+                    "timing_basis": "CPU等待及拷贝入队用主机耗时，计算包含必要loss读取；CUDA拷贝用独立事件计时，显存查询单列",
                     "peak_vram_bytes": max(row["peak_vram_bytes"] for row in measurements) if job["gpus"] else None}
                 write_json(output / "summary.json", summary)
                 event(output, "stop", state=summary["state"], attempts=progress["attempts"], reason=reason)
@@ -574,7 +600,7 @@ def launch_group(config, prepared, spec, identity, allocation, resume, stop_afte
         port = rendezvous.getsockname()[1]
     job = {**allocation, "config": config, "prepared": prepared, "spec": spec, "identity": identity,
            "shares": shares, "resume": resume, "stop_after": stop_after, "rendezvous": f"tcp://127.0.0.1:{port}"}
-    job["stage_memory"] = stage_memory(config, prepared)
+    job["stage_memory"] = stage_memory(config, prepared, prefetch=allocation["supply"]["prefetch"])
     context = mp.get_context("spawn")
     gate = BuildGate(context, allocation["supply"]["reader_slots"], allocation["supply"]["workspace_capacity_bytes"],
                      allocation["supply"]["case_estimates"])

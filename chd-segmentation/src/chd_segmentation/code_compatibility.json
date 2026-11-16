@@ -924,6 +924,557 @@
         "linked-inputs-green",
         "install-final"
       ]
+    },
+    {
+      "source": "ed188bbf5648d0065b6008c87427d3a4348560b7a7917b734f0060a3da5e5d2a",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "c10f06373f8f5858f12bc19963a9f23c86b7be8647e24f7ba453302b3c7c33d3",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "378884ca3b5b18d270a6fc21545b0f7719695407d7dfab470e840baf1d91a94e",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "6d47690294f048ef783fb26ec8a876fd25a6a98aff0f116b94322169a2e35f63",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "837242370777633814ef8619c2f93e825afe7508436b60b377ded402266ef797",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "bce6c67174dac7688b62abb49206274d126fbd9ee06ddfba9818b0badea753e5",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "48b47624afc776809111fa6616950c06d2a99bf168628ecbf759129a258b504e",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "295d146b7f8ef4912c63f3dd821ad2d32951aa91aa5efcdd1038658c81bed1c4",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "844818b0bf7e93caf94361c8c5857a3202a16d677977df3cd834900215685952",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "42b138db858e2aef18bf417c4dcd188ed8a0714d698c19bef911c9284a616bfa",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "afffd433e388f93fe5d840ba6a899cb2b814c81804e59d4b02c310cb47cf8dde",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "7c52966d5bd3ed7af73f2454b34b66400dc6b8e1435e0929e7c9f74b70dd61f1",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "f356bb109c8a7c7304694f17f738f314ca1c9d5ed19c51a91ffbb45df4f9321d",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "48fae4f30bf7127760e71079ea3faf2199a4ef8cbc6d449f95afd7d6be1f69d2",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "72c96526257124ace440ef461c55f62b11876a798065ad7ff29e340fd4e071d1",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "7fc72920281d8e45adf361fa8f967da43d04021481b06d69f45e5db8878f0136",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "7c39a0d1d7158a86ece9717464652b4567d2f4bcec0416ae02e9c9d0b4eb1964",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "3c9392f9930186a99eb4e3973aa17dbf066b6520ce5edff359e47ca3de2e09b8",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
+    },
+    {
+      "source": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "target": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569",
+      "baseline_public_commit": "62a453012b33e89e27799127fbe391334d8db186",
+      "reason": "病例内线程与块预算自适应，保留可复用映射页及确定性全局坐标；训练顺序预取及安全传输；冻结输入、模型、损失、全局抽样、优化器和完整恢复协议保持。自有解压文件缓存仅在阶段完成或压力时回收。",
+      "changed_files": [
+        "config.py",
+        "data/dataset.py",
+        "data/supply.py",
+        "models/stunet/preprocess.py",
+        "models/stunet/streaming.py",
+        "observability/progress.py",
+        "preprocessing/offline.py",
+        "training/budget.py",
+        "training/engine.py",
+        "training/memory_guard.py",
+        "training/stage_memory.py",
+        "models/stunet/block_execution.py",
+        "preprocessing/scheduling.py"
+      ],
+      "validation": [
+        "two-real-ImageCHD-64roi-bitwise",
+        "CPU-Gloo-two-updates-exact-resume",
+        "actual-quota-shrink-release-bitwise",
+        "static-owned-raw-cache-page-review"
+      ],
+      "tested_source_identity": "4f231c791413aa47cf9027c0a317b909858e74429e2d350436cc7c65d7bcefc2",
+      "quota_tested_source_identity": "2ebfdf365a706c7f252af7926502f918f5982e8b36609fde4e474ba1c6e2b569"
     }
   ]
 }
