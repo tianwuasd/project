@@ -52,6 +52,7 @@ def _receipt(training, stage, contract_id, schema):
 
 
 def inspect_source(training, cache, mode):
+    import torch
     from ..xu_pipeline import _sources
     from ..xu_pipeline_stages import iter_stages
     from ..xu_roi_workflow import verified_book
@@ -69,7 +70,8 @@ def inspect_source(training, cache, mode):
             or record['artifacts'] != artifact_identity(cache) or record['scope'] != cache.scope
             or record['padding_percent'] != 20 or (record['profile']=='smoke') != technical):
         raise ValueError('Training identity differs from the prepared input or audited implementation')
-    runtime = {name:version(name) for name in ('torch',*record['libraries'])}
+    runtime = {'torch':str(torch.__version__),
+               **{name:version(name) for name in record['libraries']}}
     if runtime != {'torch':record['torch'],**record['libraries']}:
         raise ValueError('Use the training research environment for prediction')
     args = SimpleNamespace(prepared=cache.run_dir, technical_subset=technical,
