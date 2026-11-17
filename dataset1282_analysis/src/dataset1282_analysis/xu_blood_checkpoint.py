@@ -8,7 +8,7 @@ from .contracts import sha256_file
 FORMAT = 'xu-blood-reference-v1'
 
 
-def selected_components(checkpoint):
+def selected_components(checkpoint, *, validate_identity=True):
     checkpoint = Path(checkpoint).resolve(strict=True)
     state = torch.load(checkpoint,map_location='cpu',weights_only=True)
     if state.get('format') != FORMAT:
@@ -20,10 +20,10 @@ def selected_components(checkpoint):
         if entry['file'] != name:
             raise ValueError('血池组件文件名与阶段不一致')
         path = checkpoint.parent/name
-        if path.is_symlink() or path.resolve() != path or sha256_file(path) != entry['sha256']:
+        if validate_identity and (path.is_symlink() or path.resolve() != path or sha256_file(path) != entry['sha256']):
             raise ValueError('血池组件权重发生变化')
         component = torch.load(path,map_location='cpu',weights_only=True)
-        if (component['contract'] != state['contract'] or component['stage'] != stage
+        if validate_identity and (component['contract'] != state['contract'] or component['stage'] != stage
                 or component['epoch'] != entry['epoch'] or sha256_file(path) != entry['sha256']):
             raise ValueError('血池组件的训练身份或轮次不一致')
         state[stage] = component['model']
