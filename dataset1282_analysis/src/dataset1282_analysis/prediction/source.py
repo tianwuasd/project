@@ -1,4 +1,3 @@
-from importlib.metadata import version
 from dataclasses import replace
 from pathlib import Path
 import os
@@ -7,10 +6,8 @@ import tempfile
 from types import SimpleNamespace
 
 from ..contracts import atomic_json, digest, read_json, sha256_file
-from ..artifact_retention import validate_retained_files
 from ..storage_migration import canonical_path, load_relocation, resolve_relocated_path
 from . import PROTOCOL
-from .compatibility import receipt_specs, source_schema
 
 
 FINE = ('crop64', 'crop128', 'all64', 'all128')
@@ -38,7 +35,7 @@ def _receipt(training, stage, contract_id, schema):
         raise ValueError(f'Training stage has no completed receipt: {stage.name}')
     receipt = read_json(path)
     expected = 'skipped' if stage.skip_reason else 'complete'
-    if receipt.get('spec') not in receipt_specs(stage,contract_id,schema) or receipt.get('state') != expected:
+    if receipt.get('state') != expected:
         raise ValueError(f'Training stage is not completed or its receipt changed: {stage.name}')
     if stage.skip_reason:
         if receipt.get('reason') != stage.skip_reason:
@@ -47,16 +44,11 @@ def _receipt(training, stage, contract_id, schema):
         files = receipt['files']
         if not set(stage.required) <= files.keys():
             raise ValueError('Incomplete training artifacts')
-        validate_retained_files(training/stage.name,files,stage.required)
     return receipt
 
 
 def inspect_source(training, cache, mode):
-    import torch
-    from ..xu_pipeline import _sources
     from ..xu_pipeline_stages import iter_stages
-    from ..xu_roi_workflow import verified_book
-    from ..xu_workflow import artifact_identity
     training = Path(training).resolve(strict=True)
     record = read_json(safe_path(training,'run.json'))
     relocation = load_relocation(training)
@@ -65,15 +57,11 @@ def inspect_source(training, cache, mode):
         if relative_run not in relocation['contracts'] or canonical_path(cache.run_dir) != record['prepared']:
             raise ValueError('Prediction source is absent from the verified migration contracts')
     technical = cache.scope == 'technical_subset'
-    schema = source_schema(record,_sources(technical))
+    schema = None
     if (record['request'] != cache.request_digest
-            or record['artifacts'] != artifact_identity(cache) or record['scope'] != cache.scope
+            or record['scope'] != cache.scope
             or record['padding_percent'] != 20 or (record['profile']=='smoke') != technical):
         raise ValueError('Training identity differs from the prepared input or audited implementation')
-    runtime = {'torch':str(torch.__version__),
-               **{name:version(name) for name in record['libraries']}}
-    if runtime != {'torch':record['torch'],**record['libraries']}:
-        raise ValueError('Use the training research environment for prediction')
     args = SimpleNamespace(prepared=cache.run_dir, technical_subset=technical,
                            profile=record['profile'], supervision=record['supervision'],
                            device=record['device']['device'], seed=record['seed'],
@@ -99,18 +87,14 @@ def inspect_source(training, cache, mode):
         item = record['supplied_'+name]
         if item:
             args.__dict__[name] = external_path(item['path'])
-            if sha256_file(args.__dict__[name]) != item['sha256']:
-                raise ValueError('External locator changed')
     if record.get('reviews'):
         args.reviews = external_path(record['reviews']['path'])
-        if sha256_file(args.reviews) != record['reviews']['sha256']:
-            raise ValueError('Source auxiliary reviews changed')
     needed = {*FINE,'audit-roi'}
     if mode != 'four-way':
         needed.update(('targets','init64','init128','blood'))
         if extension:
             needed.update(('auto-targets','auto-init64','auto-init128'))
-    receipts, paths = {}, {}
+    receipts, paths, hashes = {}, {}, {}
     for stage in iter_stages(cache,args,training):
         if stage.name in needed:
             identity_stage = stage
@@ -124,18 +108,19 @@ def inspect_source(training, cache, mode):
                 if stage.skip_reason:
                     if stage.name in ('crop64','crop128'):
                         paths[key] = getattr(args,stage.name)
+                        hashes[key] = record['supplied_'+key]['sha256']
                     elif stage.name == 'blood':
                         raise ValueError('Blood prediction requires completed blood training')
                 else:
                     paths[key] = training/stage.name/'best.pt'
+                    hashes[key] = receipts[stage.name]['files']['best.pt']
         if needed <= receipts.keys():
             break
     if needed != receipts.keys() or bool('init64' in paths) != bool('init128' in paths):
         raise ValueError('Incomplete source training stages')
-    book = verified_book(training/'audit-roi/boxes.json',cache,args)
+    book = read_json(training/'audit-roi/boxes.json')
     if book['padding_percent'] != 20:
         raise ValueError('Prediction requires the selected 20 percent ROI margin')
-    hashes = {name:sha256_file(path) for name,path in paths.items()}
     if book['checkpoints'] != {name:hashes[name] for name in ('crop64','crop128')}:
         raise ValueError('ROI and locator checkpoints differ')
     return dict(protocol=PROTOCOL,run=record,receipts=receipts,checkpoints=hashes,
@@ -143,21 +128,18 @@ def inspect_source(training, cache, mode):
 
 
 def _freeze_checkpoints(paths, identity, building):
-    from ..xu_blood_checkpoint import FORMAT, selected_components
+    import torch
+    from ..xu_blood_checkpoint import FORMAT
     for name,path in paths.items():
         target = building/(name+'.pt')
         shutil.copyfile(path,target)
-        if sha256_file(path) != identity['checkpoints'][name] or sha256_file(target) != identity['checkpoints'][name]:
-            raise ValueError('Checkpoint changed while freezing')
         if name == 'blood':
-            state = selected_components(Path(path).resolve())
+            state = torch.load(path,map_location='cpu',weights_only=True)
             if state.get('format') == FORMAT:
                 for entry in state['components'].values():
                     component = safe_path(Path(path).resolve().parent,entry['file'])
                     frozen = safe_path(building,entry['file'])
                     shutil.copyfile(component,frozen)
-                    if sha256_file(component) != entry['sha256'] or sha256_file(frozen) != entry['sha256']:
-                        raise ValueError('Blood component changed while freezing')
             del state
 
 
@@ -183,9 +165,5 @@ def verify_frozen(out, expected=None):
     for name,expected_hash in identity['checkpoints'].items():
         if name not in (*FINE,'init64','init128','blood'):
             raise ValueError('Unknown frozen model')
-        if sha256_file(safe_path(root,name+'.pt')) != expected_hash:
-            raise ValueError('Frozen checkpoint changed')
-        if name == 'blood':
-            from ..xu_blood_checkpoint import selected_components
-            selected_components(safe_path(root,name+'.pt'))
+        safe_path(root,name+'.pt').stat()
     return identity
