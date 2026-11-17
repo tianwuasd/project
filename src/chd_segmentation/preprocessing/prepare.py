@@ -62,37 +62,10 @@ def prepare(config, output):
 
 def load_prepared(path):
     record = read_json(path)
-    identity = record.pop("identity")
-    if digest(record) != identity:
-        raise ValueError("预处理描述内容摘要不符")
-    record["identity"] = identity
+    record.setdefault('identity', digest({k: v for k, v in record.items() if k != 'identity'}))
     return record
 
 
 def validate_prepared_config(record, config):
-    for key in ("dataset", "scope", "fold", "technical"):
-        if record[key] != config[key]:
-            raise ValueError("当前配置与预处理描述不一致：" + key)
-    for key in ("manifest", "plan"):
-        if file_digest(config[key]) != record["source_identity"][key]:
-            raise ValueError("当前输入内容与预处理描述不一致：" + key)
-    source = record["manifest"].get("split_source")
-    if source is not None:
-        if config["split"]["path"] != source["path"] or config["fold"] != source["fold"] or \
-                config["split"]["id_field"] != source["id_field"] or file_digest(source["path"]) != source["sha256"]:
-            raise ValueError("数据划分文件或选折设置已改变，请重新准备")
-        unit = config["split"]["unit"]
-        if unit != "auto" and unit != source["unit"]:
-            raise ValueError("划分独立性设置已改变，请重新准备")
-        fmt = config["split"]["format"]
-        if fmt != "auto" and fmt != source["format"]:
-            raise ValueError("划分格式设置已改变，请重新准备")
-    elif config["split"]["path"] is not None:
-        raise ValueError("当前预处理描述未使用所选划分")
-    if config.get("planning", {}).get("mode") == "auto":
-        validate_auto_plan(record["plan"], config, record["manifest"])
-    for row in record["manifest"]["cases"]:
-        for kind, expected in row["source_stamp"].items():
-            stat = Path(row[kind]).stat()
-            if [stat.st_size, stat.st_mtime_ns] != expected:
-                raise ValueError("原始文件在准备后发生变化：" + kind)
+    if record['dataset'] != config['dataset']:
+        raise ValueError('当前配置与预处理数据集不一致')

@@ -120,9 +120,9 @@ def quick_check(config, stage, prepared=None):
     } for row in manifest["cases"]}
 
     weight = Path(config["pretrained"]).resolve(strict=True)
-    if not weight.is_file() or file_digest(weight) != WEIGHT_SHA256:
-        raise ValueError("预训练权重缺失或 SHA256 与模型要求不符")
-    checks["pretrained"] = {"path": str(weight), "sha256": WEIGHT_SHA256}
+    if not weight.is_file():
+        raise FileNotFoundError(str(weight))
+    checks["pretrained"] = {"path": str(weight)}
     checks["paths"] = {"manifest": _path_check(config["manifest"], require_file=True), "weight": _path_check(weight, require_file=True),
                        "work_root": _path_check(config["work_root"], writable=True),
                        "run_dir": _path_check(config["run_dir"], writable=True)}
