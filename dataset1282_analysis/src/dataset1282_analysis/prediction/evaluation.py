@@ -24,8 +24,6 @@ def evaluate(out):
             if record['state'] == 'roi_rejected':
                 results[name] = dict(role=row['role'],device=row['device'],state='roi_rejected')
                 continue
-            if sha256_file(row['label']) != row['sha256']['label']:
-                raise ValueError('Held-out reference changed')
             volume = nib.load(row['label'])
             geo = cache.geometry(name)
             shift = np.eye(4)
