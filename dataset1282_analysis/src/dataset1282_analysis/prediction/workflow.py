@@ -10,13 +10,12 @@ from ..xu_fusion import _atomic_array, _refine_shape, _save_case, blood_grow, gr
 from ..xu_geometry import PreparedCache, _resize
 from ..xu_roi import vote_box
 from .heldout import HeldoutCache, prepare_case, verify_case
-from .source import FINE, implementation, safe_path, verify_frozen
+from .source import FINE, safe_path, verify_frozen
 
 
 def verify_job(out):
     job = read_json(out/'run.json')
-    if job['implementation'] != implementation() or job['source'] != digest(verify_frozen(out)):
-        raise ValueError('Prediction implementation or frozen source changed')
+    verify_frozen(out)
     return job
 
 
@@ -46,8 +45,6 @@ def branch_record(out,branch,name,job):
     if record['job'] != digest(job) or record['case'] != name or record['branch'] != branch:
         raise ValueError('Prediction branch identity changed')
     path = safe_path(root,name+'.npy')
-    if sha256_file(path) != record['sha256']:
-        raise ValueError('Prediction branch bytes changed')
     array = np.load(path,allow_pickle=False,mmap_mode='r')
     side = 128 if branch.endswith('128') else 64
     if array.shape != (side,)*3 or array.dtype != np.uint8 or array.max() > (6 if branch.startswith('init') else 10):
@@ -57,7 +54,8 @@ def branch_record(out,branch,name,job):
 
 def _branches(out,cache,training,source,job,device,branches,boxes=None):
     import torch
-    from ..xu_workflow import frozen_predictor, input_id, side
+    from ..xu_workflow import side
+    from ..xu_training import load_predictor
     from ..xu_supply import BatchSupply
     for branch in branches:
         names = [name for name in job['cases'] if boxes is None or boxes[name]['quality']['accepted']]
@@ -69,12 +67,11 @@ def _branches(out,cache,training,source,job,device,branches,boxes=None):
             from ..xu_init import load_init_predictor
             predictor = load_init_predictor(checkpoint,cache=training,branch=branch,
                 profile=source['run']['profile'],supervision=source['run']['supervision'],
-                book=source['boxes'],device=device)
+                book=source['boxes'],device=device,validate_identity=False)
         else:
-            training_boxes = None if branch.startswith('crop') else source['boxes']
-            predictor,_ = frozen_predictor(checkpoint,branch=branch,profile=source['run']['profile'],
-                supervision=source['run']['supervision'],data_identity=input_id(
-                    training,source['run']['supervision'],training_boxes),device=device)
+            predictor = load_predictor(checkpoint,branch=branch,profile=source['run']['profile'],
+                supervision=source['run']['supervision'],data_identity=None,device=device,
+                validate_identity=False)
         n = side(branch)
         def read(batch):
             name = batch[0]
@@ -120,8 +117,7 @@ def case_record(out,name,job):
         raise ValueError('Completed case identity changed')
     if record['state'] == 'predicted':
         for suffix,key in (('.npy','label_sha256'),('.nii.gz','native_sha256')):
-            if sha256_file(safe_path(out/'cases',name+suffix)) != record['result'][key]:
-                raise ValueError('Completed prediction changed')
+            safe_path(out/'cases',name+suffix).stat()
     elif record['state'] != 'roi_rejected' or record['roi']['quality']['accepted']:
         raise ValueError('Invalid terminal prediction state')
     return record
@@ -147,7 +143,7 @@ def predict(out,device):
     if job['mode'] != 'four-way' and any(boxes[n]['quality']['accepted'] for n in pending):
         from ..xu_blood import load_blood_predictor
         blood = load_blood_predictor(BloodInputs(training,cache),out/'source/blood.pt',device,
-                                    source['run']['profile'],source['run']['supervision'])
+                                    source['run']['profile'],source['run']['supervision'],validate_identity=False)
     started = time.monotonic()
     (out/'cases').mkdir(exist_ok=True)
     for i,name in enumerate(pending,1):

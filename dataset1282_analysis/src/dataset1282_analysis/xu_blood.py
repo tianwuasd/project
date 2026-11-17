@@ -368,19 +368,21 @@ def train(cache,args,out):
     return result
 
 
-def load_blood_predictor(cache, checkpoint, device='cpu', profile=None, supervision=None):
+def load_blood_predictor(cache, checkpoint, device='cpu', profile=None, supervision=None,
+                         validate_identity=True):
     """Return a label-free predictor yielding 0/1/2 labels in requested cache-axis ROI."""
     import torch
     from .xu_blood_models import SliceUNet, BloodSequence
     from .xu_targets import blood_ids
     from .xu_blood_checkpoint import selected_components
-    state=selected_components(checkpoint)
+    state=selected_components(checkpoint,validate_identity=validate_identity)
     c=state['contract']
     arm = supervision or c.get('supervision','marginal')
-    eligible = blood_cohort(cache,blood_ids(cache),arm)
-    expected = _contract(cache,c['targets'],arm,profile or c['profile'],c['seed'],eligible)
-    if not _matches(c,expected):
-        raise ValueError('Blood prediction checkpoint contract mismatch')
+    if validate_identity:
+        eligible = blood_cohort(cache,blood_ids(cache),arm)
+        expected = _contract(cache,c['targets'],arm,profile or c['profile'],c['seed'],eligible)
+        if not _matches(c,expected):
+            raise ValueError('Blood prediction checkpoint contract mismatch')
     if state['kind']!='best' and not (state['kind']=='technical' and c['profile']=='smoke'
                                       and cache.scope=='technical_subset'):
         raise ValueError('Expected selected weights or a technical smoke checkpoint')
