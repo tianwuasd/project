@@ -9,7 +9,7 @@ from ..observability.status import operation_lock, write_status
 from ..storage_paths import assert_output_location
 from . import PROTOCOL
 from .heldout import GROUPS, plan_inputs
-from .source import freeze_source, implementation, inspect_source
+from .source import freeze_source, implementation, inspect_source, verify_frozen
 
 
 def validate_output(args):
@@ -30,6 +30,18 @@ def open_job(args):
     out = assert_output_location(args.output)
     config = validate_output(args)
     cache = PreparedCache(args.prepared,allow_technical_subset=args.technical_subset)
+    path = out/'run.json'
+    if args.resume:
+        job = read_json(path)
+        source = verify_frozen(out)
+        if (Path(job['prepared']).resolve() != cache.run_dir or job['mode'] != args.mode
+                or Path(source['training']).resolve() != args.training.resolve()):
+            raise ValueError('Resume must use the selected prepared data, training and prediction mode')
+        from .heldout import select_cases
+        selected = select_cases(read_json(cache.run_dir/'cohort.json'), args.groups, args.cases)
+        if set(selected) != set(job['cases']):
+            raise ValueError('Resume must use the saved held-out case selection')
+        return out,cache,job
     cases = plan_inputs(cache,config,args.policy,args.groups,args.cases)
     source,_ = inspect_source(args.training,cache,args.mode)
     dataset = cache.run_dir/'preprocessed/Dataset282_CHDSource'
@@ -37,7 +49,6 @@ def open_job(args):
                mode=args.mode,cases=cases,technical_subset=args.technical_subset,
                plans=sha256_file(dataset/'nnUNetPlans.json'),dataset=sha256_file(dataset/'dataset.json'),
                implementation=implementation())
-    path = out/'run.json'
     if path.exists():
         if not args.resume or read_json(path) != job:
             raise ValueError('Resume requires identical held-out inputs, models and implementation')
