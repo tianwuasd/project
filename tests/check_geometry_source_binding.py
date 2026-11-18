@@ -1,5 +1,8 @@
 import ast
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 
 def main():
@@ -18,6 +21,23 @@ def main():
     assert len(reads)==1
     assert 'catalog.json' not in ast.unparse(function)
     print('STATIC_SOURCE_BINDING_OK: explicit storage; production open without labels; no direct catalog selection')
+    if len(sys.argv) > 1:
+        root, commit = sys.argv[1:3]
+        assert len(commit)==40 and all(c in '0123456789abcdef' for c in commit)
+        source = subprocess.check_output(['git','-C',root,'show',
+            commit+':src/chd_segmentation/preprocessing/inputs.py'],text=True,encoding='utf-8',
+            env={**os.environ,'GIT_OPTIONAL_LOCKS':'0'})
+        production = ast.parse(source)
+        resolver = next(n for n in production.body if isinstance(n,ast.FunctionDef) and n.name=='resolve_preprocessed')
+        assert [a.arg for a in resolver.args.kwonlyargs] == ['dataset','case_ids','storage']
+        offline = next(n for n in production.body if isinstance(n,ast.ClassDef) and n.name=='OfflineDataset')
+        opened = next(n for n in offline.body if isinstance(n,ast.FunctionDef) and n.name=='open')
+        fields = {k.arg for n in ast.walk(opened) if isinstance(n,ast.Call)
+                  and isinstance(n.func,ast.Attribute) and n.func.attr=='update' for k in n.keywords}
+        assert {'source_plan','axis_order','processed_spacing','source_directory'} <= fields
+        assert any(isinstance(n,ast.keyword) and n.arg=='mmap_mode'
+                   and isinstance(n.value,ast.Constant) and n.value.value=='r' for n in ast.walk(opened))
+        print('FIXED_PRODUCTION_API_AST_OK',commit)
 
 
 if __name__ == '__main__':
