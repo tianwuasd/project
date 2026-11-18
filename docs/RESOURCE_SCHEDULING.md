@@ -24,9 +24,11 @@
 
 worker 数量受 `workers`/`max_workers`、当前全局 batch、各 rank 份额、CPU 比例及内存共同约束；worker 内部数值库单线程。两个训练 rank 可以在少量 CPU 配额上共享 CPU 时间，不要求额外一颗专用协调核心。配置上限为 32 个供数进程、8 个病例构建名额；全局 batch 4 时实际最多 4 个供数进程，每个 rank 最多使用自身份额数量的 worker。实际准入数量可以减少到零 worker、一例构建。
 
-每个 rank 仅保留一个尚未消费的批次，应用后的 `prefetch` 固定为 1。当前全局批次需要的所有样本完成计算并释放输入后，才派发下一批次；病例和取块随机数仍由原全局 slot 协议决定。两卡、全局 batch 4 时，每个 rank 为当前批次准备两块数据。当前批次最多涉及四个病例，也可能重复抽到同一病例。
+STU-Net每个rank应用后的供数容量为1或2，由真实内存和CPU预算决定。容量2保留当前批和一个顺序预取批，当前批计算时准备下一批；容量不足退到1。零worker的本地异步供数线程单独计入CPU额度。病例和取块随机数仍由原全局slot协议决定，未消费预取在恢复时从已消费游标重放。两卡、全局batch4时，每个rank为每批准备两块数据。当前批次最多涉及四个病例，也可能重复抽到同一病例。
 
-`HostCoordinator` 使用主机进程间条件变量协调进程启动、模型加载、CPU 数据就绪、GPU 传输完成、批次消费、供数池调整及检查点写入。所有 rank 完成启动后再建立通信组。数据准备期间，各 rank 在主机上等待，尚未进入训练 collective。只有全部 rank 的当前数据准备完成且传输完成，才进入模型计算。CUDA 异步复制通过事件确认完成后释放 pinned 输入；计算结束同步设备，再释放当前批次。NCCL/Gloo 通信超时由 `resources.collective_timeout_seconds` 设置，默认 180 秒，不用这个超时限制 CPU 预处理。
+`HostCoordinator`使用主机进程间条件变量协调进程启动、模型加载、CPU数据就绪、GPU传输入队、批次消费、供数池调整及检查点写入。所有rank完成启动后再建立通信组。数据准备期间各rank在主机上等待，尚未进入训练collective。CUDA拷贝与模型在同一计算流按序执行；pinned源由批次及供数器持有，消费或异常收尾前通过拷贝事件确认完成。正常传输不立即阻塞CPU；显存外部查询按日志心跳间隔及收尾采样，查询耗时单列。NCCL/Gloo通信超时仍由resources.collective_timeout_seconds设置。
+
+STU-Net的mmap缓存按映射元数据和已实体化前景位置数组核算，另用cache_entries限制映射病例数（默认16）。映射文件逻辑容量独立记录，实际驻留内存继续由MemoryGuard测量；等待内存时释放本任务缓存。同一PID的多个guard分别核对自身票据，支持本地异步供数线程。
 
 运行中默认每 30 秒重新规划，增加供数前至少间隔 60 秒。调整时停止派发，结束旧供数池，清理未消费预取和缓存，再检查实时余量并启动新池。GPU 模型、优化器和 scaler 保持驻留，全局采样游标保持不变。`supply_resize_proposed`、`supply_resize_applied` 分别记录提出及实际应用的配置。
 
@@ -40,7 +42,7 @@ Linux 使用 systemd 获取当前进程的 cgroup，并通过 util-linux 的 fin
 
 `tests/verify_resource_adaptation.py` 限定一个真实 ImageCHD 病例的 32³ 区域、全局 batch 4、总计两次更新，覆盖供数 1→0→1、确定性重放、内存不足准入、同进程恢复、完整轮次边界 1→2 个 CPU/Gloo 进程恢复及预测复用。临时文件由独占工作区自动清理，保留报告独立于工作区。
 
-`tests/verify_ordered_supply.py` 限定两个真实 ImageCHD 病例的 32³ 区域、两个 CPU/Gloo 进程、全局 batch 4，总计两次训练更新及对应验证，检查恢复、每个全局 slot 恰好消费一次、单批队列上限和真实供数等待超过通信超时时仍能继续。显式 `--cuda-transfer` 使用一张通过空闲准入的显卡检查小块复制完成和缓冲释放，不进行 GPU 训练。
+`tests/verify_ordered_supply.py`限定两个真实ImageCHD病例的32³区域、两个CPU/Gloo进程、全局batch4，总计两次训练更新及对应验证，检查恢复、每个全局slot恰好消费一次和有界顺序供数。显式--cuda-transfer检查小块复制完成及缓冲释放，不进行GPU训练。`tests/verify_memory_streaming.py --adaptive`使用两例最多64³区域检查病例内并行、动态块、数值一致性、双批供数及两次更新恢复；具体运行与验收结果依独立报告确认。
 
 `tests/verify_offline.py` 在两例真实病例上检查离线处理、只读 mmap、完整复用、仅补缺失病例、稳定数据身份、两次更新/恢复、预测/评价和折统计隔离。`--preprocess-only` 只验证离线及共享资源登记，不执行训练。仿真选卡明确使用虚拟 GPU；真实计算使用 CPU/Gloo，不代表真实多卡 CUDA/NCCL 已验收。
 

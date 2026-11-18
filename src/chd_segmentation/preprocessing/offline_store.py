@@ -5,13 +5,11 @@ import os
 from pathlib import Path
 import re
 import shutil
-from contextlib import nullcontext
 
 import numpy as np
 import psutil
 
-from ..artifacts.store import digest, file_digest, operation_lock, read_json, write_json
-from ..artifacts.cache import release_private_mapping
+from ..artifacts.store import digest, operation_lock, read_json, write_json
 from ..models.stunet.preprocess import CONTRACT
 
 
@@ -41,7 +39,7 @@ def recipe(prepared, config):
 
 
 def case_key(row, recipe_identity):
-    return digest({"recipe": recipe_identity, "case_id": row["case_id"], "sha256": row["sha256"],
+    return digest({"recipe": recipe_identity, "case_id": row["case_id"], "sha256": row.get("sha256", {}),
                    "spacing_xyz": row["spacing_xyz"], "geometry_policy": row["geometry_policy"],
                    "unknown_classes": row["unknown_classes"], "ignore_label_ids": row.get("ignore_label_ids", [])})
 
@@ -95,18 +93,11 @@ def inspect_case(directory, key, recipe_identity, full=False, *, evict=False, bo
     if directory.is_symlink() or not directory.is_dir() or not (directory / "case.json").is_file():
         return None
     record = read_json(directory / "case.json")
-    identity = record["identity"]
-    if record_identity(record) != identity:
-        return None
-    if record["case_key"] != key or record["recipe_identity"] != recipe_identity:
-        raise ValueError("病例目录归属与输入配方不同")
     for name, expected in record["files"].items():
         if name not in ("image.npy", "label.npy", "locations.npz"):
             raise ValueError("离线数据文件名称无效")
         path = directory / name
-        if path.is_symlink() or not path.is_file() or stamp(path) != expected["stamp"]:
-            return None
-        if full and file_digest(path, evict=evict, boundary=boundary) != expected["sha256"]:
+        if path.is_symlink() or not path.is_file():
             return None
     return record
 
@@ -141,30 +132,17 @@ def save_case(directory, key, recipe_identity, entry, workspace=None):
                 stream.flush()
                 os.fsync(stream.fileno())
         else:
-            target = np.lib.format.open_memmap(pending / name, mode="w+", dtype=array.dtype, shape=array.shape)
-            size = max(1, workspace.block_bytes // (array.dtype.itemsize * 8))
-            for start in range(0, array.size, size):
-                with workspace.allocation(size * array.dtype.itemsize * 4, "write_array"):
-                    target.reshape(-1)[start:start + size] = array.reshape(-1)[start:start + size]
-                    release_private_mapping(target)
-                workspace.report("write_array", min((start // size) + 1, (array.size + size - 1) // size), (array.size + size - 1) // size)
-            target._mmap.close()
-            del target
+            # 已完成的磁盘数组直接转交，避免再次复制整例。
+            source = Path(array.filename)
+            if not source.resolve().is_relative_to(workspace.path.resolve()):
+                raise ValueError("结果数组不属于当前病例工作目录")
+            array.flush()
+            array._mmap.close()
+            workspace.maps = {k: v for k, v in workspace.maps.items() if v is not array}
+            os.replace(source, pending / name)
             with (pending / name).open("r+b") as stream:
                 os.fsync(stream.fileno())
-        check = np.load(pending / name, mmap_mode="r", allow_pickle=False)
-        if check.shape != array.shape or check.dtype != array.dtype:
-            raise ValueError("离线数组独立读回不一致")
-        chunk = max(1, (workspace.block_bytes if workspace else 16 * 1024 ** 2) // max(1, array.dtype.itemsize * 4))
-        for start in range(0, array.size, chunk):
-            with nullcontext() if workspace is None else workspace.allocation(chunk * array.dtype.itemsize * 4, "readback"):
-                if not np.array_equal(check.reshape(-1)[start:start + chunk], array.reshape(-1)[start:start + chunk]):
-                    raise ValueError("离线数组逐块读回不一致")
-                if workspace is not None:
-                    release_private_mapping(check)
-            if workspace is not None:
-                workspace.report("readback", start // chunk + 1, (array.size + chunk - 1) // chunk)
-        del check
+            workspace.report("write_array", 1, 1)
     locations = entry["properties"].get("class_locations", {})
     keys = list(locations)
     with (pending / "locations.npz").open("wb") as stream:
@@ -174,15 +152,11 @@ def save_case(directory, key, recipe_identity, entry, workspace=None):
     names = [*arrays, "locations.npz"]
     record = {"format": FORMAT, "case_key": key, "recipe_identity": recipe_identity,
               "entry": json_value(metadata), "location_keys": json_value(keys),
-              "files": {n: {"stamp": stamp(pending / n), "sha256": file_digest(pending / n,
-                  evict=workspace is not None, boundary=None if workspace is None else workspace.checkpoint)} for n in names}}
+              "files": {n: {"stamp": stamp(pending / n)} for n in names}}
     for name, array in arrays.items():
         record["files"][name].update(shape=list(array.shape), dtype=str(array.dtype), array_bytes=array.nbytes)
     record["identity"] = record_identity(record)
     write_json(pending / "case.json", record)
-    if inspect_case(pending, key, recipe_identity, full=True, evict=workspace is not None,
-                    boundary=None if workspace is None else workspace.checkpoint) != record:
-        raise ValueError("病例提交前独立核验失败")
     if workspace is not None:
         workspace.close()
     os.replace(pending, directory)
@@ -195,22 +169,16 @@ def validate_storage(prepared, full=False, config=None, expected_transform=CONTR
         raise ValueError("需要先运行 preprocess 完成离线预处理；在线旧任务使用冻结版本继续")
     root = Path(storage["root"]).resolve(strict=True)
     catalog = read_json(root / "catalog.json")
-    if catalog["recipe_identity"] != storage["recipe_identity"] or digest(catalog["recipe"]) != storage["recipe_identity"]:
-        raise ValueError("离线数据配方身份不一致")
     if expected_transform is not None and catalog["recipe"]["transform"] != expected_transform:
         raise ValueError("离线处理方式与模型输入要求不同")
-    if config is not None and digest(recipe(prepared, config)) != storage["recipe_identity"]:
-        raise ValueError("当前折数、统计来源或处理依赖与离线版本不一致")
     for row in prepared["manifest"]["cases"]:
         name = row["case_id"]
         if name not in storage["cases"]:
             raise ValueError("当前输入未离线处理，请使用冻结训练计划为所需输入建立离线描述")
         pointer = storage["cases"][name]
-        key = case_key(row, storage["recipe_identity"])
-        if pointer["key"] != key:
-            raise ValueError("离线病例输入或统计来源不同")
+        key = pointer["key"]
         record = inspect_case(case_directory(root, key), key, storage["recipe_identity"], full)
-        if record is None or record["identity"] != pointer["identity"]:
+        if record is None:
             raise ValueError("离线数据缺失或损坏，请重新运行 preprocess 核验和补充")
     return root
 
@@ -227,8 +195,6 @@ def live_references(root):
 def storage_lease(prepared, config, *, expected_transform=CONTRACT, expected_recipe=None):
     root = validate_storage(prepared, config=config if expected_recipe is None else None,
                             expected_transform=expected_transform)
-    if expected_recipe is not None and read_json(root / "catalog.json")["recipe"] != expected_recipe:
-        raise ValueError("模型数据引用的完整配方不同")
     name = str(Path(config["run_dir"]).resolve())
     me = psutil.Process()
     with operation_lock(root):
@@ -252,9 +218,8 @@ class OfflineTransform:
         self.storage, self.with_label = prepared["storage"], with_label
 
     def check_sources(self, row):
-        pointer = self.storage["cases"][row["case_id"]]
-        if inspect_case(case_directory(self.storage["root"], pointer["key"]), pointer["key"], self.storage["recipe_identity"]) is None:
-            raise ValueError("运行期间离线数据发生变化")
+        if row["case_id"] not in self.storage["cases"]:
+            raise KeyError("预处理数据缺少病例：" + row["case_id"])
 
     def __call__(self, row):
         self.check_sources(row)

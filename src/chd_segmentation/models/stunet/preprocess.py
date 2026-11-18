@@ -16,6 +16,8 @@ CONTRACT = "stunet-ct-nnunet-bounded-v1"
 
 
 def bounded_locations(seg, classes_or_regions, seed=1234, verbose=False, min_num_samples=10000, min_percent_coverage=.01, workspace=None):
+    if workspace is not None:
+        return parallel_locations(seg, classes_or_regions, seed, min_num_samples, min_percent_coverage, workspace)
     flat, block, result = seg[0].ravel(), 1_000_000 if workspace is None else min(1_000_000, workspace.block_bytes // 32), {}
     def parts():
         for start in range(0, len(flat), block):
@@ -41,6 +43,41 @@ def bounded_locations(seg, classes_or_regions, seed=1234, verbose=False, min_num
                     positions = np.flatnonzero(np.isin(flat[start:start + block], labels))
                     indices[left:right] = start + positions[offsets[left:right] - seen]
                 seen += count
+            coordinates = np.column_stack(np.unravel_index(indices, seg.shape[1:]))
+            result[key] = np.column_stack((np.zeros(size, dtype=np.int32), coordinates)).astype(np.int32)
+    return result
+
+
+def parallel_locations(seg, classes_or_regions, seed, minimum, coverage, workspace):
+    flat, records = seg[0].ravel(), []
+    def count(span):
+        return np.unique(flat[span[0]:span[1]], return_counts=True)
+    def collect(span, result):
+        values, counts = result
+        records.append((span, dict(zip(map(int, values), map(int, counts)))))
+    workspace.execution.linear((len(flat),), 24, count, "locations_scan", consume=collect)
+    rng, result = np.random.default_rng(seed), {}
+    for value in classes_or_regions:
+        labels = tuple(value) if isinstance(value, (tuple, list)) else (int(value),)
+        key = labels if isinstance(value, (tuple, list)) else int(value)
+        total = sum(sum(hist.get(label, 0) for label in set(labels)) for _, hist in records)
+        if not total:
+            result[key] = []
+            continue
+        size = min(total, max(min(minimum, total), int(np.ceil(total * coverage))))
+        with workspace.allocation(size * 192, "locations_sample"):
+            offsets = np.sort(rng.choice(total, size, replace=False, shuffle=False))
+            indices = np.empty(size, dtype=np.int64)
+            seen = 0
+            def sample(span):
+                return np.flatnonzero(np.isin(flat[span[0]:span[1]], labels))
+            def collect_positions(span, positions):
+                nonlocal seen
+                count = len(positions)
+                left, right = np.searchsorted(offsets, [seen, seen + count])
+                indices[left:right] = span[0] + positions[offsets[left:right] - seen]
+                seen += count
+            workspace.execution.linear((len(flat),), 24, sample, "locations_sample", consume=collect_positions)
             coordinates = np.column_stack(np.unravel_index(indices, seg.shape[1:]))
             result[key] = np.column_stack((np.zeros(size, dtype=np.int32), coordinates)).astype(np.int32)
     return result

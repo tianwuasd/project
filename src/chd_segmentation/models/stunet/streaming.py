@@ -20,6 +20,7 @@ from ...artifacts.store import read_json, write_json
 from ...artifacts.cache import release_private_mapping, discard_file_pages
 from ...preprocessing.validation import SourceReader
 from .preprocess import bounded_locations
+from .block_execution import BlockExecution
 
 
 IMPLEMENTATION = "stunet-global-coordinate-blocks-v2"
@@ -47,9 +48,12 @@ class BlockWorkspace:
         self.path, self.config, self.guard, self.case_id = Path(path), config, guard, case_id
         self.path.mkdir(exist_ok=False)
         self.maps, self.last_log, self.peak_block = {}, 0., 0
+        self.streams = []
         self.started = perf_counter()
+        self.phase, self.phase_started = None, self.started
         self.plane_context = None
         self.block_bytes = config["preprocessing"]["block_bytes"]
+        self.execution = BlockExecution(self)
 
     def create(self, name, shape, dtype):
         path = self.path / (name + ".npy")
@@ -62,6 +66,11 @@ class BlockWorkspace:
     def release_pages(self):
         for value in self.maps.values():
             release_private_mapping(value)
+        for stream in self.streams:
+            stream.flush()
+            os.fsync(stream.fileno())
+            discard_file_pages(stream)
+        self.release_raw_pages()
         if os.name == "nt" and sum(value.nbytes for value in self.maps.values()) > 64 * 1024 ** 2:
             # 仅回收当前预处理进程的可分页工作集，不触碰其他任务。
             kernel = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -71,6 +80,14 @@ class BlockWorkspace:
             if not psapi.EmptyWorkingSet(kernel.GetCurrentProcess()):
                 raise ctypes.WinError(ctypes.get_last_error())
 
+    def release_raw_pages(self):
+        if hasattr(os, "posix_fadvise"):
+            for name in ("image.nii", "label.nii"):
+                path = self.path / name
+                if path.is_file():
+                    with path.open("rb") as stream:
+                        discard_file_pages(stream)
+
     def drop(self, name):
         value = self.maps.pop(name)
         value.flush()
@@ -79,20 +96,24 @@ class BlockWorkspace:
 
     @contextmanager
     def allocation(self, count, label):
-        self.release_pages()
-        with self.guard.admit(int(count), label=f"{self.case_id}:{label}") as ticket:
+        available = 0 if self.execution is None else getattr(self.execution.local, "allowance", 0)
+        if available:
+            if count > available:
+                raise MemoryError("分块内部临时量超出已核算额度")
+            yield
+            return
+        with self.guard.admit(int(count), label=f"{self.case_id}:{label}", release=self.release_pages) as ticket:
             if ticket is None:
                 raise MemoryError("持续内存压力已停止当前病例；完整病例及冻结计划保留，可重新运行预处理")
             self.peak_block = max(self.peak_block, int(count))
             yield
-        self.release_pages()
 
     def blocks(self, shape, per_voxel=64, full_axis=None, label="block", block_bytes=None):
         limit = max(1, (self.block_bytes if block_bytes is None else block_bytes) // per_voxel)
         extent = tile_extent(shape, limit, full_axis)
         total = int(np.prod([(size + step - 1) // step for size, step in zip(shape, extent)]))
         for index, section in enumerate(tiles(shape, limit, full_axis)):
-            self.guard.boundary()
+            self.guard.observed_boundary()
             with self.allocation(int(np.prod([s.stop - s.start for s in section])) * per_voxel, label):
                 yield section
             if perf_counter() - self.last_log >= self.config["logging"]["heartbeat_seconds"] or index + 1 == total:
@@ -103,12 +124,17 @@ class BlockWorkspace:
             raise MemoryError("持续内存压力已停止当前病例；完整结果保留")
 
     def report(self, phase, done, total=None):
+        plane_record = {"plane_index": None, "plane_total": None}
         if self.plane_context is not None and total is not None:
             plane, planes, kind = self.plane_context
-            done, total = plane * total + done, planes * total
+            plane_record = {"plane_index": plane + 1, "plane_total": planes}
             phase = kind + ":" + phase
         now = perf_counter()
-        if now - self.last_log < self.config["logging"]["heartbeat_seconds"] and done != total:
+        changed = phase != self.phase
+        if changed:
+            self.phase, self.phase_started = phase, now
+        finished = done == total and (self.plane_context is None or plane_record["plane_index"] == plane_record["plane_total"])
+        if now - self.last_log < self.config["logging"]["heartbeat_seconds"] and not finished and not changed:
             return
         path = Path(self.config["run_dir"]) / "progress-preprocess.json"
         memory = self.guard.snapshot()
@@ -122,13 +148,19 @@ class BlockWorkspace:
             record = {**overall, "stage": "preprocess", "current_case": self.case_id, "phase": phase,
                       "block_done": done, "block_total": total, "block_remaining": None if total is None else total - done,
                       "resource": resource_summary(memory), "disk": disk, "elapsed_seconds": now - self.started,
-                      "peak_block_bytes": self.peak_block}
+                      "case_seconds": now-self.started, "stage_seconds": now-self.phase_started,
+                      "peak_block_bytes": self.peak_block, **plane_record}
+            if self.execution is not None and self.execution.phase == phase:
+                record["execution"] = self.execution.metrics()
+            else:
+                record['execution'] = {'applied_case_threads': 1, 'applied_block_bytes': self.block_bytes}
             write_json(path, record)
         event(self.config["run_dir"], "preprocess_blocks", console=False, **record)
         console_progress(record)
         self.last_log = now
 
     def close(self):
+        self._close_execution()
         for name in list(self.maps):
             self.drop(name)
         for path in self.path.iterdir():
@@ -138,9 +170,15 @@ class BlockWorkspace:
         self.path.rmdir()
 
     def release_handles(self):
+        self._close_execution()
         for value in self.maps.values():
             value._mmap.close()
         self.maps.clear()
+
+    def _close_execution(self):
+        if self.execution is not None:
+            self.execution.close()
+            self.execution = None
 
 
 def local_image(image, source, name, workspace):
@@ -148,22 +186,22 @@ def local_image(image, source, name, workspace):
         return image
     target = workspace.path / (name + ".nii")
     with gzip.open(source, "rb") as incoming, target.open("xb") as outgoing:
-        count = 0
-        while True:
-            with workspace.allocation(8 * 1024 ** 2, "decompress"):
-                block = incoming.read(4 * 1024 ** 2)
-                if not block:
-                    break
-                outgoing.write(block)
-                if hasattr(os, "posix_fadvise"):
-                    outgoing.flush()
-                    os.fdatasync(outgoing.fileno())
-                    discard_file_pages(outgoing)
-                count += 1
-                workspace.report("decompress", count)
-                del block
-        outgoing.flush()
-        os.fsync(outgoing.fileno())
+        workspace.streams.append(outgoing)
+        try:
+            count = 0
+            while True:
+                with workspace.allocation(8 * 1024 ** 2, "decompress"):
+                    block = incoming.read(4 * 1024 ** 2)
+                    if not block:
+                        break
+                    outgoing.write(block)
+                    count += 1
+                    workspace.report("decompress", count)
+                    del block
+            outgoing.flush()
+            os.fsync(outgoing.fileno())
+        finally:
+            workspace.streams.remove(outgoing)
     return nib.load(target, mmap="r", keep_file_open=False)
 
 
@@ -175,7 +213,7 @@ def unique_values(array, workspace):
 
 
 def read_sources(reader, row, workspace):
-    with workspace.allocation(8 * 1024 ** 2, "source_verify"):
+    with workspace.allocation(64 * 1024, "source_metadata"):
         image, label, spacing, roi = reader.read_metadata(row)
     native_image = image
     image = local_image(image, Path(row["image"]), "image", workspace)
@@ -219,6 +257,7 @@ def read_sources(reader, row, workspace):
         del values
     if lo == hi:
         raise ValueError("原图无灰度变化")
+    workspace.release_raw_pages()
     return native_image, spacing, roi, data, seg, mask, present - {-1, 0}, label is not None
 
 
@@ -294,14 +333,40 @@ def prepare_coefficients(source, order, workspace, name):
     padding = 12 if order > 1 else 0
     shape = tuple(n + 2 * padding for n in source.shape)
     coeff = workspace.create(name, shape, np.float64)
-    for part in workspace.blocks(shape, 24, label="prefilter_copy"):
+    def copy(part):
         indices = [np.clip(np.arange(s.start, s.stop) - padding, 0, size - 1) for s, size in zip(part, source.shape)]
         coeff[part] = source[np.ix_(*indices)]
+    parallel_sections(workspace, shape, 24, copy, "prefilter_copy")
     if order > 1:
         for axis in range(source.ndim):
-            for part in workspace.blocks(shape, 24, full_axis=axis, label=f"prefilter_axis_{axis}"):
+            def filter_lines(part):
                 spline_filter1d(coeff[part], order=order, axis=axis, output=coeff[part], mode="nearest")
+            parallel_sections(workspace, shape, 24, filter_lines, f"prefilter_axis_{axis}", full_axis=axis)
     return coeff, padding
+
+
+def parallel_sections(workspace, shape, cost, operation, label, full_axis=None):
+    workspace.execution.sections(shape, cost, operation, label, full_axis)
+
+
+def linear_points(span, source_shape, output_shape, padding=0):
+    indices = np.unravel_index(np.arange(*span, dtype=np.int64), output_shape)
+    points = np.asarray([(axis.astype(np.float64) + .5) * (float(old) / new) - .5 + padding
+                         for axis, old, new in zip(indices, source_shape, output_shape)])
+    return indices, points
+
+
+def support_window(span, source_shape, output_shape):
+    bounds = []
+    for axis, size in enumerate(output_shape):
+        stride = int(np.prod(output_shape[axis + 1:]))
+        first, last = span[0] // stride, (span[1] - 1) // stride
+        begin, end = (0, size) if first // size != last // size else (first % size, last % size + 1)
+        old = source_shape[axis]
+        lo = max(0, min(old - 1, int(np.floor((begin + .5) * (float(old) / size) - .5))))
+        hi = min(old, max(lo + 1, int(np.ceil((end - .5) * (float(old) / size) - .5)) + 1))
+        bounds.append(slice(lo, hi))
+    return tuple(bounds)
 
 
 def coordinates(part, source_shape, output_shape, padding=0):
@@ -317,15 +382,16 @@ def resize_image(source, output, order, workspace, name, clip=True):
     if clip:
         for part in workspace.blocks(source.shape, 8, label="intensity_bounds"):
             low, high = min(low, float(source[part].min())), max(high, float(source[part].max()))
-    for part in workspace.blocks(output.shape, 96, label="image_resample"):
-        points = coordinates(part, source.shape, output.shape, padding)
+    def interpolate(span):
+        indices, points = linear_points(span, source.shape, output.shape, padding)
         block = map_coordinates(coeff, points, output=np.float64, order=order, mode="nearest", prefilter=False)
         if clip:
             np.clip(block, low, high, out=block)
         if not np.isfinite(block).all():
             raise ValueError("图像插值产生非有限数值")
-        output[part] = block
+        output[indices] = block
         del block, points
+    workspace.execution.linear(output.shape, 128, interpolate, "image_resample")
     if own_coeff:
         workspace.drop(name)
 
@@ -342,36 +408,32 @@ def resize_labels(source, output, order, workspace):
             coefficients[int(label)] = (*prepare_coefficients(indicator, order, workspace, name), name)
             workspace.drop("indicator")
     # 最近邻及每类分数遵循当前 batchgenerators 的精确并列决策。
-    for part in workspace.blocks(output.shape, 128, label="label_resample"):
-        points = coordinates(part, source.shape, output.shape)
+    def interpolate(span):
+        indices, points = linear_points(span, source.shape, output.shape)
         if order == 0:
-            output[part] = map_coordinates(source, points, order=0, mode="nearest", prefilter=False)
+            output[indices] = map_coordinates(source, points, order=0, mode="nearest", prefilter=False)
         else:
-            shape = tuple(s.stop - s.start for s in part)
+            shape = (span[1] - span[0],)
             def scores(value):
                 if order > 1:
                     coeff, padding, _ = coefficients[int(value)]
                     result = map_coordinates(coeff, points + padding, order=order, mode="nearest", prefilter=False)
                 else:
-                    lower = [max(0, min(size - 1, int(np.floor(axis.min())))) for axis, size in zip(points, source.shape)]
-                    upper = [min(size, max(low + 1, int(np.ceil(axis.max())) + 1))
-                             for axis, size, low in zip(points, source.shape, lower)]
-                    window = tuple(slice(a, b) for a, b in zip(lower, upper))
-                    required = int(np.prod([b - a for a, b in zip(lower, upper)])) * 16
-                    if required > workspace.block_bytes:
-                        raise MemoryError("标签源支持窗口超过块预算；请减小 preprocessing.block_bytes 以缩小目标块")
-                    with workspace.guard.admit(required, label="label_local_support") as ticket:
-                        if ticket is None:
-                            raise MemoryError("标签插值等待超时；完整病例仍可复用")
+                    window = support_window(span, source.shape, output.shape)
+                    required = int(np.prod([s.stop - s.start for s in window])) * 16
+                    with workspace.allocation(required, "label_local_support"):
                         indicator = (source[window] == value).astype(np.float64)
-                        local = points - np.asarray(lower).reshape((-1,) + (1,) * source.ndim)
+                        local = points - np.asarray([s.start for s in window])[:, None]
                         result = map_coordinates(indicator, local, order=order, mode="nearest", prefilter=False)
                 np.clip(result, 0., 1., out=result)
                 return result
-            output[part] = _resample_seg_by_argmax(labels, scores,
+            output[indices] = _resample_seg_by_argmax(labels, scores,
                 lambda: map_coordinates(source, points, order=0, mode="nearest", prefilter=False),
                 shape, source.dtype, "nearest")
         del points
+    extra = None if order != 1 else lambda span: int(np.prod([
+        s.stop - s.start for s in support_window(span, source.shape, output.shape)])) * 16
+    workspace.execution.linear(output.shape, 128, interpolate, "label_resample", extra)
     for _, _, name in coefficients.values():
         workspace.drop(name)
 
@@ -468,6 +530,8 @@ def stream_into_workspace(prepared, row, config, guard, workspace):
         affine = np.diag([*spacing, 1.])
     else:
         affine[:3, :3] *= spacing / np.linalg.norm(affine[:3, :3], axis=0)
+    event(config["run_dir"], "preprocess_execution", console=False, case_id=row["case_id"],
+          **workspace.execution.metrics())
     entry = {"case_id": row["case_id"], "image": values, "label": targets if has_label else None,
         "unknown_classes": row["unknown_classes"], "properties": properties, "source_shape_xyz": list(image.shape),
         "source_affine": image.affine.tolist(), "source_units": image.header.get_xyzt_units()[0],

@@ -9,6 +9,9 @@ from ..preprocessing.offline_store import OfflineTransform, validate_storage
 
 
 def array_bytes(value):
+    if isinstance(value, np.memmap):
+        # 映射文件的逻辑尺寸独立于驻留页；实际物理占用由MemoryGuard持续监控。
+        return min(value.nbytes, 64 * 1024)
     if isinstance(value, np.ndarray):
         return value.nbytes
     if isinstance(value, dict):
@@ -27,6 +30,7 @@ class CaseDataset:
         self.dataset = Dataset(self.rows, transform=Compose([self.transform]))
         self.cache, self.cached_bytes = OrderedDict(), 0
         self.budget = resources["cache_bytes"]
+        self.case_limit = resources.get("cache_entries", 16)
         self.hits, self.misses, self.wait_seconds = 0, 0, 0.
 
     def get(self, name):
@@ -40,7 +44,7 @@ class CaseDataset:
             result = self.dataset[self.by_id[name]]
             self.misses += 1
             size = array_bytes(result)
-            while self.cache and self.cached_bytes + size > self.budget:
+            while self.cache and (self.cached_bytes + size > self.budget or len(self.cache) >= self.case_limit):
                 _, (_, removed) = self.cache.popitem(last=False)
                 self.cached_bytes -= removed
             if size <= self.budget:
