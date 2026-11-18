@@ -68,7 +68,7 @@ class ResourceSession:
                     current = sum(psutil.Process(m['pid']).memory_info().rss
                                   for m in self.members.values() if alive(m))
                 amount = max(demand.memory_bytes, current)
-                cpu_available = max(0, int(facts['cores']*min(.8,r.get('cpu_fraction', .8)))-
+                cpu_available = max(0, int(facts['cores']*r.get('cpu_fraction', .8))-
                                     sum(row.get('cpu_slots', 0) for row in peers))
                 # 只有能按获批数量调整布局的调用者才允许部分授予。
                 self.cpu_slots = min(demand.cpu_slots, cpu_available) if demand.allow_partial_cpu else (
