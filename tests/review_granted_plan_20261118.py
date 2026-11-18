@@ -16,6 +16,11 @@ def check(args):
     config.update(work_root=str(root),run_dir=str(root/'checks/granted-plan'))
     config['resources'].update(workers=0,prefetch=1,cache_bytes=0,wait_seconds=15)
     prepared = load_prepared(root/'course/shared-offline.json')
+    from chd_segmentation.acceleration.planning import case_estimates
+    prediction = case_estimates(config,prepared,'prediction')
+    for row in prediction:
+        if row['workspace_bytes'] < row['probability_workspace_bytes']+row['restore_workspace_bytes']:
+            raise AssertionError('预测总额度未覆盖真实概率图和原图恢复工作集')
     initial = cpu_plan(config,prepared,1)
     minimum = deepcopy(initial)
     minimum.update(admitted=False,workers=[0],cache_bytes=[0],prefetch=1,cpu_slots=1,
@@ -35,5 +40,6 @@ def check(args):
             actual_capacity=session.allocation.memory_bytes,layout=dict(session.handle.state['layout']),
             generation=session.handle.state['plan_generation'],host=applied['facts'],
             peak_task_rss_bytes=session.handle.state['peak_task_rss'])
+        record['prediction_cases'] = prediction
     record.update(seconds=perf_counter()-began,cases=['ct_1001','ct_1012'])
     write_json(reports/'granted-plan.json',record)

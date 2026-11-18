@@ -48,8 +48,13 @@ def predict(config, output, inputs=None, case_ids=None, manifest=None):
     if config.get('input_source',{}).get('path'):
         from ..data.input_binding import bind_prepared_source
         prepared = bind_prepared_source(prepared,config['input_source']['path'])
-    with admitted_training(runtime, prepared, training["scientific"]["spec"], stage="prediction") as (allocation, session):
+    budget = deepcopy(prepared)
+    if case_ids is not None:
+        budget['manifest']['cases'] = [row for row in prepared['manifest']['cases'] if row['case_id'] in case_ids]
+    with admitted_training(runtime, budget, training["scientific"]["spec"], stage="prediction") as (allocation, session):
         runtime['resource_handle'] = allocation['resource_handle']
+        runtime['prediction_case_estimates'] = {row['case_id']:row['workspace_bytes']
+            for row in allocation['supply']['case_estimates']}
         if allocation['gpus']:
             os.environ["CUDA_VISIBLE_DEVICES"] = allocation["gpus"][0]["uuid"]
         try:
@@ -130,6 +135,9 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None, prepared
             if path.exists() or previous:
                 raise FileExistsError("已有预测的身份不同，请使用新的预测目录")
             mark = perf_counter()
+            amount = config['prediction_case_estimates'][name]
+            case_cleanup.enter_context(memory.client.case(amount,purpose='prediction_case:'+name))
+            event(log_dir,'prediction_case_admitted',case_id=name,workspace_bytes=amount)
             with stage(config, "prediction_case_load", case_id=name):
                 entry = dataset.get(name)
             if model is None:
@@ -141,10 +149,6 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None, prepared
                     model.load_state_dict(state["model"], strict=True)
                     spec = state["spec"]
                     del state
-            footprint = int(entry["image"].size * (spec["num_classes"] * 12 + 8))
-            ticket = case_cleanup.enter_context(memory.admit(footprint,label='prediction_probabilities'))
-            if ticket is None:
-                raise InterruptedError('整例预测已取消')
             read_seconds = perf_counter() - mark
             mark = perf_counter()
 
@@ -186,7 +190,7 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None, prepared
             event(log_dir, "prediction", case_id=name, scope=prepared["scope"], timing=receipt["timing"],
                   completed=len(results) + 1, total=len(requested), bytes=path.stat().st_size)
             results.append(receipt)
-            del native, probabilities, logits, entry
+            del native, probabilities, logits, entry, image
             dataset.clear()
             case_cleanup.close()
         summary = {"state": "completed", "scope": prepared["scope"], "cases": results,

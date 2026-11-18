@@ -203,6 +203,8 @@ def rank_entry(rank,payload,common,allocation,gate,port):
             verify_device(device,allocation,rank)
             from .prediction import _predict
             applied = dict(payload['config'],device=str(device),threads=1)
+            applied['prediction_case_estimates'] = {row['case_id']:row['workspace_bytes']
+                for row in allocation['supply']['case_estimates']}
             summary = _predict(applied,payload['prepared_path'],payload['checkpoint'],payload['output'],
                 payload['case_ids'],payload['prompts'],memory=memory,**payload.get('prediction_options',{}))
             write_json(root/'summary.json',summary)

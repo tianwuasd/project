@@ -4,6 +4,14 @@ import math
 from ..models.stunet.adapter import StunetAdapter
 
 
+def prediction_workspace(shape_czyx, source_shape_xyz, roi_xyz, classes):
+    working = math.prod(shape_czyx[1:])*(classes*12+8)
+    native_voxels = math.prod(high-low for low,high in roi_xyz)
+    restored = native_voxels*(classes*8+10)+math.prod(source_shape_xyz)*2
+    return dict(probability_workspace_bytes=working,restore_workspace_bytes=restored,
+                prediction_workspace_bytes=working+restored)
+
+
 def stage_memory(config, prepared, prefetch=None):
     prefetch = min(2, config["resources"]["prefetch"]) if prefetch is None else prefetch
     if type(prefetch) is not int or prefetch not in (1, 2):

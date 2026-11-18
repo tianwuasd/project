@@ -30,15 +30,27 @@ def case_estimates(config, prepared, stage):
     target = np.array(prepared["plan"]["configurations"]["3d_fullres"]["spacing"])
     order = prepared["plan"]["transpose_forward"]
     reports = []
+    prediction = stage in ('predict','prediction')
+    source = None
+    if prediction and prepared.get('storage') is not None:
+        from ..preprocessing.inputs import resolve_preprocessed
+        source = resolve_preprocessed(prepared['storage']['root'],dataset=prepared['dataset'],
+            case_ids=[row['case_id'] for row in prepared['manifest']['cases']])
     for row in prepared["manifest"]["cases"]:
         if stage == "train" and not set(row["roles"]) & {"train", "validation"}:
             continue
-        if prepared.get("storage") is not None and stage in ("train", "predict"):
+        if prepared.get("storage") is not None and (stage=='train' or prediction):
             item = prepared["storage"]["cases"][row["case_id"]]
             patch = int(np.prod(config["training"]["patch"])) * 16 * config["training"]["batch"]
             reports.append({"case_id": row["case_id"], "storage": "readonly_mmap", "input_shape_xyz": item["shape_czyx"][1:][::-1],
                             "raw_workspace_bytes": 0, "resample_workspace_bytes": 0,
                             "mapped_file_bytes": item["array_bytes"], "workspace_bytes": patch * 3 + item["locations_bytes"]})
+            if prediction:
+                from ..training.stage_memory import prediction_workspace
+                entry = source.open(row['case_id'],with_label=False)
+                memory = prediction_workspace(item['shape_czyx'],entry['source_shape_xyz'],entry['roi_xyz'],
+                    len(prepared['dataset_json']['labels']))
+                reports[-1].update(memory,workspace_bytes=memory['prediction_workspace_bytes']+item['locations_bytes'])
             continue
         native = list(nib.load(row["image"]).shape)
         shape = np.array([end - begin for begin, end in roi] if roi else native)
@@ -52,6 +64,11 @@ def case_estimates(config, prepared, stage):
                         "raw_workspace_bytes": 2 * GIB if streamed else int(np.prod(shape)) * 32,
                         "resample_workspace_bytes": config["preprocessing"]["block_bytes"] * 4 if streamed else int(np.prod(output)) * 64,
                         "output_array_bytes": int(np.prod(output)) * 5})
+        if prediction:
+            from ..training.stage_memory import prediction_workspace
+            memory = prediction_workspace([1,*output.tolist()],native,
+                roi if roi else [[0,int(size)] for size in native],len(prepared['dataset_json']['labels']))
+            reports[-1].update(memory,workspace_bytes=legacy_bytes+memory['prediction_workspace_bytes'])
     if not reports:
         raise ValueError("资源规划没有可用病例")
     for row in reports:

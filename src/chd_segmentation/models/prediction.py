@@ -188,10 +188,8 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
         feedback.update(done=len(results),new=len(results)-reused,reused=reused,
             current_case=name,pending=len(rows)-len(results),active=1)
         feedback.snapshot()
-        with memory.admit(0, label='prediction_case:'+name, release=dataset.clear) as ticket:
-            if ticket is None:
-                raise RuntimeError('预测在明确取消或停止后结束，已有输出保持原位置')
-        entry = dataset.get(name)
+        with memory.client.case(config['prediction_case_estimates'][name],purpose='prediction_read:'+name):
+            entry = dataset.get(name)
         case_prompts, protocol = prompts, None
         truth = entry['label'] if label_mode else None
         if label_mode:
