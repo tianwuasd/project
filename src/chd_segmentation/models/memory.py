@@ -82,8 +82,8 @@ def memory_profile(config,prepared,stage,shares,records=None):
     retained=max(row['retained_case_bytes'] for row in records)
     prediction=max(row['rank_prediction_bytes'] for row in records)
     if config['model']=='medsam2':
-        # 官方8帧/512的浮点多尺度激活按三个256通道工作区估算，实测峰值另行记录。
-        sequence_work = math.prod(config['training']['patch'])*4*256*3
+        # CPU保留骨干及官方最多3目标的多对象计算图；成功峰值仍需独立实测。
+        sequence_work = math.prod(config['training']['patch'])*4*256*3*(1+3)
         fixed=[(GIB+sequence_work*batch if config['resources']['device']=='cpu' and stage!='prediction' else 2*GIB)
                for batch in shares]
         queue_per_sample=8*512*512*(3*4+3*2)
