@@ -16,7 +16,8 @@ def supply_demand(supply, world, resources, shares, gpus=None):
     return ResourceDemand(fixed_bytes=int(amount-workspace), workspace_bytes=int(workspace),
         reader_slots=int(supply['reader_slots']), cpu_slots=int(supply['cpu_slots']),
         gpu_count=world if resources['device']=='cuda' else 0,
-        gpu_ids=resources['gpu_ids'] if gpus is None else [gpu['uuid'] for gpu in gpus],local_batches=shares)
+        gpu_ids=(None if resources['device']=='cpu' else resources['gpu_ids'] if gpus is None
+            else [gpu['uuid'] for gpu in gpus]),local_batches=shares)
 
 
 def supply_planner(config,prepared,stage,estimates):
