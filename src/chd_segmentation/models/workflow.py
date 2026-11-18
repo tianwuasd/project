@@ -291,9 +291,19 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
     dataset = AdmittedCases(prepared,dict(reserve_ram_bytes=common['resources']['reserve_ram_bytes'],
         cache_bytes=allocation['supply']['cache_bytes'][rank]),with_label=True,
         log_dir=root,logging=config['logging'])
+    from ..observability.progress import Progress
+    from ..observability.events import event
+    feedback = Progress(dict(common,run_dir=str(root)),'train',total=config['updates'],unit='updates') if rank==0 else None
+    if rank==0:
+        feedback.update(done=previous['update'] if previous else 0,phase='准备候选')
+        feedback.snapshot(force=True)
+        event(root,'model_candidates_started',stage=stage,cases=len(names))
+    candidates_started = perf_counter()
     gate.start(rank,'q-candidates',[len(names) if stage=='local' else 0]*allocation['world'],device)
     bundle.prepare_training(dataset,names)
     gate.finish(rank,'q-candidates',device)
+    if rank==0:
+        event(root,'model_candidates_completed',stage=stage,seconds=perf_counter()-candidates_started)
     update,history,best = 0,[],None
     selection = None
     from ..training.stopping import selection_options, update_selection
@@ -336,11 +346,9 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
     saved_at = perf_counter()
     peak_vram = 0
     replicas_equal = None
-    from ..observability.progress import Progress
-    feedback = Progress(dict(common, run_dir=str(root)), 'train', total=config['updates'], unit='updates') if rank == 0 else None
     resumed_update = update
     if rank == 0:
-        feedback.update(done=update, new=0, step=update)
+        feedback.update(done=update, new=0, step=update,phase='训练更新')
         feedback.snapshot(force=True)
     with torch.enable_grad():
         while update < (config['updates'] if stop_after is None else stop_after):
@@ -402,6 +410,9 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
             if device.type=='cuda':
                 peak_vram = max(peak_vram,rank_measurement(device,allocation,rank)['peak_vram_bytes'])
             update += 1
+            if rank==0:
+                feedback.update(done=update,new=update-resumed_update,step=update,phase='优化器更新完成')
+                feedback.snapshot(force=True)
             history.append(dict(update=update,loss=loss_sum,gradient_norm=float(norm),seconds=perf_counter()-mark))
             improved = False
             if update%config['validate_every']==0 or update==config['updates'] or update==stop_after:
@@ -414,6 +425,11 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 if not validation_names:
                     raise ValueError('正式选模需要独立验证病例')
                 model.eval()
+                validation_started = perf_counter()
+                if rank==0:
+                    feedback.update(phase='独立验证')
+                    feedback.snapshot(force=True)
+                    event(root,'model_validation_started',stage=stage,update=update,cases=len(validation_names))
                 gate.start(rank,f'q-validation:{update}',[len(validation_names)]+[0]*(allocation['world']-1),device)
                 dataset.mode,dataset.position = 'validation',0
                 with torch.no_grad():
@@ -424,6 +440,9 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 selection = update_selection(selection, value, update, stopping)
                 improved, best = selection['improved'], selection['best']
                 history[-1]['validation_loss'] = value
+                if rank==0:
+                    event(root,'model_validation_completed',stage=stage,update=update,loss=value,
+                        seconds=perf_counter()-validation_started)
             due = (config['technical'] or improved or selection and selection['stop'] or
                    update == (config['updates'] if stop_after is None else stop_after) or
                    update % config.get('save_every_updates', 250) == 0 or
@@ -443,17 +462,23 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
             if stage=='local':
                 state['parent_models'] = bundle.parent_models
             if rank==0 and due:
+                feedback.update(phase='保存检查点')
+                feedback.snapshot(force=True)
+                checkpoint_started = perf_counter()
+                event(root,'model_checkpoint_started',stage=stage,update=update,best_improved=improved)
                 save_state(root/'latest.pt',state)
                 if improved:
                     save_state(root/'best.pt',state)
                 from ..observability.events import event
                 event(root,'model_update_completed',model=config['model'],stage=stage,**history[-1])
+                event(root,'model_checkpoint_completed',stage=stage,update=update,
+                    seconds=perf_counter()-checkpoint_started)
             if due:
                 saved_at = perf_counter()
             gate.ready.wait(rank,f'q-checkpoint-written:{update}',device)
             if rank == 0:
                 feedback.update(done=update, new=update-resumed_update, step=update,
-                    pending=config['updates']-update, active=0)
+                    pending=config['updates']-update, active=0,phase='当前更新已保存')
                 feedback.snapshot(force=True)
             if selection and selection['stop']:
                 reason = 'early_stopping'

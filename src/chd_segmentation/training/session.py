@@ -18,7 +18,8 @@ def admitted_training(config, prepared, spec, previous_world=None, stage='train'
     demand = ResourceDemand(fixed_bytes=int(amount), cpu_slots=int(supply.get('cpu_slots', world)),
         gpu_count=world if resources['device']=='cuda' else 0, gpu_ids=resources['gpu_ids'], local_batches=shares)
     request = RuntimeRequest(str(Path(config['run_dir']).resolve()), stage,
-        Path(config['work_root'])/'resources', config['run_dir'], dict(resources, gpu_spec=spec), demand)
+        Path(config['work_root'])/'resources', config['run_dir'],
+        dict(resources,gpu_spec=spec,max_wait=resources['wait_seconds']), demand)
     with ResourceSession(request) as session:
         if not supply['admitted']:
             supply = cpu_plan(config, prepared, world, stage=stage)

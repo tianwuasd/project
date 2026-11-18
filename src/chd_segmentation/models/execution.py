@@ -101,7 +101,7 @@ def admitted(config,prepared,stage,topology=None):
         gpu_ids=common['resources']['gpu_ids'], local_batches=layout(common['training']['batch'], world,
             common['resources']['batch_layout']))
     request = RuntimeRequest(str(Path(config['run_dir']).resolve()), stage, root/'resources',
-        common['run_dir'], dict(common['resources'],gpu_spec=spec), demand)
+        common['run_dir'], dict(common['resources'],gpu_spec=spec,max_wait=common['resources']['wait_seconds']), demand)
     with ResourceSession(request) as session:
         if not supply['admitted']:
             supply = cpu_plan(common, budget, world, stage='prediction' if stage=='prediction' else 'train')
