@@ -35,6 +35,21 @@ def selected_best(item):
     return str(checkpoint)
 
 
+def prediction_args(model, item, checkpoint, output):
+    if model == 'stu':
+        return ['predict', '--config', item['config'], '--checkpoint', 'best',
+                '--preprocessed-source', item['prepared'], '--output', output]
+    args = ['models', 'predict', '--config', item['config'], '--checkpoint', checkpoint,
+            '--output', output, '--prepared', item['prepared'], '--device', 'cpu']
+    if model == 'med':
+        args += ['--prompt-mode', item['prompt_mode']]
+        if item['prompt_mode'] == 'external':
+            args += ['--prompts', item['prompts']]
+        elif item['prompt_mode'] != 'label-box':
+            raise ValueError('Med提示模式无效')
+    return args
+
+
 def build_review(handoff):
     if handoff['roles'] != ROLES or set(handoff['models']) != set(MODELS):
         raise ValueError('交接必须是ct_1001/ct_1012且包含三模型')
@@ -55,20 +70,11 @@ def build_review(handoff):
     for model in MODELS:
         item = handoff['models'][model]
         checkpoint = selected_best(item)
-        base = ['predict'] if model == 'stu' else ['models', 'predict']
         cli = engine / 'src/chd_segmentation' / ('cli.py' if model == 'stu' else 'models_cli.py')
         if '--checkpoint' not in flags(cli):
             raise ValueError(model+'生产CLI尚无显式checkpoint入口，等待助手2交接')
         output = str(Path(handoff['work_root']) / 'assistant3' / model)
-        args = [*base, '--config', item['config'], '--checkpoint', checkpoint, '--output', output]
-        if model != 'stu':
-            args += ['--prepared', item['prepared'], '--device', 'cpu']
-        if model == 'med':
-            args += ['--prompt-mode', item['prompt_mode']]
-            if item['prompt_mode'] == 'external':
-                args += ['--prompts', item['prompts']]
-            elif item['prompt_mode'] != 'label-box':
-                raise ValueError('Med提示模式无效')
+        args = prediction_args(model, item, checkpoint, output)
         for label, cases in (('first', ['ct_1001']), ('resume', ['ct_1001', 'ct_1012'])):
             requested = [arg for name in cases for arg in ('--case', name)]
             steps.append(dict(name=model+'_'+label, model=model, output=output,

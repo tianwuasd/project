@@ -16,11 +16,11 @@
 | secretary_stage2_release | 秘书明确阶段2交接的文字记录，非空字符串 |
 | cleanup_owner | 同轮共享模型/数组最后消费者的清理责任人 |
 | source_images | 恰好ct_1001与ct_1012的原地影像路径，用nibabel读取头部进行输出几何评价 |
-| models | stu/q/med三项，每项包含config、best_record、best_path_field；Q/Med还包含prepared；Med包含prompt_mode及external模式的prompts路径 |
+| models | stu/q/med三项，每项包含config、prepared、best_record、best_path_field；Med包含prompt_mode及external模式的prompts路径 |
 | models每项的geometry_sources | 两例实际小区域输入NIfTI路径，核对小区域shape/affine，不能据此宣称完整原图回填通过 |
 | training_event_logs | 按stu/q_base/q_localizer/q_local/med_sequence列阶段2原始事件路径；成功更新只从已解释的优化器更新事件统计，缺事件或未知事件语义保持未验证 |
 
-best_record为真实阶段2选模记录JSON，best_path_field为其中指向模型文件的字段名称，相对路径按记录所在目录解释。它应对应实际验证最佳模型，不能提供手工编造的记录。STU命令为`predict --config CONFIG --checkpoint BEST --output OUTPUT --case CASE`；Q/Med使用`models predict --config CONFIG --prepared PREPARED --checkpoint BEST --output OUTPUT --device cpu --case CASE`。Med同时转交真实提示模式和提示文件。生产CLI缺少显式--checkpoint时只读检查立即报告未接入，禁止自行改latest冒充best。配置必须是阶段2明确交接的本轮CPU技术配置。
+best_record为真实阶段2选模记录JSON，best_path_field为其中指向模型文件的字段名称，相对路径按记录所在目录解释。它应对应实际验证最佳模型，不能提供手工编造的记录。STU命令为`predict --config CONFIG --checkpoint best --preprocessed-source PREPARED --output OUTPUT --case CASE`，保留selected_best所得实际文件路径供核对最终加载来源，不将此文件路径传给STU枚举参数。Q/Med使用`models predict --config CONFIG --prepared PREPARED --checkpoint BEST_PATH --output OUTPUT --device cpu --case CASE`。Med同时转交真实提示模式和提示文件。生产CLI缺少显式--checkpoint时只读检查立即报告未接入，禁止自行改latest冒充best。配置必须是阶段2明确交接的本轮CPU技术配置。
 
 第一步只请求ct_1001，第二步同目录请求ct_1001和ct_1012。工具核对第一例文件大小/修改时间没有变化，提取第二步新增原始事件中的prediction_reused或model_case_reused，并用源图和输出的真实shape/affine核对几何；不从配置生成restored或geometry=True。原始production summary随结果保留。当前逐项完整验收仍输出INCOMPLETE，交由最终审核根据真实记录列明缺项。
 
