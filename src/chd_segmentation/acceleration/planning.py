@@ -76,17 +76,23 @@ def case_estimates(config, prepared, stage):
     return reports
 
 
-def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates=None, allocation=None):
+def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates=None, allocation=None, bounds=None):
     r = config["resources"]
-    facts = host_capacity()
-    credit = private_bytes(own)
-    pending = sum(max(0, p["ram_bytes"] - private_bytes([p])) for p in peers)
-    budget = max(0, min(int(facts["total_bytes"] * r["ram_fraction"]),
-                        facts["available_bytes"] + credit - r["reserve_ram_bytes"]) - pending)
-    cores = max(0, max(1, math.floor(facts["cores"] * r["cpu_fraction"])) - sum(p["cpu_slots"] for p in peers))
-    if allocation is not None:
+    if bounds is not None and allocation is not None:
+        raise ValueError('bounds和allocation只能选择一个资源来源')
+    facts = bounds['facts'] if bounds is not None else host_capacity()
+    credit,pending = 0,0
+    if bounds is not None:
+        budget,cores = bounds['memory_budget_bytes'],bounds['cpu_budget_slots']
+    elif allocation is not None:
         budget = allocation.memory_bytes
         cores = allocation.cpu_threads
+    else:
+        credit = private_bytes(own) if own else 0
+        pending = sum(max(0,p['ram_bytes']-private_bytes([p])) for p in peers)
+        budget = max(0,min(int(facts['total_bytes']*r['ram_fraction']),
+            facts['available_bytes']+credit-r['reserve_ram_bytes'])-pending)
+        cores = max(0,max(1,math.floor(facts['cores']*r['cpu_fraction']))-sum(p['cpu_slots'] for p in peers))
     reports = estimates if estimates is not None else case_estimates(config, prepared, stage)
     if stage == "preprocess" and config.get("pending_case_ids") is not None:
         reports = [row for row in reports if row["case_id"] in config["pending_case_ids"]]
