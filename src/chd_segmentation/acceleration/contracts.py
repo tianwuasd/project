@@ -14,6 +14,7 @@ class ResourceDemand:
     gpu_ids: Any = None
     local_batches: Any = None
     allow_partial_cpu: bool = False
+    reader_slots: int = 0
 
     def __post_init__(self):
         for name in ('fixed_bytes','workspace_bytes','sample_bytes','batch_buffer_bytes','cache_bytes'):
@@ -23,6 +24,10 @@ class ResourceDemand:
             raise ValueError('cpu_slots必须为正整数')
         if type(self.allow_partial_cpu) is not bool:
             raise ValueError('allow_partial_cpu必须为布尔值')
+        if type(self.reader_slots) is not int or self.reader_slots < 0:
+            raise ValueError('reader_slots必须为非负整数')
+        if self.reader_slots and not self.workspace_bytes:
+            raise ValueError('病例读盘名额需要正数workspace_bytes预算')
         if type(self.gpu_count) is not int or not 0 <= self.gpu_count <= 4:
             raise ValueError('gpu_count必须在0至4之间')
         if self.local_batches is not None and (not self.local_batches or
