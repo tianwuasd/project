@@ -6,7 +6,7 @@ import sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'src'))
 
-from chd_mini.review import prediction_args
+from chd_mini.review import prediction_args, evaluation_args
 
 
 def production_parser(path):
@@ -34,7 +34,8 @@ def main():
     parsers = dict(stu=production_parser(root/'src/chd_segmentation/cli.py'),
                    models=production_parser(root/'src/chd_segmentation/models_cli.py'))
     # 字符串仅用于参数解析，不读取配置、输入或模型，也不构造运行回执。
-    item = dict(config='CONFIG', prepared='SHARED_PREPARED', prompt_mode='external', prompts='PROMPTS')
+    item = dict(config='CONFIG', prepared='SHARED_PREPARED', evaluation_config='EVALUATION_CONFIG',
+                prompt_mode='external', prompts='PROMPTS')
     for model in ('stu', 'q', 'med'):
         for cases in (['ct_1001'], ['ct_1001', 'ct_1012']):
             args = prediction_args(model, item, 'BEST_FILE', 'OUTPUT')
@@ -43,7 +44,10 @@ def main():
             assert parsed.case == cases
             assert parsed.checkpoint == ('best' if model == 'stu' else 'BEST_FILE')
             assert (parsed.preprocessed_source if model == 'stu' else parsed.prepared) == item['prepared']
-    print('PRODUCTION_ARGPARSE_OK: 6 prediction parameter sets; zero model execution')
+        evaluation = parsers['stu'].parse_args(evaluation_args(item,'PREDICTIONS','METRICS.json'))
+        assert evaluation.command == 'evaluate' and evaluation.predictions == 'PREDICTIONS'
+        assert evaluation.prepared == item['prepared'] and evaluation.config == item['evaluation_config']
+    print('PRODUCTION_ARGPARSE_OK: 6 prediction + 3 evaluation parameter sets; zero model execution')
 
 
 if __name__ == '__main__':

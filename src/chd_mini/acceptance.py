@@ -7,10 +7,10 @@ def summarize_run(invocations, ledger, versions, elapsed):
         rows = [r for r in ledger["attempts"] if r["stage"] == stage]
         events = [e for r in invocations if r.get('stage') == stage
                   for e in r.get('receipt', {}).get('optimizer_update_events', [])]
-        positions = {e['update'] for e in events if type(e.get('update')) is int and e['update'] > 0}
         counts[stage] = {"attempts": len(rows),
                          "ledger_successful": sum(r["outcome"] == "successful" for r in rows),
-                         "successful_updates": len(positions) if positions else None,
+                         "successful_updates": None, "optimizer_records": events,
+                         "update_count_note": "记录位置及台账状态不等于总真实优化器更新次数",
                          "outcomes": [r["outcome"] for r in rows]}
     completed = bool(invocations) and all(r["state"] == "completed" for r in invocations)
     coverage = {}

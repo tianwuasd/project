@@ -6,13 +6,11 @@ import shutil
 import traceback
 from time import perf_counter
 
-import nibabel as nib
-import numpy as np
-
 from .attempts import AttemptLedger
 from .contracts import TOOL_ROOT, confined, git, read_json, write_json
 from .runner import inventory
 from .version_review import full_commit, model_versions
+from .geometry_review import source_geometry, verify_output
 
 
 ROLES = dict(train=['ct_1001'], validation=['ct_1012'], test=[])
@@ -72,6 +70,11 @@ def prediction_args(model, item, checkpoint, output):
     return args
 
 
+def evaluation_args(item, predictions, output):
+    return ['evaluate','--config',item['evaluation_config'],'--prepared',item['prepared'],
+            '--predictions',predictions,'--output',output]
+
+
 def build_review(handoff):
     available = review_models(handoff)
     if handoff['roles'] != ROLES:
@@ -83,6 +86,7 @@ def build_review(handoff):
     if Path(handoff['report_root']).resolve() != Path('D:/projects/back/sync-reports/chd-review-20261118').resolve():
         raise ValueError('报告根不符合本轮共享许可')
     engine = Path(handoff['engine_root']).resolve(strict=True)
+    require_clean_source(engine)
     actual = git(engine, 'rev-parse', 'HEAD')
     if actual != full_commit(handoff['engine_commit']):
         raise ValueError('生产目录与最终交接版本不对应')
@@ -102,25 +106,33 @@ def build_review(handoff):
         for label, cases in (('first', ['ct_1001']), ('resume', ['ct_1001', 'ct_1012'])):
             requested = [arg for name in cases for arg in ('--case', name)]
             steps.append(dict(name=model+'_'+label, model=model, output=output,
-                              checkpoint=checkpoint, args=args+requested))
+                              kind='predict',checkpoint=checkpoint, args=args+requested))
+        evaluation = str(Path(handoff['work_root'])/'assistant3'/(model+'-evaluation.json'))
+        steps.append(dict(name=model+'_evaluate',model=model,kind='evaluate',output=evaluation,
+                          args=evaluation_args(item,output,evaluation)))
     return dict(steps=steps, ledger=ledger, engine_commit=actual, model_versions=versions,
                 review_mode=handoff.get('review_mode','complete'), target_models=list(MODELS),
                 available_models=available, unavailable_models=handoff.get('unavailable_models',{}),
                 scope='zero_additional_training', roles=ROLES)
 
 
-def geometry(item, output):
+def require_clean_source(engine):
+    status = git(engine,'status','--porcelain','--untracked-files=all','--',
+                 'src','run.py','pyproject.toml')
+    if status:
+        raise ValueError('生产业务源码存在未提交修改：'+status)
+    return status
+
+
+def geometry(handoff, model, output):
     result = []
-    if set(item['geometry_sources']) != {'ct_1001', 'ct_1012'}:
-        raise ValueError('必须提供两例实际小区域来源')
-    for case, source in item['geometry_sources'].items():
-        if case not in ('ct_1001', 'ct_1012'):
-            raise ValueError('禁止读取额外病例')
-        original, prediction = nib.load(source), nib.load(str(Path(output)/(case+'.nii.gz')))
-        matches = original.shape[:3] == prediction.shape[:3] and np.allclose(
-            original.affine, prediction.affine, atol=1e-5, rtol=0)
-        result.append(dict(case_id=case, shape=list(prediction.shape), matches=bool(matches),
-                           source=str(source), scope='实际交接小区域shape/affine，未验证完整原图回填'))
+    produced = {r['case_id']:r for r in read_json(Path(output)/'summary.json')['cases']}
+    for case, source in handoff['source_images'].items():
+        metadata = source_geometry(handoff['models'][model],case)
+        if produced[case]['roi_xyz'] != metadata['roi_xyz']:
+            raise ValueError('实际预测ROI与读取来源记录不符：'+case)
+        record = verify_output(source,Path(output)/(case+'.nii.gz'),metadata)
+        result.append(dict(case_id=case,**record))
     return result
 
 
@@ -186,25 +198,27 @@ def budget(handoff):
 def optimizer_evidence(handoff, ledger):
     evidence = {}
     for stage in ('stu', 'q_base', 'q_localizer', 'q_local', 'med_sequence'):
-        observed = []
+        observed, auxiliary = [], []
         for path in handoff.get('training_event_logs', {}).get(stage, []):
             for line in Path(path).read_text(encoding='utf-8').splitlines():
                 if not line.strip():
                     continue
                 row = json.loads(line)
-                counter = None
                 if stage == 'stu' and row.get('event') == 'train':
-                    counter = row.get('updates')
-                if stage.startswith('q_') and row.get('event') == 'model_update_completed' and row.get('stage') == stage[2:]:
-                    counter = row.get('update')
-                if type(counter) is int and counter > 0:
                     observed.append(dict(path=str(path), event=row))
-        counters = {r['event'].get('updates', r['event'].get('update')) for r in observed}
+                if stage.startswith('q_') and row.get('stage') == stage[2:]:
+                    if row.get('event') == 'model_optimizer_completed':
+                        observed.append(dict(path=str(path),event=row))
+                    if row.get('event') == 'model_update_completed':
+                        auxiliary.append(dict(path=str(path),event=row,meaning='保存后更新位置，不能代替总真实更新次数'))
+                if stage == 'med_sequence' and row.get('event') in ('model_forward_backward','model_epoch_completed'):
+                    auxiliary.append(dict(path=str(path),event=row,
+                        meaning='Med计算/epoch记录，单独不足以证明优化器成功更新'))
         successful = sum(r['stage'] == stage and r['outcome'] == 'successful' for r in ledger['attempts'])
-        evidence[stage] = dict(ledger_successful=successful, optimizer_update_events=observed,
-            observed_update_positions=sorted(counters),
-            successful_updates=len(counters) if counters else None,
-            status='已取得优化器更新事件，待与完整阶段2记录核对' if counters else '未取得可解释的优化器更新事件，未验证')
+        evidence[stage] = dict(ledger_successful=successful, optimizer_update_events=observed, auxiliary_events=auxiliary,
+            event_positions=[r['event'].get('updates',r['event'].get('update')) for r in observed],
+            total_real_updates=None,
+            status='原始已记录位置不等于总真实更新次数；未保存更新及Med事件语义仍需阶段2核对')
     return evidence
 
 
@@ -245,10 +259,12 @@ class ReviewFinalizer:
                 target_models=list(MODELS), review_mode=self.plan.get('review_mode','complete'),
                 available_models=self.plan.get('available_models',[]),
                 unavailable_models=self.plan.get('unavailable_models',{}),
-                geometry_scope='两例实际交接小区域；完整原图回填未验证')
+                geometry_scope='两例原图头/ROI外零填充；计算仅ROI，不证明全体积预测效果')
             write_json(self.reports/'review.json', summary)
             # 最终容量只记录，不在此处抛出额度错误阻止清理。
             summary['capacity'] = capacity(self.handoff)
+            if 'engine_root' in self.handoff:
+                summary['production_status_end'] = require_clean_source(self.handoff['engine_root'])
             current = AttemptLedger(self.handoff['attempt_ledger']).read()
             summary['training_ledger_unchanged'] = current == self.plan['ledger']
             summary['optimizer_evidence'] = optimizer_evidence(self.handoff, self.plan['ledger'])
@@ -289,11 +305,25 @@ def _execute_steps(handoff, plan, root, reports, records, before, process_paths,
                              simulator_root=handoff['simulator_root']), root, reports)
     for step in plan['steps']:
         budget(handoff)
+        require_clean_source(handoff['engine_root'])
         command = [handoff['python'], '-u', '-B', str(Path(handoff['engine_root'])/'run.py'), *step['args']]
         process_path = reports/(step['name']+'.process.json')
         process_paths.append(process_path)
         receipt = supervise(command, handoff['engine_root'], env, reports/(step['name']+'.log'),
                              1200, 512*1024, 16*1024**3, process_path)
+        if step['kind'] == 'evaluate':
+            evaluation = read_json(step['output'])
+            write_json(reports/(step['name']+'.json'),evaluation)
+            records.append(dict(step=step,process=receipt,evaluation=evaluation,
+                scope='两例实际ROI技术评价',wall_seconds=receipt['wall_seconds']))
+            write_json(reports/'execution.json',records)
+            if {r['case_id'] for r in evaluation['cases']} != {'ct_1001','ct_1012'}:
+                raise ValueError('生产评价未覆盖本轮两例')
+            if evaluation['scope'] != 'technical':
+                raise ValueError('本轮评价范围必须标记technical')
+            if AttemptLedger(handoff['attempt_ledger']).read() != plan['ledger']:
+                raise RuntimeError('评价阶段改变共享训练台账')
+            continue
         summary = read_json(Path(step['output'])/'summary.json')
         write_json(reports/(step['name']+'.production-summary.json'), summary)
         item = dict(step=step, process=receipt, production_summary=summary,
@@ -309,7 +339,7 @@ def _execute_steps(handoff, plan, root, reports, records, before, process_paths,
             item['first_output_unchanged'] = stamp == before[step['model']]
             item['reuse_events'] = [r for r in item['production_events'] if r['record']['event'] in
                                    ('prediction_reused', 'model_case_reused') and r['record']['case_id'] == 'ct_1001']
-            item['geometry'] = geometry(handoff['models'][step['model']], step['output'])
+            item['geometry'] = geometry(handoff,step['model'],step['output'])
         write_json(reports/'execution.json', records)
         if AttemptLedger(handoff['attempt_ledger']).read() != plan['ledger']:
             raise RuntimeError('阶段3改变共享训练台账，立即终止')

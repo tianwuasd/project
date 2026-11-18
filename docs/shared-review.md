@@ -16,12 +16,11 @@
 | report_root | D:/projects/back/sync-reports/chd-review-20261118 |
 | secretary_stage2_release | 秘书明确阶段2交接的文字记录，非空字符串 |
 | cleanup_owner | 同轮共享模型/数组最后消费者的清理责任人 |
-| source_images | 恰好ct_1001与ct_1012的原地影像路径，用nibabel读取头部进行输出几何评价 |
-| models | 仅明确可用模型，每项包含config、prepared、best_record、best_path_field；完整模式中Med包含prompt_mode及external模式的prompts路径 |
+| source_images | 恰好ct_1001与ct_1012的真实原始CT路径，仅加载原图头；不能指向小区域副本 |
+| models | 仅明确可用模型，每项包含config、prepared、evaluation_config、best_record、best_path_field；完整模式中Med包含prompt_mode及external模式的prompts路径。evaluation_config须为生产evaluate加载器兼容的实际配置，等待助手2交接 |
 | models每项的training_commits | 不重复的实际训练完整SHA列表，保留首次/恢复及各阶段的全部实际来源，不以最终SHA重写旧证据 |
 | models每项的version_reviews | 训练SHA为键；每项包含production_commit、approved_changed_files完整列表、secretary_review_reference。SHA不同时须有秘书最终逐项审核记录 |
-| models每项的geometry_sources | 两例实际小区域输入NIfTI路径，核对小区域shape/affine，不能据此宣称完整原图回填通过 |
-| training_event_logs | 按stu/q_base/q_localizer/q_local/med_sequence列阶段2原始事件路径；成功更新只从已解释的优化器更新事件统计，缺事件或未知事件语义保持未验证 |
+| training_event_logs | 五阶段原始事件路径；保存后的update位置、显式优化器事件及台账分别保留，不按去重位置个数推断总真实更新次数 |
 
 best_record为真实阶段2选模记录JSON，best_path_field为其中指向模型文件的字段名称，相对路径按记录所在目录解释。它应对应实际验证最佳模型，不能提供手工编造的记录。STU命令为`predict --config CONFIG --checkpoint best --preprocessed-source PREPARED --output OUTPUT --case CASE`，保留selected_best所得实际文件路径供核对最终加载来源，不将此文件路径传给STU枚举参数。Q/Med使用`models predict --config CONFIG --prepared PREPARED --checkpoint BEST_PATH --output OUTPUT --device cpu --case CASE`。Med同时转交真实提示模式和提示文件。生产CLI缺少显式--checkpoint时只读检查立即报告未接入，禁止自行改latest冒充best。配置必须是阶段2明确交接的本轮CPU技术配置。
 
@@ -31,7 +30,13 @@ best_record为真实阶段2选模记录JSON，best_path_field为其中指向模�
 
 AttemptLedger新增`limits()`，返回`stage_limits`与`total_limit`。无同名`.approval.json`时仍为每阶段2/总10。本轮秘书根据用户明确批准写入attempts.approval.json，严格绑定run_id与解析后的ledger_path，明确协议、全部字段及授权说明；仅接受q_base=3、其他阶段2、总11这一个例外。read/claim均核对批准文件及上限，原记录与outcome保持不变。助手2计算remaining时取该阶段上限减累计次数与总上限减全部次数的较小值，不能在调用方固定写成2/10。阶段3继续仅读台账，不能领取Q base第三次或Q localizer第三次。
 
-第一步只请求ct_1001，第二步同目录请求ct_1001和ct_1012。工具核对第一例文件大小/修改时间没有变化，提取第二步新增原始事件中的prediction_reused或model_case_reused，并用源图和输出的真实shape/affine核对几何；不从配置生成restored或geometry=True。原始production summary随结果保留。当前逐项完整验收仍输出INCOMPLETE，交由最终审核根据真实记录列明缺项。
+第一步只请求ct_1001，第二步同目录请求ct_1001和ct_1012。工具核对第一例文件大小/修改时间没有变化，并要求第二步的真实复用/完成事件。几何读取实际prepared.storage的case.json与catalog.json，记录roi_xyz、轴序、原spacing与处理后spacing，核对其ROI与生产summary一致。预测输出应与真实原图头的shape/affine一致；按z顺序逐片读取预测标签实际dtype，核对ROI外零填充，不读取原始CT数值或SHA。mismatch明确失败。该范围证明原图空间头和ROI回填/零填充，计算仍仅ROI，不能证明全体积预测效果。
+
+每个可用模型接续完成后，增加真实生产`evaluate --config EVALUATION_CONFIG --prepared PREPARED --predictions MODEL_OUTPUT --output OWN_EVALUATION.json`。Q同样使用生产公共evaluate入口，需要助手2交接其兼容评价配置；工具不自算Dice、不把预测summary当评价。保存实际评价JSON、病例/类别指标、technical范围、ROI和命令墙钟，必须覆盖两例。本轮仅完成该参数接入，真实评价待交接后运行。
+
+build_review、每条预测/评价命令前及最终收尾均检查`git status --porcelain --untracked-files=all -- src run.py pyproject.toml`；存在未提交业务源码即拒绝执行，AGENTS私有说明修改不在业务检查范围。该检查只查Git源码状态，不扫描数据内容。
+
+optimizer_evidence保留STU train事件、Q model_optimizer_completed显式优化器事件，并单列Q model_update_completed保存后位置；不去重后计为总真实更新次数。Med model_forward_backward与model_epoch_completed列为计算/epoch辅助事件，不能单独证明优化器成功更新。台账successful单列，总真实更新次数保持未核实，防止遗漏失败保存前的实际更新。
 
 Q/Med的实际prediction run_dir随checkpoint/prepared/output/names/prompts/protocol变化，first和resume可以使用不同事件文件。每次生产summary须返回event_log绝对路径、start_offset及end_offset整数字节偏移。阶段3只读取该实际区间，检查文件大小、起止行边界和完整JSONL，保留源文件、区间、每条记录的字节偏移及原始记录。每步最多读取512KiB事件，超出即明确失败；不扫描旧固定日志或主console。每步原始生产summary先另存报告；起始步骤必须有ct_1001完成事件，接续步骤必须有ct_1001复用及ct_1012完成事件，缺失明确失败，mtime不独立构成通过条件。生产summary字段尚待助手2最终接入核实；本轮只准备适配，未执行预测。
 
