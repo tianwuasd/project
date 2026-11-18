@@ -463,7 +463,7 @@ if __name__ == '__main__':
     parser.add_argument('--settings',required=True)
     parser.add_argument('--work',required=True)
     parser.add_argument('--reports',required=True)
-    parser.add_argument('--phase',choices=('prepare','inspect','q-base-fork','startup-check','preprocess-reuse','q-inputs','q-local-inputs','med-supervision','restore','train','predict','evaluate'),required=True)
+    parser.add_argument('--phase',choices=('prepare','inspect','resource-integration','q-base-fork','startup-check','preprocess-reuse','q-inputs','q-local-inputs','med-supervision','restore','train','predict','evaluate'),required=True)
     parser.add_argument('--stage',choices=('stu','q_base','q_localizer','q_local','med_sequence'))
     parser.add_argument('--resume',action='store_true')
     parser.add_argument('--stop-after',type=int,choices=(1,2),default=1)
@@ -474,6 +474,9 @@ if __name__ == '__main__':
     arguments = parser.parse_args()
     if arguments.supervise:
         supervised(arguments)
+    elif arguments.phase=='resource-integration':
+        from review_resource_integration_20261118 import check
+        check(arguments)
     elif arguments.phase=='prepare':
         prepare(arguments)
     elif arguments.phase=='inspect':

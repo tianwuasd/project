@@ -149,11 +149,18 @@ def rebalance_supply(job, supply, gate, device, rank, stop_event, proposal=None)
     supply.__exit__(None, None, None)
     control = job.get("control_batch", 0)
     host_wait(job, rank, control, "pool_closed")
-    proposal = refresh_supply(config, job["prepared"], job, apply=True) if rank == 0 else None
+    proposal = refresh_supply(config, job["prepared"], job) if rank == 0 else None
     proposal = all_objects(proposal, world)[0]
     if not proposal["admitted"]:
         return "pressure"
     if rank == 0:
+        from ..acceleration import attach, SafeBoundary
+        from .session import supply_demand, supply_layout
+        applied = attach(job['resource_handle']).request_replan(
+            supply_demand(proposal, world, config['resources'], job['shares']),
+            safe_boundary=SafeBoundary('batch_consumed', control), layout=supply_layout(proposal))
+        if applied['applied']['layout'] != supply_layout(proposal):
+            raise RuntimeError('公共会话应用的供数布局与请求不同')
         gate.set_limit(proposal["reader_slots"], proposal["workspace_capacity_bytes"])
     host_wait(job, rank, control, "pool_applied")
     job["supply"] = proposal
@@ -586,11 +593,11 @@ def train(config, prepared_path, resume=False, stop_after=None):
                     admission["resources"].update(gpu_count=old_world, min_gpus=None)
                     event(output, "fixed_world_resume", world=old_world, reason="当前完整检查点位于 epoch 内部")
                 del previous_state
-            with admitted_training(admission, prepared, spec, previous_world=old_world) as allocation:
+            with admitted_training(admission, prepared, spec, previous_world=old_world) as (allocation, owner_session):
                 if not resume:
                     write_json(output / "run.json", {"identity": identity, "scientific": scientific,
                                "config": config, "prepared": prepared})
-                summary = launch_group(config, prepared, spec, identity, allocation, resume, stop_after)
+                summary = launch_group(config, prepared, spec, identity, allocation, resume, stop_after, owner_session)
             if summary["reason"] not in ("resource_pressure", "regroup"):
                 return summary
             if summary["reason"] == "resource_pressure":
@@ -607,7 +614,7 @@ def train(config, prepared_path, resume=False, stop_after=None):
             resume = True
 
 
-def launch_group(config, prepared, spec, identity, allocation, resume, stop_after):
+def launch_group(config, prepared, spec, identity, allocation, resume, stop_after, owner_session):
     world = allocation["world"]
     if resume:
         state = load_checkpoint(config["run_dir"], identity)
@@ -653,6 +660,7 @@ def launch_group(config, prepared, spec, identity, allocation, resume, stop_afte
                         raise MemoryError("训练启动前持续内存压力，保留已有完整检查点")
                     processes = torch.multiprocessing.spawn(run_rank, args=(job, gate, stop_event), nprocs=world, join=False)
                     while not processes.join(timeout=1):
+                        owner_session.service_replans()
                         facts = memory.boundary()
                         if facts["paused"]:
                             job["pause_event"].set()

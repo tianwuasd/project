@@ -29,8 +29,8 @@ class ResourceWorkerInit:
         self.common,self.owner,self.gate = common,owner,gate
 
     def __call__(self,worker_id):
-        from ...training.resources import register_member
-        register_member(self.common,self.owner)
+        from ...acceleration import attach
+        attach(self.common['resource_handle'])
         torch.set_num_threads(1)
 
 

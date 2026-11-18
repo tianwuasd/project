@@ -9,13 +9,15 @@ import torch
 from ..acceleration import OrderedSupply, attach, transfer_batch
 from ..acceleration.stunet_supply import selection
 from ..data.dataset import CaseDataset, sample_patch
+from ..observability.events import event
 
 
-def initialize(prepared, config, resources, handle):
-    global _dataset, _config, _client
+def initialize(prepared, config, resources, handle, estimates):
+    global _dataset, _config, _client, _estimates
     torch.set_num_threads(1)
     _dataset = CaseDataset(prepared, resources)
     _config, _client = config, attach(handle)
+    _estimates = estimates
 
 
 def build_patch(dataset, config, request):
@@ -29,8 +31,20 @@ def build_patch(dataset, config, request):
 
 
 def worker_patch(request):
-    with _client.reserve(0, purpose='sample_patch'):
-        return build_patch(_dataset, _config, request)
+    return case_patch(_dataset, _config, _client, _estimates, request)
+
+
+def case_patch(dataset, config, client, estimates, request):
+    name = selection(request)[0]
+    began = perf_counter()
+    with client.case(estimates[name], purpose='sample_patch:'+name):
+        if config.get('scope')=='technical' and config.get('logging',{}).get('case_details'):
+            with client.handle.condition:
+                facts = dict(active_readers=client.handle.state['active_readers'],
+                    workspace_reserved=client.handle.state['workspace_reserved'])
+            event(config['run_dir'], 'sample_patch_admitted', case_id=name,
+                workspace_bytes=estimates[name],wait_seconds=perf_counter()-began,**facts)
+        return build_patch(dataset, config, request)
 
 
 class BatchSupply:
@@ -39,6 +53,7 @@ class BatchSupply:
         self.prepared, self.config, self.slots = prepared, config, slots
         self.workers, self.cache_bytes, self.rank = workers, cache_bytes, rank
         self.handle, self.prefetch, self.cancel = handle, prefetch, cancel
+        self.estimates = dict(gate.estimates)
         self.inflight, self.transfer_handle = None, None
 
     @property
@@ -50,13 +65,15 @@ class BatchSupply:
         resources = dict(self.config['resources'], cache_bytes=self.cache_bytes)
         self.dataset = CaseDataset(self.prepared, resources)
         self.pool = ProcessPoolExecutor(self.workers, mp_context=mp.get_context('spawn'),
-            initializer=initialize, initargs=(self.prepared, self.config, resources, self.handle)) if self.workers else None
+            initializer=initialize, initargs=(self.prepared, self.config, resources, self.handle, self.estimates)) if self.workers else None
         self.supply = OrderedSupply(self.client, capacity=self.prefetch, build=self.build, collate=self.collate)
         self.supply.__enter__()
         return self
 
     def build(self, request):
-        return self.pool.submit(worker_patch, request) if self.pool else build_patch(self.dataset, self.config, request)
+        if self.pool:
+            return self.pool.submit(worker_patch, request)
+        return case_patch(self.dataset, self.config, self.client, self.estimates, request)
 
     def collate(self, values):
         results = [value.result() for value in values] if self.pool else values

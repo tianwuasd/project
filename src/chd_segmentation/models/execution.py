@@ -96,17 +96,19 @@ def admitted(config,prepared,stage,topology=None):
     amount = supply['ram_bytes'] if supply['admitted'] else supply.get('minimum_bytes', 0)
     if amount <= 0:
         raise RuntimeError('模型供数无法建立有效工作集预算：'+supply.get('reason', '未知原因'))
-    demand = ResourceDemand(fixed_bytes=int(amount), cpu_slots=int(supply.get('cpu_slots', world)),
-        gpu_count=world if common['resources']['device']=='cuda' else 0,
-        gpu_ids=common['resources']['gpu_ids'], local_batches=layout(common['training']['batch'], world,
-            common['resources']['batch_layout']))
+    from ..training.session import supply_demand,supply_layout
+    shares = layout(common['training']['batch'],world,common['resources']['batch_layout'])
+    demand = supply_demand(supply,world,common['resources'],shares)
     request = RuntimeRequest(str(Path(config['run_dir']).resolve()), stage, root/'resources',
         common['run_dir'], dict(common['resources'],gpu_spec=spec,max_wait=common['resources']['wait_seconds']), demand)
-    with ResourceSession(request) as session:
+    with ResourceSession(request,layout=supply_layout(supply)) as session:
         if not supply['admitted']:
             supply = cpu_plan(common, budget, world, stage='prediction' if stage=='prediction' else 'train')
             if not supply['admitted']:
                 raise RuntimeError('公共准入后模型供数预算仍不可用：'+supply['reason'])
+            from ..acceleration import SafeBoundary
+            session.replan(supply_demand(supply,world,common['resources'],shares),
+                safe_boundary=SafeBoundary('before_case'),layout=supply_layout(supply))
         common['resource_handle'] = session.handle
         allocation = dict(owner=session.handle.owner, gpus=session.allocation.gpus,
             world=world, supply=supply)
@@ -272,13 +274,13 @@ def _run_workers(payload,common,allocation):
         CUDA_VISIBLE_DEVICES=','.join(g['uuid'] for g in allocation['gpus']))
     context = torch.multiprocessing.get_context('spawn')
     from .supply import CpuReady,OrderedSupply
-    cancel = context.Event()
+    cancel = common['resource_handle'].cancel
     common = dict(common, run_dir=str(root), memory_owner=allocation['owner'], memory_cancel=cancel)
-    ready = CpuReady(context,allocation['world'],root,owner=allocation['owner'],cancel=cancel)
+    ready = CpuReady(context,allocation['world'],root,owner=allocation['owner'],handle=common['resource_handle'])
     gate = OrderedSupply(context,allocation['shares'],allocation['supply']['reader_slots'],ready,root,
         capacity_bytes=allocation['supply']['breakdown']['case_workspaces_bytes'],
         estimates=allocation['supply']['case_estimates'],
-        unit='sequence_batch' if payload['config']['model']=='medsam2' else 'case_entry')
+        unit='sequence_batch' if payload['config']['model']=='medsam2' else 'case_entry',handle=common['resource_handle'])
     previous = dict(os.environ)
     with ExitStack() as cleanup:
         def restore_environment():

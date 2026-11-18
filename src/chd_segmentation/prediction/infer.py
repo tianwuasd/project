@@ -48,7 +48,7 @@ def predict(config, output, inputs=None, case_ids=None, manifest=None):
     if config.get('input_source',{}).get('path'):
         from ..data.input_binding import bind_prepared_source
         prepared = bind_prepared_source(prepared,config['input_source']['path'])
-    with admitted_training(runtime, prepared, training["scientific"]["spec"], stage="prediction") as allocation:
+    with admitted_training(runtime, prepared, training["scientific"]["spec"], stage="prediction") as (allocation, session):
         runtime['resource_handle'] = allocation['resource_handle']
         if allocation['gpus']:
             os.environ["CUDA_VISIBLE_DEVICES"] = allocation["gpus"][0]["uuid"]
