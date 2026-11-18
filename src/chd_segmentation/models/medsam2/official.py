@@ -5,7 +5,6 @@ from filelock import FileLock
 from ...artifacts.store import read_json,write_json
 from ...preprocessing.prepare import load_prepared
 from .adapter import activate
-from .weights import verify_official_weight
 
 
 OFFICIAL_CONFIG = 'sam2/configs/sam2.1_hiera_tiny512_FLARE_RECIST.yaml'
@@ -52,6 +51,11 @@ def train_official(config,prepared_path,stage,resume=False,stop_after=None):
     if stage!='sequence':
         raise ValueError('MedSAM2阶段必须为sequence')
     prepared = load_prepared(prepared_path)
+    from ..workflow import stage_case_names,selected_prepared
+    consumed = stage_case_names(config,prepared,stage)
+    if config.get('input_source',{}).get('path'):
+        from ...data.input_binding import bind_prepared_source
+        prepared = bind_prepared_source(prepared,config['input_source']['path'],case_ids=consumed)
     from ..offline import model_storage_lease
     root = (Path(config['run_dir'])/stage).resolve()
     protected = [Path(prepared['manifest']['data_root']).resolve(),
@@ -60,7 +64,7 @@ def train_official(config,prepared_path,stage,resume=False,stop_after=None):
     if any(root==path or root.is_relative_to(path) or path.is_relative_to(root) for path in protected):
         raise ValueError('MedSAM2训练目录与原始数据或复用依赖重叠')
     root.parent.mkdir(parents=True,exist_ok=True)
-    with FileLock(root.parent/(stage+'.lock'),timeout=0), model_storage_lease(config,prepared,stage):
+    with FileLock(root.parent/(stage+'.lock'),timeout=0), model_storage_lease(config,selected_prepared(prepared,consumed),stage):
         return _train_locked(config,prepared,prepared_path,root,stage,resume,stop_after)
 
 
@@ -83,7 +87,14 @@ def _train_locked(config,prepared,prepared_path,root,stage,resume,stop_after):
         raise FileNotFoundError('MedSAM2恢复需要完整官方检查点')
     if resume:
         from ...training.checkpoint import require_resume_device
-        require_resume_device(read_json(root/'worker-input.json')['config']['device'],config['device'])
+        previous_input = read_json(root/'worker-input.json')
+        previous_names = previous_input['recipe']['trainer']['data']['train']['datasets'][0]['dataset']['datasets'][0]['video_dataset']['names']
+        if (previous_input['stage']!=stage or previous_input['config']['model']!=config['model'] or
+            previous_input['prepared']['dataset']!=prepared['dataset'] or
+            previous_input['prepared']['dataset_json']!=prepared['dataset_json'] or
+            previous_input['prepared']['scope']!=prepared['scope'] or previous_names!=names):
+            raise ValueError('MedSAM2恢复的模型阶段、数据集类别或当前训练名单不同')
+        require_resume_device(previous_input['config']['device'],config['device'])
     recipe = effective_config(config,prepared,prepared_path,root,names)
     previous = read_json(root/'identity.json')['identity'] if resume else None
     identity = checked_identity(config,prepared,stage,previous=previous)

@@ -97,6 +97,10 @@ def options(path,overrides=None):
         if config[key] is not None:
             config[key] = str((root/Path(config[key])).resolve())
     config['parents'] = {key:str((root/Path(value)).resolve()) for key,value in config['parents'].items()}
+    if not isinstance(config['input_source'],dict):
+        raise ValueError('input_source必须为来源配置对象')
+    if config['input_source'].get('path') is not None:
+        config['input_source'] = dict(config['input_source'],path=str((root/Path(config['input_source']['path'])).resolve()))
     from .execution import execution_config
     execution_config(config)
     return config
@@ -192,6 +196,29 @@ def dataset_for(prepared, with_label, resources=None, log_dir=None, logging=None
     return CaseDataset(prepared,resources,with_label=with_label,log_dir=log_dir,logging=logging)
 
 
+def selected_prepared(prepared, names):
+    names = set(names)
+    rows = prepared['manifest']['cases']
+    if not names or not names <= {row['case_id'] for row in rows}:
+        raise ValueError('当前消费名单不属于实验描述')
+    return dict(prepared,manifest=dict(prepared['manifest'],cases=[row for row in rows if row['case_id'] in names]))
+
+
+def stage_case_names(config, prepared, stage):
+    names = training_names(config,prepared,stage)
+    if config['technical']:
+        from .roles import technical_names
+        validation = technical_names(config['technical_roles'],stage,'validation',
+            [row['case_id'] for row in prepared['manifest']['cases']])
+    elif config['model']=='q_route1':
+        validation = validated_q_groups(config,prepared)['C']
+    else:
+        validation = [row['case_id'] for row in prepared['manifest']['cases'] if 'validation' in row['roles']]
+    if not validation:
+        raise ValueError('训练选模需要独立验证病例')
+    return list(dict.fromkeys(names+validation))
+
+
 def load_state(path):
     return torch.load(path,map_location='cpu',weights_only=False)
 
@@ -231,13 +258,17 @@ def train(config, prepared_path, stage, resume=False, stop_after=None):
     from .offline import model_storage_lease
     prepared = load_prepared(prepared_path)
     training_names(config,prepared,stage)
+    consumed = stage_case_names(config,prepared,stage)
+    if config.get('input_source',{}).get('path'):
+        from ..data.input_binding import bind_prepared_source
+        prepared = bind_prepared_source(prepared,config['input_source']['path'],case_ids=consumed)
     root = Path(config['run_dir'])/stage
     if root.resolve().is_relative_to(Path(prepared['manifest']['data_root']).resolve()):
         raise ValueError('训练输出不能位于原始数据目录内')
     if stop_after is not None and not 1<=stop_after<=config['updates']:
         raise ValueError('stop-after超出预算')
     root.parent.mkdir(parents=True,exist_ok=True)
-    with FileLock(root.parent/(stage+'.lock'),timeout=0), model_storage_lease(config,prepared,stage):
+    with FileLock(root.parent/(stage+'.lock'),timeout=0), model_storage_lease(config,selected_prepared(prepared,consumed),stage):
         if not resume:
             from .startup import check_start
             check_start(root,config['model'],prepared['identity'],stage)
@@ -265,6 +296,10 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
     rng = np.random.default_rng(np.random.SeedSequence([seed,rank]))
     previous = load_state(root/'latest.pt') if resume else None
     if previous:
+        if (previous['stage']!=stage or previous['config']['model']!=config['model'] or
+            previous['prepared']['dataset']!=prepared['dataset'] or previous['scope']!=prepared['scope'] or
+            previous['prepared']['dataset_json']!=prepared['dataset_json'] or previous['training_cases']!=names):
+            raise ValueError('Q恢复的模型阶段、数据集类别或当前训练名单不同')
         from ..training.checkpoint import require_resume_device
         require_resume_device(previous['config']['device'],device)
     initial_sha = initialization_digest(config,previous['initialization_sha256'] if previous else None)
@@ -288,7 +323,7 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
             gate.deliver(rank)
             self.position += 1
             return entry
-    dataset = AdmittedCases(prepared,dict(reserve_ram_bytes=common['resources']['reserve_ram_bytes'],
+    dataset = AdmittedCases(selected_prepared(prepared,stage_case_names(config,prepared,stage)),dict(reserve_ram_bytes=common['resources']['reserve_ram_bytes'],
         cache_bytes=allocation['supply']['cache_bytes'][rank]),with_label=True,
         log_dir=root,logging=config['logging'])
     from ..observability.progress import Progress

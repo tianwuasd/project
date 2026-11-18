@@ -23,15 +23,20 @@ def load_case(binding, case_id, with_label=True):
     return binding.source.open(case_id, with_label=with_label)
 
 
-def bind_prepared_source(prepared, path):
+def bind_prepared_source(prepared, path, case_ids=None):
     from copy import deepcopy
     from ..artifacts.store import digest
     from ..preprocessing.inputs import resolve_preprocessed
-    names = [row['case_id'] for row in prepared['manifest']['cases']]
+    available = [row['case_id'] for row in prepared['manifest']['cases']]
+    names = available if case_ids is None else list(case_ids)
+    if not names or len(set(names))!=len(names) or not set(names)<=set(available):
+        raise ValueError('指定预处理消费名单为空、重复或不属于当前实验')
     source = resolve_preprocessed(path,dataset=prepared['dataset'],case_ids=names)
     catalog = source.catalog
     if catalog['recipe']['scope'] != prepared['scope']:
         raise ValueError('当前任务与指定预处理的正式或技术范围不同')
+    if catalog['recipe']['labels'] != prepared['dataset_json']:
+        raise ValueError('指定预处理的类别语义与当前实验不同')
     result = deepcopy(prepared)
     result['storage'] = dict(format=catalog['format'],root=str(source.root),complete=True,
         recipe_identity=catalog['recipe_identity'],cases=source.cases)

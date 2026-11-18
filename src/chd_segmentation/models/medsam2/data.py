@@ -51,7 +51,12 @@ def sample_supply(gate,rank):
 class ManifestRawDataset(VOSRawDataset):
     def __init__(self,prepared_path,names,window,log_dir=None,logging=None,reserve_ram_bytes=4*2**30,input_source=None):
         from ..cases import ModelCases
-        self.cases = ModelCases(load_prepared(prepared_path),
+        from ..workflow import selected_prepared
+        prepared = load_prepared(prepared_path)
+        if (input_source or {}).get('path'):
+            from ...data.input_binding import bind_prepared_source
+            prepared = bind_prepared_source(prepared,input_source['path'],case_ids=names)
+        self.cases = ModelCases(selected_prepared(prepared,names),
             dict(model='medsam2',input_source=input_source or {}),with_label=True)
         self.names,self.window = list(names),window
 

@@ -17,11 +17,18 @@ def case_estimates(config,prepared,stage):
     roi=prepared['technical']['roi_xyz']
     records=[]
     classes=len(LABELS[prepared['dataset']])
+    source = None
+    if prepared.get('storage'):
+        from ..preprocessing.inputs import resolve_preprocessed
+        source = resolve_preprocessed(prepared['storage']['root'],dataset=prepared['dataset'],
+            case_ids=[row['case_id'] for row in rows])
     for row in rows:
-        original_shape = np.asarray(nib.load(row['image']).shape, dtype=np.int64)
-        original_voxels = math.prod(map(int, original_shape))
-        input_shape = np.asarray([end-begin for begin,end in roi] if roi else original_shape, dtype=np.int64)
         stored = prepared.get('storage',{}).get('cases',{}).get(row['case_id'])
+        entry = source.open(row['case_id'],with_label=False) if stored is not None else None
+        original_shape = np.asarray(entry['source_shape_xyz'] if entry is not None else nib.load(row['image']).shape,dtype=np.int64)
+        original_voxels = math.prod(map(int, original_shape))
+        actual_roi = entry['roi_xyz'] if entry is not None else roi
+        input_shape = np.asarray([end-begin for begin,end in actual_roi] if actual_roi else original_shape,dtype=np.int64)
         shape=np.asarray(stored['shape_czyx'][1:][::-1] if stored is not None else
             input_shape,dtype=np.int64)
         if shape.shape!=(3,) or (shape<=0).any():

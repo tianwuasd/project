@@ -24,6 +24,7 @@ from ..preprocessing.prepare import validate_prepared_config
 from ..preprocessing.offline_store import storage_lease
 from .metrics import case_data_identity
 from .restore import restore
+from .log_cursor import start_event_range,finish_event_range
 
 
 @logged("prediction")
@@ -78,6 +79,7 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None, prepared
     output = require_result_output(config, output, protected)
     log_dir = require_output(config["run_dir"], config["work_root"],
                              [prepared["manifest"]["data_root"], Path(__file__).parents[3]])
+    event_cursor = start_event_range(log_dir)
     names = {row["case_id"] for row in prepared["manifest"]["cases"]}
     requested = names if case_ids is None else set(case_ids)
     if not requested or not requested <= names:
@@ -189,7 +191,9 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None, prepared
             case_cleanup.close()
         summary = {"state": "completed", "scope": prepared["scope"], "cases": results,
                    "new": len(results) - reused, "reused": reused, "seconds": perf_counter() - started}
-        write_json(output / "summary.json", summary)
         event(log_dir, "prediction_completed", cases=len(results), new=summary["new"], reused=reused,
               seconds=summary["seconds"], output=str(output))
+        summary.update(finish_event_range(event_cursor))
+        summary['model_compute_cases'] = len(results)-reused
+        write_json(output / "summary.json", summary)
         return summary

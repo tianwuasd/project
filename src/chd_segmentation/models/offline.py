@@ -52,7 +52,8 @@ def validate_model_storage(config, prepared):
     root = validate_storage(prepared, expected_transform=None)
     actual = read_json(root/'catalog.json')['recipe']
     permitted = (Q_CONTRACT,) if config['model']=='q_route1' else (Q_CONTRACT,MED_CONTRACT)
-    if actual['transform'] not in permitted or actual['dataset'] != prepared['dataset']:
+    if (actual['transform'] not in permitted or actual['dataset']!=prepared['dataset'] or
+            actual['labels']!=prepared['dataset_json']):
         raise ValueError('现有预处理的数据集或实际输入形式不能由当前模型消费')
     return actual
 
