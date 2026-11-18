@@ -213,7 +213,7 @@ def unique_values(array, workspace):
 
 
 def read_sources(reader, row, workspace):
-    with workspace.allocation(8 * 1024 ** 2, "source_verify"):
+    with workspace.allocation(64 * 1024, "source_metadata"):
         image, label, spacing, roi = reader.read_metadata(row)
     native_image = image
     image = local_image(image, Path(row["image"]), "image", workspace)

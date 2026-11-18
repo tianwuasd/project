@@ -71,7 +71,7 @@ def produce_case(prepared, config, root, name, key, recipe_identity):
         policy = CasePolicy(execution, settings['block_bytes'] if 'block_bytes' in explicit else None,
             settings['max_block_bytes'] if 'max_block_bytes' in explicit else None,
             settings['max_case_threads'] or max(1, int(snapshot.host['cores']*config['resources']['cpu_fraction'])))
-        decision = choose_execution(CaseEstimate(name, estimate['legacy_whole_case_bytes'], 2*1024**3,
+        decision = choose_execution(CaseEstimate(name, estimate['legacy_whole_case_bytes'], 0,
             4096, estimate.get('resampled_upper_shape', estimate.get('working_shape'))), snapshot, policy)
         while decision.mode == 'wait':
             guard.checkpoint()
@@ -81,7 +81,7 @@ def produce_case(prepared, config, root, name, key, recipe_identity):
             snapshot.cancelled = observation['stop_requested']
             if snapshot.cancelled:
                 raise InterruptedError('预处理资源等待已取消')
-            decision = choose_execution(CaseEstimate(name, estimate['legacy_whole_case_bytes'], 2*1024**3,
+            decision = choose_execution(CaseEstimate(name, estimate['legacy_whole_case_bytes'], 0,
                 4096, estimate.get('resampled_upper_shape', estimate.get('working_shape'))), snapshot, policy)
         event(config['run_dir'], 'preprocess_execution_selected', case_id=name, execution=decision.mode,
               reason=decision.reason, whole_peak_bytes=estimate['legacy_whole_case_bytes'],
@@ -94,11 +94,14 @@ def produce_case(prepared, config, root, name, key, recipe_identity):
             entry = StunetTransform(prepared, config['resources']['reserve_ram_bytes'],
                 with_label=row.get('label') is not None, log_dir=config['run_dir'], logging=config['logging'])(row)
         else:
-            config = deepcopy(config)
+            config = {**config, 'preprocessing': deepcopy(config['preprocessing'])}
             if 'block_bytes' not in explicit:
                 config['preprocessing']['block_bytes'] = max(1024, decision.block_bytes)
             if 'max_block_bytes' not in explicit:
                 config['preprocessing']['max_block_bytes'] = max(config['preprocessing']['block_bytes'], decision.block_bytes)
+            if 'read_block_bytes' not in explicit:
+                config['preprocessing']['read_block_bytes'] = min(config['preprocessing']['read_block_bytes'],
+                                                                 config['preprocessing']['block_bytes'])
             entry, workspace = stream_case(prepared, row, config, pending, guard)
         try:
             with stage(config, "preprocess_case_save", case_id=name):
@@ -113,7 +116,7 @@ def produce_case(prepared, config, root, name, key, recipe_identity):
 
 
 def case_pointer(record):
-    return {"key": record["case_key"], "identity": record["identity"], "shape_czyx": record["files"]["image.npy"]["shape"],
+    return {"case_id": record['entry']['case_id'], "key": record["case_key"], "identity": record["identity"], "shape_czyx": record["files"]["image.npy"]["shape"],
             "array_bytes": sum(v["array_bytes"] for n, v in record["files"].items() if n.endswith(".npy")),
             "locations_bytes": record["files"]["locations.npz"]["stamp"][0]}
 
@@ -179,6 +182,7 @@ def process_pending(config, prepared, root, identity, pending, pointers, catalog
                         running.pop(future)
                         pointers[name] = pointer
                         catalog['cases'][pointer['key']] = pointer
+                        catalog.setdefault('case_index', {})[name] = pointer['key']
                         write_json(root/'catalog.json', catalog)
                     session.handle.state['case_slots'] = max(1, min(workers, len(pending)+len(running)))
                     progress.update(done=len(pointers), new=len(pointers)-before,

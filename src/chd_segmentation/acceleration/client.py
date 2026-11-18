@@ -17,13 +17,16 @@ class ResourceClient:
             raise RuntimeError('资源监控异常结束，停止新增分配')
         return ResourceSnapshot(state['sampled_at'], state['sampled_monotonic'],
             monotonic() - state['sampled_monotonic'], state['host'], state['project_bytes'],
-            state['headroom'], state['paused'], h.cancel.is_set(), state['sampling_seconds'])
+            max(0,min(state['headroom'],state['capacity']-state.get('fixed_rss',0)-state['reserved'])),
+            state['paused'], h.cancel.is_set(), state['sampling_seconds'])
 
     def boundary(self):
         value = self.snapshot()
         if value.cancelled:
             return BoundaryDecision('stop', 'cancelled')
-        if value.paused:
+        with self.handle.condition:
+            quota_full = self.handle.state['reserved'] >= self.handle.state['capacity']-self.handle.state.get('fixed_rss',0)
+        if value.paused or quota_full:
             self.wait_started = monotonic() if self.wait_started is None else self.wait_started
             elapsed = monotonic() - self.wait_started
             limit = self.handle.resources.get('max_wait')
@@ -43,7 +46,8 @@ class ResourceClient:
                     raise RuntimeError('资源监控异常结束，停止新增分配')
                 if h.cancel.is_set():
                     raise InterruptedError('资源等待已取消')
-                if not h.state['paused'] and h.state['reserved'] + amount_bytes <= h.state['capacity']-h.state.get('fixed_rss',0):
+                free = h.state['capacity']-h.state.get('fixed_rss',0)-h.state['reserved']
+                if not h.state['paused'] and amount_bytes <= free and (amount_bytes > 0 or free > 0):
                     h.state['reserved'] += amount_bytes
                     acquired = True
                     break

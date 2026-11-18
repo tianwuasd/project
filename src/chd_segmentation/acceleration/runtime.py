@@ -21,7 +21,8 @@ from .timing import TimingBook
 def attach(handle):
     member = identity()
     member['baseline_rss'] = psutil.Process().memory_info().rss
-    handle.members[member['pid']] = member
+    if member['pid'] not in handle.members:
+        handle.members[member['pid']] = member
     return ResourceClient(handle)
 
 
@@ -120,7 +121,8 @@ class ResourceSession:
                 self.state.update(sampled_at=datetime.now(timezone.utc).isoformat(), sampled_monotonic=monotonic(),
                     host=facts, project_bytes=project,
                     headroom=max(0, min(self.capacity-rss, spare-pending+max(0,self.capacity-rss))),
-                    task_rss=rss, fixed_rss=sum(m.get('baseline_rss', 0) for m in members if alive(m)),
+                    task_rss=rss, peak_task_rss=max(rss,self.state.get('peak_task_rss',0)),
+                    fixed_rss=sum(m.get('baseline_rss', 0) for m in members if alive(m)),
                     paused=spare-pending<0 or project>limit, sampling_seconds=monotonic()-began)
                 self.condition.notify_all()
 

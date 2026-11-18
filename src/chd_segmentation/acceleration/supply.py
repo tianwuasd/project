@@ -14,9 +14,8 @@ class OrderedSupply:
         return self
 
     def _build(self, requests):
-        if self.client.boundary().action == 'stop':
-            raise InterruptedError('供数已取消')
-        return self.collate([self.build(request) for request in requests])
+        with self.client.reserve(0, purpose='batch_ready'):
+            return self.collate([self.build(request) for request in requests])
 
     def submit(self, index, requests):
         if len(self.queue) + int(self.current is not None) >= self.capacity:
