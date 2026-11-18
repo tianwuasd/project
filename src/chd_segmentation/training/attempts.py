@@ -50,9 +50,11 @@ def settle_attempts(function):
 def remaining_attempts(config, stage):
     if not is_technical(config):
         return None
-    state = tool_ledger(config).read()
+    ledger = tool_ledger(config)
+    state, limits = ledger.read(), ledger.limits()
     key = tool_stage(config, stage)
-    return max(0, min(2-sum(row['stage'] == key for row in state['attempts']), 10-len(state['attempts'])))
+    return max(0,min(limits['stage_limits'][key]-sum(row['stage']==key for row in state['attempts']),
+        limits['total_limit']-len(state['attempts'])))
 
 
 def claim_attempt(config, stage):

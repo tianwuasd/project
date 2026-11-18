@@ -159,6 +159,8 @@ def command(args):
     stage = args.stage
     model_stage = stage.removeprefix('q_') if stage.startswith('q_') else 'sequence'
     config = course/('stu.json' if stage=='stu' else 'med.json' if stage=='med_sequence' else 'q-'+model_stage+'.json')
+    if args.config is not None:
+        config = Path(args.config).resolve(strict=True)
     prepared = course/('med-offline.json' if stage=='med_sequence' else 'shared-offline.json')
     if args.prepared is not None:
         prepared = Path(args.prepared).resolve(strict=True)
@@ -265,10 +267,14 @@ def inspect_restore(args):
     torch.set_num_threads(1)
     ledger = reports.parent/'attempts.json'
     before = read_json(ledger)
-    state = load_state(root/'course/runs/Q/base/latest.pt')
-    if state['stage']!='base' or state['training_cases']!=['ct_1001'] or state['update']!=1:
-        raise ValueError('Q基础状态与本次实际训练不符')
-    bundle = adapter(state['config'],state['prepared'],'base',initialize=False)
+    if args.stage not in ('q_base','q_localizer'):
+        raise ValueError('只读恢复检查需要明确Q基础或定位器阶段')
+    stage = args.stage.removeprefix('q_')
+    run = root/'course/runs'/('Q' if stage=='base' else 'Q-wide')
+    state = load_state(run/stage/'latest.pt')
+    if state['stage']!=stage or state['training_cases']!=['ct_1001'] or state['update']!=1:
+        raise ValueError('Q状态与本次实际训练不符')
+    bundle = adapter(state['config'],state['prepared'],stage,initialize=False)
     bundle.model.load_state_dict(state['model'],strict=True)
     optimizer = bundle.optimizer()
     optimizer.load_state_dict(state['optimizer'])
@@ -276,10 +282,42 @@ def inspect_restore(args):
     bundle.restore_extra(state['rank_states'][0]['extra'])
     if read_json(ledger)!=before:
         raise ValueError('只读恢复检查期间台账发生变化')
-    write_json(reports/'q-base-restore.json',dict(state='completed',checkpoint_update=state['update'],
+    write_json(reports/('q-'+stage+'-restore.json'),dict(state='completed',checkpoint_update=state['update'],
         stage=state['stage'],model_loaded_strict=True,optimizer_states=len(optimizer.state),
         sampler_extra_loaded=True,optimizer_step_calls=0,ledger_unchanged=True,
         resume_with_additional_update_verified=False))
+
+
+def fork_q_base(args):
+    engine, root, reports = setup(args)
+    sys.path.insert(0,str(engine.parent/'chd-segmentation-assistant3/src'))
+    from chd_mini.attempts import AttemptLedger
+    from chd_segmentation.artifacts.store import read_json,write_json
+    ledger = AttemptLedger(reports.parent/'attempts.json')
+    state,limits = ledger.read(),ledger.limits()
+    if limits['stage_limits']['q_base']!=3 or sum(row['stage']=='q_base' for row in state['attempts'])!=2:
+        raise ValueError('额外Q基础恢复尚未获准或已使用')
+    source = root/'course/runs/Q/base'
+    target = root/'course/runs/Q-base-extra/base'
+    if not target.resolve().is_relative_to(root) or target.exists():
+        raise ValueError('独立恢复目标已存在或不属于本轮目录')
+    names = ('latest.pt','best.pt','execution-topology.json')
+    copies = []
+    for name in names:
+        path = source/name
+        if path.is_symlink() or not path.is_file():
+            raise ValueError('恢复来源不是本轮普通文件')
+        copies.append(dict(source=str(path),target=str(target/name),bytes=path.stat().st_size))
+    target.mkdir(parents=True,exist_ok=False)
+    for record in copies:
+        shutil.copy2(record['source'],record['target'])
+    config = read_json(root/'course/q-base.json')
+    config['run_dir'] = str(target.parent)
+    write_json(root/'course/q-base-extra.json',config)
+    originals = [source/'best.pt',root/'course/runs/Q-wide/localizer/best.pt']
+    write_json(reports/'q-base-fork.json',dict(state='completed',copies=copies,
+        approval=str(reports.parent/'attempts.approval.json'),optimizer_updates=0,
+        original_parents=[dict(path=str(path),stamp=[path.stat().st_size,path.stat().st_mtime_ns]) for path in originals]))
 
 
 def inspect_med_supervision(args):
@@ -400,6 +438,8 @@ def supervised(args):
         command_line += ['--resume']
     if args.prepared is not None:
         command_line += ['--prepared',str(Path(args.prepared).resolve(strict=True))]
+    if args.config is not None:
+        command_line += ['--config',str(Path(args.config).resolve(strict=True))]
     source = subprocess.run(['git','-C',str(engine),'rev-parse','HEAD'],check=True,capture_output=True,text=True).stdout.strip()
     environment = dict(os.environ,PYTHONUTF8='1',PYTHONIOENCODING='utf-8',PYTHONDONTWRITEBYTECODE='1')
     try:
@@ -423,13 +463,14 @@ if __name__ == '__main__':
     parser.add_argument('--settings',required=True)
     parser.add_argument('--work',required=True)
     parser.add_argument('--reports',required=True)
-    parser.add_argument('--phase',choices=('prepare','inspect','startup-check','preprocess-reuse','q-inputs','q-local-inputs','med-supervision','restore','train','predict','evaluate'),required=True)
+    parser.add_argument('--phase',choices=('prepare','inspect','q-base-fork','startup-check','preprocess-reuse','q-inputs','q-local-inputs','med-supervision','restore','train','predict','evaluate'),required=True)
     parser.add_argument('--stage',choices=('stu','q_base','q_localizer','q_local','med_sequence'))
     parser.add_argument('--resume',action='store_true')
     parser.add_argument('--stop-after',type=int,choices=(1,2),default=1)
     parser.add_argument('--supervise',action='store_true')
     parser.add_argument('--tag')
     parser.add_argument('--prepared')
+    parser.add_argument('--config')
     arguments = parser.parse_args()
     if arguments.supervise:
         supervised(arguments)
@@ -449,5 +490,7 @@ if __name__ == '__main__':
         inspect_preprocess_reuse(arguments)
     elif arguments.phase=='startup-check':
         inspect_startup(arguments)
+    elif arguments.phase=='q-base-fork':
+        fork_q_base(arguments)
     else:
         command(arguments)
