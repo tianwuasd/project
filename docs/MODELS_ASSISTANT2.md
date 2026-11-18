@@ -48,7 +48,9 @@ python -B run.py models train --config /path/to/q-local.yaml --prepared /path/to
 python -B run.py models train --config /path/to/medsam2.yaml --prepared /path/to/prepared.json --stage sequence
 ```
 
-`--resume`读取同阶段完整检查点；`--stop-after`限制累计更新数。MedSAM2正式预算为75个epoch。latest用于继续训练，best按独立验证指标选择；严格改善才替换best，损失相同保留较早状态。已有模型或检查点的目录需要resume或新目录；仅有候选、日志或资源记录的目录可正常初始化，同阶段操作锁和活动进程检查继续生效。
+`--resume`读取同阶段完整检查点；`--stop-after`限制累计更新数，MedSAM2停止位置须位于完整官方epoch边界，轮内停止请求在执行更新前拒绝。MedSAM2正式预算为75个epoch。latest用于继续训练，best按独立验证指标选择；严格改善才替换best，损失相同保留较早状态。已有模型或检查点的目录需要resume或新目录；仅有候选、日志或资源记录的目录可正常初始化，同阶段操作锁和活动进程检查继续生效。
+
+恢复核对科学设置、训练验证划分及监督语义。用户显式更换预处理目录、fold或spacing时继续允许复用模型；实际来源变化写入状态，选模比较从当前来源重新开始，Q候选抽样器按新输入构建，此时不声明输入不变的精确恢复。
 
 提前停止默认关闭。Q默认patience=10次验证，STU及Med默认20个完整验证轮次，min_delta=0.0001；微小严格改善仍更新best。模型CLI提供--early-stop、--patience和--min-delta。Q预算以updates为单位，使用--epochs时必须同时提供--updates-per-epoch，显式updates与换算值必须一致。
 
@@ -61,9 +63,9 @@ python -B run.py models predict --config /path/to/q-local.yaml --prepared /path/
 python -B run.py models predict --config /path/to/medsam2.yaml --prepared /path/to/prepared.json --checkpoint /path/to/medsam2/sequence/latest.pt --prompts /path/to/prompts.yaml --output /path/to/result/medsam2
 ```
 
-普通预测数据加载器不读取标签数组。新病例使用包含新清单的准备描述，训练计划和数据集语义需与检查点一致。Q根据CT定位器产生候选。MedSAM2普通提示文件登记人工或图像定位器来源；自动提示登记定位器检查点摘要。显式`--prompt-mode label-box`从标签生成框并输出有提示评价，规则和命令见[1282组合与标签框](Q1282_AND_LABEL_BOX.md)。MedSAM2提示坐标使用原图所选范围的DHW网格，二维框以XYXY记录，frame指D轴切片，提示文件的space字段为 `native_dhw`。结构冲突按最高logit选择，背景logit固定为0。输出恢复到源数组尺寸与affine。
+普通预测数据加载器不读取标签数组。新病例使用包含新清单的准备描述，数据集类别语义需与检查点一致；几何恢复采用实际选定来源的轴序、spacing及ROI。显式描述按其storage.cases读取精确版本；显式目录只解析一次当前病例索引。Q根据CT定位器产生候选，模型快照固定方法与候选等科学参数；强度规则及实际输入来源写入任务，同一结果目录的接续调用保持相同推断设置。MedSAM2普通提示文件登记人工或图像定位器来源；自动提示登记定位器检查点摘要。显式`--prompt-mode label-box`从标签生成框并输出有提示评价，规则和命令见[1282组合与标签框](Q1282_AND_LABEL_BOX.md)。MedSAM2提示坐标使用原图所选范围的DHW网格，二维框以XYXY记录，frame指D轴切片，提示文件的space字段为 `native_dhw`。结构冲突按最高logit选择，背景logit固定为0。输出恢复到源数组尺寸与affine。
 
-普通预测生成predictions.json，记录实际来源、固定模型、任务范围和相对文件名，可用共享evaluate入口计算已知类别指标。预测开始保存selected-model.pt；Q同时保存基础模型和定位器参数，随后从该组合继续，不随父模型路径后续写出而改变。已完成病例核对小型来源记录及文件存在后复用，不对全部输出做内容扫描。每例独立保存完成记录。标签框模式生成独立evaluation.json，保留有提示评价含义。
+普通预测生成predictions.json，累计记录整个任务已完成的病例、实际来源、固定模型及相对文件名，可用共享evaluate入口计算已知类别指标；summary中的new/reused只统计本次调用。预测开始保存selected-model.pt；Q同时保存基础模型和定位器参数，随后从该组合继续，不随父模型路径后续写出而改变。已完成病例核对小型来源记录及文件存在后复用，不对全部输出做内容扫描。结果根目录使用单写锁，每例写出与完成登记之间保存pending-case.json；接续时补交已写完的文件，尚未写完的自有文件重新计算该例。标签框模式生成累计evaluation.json，保留有提示评价含义。
 
 ```yaml
 case_id:
@@ -77,6 +79,8 @@ case_id:
 MedSAM2使用[固定官方提交332f30d](https://github.com/bowang-lab/MedSAM2/tree/332f30d420f1d1b08e2a79b3ae6a602458808383) 的Trainer、SAM2Train、官方VOS数据与变换、MultiStepMultiMasksAndIous 和 SAM2VideoPredictorNPZ。读取原始影像网格，CT窗默认来自训练计划的拟合上下界，也可明确填写gray_window。按官方CT处理方式执行窗内截断及0—255转换，后续执行官方RGB、增强和标准化。未标类别不生成目标，训练提示从已知标注产生；测试标签仅在显式标签框评测模式用于生成框及评价。CUDA后处理扩展显式关闭。
 
 官方源码在vendor/MedSAM2，额外依赖在env/medsam2，官方权重在data/model_weights/MedSAM2_latest.pt，均被Git忽略并保留复用。权重来自[官方Hugging Face仓库固定版本](https://huggingface.co/wanglab/MedSAM2/tree/e4a6f35edd7e091619cbc0750f462f1574e23955)，容量156040129字节，SHA-256为 `c92743b99f00d078bf32a3afcc38aaa9faf1c1692dffe3eaa7a90938c1991060`。下载交付时独立核验；常规训练直接由官方初始化器严格加载参数，预测按实际模型结构与参数键加载。
+
+常规运行记录实际配置的权重路径、文件容量和已导入源码位置，沿用已有交付记录；未重新核实的输入明确标记configured_pretrained及official_verified=false。直接权重预测的训练更新数标为未核实，不据参数键把任意同结构模型写成官方零更新状态。
 
 额外依赖列于requirements-medsam2.txt。运行需要实际可用的依赖与API；必要导入或参数读取失败时直接报告。模型预处理不依赖初始化权重或严格Torch版本文字。独立安装不修改助手1的Python环境。
 
