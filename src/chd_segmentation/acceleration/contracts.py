@@ -85,6 +85,9 @@ class Allocation:
     memory_bytes: int
     requested: dict = field(default_factory=dict)
     applied: dict = field(default_factory=dict)
+    world: int = 0
+    shares: list = field(default_factory=list)
+    supply: dict = field(default_factory=dict)
 
 
 @dataclass

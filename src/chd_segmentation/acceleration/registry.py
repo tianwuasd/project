@@ -100,7 +100,9 @@ def gpu_decision(config, spec, history, peaks, peers, world=None, require_measur
             elif g["uuid"] in reserved:
                 reason = "本项目其他活动任务已预留"
             elif not g["busy"]:
-                measured = peaks.get(g["uuid"], {}).get(capacity_key(config, spec, local_batch, world)) if require_measured else 0
+                if require_measured and local_batch not in keys:
+                    keys[local_batch] = capacity_key(config,spec,local_batch,world)
+                measured = peaks.get(g["uuid"], {}).get(keys[local_batch]) if require_measured else 0
                 if measured is None:
                     reason = "自动调整卡数需要此卡同配方和每卡 batch 的实测容量"
                 elif require_measured and (type(measured) not in (int, float) or not math.isfinite(measured) or measured <= 0):
@@ -149,7 +151,7 @@ def choose_gpus(config, spec, history, peaks, peers):
     return gpu_decision(config, spec, history, peaks, peers)["gpus"]
 
 
-def fleet_decision(config, spec, history, peaks, peers, previous_world=None):
+def fleet_decision(config, spec, history, peaks, peers, previous_world=None, *, plan_candidate=None):
     r = config["resources"]
     minimum = r["gpu_count"] if r["min_gpus"] is None else r["min_gpus"]
     decisions = []
@@ -161,13 +163,20 @@ def fleet_decision(config, spec, history, peaks, peers, previous_world=None):
         decision = gpu_decision(config, spec, history, peaks, peers, world,
                                 require_measured=world != r["gpu_count"] or
                                 previous_world is not None and world != previous_world)
-        decisions.append({"world": world, "reason": decision["reason"], "candidates": decision["candidates"]})
+        shares = layout(config['training']['batch'],world,r['batch_layout'])
+        plan = None
+        if decision['gpus'] is not None and plan_candidate is not None:
+            plan = plan_candidate(world=world,shares=shares,gpus=decision['gpus'])
+            if not plan['admitted']:
+                decision.update(gpus=None,reason=plan['reason'])
+        decisions.append({"world": world, "reason": decision["reason"], "candidates": decision["candidates"],
+                          "minimum_bytes": plan.get('minimum_bytes') if plan is not None else None})
         if decision["gpus"] is not None:
-            decision["alternatives"] = decisions
+            decision.update(alternatives=decisions,world=world,shares=shares,plan=plan)
             return decision
     if decision is None:
         raise ValueError('没有可以均分MedSAM2全局batch的进程数量')
-    decision["alternatives"] = decisions
+    decision.update(alternatives=decisions,world=0,shares=[],plan=None)
     return decision
 
 

@@ -1,4 +1,4 @@
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from copy import deepcopy
@@ -19,6 +19,7 @@ from .host import host_capacity
 from .memory import identity, alive, system_headroom
 from .timing import TimingBook
 from .accounting import reconcile
+from .admission import select_admission
 
 
 def attach(handle):
@@ -32,7 +33,7 @@ def attach(handle):
 
 
 class ResourceSession:
-    def __init__(self, request, *, context=None, cancel=None, layout=None):
+    def __init__(self, request, *, context=None, cancel=None, layout=None, planner=None):
         self.request = request
         self.context = context or mp.get_context('spawn')
         self.cancel = cancel or self.context.Event()
@@ -41,6 +42,7 @@ class ResourceSession:
         self.control_lock = RLock()
         self.requested_layout = self._layout(layout)
         self.pending_token = None
+        self.planner = planner
 
     @staticmethod
     def _layout(layout):
@@ -52,7 +54,7 @@ class ResourceSession:
             raise ValueError('供数预取容量必须为1或2')
         return value
 
-    def _admit(self, demand, *, layout=None, keep_gpus=None):
+    def _admit(self, demand, *, layout=None, keep_gpus=None, initial=False):
         root = Path(self.request.registry_root)
         root.mkdir(parents=True, exist_ok=True)
         began = monotonic()
@@ -91,59 +93,67 @@ class ResourceSession:
                 if hasattr(self, 'members'):
                     current = sum(psutil.Process(m['pid']).memory_info().rss
                                   for m in self.members.values() if alive(m))
-                amount = max(demand.memory_bytes, current)
+                occupied = current
                 if hasattr(self,'condition'):
                     with self.condition:
-                        pool = demand.workspace_bytes if demand.reader_slots else 0
-                        amount = max(amount,current+self.state.get('unrealized_bytes',0)+pool)
+                        occupied += self.state.get('unrealized_bytes',0)
                 cpu_available = max(0, int(facts['cores']*r.get('cpu_fraction', .8))-
                                     sum(row.get('cpu_slots', 0) for row in peers))
-                # 只有能按获批数量调整布局的调用者才允许部分授予。
-                cpu_slots = min(demand.cpu_slots, cpu_available) if demand.allow_partial_cpu else (
-                    demand.cpu_slots if cpu_available >= demand.cpu_slots else 0)
-                gpus = [] if keep_gpus is None else keep_gpus
-                if observed is not None:
-                    from .registry import gpu_decision
-                    gpu_config = {'resources': {**r, 'gpu_count': demand.gpu_count, 'gpu_ids': demand.gpu_ids},
-                        'training': {'batch': sum(demand.local_batches) if demand.local_batches else demand.gpu_count,
-                                     'precision': r.get('precision', 'fp32')}}
-                    peak_path = root/'gpu-peaks.json'
-                    peaks = read_json(peak_path) if peak_path.is_file() else {}
-                    gpus = gpu_decision(gpu_config, r.get('gpu_spec', {}), history, peaks, peers)['gpus']
-                if cpu_slots > 0 and gpus is not None and amount <= limit-project and max(0, amount-current) <= headroom-pending:
-                    applied_layout = self._layout(layout if layout is not None else self.requested_layout)
+                budget = min(limit-project,current+headroom-pending)
+                peak_path = root/'gpu-peaks.json'
+                peaks = read_json(peak_path) if observed is not None and peak_path.is_file() else {}
+                decision = select_admission(self.request,demand,self.planner if initial else None,
+                    facts=facts,memory_budget_bytes=budget,cpu_budget_slots=cpu_available,
+                    occupied_bytes=occupied,history=history,peaks=peaks,peers=peers,
+                    layout=layout if layout is not None else self.requested_layout,
+                    keep_gpus=keep_gpus,initial=initial)
+                if decision['gpus'] is not None:
+                    plan = decision['plan']
+                    selected,amount,cpu_slots = plan['demand'],plan['memory_bytes'],plan['cpu_slots']
+                    gpus,world,shares = decision['gpus'],decision['world'],decision['shares']
+                    applied_layout = self._layout(plan['layout'])
                     generation = self.state['plan_generation']+1 if hasattr(self,'state') else 0
                     rows = peers + [{**self.owner, 'members': list(self.members.values()) if hasattr(self,'members') else [],
                         'ram_bytes': amount, 'rss_bytes': current, 'cpu_slots': cpu_slots,
                         'uuids': [g['uuid'] for g in gpus], 'memory_limit_bytes': limit,
-                        'layout': applied_layout, 'reader_slots': demand.reader_slots,
-                        'workspace_capacity': demand.workspace_bytes if demand.reader_slots else 0,
-                        'plan_generation': generation}]
+                        'layout': applied_layout, 'reader_slots': selected.reader_slots,
+                        'workspace_capacity': selected.workspace_bytes if selected.reader_slots else 0,
+                        'plan_generation': generation,'world':world,'shares':shares,'precision':r.get('precision')}]
                     if hasattr(self,'condition'):
                         with self.condition:
                             write_json(path,rows,durable=False)
                             self.capacity,self.cpu_slots,self.gpus = amount,cpu_slots,gpus
                             self.rows = rows
-                            self.state.update(capacity=amount,reader_slots=demand.reader_slots,
-                                workspace_capacity=demand.workspace_bytes if demand.reader_slots else 0,
-                                layout=applied_layout,plan_generation=generation,cpu_slots=cpu_slots,gpus=gpus)
+                            self.state.update(capacity=amount,reader_slots=selected.reader_slots,
+                                workspace_capacity=selected.workspace_bytes if selected.reader_slots else 0,
+                                layout=applied_layout,plan_generation=generation,cpu_slots=cpu_slots,gpus=gpus,
+                                world=world,shares=shares,precision=r.get('precision'))
                             self.condition.notify_all()
                     else:
                         write_json(path,rows,durable=False)
                         self.capacity,self.cpu_slots,self.gpus = amount,cpu_slots,gpus
+                    self.applied_demand = selected
+                    self.applied_plan = dict(layout=applied_layout,supply=plan['supply'])
+                    self.world,self.shares = world,shares
+                    self.admission_decision = decision
                     return
             limit = r.get('max_wait')
             if monotonic()-last_log >= 15.:
                 event(self.request.run_dir, 'waiting_resources', stage=self.request.stage,
                       seconds=monotonic()-began, wait_forever=limit is None,
-                      reason='CPU、GPU或内存额度不足', requested_bytes=demand.memory_bytes,
+                      reason=decision['reason'], requested_bytes=demand.memory_bytes,
                       requested_cpu_slots=demand.cpu_slots, available_cpu_slots=cpu_available,
+                      requested_gpu_count=demand.gpu_count,precision=r.get('precision'),
+                      memory_budget_bytes=budget,alternatives=decision['alternatives'],
                       allow_partial_cpu=demand.allow_partial_cpu,
                       project_accounted_bytes=project, system_headroom_bytes=headroom)
                 last_log = monotonic()
             if limit is not None and monotonic()-began >= limit:
                 raise TimeoutError('已达到显式资源准入等待时限')
-            sleep(r.get('poll_seconds', 2.))
+            delay = r.get('poll_seconds',2.)
+            if limit is not None:
+                delay = min(delay,max(0,limit-(monotonic()-began)))
+            self.cancel.wait(delay)
 
     def _sample(self):
         with self.control_lock:
@@ -191,15 +201,17 @@ class ResourceSession:
     def __enter__(self):
         self.owner = identity()
         self.owner['baseline_rss'] = psutil.Process().memory_info().rss
-        self._admit(self.request.demand)
+        self._admit(self.request.demand,initial=True)
         self.manager = self.context.Manager()
         self.condition = self.context.Condition()
-        demand = self.request.demand
+        demand = self.applied_demand
+        self.requested_layout = self.applied_plan['layout']
         self.state = self.manager.dict(capacity=self.capacity, reserved=0, monitor_failed=False,
             reader_slots=demand.reader_slots,active_readers=0,workspace_reserved=0,
             workspace_capacity=demand.workspace_bytes if demand.reader_slots else 0,
             layout=self.requested_layout,plan_generation=0,replanning=False,replan_request=None,replan_result=None,
-            cpu_slots=self.cpu_slots,gpus=self.gpus)
+            cpu_slots=self.cpu_slots,gpus=self.gpus,world=self.world,shares=self.shares,
+            precision=self.request.resources.get('precision'))
         self.state.update(claims={},unrealized_bytes=0)
         manager_member = identity(psutil.Process(self.manager._process.pid))
         manager_member['baseline_rss'] = psutil.Process(manager_member['pid']).memory_info().rss
@@ -210,18 +222,27 @@ class ResourceSession:
         self.allocation = Allocation(self.owner, self.gpus, self.requested_layout['workers'],
                                     demand.reader_slots, self.requested_layout['prefetch'], self.cpu_slots, self.capacity,
                                     requested=asdict(self.request.demand),
-                                    applied=dict(memory_bytes=self.capacity, cpu_slots=self.cpu_slots, gpus=self.gpus))
+                                    applied=self._applied(),world=self.world,shares=self.shares,
+                                    supply=self.applied_plan['supply'])
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='resource-monitor')
         self.future = self.executor.submit(self._monitor)
         return self
+
+    def _applied(self):
+        return dict(memory_bytes=self.capacity,cpu_slots=self.cpu_slots,gpus=self.gpus,
+            world=self.world,shares=self.shares,precision=self.request.resources.get('precision'),
+            layout=self.requested_layout,plan_generation=self.state['plan_generation'])
 
     def replan(self, demand, *, safe_boundary, layout=None):
         if os.getpid() != self.owner['pid']:
             raise RuntimeError('只有会话所有者可以应用重规划，请使用request_replan')
         if safe_boundary.kind not in ('before_case','block_group','batch_consumed','checkpoint_saved','prediction_case_completed'):
             raise ValueError('资源调整需要明确安全边界')
-        previous = self.request.demand
-        changed_gpu = (demand.gpu_count,demand.gpu_ids) != (previous.gpu_count,previous.gpu_ids)
+        previous = self.applied_demand
+        if demand.gpu_count == previous.gpu_count and demand.gpu_ids in (None,self.request.demand.gpu_ids):
+            demand = replace(demand,gpu_ids=previous.gpu_ids)
+        changed_gpu = ((demand.gpu_count,demand.gpu_ids) != (previous.gpu_count,previous.gpu_ids) or
+                       demand.gpu_count and demand.local_batches != previous.local_batches)
         if changed_gpu and not safe_boundary.checkpoint_path:
             raise ValueError('改变GPU组需要完整恢复点')
         with self.condition:
@@ -234,7 +255,6 @@ class ResourceSession:
             self._admit(demand,layout=layout if layout is not None else self.state['layout'],
                         keep_gpus=None if changed_gpu else self.gpus)
             with self.control_lock, self.condition:
-                self.request.demand = demand
                 self.requested_layout = self.state['layout']
                 self.last_registry = -float('inf')
                 self.allocation.memory_bytes = self.capacity
@@ -243,9 +263,10 @@ class ResourceSession:
                 self.allocation.reader_slots = demand.reader_slots
                 self.allocation.workers = self.requested_layout['workers']
                 self.allocation.prefetch = self.requested_layout['prefetch']
-                self.allocation.requested = asdict(demand)
-                self.allocation.applied = dict(memory_bytes=self.capacity,cpu_slots=self.cpu_slots,
-                    gpus=self.gpus,layout=self.requested_layout,plan_generation=self.state['plan_generation'])
+                self.allocation.applied = self._applied()
+                self.allocation.applied['replan_request'] = asdict(demand)
+                self.allocation.world,self.allocation.shares = self.world,self.shares
+                self.allocation.supply = self.applied_plan['supply']
                 return self.allocation
         finally:
             with self.condition:
