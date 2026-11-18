@@ -58,6 +58,7 @@ class ReviewRegressions(unittest.TestCase):
         from chd_segmentation.prediction.metrics import case_data_identity
         from chd_segmentation.preprocessing.prepare import load_prepared
         bound = bind_prepared_source(self.prepared,self.root/'course/shared-offline.json')
+        self.assertNotIn('source_scope',bound['storage'])
         rows = self.prepared['manifest']['cases']
         for row in rows:
             self.assertEqual(case_data_identity(self.prepared,row),case_data_identity(bound,row))

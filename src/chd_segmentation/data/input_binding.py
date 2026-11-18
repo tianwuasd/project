@@ -37,7 +37,8 @@ def bind_prepared_source(prepared, path, case_ids=None):
         raise ValueError('指定预处理的类别语义与当前实验不同')
     result = deepcopy(prepared)
     result['storage'] = dict(format=catalog['format'],root=str(source.root),complete=True,
-        recipe_identity=catalog['recipe_identity'],source_scope=catalog['recipe']['scope'],cases=source.cases)
+        recipe_identity=catalog['recipe_identity'],cases=source.cases)
+    result['source_scope'] = catalog['recipe']['scope']
     result['plan'] = deepcopy(catalog['recipe'].get('plan',prepared['plan']))
     result['identity'] = digest(dict(dataset=result['dataset'],cases=names,storage=result['storage']))
     return result
