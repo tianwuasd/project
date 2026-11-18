@@ -1,5 +1,6 @@
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 
 
 class OrderedSupply:
@@ -10,12 +11,25 @@ class OrderedSupply:
         self.queue, self.current, self.last = deque(), None, None
 
     def __enter__(self):
+        self.stopping = Event()
         self.pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='ordered-supply')
         return self
 
     def _build(self, requests):
-        with self.client.reserve(0, purpose='batch_ready'):
-            return self.collate([self.build(request) for request in requests])
+        # 仅取消此供数器的等待，不改变同一会话中其他消费者的取消状态。
+        while not self.stopping.is_set():
+            decision = self.client.boundary()
+            if decision.action == 'stop':
+                if decision.reason == 'cancelled':
+                    raise InterruptedError('供数任务已取消')
+                raise TimeoutError('已达到显式批次资源等待时限')
+            with self.client.reserve(0, purpose='batch_ready', wait=False) as allowance:
+                if allowance is not None:
+                    if self.stopping.is_set():
+                        break
+                    return self.collate([self.build(request) for request in requests])
+            self.stopping.wait(.1)
+        raise InterruptedError('供数器已经退出，停止等待新批次额度')
 
     def submit(self, index, requests):
         if len(self.queue) + int(self.current is not None) >= self.capacity:
@@ -37,6 +51,7 @@ class OrderedSupply:
         self.current = None
 
     def __exit__(self, *_):
+        self.stopping.set()
         for _, future in self.queue:
             future.cancel()
         self.pool.shutdown(wait=True, cancel_futures=True)
