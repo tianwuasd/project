@@ -227,8 +227,9 @@ class GitRepository:
             if mode != "100644" or kind != "blob" or not allowed(name):
                 raise ValueError("代码目录包含非法路径或文件类型：" + name)
             files[name] = blob
-        if not {"run.py", "setup_env.py", "pyproject.toml", "update.py"} <= files.keys() or len(files) > 256:
-            raise ValueError("代码目录缺少必要文件或超出文件预算")
+        missing = {"run.py", "setup_env.py", "pyproject.toml", "update.py"} - files.keys()
+        if missing:
+            raise ValueError("代码目录缺少必要文件：" + ", ".join(sorted(missing)))
         return files
 
     def fetch_files(self, files):

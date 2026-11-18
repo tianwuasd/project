@@ -49,7 +49,9 @@ def public_files(offset, limit):
         raise ValueError('发布读取仅接受已提交且干净的工作树')
     names = git('ls-tree', '-r', '--name-only', 'HEAD').decode().splitlines()
     names = [name for name in names if allowed(name)]
-    assert len(names)<=256
+    missing = {'run.py', 'setup_env.py', 'pyproject.toml', 'update.py'} - set(names)
+    if missing:
+        raise ValueError('发布代码缺少必要文件：' + ', '.join(sorted(missing)))
     entries = []
     for name in names[offset:offset+limit]:
         data = git('show', 'HEAD:'+name)
