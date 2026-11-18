@@ -95,7 +95,7 @@ def geometry(item, output):
 def prediction_events_from_console(path):
     events = []
     for number, line in enumerate(Path(path).read_text(encoding='utf-8').splitlines(), 1):
-        if line.lstrip().startswith('{'):
+        if line.lstrip().startswith('{') and '"event":' in line:
             row = json.loads(line)
             if row.get('event') in ('prediction_reused', 'model_case_reused', 'prediction', 'model_case_completed'):
                 if row.get('case_id') in ('ct_1001', 'ct_1012'):
