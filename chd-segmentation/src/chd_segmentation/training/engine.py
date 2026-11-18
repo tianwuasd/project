@@ -18,14 +18,18 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel
 
 from ..artifacts.store import digest, operation_lock, read_json, require_output, write_json
-from ..compatibility import compatible_code
-from ..data.supply import BatchSupply, batch_index
+from ..data.supply import batch_index
+from .batches import BatchSupply
+from .session import admitted_training, memory_for
 from ..models.stunet.adapter import StunetAdapter, WEIGHT_SHA256
 from ..observability.events import event, logged, stage
 from ..observability.progress import Progress
 from ..preprocessing.prepare import load_prepared, validate_prepared_config
-from ..preprocessing.offline_store import storage_lease, validate_storage
+from ..preprocessing.offline_store import storage_lease
+from .resume import validate_training_inputs,resume_inputs,selection_scope,reset_selection
 from .checkpoint import load_checkpoint, save_checkpoint, tensors_equal,require_resume_device,verify_optimizer_device
+from .attempts import settle_attempts, claim_attempt, finish_attempt, remaining_attempts, is_technical
+from .stopping import selection_options, update_selection
 from .build_gate import BuildGate
 from .coordinator import HostCoordinator
 from .memory_guard import MemoryGuard, alive
@@ -43,18 +47,14 @@ def code_identity():
     return hashes.hexdigest()
 
 
-def validate_initialization_restart(output, scientific):
+def validate_initialization_restart(output, scientific, config, prepared):
     output = Path(output)
     previous = read_json(output / "run.json")
-    expected = {**scientific, "code_identity": previous["scientific"]["code_identity"]}
-    if digest(previous["scientific"]) != digest(expected) or previous["identity"] != digest(expected) or not compatible_code(
-            previous["scientific"]["code_identity"], scientific["code_identity"]):
-        raise ValueError("初始化重试的配置、数据、代码或依赖版本改变")
+    changed = resume_inputs(previous,prepared,config)
     if (output / "latest.json").exists() or (output / "summary.json").exists() or any(output.glob("state-*.pt*")):
         raise FileExistsError("运行目录已有检查点、写入中的状态或训练摘要，请使用 --resume")
     event(output, "initialization_restarted", previous_identity=previous["identity"],
-          identity=digest(scientific), previous_code=previous["scientific"]["code_identity"],
-          applied_code=scientific["code_identity"], reason="已核对输入，尚无任何检查点或训练摘要")
+          identity=digest(scientific),source_changed=changed,reason="已核对当前实际输入，尚无检查点或训练摘要")
 
 
 def device_for(config):
@@ -121,7 +121,7 @@ def host_wait(job, rank, index, phase):
 def group_memory(job, rank, index, amount):
     with ExitStack() as cleanup:
         if rank == 0:
-            memory = cleanup.enter_context(MemoryGuard(job["config"], "training_batch", owner=job["owner"]))
+            memory = cleanup.enter_context(memory_for(job))
             granted = cleanup.enter_context(memory.admit(amount, label="global_batch_host_buffers"))
             job["memory_granted"].value = granted is not None
         host_wait(job, rank, index, "group_memory_ready")
@@ -145,11 +145,18 @@ def rebalance_supply(job, supply, gate, device, rank, stop_event, proposal=None)
     supply.__exit__(None, None, None)
     control = job.get("control_batch", 0)
     host_wait(job, rank, control, "pool_closed")
-    proposal = refresh_supply(config, job["prepared"], job, apply=True) if rank == 0 else None
+    proposal = refresh_supply(config, job["prepared"], job) if rank == 0 else None
     proposal = all_objects(proposal, world)[0]
     if not proposal["admitted"]:
         return "pressure"
     if rank == 0:
+        from ..acceleration import attach, SafeBoundary
+        from .session import supply_demand, supply_layout
+        applied = attach(job['resource_handle']).request_replan(
+            supply_demand(proposal, world, config['resources'], job['shares'],gpus=job['gpus']),
+            safe_boundary=SafeBoundary('batch_consumed', control), layout=supply_layout(proposal))
+        if applied['applied']['layout'] != supply_layout(proposal):
+            raise RuntimeError('公共会话应用的供数布局与请求不同')
         gate.set_limit(proposal["reader_slots"], proposal["workspace_capacity_bytes"])
     host_wait(job, rank, control, "pool_applied")
     job["supply"] = proposal
@@ -172,12 +179,19 @@ def checkpoint(output, model, optimizer, scaler, progress, job, receipt, device,
             "optimizer": optimizer.state_dict(), "scaler": scaler.state_dict(), "rank_rng": states,
             "torch_rng": states[0]["torch"], "sampler_rng": {"protocol": "global-slot-v1", "next": progress["attempts"]},
             "attempts": progress["attempts"], "updates": progress["updates"], "skipped": progress["skipped"],
-            "progress": dict(progress), "spec": job["spec"], "config": job["config"], "pretrained_receipt": receipt})
+            "progress": dict(progress), "spec": job["spec"], "config": job["config"], "pretrained_receipt": receipt,
+            "prepared": job['prepared'], "scientific": job['scientific']})
+        record = read_json(Path(output)/'run.json')
+        if record.get('scientific')!=job['scientific'] or record.get('prepared')!=job['prepared'] or record.get('config')!=job['config']:
+            record.setdefault('initial_scientific',record['scientific'])
+            record.update(scientific=job['scientific'],prepared=job['prepared'],config=job['config'])
+            write_json(Path(output)/'run.json',record)
     host_wait(job, rank, next_batch_index(progress, job["config"]["training"]), "checkpoint_saved")
     return all_objects(pointer, job["world"])[0]
 
 
 @logged("training_rank", config_argument=1, config_key="config")
+@settle_attempts
 def run_rank(rank, job, gate, stop_event):
     config, world, output = job["config"], job["world"], Path(job["config"]["run_dir"])
     settings, resources = config["training"], config["resources"]
@@ -252,13 +266,19 @@ def run_rank(rank, job, gate, stop_event):
                           rng_policy="保留已有 rank 状态，新增 rank 使用检查点派生种子",
                           reduction="全局样本统计归约；浮点加和顺序可能变化", bitwise_equivalent=False)
                 progress, receipt = state["progress"], state["pretrained_receipt"]
+                if job['selection_source_changed']:
+                    progress = reset_selection(progress,selection_scope(job['prepared'],config))
+                    restored = False
+                    if rank==0:
+                        event(output,'selection_source_changed',selection_scope=progress['selection_scope'],
+                              training_state_loaded=True,restored_exact=False)
                 del state
             else:
                 restored_state = False
                 with stage(config, "pretrained_load", rank=rank, path=config["pretrained"]):
                     receipt = StunetAdapter.load_pretrained(model, config["pretrained"])
                 progress = {"attempts": 0, "updates": 0, "skipped": 0, "epoch": 0, "phase": "train", "val_step": 0,
-                            "val_sum": 0., "validation_loss": None}
+                            "val_sum": 0., "validation_loss": None,"selection_scope":selection_scope(job['prepared'],config)}
             before_parameter = next(model.parameters()).detach().cpu().clone()
             host_wait(job, rank, next_batch_index(progress, settings), "model_ready")
             with stage(config, "model_ready", rank=rank, distributed=world > 1):
@@ -272,7 +292,7 @@ def run_rank(rank, job, gate, stop_event):
             slots = list(range(offset, offset + job["shares"][rank]))
             supply = cleanup.enter_context(BatchSupply(job["prepared"], config, slots,
                 job["supply"]["workers"][rank], job["supply"]["cache_bytes"][rank], gate, job["owner"], rank,
-                cancel=stop_event, prefetch=job["supply"]["prefetch"]))
+                cancel=stop_event, prefetch=job['supply']['prefetch'], handle=job['resource_handle']))
             batch_cleanup = cleanup.enter_context(ExitStack())
             if rank == 0:
                 event(output, "resume" if job["resume"] else "start", identity=job["identity"], restored_exact=restored,
@@ -338,6 +358,15 @@ def run_rank(rank, job, gate, stop_event):
                         next_growth = perf_counter() + resources["growth_seconds"]
                     next_adapt = perf_counter() + resources["adapt_seconds"]
                 phase = progress["phase"]
+                attempt = None
+                if phase == 'train' and is_technical(config):
+                    remaining = remaining_attempts(config, 'train') if rank == 0 else None
+                    remaining = all_objects(remaining, world)[0]
+                    if remaining == 0:
+                        reason = 'attempt_limit'
+                        break
+                    attempt = claim_attempt(config, 'train') if rank == 0 else None
+                    attempt = all_objects(attempt, world)[0]
                 cursor = progress["attempts"] if phase == "train" else progress["val_step"]
                 if queued_phase != (phase, progress["epoch"]):
                     if supply.queue:
@@ -390,6 +419,7 @@ def run_rank(rank, job, gate, stop_event):
                     submitted += 1
                 mark = perf_counter()
                 if phase == "train":
+                    updates_before = progress['updates']
                     wrapped.train()
                     if settings["epochs"]:
                         lr = settings["learning_rate"] * (1 - progress["epoch"] / settings["epochs"]) ** settings["poly_power"]
@@ -417,6 +447,9 @@ def run_rank(rank, job, gate, stop_event):
                             changed = True
                     else:
                         progress["skipped"] += 1
+                    if rank == 0:
+                        finish_attempt(config, 'train', attempt,
+                            'successful' if progress['updates'] > updates_before else 'skipped')
                     last_loss = float(loss.detach())
                 else:
                     wrapped.eval()
@@ -461,6 +494,9 @@ def run_rank(rank, job, gate, stop_event):
                 if phase == "validation" and progress["val_step"] == val_steps:
                     progress.update(epoch=progress["epoch"] + 1, phase="train",
                                     validation_loss=progress["val_sum"] / val_steps)
+                    stopping = selection_options(settings.get('early_stopping', {}), 'stunet')
+                    progress['selection'] = update_selection(progress.get('selection'),
+                        progress['validation_loss'], progress['epoch'], stopping)
                     if rank == 0:
                         event(output, "epoch", epoch=progress["epoch"], validation_loss=progress["validation_loss"])
                 if (phase == "train" and progress["attempts"] % settings["save_every_attempts"] == 0) or \
@@ -468,6 +504,9 @@ def run_rank(rank, job, gate, stop_event):
                     mark = perf_counter()
                     checkpoint(output, model, optimizer, scaler, progress, job, receipt, device, rank)
                     timings["checkpoint_seconds"] += perf_counter() - mark
+                if progress.get('selection', {}).get('stop'):
+                    reason = 'early_stopping'
+                    break
                 if phase == "validation" and progress["phase"] == "train" and progress["epoch"] < (settings["epochs"] or 1):
                     peaks = all_objects(peak_reserved + peak_non_allocator, world)
                     if rank == 0:
@@ -520,42 +559,36 @@ def run_rank(rank, job, gate, stop_event):
 
 @logged("training")
 def train(config, prepared_path, resume=False, stop_after=None):
-    from ..preflight import quick_check
-    event(config["run_dir"], "quick_check", report=quick_check(config, "train", prepared_path))
     with stage(config, "training_inputs", prepared=str(prepared_path), resume=resume):
         prepared = load_prepared(prepared_path)
+        if config.get('input_source',{}).get('path'):
+            from ..data.input_binding import bind_prepared_source
+            prepared = bind_prepared_source(prepared,config['input_source']['path'])
         validate_prepared_config(prepared, config)
-        validate_storage(prepared, config=config)
+        validate_training_inputs(prepared,config)
     output = require_output(config["run_dir"], config["work_root"], [prepared["manifest"]["data_root"]])
-    rows = prepared["manifest"]["cases"]
-    if not all(any(role in r["roles"] for r in rows) for role in ("train", "validation")) or \
-            any(r.get("label") is None for r in rows if set(r["roles"]) & {"train", "validation"}):
-        raise ValueError("训练与验证需要非空的图像、标签及角色")
     spec = asdict(StunetAdapter.spec(config, prepared["plan"]))
     scientific = {"prepared_identity": prepared["identity"], "model": "stunet", "spec": spec,
-        "training": config["training"], "pretrained": WEIGHT_SHA256, "code_identity": code_identity(),
+        "training": config["training"], "pretrained": WEIGHT_SHA256,
         "versions": {n: version(n) for n in ("torch", "monai", "nnunetv2", "numpy", "scipy")}}
     identity = digest(scientific)
     with operation_lock(output), storage_lease(prepared, config):
         if resume:
             previous = read_json(output / "run.json")
-            expected = {**scientific, "code_identity": previous["scientific"]["code_identity"]}
-            if digest(previous["scientific"]) != digest(expected) or previous["identity"] != digest(expected) or not compatible_code(
-                    previous["scientific"]["code_identity"], scientific["code_identity"]):
-                raise ValueError("恢复训练的配置、数据、代码或依赖版本改变")
+            resume_inputs(previous,prepared,config)
             identity = previous["identity"]
-            if previous["scientific"]["code_identity"] != scientific["code_identity"]:
-                event(output, "code_compatibility_verified", source=previous["scientific"]["code_identity"],
-                      target=scientific["code_identity"], training_identity=identity)
-            load_checkpoint(output, identity)
         elif (output / "run.json").exists():
-            validate_initialization_restart(output, scientific)
+            validate_initialization_restart(output, scientific, config, prepared)
         pressure_retries = 0
         while True:
             admission = deepcopy(config)
             old_world = None
+            source_changed = False
             if resume:
+                previous_run = read_json(output/'run.json')
                 previous_state = load_checkpoint(output, identity)
+                source_changed = resume_inputs(dict(prepared=previous_state.get('prepared',previous_run['prepared']),
+                    config=previous_state['config']),prepared,config)
                 old_world = len(previous_state["rank_rng"])
                 boundary = previous_state["progress"]["phase"] == "train" and (previous_state["attempts"] == 0 or
                     config["training"]["epochs"] is not None and
@@ -564,11 +597,12 @@ def train(config, prepared_path, resume=False, stop_after=None):
                     admission["resources"].update(gpu_count=old_world, min_gpus=None)
                     event(output, "fixed_world_resume", world=old_world, reason="当前完整检查点位于 epoch 内部")
                 del previous_state
-            with resource_lease(admission, prepared, spec, previous_world=old_world) as allocation:
+            with admitted_training(admission, prepared, spec, previous_world=old_world) as (allocation, owner_session):
                 if not resume:
                     write_json(output / "run.json", {"identity": identity, "scientific": scientific,
                                "config": config, "prepared": prepared})
-                summary = launch_group(config, prepared, spec, identity, allocation, resume, stop_after)
+                summary = launch_group(config, prepared, spec, identity, allocation, resume, stop_after, owner_session,
+                                       scientific,source_changed)
             if summary["reason"] not in ("resource_pressure", "regroup"):
                 return summary
             if summary["reason"] == "resource_pressure":
@@ -585,7 +619,7 @@ def train(config, prepared_path, resume=False, stop_after=None):
             resume = True
 
 
-def launch_group(config, prepared, spec, identity, allocation, resume, stop_after):
+def launch_group(config, prepared, spec, identity, allocation, resume, stop_after, owner_session,scientific,source_changed):
     world = allocation["world"]
     if resume:
         state = load_checkpoint(config["run_dir"], identity)
@@ -594,17 +628,18 @@ def launch_group(config, prepared, spec, identity, allocation, resume, stop_afte
         if len(state["rank_rng"]) != world and not boundary:
             raise ValueError("当前检查点处于 epoch 内部，恢复时需要原进程数量")
         del state
-    shares = layout(config["training"]["batch"], world, config["resources"]["batch_layout"])
+    shares = allocation['shares']
     with socket.socket() as rendezvous:
         rendezvous.bind(("127.0.0.1", 0))
         port = rendezvous.getsockname()[1]
     job = {**allocation, "config": config, "prepared": prepared, "spec": spec, "identity": identity,
-           "shares": shares, "resume": resume, "stop_after": stop_after, "rendezvous": f"tcp://127.0.0.1:{port}"}
-    job["stage_memory"] = stage_memory(config, prepared, prefetch=allocation["supply"]["prefetch"])
+           "shares": shares, "resume": resume, "stop_after": stop_after, "rendezvous": f"tcp://127.0.0.1:{port}",
+           "scientific":scientific,"selection_source_changed":source_changed}
+    job["stage_memory"] = stage_memory(config, prepared)
     context = mp.get_context("spawn")
     gate = BuildGate(context, allocation["supply"]["reader_slots"], allocation["supply"]["workspace_capacity_bytes"],
                      allocation["supply"]["case_estimates"])
-    stop_event = context.Event()
+    stop_event = allocation['resource_handle'].cancel
     job["coordinator"] = HostCoordinator(context, world)
     job["pressure_event"] = context.Event()
     job["pause_event"] = context.Event()
@@ -620,7 +655,7 @@ def launch_group(config, prepared, spec, identity, allocation, resume, stop_afte
         os.environ[key] = "1"
     previous_handlers = {sig: signal.signal(sig, lambda *_: stop_event.set()) for sig in (signal.SIGINT, signal.SIGTERM)}
     try:
-        with MemoryGuard(config, "training", owner=allocation["owner"], cancel=stop_event) as memory:
+        with memory_for(job) as memory:
             with memory.admit(job["stage_memory"]["checkpoint_reserve_bytes"],
                               label="checkpoint_reserve", reserve=True) as reserve:
                 if reserve is None:
@@ -631,6 +666,7 @@ def launch_group(config, prepared, spec, identity, allocation, resume, stop_afte
                         raise MemoryError("训练启动前持续内存压力，保留已有完整检查点")
                     processes = torch.multiprocessing.spawn(run_rank, args=(job, gate, stop_event), nprocs=world, join=False)
                     while not processes.join(timeout=1):
+                        owner_session.service_replans()
                         facts = memory.boundary()
                         if facts["paused"]:
                             job["pause_event"].set()
@@ -644,7 +680,6 @@ def launch_group(config, prepared, spec, identity, allocation, resume, stop_afte
                             stop_event.set()
     finally:
         stop_event.set()
-        close_members(config, allocation["owner"])
         for sig, handler in previous_handlers.items():
             signal.signal(sig, handler)
         for key, value in {**env_previous, "CUDA_VISIBLE_DEVICES": previous_visible}.items():

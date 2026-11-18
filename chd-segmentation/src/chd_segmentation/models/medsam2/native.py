@@ -8,7 +8,7 @@ import torch
 
 from ...artifacts.store import read_json
 from ...observability.events import event, stage
-from ...preprocessing.offline import case_pointer, worker_cancel
+from ...preprocessing.offline import case_pointer, worker_cancel, case_guard
 from ...preprocessing.offline_store import FORMAT, OfflineTransform, case_directory, recipe, save_case, validate_storage, begin_case
 from ...preprocessing.validation import SourceReader
 from ...models.stunet.streaming import BlockWorkspace, read_sources
@@ -66,7 +66,39 @@ def produce_native_case(prepared, config, root, name, key, recipe_identity, *, w
     reader.prepared = native
     directory = case_directory(root, key)
     pending = begin_case(directory, key, recipe_identity)
-    with MemoryGuard(config, 'preprocess_case', owner=config.get('memory_owner'), cancel=worker_cancel(config)) as guard:
+    with case_guard(config) as guard:
+        image, label_header, spacing, roi = reader.read_metadata(row)
+        shape = [high-low for low, high in roi]
+        whole_bytes = int(np.prod(shape))*32
+        snapshot = guard.snapshot()
+        available = snapshot['budget']['headroom_bytes']
+        mode = config['preprocessing'].get('execution', 'auto')
+        if mode == 'auto' and whole_bytes <= config.get('_whole_capacity', 0):
+            mode = 'whole'
+        if mode != 'blocks' and (whole_bytes <= available or mode == 'whole'):
+            with guard.admit(whole_bytes, label='native_whole_case') as ticket:
+                if ticket is None:
+                    raise InterruptedError('原生整例处理已取消')
+                data, label, image, spacing, roi, read_seconds = reader.read_case(row)
+                pixels = window_image(data.transpose(2,1,0), window)[None]
+                entry = dict(case_id=name, image=pixels,
+                    label=None if label is None else label.transpose(2,1,0),
+                    unknown_classes=row['unknown_classes'], source_shape_xyz=list(image.shape),
+                    source_affine=image.affine.tolist(), source_units=image.header.get_xyzt_units()[0],
+                    spacing_xyz=spacing.tolist(), roi_xyz=roi, properties=dict(class_locations={}),
+                    medsam_native=True, medsam_windowed=True, gray_window=list(window),
+                    timing=dict(read_decompress_seconds=read_seconds, native_seconds=perf_counter()-began))
+                event(config['run_dir'], 'preprocess_execution_selected', case_id=name,
+                      execution='whole', whole_peak_bytes=whole_bytes)
+                record = save_case(directory, key, recipe_identity, entry)
+            return name, case_pointer(record)
+        settings = dict(config['preprocessing'])
+        explicit = config.get('_explicit_preprocessing', [])
+        if 'block_bytes' not in explicit:
+            settings['block_bytes'] = max(1024, available//4)
+        if 'max_block_bytes' not in explicit:
+            settings['max_block_bytes'] = max(settings['max_block_bytes'], settings['block_bytes'])
+        config = {**config, 'preprocessing': settings}
         workspace = BlockWorkspace(pending/'work', config, guard, name)
         try:
             image, spacing, roi, data, label, _, _, has_label = read_sources(reader, row, workspace)

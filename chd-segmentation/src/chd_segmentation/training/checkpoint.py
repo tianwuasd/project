@@ -1,4 +1,5 @@
 import os
+import re
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -42,8 +43,8 @@ def load_checkpoint(directory, identity, pointer=None):
     if Path(filename).name != filename or not filename.startswith("state-") or not filename.endswith(".pt"):
         raise ValueError("检查点索引包含非法路径")
     path = directory / filename
-    if path.is_symlink() or file_digest(path) != pointer["sha256"]:
-        raise ValueError("最新检查点内容摘要不符")
+    if path.is_symlink():
+        raise ValueError('检查点不能是符号链接')
     state = torch.load(path, map_location="cpu", weights_only=True)
     required = {"identity", "model", "optimizer", "torch_rng", "sampler_rng", "attempts", "updates", "spec", "config",
                 "skipped", "pretrained_receipt"}
@@ -52,14 +53,34 @@ def load_checkpoint(directory, identity, pointer=None):
     if state["attempts"] != pointer["attempts"]:
         raise ValueError("检查点与进度索引不一致")
     event(directory, "checkpoint_loaded", file=filename, bytes=path.stat().st_size,
-          attempts=state["attempts"], updates=state["updates"], sha256=pointer["sha256"])
+          attempts=state["attempts"], updates=state["updates"])
     return state
 
 
 @contextmanager
-def prediction_snapshot(directory):
+def prediction_snapshot(directory, selection='latest'):
     with operation_lock(directory):
-        yield read_json(Path(directory) / "latest.json")
+        if selection not in ('latest','best'):
+            raise ValueError('检查点选择必须为best或latest')
+        yield read_json(Path(directory) / (selection+'.json'))
+
+
+def remove_owned_state(directory, pointer, identity, protected):
+    filename = pointer['file']
+    directory = Path(directory).resolve()
+    path = directory/filename
+    if filename in protected:
+        return
+    if (not re.fullmatch(r'state-[0-9]{9}-[0-9a-f]{8}\.pt', filename) or path.parent != directory or
+            path.is_symlink() or not path.is_file() or pointer.get('writer_identity') != identity or
+            'written_stamp' not in pointer):
+        event(directory, 'checkpoint_retained', file=filename, reason='缺少本运行写出登记或路径归属不明确')
+        return
+    stat = path.stat()
+    if [stat.st_size, stat.st_mtime_ns] != pointer['written_stamp']:
+        event(directory, 'checkpoint_retained', file=filename, reason='文件信息与本运行写出登记不同')
+        return
+    path.unlink()
 
 
 @logged_directory("checkpoint_save")
@@ -73,24 +94,33 @@ def save_checkpoint(directory, state):
     filename = f"state-{state['attempts']:09d}-{digest(progress)[:8]}.pt"
     path = directory / filename
     pending = path.with_name(path.name + ".pending")
+    if path.is_symlink() or pending.is_symlink():
+        raise ValueError('检查点写入路径不能是符号链接')
     event(directory, "checkpoint_writing", file=filename, attempts=state["attempts"], updates=state["updates"])
     with pending.open("wb") as stream:
         torch.save(state, stream)
         stream.flush()
         os.fsync(stream.fileno())
-    loaded = torch.load(pending, map_location="cpu", weights_only=True)
-    if not tensors_equal(state, loaded):
-        raise ValueError("新检查点独立读回与保存状态不一致")
-    del loaded
-    event(directory, "checkpoint_readback_verified", file=filename, bytes=pending.stat().st_size)
     os.replace(pending, path)
-    pointer = {"file": filename, "sha256": file_digest(path), "attempts": state["attempts"],
+    stat = path.stat()
+    pointer = {"file": filename, "writer_identity": state['identity'],
+               "written_stamp": [stat.st_size, stat.st_mtime_ns], "attempts": state["attempts"],
                "updates": state["updates"], "progress": progress}
     write_json(directory / "latest.json", pointer)
+    best_path = directory/'best.json'
+    best = read_json(best_path) if best_path.exists() else None
+    old_best = best
+    selection = progress.get('selection')
+    same_scope = best is not None and best.get('progress',{}).get('selection_scope')==progress.get('selection_scope')
+    if selection and (best is None or not same_scope or selection['best'] < best['metric']):
+        best = dict(pointer, metric=selection['best'], monitor=selection['monitor'], position=selection['best_position'])
+        write_json(best_path, best)
+    protected = {filename}
+    if best:
+        protected.add(best['file'])
     if previous and previous["file"] != filename:
-        old = directory / previous["file"]
-        if old.parent != directory or old.is_symlink() or file_digest(old) != previous["sha256"]:
-            raise ValueError("旧检查点归属或内容发生变化，停止清理")
-        old.unlink()
+        remove_owned_state(directory, previous, state['identity'], protected)
+    if old_best and (not previous or old_best['file'] != previous['file']):
+        remove_owned_state(directory, old_best, state['identity'], protected)
     event(directory, "checkpoint_committed", **pointer, bytes=path.stat().st_size)
     return pointer

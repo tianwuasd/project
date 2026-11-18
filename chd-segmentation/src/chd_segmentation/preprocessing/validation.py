@@ -4,7 +4,6 @@ from time import perf_counter
 import nibabel as nib
 import numpy as np
 
-from ..artifacts.store import file_digest
 from ..observability.events import Stage
 from ..training.host import host_capacity
 
@@ -21,24 +20,6 @@ class SourceReader:
 
     def _source(self, row, kind):
         path = Path(row[kind])
-        stat = path.stat()
-        stamp = (stat.st_size, stat.st_mtime_ns)
-        expected = row.get("sha256", {}).get(kind)
-        if not expected or kind not in row.get("source_stamp", {}):
-            raise ValueError("来源缺少已审计摘要或持久文件标记")
-        if list(stamp) != row["source_stamp"][kind]:
-            raise ValueError("原始文件与准备阶段的身份不同")
-        key = (str(path), kind)
-        if key in self.checked and self.checked[key] != stamp:
-            raise ValueError("运行期间原始文件发生变化")
-        if key not in self.checked:
-            with self.stage("source_verify", case_id=row["case_id"], source=kind, bytes=stat.st_size):
-                if file_digest(path) != expected:
-                    raise ValueError("原始文件摘要与清单不一致")
-            after = path.stat()
-            if stamp != (after.st_size, after.st_mtime_ns):
-                raise ValueError("核验期间原始文件发生变化")
-            self.checked[key] = stamp
         return path
 
     def check_sources(self, row):

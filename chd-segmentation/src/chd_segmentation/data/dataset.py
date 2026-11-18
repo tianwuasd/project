@@ -6,6 +6,7 @@ from monai.transforms import Compose
 import numpy as np
 
 from ..preprocessing.offline_store import OfflineTransform, validate_storage
+from ..preprocessing.inputs import resolve_preprocessed
 
 
 def array_bytes(value):
@@ -25,9 +26,9 @@ class CaseDataset:
     def __init__(self, prepared, resources, with_label=True, log_dir=None, logging=None):
         self.rows = prepared["manifest"]["cases"]
         self.by_id = {row["case_id"]: index for index, row in enumerate(self.rows)}
-        validate_storage(prepared)
-        self.transform = OfflineTransform(prepared, with_label)
-        self.dataset = Dataset(self.rows, transform=Compose([self.transform]))
+        self.source = resolve_preprocessed(prepared['storage']['root'], dataset=prepared['dataset'],
+            case_ids=list(self.by_id),storage=prepared['storage'])
+        self.with_label = with_label
         self.cache, self.cached_bytes = OrderedDict(), 0
         self.budget = resources["cache_bytes"]
         self.case_limit = resources.get("cache_entries", 16)
@@ -36,12 +37,11 @@ class CaseDataset:
     def get(self, name):
         started = perf_counter()
         if name in self.cache:
-            self.transform.check_sources(self.rows[self.by_id[name]])
             result, size = self.cache.pop(name)
             self.cache[name] = (result, size)
             self.hits += 1
         else:
-            result = self.dataset[self.by_id[name]]
+            result = self.source.open(name, with_label=self.with_label)
             self.misses += 1
             size = array_bytes(result)
             while self.cache and (self.cached_bytes + size > self.budget or len(self.cache) >= self.case_limit):

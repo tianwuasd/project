@@ -17,11 +17,18 @@ def case_estimates(config,prepared,stage):
     roi=prepared['technical']['roi_xyz']
     records=[]
     classes=len(LABELS[prepared['dataset']])
+    source = None
+    if prepared.get('storage'):
+        from ..preprocessing.inputs import resolve_preprocessed
+        source = resolve_preprocessed(prepared['storage']['root'],dataset=prepared['dataset'],
+            case_ids=[row['case_id'] for row in rows],storage=prepared['storage'])
     for row in rows:
-        original_shape = np.asarray(nib.load(row['image']).shape, dtype=np.int64)
-        original_voxels = math.prod(map(int, original_shape))
-        input_shape = np.asarray([end-begin for begin,end in roi] if roi else original_shape, dtype=np.int64)
         stored = prepared.get('storage',{}).get('cases',{}).get(row['case_id'])
+        entry = source.open(row['case_id'],with_label=False) if stored is not None else None
+        original_shape = np.asarray(entry['source_shape_xyz'] if entry is not None else nib.load(row['image']).shape,dtype=np.int64)
+        original_voxels = math.prod(map(int, original_shape))
+        actual_roi = entry['roi_xyz'] if entry is not None else roi
+        input_shape = np.asarray([end-begin for begin,end in actual_roi] if actual_roi else original_shape,dtype=np.int64)
         shape=np.asarray(stored['shape_czyx'][1:][::-1] if stored is not None else
             input_shape,dtype=np.int64)
         if shape.shape!=(3,) or (shape<=0).any():
@@ -41,13 +48,21 @@ def case_estimates(config,prepared,stage):
                 mapped_file_bytes=stored['array_bytes'] if stored is not None else 0,
                 rank_prediction_bytes=voxels*(11*32+288)+native*classes*8+original_voxels*2))
         else:
-            # 原生序列不进入nnU-Net重采样；视频帧按需转换，传播记忆按层保留。
-            working=native*(8 if stored is not None else 32)
-            history=int(shape[2])*max(1,classes-1)*4*2**20 if stage=='prediction' else 0
-            records.append(dict(case_id=row['case_id'],native_shape_xyz=shape.tolist(),
+            from ..data.input_binding import intensity_policy
+            mode = intensity_policy(entry,config.get('input_source',{}))['mode'] if entry is not None else 'source_window'
+            processed=math.prod(map(int,shape))
+            depth=int(stored['shape_czyx'][1]) if stored is not None else int(shape[2])
+            # 转码、完整float32视频与标签按实际处理网格；原图与ROI仅用于空间恢复。
+            conversion=processed*({'windowed_uint8':8,'source_window':24,'normalized_percentile':32}[mode])
+            working=conversion+(stored['locations_bytes'] if stored is not None else native*32)
+            history=depth*max(1,classes-1)*4*2**20 if stage=='prediction' else 0
+            restore=native*(classes*8+10)+original_voxels*2
+            records.append(dict(case_id=row['case_id'],native_shape_xyz=input_shape.tolist(),
+                processed_shape_xyz=shape.tolist(),processed_voxels=processed,intensity_mode=mode,
+                conversion_workspace_bytes=conversion,restore_workspace_bytes=restore,
                 native_read_bytes=0 if stored is not None else native*32,working_bytes=working,workspace_bytes=working,
                 mapped_file_bytes=stored['array_bytes'] if stored is not None else 0,
-                retained_case_bytes=native*10,rank_prediction_bytes=native*8*classes+history+original_voxels*2,
+                retained_case_bytes=processed*10,rank_prediction_bytes=processed*8*classes+history+restore,
                 propagation_history_bytes=history))
         if stage == 'preprocess':
             block = config['preprocessing']['block_bytes']
@@ -67,7 +82,9 @@ def memory_profile(config,prepared,stage,shares,records=None):
     retained=max(row['retained_case_bytes'] for row in records)
     prediction=max(row['rank_prediction_bytes'] for row in records)
     if config['model']=='medsam2':
-        fixed=[(18*GIB*batch if config['resources']['device']=='cpu' and stage!='prediction' else 2*GIB)
+        # CPU保留骨干及官方最多3目标的多对象计算图；成功峰值仍需独立实测。
+        sequence_work = math.prod(config['training']['patch'])*4*256*3*(1+3)
+        fixed=[(GIB+sequence_work*batch if config['resources']['device']=='cpu' and stage!='prediction' else 2*GIB)
                for batch in shares]
         queue_per_sample=8*512*512*(3*4+3*2)
         cache_bytes=0

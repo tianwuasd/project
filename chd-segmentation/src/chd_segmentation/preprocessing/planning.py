@@ -57,6 +57,24 @@ def foreground_sample(data, segmentation, count, rng):
 
 
 def fit_plan(config, manifest, request):
+    from ..acceleration import ResourceSession, RuntimeRequest, ResourceDemand
+    from ..acceleration.host import host_capacity
+    from ..acceleration.memory import system_headroom
+    facts = host_capacity()
+    resources = config['resources']
+    headroom, _ = system_headroom(facts, min(.8, resources['ram_fraction']), resources['reserve_ram_bytes'])
+    current = psutil.Process().memory_info().rss
+    capacity = max(1, min(100_000_000_000, resources['memory_limit_bytes'], headroom+current-256*1024**2))
+    runtime = dict(config)
+    job = RuntimeRequest(str(Path(config['run_dir']).resolve()), 'planning',
+        Path(config['work_root'])/'resources', config['run_dir'], resources,
+        ResourceDemand(workspace_bytes=capacity))
+    with ResourceSession(job) as session:
+        runtime['resource_handle'] = session.handle
+        return _fit_plan(runtime, manifest, request)
+
+
+def _fit_plan(config, manifest, request):
     started = perf_counter()
     settings, rows = config["planning"], request["training_cases"]
     count = min(settings["samples_per_case"], settings["max_samples"] // len(rows))
@@ -74,11 +92,13 @@ def fit_plan(config, manifest, request):
     for index, row in enumerate(rows, 1):
         mark = perf_counter()
         with stage(config, "plan_case", case_id=row["case_id"], completed=index - 1, total=len(rows)):
-            data, label, image, spacing, roi, read_seconds = reader.read_case(row)
-            data, label, _ = crop_to_nonzero(data[None], label[None])
-            samples.append(foreground_sample(data[0], label[0], count,
-                                            np.random.default_rng(settings["seed"])))
-        shapes.append(list(data.shape[1:][::-1]))
+            from .planning_input import plan_case_data
+            with plan_case_data(config, reader, row) as (data, label, image, spacing, roi, read_seconds):
+                samples.append(foreground_sample(data[0], label[0], count,
+                                                np.random.default_rng(settings["seed"])))
+                cropped_shape = list(data.shape[1:][::-1])
+                del data, label
+        shapes.append(cropped_shape)
         spacings.append(spacing[::-1].tolist())
         reader.check_sources(row)
         timings.append({"case_id": row["case_id"], "read_seconds": read_seconds,
@@ -86,7 +106,7 @@ def fit_plan(config, manifest, request):
         event(config["run_dir"], "plan_case_completed", case_id=row["case_id"], completed=index,
               total=len(rows), seconds=timings[-1]["seconds"], read_seconds=read_seconds,
               cases_per_second=index / (perf_counter() - started))
-        del data, label, image
+        del image
     values = np.concatenate(samples)
     low, median, high = np.percentile(values, [0.5, 50, 99.5])
     stats = {"mean": float(values.mean(dtype=np.float64)), "std": float(values.std(dtype=np.float64)),
@@ -138,15 +158,7 @@ def resolve_plan(config, manifest):
     with operation_lock(path.parent):
         if path.exists():
             plan = read_json(path)
-            validate_auto_plan(plan, config, manifest)
-            reader = SourceReader({}, config["resources"]["reserve_ram_bytes"], log_dir=config["run_dir"],
-                                   logging=config.get("logging"))
-            rows = request["training_cases"]
-            for index, row in enumerate(rows, 1):
-                with stage(config, "plan_reuse_verify", case_id=row["case_id"], completed=index - 1, total=len(rows)):
-                    reader.check_sources(row)
-                event(config["run_dir"], "plan_reuse_case_verified", case_id=row["case_id"], completed=index, total=len(rows))
-            event(config["run_dir"], "plan_reused", path=str(path), cases=len(rows))
+            event(config["run_dir"], "plan_reused", path=str(path), cases=len(request['training_cases']))
             return plan
         plan = fit_plan(config, manifest, request)
         write_json(path, plan)

@@ -50,6 +50,7 @@ class BlockWorkspace:
         self.maps, self.last_log, self.peak_block = {}, 0., 0
         self.streams = []
         self.started = perf_counter()
+        self.phase, self.phase_started = None, self.started
         self.plane_context = None
         self.block_bytes = config["preprocessing"]["block_bytes"]
         self.execution = BlockExecution(self)
@@ -129,8 +130,11 @@ class BlockWorkspace:
             plane_record = {"plane_index": plane + 1, "plane_total": planes}
             phase = kind + ":" + phase
         now = perf_counter()
+        changed = phase != self.phase
+        if changed:
+            self.phase, self.phase_started = phase, now
         finished = done == total and (self.plane_context is None or plane_record["plane_index"] == plane_record["plane_total"])
-        if now - self.last_log < self.config["logging"]["heartbeat_seconds"] and not finished:
+        if now - self.last_log < self.config["logging"]["heartbeat_seconds"] and not finished and not changed:
             return
         path = Path(self.config["run_dir"]) / "progress-preprocess.json"
         memory = self.guard.snapshot()
@@ -144,9 +148,12 @@ class BlockWorkspace:
             record = {**overall, "stage": "preprocess", "current_case": self.case_id, "phase": phase,
                       "block_done": done, "block_total": total, "block_remaining": None if total is None else total - done,
                       "resource": resource_summary(memory), "disk": disk, "elapsed_seconds": now - self.started,
+                      "case_seconds": now-self.started, "stage_seconds": now-self.phase_started,
                       "peak_block_bytes": self.peak_block, **plane_record}
-            if self.execution is not None:
+            if self.execution is not None and self.execution.phase == phase:
                 record["execution"] = self.execution.metrics()
+            else:
+                record['execution'] = {'applied_case_threads': 1, 'applied_block_bytes': self.block_bytes}
             write_json(path, record)
         event(self.config["run_dir"], "preprocess_blocks", console=False, **record)
         console_progress(record)
@@ -206,7 +213,7 @@ def unique_values(array, workspace):
 
 
 def read_sources(reader, row, workspace):
-    with workspace.allocation(8 * 1024 ** 2, "source_verify"):
+    with workspace.allocation(64 * 1024, "source_metadata"):
         image, label, spacing, roi = reader.read_metadata(row)
     native_image = image
     image = local_image(image, Path(row["image"]), "image", workspace)

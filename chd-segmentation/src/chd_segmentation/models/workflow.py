@@ -15,6 +15,7 @@ import yaml
 from ..artifacts.store import digest, file_digest, read_json, write_json
 from ..data.dataset import CaseDataset
 from ..preprocessing.prepare import load_prepared
+from ..training.attempts import settle_attempts
 
 
 def options(path,overrides=None):
@@ -27,18 +28,28 @@ def options(path,overrides=None):
             overrides['accumulation' if raw['model']=='q_route1' else 'batch'] = overrides.pop('global_batch')
         if 'execution' in overrides:
             raw['execution'] = {**raw.get('execution',{}),**overrides.pop('execution')}
+        for key in ('early_stopping','input_source'):
+            if key in overrides:
+                raw[key] = {**raw.get(key,{}), **overrides.pop(key)}
         raw.update(overrides)
     defaults = dict(model=None, run_dir=None, device='cpu', precision='fp32', threads=2,
-                    seed=20261114, updates=2, accumulation=4, learning_rate=0.0002,
+                    seed=20261114, updates=None, accumulation=4, learning_rate=0.0002,
                     patch=128, local_size=128, frames=8, resolution=512,
                     pretrained=None, parents={}, groups=None, technical=False,
                     official_root=None, dependency_root=None, freeze_image_encoder=False,
                     max_candidates=24, warmup_updates=2000,method='M07',key_references=None,
                     validate_every=1000,batch=2,workers=15,epochs=None,gray_window=None,
-                    work_root=None,execution={},logging=dict(heartbeat_seconds=15,case_details=True))
+                    work_root=None,execution={},logging=dict(heartbeat_seconds=15,case_details=True),
+                    input_source={}, technical_roles={}, attempt_ledger=None, early_stopping={},
+                    checkpoint_dir=None, updates_per_epoch=None, save_every_updates=250,
+                    save_every_seconds=300.,distributed_backend=None)
     if not isinstance(raw, dict) or set(raw)-set(defaults):
         raise ValueError('模型配置字段无效')
     config = {**defaults, **raw}
+    if config['technical'] and config['updates'] is None:
+        config['updates'] = 2
+    from ..training.stopping import selection_options
+    config['early_stopping'] = selection_options(config['early_stopping'], config['model'])
     if isinstance(config['logging'],dict):
         config['logging'] = {**defaults['logging'],**config['logging']}
     if config['model']=='medsam2':
@@ -48,7 +59,12 @@ def options(path,overrides=None):
             config['seed'] = 123
     if config['model'] not in ('medsam2', 'q_route1') or not config['run_dir']:
         raise ValueError('必须指定模型与独立运行目录')
+    if config['distributed_backend'] not in (None,'gloo','nccl') or (
+            config['model']!='medsam2' and config['distributed_backend'] is not None):
+        raise ValueError('MedSAM2可显式选择gloo或nccl；其他模型保持现有后端策略')
     for key in ('updates', 'accumulation', 'threads', 'patch', 'local_size', 'frames', 'resolution', 'max_candidates'):
+        if key == 'updates' and config[key] is None:
+            continue
         if type(config[key]) is not int or config[key] < 1:
             raise ValueError('模型配置需要正整数：'+key)
     if config['precision'] not in ('fp32','bf16'):
@@ -79,10 +95,15 @@ def options(path,overrides=None):
             logging['heartbeat_seconds']<0 or type(logging['case_details']) is not bool:
         raise ValueError('模型日志心跳需要有限非负秒数，病例细节开关需要布尔值')
     root = Path(path).resolve().parent
-    for key in ('run_dir','pretrained','groups','official_root','dependency_root','key_references','work_root'):
+    for key in ('run_dir','pretrained','groups','official_root','dependency_root','key_references','work_root',
+                'attempt_ledger','checkpoint_dir'):
         if config[key] is not None:
             config[key] = str((root/Path(config[key])).resolve())
-    config['parents'] = {key:str((root/Path(value)).resolve(strict=True)) for key,value in config['parents'].items()}
+    config['parents'] = {key:str((root/Path(value)).resolve()) for key,value in config['parents'].items()}
+    if not isinstance(config['input_source'],dict):
+        raise ValueError('input_source必须为来源配置对象')
+    if config['input_source'].get('path') is not None:
+        config['input_source'] = dict(config['input_source'],path=str((root/Path(config['input_source']['path'])).resolve()))
     from .execution import execution_config
     execution_config(config)
     return config
@@ -103,10 +124,10 @@ def resources(config):
     return device
 
 
-def adapter(config, prepared, stage, initialize=True):
+def adapter(config, prepared, stage, initialize=True, parent_states=None):
     if config['model']=='q_route1':
         from .q_route1.adapter import QAdapter
-        return QAdapter(config,prepared,stage,initialize=initialize)
+        return QAdapter(config,prepared,stage,initialize=initialize,parent_states=parent_states)
     from .medsam2.adapter import MedSAM2Adapter
     return MedSAM2Adapter(config,prepared,stage,initialize=initialize)
 
@@ -124,18 +145,23 @@ def validated_q_groups(config,prepared):
             not isinstance(groups[key],list) or not groups[key] for key in groups):
         raise ValueError('Q分组必须包含非空A/B/C/D病例名单')
     rows = {row['case_id']:row for row in prepared['manifest']['cases']}
+    frozen = prepared['manifest'].get('split_source',{}).get('format')=='q1282' or any('q_group' in row for row in rows.values())
+    unit = prepared['manifest'].get('split_source',{}).get('unit',
+        'case' if prepared['dataset']=='imagechd' else 'patient')
+    if unit not in ('case','patient') or frozen and unit != 'patient':
+        raise ValueError('Q划分单位无效或与1282冻结患者协议不符')
     seen_patients,seen_cases = set(),set()
     for role in 'ABCD':
         names = groups[role]
         if any(not isinstance(name,str) for name in names) or len(set(names))!=len(names) or \
                 not set(names)<=rows.keys() or seen_cases & set(names):
             raise ValueError('Q分组病例重复、重叠或未登记')
-        patients = {rows[name].get('patient') for name in names}
-        if seen_patients & patients or not all(patients):
+        patients = {rows[name].get('patient') for name in names} if unit=='patient' else set()
+        if unit=='patient' and (seen_patients & patients or not all(patients)):
             raise ValueError('Q患者分组重叠或缺少患者身份')
         seen_cases.update(names)
         seen_patients.update(patients)
-    if prepared['manifest'].get('split_source',{}).get('format')=='q1282' or any('q_group' in row for row in rows.values()):
+    if frozen:
         expected = {key:set() for key in 'ABCD'}
         source_roles = dict(A={'train'},B={'train'},C={'development'},
                             D={'source_test','target_primary','target_secondary'})
@@ -146,9 +172,6 @@ def validated_q_groups(config,prepared):
             expected[group].add(name)
         if any(set(groups[key])!=expected[key] for key in 'ABCD'):
             raise ValueError('Q1282外部分组与准备描述的冻结名单不一致')
-    fit_ids = set(prepared['plan'].get('fit_ids',[]))
-    if not fit_ids or not fit_ids <= set(groups['A']):
-        raise ValueError('Q统计拟合必须限于A组')
     return groups
 
 
@@ -156,7 +179,9 @@ def training_names(config, prepared, stage):
     if config['technical']:
         if prepared['scope']!='technical' or len(prepared['manifest']['cases'])>2:
             raise ValueError('技术验证必须使用最多两例的技术准备描述')
-        return [row['case_id'] for row in prepared['manifest']['cases']]
+        from .roles import technical_names
+        return technical_names(config.get('technical_roles', {}), stage, 'train',
+                               [row['case_id'] for row in prepared['manifest']['cases']])
     if prepared['scope']!='formal':
         raise ValueError('正式模型训练需要正式准备描述')
     if config['model']=='q_route1':
@@ -174,6 +199,29 @@ def dataset_for(prepared, with_label, resources=None, log_dir=None, logging=None
     return CaseDataset(prepared,resources,with_label=with_label,log_dir=log_dir,logging=logging)
 
 
+def selected_prepared(prepared, names):
+    names = set(names)
+    rows = prepared['manifest']['cases']
+    if not names or not names <= {row['case_id'] for row in rows}:
+        raise ValueError('当前消费名单不属于实验描述')
+    return dict(prepared,manifest=dict(prepared['manifest'],cases=[row for row in rows if row['case_id'] in names]))
+
+
+def stage_case_names(config, prepared, stage):
+    names = training_names(config,prepared,stage)
+    if config['technical']:
+        from .roles import technical_names
+        validation = technical_names(config['technical_roles'],stage,'validation',
+            [row['case_id'] for row in prepared['manifest']['cases']])
+    elif config['model']=='q_route1':
+        validation = validated_q_groups(config,prepared)['C']
+    else:
+        validation = [row['case_id'] for row in prepared['manifest']['cases'] if 'validation' in row['roles']]
+    if not validation:
+        raise ValueError('训练选模需要独立验证病例')
+    return list(dict.fromkeys(names+validation))
+
+
 def load_state(path):
     return torch.load(path,map_location='cpu',weights_only=False)
 
@@ -189,45 +237,23 @@ def save_state(path, state):
 
 def model_identity(config,prepared,stage,initialization_sha256=None,code=None):
     scientific = {key:value for key,value in config.items() if key not in
-                  ('run_dir','threads','dependency_root','official_root','execution','work_root','device','logging')}
-    return digest(dict(config=scientific,prepared=prepared['identity'],stage=stage,
-        code=source_identity(config) if code is None else code,
-        parents={key:file_digest(value) for key,value in config['parents'].items()},
-        pretrained=initialization_digest(config,initialization_sha256),
-        groups=file_digest(config['groups']) if config['groups'] else None,
-        key_references=file_digest(config['key_references']) if config['key_references'] else None))
+                  ('run_dir','threads','dependency_root','official_root','execution','work_root','device','logging','distributed_backend')}
+    return digest(dict(config=scientific, dataset=prepared['dataset'], stage=stage))
 
 
 def checked_identity(config,prepared,stage,initialization_sha256=None,previous=None):
-    current = model_identity(config,prepared,stage,initialization_sha256)
-    if previous is None or previous==current:
-        return current
-    audit = read_json(Path(__file__).with_name('code_compatibility.json'))
-    if audit['schema']!=1:
-        raise ValueError('模型代码兼容审计格式无效')
-    target = digest({name.replace('\\','/'):value for name,value in source_identity(config).items()})
-    for edge in audit['edges']:
-        if edge['target']!=target or config['model'] not in edge['models']:
-            continue
-        # 两种路径分隔符覆盖原检查点所在平台，完整文件摘要仍须匹配审计记录。
-        for separator in ('/','\\'):
-            code = {name.replace('/',separator):value for name,value in edge['source_files'].items()}
-            if previous==model_identity(config,prepared,stage,initialization_sha256,code):
-                return previous
-    raise ValueError('模型配置、数据、源码或上游检查点身份不同')
+    return previous if previous is not None else model_identity(config,prepared,stage)
 
 
 def initialization_digest(config,previous=None):
-    if config['pretrained'] is None:
-        return None
-    if Path(config['pretrained']).is_file():
-        return file_digest(config['pretrained'])
-    if previous is None:
-        raise FileNotFoundError('初始化权重缺失且检查点未保存其摘要')
+    # 历史摘要仅作为来源记录；实际初始化直接由框架读取配置路径。
     return previous
 
 
 def train(config, prepared_path, stage, resume=False, stop_after=None):
+    from ..training.stopping import resolve_budget
+    config = dict(config, **resolve_budget(config, config['model'], stage))
+    config.pop('unit', None)
     if config['model']=='medsam2':
         from .medsam2.official import train_official
         return train_official(config,prepared_path,stage,resume,stop_after)
@@ -235,16 +261,17 @@ def train(config, prepared_path, stage, resume=False, stop_after=None):
     from .offline import model_storage_lease
     prepared = load_prepared(prepared_path)
     training_names(config,prepared,stage)
-    from .offline import quick_check_model
-    from ..observability.events import event
-    event(Path(config['run_dir'])/'admission'/stage, 'quick_check', report=quick_check_model(config, prepared, 'train'))
+    consumed = stage_case_names(config,prepared,stage)
+    if config.get('input_source',{}).get('path'):
+        from ..data.input_binding import bind_prepared_source
+        prepared = bind_prepared_source(prepared,config['input_source']['path'],case_ids=consumed)
     root = Path(config['run_dir'])/stage
     if root.resolve().is_relative_to(Path(prepared['manifest']['data_root']).resolve()):
         raise ValueError('训练输出不能位于原始数据目录内')
     if stop_after is not None and not 1<=stop_after<=config['updates']:
         raise ValueError('stop-after超出预算')
     root.parent.mkdir(parents=True,exist_ok=True)
-    with FileLock(root.parent/(stage+'.lock'),timeout=0), model_storage_lease(config,prepared,stage):
+    with FileLock(root.parent/(stage+'.lock'),timeout=0), model_storage_lease(config,selected_prepared(prepared,consumed),stage):
         if not resume:
             from .startup import check_start
             check_start(root,config['model'],prepared['identity'],stage)
@@ -256,6 +283,7 @@ def train(config, prepared_path, stage, resume=False, stop_after=None):
                 resume=resume,stop_after=stop_after),common,allocation)
 
 
+@settle_attempts
 def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
     from .execution import all_states,synchronize_gradients,pressure,rank_measurement
     from ..training.resources import record_peaks
@@ -271,10 +299,19 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
     rng = np.random.default_rng(np.random.SeedSequence([seed,rank]))
     previous = load_state(root/'latest.pt') if resume else None
     if previous:
+        if (previous['stage']!=stage or previous['config']['model']!=config['model'] or
+            previous['prepared']['dataset']!=prepared['dataset'] or previous['scope']!=prepared['scope'] or
+            previous['prepared']['dataset_json']!=prepared['dataset_json'] or previous['training_cases']!=names):
+            raise ValueError('Q恢复的模型阶段、数据集类别或当前训练名单不同')
         from ..training.checkpoint import require_resume_device
         require_resume_device(previous['config']['device'],device)
     initial_sha = initialization_digest(config,previous['initialization_sha256'] if previous else None)
-    bundle = adapter(dict(config,device=str(device),seed=seed+rank),prepared,stage,initialize=not resume)
+    source_changed = False
+    if previous is not None:
+        from .contracts import require_resume_contract
+        source_changed = require_resume_contract(previous['config'],previous['prepared'],config,prepared,stage)
+    bundle = adapter(dict(config,device=str(device),seed=seed+rank),prepared,stage,initialize=not resume,
+        parent_states=previous.get('parent_models') if previous else None)
     model = bundle.model.to(device)
     model.train()
     optimizer = bundle.optimizer()
@@ -293,13 +330,26 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
             gate.deliver(rank)
             self.position += 1
             return entry
-    dataset = AdmittedCases(prepared,dict(reserve_ram_bytes=common['resources']['reserve_ram_bytes'],
+    dataset = AdmittedCases(selected_prepared(prepared,stage_case_names(config,prepared,stage)),dict(reserve_ram_bytes=common['resources']['reserve_ram_bytes'],
         cache_bytes=allocation['supply']['cache_bytes'][rank]),with_label=True,
         log_dir=root,logging=config['logging'])
+    from ..observability.progress import Progress
+    from ..observability.events import event
+    feedback = Progress(dict(common,run_dir=str(root)),'train',total=config['updates'],unit='updates') if rank==0 else None
+    if rank==0:
+        feedback.update(done=previous['update'] if previous else 0,phase='准备候选')
+        feedback.snapshot(force=True)
+        event(root,'model_candidates_started',stage=stage,cases=len(names))
+    candidates_started = perf_counter()
     gate.start(rank,'q-candidates',[len(names) if stage=='local' else 0]*allocation['world'],device)
     bundle.prepare_training(dataset,names)
     gate.finish(rank,'q-candidates',device)
+    if rank==0:
+        event(root,'model_candidates_completed',stage=stage,seconds=perf_counter()-candidates_started)
     update,history,best = 0,[],None
+    selection = None
+    from ..training.stopping import selection_options, update_selection
+    stopping = selection_options(config.get('early_stopping', {}), config['model'])
     restored = False
     if resume:
         state = previous
@@ -318,7 +368,8 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
         rng.bit_generator.state = local_state['data_rng']
         if device.type=='cuda':
             torch.cuda.set_rng_state(local_state['cuda_rng'],device)
-        bundle.restore_extra(local_state['extra'])
+        if not source_changed:
+            bundle.restore_extra(local_state['extra'])
         from ..training.checkpoint import tensors_equal
         restored = (tensors_equal(model.state_dict(),state['model']) and
             tensors_equal(optimizer.state_dict(),state['optimizer']) and
@@ -328,23 +379,36 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
             np.array_equal(np.random.get_state()[1],local_state['numpy_rng'][1]) and
             np.random.get_state()[2:]==local_state['numpy_rng'][2:] and
             (device.type!='cuda' or torch.equal(torch.cuda.get_rng_state(device),local_state['cuda_rng'])) and
-            tensors_equal(bundle.extra_state(),local_state['extra']) and
+            (source_changed or tensors_equal(bundle.extra_state(),local_state['extra'])) and
             rng.bit_generator.state==local_state['data_rng'])
         if not restored:
             raise ValueError('Q模型、优化器或逐进程随机状态未完整恢复')
+        if source_changed:
+            restored = False
         update,history,best = state['update'],state['history'],state['best']
+        if source_changed:
+            best = None
+        selection = None if source_changed else state.get('selection')
     reason = None
+    saved_at = perf_counter()
     peak_vram = 0
+    vram_complete = True
     replicas_equal = None
-    from ..observability.progress import Progress
-    feedback = Progress(dict(common, run_dir=str(root)), 'train', total=config['updates'], unit='updates') if rank == 0 else None
     resumed_update = update
     if rank == 0:
-        feedback.update(done=update, new=0, step=update)
+        feedback.update(done=update, new=0, step=update,phase='训练更新')
         feedback.snapshot(force=True)
     with torch.enable_grad():
         while update < (config['updates'] if stop_after is None else stop_after):
             mark = perf_counter()
+            from ..training.attempts import claim_attempt, remaining_attempts
+            remaining = remaining_attempts(config, stage) if rank == 0 else None
+            remaining = all_states(remaining)[0]
+            if config['technical'] and remaining == 0:
+                reason = 'attempt_limit'
+                break
+            attempt = claim_attempt(config, stage) if rank == 0 else None
+            attempt = all_states(attempt)[0]
             gate.start(rank,f'q-update:{update}',allocation['shares'],device)
             dataset.mode,dataset.position = 'training',0
             optimizer.zero_grad(set_to_none=True)
@@ -376,6 +440,12 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 seconds=perf_counter()-communication_started,all_ranks_data_consumed=True)
             norm = torch.nn.utils.clip_grad_norm_(model.parameters(),5.,error_if_nonfinite=True)
             optimizer.step()
+            if rank == 0:
+                from ..training.attempts import finish_attempt
+                finish_attempt(config, stage, attempt)
+                from ..observability.events import event
+                event(root,'model_optimizer_completed',model=config['model'],stage=stage,
+                    attempt=attempt,update=update+1,successful=True)
             if config['technical']:
                 import hashlib
                 checksum = hashlib.sha256()
@@ -386,16 +456,32 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 if not replicas_equal:
                     raise ValueError('Q各进程更新后的模型参数不一致')
             if device.type=='cuda':
-                peak_vram = max(peak_vram,rank_measurement(device,allocation,rank)['peak_vram_bytes'])
+                observed = rank_measurement(device,allocation,rank)
+                if observed['peak_vram_bytes'] is None:
+                    vram_complete = False
+                else:
+                    peak_vram = max(peak_vram,observed['peak_vram_bytes'])
             update += 1
+            if rank==0:
+                feedback.update(done=update,new=update-resumed_update,step=update,phase='优化器更新完成')
+                feedback.snapshot(force=True)
             history.append(dict(update=update,loss=loss_sum,gradient_norm=float(norm),seconds=perf_counter()-mark))
             improved = False
-            if not config['technical'] and (update%config['validate_every']==0 or update==config['updates']):
-                validation_names = (validated_q_groups(config,prepared)['C']
-                    if config['model']=='q_route1' else [row['case_id'] for row in prepared['manifest']['cases'] if 'validation' in row['roles']])
+            if update%config['validate_every']==0 or update==config['updates'] or update==stop_after:
+                if config['technical']:
+                    from .roles import technical_names
+                    validation_names = technical_names(config['technical_roles'], stage, 'validation', names + [
+                        row['case_id'] for row in prepared['manifest']['cases']])
+                else:
+                    validation_names = validated_q_groups(config,prepared)['C']
                 if not validation_names:
                     raise ValueError('正式选模需要独立验证病例')
                 model.eval()
+                validation_started = perf_counter()
+                if rank==0:
+                    feedback.update(phase='独立验证')
+                    feedback.snapshot(force=True)
+                    event(root,'model_validation_started',stage=stage,update=update,cases=len(validation_names))
                 gate.start(rank,f'q-validation:{update}',[len(validation_names)]+[0]*(allocation['world']-1),device)
                 dataset.mode,dataset.position = 'validation',0
                 with torch.no_grad():
@@ -403,10 +489,17 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 gate.finish(rank,f'q-validation:{update}',device)
                 value = all_states(value)[0]
                 model.train()
-                improved = best is None or value<best
-                if improved:
-                    best = value
+                selection = update_selection(selection, value, update, stopping)
+                improved, best = selection['improved'], selection['best']
                 history[-1]['validation_loss'] = value
+                if rank==0:
+                    event(root,'model_validation_completed',stage=stage,update=update,loss=value,
+                        seconds=perf_counter()-validation_started)
+            due = (config['technical'] or improved or selection and selection['stop'] or
+                   update == (config['updates'] if stop_after is None else stop_after) or
+                   update % config.get('save_every_updates', 250) == 0 or
+                   perf_counter()-saved_at >= config.get('save_every_seconds', 300.)) if rank == 0 else None
+            due = all_states(due)[0]
             local_state = dict(torch_rng=torch.get_rng_state(),python_rng=random.getstate(),numpy_rng=np.random.get_state(),
                 data_rng=rng.bit_generator.state,cuda_rng=torch.cuda.get_rng_state(device) if device.type=='cuda' else None,
                 extra=bundle.extra_state())
@@ -415,39 +508,57 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
             state = dict(identity=identity,model=model.state_dict(),optimizer=optimizer.state_dict(),rank_states=rank_states,
                 batch_layout=allocation['shares'],
                 update=update,history=history,config=config,prepared_identity=prepared['identity'],stage=stage,
-                spec=bundle.spec,training_cases=names,scope=prepared['scope'],best=best)
+                selection_source_changed=source_changed,
+                spec=bundle.spec,training_cases=names,scope=prepared['scope'],best=best,
+                selection=selection, attempt=attempt)
             state.update(prepared=prepared,initialization_sha256=initial_sha)
-            if rank==0:
+            if stage=='local':
+                state['parent_models'] = bundle.parent_models
+            if rank==0 and due:
+                feedback.update(phase='保存检查点')
+                feedback.snapshot(force=True)
+                checkpoint_started = perf_counter()
+                event(root,'model_checkpoint_started',stage=stage,update=update,best_improved=improved)
                 save_state(root/'latest.pt',state)
                 if improved:
                     save_state(root/'best.pt',state)
                 from ..observability.events import event
                 event(root,'model_update_completed',model=config['model'],stage=stage,**history[-1])
+                event(root,'model_checkpoint_completed',stage=stage,update=update,
+                    seconds=perf_counter()-checkpoint_started)
+            if due:
+                saved_at = perf_counter()
             gate.ready.wait(rank,f'q-checkpoint-written:{update}',device)
             if rank == 0:
                 feedback.update(done=update, new=update-resumed_update, step=update,
-                    pending=config['updates']-update, active=0)
+                    pending=config['updates']-update, active=0,phase='当前更新已保存')
                 feedback.snapshot(force=True)
+            if selection and selection['stop']:
+                reason = 'early_stopping'
+                break
         measurement = rank_measurement(device,allocation,rank)
         if device.type=='cuda':
-            measurement['peak_vram_bytes'] = max(measurement['peak_vram_bytes'],peak_vram)
+            if not vram_complete or measurement['peak_vram_bytes'] is None:
+                measurement.update(peak_vram_bytes=None,vram_complete=False)
+            else:
+                measurement['peak_vram_bytes'] = max(measurement['peak_vram_bytes'],peak_vram)
         gate.ready.wait(rank,f'q-summary:{update}',device)
         measurements = all_states(measurement)
+        from ..acceleration.measurements import complete_peak
         summary = dict(model=config['model'],stage=stage,scope=prepared['scope'],update=update,history=history,
                        checkpoint=str(root/'latest.pt'),
                        seconds=perf_counter()-started,rss_bytes=psutil.Process().memory_info().rss,
-                       peak_vram_bytes=max(m['peak_vram_bytes'] for m in measurements) if device.type=='cuda' else None,
+                       peak_vram_bytes=complete_peak(measurements),
                        reason=reason,world_size=allocation['world'],batch_layout=allocation['shares'],
                        ranks=measurements,restored_exact=all(all_states(restored)) if resume else None,
                        replicas_equal=replicas_equal)
         if rank==0:
             if not (root/'latest.pt').is_file():
                 raise MemoryError('Q在第一次更新前资源不足，未生成训练检查点')
-            summary['checkpoint_sha256'] = file_digest(root/'latest.pt')
             write_json(root/'summary.json',summary)
             if update==(config['updates'] if stop_after is None else stop_after):
-                record_peaks(common,allocation['spec'],allocation['gpus'],allocation['shares'],
-                    [m['peak_vram_bytes'] for m in measurements] if allocation['gpus'] else [])
+                from .execution import record_model_peaks
+                record_model_peaks(common,allocation['spec'],allocation['gpus'],allocation['shares'],measurements)
     dataset.clear()
     if rank == 0:
         feedback.close()

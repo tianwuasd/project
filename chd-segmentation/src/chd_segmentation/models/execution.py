@@ -41,6 +41,7 @@ def execution_config(config):
         raise ValueError('MedSAM2官方DistributedSampler要求全局batch可均分到各卡')
     patch = [config['frames'],config['resolution'],config['resolution']] if config['model']=='medsam2' else [config['patch']]*3
     return dict(model=config['model'],resources=resources,run_dir=config['run_dir'],
+        input_source=config.get('input_source',{}),
         scope='technical' if config['technical'] else 'formal',pretrained=config['pretrained'],
         logging=config.get('logging',DEFAULTS['logging']),
         work_root=config['work_root'] or str(Path(config['run_dir']).parent),
@@ -48,11 +49,18 @@ def execution_config(config):
 
 
 def resource_spec(config,prepared,stage):
-    from .workflow import source_identity
     return dict(resource_model=config['model'],stage=stage,patch=config['patch'],local_size=config['local_size'],
         frames=config['frames'],resolution=config['resolution'],technical=config['technical'],
-        source=digest(source_identity(config)),method=config['method'],prepared=prepared['identity'],
-        parents={key:file_digest(path) for key,path in config['parents'].items()})
+        method=config['method'],prepared=prepared['identity'],parents=config['parents'])
+
+
+def training_budget(config,prepared,stage):
+    from .workflow import stage_case_names
+    names = set(stage_case_names(config,prepared,stage))
+    budget = deepcopy(prepared)
+    budget['manifest']['cases'] = [dict(row,roles=['train']) for row in prepared['manifest']['cases']
+                                  if row['case_id'] in names]
+    return budget
 
 
 @contextmanager
@@ -63,6 +71,7 @@ def admitted(config,prepared,stage,topology=None):
     common['model_stage'] = stage
     if stage=='prediction':
         common['training']['batch'] = 1
+        common['training']['precision'] = 'fp32'
     if topology is not None:
         requested_layout = common['resources']['batch_layout']
         if requested_layout is not None and requested_layout!=topology['shares']:
@@ -80,15 +89,31 @@ def admitted(config,prepared,stage,topology=None):
     spec = resource_spec(config,prepared,stage)
     budget = prepared
     if stage!='prediction':
-        from .workflow import training_names,validated_q_groups
-        names = set(training_names(config,prepared,stage))
-        if config['model']=='q_route1' and not config['technical']:
-            names.update(validated_q_groups(config,prepared)['C'])
-        budget = deepcopy(prepared)
-        budget['manifest']['cases'] = [dict(row,roles=['train']) for row in prepared['manifest']['cases']
-                                      if row['case_id'] in names]
-    with resource_lease(common,budget,spec,stage='prediction' if stage=='prediction' else 'train') as allocation:
-        allocation['shares'] = layout(common['training']['batch'],allocation['world'],common['resources']['batch_layout'])
+        budget = training_budget(config,prepared,stage)
+    from ..acceleration import ResourceSession, RuntimeRequest, ResourceDemand
+    from ..training.budget import cpu_plan
+    world = common['resources']['gpu_count'] if common['resources']['device'] == 'cuda' else common['resources']['cpu_processes']
+    supply = cpu_plan(common, budget, world, stage='prediction' if stage=='prediction' else 'train')
+    amount = supply['ram_bytes'] if supply['admitted'] else supply.get('minimum_bytes', 0)
+    if amount <= 0:
+        raise RuntimeError('模型供数无法建立有效工作集预算：'+supply.get('reason', '未知原因'))
+    from ..training.session import supply_demand,supply_layout,supply_planner
+    shares = layout(common['training']['batch'],world,common['resources']['batch_layout'])
+    demand = supply_demand(supply,world,common['resources'],shares)
+    request = RuntimeRequest(str(Path(config['run_dir']).resolve()), stage, root/'resources',
+        common['run_dir'], dict(common['resources'],gpu_spec=spec,max_wait=common['resources']['wait_seconds'],
+            precision=common['training']['precision'],previous_world=topology['world'] if topology is not None else None), demand)
+    with ResourceSession(request,layout=supply_layout(supply),planner=supply_planner(common,budget,
+            'prediction' if stage=='prediction' else 'train',supply['case_estimates'])) as session:
+        applied = session.allocation
+        common['resource_handle'] = session.handle
+        common['resources'] = dict(common['resources'],batch_layout=applied.shares,
+            cpu_processes=applied.world,
+            gpu_count=applied.world if applied.gpus else common['resources']['gpu_count'],
+            min_gpus=applied.world if applied.gpus else common['resources']['min_gpus'],
+            gpu_ids=[gpu['uuid'] for gpu in applied.gpus] if applied.gpus else common['resources']['gpu_ids'])
+        allocation = dict(owner=session.handle.owner, gpus=session.allocation.gpus,
+            world=applied.world,supply=applied.supply,shares=applied.shares)
         if config['model']=='medsam2' and len(set(allocation['shares']))!=1:
             raise ValueError('MedSAM2官方训练要求各进程均分全局batch')
         allocation['spec'] = spec
@@ -99,6 +124,13 @@ def all_states(value):
     values = [None]*dist.get_world_size()
     dist.all_gather_object(values,value)
     return values
+
+
+def model_memory(common):
+    from ..acceleration.legacy import SessionGuard
+    guard = SessionGuard(common['resource_handle'])
+    guard.config = common
+    return guard
 
 
 def pressure(common,device,ready,rank,phase,memory,release=None):
@@ -136,13 +168,27 @@ def verify_device(device,allocation,rank):
 
 def rank_measurement(device,allocation,rank):
     memory = psutil.Process().memory_info()
-    peak = None
+    peak,allocated,reserved,external = None,None,None,dict(bytes=None,reason='cpu_execution')
     if device.type=='cuda':
         torch.cuda.synchronize(device)
-        actual = process_vram(allocation['gpus'][rank]['uuid'],os.getpid())
-        peak = torch.cuda.max_memory_reserved(device)+max(0,actual-torch.cuda.memory_reserved(device))
+        from ..acceleration.measurements import process_vram_observation
+        allocated,reserved = torch.cuda.max_memory_allocated(device),torch.cuda.max_memory_reserved(device)
+        external = process_vram_observation(allocation['gpus'][rank]['uuid'],os.getpid())
+        if external['bytes'] is not None:
+            peak = reserved+max(0,external['bytes']-torch.cuda.memory_reserved(device))
     return dict(rank=rank,rss_bytes=memory.rss,peak_rss_bytes=memory.peak_wset if sys.platform=='win32' else None,
-                peak_vram_bytes=peak)
+                peak_vram_bytes=peak,torch_peak_allocated_bytes=allocated,torch_peak_reserved_bytes=reserved,
+                external_process_vram=external,vram_complete=peak is not None)
+
+
+def record_model_peaks(common,spec,gpus,shares,measurements):
+    if not gpus:
+        return
+    if not all(row['vram_complete'] and row['peak_vram_bytes'] is not None for row in measurements):
+        event(common['run_dir'],'gpu_peak_record_skipped',reason='external_process_memory_unobservable',
+            ranks=measurements,capacity_evidence_written=False)
+        return
+    record_peaks(common,spec,gpus,shares,[row['peak_vram_bytes'] for row in measurements])
 
 
 def rank_entry(rank,payload,common,allocation,gate,port):
@@ -153,7 +199,7 @@ def rank_entry(rank,payload,common,allocation,gate,port):
     with (root/f'rank{rank}.log').open('a',encoding='utf-8') as log,redirect_stdout(log),redirect_stderr(log), \
             Stage(root,'model_worker',heartbeat_seconds=common['logging']['heartbeat_seconds'],
                   model=payload['config']['model'],rank=rank,operation=payload.get('operation','train')), \
-            MemoryGuard(common, 'model_rank', owner=allocation['owner']) as memory:
+            model_memory(common) as memory:
         register_member(common,allocation['owner'])
         os.environ.update(MASTER_ADDR='127.0.0.1',MASTER_PORT=str(port),RANK=str(rank),LOCAL_RANK=str(rank),
                           WORLD_SIZE=str(allocation['world']))
@@ -171,12 +217,13 @@ def rank_entry(rank,payload,common,allocation,gate,port):
             verify_device(device,allocation,rank)
             from .prediction import _predict
             applied = dict(payload['config'],device=str(device),threads=1)
+            applied['prediction_case_estimates'] = {row['case_id']:row['workspace_bytes']
+                for row in allocation['supply']['case_estimates']}
             summary = _predict(applied,payload['prepared_path'],payload['checkpoint'],payload['output'],
                 payload['case_ids'],payload['prompts'],memory=memory,**payload.get('prediction_options',{}))
             write_json(root/'summary.json',summary)
             measurement = rank_measurement(device,allocation,rank)
-            record_peaks(common,allocation['spec'],allocation['gpus'],allocation['shares'],
-                [measurement['peak_vram_bytes']] if allocation['gpus'] else [])
+            record_model_peaks(common,allocation['spec'],allocation['gpus'],allocation['shares'],[measurement])
         elif payload['config']['model']=='medsam2':
             from .medsam2.worker import main
             main(payload,rank,common,allocation,gate,memory)
@@ -228,6 +275,10 @@ def _run_workers(payload,common,allocation):
     keep = {'PATH','SYSTEMROOT','WINDIR','COMSPEC','PATHEXT','USERPROFILE','APPDATA','LOCALAPPDATA',
         'PROGRAMDATA','PROGRAMFILES','PROGRAMFILES(X86)','SYSTEMDRIVE','NUMBER_OF_PROCESSORS','USERNAME','USER','LOGNAME'}
     environment = {key:value for key,value in os.environ.items() if key.upper() in keep}
+    if payload['config'].get('technical') is True:
+        for key in ('CHD_MINI_TOOL_ROOT','CHD_MINI_ATTEMPT_LEDGER','CHD_MINI_STAGE','CHD_MINI_ROLES'):
+            if key in os.environ:
+                environment[key] = os.environ[key]
     paths = [str(project/'src')]
     if payload['config']['model']=='medsam2':
         paths += [payload['config']['dependency_root'],payload['config']['official_root']]
@@ -239,23 +290,22 @@ def _run_workers(payload,common,allocation):
         CUDA_VISIBLE_DEVICES=','.join(g['uuid'] for g in allocation['gpus']))
     context = torch.multiprocessing.get_context('spawn')
     from .supply import CpuReady,OrderedSupply
-    cancel = context.Event()
+    cancel = common['resource_handle'].cancel
     common = dict(common, run_dir=str(root), memory_owner=allocation['owner'], memory_cancel=cancel)
-    ready = CpuReady(context,allocation['world'],root,owner=allocation['owner'],cancel=cancel)
+    ready = CpuReady(context,allocation['world'],root,owner=allocation['owner'],handle=common['resource_handle'])
     gate = OrderedSupply(context,allocation['shares'],allocation['supply']['reader_slots'],ready,root,
         capacity_bytes=allocation['supply']['breakdown']['case_workspaces_bytes'],
         estimates=allocation['supply']['case_estimates'],
-        unit='sequence_batch' if payload['config']['model']=='medsam2' else 'case_entry')
+        unit='sequence_batch' if payload['config']['model']=='medsam2' else 'case_entry',handle=common['resource_handle'])
     previous = dict(os.environ)
     with ExitStack() as cleanup:
         def restore_environment():
             os.environ.clear()
             os.environ.update(previous)
         cleanup.callback(restore_environment)
-        cleanup.callback(close_members,common,allocation['owner'])
         os.environ.clear()
         os.environ.update(environment)
-        memory = cleanup.enter_context(MemoryGuard(common, 'model_execution', owner=allocation['owner']))
+        memory = cleanup.enter_context(model_memory(common))
         reserve = allocation['supply']['model_memory']['checkpoint_reserve_bytes']
         ticket = cleanup.enter_context(memory.admit(reserve, label='checkpoint_reserve', reserve=True))
         if ticket is None:

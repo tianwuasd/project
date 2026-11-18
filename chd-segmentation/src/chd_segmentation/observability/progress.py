@@ -78,9 +78,13 @@ def console_progress(record):
         parts.append(f"任务内存 {gb(own.get('accounted_bytes'))}/{gb(budget.get('memory_limit_bytes'))} 安全余量{gb(budget.get('headroom_bytes'))}")
     disk = record.get("disk", {})
     if disk:
-        parts.append(f"数据已写{gb(disk.get('task_storage_bytes'))} 磁盘剩余{gb(disk.get('data_free_bytes', disk.get('free_bytes')))}")
+        label = '当前病例文件' if record.get('case_seconds') is not None else '已完成病例文件'
+        parts.append(f"{label}{gb(disk.get('task_storage_bytes'))} 磁盘剩余{gb(disk.get('data_free_bytes', disk.get('free_bytes')))}")
     if record.get("elapsed_seconds") is not None:
-        parts.append(f"耗时{record['elapsed_seconds']:.1f}秒")
+        scope = '病例累计' if record.get('case_seconds') is not None else '运行累计'
+        parts.append(f"{scope}{record['elapsed_seconds']:.1f}秒")
+    if record.get('stage_seconds') is not None:
+        parts.append(f"当前阶段{record['stage_seconds']:.1f}秒")
     reason = record.get("waiting_reason")
     complete = total is not None and done == total and not record.get('active')
     if not complete and (reason or memory.get("paused")):

@@ -8,7 +8,8 @@ import yaml
 
 DEFAULTS = {
     "model": "stunet", "scope": "formal", "fold": 0, "result_root": None, "plan": None,
-    "preprocessing": {"root": None, "statistics_source": "main-train", "block_bytes": 64 * 1024 ** 2,
+    "input_source": {"path": None}, "checkpoint_dir": None,
+    "preprocessing": {"root": None, "statistics_source": "main-train", "execution": "auto", "block_bytes": 64 * 1024 ** 2,
                       "read_block_bytes": 64 * 1024 ** 2,
                       "auto_blocks": True, "max_block_bytes": 512 * 1024 ** 2,
                       "max_case_threads": 0, "growth_seconds": 5.,
@@ -22,13 +23,15 @@ DEFAULTS = {
                  "epochs": None, "steps_per_epoch": 250, "validation_steps": 50, "poly_power": 0.9,
                  "learning_rate": 0.001, "momentum": 0.99, "weight_decay": 3e-5,
                  "seed": 20261113, "precision": "fp32", "foreground_fraction": 0.33,
-                 "save_every_attempts": 250},
-    "prediction": {"overlap": 0.5, "window_batch": 1, "blend": "gaussian", "export_space": "source"},
+                 "save_every_attempts": 250,
+                 "early_stopping": {"enabled": False, "monitor": "validation_loss", "mode": "min",
+                    "patience": 20, "min_delta": .0001, "unit": "completed_validation_epoch"}},
+    "prediction": {"overlap": 0.5, "window_batch": 1, "blend": "gaussian", "export_space": "source", "checkpoint": "latest"},
     "resources": {"device": "cpu", "cpu_threads": 2, "cache_bytes": 1024 ** 3, "cache_entries": 16,
                   "reserve_ram_bytes": 4 * 1024 ** 3, "cpu_fraction": 0.8, "ram_fraction": 0.8,
                   "workers": "auto", "max_workers": 32, "prefetch": 2, "readers": "auto", "max_readers": 8,
                   "gpu_count": 1, "gpu_ids": None, "batch_layout": None, "cpu_processes": 1,
-                  "wait_seconds": None, "poll_seconds": 2, "share": False,
+                  "wait_seconds": None, "max_wait": None, "release_and_regroup": False, "poll_seconds": 2, "share": False,
                   "min_gpus": None, "adapt_seconds": 30, "growth_seconds": 60,
                   "pressure_retries": 3,
                   "memory_limit_bytes": 100_000_000_000, "memory_sample_seconds": 1.,
@@ -65,12 +68,28 @@ def load_config(path, overrides=None):
     config = _merge({**DEFAULTS, **{key: None for key in required}}, source)
     if overrides:
         config = _merge(config, overrides)
+    limit = config['resources']['max_wait']
+    specified = source.get('resources', {})
+    if overrides:
+        specified = {**specified, **overrides.get('resources', {})}
+    if 'max_wait' in specified and 'wait_seconds' in specified and specified['max_wait'] != specified['wait_seconds']:
+        raise ValueError('显式max_wait与旧wait_seconds不一致')
+    if limit is not None and (type(limit) not in (int, float) or not math.isfinite(limit) or limit <= 0):
+        raise ValueError('resources.max_wait必须为正秒数或null')
+    if type(config['resources']['release_and_regroup']) is not bool:
+        raise ValueError('resources.release_and_regroup必须为布尔值')
     if not isinstance(config["preprocessing"]["statistics_source"], str) or not config["preprocessing"]["statistics_source"].strip():
         raise ValueError("预处理统计来源必须使用明确名称")
     for key in ("block_bytes", "read_block_bytes", "block_threshold_bytes", "max_block_bytes"):
         if type(config["preprocessing"][key]) is not int or config["preprocessing"][key] < 1024:
             raise ValueError("预处理块预算及分块阈值必须为至少 1024 字节的整数")
     prep = config["preprocessing"]
+    if prep['execution'] not in ('auto', 'whole', 'blocks'):
+        raise ValueError('preprocessing.execution必须为auto、whole或blocks')
+    explicit = source.get('preprocessing', {})
+    if overrides:
+        explicit = {**explicit, **overrides.get('preprocessing', {})}
+    config['_explicit_preprocessing'] = list(explicit)
     if type(prep["auto_blocks"]) is not bool or prep["max_block_bytes"] < prep["block_bytes"]:
         raise ValueError("自动分块开关无效或最大块预算小于起始值")
     if type(prep["max_case_threads"]) is not int or prep["max_case_threads"] < 0:

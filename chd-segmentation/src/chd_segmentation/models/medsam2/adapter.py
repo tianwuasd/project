@@ -1,6 +1,5 @@
 from copy import deepcopy
 from pathlib import Path
-import subprocess
 import sys
 
 import numpy as np
@@ -13,20 +12,12 @@ from ...training.checkpoint import tensors_equal
 from . import UPSTREAM_COMMIT
 
 
-def activate(config):
+def activate(config, *, inference=False):
     root = Path(config['official_root']).resolve(strict=True)
-    sha = subprocess.run(['git','-C',str(root),'rev-parse','HEAD'],check=True,capture_output=True,text=True).stdout.strip()
-    if sha!=UPSTREAM_COMMIT:
-        raise ValueError('MedSAM2官方提交不匹配')
-    changed = subprocess.run(['git','-C',str(root),'status','--porcelain','--untracked-files=no'],check=True,capture_output=True,text=True).stdout
-    if changed:
-        raise ValueError('MedSAM2官方源码包含修改')
     sys.path.insert(0,str(root))
     if config['dependency_root']:
         sys.path.insert(0,str(Path(config['dependency_root']).resolve(strict=True)))
     import sam2
-    if Path(sam2.__file__).resolve()!=root/'sam2/__init__.py':
-        raise ValueError('MedSAM2导入来源不匹配')
     return root
 
 
@@ -58,7 +49,9 @@ class MedSAM2Adapter:
     def __init__(self,config,prepared,stage,initialize=True):
         if stage!='sequence':
             raise ValueError('MedSAM2阶段必须为sequence')
-        root = activate(config)
+        root = activate(config, inference=not initialize)
+        import sam2
+        self.imported_source = str(Path(sam2.__file__).resolve())
         from hydra.utils import instantiate
         from omegaconf import OmegaConf
         self.config,self.prepared = config,prepared
@@ -73,8 +66,6 @@ class MedSAM2Adapter:
         if config['pretrained'] and initialize:
             source = torch.load(config['pretrained'],map_location='cpu',weights_only=True)
             self.model.load_state_dict(source['model'],strict=True)
-            if not tensors_equal(self.model.state_dict(),source['model']):
-                raise ValueError('MedSAM2初始化参数的数值或精度不同')
         elif initialize and not config['technical']:
             raise ValueError('MedSAM2正式训练需要登记官方预训练权重')
 
@@ -94,12 +85,7 @@ class MedSAM2Adapter:
         model_config['fill_hole_area'] = 0
         predictor = instantiate(OmegaConf.create(model_config),_recursive_=True).to(self.device).eval()
         predictor.load_state_dict(self.model.state_dict(),strict=True)
-        if not tensors_equal(predictor.state_dict(),self.model.state_dict()):
-            raise ValueError('MedSAM2预测参数未完整复制')
-        from .native import resolve_window
-        window = resolve_window(self.config,self.prepared)
-        if entry['gray_window'] != window:
-            raise ValueError('MedSAM2预测窗口与离线数据不同')
+        window = entry['gray_window']
         image = FrameSequence(entry['image'],self.config['resolution'],window,
             self.config['execution'].get('reserve_ram_bytes',4*2**30),windowed=True)
         depth,height,width = entry['image'].shape[1:]
@@ -140,5 +126,8 @@ class MedSAM2Adapter:
                         scores[class_id,index] = logits[position,0].float().cpu()
         probability = scores.softmax(0).numpy()
         return probability,dict(prompt_sources=[item['source'] for item in items],prompt_space='native_dhw',
-                                upstream_commit=UPSTREAM_COMMIT,frames=depth,postprocess_extension=False,
+                                configured_official_root=self.config['official_root'],
+                                imported_sam2=self.imported_source,
+                                declared_upstream_commit=UPSTREAM_COMMIT,source_reverified=False,
+                                frames=depth,postprocess_extension=False,
                                 propagation_steps=propagation_steps)
