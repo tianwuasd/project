@@ -30,10 +30,12 @@ class AttemptLedger:
             raise ValueError('尝试批准文件缺少明确授权记录')
         approved = approval['stage_limits']
         expected = {**defaults['stage_limits'], 'q_base': 3}
+        approved_options = ((expected, 11), ({**expected, 'q_localizer': 3}, 12))
         if (not isinstance(approved,dict) or set(approved) != set(STAGES) or
-                any(type(n) is not int for n in approved.values()) or approved != expected or
-                type(approval['total_limit']) is not int or approval['total_limit'] != 11):
-            raise ValueError('本次批准仅允许Q基础模型3次、其他阶段2次、总计11次')
+                any(type(n) is not int for n in approved.values()) or
+                type(approval['total_limit']) is not int or
+                (approved, approval['total_limit']) not in approved_options):
+            raise ValueError('批准仅允许Q基础模型3次及可选Q定位器3次，其余阶段2次，总计分别11或12次')
         return dict(stage_limits=dict(approved), total_limit=approval['total_limit'])
 
     def limits(self):
