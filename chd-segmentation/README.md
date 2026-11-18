@@ -89,7 +89,7 @@ python -B run.py evaluate --config /data4/zhangruichen/course/chd-segmentation/c
 
 预测通过 `--inputs` 读取相同数据协议的新清单，通过 `--case` 选择病例。推断不读取标签数组；评价独立执行。导出默认恢复原始数组尺寸与 source affine，同时在结果记录保留工作毫米网格的来源。选择 `export_space: working` 时使用衍生毫米网格。新任务应使用新目录，完成结果按身份复用。
 
-训练配置支持固定尝试预算或 epoch 预算、SGD、深监督及显式学习率；正式示例默认 200 epoch，每轮 250 次训练尝试、50 次验证，使用 poly 学习率。`save_every_attempts` 控制周期保存，轮次边界、正常停止与结束都会保存。最新完整状态包含模型、优化器、scaler、逐进程随机状态、消费和验证进度；恢复拒绝缺失检查点、代码或输入身份变化。当前保留 latest，不提供 best 选模或旧工程检查点导入。
+训练配置支持固定尝试预算或 epoch 预算、SGD、深监督及显式学习率；正式示例默认 200 epoch，每轮 250 次训练尝试、50 次验证，使用 poly 学习率。`save_every_attempts` 控制周期保存，轮次边界、正常停止与结束都会保存。完整状态包含模型、优化器、scaler、逐进程随机状态、消费和验证进度；latest用于恢复，best按完整独立验证选模。STU恢复检查当前数据集、类别、CT通道、划分与实际模型状态；代码或依赖版本文字、完整预处理身份变化不单独阻止恢复。显式更换输入来源时记录差异并重新建立best比较范围，新完整结果提交前保留原best。Q与MedSAM2的阶段、科学设置和恢复边界见[模型说明](docs/MODELS_ASSISTANT2.md)。
 
 ## 短测与保留
 
