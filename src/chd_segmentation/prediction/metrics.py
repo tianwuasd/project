@@ -8,11 +8,13 @@ from ..artifacts.store import digest, read_json, require_result_output, write_js
 from ..observability.events import event, logged, stage
 
 
-def case_data_identity(prepared, row):
+def case_data_identity(prepared, row, *, include_generation=False):
+    plan = prepared['plan'] if include_generation else {
+        key:value for key,value in prepared['plan'].items() if key!='generation'}
     return digest({"dataset": prepared["dataset"], "labels": prepared["dataset_json"]["labels"],
                    "image_sha256": row.get('sha256', {}).get('image', row.get('image')), "spacing_xyz": row["spacing_xyz"],
                    "geometry_policy": row["geometry_policy"], "unknown_classes": row["unknown_classes"],
-                   "ignore_label_ids": row.get("ignore_label_ids", []), "plan": prepared["plan"],
+                   "ignore_label_ids": row.get("ignore_label_ids", []), "plan": plan,
                    "technical": prepared["technical"]})
 
 
@@ -33,14 +35,15 @@ def evaluate(prediction_dir, prepared, output, config):
     selection = [(row, records[row["case_id"]]) for row in prepared["manifest"]["cases"] if row["case_id"] in records]
     if not selection:
         raise ValueError("没有与当前评价清单匹配的预测")
-    identity = digest({"cases": [{"data": case_data_identity(prepared, row), "label": row.get('label'),
+    for index, (row, receipt) in enumerate(selection, 1):
+        if receipt["data_identity"] not in (case_data_identity(prepared, row),
+                case_data_identity(prepared, row, include_generation=True)) or \
+                receipt.get("reference_sha256") not in (None, row.get('sha256', {}).get('label')):
+            raise ValueError("预测与评价的数据、类别或标签版本不同")
+    identity = digest({"cases": [{"data": receipt['data_identity'], "label": row.get('label'),
                                  "prediction": receipt.get('identity', receipt['file']),
                                  "checkpoint": receipt.get('checkpoint', receipt.get('checkpoint_file',receipt.get('checkpoint_sha256')))}
                                 for row, receipt in selection], "metric": "supervised-dice-v2"})
-    for index, (row, receipt) in enumerate(selection, 1):
-        if receipt["data_identity"] != case_data_identity(prepared, row) or \
-                receipt.get("reference_sha256") not in (None, row.get('sha256', {}).get('label')):
-            raise ValueError("预测与评价的数据、类别或标签版本不同")
     if output.exists():
         previous = read_json(output)
         if previous.get("identity") != identity:

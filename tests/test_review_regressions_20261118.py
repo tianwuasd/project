@@ -52,6 +52,40 @@ class ReviewRegressions(unittest.TestCase):
             require_complete_epoch(steps=0,limit=1,batches=count)
         require_complete_epoch(steps=0,limit=count,batches=count)
 
+    def test_prediction_and_evaluation_share_real_source_plan_semantics(self):
+        from chd_segmentation.artifacts.store import read_json
+        from chd_segmentation.data.input_binding import bind_prepared_source
+        from chd_segmentation.prediction.metrics import case_data_identity
+        from chd_segmentation.preprocessing.prepare import load_prepared
+        bound = bind_prepared_source(self.prepared,self.root/'course/shared-offline.json')
+        rows = self.prepared['manifest']['cases']
+        for row in rows:
+            self.assertEqual(case_data_identity(self.prepared,row),case_data_identity(bound,row))
+        receipts = read_json(self.root/'result/stu/predictions.json')['cases']
+        for row in rows:
+            self.assertIn(receipts[row['case_id']]['data_identity'],
+                (case_data_identity(self.prepared,row),case_data_identity(self.prepared,row,include_generation=True)))
+        self.assertNotEqual(case_data_identity(self.prepared,rows[0]),case_data_identity(self.prepared,rows[1]))
+        other = load_prepared(self.root/'course/q-wide-offline.json')
+        self.assertNotEqual(case_data_identity(self.prepared,rows[0]),case_data_identity(other,rows[0]))
+
+    def test_evaluation_keeps_real_input_and_reference_guards(self):
+        from chd_segmentation.config import load_config
+        from chd_segmentation.prediction.metrics import evaluate
+        config = load_config(self.root/'course/stu.json')
+        wrong_label = deepcopy(self.prepared)
+        wrong_label['manifest']['cases'][0]['sha256']['label'] = self.prepared['manifest']['cases'][1]['sha256']['label']
+        wrong_classes = deepcopy(self.prepared)
+        names = list(wrong_classes['dataset_json']['labels'])
+        first,second = names[1:3]
+        values = wrong_classes['dataset_json']['labels']
+        values[first],values[second] = values[second],values[first]
+        wrong_space = deepcopy(self.prepared)
+        wrong_space['manifest']['cases'][0]['spacing_xyz'] = self.prepared['manifest']['cases'][1]['spacing_xyz']
+        for prepared in (wrong_label,wrong_classes,wrong_space):
+            with self.assertRaisesRegex(ValueError,'预测与评价的数据、类别或标签版本不同'):
+                evaluate(self.root/'result/stu',prepared,self.root/'result/stu-evaluation.json',config)
+
     def test_med_resource_names_include_the_real_validation_case(self):
         from chd_segmentation.models.execution import training_budget
         from chd_segmentation.models.workflow import options
