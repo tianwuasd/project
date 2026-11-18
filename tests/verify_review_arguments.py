@@ -6,7 +6,7 @@ import sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'src'))
 
-from chd_mini.review import prediction_args, evaluation_args
+from chd_mini.review import prediction_args, evaluation_args, evaluation_step
 
 
 def production_parser(path):
@@ -47,7 +47,14 @@ def main():
         evaluation = parsers['stu'].parse_args(evaluation_args(item,'PREDICTIONS','METRICS.json'))
         assert evaluation.command == 'evaluate' and evaluation.predictions == 'PREDICTIONS'
         assert evaluation.prepared == item['prepared'] and evaluation.config == item['evaluation_config']
-    print('PRODUCTION_ARGPARSE_OK: 6 prediction + 3 evaluation parameter sets; zero model execution')
+    label_box = dict(item,prompt_mode='label-box')
+    selected = evaluation_step('med',label_box,'PREDICTIONS','UNUSED_PUBLIC_EVALUATION.json')
+    assert selected['kind']=='producer_evaluation' and 'args' not in selected
+    assert Path(selected['output']) == Path('PREDICTIONS')/'evaluation.json'
+    for model in ('stu','q'):
+        assert evaluation_step(model,item,'PREDICTIONS','METRICS.json')['kind']=='evaluate'
+    assert evaluation_step('med',item,'PREDICTIONS','METRICS.json')['kind']=='evaluate'
+    print('PRODUCTION_ARGPARSE_OK: prediction/evaluate parameters and Med label-box producer route; zero model execution')
 
 
 if __name__ == '__main__':

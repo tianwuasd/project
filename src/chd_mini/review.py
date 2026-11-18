@@ -75,6 +75,40 @@ def evaluation_args(item, predictions, output):
             '--predictions',predictions,'--output',output]
 
 
+def evaluation_step(model, item, predictions, output):
+    if model == 'med' and item['prompt_mode'] == 'label-box':
+        return dict(name='med_evaluate',model=model,kind='producer_evaluation',
+                    output=str(Path(predictions)/'evaluation.json'),
+                    producer_summary=str(Path(predictions)/'summary.json'),producer_step='med_resume')
+    return dict(name=model+'_evaluate',model=model,kind='evaluate',output=output,
+                args=evaluation_args(item,predictions,output))
+
+
+def producer_evaluation(step, reports, records):
+    started = perf_counter()
+    producer = next(r for r in records if r['step']['name'] == step['producer_step'])
+    summary = read_json(step['producer_summary'])
+    evaluation = read_json(step['output'])
+    if summary['model'] != 'medsam2' or summary['prompt_mode'] != 'label-box':
+        raise ValueError('生产评价未对应Med标签框预测')
+    if evaluation != summary['evaluation'] or evaluation != producer['production_summary']['evaluation']:
+        raise ValueError('生产评价文件与实际预测Job的summary不符')
+    if (evaluation['metric'] != 'prompted_known_present_class_dice' or evaluation['scope'] != 'technical'
+            or set(evaluation['case_classes']) != {'ct_1001','ct_1012'}):
+        raise ValueError('Med评价的指标、范围或病例不符')
+    if not producer['process']['all_workers_exited']:
+        raise ValueError('Med生产评价的预测Job尚未确认退出')
+    receipt = dict(step=step,evaluation=evaluation,source_evaluation_file=step['output'],
+        source_prediction_summary=step['producer_summary'],
+        source_prediction_process=str(reports/(step['producer_step']+'.process.json')),
+        prediction_job=producer['process'],read_seconds=perf_counter()-started,
+        evaluation_compute_seconds=None,
+        scope='参考标签框提示下已知且存在类别的Dice；不证明自动定位或全类别效果',
+        timing_note='评价由生产预测Job生成，未独立测量评价计算耗时，不重复相加')
+    write_json(reports/(step['name']+'.json'),receipt)
+    return receipt
+
+
 def build_review(handoff):
     available = review_models(handoff)
     if handoff['roles'] != ROLES:
@@ -108,8 +142,7 @@ def build_review(handoff):
             steps.append(dict(name=model+'_'+label, model=model, output=output,
                               kind='predict',checkpoint=checkpoint, args=args+requested))
         evaluation = str(Path(handoff['work_root'])/'assistant3'/(model+'-evaluation.json'))
-        steps.append(dict(name=model+'_evaluate',model=model,kind='evaluate',output=evaluation,
-                          args=evaluation_args(item,output,evaluation)))
+        steps.append(evaluation_step(model,item,output,evaluation))
     return dict(steps=steps, ledger=ledger, engine_commit=actual, model_versions=versions,
                 review_mode=handoff.get('review_mode','complete'), target_models=list(MODELS),
                 available_models=available, unavailable_models=handoff.get('unavailable_models',{}),
@@ -306,6 +339,12 @@ def _execute_steps(handoff, plan, root, reports, records, before, process_paths,
     for step in plan['steps']:
         budget(handoff)
         require_clean_source(handoff['engine_root'])
+        if step['kind'] == 'producer_evaluation':
+            records.append(producer_evaluation(step,reports,records))
+            write_json(reports/'execution.json',records)
+            if AttemptLedger(handoff['attempt_ledger']).read() != plan['ledger']:
+                raise RuntimeError('生产评价读取阶段改变共享训练台账')
+            continue
         command = [handoff['python'], '-u', '-B', str(Path(handoff['engine_root'])/'run.py'), *step['args']]
         process_path = reports/(step['name']+'.process.json')
         process_paths.append(process_path)

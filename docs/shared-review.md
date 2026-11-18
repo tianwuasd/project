@@ -17,7 +17,7 @@
 | secretary_stage2_release | 秘书明确阶段2交接的文字记录，非空字符串 |
 | cleanup_owner | 同轮共享模型/数组最后消费者的清理责任人 |
 | source_images | 恰好ct_1001与ct_1012的真实原始CT路径，仅加载原图头；不能指向小区域副本 |
-| models | 仅明确可用模型，每项包含config、prepared、evaluation_config、best_record、best_path_field；完整模式中Med包含prompt_mode及external模式的prompts路径。evaluation_config须为生产evaluate加载器兼容的实际配置，等待助手2交接 |
+| models | 仅明确可用模型，每项包含config、prepared、best_record、best_path_field；STU/Q及Med external模式还包含evaluation_config。完整模式中Med包含prompt_mode及external模式的prompts路径。evaluation_config须兼容生产evaluate加载器，等待助手2交接 |
 | models每项的training_commits | 不重复的实际训练完整SHA列表，保留首次/恢复及各阶段的全部实际来源，不以最终SHA重写旧证据 |
 | models每项的version_reviews | 训练SHA为键；每项包含production_commit、approved_changed_files完整列表、secretary_review_reference。SHA不同时须有秘书最终逐项审核记录 |
 | training_event_logs | 五阶段原始事件路径；保存后的update位置、显式优化器事件及台账分别保留，不按去重位置个数推断总真实更新次数 |
@@ -34,7 +34,9 @@ AttemptLedger新增`limits()`，返回`stage_limits`与`total_limit`。无同名
 
 核对实际entry的ROI与生产summary一致。预测输出应与真实原图头的shape/affine一致；按z顺序逐片读取预测标签实际dtype，核对ROI外零填充，不读取原始CT数值或SHA。mismatch明确失败。该范围证明原图空间头和ROI回填/零填充，计算仍仅ROI，不能证明全体积预测效果。
 
-每个可用模型接续完成后，增加真实生产`evaluate --config EVALUATION_CONFIG --prepared PREPARED --predictions MODEL_OUTPUT --output OWN_EVALUATION.json`。Q同样使用生产公共evaluate入口，需要助手2交接其兼容评价配置；工具不自算Dice、不把预测summary当评价。保存实际评价JSON、病例/类别指标、technical范围、ROI和命令墙钟，必须覆盖两例。本轮仅完成该参数接入，真实评价待交接后运行。
+STU/Q接续完成后调用真实生产`evaluate --config EVALUATION_CONFIG --prepared PREPARED --predictions MODEL_OUTPUT --output OWN_EVALUATION.json`，需要助手2交接兼容评价配置；工具不自算Dice。保存实际评价JSON、病例/类别指标、technical范围、ROI和命令墙钟，必须覆盖两例。Med external模式有生产predictions.json时沿用该合同。
+
+Med label-box模式由生产预测写evaluation.json及summary.evaluation，工具不调用公共evaluate。读取实际文件并核对其与已完成med_resume预测Job的summary.evaluation一致，要求scope=technical、metric=prompted_known_present_class_dice及两例case_classes；保留源路径、实际预测Job及原指标，未单独测量的评价计算耗时为None，读取耗时单列。该指标仅说明标签框提示下已知且存在类别Dice，不能声明自动定位或全类别效果。没有Med真实模型及明确交接时保持partial与未验证。本轮仅完成源码/参数检查，生产评价尚未执行。
 
 build_review、每条预测/评价命令前及最终收尾均检查`git status --porcelain --untracked-files=all -- src run.py pyproject.toml`；存在未提交业务源码即拒绝执行，AGENTS私有说明修改不在业务检查范围。该检查只查Git源码状态，不扫描数据内容。
 
