@@ -30,7 +30,9 @@ best_record为真实阶段2选模记录JSON，best_path_field为其中指向模�
 
 AttemptLedger新增`limits()`，返回`stage_limits`与`total_limit`。无同名`.approval.json`时仍为每阶段2/总10。本轮秘书根据用户明确批准写入attempts.approval.json，严格绑定run_id与解析后的ledger_path，明确协议、全部字段及授权说明；仅接受q_base=3、其他阶段2、总11这一个例外。read/claim均核对批准文件及上限，原记录与outcome保持不变。助手2计算remaining时取该阶段上限减累计次数与总上限减全部次数的较小值，不能在调用方固定写成2/10。阶段3继续仅读台账，不能领取Q base第三次或Q localizer第三次。
 
-第一步只请求ct_1001，第二步同目录请求ct_1001和ct_1012。工具核对第一例文件大小/修改时间没有变化，并要求第二步的真实复用/完成事件。几何读取实际prepared.storage的case.json与catalog.json，记录roi_xyz、轴序、原spacing与处理后spacing，核对其ROI与生产summary一致。预测输出应与真实原图头的shape/affine一致；按z顺序逐片读取预测标签实际dtype，核对ROI外零填充，不读取原始CT数值或SHA。mismatch明确失败。该范围证明原图空间头和ROI回填/零填充，计算仍仅ROI，不能证明全体积预测效果。
+第一步只请求ct_1001，第二步同目录请求ct_1001和ct_1012。工具核对第一例文件大小/修改时间没有变化，并要求第二步的真实复用/完成事件。几何调用生产resolve_preprocessed(storage.root,dataset=prepared.dataset,case_ids=[case],storage=prepared.storage)，原样传入显式所选storage，再用open(case,with_label=False)取得实际entry。记录source_plan、processed_spacing、axis_order、roi_xyz、原spacing、source_directory、所选指针及recipe_identity，不自行从根catalog默认重选配方。API按需映射所选数组，工具只提取元数据并释放entry，不读取体素或标签。该接口当前待助手2最终固定，适配仅静态检查。
+
+核对实际entry的ROI与生产summary一致。预测输出应与真实原图头的shape/affine一致；按z顺序逐片读取预测标签实际dtype，核对ROI外零填充，不读取原始CT数值或SHA。mismatch明确失败。该范围证明原图空间头和ROI回填/零填充，计算仍仅ROI，不能证明全体积预测效果。
 
 每个可用模型接续完成后，增加真实生产`evaluate --config EVALUATION_CONFIG --prepared PREPARED --predictions MODEL_OUTPUT --output OWN_EVALUATION.json`。Q同样使用生产公共evaluate入口，需要助手2交接其兼容评价配置；工具不自算Dice、不把预测summary当评价。保存实际评价JSON、病例/类别指标、technical范围、ROI和命令墙钟，必须覆盖两例。本轮仅完成该参数接入，真实评价待交接后运行。
 

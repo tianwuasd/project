@@ -8,24 +8,20 @@ from .contracts import read_json
 
 
 def source_geometry(item, case):
+    from chd_segmentation.preprocessing.inputs import resolve_preprocessed
     prepared = read_json(item['prepared'])
-    root = Path(prepared['storage']['root']).resolve(strict=True)
-    pointer = prepared['storage']['cases'][case]
-    record_path = root / pointer['key'][:16] / 'case.json'
-    entry = read_json(record_path)['entry']
-    if entry['case_id'] != case:
-        raise ValueError('实际预处理记录病例不符')
-    catalog_path = root/'catalog.json'
-    recipe = read_json(catalog_path)['recipe']
-    if recipe['transform'].startswith('medsam2-native'):
-        axes, processed_spacing = [0,1,2], entry['spacing_xyz'][::-1]
-    else:
-        plan = recipe['plan']
-        axes = plan['transpose_forward']
-        processed_spacing = plan['configurations']['3d_fullres']['spacing']
-    return dict(record=str(record_path), catalog=str(catalog_path), roi_xyz=entry['roi_xyz'],
-                axis_order=axes, processed_spacing=processed_spacing, transform=recipe['transform'],
-                spacing_xyz=entry['spacing_xyz'], source_shape_xyz=entry['source_shape_xyz'])
+    storage = prepared['storage']
+    source = resolve_preprocessed(storage['root'],dataset=prepared['dataset'],
+                                  case_ids=[case],storage=storage)
+    entry = source.open(case,with_label=False)
+    fields = ('roi_xyz','axis_order','processed_spacing','source_plan','source_directory',
+              'source_shape_xyz','spacing_xyz','transform')
+    metadata = {key:entry[key] for key in fields}
+    metadata.update(prepared=str(Path(item['prepared']).resolve()),case_id=case,
+                    recipe_identity=storage['recipe_identity'],selected_pointer=storage['cases'][case])
+    # API按需映射所选数组；本函数只取元数据，不读取影像体素或标签。
+    del entry
+    return metadata
 
 
 def verify_output(source, output, metadata):
