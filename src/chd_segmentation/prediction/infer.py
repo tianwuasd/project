@@ -11,7 +11,6 @@ import psutil
 import torch
 
 from ..artifacts.store import digest, file_digest, operation_lock, read_json, require_output, require_result_output, write_json
-from ..compatibility import compatible_code
 from ..data.dataset import CaseDataset
 from ..datasets.manifest import load_manifest
 from ..models.stunet.adapter import StunetAdapter

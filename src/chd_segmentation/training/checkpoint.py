@@ -111,7 +111,8 @@ def save_checkpoint(directory, state):
     best = read_json(best_path) if best_path.exists() else None
     old_best = best
     selection = progress.get('selection')
-    if selection and (best is None or selection['best'] < best['metric']):
+    same_scope = best is not None and best.get('progress',{}).get('selection_scope')==progress.get('selection_scope')
+    if selection and (best is None or not same_scope or selection['best'] < best['metric']):
         best = dict(pointer, metric=selection['best'], monitor=selection['monitor'], position=selection['best_position'])
         write_json(best_path, best)
     protected = {filename}

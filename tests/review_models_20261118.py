@@ -268,32 +268,35 @@ def inspect_restore(args):
     ledger = reports.parent/'attempts.json'
     before = read_json(ledger)
     if args.stage=='stu':
-        from dataclasses import asdict
-        from importlib.metadata import version
         from chd_segmentation.config import load_config
         from chd_segmentation.preprocessing.prepare import load_prepared
-        from chd_segmentation.models.stunet.adapter import StunetAdapter,WEIGHT_SHA256
-        from chd_segmentation.training.engine import code_identity
-        from chd_segmentation.compatibility import compatible_code
-        from chd_segmentation.artifacts.store import digest
+        from chd_segmentation.models.stunet.adapter import StunetAdapter
+        from chd_segmentation.training.checkpoint import load_checkpoint,tensors_equal
+        from chd_segmentation.training.resume import resume_inputs
         config = load_config(root/'course/stu.json')
         prepared = load_prepared(root/'course/shared-offline.json')
         previous = read_json(root/'course/runs/STU/run.json')
-        target = code_identity()
-        current = dict(prepared_identity=prepared['identity'],model='stunet',
-            spec=asdict(StunetAdapter.spec(config,prepared['plan'])),training=config['training'],
-            pretrained=WEIGHT_SHA256,code_identity=target,
-            versions={name:version(name) for name in ('torch','monai','nnunetv2','numpy','scipy')})
-        expected = dict(current,code_identity=previous['scientific']['code_identity'])
-        if previous['scientific']!=expected or digest(expected)!=previous['identity']:
-            raise ValueError('真实旧STU运行的科学设置与当前配置不同')
-        if not compatible_code(previous['scientific']['code_identity'],target) or compatible_code('0'*64,target):
-            raise ValueError('精确代码兼容记录缺失或意外放行未知摘要')
+        changed = resume_inputs(previous,prepared,config)
+        state = load_checkpoint(root/'course/runs/STU',previous['identity'])
+        model = StunetAdapter.build(state['spec'])
+        model.load_state_dict(state['model'],strict=True)
+        settings = config['training']
+        optimizer = torch.optim.SGD(model.parameters(),lr=settings['learning_rate'],momentum=settings['momentum'],
+            nesterov=True,weight_decay=settings['weight_decay'])
+        optimizer.load_state_dict(state['optimizer'])
+        verify_optimizer_device(optimizer)
+        scaler = torch.amp.GradScaler('cuda',enabled=False)
+        scaler.load_state_dict(state['scaler'])
+        torch.set_rng_state(state['rank_rng'][0]['torch'])
+        if not (tensors_equal(model.state_dict(),state['model']) and tensors_equal(optimizer.state_dict(),state['optimizer'])
+                and tensors_equal(scaler.state_dict(),state['scaler']) and torch.equal(torch.get_rng_state(),state['rank_rng'][0]['torch'])
+                and state['sampler_rng']['next']==state['attempts']):
+            raise ValueError('STU真实模型或优化器、scaler、随机状态恢复不同')
         if read_json(ledger)!=before:
             raise ValueError('零更新兼容核对改变了唯一台账')
-        write_json(reports/'stu-compatibility.json',dict(state='completed',
-            source=previous['scientific']['code_identity'],target=target,scientific_equal=True,
-            exact_edge=True,unknown_rejected=True,optimizer_step_calls=0,ledger_unchanged=True))
+        write_json(reports/'stu-restore-inputs.json',dict(state='completed',
+            checkpoint_update=state['updates'],model_loaded_strict=True,optimizer_states=len(optimizer.state),
+            scaler_and_rng_equal=True,source_changed=changed,optimizer_step_calls=0,ledger_unchanged=True))
         return
     if args.stage not in ('q_base','q_localizer'):
         raise ValueError('只读恢复检查需要明确Q基础或定位器阶段')
@@ -323,10 +326,13 @@ def fork_q_base(args):
     from chd_segmentation.artifacts.store import read_json,write_json
     ledger = AttemptLedger(reports.parent/'attempts.json')
     state,limits = ledger.read(),ledger.limits()
-    if limits['stage_limits']['q_base']!=3 or sum(row['stage']=='q_base' for row in state['attempts'])!=2:
-        raise ValueError('额外Q基础恢复尚未获准或已使用')
-    source = root/'course/runs/Q/base'
-    target = root/'course/runs/Q-base-extra/base'
+    if args.stage not in (None,'q_base','q_localizer'):
+        raise ValueError('独立恢复副本仅支持Q基础或定位器')
+    stage = 'localizer' if args.stage=='q_localizer' else 'base'
+    if limits['stage_limits']['q_'+stage]!=3 or sum(row['stage']=='q_'+stage for row in state['attempts'])!=2:
+        raise ValueError('额外Q恢复尚未获准或已使用')
+    source = root/'course/runs'/('Q-wide' if stage=='localizer' else 'Q')/stage
+    target = root/'course/runs'/('Q-'+stage+'-extra')/stage
     if not target.resolve().is_relative_to(root) or target.exists():
         raise ValueError('独立恢复目标已存在或不属于本轮目录')
     names = ('latest.pt','best.pt','execution-topology.json')
@@ -336,14 +342,16 @@ def fork_q_base(args):
         if path.is_symlink() or not path.is_file():
             raise ValueError('恢复来源不是本轮普通文件')
         copies.append(dict(source=str(path),target=str(target/name),bytes=path.stat().st_size))
+    if sum(row['bytes'] for row in copies)>64*2**20:
+        raise ValueError('独立恢复初始副本超过64MiB')
     target.mkdir(parents=True,exist_ok=False)
     for record in copies:
         shutil.copy2(record['source'],record['target'])
-    config = read_json(root/'course/q-base.json')
+    config = read_json(root/'course'/('q-'+stage+'.json'))
     config['run_dir'] = str(target.parent)
-    write_json(root/'course/q-base-extra.json',config)
-    originals = [source/'best.pt',root/'course/runs/Q-wide/localizer/best.pt']
-    write_json(reports/'q-base-fork.json',dict(state='completed',copies=copies,
+    write_json(root/'course'/('q-'+stage+'-extra.json'),config)
+    originals = [root/'course/runs/Q/base/best.pt',root/'course/runs/Q-wide/localizer/best.pt']
+    write_json(reports/('q-'+stage+'-fork.json'),dict(state='completed',copies=copies,
         approval=str(reports.parent/'attempts.approval.json'),optimizer_updates=0,
         original_parents=[dict(path=str(path),stamp=[path.stat().st_size,path.stat().st_mtime_ns]) for path in originals]))
 

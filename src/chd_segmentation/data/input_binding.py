@@ -33,13 +33,11 @@ def bind_prepared_source(prepared, path, case_ids=None):
         raise ValueError('指定预处理消费名单为空、重复或不属于当前实验')
     source = resolve_preprocessed(path,dataset=prepared['dataset'],case_ids=names)
     catalog = source.catalog
-    if catalog['recipe']['scope'] != prepared['scope']:
-        raise ValueError('当前任务与指定预处理的正式或技术范围不同')
     if catalog['recipe']['labels'] != prepared['dataset_json']:
         raise ValueError('指定预处理的类别语义与当前实验不同')
     result = deepcopy(prepared)
     result['storage'] = dict(format=catalog['format'],root=str(source.root),complete=True,
-        recipe_identity=catalog['recipe_identity'],cases=source.cases)
+        recipe_identity=catalog['recipe_identity'],source_scope=catalog['recipe']['scope'],cases=source.cases)
     result['plan'] = deepcopy(catalog['recipe'].get('plan',prepared['plan']))
     result['identity'] = digest(dict(dataset=result['dataset'],cases=names,storage=result['storage']))
     return result

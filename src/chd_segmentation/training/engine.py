@@ -18,7 +18,6 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel
 
 from ..artifacts.store import digest, operation_lock, read_json, require_output, write_json
-from ..compatibility import compatible_code
 from ..data.supply import batch_index
 from .batches import BatchSupply
 from .session import admitted_training, memory_for
@@ -26,7 +25,8 @@ from ..models.stunet.adapter import StunetAdapter, WEIGHT_SHA256
 from ..observability.events import event, logged, stage
 from ..observability.progress import Progress
 from ..preprocessing.prepare import load_prepared, validate_prepared_config
-from ..preprocessing.offline_store import storage_lease, validate_storage
+from ..preprocessing.offline_store import storage_lease
+from .resume import validate_training_inputs,resume_inputs,selection_scope,reset_selection
 from .checkpoint import load_checkpoint, save_checkpoint, tensors_equal,require_resume_device,verify_optimizer_device
 from .attempts import settle_attempts, claim_attempt, finish_attempt, remaining_attempts, is_technical
 from .stopping import selection_options, update_selection
@@ -47,18 +47,14 @@ def code_identity():
     return hashes.hexdigest()
 
 
-def validate_initialization_restart(output, scientific):
+def validate_initialization_restart(output, scientific, config, prepared):
     output = Path(output)
     previous = read_json(output / "run.json")
-    expected = {**scientific, "code_identity": previous["scientific"]["code_identity"]}
-    if digest(previous["scientific"]) != digest(expected) or previous["identity"] != digest(expected) or not compatible_code(
-            previous["scientific"]["code_identity"], scientific["code_identity"]):
-        raise ValueError("初始化重试的配置、数据、代码或依赖版本改变")
+    changed = resume_inputs(previous,prepared,config)
     if (output / "latest.json").exists() or (output / "summary.json").exists() or any(output.glob("state-*.pt*")):
         raise FileExistsError("运行目录已有检查点、写入中的状态或训练摘要，请使用 --resume")
     event(output, "initialization_restarted", previous_identity=previous["identity"],
-          identity=digest(scientific), previous_code=previous["scientific"]["code_identity"],
-          applied_code=scientific["code_identity"], reason="已核对输入，尚无任何检查点或训练摘要")
+          identity=digest(scientific),source_changed=changed,reason="已核对当前实际输入，尚无检查点或训练摘要")
 
 
 def device_for(config):
@@ -183,7 +179,13 @@ def checkpoint(output, model, optimizer, scaler, progress, job, receipt, device,
             "optimizer": optimizer.state_dict(), "scaler": scaler.state_dict(), "rank_rng": states,
             "torch_rng": states[0]["torch"], "sampler_rng": {"protocol": "global-slot-v1", "next": progress["attempts"]},
             "attempts": progress["attempts"], "updates": progress["updates"], "skipped": progress["skipped"],
-            "progress": dict(progress), "spec": job["spec"], "config": job["config"], "pretrained_receipt": receipt})
+            "progress": dict(progress), "spec": job["spec"], "config": job["config"], "pretrained_receipt": receipt,
+            "prepared": job['prepared'], "scientific": job['scientific']})
+        record = read_json(Path(output)/'run.json')
+        if record.get('scientific')!=job['scientific'] or record.get('prepared')!=job['prepared'] or record.get('config')!=job['config']:
+            record.setdefault('initial_scientific',record['scientific'])
+            record.update(scientific=job['scientific'],prepared=job['prepared'],config=job['config'])
+            write_json(Path(output)/'run.json',record)
     host_wait(job, rank, next_batch_index(progress, job["config"]["training"]), "checkpoint_saved")
     return all_objects(pointer, job["world"])[0]
 
@@ -264,13 +266,19 @@ def run_rank(rank, job, gate, stop_event):
                           rng_policy="保留已有 rank 状态，新增 rank 使用检查点派生种子",
                           reduction="全局样本统计归约；浮点加和顺序可能变化", bitwise_equivalent=False)
                 progress, receipt = state["progress"], state["pretrained_receipt"]
+                if job['selection_source_changed']:
+                    progress = reset_selection(progress,selection_scope(job['prepared'],config))
+                    restored = False
+                    if rank==0:
+                        event(output,'selection_source_changed',selection_scope=progress['selection_scope'],
+                              training_state_loaded=True,restored_exact=False)
                 del state
             else:
                 restored_state = False
                 with stage(config, "pretrained_load", rank=rank, path=config["pretrained"]):
                     receipt = StunetAdapter.load_pretrained(model, config["pretrained"])
                 progress = {"attempts": 0, "updates": 0, "skipped": 0, "epoch": 0, "phase": "train", "val_step": 0,
-                            "val_sum": 0., "validation_loss": None}
+                            "val_sum": 0., "validation_loss": None,"selection_scope":selection_scope(job['prepared'],config)}
             before_parameter = next(model.parameters()).detach().cpu().clone()
             host_wait(job, rank, next_batch_index(progress, settings), "model_ready")
             with stage(config, "model_ready", rank=rank, distributed=world > 1):
@@ -553,38 +561,34 @@ def run_rank(rank, job, gate, stop_event):
 def train(config, prepared_path, resume=False, stop_after=None):
     with stage(config, "training_inputs", prepared=str(prepared_path), resume=resume):
         prepared = load_prepared(prepared_path)
+        if config.get('input_source',{}).get('path'):
+            from ..data.input_binding import bind_prepared_source
+            prepared = bind_prepared_source(prepared,config['input_source']['path'])
         validate_prepared_config(prepared, config)
-        validate_storage(prepared, config=config)
+        validate_training_inputs(prepared,config)
     output = require_output(config["run_dir"], config["work_root"], [prepared["manifest"]["data_root"]])
-    rows = prepared["manifest"]["cases"]
-    if not all(any(role in r["roles"] for r in rows) for role in ("train", "validation")) or \
-            any(r.get("label") is None for r in rows if set(r["roles"]) & {"train", "validation"}):
-        raise ValueError("训练与验证需要非空的图像、标签及角色")
     spec = asdict(StunetAdapter.spec(config, prepared["plan"]))
     scientific = {"prepared_identity": prepared["identity"], "model": "stunet", "spec": spec,
-        "training": config["training"], "pretrained": WEIGHT_SHA256, "code_identity": code_identity(),
+        "training": config["training"], "pretrained": WEIGHT_SHA256,
         "versions": {n: version(n) for n in ("torch", "monai", "nnunetv2", "numpy", "scipy")}}
     identity = digest(scientific)
     with operation_lock(output), storage_lease(prepared, config):
         if resume:
             previous = read_json(output / "run.json")
-            expected = {**scientific, "code_identity": previous["scientific"]["code_identity"]}
-            if digest(previous["scientific"]) != digest(expected) or previous["identity"] != digest(expected) or not compatible_code(
-                    previous["scientific"]["code_identity"], scientific["code_identity"]):
-                raise ValueError("恢复训练的配置、数据、代码或依赖版本改变")
+            resume_inputs(previous,prepared,config)
             identity = previous["identity"]
-            if previous["scientific"]["code_identity"] != scientific["code_identity"]:
-                event(output, "code_compatibility_verified", source=previous["scientific"]["code_identity"],
-                      target=scientific["code_identity"], training_identity=identity)
-            load_checkpoint(output, identity)
         elif (output / "run.json").exists():
-            validate_initialization_restart(output, scientific)
+            validate_initialization_restart(output, scientific, config, prepared)
         pressure_retries = 0
         while True:
             admission = deepcopy(config)
             old_world = None
+            source_changed = False
             if resume:
+                previous_run = read_json(output/'run.json')
                 previous_state = load_checkpoint(output, identity)
+                source_changed = resume_inputs(dict(prepared=previous_state.get('prepared',previous_run['prepared']),
+                    config=previous_state['config']),prepared,config)
                 old_world = len(previous_state["rank_rng"])
                 boundary = previous_state["progress"]["phase"] == "train" and (previous_state["attempts"] == 0 or
                     config["training"]["epochs"] is not None and
@@ -597,7 +601,8 @@ def train(config, prepared_path, resume=False, stop_after=None):
                 if not resume:
                     write_json(output / "run.json", {"identity": identity, "scientific": scientific,
                                "config": config, "prepared": prepared})
-                summary = launch_group(config, prepared, spec, identity, allocation, resume, stop_after, owner_session)
+                summary = launch_group(config, prepared, spec, identity, allocation, resume, stop_after, owner_session,
+                                       scientific,source_changed)
             if summary["reason"] not in ("resource_pressure", "regroup"):
                 return summary
             if summary["reason"] == "resource_pressure":
@@ -614,7 +619,7 @@ def train(config, prepared_path, resume=False, stop_after=None):
             resume = True
 
 
-def launch_group(config, prepared, spec, identity, allocation, resume, stop_after, owner_session):
+def launch_group(config, prepared, spec, identity, allocation, resume, stop_after, owner_session,scientific,source_changed):
     world = allocation["world"]
     if resume:
         state = load_checkpoint(config["run_dir"], identity)
@@ -628,7 +633,8 @@ def launch_group(config, prepared, spec, identity, allocation, resume, stop_afte
         rendezvous.bind(("127.0.0.1", 0))
         port = rendezvous.getsockname()[1]
     job = {**allocation, "config": config, "prepared": prepared, "spec": spec, "identity": identity,
-           "shares": shares, "resume": resume, "stop_after": stop_after, "rendezvous": f"tcp://127.0.0.1:{port}"}
+           "shares": shares, "resume": resume, "stop_after": stop_after, "rendezvous": f"tcp://127.0.0.1:{port}",
+           "scientific":scientific,"selection_source_changed":source_changed}
     job["stage_memory"] = stage_memory(config, prepared)
     context = mp.get_context("spawn")
     gate = BuildGate(context, allocation["supply"]["reader_slots"], allocation["supply"]["workspace_capacity_bytes"],

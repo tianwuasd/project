@@ -14,10 +14,8 @@ class OfflineDataset:
         pointer = self.cases[case_id]
         directory = self.root / pointer['key'][:16]
         record = read_json(directory / 'case.json')
-        from .offline_store import record_identity
         if (record['case_key']!=pointer['key'] or record['recipe_identity']!=self.catalog['recipe_identity']
-                or record['entry']['case_id']!=case_id or pointer.get('case_id',case_id)!=case_id
-                or record_identity(record)!=pointer['identity']):
+                or record['entry']['case_id']!=case_id or pointer.get('case_id',case_id)!=case_id):
             raise ValueError('选定病例指针与实际病例、版本或配方不一致：'+case_id)
         entry = deepcopy(record['entry'])
         entry['image'] = np.load(directory / 'image.npy', mmap_mode='r', allow_pickle=False)

@@ -171,15 +171,11 @@ def validate_storage(prepared, full=False, config=None, expected_transform=CONTR
     catalog = read_json(root / "catalog.json")
     if expected_transform is not None and catalog["recipe"]["transform"] != expected_transform:
         raise ValueError("离线处理方式与模型输入要求不同")
-    for row in prepared["manifest"]["cases"]:
-        name = row["case_id"]
-        if name not in storage["cases"]:
-            raise ValueError("当前输入未离线处理，请使用冻结训练计划为所需输入建立离线描述")
-        pointer = storage["cases"][name]
-        key = pointer["key"]
-        record = inspect_case(case_directory(root, key), key, storage["recipe_identity"], full)
-        if record is None:
-            raise ValueError("离线数据缺失或损坏，请重新运行 preprocess 核验和补充")
+    if catalog['format']!=FORMAT or catalog['recipe']['dataset']!=prepared['dataset'] or catalog['recipe']['labels']!=prepared['dataset_json']:
+        raise ValueError('离线描述的数据集、格式或类别不同')
+    missing = {row['case_id'] for row in prepared['manifest']['cases']}-storage['cases'].keys()
+    if missing:
+        raise ValueError('离线描述缺少当前病例：'+', '.join(sorted(missing)))
     return root
 
 
