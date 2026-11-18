@@ -19,6 +19,27 @@ ROLES = dict(train=['ct_1001'], validation=['ct_1012'], test=[])
 MODELS = ('stu', 'q', 'med')
 
 
+def review_models(handoff):
+    mode = handoff.get('review_mode', 'complete')
+    available = handoff.get('available_models', list(MODELS) if mode == 'complete' else None)
+    unavailable = handoff.get('unavailable_models', {})
+    if mode not in ('complete', 'partial') or not isinstance(available, list) or not available:
+        raise ValueError('须明确完整或部分验收模式及非空可用模型列表')
+    if (any(not isinstance(m,str) for m in available) or len(set(available)) != len(available) or
+            not set(available) <= set(MODELS) or not isinstance(unavailable,dict)):
+        raise ValueError('模型声明无效')
+    if (set(handoff['models']) != set(available) or set(available) & set(unavailable) or
+            set(available) | set(unavailable) != set(MODELS)):
+        raise ValueError('每个目标模型必须明确可用或不可用，且与实际交接模型一致')
+    if mode == 'complete' and (set(available) != set(MODELS) or unavailable):
+        raise ValueError('完整验收需要三模型全部交接')
+    if mode == 'partial' and (not unavailable or not set(available) <= {'stu','q'}):
+        raise ValueError('本轮部分验收仅允许明确交接的STU/Q，Med缺项必须登记')
+    if any(not isinstance(reason,str) or not reason.strip() for reason in unavailable.values()):
+        raise ValueError('不可用模型必须有具体原因')
+    return [m for m in MODELS if m in available]
+
+
 def flags(path):
     tree = ast.parse(Path(path).read_text(encoding='utf-8'))
     return {arg.value for node in ast.walk(tree) if isinstance(node, ast.Call)
@@ -52,8 +73,9 @@ def prediction_args(model, item, checkpoint, output):
 
 
 def build_review(handoff):
-    if handoff['roles'] != ROLES or set(handoff['models']) != set(MODELS):
-        raise ValueError('交接必须是ct_1001/ct_1012且包含三模型')
+    available = review_models(handoff)
+    if handoff['roles'] != ROLES:
+        raise ValueError('交接必须是ct_1001/ct_1012技术角色')
     if set(handoff['source_images']) != {'ct_1001', 'ct_1012'}:
         raise ValueError('几何来源必须恰好对应两例')
     if Path(handoff['work_root']).resolve() != Path('D:/projects/back/t17/chd-review-20261118').resolve():
@@ -68,7 +90,7 @@ def build_review(handoff):
     if any(r['outcome'] == 'started' for r in ledger['attempts']):
         raise ValueError('阶段2仍有未结算尝试，不能开始阶段3')
     steps, versions = [], {}
-    for model in MODELS:
+    for model in available:
         item = handoff['models'][model]
         versions[model] = model_versions(engine, model, item, actual)
         checkpoint = selected_best(item)
@@ -82,6 +104,8 @@ def build_review(handoff):
             steps.append(dict(name=model+'_'+label, model=model, output=output,
                               checkpoint=checkpoint, args=args+requested))
     return dict(steps=steps, ledger=ledger, engine_commit=actual, model_versions=versions,
+                review_mode=handoff.get('review_mode','complete'), target_models=list(MODELS),
+                available_models=available, unavailable_models=handoff.get('unavailable_models',{}),
                 scope='zero_additional_training', roles=ROLES)
 
 
@@ -187,6 +211,9 @@ class ReviewFinalizer:
                 error=None if kind is None else ''.join(traceback.format_exception(kind,error,trace)),
                 production_commit=self.plan['engine_commit'],
                 model_versions=self.plan.get('model_versions', {}),
+                target_models=list(MODELS), review_mode=self.plan.get('review_mode','complete'),
+                available_models=self.plan.get('available_models',[]),
+                unavailable_models=self.plan.get('unavailable_models',{}),
                 geometry_scope='两例实际交接小区域；完整原图回填未验证')
             write_json(self.reports/'review.json', summary)
             # 最终容量只记录，不在此处抛出额度错误阻止清理。
@@ -252,4 +279,5 @@ def _execute_steps(handoff, plan, root, reports, records, before, process_paths,
         write_json(reports/'execution.json', records)
         if AttemptLedger(handoff['attempt_ledger']).read() != plan['ledger']:
             raise RuntimeError('阶段3改变共享训练台账，立即终止')
-    return dict(state='INCOMPLETE', records=records)
+    return dict(state='INCOMPLETE', records=records, target_models=list(MODELS),
+                review_mode=plan['review_mode'], unavailable_models=plan['unavailable_models'])
