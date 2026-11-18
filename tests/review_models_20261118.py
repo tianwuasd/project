@@ -159,8 +159,10 @@ def command(args):
     model_stage = stage.removeprefix('q_') if stage.startswith('q_') else 'sequence'
     config = course/('stu.json' if stage=='stu' else 'med.json' if stage=='med_sequence' else 'q-'+model_stage+'.json')
     prepared = course/('med-offline.json' if stage=='med_sequence' else 'shared-offline.json')
-    if stage in ('q_localizer','q_local') and (course/'q-wide-offline.json').exists():
-        prepared = course/'q-wide-offline.json'
+    if args.prepared is not None:
+        prepared = Path(args.prepared).resolve(strict=True)
+    if stage in ('q_localizer','q_local') and args.prepared is None:
+        raise ValueError('定位及局部阶段必须显式指定本次prepared来源')
     if args.phase=='train':
         command_args = ['train','--config',str(config),'--prepared',str(prepared),'--stop-after',str(args.stop_after)]
         if stage!='stu':
@@ -279,6 +281,66 @@ def inspect_restore(args):
         resume_with_additional_update_verified=False))
 
 
+def inspect_med_supervision(args):
+    engine, root, reports = setup(args)
+    from chd_segmentation.artifacts.store import write_json
+    from chd_segmentation.models.workflow import options
+    from chd_segmentation.preprocessing.prepare import load_prepared
+    from chd_segmentation.models.medsam2.official import effective_config
+    from chd_segmentation.acceleration.host import host_capacity
+    from chd_segmentation.acceleration.memory import system_headroom
+    import torch
+    torch.set_num_threads(1)
+    config = options(root/'course/med.json')
+    source_path = Path(args.prepared).resolve(strict=True)
+    prepared = load_prepared(source_path)
+    recipe = effective_config(config,prepared,source_path,root/'course/runs/Med/sequence',['ct_1001'])
+    from hydra.utils import instantiate
+    checks = {}
+    for name in ('ct_1001','ct_1012'):
+        leaf = deepcopy(recipe['trainer']['data']['train']['datasets'][0]['dataset']['datasets'][0])
+        leaf['video_dataset']['names'] = [name]
+        dataset = instantiate(leaf)
+        sample = dataset[0]
+        frames = [dict(objects=len(frame.objects),positive_pixels=sum(int(obj.segment.sum()) for obj in frame.objects))
+                  for frame in sample.frames]
+        if len(frames)!=8 or not all(frame['objects']>0 for frame in frames) or not any(frame['positive_pixels']>0 for frame in frames):
+            raise ValueError('官方序列没有实际有监督对象：'+name)
+        checks[name] = frames
+    facts = host_capacity()
+    headroom,scopes = system_headroom(facts,.8,4*2**30)
+    write_json(reports/'med-supervision.json',dict(state='completed',prepared_source=str(source_path),
+        frames=checks,optimizer_updates=0,host=facts,headroom_bytes=headroom,memory_scopes=scopes,
+        first_admission_requested_bytes=9660917382))
+
+
+def inspect_q_local(args):
+    engine, root, reports = setup(args)
+    from chd_segmentation.artifacts.store import write_json
+    from chd_segmentation.models.workflow import options,adapter
+    from chd_segmentation.preprocessing.prepare import load_prepared
+    from chd_segmentation.data.dataset import CaseDataset
+    import numpy as np
+    import torch
+    torch.set_num_threads(1)
+    source = Path(args.prepared).resolve(strict=True)
+    prepared = load_prepared(source)
+    config = options(root/'course/q-local.json')
+    bundle = adapter(config,prepared,'local')
+    dataset = CaseDataset(prepared,dict(cache_bytes=0),with_label=True)
+    bundle.prepare_training(dataset,['ct_1001'])
+    rng = np.random.default_rng(123)
+    entry = bundle.sample(dataset,['ct_1001'],rng)
+    with torch.no_grad():
+        loss = float(bundle.loss(entry,rng,0))
+        validation = bundle.validate(dataset,['ct_1012'])
+    if not np.isfinite(loss) or not np.isfinite(validation):
+        raise ValueError('Q局部真实训练或验证损失不是有限数值')
+    write_json(reports/'q-local-inputs.json',dict(state='completed',prepared_source=str(source),
+        training_case='ct_1001',validation_case='ct_1012',loss=loss,validation_loss=validation,optimizer_updates=0))
+    dataset.clear()
+
+
 def supervised(args):
     engine, root, reports = setup(args)
     tool = engine.parent/'chd-segmentation-assistant3'
@@ -293,6 +355,8 @@ def supervised(args):
         command_line += ['--stage',args.stage]
     if args.resume:
         command_line += ['--resume']
+    if args.prepared is not None:
+        command_line += ['--prepared',str(Path(args.prepared).resolve(strict=True))]
     source = subprocess.run(['git','-C',str(engine),'rev-parse','HEAD'],check=True,capture_output=True,text=True).stdout.strip()
     environment = dict(os.environ,PYTHONUTF8='1',PYTHONIOENCODING='utf-8',PYTHONDONTWRITEBYTECODE='1')
     try:
@@ -305,6 +369,7 @@ def supervised(args):
         result.update(source_commit=source,tool_commit=subprocess.run(['git','-C',str(tool),'rev-parse','HEAD'],
             check=True,capture_output=True,text=True).stdout.strip(),ram_limit_bytes=16*2**30,
             cases=dict(train=['ct_1001'],validation=['ct_1012'],test=[]),work_inventory=inventory)
+        result['prepared_source'] = args.prepared
         write_json(receipt,result)
         if inventory['files']>200 or inventory['bytes']>8*2**30:
             raise RuntimeError('本阶段工作产物超过批准额度')
@@ -315,12 +380,13 @@ if __name__ == '__main__':
     parser.add_argument('--settings',required=True)
     parser.add_argument('--work',required=True)
     parser.add_argument('--reports',required=True)
-    parser.add_argument('--phase',choices=('prepare','inspect','q-inputs','restore','train','predict','evaluate'),required=True)
+    parser.add_argument('--phase',choices=('prepare','inspect','q-inputs','q-local-inputs','med-supervision','restore','train','predict','evaluate'),required=True)
     parser.add_argument('--stage',choices=('stu','q_base','q_localizer','q_local','med_sequence'))
     parser.add_argument('--resume',action='store_true')
     parser.add_argument('--stop-after',type=int,choices=(1,2),default=1)
     parser.add_argument('--supervise',action='store_true')
     parser.add_argument('--tag')
+    parser.add_argument('--prepared')
     arguments = parser.parse_args()
     if arguments.supervise:
         supervised(arguments)
@@ -332,5 +398,9 @@ if __name__ == '__main__':
         inspect_restore(arguments)
     elif arguments.phase=='q-inputs':
         prepare_q_inputs(arguments)
+    elif arguments.phase=='q-local-inputs':
+        inspect_q_local(arguments)
+    elif arguments.phase=='med-supervision':
+        inspect_med_supervision(arguments)
     else:
         command(arguments)
