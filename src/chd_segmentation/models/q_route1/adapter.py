@@ -51,7 +51,7 @@ def export_probabilities(probability,dataset):
 
 
 class QAdapter:
-    def __init__(self,config,prepared,stage,initialize=True):
+    def __init__(self,config,prepared,stage,initialize=True,parent_states=None):
         if stage not in ('base','localizer','local'):
             raise ValueError('Q阶段必须为base、localizer或local')
         self.config,self.prepared,self.stage = config,prepared,stage
@@ -60,6 +60,7 @@ class QAdapter:
         self.corruption_rng = np.random.default_rng(config['seed']+1)
         self.current_name,self.current_frozen = None,None
         self.picked = None
+        self.parent_models = None
         patch = config['patch']
         spec = asdict(StunetAdapter.spec({'training':{'patch':[patch]*3},'dataset':prepared['dataset']},prepared['plan']))
         spec['num_classes'] = 11
@@ -76,7 +77,10 @@ class QAdapter:
             from ..workflow import load_state,checked_identity,training_names
             if set(config['parents'])!={'base','localizer'}:
                 raise ValueError('Q局部模型需要base与localizer检查点')
-            parents = {key:load_state(value) for key,value in config['parents'].items()}
+            parents = ({key:load_state(value) for key,value in config['parents'].items()}
+                if parent_states is None else parent_states)
+            if set(parents)!={'base','localizer'}:
+                raise ValueError('Q固定上游参数必须同时包含base和localizer')
             for key,state in parents.items():
                 if state['stage']!=key or state['prepared']['dataset']!=prepared['dataset']:
                     raise ValueError('Q上游阶段或数据集不匹配')
@@ -94,6 +98,10 @@ class QAdapter:
                     selected = state['history'][-1].get('validation_loss')
                     if selected is None or not np.isfinite(selected) or selected!=state['best']:
                         raise ValueError('Q上游需要由C组选择的最佳完整检查点')
+            retained = ('model','spec','stage','prepared','scope','config','training_cases',
+                'initialization_sha256','identity','best')
+            self.parent_models = {key:{**{name:state[name] for name in retained},
+                'history':state['history'][-1:]} for key,state in parents.items()}
             self.base = StunetAdapter.build(parents['base']['spec']).to(self.device).eval().requires_grad_(False)
             self.base.load_state_dict(parents['base']['model'],strict=True)
             self.locator = Localizer().to(self.device).eval().requires_grad_(False)

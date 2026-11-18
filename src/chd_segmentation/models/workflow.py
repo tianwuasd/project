@@ -96,7 +96,7 @@ def options(path,overrides=None):
                 'attempt_ledger','checkpoint_dir'):
         if config[key] is not None:
             config[key] = str((root/Path(config[key])).resolve())
-    config['parents'] = {key:str((root/Path(value)).resolve(strict=True)) for key,value in config['parents'].items()}
+    config['parents'] = {key:str((root/Path(value)).resolve()) for key,value in config['parents'].items()}
     from .execution import execution_config
     execution_config(config)
     return config
@@ -117,10 +117,10 @@ def resources(config):
     return device
 
 
-def adapter(config, prepared, stage, initialize=True):
+def adapter(config, prepared, stage, initialize=True, parent_states=None):
     if config['model']=='q_route1':
         from .q_route1.adapter import QAdapter
-        return QAdapter(config,prepared,stage,initialize=initialize)
+        return QAdapter(config,prepared,stage,initialize=initialize,parent_states=parent_states)
     from .medsam2.adapter import MedSAM2Adapter
     return MedSAM2Adapter(config,prepared,stage,initialize=initialize)
 
@@ -268,7 +268,8 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
         from ..training.checkpoint import require_resume_device
         require_resume_device(previous['config']['device'],device)
     initial_sha = initialization_digest(config,previous['initialization_sha256'] if previous else None)
-    bundle = adapter(dict(config,device=str(device),seed=seed+rank),prepared,stage,initialize=not resume)
+    bundle = adapter(dict(config,device=str(device),seed=seed+rank),prepared,stage,initialize=not resume,
+        parent_states=previous.get('parent_models') if previous else None)
     model = bundle.model.to(device)
     model.train()
     optimizer = bundle.optimizer()
@@ -439,6 +440,8 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 spec=bundle.spec,training_cases=names,scope=prepared['scope'],best=best,
                 selection=selection, attempt=attempt)
             state.update(prepared=prepared,initialization_sha256=initial_sha)
+            if stage=='local':
+                state['parent_models'] = bundle.parent_models
             if rank==0 and due:
                 save_state(root/'latest.pt',state)
                 if improved:

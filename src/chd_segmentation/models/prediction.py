@@ -113,14 +113,18 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
         trained = state['prepared']
         if prepared['dataset'] != trained['dataset']:
             raise ValueError('预测输入的数据集语义与模型不同')
-        model_config = dict(config, patch=state['config']['patch'], local_size=state['config']['local_size'])
-        bundle = adapter(model_config, trained, state['stage'], initialize=False)
+        model_config = dict(config, patch=state['config']['patch'], local_size=state['config']['local_size'],
+            parents=state['config']['parents'])
+        bundle = adapter(model_config, trained, state['stage'], initialize=False,
+            parent_states=state.get('parent_models'))
         initialization = dict(kind='trained_checkpoint', identity=state['identity'])
     bundle.model.load_state_dict(state['model'], strict=True)
     if not run_path.exists():
         snapshot = root/'selected-model.pt'
         snapshot_state = {key: state[key] for key in (
             'model','config','prepared','stage','scope','identity','initialization_sha256','spec') if key in state}
+        if config['model']=='q_route1':
+            snapshot_state['parent_models'] = bundle.parent_models
         save_state(snapshot, snapshot_state)
         write_json(run_path, dict(model=config['model'], dataset=prepared['dataset'],
             checkpoint=str(snapshot), source_checkpoint=str(checkpoint), official_weights=official_weights, task=task))
