@@ -168,13 +168,27 @@ def verify_device(device,allocation,rank):
 
 def rank_measurement(device,allocation,rank):
     memory = psutil.Process().memory_info()
-    peak = None
+    peak,allocated,reserved,external = None,None,None,dict(bytes=None,reason='cpu_execution')
     if device.type=='cuda':
         torch.cuda.synchronize(device)
-        actual = process_vram(allocation['gpus'][rank]['uuid'],os.getpid())
-        peak = torch.cuda.max_memory_reserved(device)+max(0,actual-torch.cuda.memory_reserved(device))
+        from ..acceleration.measurements import process_vram_observation
+        allocated,reserved = torch.cuda.max_memory_allocated(device),torch.cuda.max_memory_reserved(device)
+        external = process_vram_observation(allocation['gpus'][rank]['uuid'],os.getpid())
+        if external['bytes'] is not None:
+            peak = reserved+max(0,external['bytes']-torch.cuda.memory_reserved(device))
     return dict(rank=rank,rss_bytes=memory.rss,peak_rss_bytes=memory.peak_wset if sys.platform=='win32' else None,
-                peak_vram_bytes=peak)
+                peak_vram_bytes=peak,torch_peak_allocated_bytes=allocated,torch_peak_reserved_bytes=reserved,
+                external_process_vram=external,vram_complete=peak is not None)
+
+
+def record_model_peaks(common,spec,gpus,shares,measurements):
+    if not gpus:
+        return
+    if not all(row['vram_complete'] and row['peak_vram_bytes'] is not None for row in measurements):
+        event(common['run_dir'],'gpu_peak_record_skipped',reason='external_process_memory_unobservable',
+            ranks=measurements,capacity_evidence_written=False)
+        return
+    record_peaks(common,spec,gpus,shares,[row['peak_vram_bytes'] for row in measurements])
 
 
 def rank_entry(rank,payload,common,allocation,gate,port):
@@ -209,8 +223,7 @@ def rank_entry(rank,payload,common,allocation,gate,port):
                 payload['case_ids'],payload['prompts'],memory=memory,**payload.get('prediction_options',{}))
             write_json(root/'summary.json',summary)
             measurement = rank_measurement(device,allocation,rank)
-            record_peaks(common,allocation['spec'],allocation['gpus'],allocation['shares'],
-                [measurement['peak_vram_bytes']] if allocation['gpus'] else [])
+            record_model_peaks(common,allocation['spec'],allocation['gpus'],allocation['shares'],[measurement])
         elif payload['config']['model']=='medsam2':
             from .medsam2.worker import main
             main(payload,rank,common,allocation,gate,memory)

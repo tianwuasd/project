@@ -24,7 +24,8 @@ def effective_config(config,prepared,prepared_path,root,names):
     recipe.scratch.vision_lr = config['learning_rate']*.6
     recipe.trainer.seed_value = config['seed']
     recipe.trainer.accelerator = 'cpu' if config['device']=='cpu' else 'cuda'
-    recipe.trainer.distributed.backend = 'gloo' if config['device']=='cpu' else 'nccl'
+    from ...acceleration.distributed import distributed_backend
+    recipe.trainer.distributed.backend = distributed_backend(config['device'],config.get('distributed_backend'))
     recipe.trainer.optim.amp.enabled = config['device']!='cpu'
     recipe.trainer.optim.amp.amp_dtype = 'bfloat16'
     if config['precision']=='fp32':

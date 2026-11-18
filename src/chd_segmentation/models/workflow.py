@@ -42,7 +42,7 @@ def options(path,overrides=None):
                     work_root=None,execution={},logging=dict(heartbeat_seconds=15,case_details=True),
                     input_source={}, technical_roles={}, attempt_ledger=None, early_stopping={},
                     checkpoint_dir=None, updates_per_epoch=None, save_every_updates=250,
-                    save_every_seconds=300.)
+                    save_every_seconds=300.,distributed_backend=None)
     if not isinstance(raw, dict) or set(raw)-set(defaults):
         raise ValueError('模型配置字段无效')
     config = {**defaults, **raw}
@@ -59,6 +59,9 @@ def options(path,overrides=None):
             config['seed'] = 123
     if config['model'] not in ('medsam2', 'q_route1') or not config['run_dir']:
         raise ValueError('必须指定模型与独立运行目录')
+    if config['distributed_backend'] not in (None,'gloo','nccl') or (
+            config['model']!='medsam2' and config['distributed_backend'] is not None):
+        raise ValueError('MedSAM2可显式选择gloo或nccl；其他模型保持现有后端策略')
     for key in ('updates', 'accumulation', 'threads', 'patch', 'local_size', 'frames', 'resolution', 'max_candidates'):
         if key == 'updates' and config[key] is None:
             continue
@@ -234,7 +237,7 @@ def save_state(path, state):
 
 def model_identity(config,prepared,stage,initialization_sha256=None,code=None):
     scientific = {key:value for key,value in config.items() if key not in
-                  ('run_dir','threads','dependency_root','official_root','execution','work_root','device','logging')}
+                  ('run_dir','threads','dependency_root','official_root','execution','work_root','device','logging','distributed_backend')}
     return digest(dict(config=scientific, dataset=prepared['dataset'], stage=stage))
 
 
@@ -389,6 +392,7 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
     reason = None
     saved_at = perf_counter()
     peak_vram = 0
+    vram_complete = True
     replicas_equal = None
     resumed_update = update
     if rank == 0:
@@ -452,7 +456,11 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 if not replicas_equal:
                     raise ValueError('Q各进程更新后的模型参数不一致')
             if device.type=='cuda':
-                peak_vram = max(peak_vram,rank_measurement(device,allocation,rank)['peak_vram_bytes'])
+                observed = rank_measurement(device,allocation,rank)
+                if observed['peak_vram_bytes'] is None:
+                    vram_complete = False
+                else:
+                    peak_vram = max(peak_vram,observed['peak_vram_bytes'])
             update += 1
             if rank==0:
                 feedback.update(done=update,new=update-resumed_update,step=update,phase='优化器更新完成')
@@ -530,13 +538,17 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 break
         measurement = rank_measurement(device,allocation,rank)
         if device.type=='cuda':
-            measurement['peak_vram_bytes'] = max(measurement['peak_vram_bytes'],peak_vram)
+            if not vram_complete or measurement['peak_vram_bytes'] is None:
+                measurement.update(peak_vram_bytes=None,vram_complete=False)
+            else:
+                measurement['peak_vram_bytes'] = max(measurement['peak_vram_bytes'],peak_vram)
         gate.ready.wait(rank,f'q-summary:{update}',device)
         measurements = all_states(measurement)
+        from ..acceleration.measurements import complete_peak
         summary = dict(model=config['model'],stage=stage,scope=prepared['scope'],update=update,history=history,
                        checkpoint=str(root/'latest.pt'),
                        seconds=perf_counter()-started,rss_bytes=psutil.Process().memory_info().rss,
-                       peak_vram_bytes=max(m['peak_vram_bytes'] for m in measurements) if device.type=='cuda' else None,
+                       peak_vram_bytes=complete_peak(measurements),
                        reason=reason,world_size=allocation['world'],batch_layout=allocation['shares'],
                        ranks=measurements,restored_exact=all(all_states(restored)) if resume else None,
                        replicas_equal=replicas_equal)
@@ -545,8 +557,8 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 raise MemoryError('Q在第一次更新前资源不足，未生成训练检查点')
             write_json(root/'summary.json',summary)
             if update==(config['updates'] if stop_after is None else stop_after):
-                record_peaks(common,allocation['spec'],allocation['gpus'],allocation['shares'],
-                    [m['peak_vram_bytes'] for m in measurements] if allocation['gpus'] else [])
+                from .execution import record_model_peaks
+                record_model_peaks(common,allocation['spec'],allocation['gpus'],allocation['shares'],measurements)
     dataset.clear()
     if rank == 0:
         feedback.close()

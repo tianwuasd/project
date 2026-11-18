@@ -25,7 +25,8 @@ def main(payload,rank,common,allocation,gate,memory):
     import training.trainer as official
     from training.utils.train_utils import MemMeter
     from ..workflow import save_state
-    from ..execution import all_states,pressure,verify_device,rank_measurement
+    from ..execution import all_states,pressure,verify_device,rank_measurement,record_model_peaks
+    from ...acceleration.measurements import complete_peak
     from ...training.resources import record_peaks
     from .data import ResourceWorkerInit,set_read_gate
 
@@ -47,6 +48,7 @@ def main(payload,rank,common,allocation,gate,memory):
     from ...training.stopping import selection_options, update_selection
     stopping = selection_options(config.get('early_stopping', {}), 'medsam2')
     observed_peak = 0
+    vram_complete = True
 
     class CheckpointTrainer(official.Trainer):
         def _setup_torch_dist_and_backend(self,*args,**kwargs):
@@ -84,9 +86,13 @@ def main(payload,rank,common,allocation,gate,memory):
 
     class DeviceMemoryMeter(MemMeter):
         def update(self,n=1,reset_peak_usage=True):
-            nonlocal observed_peak
+            nonlocal observed_peak,vram_complete
             if self.device.type!='cpu':
-                observed_peak = max(observed_peak,rank_measurement(self.device,allocation,rank)['peak_vram_bytes'])
+                observed = rank_measurement(self.device,allocation,rank)
+                if observed['peak_vram_bytes'] is None:
+                    vram_complete = False
+                else:
+                    observed_peak = max(observed_peak,observed['peak_vram_bytes'])
                 return super().update(n,reset_peak_usage)
             self.val = psutil.Process().memory_info().rss/1e9
             self.sum += self.val*n
@@ -247,7 +253,10 @@ def main(payload,rank,common,allocation,gate,memory):
     dist.barrier()
     measurement = rank_measurement(trainer.device,allocation,rank)
     if trainer.device.type=='cuda':
-        measurement['peak_vram_bytes'] = max(measurement['peak_vram_bytes'],observed_peak)
+        if not vram_complete or measurement['peak_vram_bytes'] is None:
+            measurement.update(peak_vram_bytes=None,vram_complete=False)
+        else:
+            measurement['peak_vram_bytes'] = max(measurement['peak_vram_bytes'],observed_peak)
     measurements = all_states(measurement)
     memory = psutil.Process().memory_info()
     summary = dict(model='medsam2',stage='sequence',scope=payload['prepared']['scope'],
@@ -261,14 +270,13 @@ def main(payload,rank,common,allocation,gate,memory):
         gradient_clip_norm=recipe['trainer']['optim']['gradient_clip']['max_norm'],
         epochs=trainer.max_epochs,batch=recipe['scratch']['train_video_batch_size'],
         rss_bytes=memory.rss,peak_rss_bytes=memory.peak_wset if sys.platform=='win32' else None,
-        peak_vram_bytes=max(m['peak_vram_bytes'] for m in measurements) if trainer.device.type=='cuda' else None,
+        peak_vram_bytes=complete_peak(measurements),
         world_size=allocation['world'],batch_layout=allocation['shares'],ranks=measurements,reason=reason,
         data_workers=allocation['supply']['workers'],prefetch_factor=actual_prefetch)
     if rank==0:
         feedback.close()
         write_json(root/'summary.json',summary)
         if reason is None:
-            record_peaks(common,allocation['spec'],allocation['gpus'],allocation['shares'],
-                [m['peak_vram_bytes'] for m in measurements] if allocation['gpus'] else [])
+            record_model_peaks(common,allocation['spec'],allocation['gpus'],allocation['shares'],measurements)
     dist.destroy_process_group()
     optimizer_hook.remove()
