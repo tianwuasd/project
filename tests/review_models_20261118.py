@@ -159,6 +159,8 @@ def command(args):
     model_stage = stage.removeprefix('q_') if stage.startswith('q_') else 'sequence'
     config = course/('stu.json' if stage=='stu' else 'med.json' if stage=='med_sequence' else 'q-'+model_stage+'.json')
     prepared = course/('med-offline.json' if stage=='med_sequence' else 'shared-offline.json')
+    if stage in ('q_localizer','q_local') and (course/'q-wide-offline.json').exists():
+        prepared = course/'q-wide-offline.json'
     if args.phase=='train':
         command_args = ['train','--config',str(config),'--prepared',str(prepared),'--stop-after',str(args.stop_after)]
         if stage!='stu':
@@ -177,6 +179,78 @@ def command(args):
         command_args = ['evaluate','--config',str(course/'stu.json'),'--prepared',str(prepared),
             '--predictions',str(root/'result'/stage),'--output',str(root/'result'/(stage+'-evaluation.json'))]
     main(command_args)
+
+
+def prepare_q_inputs(args):
+    engine, root, reports = setup(args)
+    import nibabel as nib
+    import numpy as np
+    import torch
+    from scipy.ndimage import distance_transform_edt
+    from chd_segmentation.artifacts.store import read_json,write_json
+    from chd_segmentation.config import load_config
+    from chd_segmentation.preprocessing.prepare import prepare as prepare_source
+    from chd_segmentation.preprocessing.offline import preprocess
+    from chd_segmentation.data.dataset import CaseDataset
+    from chd_segmentation.models.workflow import options,adapter
+    from chd_segmentation.models.q_route1.adapter import allowed
+    from chd_segmentation.models.q_route1.targets import build_heatmap_targets
+    torch.set_num_threads(1)
+    course = root/'course'
+    manifest = read_json(course/'manifest.json')
+    selections = {}
+    for row in manifest['cases']:
+        label = np.asanyarray(nib.load(row['label']).dataobj)
+        ventricle, vessel = np.isin(label,[1,2]),np.isin(label,[6,7])
+        if not ventricle.any() or not vessel.any():
+            raise ValueError('真实标签缺少心室或大血管：'+row['case_id'])
+        distances = distance_transform_edt(~vessel,sampling=row['spacing_xyz'])
+        minimum = float(distances[ventricle].min())
+        junction = ventricle & (distances<=minimum+max(row['spacing_xyz']))
+        center = np.asarray(np.where(junction)).mean(1)
+        extent = np.array([128,128,96])
+        start = np.clip(np.rint(center).astype(int)-extent//2,0,np.array(label.shape)-extent)
+        selections[row['case_id']] = dict(center_xyz=center.tolist(),minimum_vessel_distance_mm=minimum,
+            roi_xyz=np.stack((start,start+extent),axis=1).tolist())
+        del label,ventricle,vessel,distances,junction
+    # 两例分别依据真实标签确定区域，公共技术配置按逐病例ROI读取。
+    if any(value['roi_xyz']!=selections['ct_1001']['roi_xyz'] for value in selections.values()):
+        # 统一区域覆盖两个真实连接部位，尺寸由两例选区的包围框确定。
+        boxes = np.asarray([value['roi_xyz'] for value in selections.values()])
+        roi = np.stack((boxes[:,:,0].min(0),boxes[:,:,1].max(0)),axis=1).tolist()
+    else:
+        roi = selections['ct_1001']['roi_xyz']
+    raw = read_json(course/'stu.json')
+    raw.update(plan=str(course/'q-wide-plan.json'),run_dir=str(course/'runs/Q-wide-preprocess'))
+    raw['technical']['roi_xyz'] = roi
+    raw['preprocessing']['root'] = str(root/'data/q-wide')
+    write_json(course/'q-wide-prepare.json',raw)
+    applied = load_config(course/'q-wide-prepare.json')
+    prepare_source(applied,course/'q-wide-source.json')
+    prepared = preprocess(applied,course/'q-wide-source.json',course/'q-wide-offline.json')
+    for stage in ('localizer','local'):
+        path = course/('q-'+stage+'.json')
+        config = read_json(path)
+        config['run_dir'] = str(course/'runs/Q-wide')
+        if stage=='local':
+            config['parents']['localizer'] = str(course/'runs/Q-wide/localizer/best.pt')
+        write_json(path,config)
+    dataset = CaseDataset(prepared,dict(cache_bytes=0),with_label=True)
+    q = options(course/'q-localizer.json')
+    bundle = adapter(q,prepared,'localizer',initialize=False)
+    checks = {}
+    for row in manifest['cases']:
+        entry = dataset.get(row['case_id'])
+        _,mask = build_heatmap_targets(allowed(entry['label'],entry['unknown_classes'],'imagechd'),
+            entry['label']>=0,entry['processed_spacing'])
+        with torch.no_grad():
+            loss = float(bundle.loss(entry,np.random.default_rng(123),0))
+        if not np.isfinite(loss) or not mask.any():
+            raise ValueError('真实定位监督核验未通过')
+        checks[row['case_id']] = dict(shape=list(entry['image'].shape),valid_supervision=int(mask.sum()),loss=loss)
+    dataset.clear()
+    write_json(reports/'q-inputs.json',dict(state='completed',selection='real_label_ventricle_vessel_proximity',
+        selections=selections,applied_shared_roi_xyz=roi,checks=checks,optimizer_updates=0))
 
 
 def inspect_restore(args):
@@ -241,7 +315,7 @@ if __name__ == '__main__':
     parser.add_argument('--settings',required=True)
     parser.add_argument('--work',required=True)
     parser.add_argument('--reports',required=True)
-    parser.add_argument('--phase',choices=('prepare','inspect','restore','train','predict','evaluate'),required=True)
+    parser.add_argument('--phase',choices=('prepare','inspect','q-inputs','restore','train','predict','evaluate'),required=True)
     parser.add_argument('--stage',choices=('stu','q_base','q_localizer','q_local','med_sequence'))
     parser.add_argument('--resume',action='store_true')
     parser.add_argument('--stop-after',type=int,choices=(1,2),default=1)
@@ -256,5 +330,7 @@ if __name__ == '__main__':
         inspect_inputs(arguments)
     elif arguments.phase=='restore':
         inspect_restore(arguments)
+    elif arguments.phase=='q-inputs':
+        prepare_q_inputs(arguments)
     else:
         command(arguments)

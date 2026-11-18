@@ -386,6 +386,9 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
             if rank == 0:
                 from ..training.attempts import finish_attempt
                 finish_attempt(config, stage, attempt)
+                from ..observability.events import event
+                event(root,'model_optimizer_completed',model=config['model'],stage=stage,
+                    attempt=attempt,update=update+1,successful=True)
             if config['technical']:
                 import hashlib
                 checksum = hashlib.sha256()
