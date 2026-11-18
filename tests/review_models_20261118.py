@@ -179,6 +179,32 @@ def command(args):
     main(command_args)
 
 
+def inspect_restore(args):
+    engine, root, reports = setup(args)
+    from chd_segmentation.artifacts.store import read_json,write_json
+    from chd_segmentation.models.workflow import load_state,adapter
+    from chd_segmentation.training.checkpoint import verify_optimizer_device
+    import torch
+    torch.set_num_threads(1)
+    ledger = reports.parent/'attempts.json'
+    before = read_json(ledger)
+    state = load_state(root/'course/runs/Q/base/latest.pt')
+    if state['stage']!='base' or state['training_cases']!=['ct_1001'] or state['update']!=1:
+        raise ValueError('Q基础状态与本次实际训练不符')
+    bundle = adapter(state['config'],state['prepared'],'base',initialize=False)
+    bundle.model.load_state_dict(state['model'],strict=True)
+    optimizer = bundle.optimizer()
+    optimizer.load_state_dict(state['optimizer'])
+    verify_optimizer_device(optimizer)
+    bundle.restore_extra(state['rank_states'][0]['extra'])
+    if read_json(ledger)!=before:
+        raise ValueError('只读恢复检查期间台账发生变化')
+    write_json(reports/'q-base-restore.json',dict(state='completed',checkpoint_update=state['update'],
+        stage=state['stage'],model_loaded_strict=True,optimizer_states=len(optimizer.state),
+        sampler_extra_loaded=True,optimizer_step_calls=0,ledger_unchanged=True,
+        resume_with_additional_update_verified=False))
+
+
 def supervised(args):
     engine, root, reports = setup(args)
     tool = engine.parent/'chd-segmentation-assistant3'
@@ -215,7 +241,7 @@ if __name__ == '__main__':
     parser.add_argument('--settings',required=True)
     parser.add_argument('--work',required=True)
     parser.add_argument('--reports',required=True)
-    parser.add_argument('--phase',choices=('prepare','inspect','train','predict','evaluate'),required=True)
+    parser.add_argument('--phase',choices=('prepare','inspect','restore','train','predict','evaluate'),required=True)
     parser.add_argument('--stage',choices=('stu','q_base','q_localizer','q_local','med_sequence'))
     parser.add_argument('--resume',action='store_true')
     parser.add_argument('--stop-after',type=int,choices=(1,2),default=1)
@@ -228,5 +254,7 @@ if __name__ == '__main__':
         prepare(arguments)
     elif arguments.phase=='inspect':
         inspect_inputs(arguments)
+    elif arguments.phase=='restore':
+        inspect_restore(arguments)
     else:
         command(arguments)
