@@ -49,8 +49,10 @@ class ConsumedLoader:
             self.supply.ready.wait(self.rank,f'med-data:{self.epoch}:{batch}')
             self.supply.deliver(self.rank)
             started = perf_counter()
-            yield value
-            self.supply.finish(self.rank,f'med-epoch:{self.epoch}',self.device)
-            event(self.supply.root,'model_batch_consumed',rank=self.rank,batch=batch,epoch=self.epoch,
-                  seconds=perf_counter()-started,device_completion_checked=True)
-            del value
+            try:
+                yield value
+            finally:
+                self.supply.finish(self.rank,f'med-epoch:{self.epoch}',self.device)
+                event(self.supply.root,'model_batch_consumed',rank=self.rank,batch=batch,epoch=self.epoch,
+                      seconds=perf_counter()-started,device_completion_checked=True)
+                del value

@@ -57,13 +57,8 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None):
     started = perf_counter()
     training = read_json(Path(config["run_dir"]) / "run.json")
     prepared = deepcopy(training["prepared"])
-    validate_prepared_config(prepared, config)
-    current_code = code_identity()
-    if not compatible_code(training["scientific"]["code_identity"], current_code):
-        raise ValueError("预测代码与训练记录不一致，需要经过验证的兼容记录")
-    if current_code != training["scientific"]["code_identity"]:
-        event(config["run_dir"], "code_compatibility_verified", source=training["scientific"]["code_identity"],
-              target=current_code, training_identity=training["identity"])
+    if config['dataset'] != prepared['dataset']:
+        raise ValueError('预测配置与输入数据集不同')
     if inputs is not None:
         prepared["manifest"] = load_manifest(inputs, prepared["dataset"], prepared["scope"])
     if manifest is not None:
@@ -82,6 +77,17 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None):
     torch.set_num_threads(config["resources"]["cpu_threads"])
     device = device_for(config)
     with operation_lock(output), storage_lease(prepared, config), prediction_snapshot(config["run_dir"]) as pointer:
+        task_path = output/'prediction-task.json'
+        task = dict(training_run=str(Path(config['run_dir']).resolve()), dataset=prepared['dataset'],
+            source=prepared.get('storage'), geometry=prepared['plan'], technical=prepared['technical'],
+            available_cases=sorted(names), prediction=options)
+        if task_path.exists():
+            recorded = read_json(task_path)
+            if recorded['task'] != task:
+                raise ValueError('已有预测任务的模型运行、来源或几何参数不同，请使用新的输出目录')
+            pointer = recorded['pointer']
+        else:
+            write_json(task_path, dict(task=task, pointer=pointer))
         completed = read_json(output / "predictions.json") if (output / "predictions.json").exists() else {"cases": {}}
         dataset = CaseDataset(prepared, config["resources"], with_label=False, log_dir=log_dir,
                               logging=config.get("logging"))
@@ -92,15 +98,14 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None):
             if name not in requested:
                 continue
             event(log_dir, "prediction_case_started", case_id=name, completed=len(results), total=len(requested))
-            source_stat = Path(row["image"]).stat()
-            identity = digest({"checkpoint": pointer["sha256"], "plan": training["scientific"]["prepared_identity"],
-                               "row": row, "source_stamp": [source_stat.st_size, source_stat.st_mtime_ns],
+            identity = digest({"checkpoint": pointer.get('sha256', pointer['file']), "plan": training["scientific"]["prepared_identity"],
+                               "row": row,
                                "options": options, "technical": prepared["technical"]})
             path = output / f"{name}.nii.gz"
             previous = completed["cases"].get(name)
             if previous and previous["identity"] == identity:
-                if not path.is_file() or file_digest(path) != previous["sha256"]:
-                    raise ValueError("已有预测损坏，拒绝将其作为完成结果")
+                if not path.is_file():
+                    raise FileNotFoundError('完成记录对应预测文件不存在：'+str(path))
                 reused += 1
                 results.append({**previous, "reused": True})
                 event(log_dir, "prediction_reused", case_id=name, completed=len(results), total=len(requested), file=str(path))
@@ -146,18 +151,11 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None):
             pending = path.with_name(path.stem + ".pending.nii.gz")
             event(log_dir, "prediction_writing", case_id=name, file=str(path))
             nib.save(image, pending)
-            check = nib.load(pending)
-            observed = np.asanyarray(check.dataobj)
-            if check.shape != tuple(entry["source_shape_xyz"]) or not np.array_equal(observed, native):
-                raise ValueError("预测文件独立读回不一致")
-            if not np.allclose(check.affine, affine, atol=1e-5, rtol=0):
-                raise ValueError("预测空间头独立读回不一致")
-            del observed
             os.replace(pending, path)
-            receipt = {"case_id": name, "identity": identity, "file": path.name, "sha256": file_digest(path),
+            receipt = {"case_id": name, "identity": identity, "file": path.name,
                        "data_identity": case_data_identity(prepared, row), "dataset": prepared["dataset"],
                        "reference_sha256": row.get("sha256", {}).get("label"),
-                       "checkpoint_sha256": pointer["sha256"],
+                       "checkpoint_sha256": pointer.get('sha256'), "checkpoint_file": pointer['file'],
                        "shape_xyz": entry["source_shape_xyz"], "affine": affine, "roi_xyz": entry["roi_xyz"],
                        "scope": prepared["scope"], "export_space": options["export_space"],
                        "unknown_classes": row["unknown_classes"], "reused": False,

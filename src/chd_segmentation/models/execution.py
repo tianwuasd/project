@@ -228,6 +228,10 @@ def _run_workers(payload,common,allocation):
     keep = {'PATH','SYSTEMROOT','WINDIR','COMSPEC','PATHEXT','USERPROFILE','APPDATA','LOCALAPPDATA',
         'PROGRAMDATA','PROGRAMFILES','PROGRAMFILES(X86)','SYSTEMDRIVE','NUMBER_OF_PROCESSORS','USERNAME','USER','LOGNAME'}
     environment = {key:value for key,value in os.environ.items() if key.upper() in keep}
+    if payload['config'].get('technical') is True:
+        for key in ('CHD_MINI_TOOL_ROOT','CHD_MINI_ATTEMPT_LEDGER','CHD_MINI_STAGE','CHD_MINI_ROLES'):
+            if key in os.environ:
+                environment[key] = os.environ[key]
     paths = [str(project/'src')]
     if payload['config']['model']=='medsam2':
         paths += [payload['config']['dependency_root'],payload['config']['official_root']]

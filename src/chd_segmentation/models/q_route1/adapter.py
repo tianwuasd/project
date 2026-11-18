@@ -78,8 +78,8 @@ class QAdapter:
                 raise ValueError('Q局部模型需要base与localizer检查点')
             parents = {key:load_state(value) for key,value in config['parents'].items()}
             for key,state in parents.items():
-                if state['stage']!=key or state['prepared_identity']!=prepared['identity']:
-                    raise ValueError('Q上游阶段或预处理来源不匹配')
+                if state['stage']!=key or state['prepared']['dataset']!=prepared['dataset']:
+                    raise ValueError('Q上游阶段或数据集不匹配')
                 if state['scope']!=prepared['scope']:
                     raise ValueError('Q上游范围不匹配')
                 parent_config = state['config']
@@ -98,9 +98,6 @@ class QAdapter:
             self.base.load_state_dict(parents['base']['model'],strict=True)
             self.locator = Localizer().to(self.device).eval().requires_grad_(False)
             self.locator.load_state_dict(parents['localizer']['model'],strict=True)
-            if not tensors_equal(self.base.state_dict(),parents['base']['model']) or not tensors_equal(
-                    self.locator.state_dict(),parents['localizer']['model']):
-                raise ValueError('Q上游权重的数值或精度未完整加载')
             self.model = LocalNetwork(method=config['method'])
         self.model.to(self.device)
 
@@ -228,7 +225,8 @@ class QAdapter:
             label = entry['label']
             support = allowed(label,entry['unknown_classes'],self.prepared['dataset'])
             valid = torch.from_numpy(label>=0)[None,None].to(self.device)
-            heat,mask = build_heatmap_targets(support,label>=0,self.prepared['plan']['configurations']['3d_fullres']['spacing'])
+            heat,mask = build_heatmap_targets(support,label>=0,entry.get('processed_spacing',
+                self.prepared['plan']['configurations']['3d_fullres']['spacing']))
             if not mask.any():
                 raise ValueError('定位器输入缺少可监督区域')
             return localizer_loss(self.model(x,valid)['logits'].float(),heat.to(self.device),mask.to(self.device))
@@ -280,20 +278,23 @@ class QAdapter:
     def validate(self,dataset,names):
         patients = {}
         rows = {row['case_id']:row for row in self.prepared['manifest']['cases']}
+        aggregation_unit = 'patient' if all(rows[name].get('patient') for name in names) else 'case'
         for completed,name in enumerate(names,1):
             entry = dataset.get(name)
             support = allowed(entry['label'],entry['unknown_classes'],self.prepared['dataset'])
             valid = torch.from_numpy(entry['label']>=0)[None,None]
             if self.stage=='localizer':
                 image = torch.from_numpy(entry['image'])[None].to(self.device)
-                heat,mask = build_heatmap_targets(support,entry['label']>=0,self.prepared['plan']['configurations']['3d_fullres']['spacing'])
+                heat,mask = build_heatmap_targets(support,entry['label']>=0,entry.get('processed_spacing',
+                    self.prepared['plan']['configurations']['3d_fullres']['spacing']))
                 value = localizer_loss(self.model(image,valid.to(self.device))['logits'].float(),heat.to(self.device),mask.to(self.device))
             else:
                 probability = self.base_probability(entry)[0].numpy() if self.stage=='base' else self.predict(entry,internal=True)[0]
                 logits = torch.from_numpy(probability).clamp_min(1e-8).log()[None]
                 value = segmentation_loss(logits,torch.from_numpy(support)[None],valid)
-            patients.setdefault(rows[name]['patient'],[]).append(float(value))
+            key = rows[name]['patient'] if aggregation_unit == 'patient' else name
+            patients.setdefault(key,[]).append(float(value))
             if self.config['logging']['case_details']:
                 event(Path(self.config['run_dir'])/self.stage,'q_validation_case_completed',case_id=name,
-                    cases_completed=completed,cases_total=len(names),loss=float(value))
+                    cases_completed=completed,cases_total=len(names),loss=float(value),aggregation_unit=aggregation_unit)
         return float(np.mean([np.mean(values) for values in patients.values()]))

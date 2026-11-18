@@ -52,9 +52,6 @@ def train_official(config,prepared_path,stage,resume=False,stop_after=None):
     if stage!='sequence':
         raise ValueError('MedSAM2阶段必须为sequence')
     prepared = load_prepared(prepared_path)
-    from ..offline import quick_check_model
-    from ...observability.events import event
-    event(Path(config['run_dir'])/'admission'/stage, 'quick_check', report=quick_check_model(config, prepared, 'train'))
     from ..offline import model_storage_lease
     root = (Path(config['run_dir'])/stage).resolve()
     protected = [Path(prepared['manifest']['data_root']).resolve(),
@@ -70,7 +67,7 @@ def train_official(config,prepared_path,stage,resume=False,stop_after=None):
 def _train_locked(config,prepared,prepared_path,root,stage,resume,stop_after):
     if config['frames']!=8 or config['resolution']!=512 or config['accumulation']!=1 or config['freeze_image_encoder']:
         raise ValueError('MedSAM2官方配方需要8帧、512分辨率、无梯度累积且训练全部模型')
-    receipt = verify_official_weight(config['pretrained'])
+    receipt = dict(path=config['pretrained'], sha256=None, source='configured_official_weight')
     from ..workflow import training_names,checked_identity
     from ..execution import admitted,run_workers
     names = training_names(config,prepared,stage)

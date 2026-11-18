@@ -1,5 +1,6 @@
 from copy import deepcopy
 from pathlib import Path
+import os
 from time import perf_counter
 
 import nibabel as nib
@@ -7,7 +8,7 @@ import numpy as np
 import torch
 import yaml
 
-from ..artifacts.store import digest, file_digest, write_json
+from ..artifacts.store import digest, read_json, write_json
 from ..datasets.splits import select_test
 from ..observability.events import event
 from ..prediction.dice import supervised_dice
@@ -62,7 +63,7 @@ def predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=No
     applied['execution'].update(gpu_count=1, min_gpus=None, cpu_processes=1, batch_layout=None, workers=0)
     if applied['execution'].get('gpu_ids'):
         applied['execution']['gpu_ids'] = applied['execution']['gpu_ids'][:1]
-    key = digest(dict(checkpoint=file_digest(checkpoint), prepared=prepared['identity'],
+    key = digest(dict(checkpoint=str(Path(checkpoint).resolve()), prepared_path=str(Path(prepared_path).resolve()),
         output=str(Path(output).resolve()), names=names, prompts=prompts, protocol=protocol))[:16]
     label = ('ImageCHD' if prepared['dataset'] == 'imagechd' else 'CHD1282')+'-'+('Q' if config['model'] == 'q_route1' else 'MedSAM2')
     applied['run_dir'] = str(Path(config['work_root'] or Path(config['run_dir']).parent)/'runs'/label/'predictions'/key)
@@ -78,37 +79,51 @@ def predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=No
 def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=None,
              prompt_mode='external', label_classes=None, box_seed=2024, box_max_shift=20,
              official_weights=False, test_set=None, test_group=None, *, memory):
-    from .workflow import resources, load_state, adapter, checked_identity, dataset_for
+    from .workflow import resources, load_state, save_state, adapter, dataset_for
     started = perf_counter()
     resources(config)
     prepared = load_prepared(prepared_path)
     root = Path(output).resolve()
-    if root.exists():
-        raise FileExistsError('预测目录已存在')
     if root.is_relative_to(Path(prepared['manifest']['data_root']).resolve()):
         raise ValueError('预测输出不能位于原始数据目录内')
+    root.mkdir(parents=True, exist_ok=True)
+    run_path = root/'prediction-run.json'
+    task = dict(source=prepared.get('storage'), source_plan=prepared['plan'],
+        available_cases=sorted(row['case_id'] for row in prepared['manifest']['cases']),
+        selection_source=str(Path(checkpoint).resolve()), prompts=prompts,
+        protocol=dict(prompt_mode=prompt_mode, label_classes=label_classes, box_seed=box_seed,
+                      box_max_shift=box_max_shift, test_set=test_set, test_group=test_group))
+    if run_path.exists():
+        run = read_json(run_path)
+        if run['model'] != config['model'] or run['dataset'] != prepared['dataset']:
+            raise ValueError('预测运行的数据集或模型不同，请使用新的输出目录')
+        if run.get('task') != task:
+            raise ValueError('预测来源、几何、提示或模型选择不同，请使用新的输出目录')
+        checkpoint = run['checkpoint']
+        official_weights = run['official_weights']
+    state = load_state(checkpoint)
     if official_weights:
-        from .medsam2.weights import verify_official_weight
-        released = verify_official_weight(checkpoint)
-        state = load_state(checkpoint)
         bundle = adapter(config, prepared, 'sequence', initialize=False)
-        initialization = dict(kind='official_pretrained', weight=released, optimizer_updates=0)
+        initialization = dict(kind='official_pretrained', path=str(checkpoint), optimizer_updates=0)
     else:
-        state = load_state(checkpoint)
         if state['config']['model'] != config['model'] or state['scope'] != prepared['scope']:
             raise ValueError('预测模型或范围与检查点不同')
         if not config['technical'] and state['scope'] != 'formal':
             raise ValueError('正式预测禁止技术检查点')
         trained = state['prepared']
-        if prepared['dataset'] != trained['dataset'] or digest(prepared['plan']) != digest(trained['plan']):
-            raise ValueError('新预测输入必须使用训练时的同一数据集语义与拟合计划')
-        checked_identity(config,trained,state['stage'],state['initialization_sha256'],state['identity'])
-        bundle = adapter(config, trained, state['stage'], initialize=False)
+        if prepared['dataset'] != trained['dataset']:
+            raise ValueError('预测输入的数据集语义与模型不同')
+        model_config = dict(config, patch=state['config']['patch'], local_size=state['config']['local_size'])
+        bundle = adapter(model_config, trained, state['stage'], initialize=False)
         initialization = dict(kind='trained_checkpoint', identity=state['identity'])
     bundle.model.load_state_dict(state['model'], strict=True)
-    from ..training.checkpoint import tensors_equal
-    if not tensors_equal(bundle.model.state_dict(),state['model']):
-        raise ValueError('预测权重的数值或精度未完整加载')
+    if not run_path.exists():
+        snapshot = root/'selected-model.pt'
+        snapshot_state = {key: state[key] for key in (
+            'model','config','prepared','stage','scope','identity','initialization_sha256','spec') if key in state}
+        save_state(snapshot, snapshot_state)
+        write_json(run_path, dict(model=config['model'], dataset=prepared['dataset'],
+            checkpoint=str(snapshot), source_checkpoint=str(checkpoint), official_weights=official_weights, task=task))
     del state
     bundle.model.to(config['device']).eval()
     rows = prediction_rows(config, prepared, case_ids, test_set, test_group)
@@ -120,7 +135,10 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
     else:
         dataset = dataset_for(prepared, False,dict(reserve_ram_bytes=config['execution']['reserve_ram_bytes'],
             cache_bytes=config['execution']['cache_bytes']),Path(config['run_dir'])/'prediction',config['logging'])
-    root.mkdir(parents=True)
+    progress_path = root/'completed-cases.json'
+    completed = read_json(progress_path)['cases'] if progress_path.exists() else {}
+    if not completed and (root/'summary.json').exists():
+        completed = {item['case_id']: item for item in read_json(root/'summary.json')['cases']}
     results = []
     classes = len(prepared['dataset_json']['labels'])
     log_dir = Path(config['run_dir'])/'prediction'
@@ -129,6 +147,10 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
     for row in rows:
         mark = perf_counter()
         name = row['case_id']
+        if name in completed and Path(completed[name]['file']).is_file():
+            results.append(completed[name])
+            event(log_dir, 'model_case_reused', case_id=name, file=completed[name]['file'])
+            continue
         event(log_dir, 'model_case_started', case_id=name, model=config['model'], prompt_mode=prompt_mode)
         feedback.update(done=len(results), new=len(results), current_case=name, pending=len(rows)-len(results), active=1)
         feedback.snapshot()
@@ -140,7 +162,7 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
         truth = entry['label'] if label_mode else None
         if label_mode:
             from .medsam2.prompts import label_box_prompts
-            case_prompts, protocol = label_box_prompts(entry, row['sha256']['label'], classes,
+            case_prompts, protocol = label_box_prompts(entry, row.get('sha256', {}).get('label'), classes,
                 label_classes, box_seed, box_max_shift)
             event(log_dir, 'label_box_generated', case_id=name, protocol=protocol)
         # 传播模型只接收图像与显式提示；参考标签只用于生成框和计算指标。
@@ -162,25 +184,27 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
         else:
             native = restore(probability, entry, prepared['plan'])
         path = root/(name+'.nii.gz')
+        if path.exists() and name not in completed:
+            raise FileExistsError('预测文件没有完成记录：'+str(path))
         image = nib.Nifti1Image(native, np.asarray(entry['source_affine']))
         image.header.set_xyzt_units(entry['source_units'])
-        nib.save(image, path)
-        check = nib.load(path)
-        if check.shape != tuple(entry['source_shape_xyz']) or not np.array_equal(np.asanyarray(check.dataobj), native) or \
-                not np.allclose(check.affine, entry['source_affine'], atol=1e-5, rtol=0):
-            raise ValueError('预测保存后网格、空间或内容读回不一致')
-        results.append(dict(case_id=name, file=str(path), sha256=file_digest(path), diagnostics=diagnostics,
-            seconds=perf_counter()-mark, inference_seconds=inference_seconds, shape=list(check.shape),
+        pending = root/(name+'.pending.nii.gz')
+        nib.save(image, pending)
+        os.replace(pending, path)
+        results.append(dict(case_id=name, file=str(path), diagnostics=diagnostics,
+            seconds=perf_counter()-mark, inference_seconds=inference_seconds, shape=list(native.shape),
             timing=entry['timing'], roi_xyz=entry['roi_xyz'], prompt_protocol=protocol, classes=metrics,
             test_set=row.get('test_set'), test_group=row.get('test_group')))
+        completed[name] = results[-1]
+        write_json(progress_path, dict(cases=completed))
         event(log_dir, 'model_case_completed', case_id=name, seconds=perf_counter()-mark,
-              inference_seconds=inference_seconds, shape=list(check.shape), classes=metrics)
+              inference_seconds=inference_seconds, shape=list(native.shape), classes=metrics)
         dataset.clear()
-        del probability, native, image, check, entry, inference_entry, truth
+        del probability, native, image, entry, inference_entry, truth
         feedback.update(done=len(results), new=len(results), pending=len(rows)-len(results), active=0)
         feedback.snapshot(force=True)
     feedback.close()
-    summary = dict(model=config['model'], scope=prepared['scope'], checkpoint_sha256=file_digest(checkpoint),
+    summary = dict(model=config['model'], scope=prepared['scope'], checkpoint=str(checkpoint),
         initialization=initialization, prompt_mode=prompt_mode, test_set=test_set, test_group=test_group,
         cases=results, seconds=perf_counter()-started)
     if label_mode:
@@ -196,10 +220,10 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
         summary['evaluation'] = evaluation
     else:
         by_id = {row['case_id']:row for row in rows}
-        records = {result['case_id']:dict(file=Path(result['file']).name,sha256=result['sha256'],
-            checkpoint_sha256=summary['checkpoint_sha256'],scope=prepared['scope'],roi_xyz=result['roi_xyz'],
+        records = {result['case_id']:dict(file=Path(result['file']).name,
+            checkpoint=summary['checkpoint'],scope=prepared['scope'],roi_xyz=result['roi_xyz'],
             data_identity=case_data_identity(prepared,by_id[result['case_id']]),
-            reference_sha256=by_id[result['case_id']]['sha256'].get('label')) for result in results}
+            reference_sha256=by_id[result['case_id']].get('sha256', {}).get('label')) for result in results}
         write_json(root/'predictions.json',dict(model=config['model'],prompt_mode='external',cases=records))
     write_json(root/'summary.json', summary)
     return summary

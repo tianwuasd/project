@@ -21,13 +21,13 @@ def main(argv=None):
         preprocess.add_argument('--'+name,required=True)
     train = commands.add_parser('train')
     train.add_argument('--config',required=True)
-    train.add_argument('--prepared',required=True)
+    train.add_argument('--prepared','--preprocessed-source',dest='prepared',required=True)
     train.add_argument('--stage',choices=('base','localizer','local','sequence'),required=True)
     train.add_argument('--resume',action='store_true')
     train.add_argument('--stop-after',type=int)
     predict = commands.add_parser('predict')
     predict.add_argument('--config',required=True)
-    predict.add_argument('--prepared',required=True)
+    predict.add_argument('--prepared','--preprocessed-source',dest='prepared',required=True)
     predict.add_argument('--checkpoint',required=True)
     predict.add_argument('--output',required=True)
     predict.add_argument('--case',action='append')
@@ -40,6 +40,11 @@ def main(argv=None):
     predict.add_argument('--test-set',choices=('internal','external'))
     predict.add_argument('--test-group',choices=('source_test','target_primary','target_secondary'))
     for command in (train,predict):
+        command.add_argument('--intensity-mode',choices=('auto','source_window','windowed_uint8','normalized_percentile'))
+        command.add_argument('--source-semantics',choices=('hu','clipped_hu','zscore_clipped_hu','windowed_uint8','normalized_float'))
+        command.add_argument('--source-mean',type=float)
+        command.add_argument('--source-std',type=float)
+        command.add_argument('--source-window',nargs=2,type=float)
         command.add_argument('--device',choices=('cpu','cuda'))
         command.add_argument('--gpus',type=int,choices=(1,2,3,4))
         command.add_argument('--gpu-ids')
@@ -52,6 +57,12 @@ def main(argv=None):
         command.add_argument('--wait-seconds',type=wait_seconds,default=argparse.SUPPRESS,
             help='显卡等待秒数；forever持续等待，默认持续等待')
     train.add_argument('--batch',type=int)
+    train.add_argument('--epochs',type=int)
+    train.add_argument('--updates',type=int)
+    train.add_argument('--updates-per-epoch',type=int)
+    train.add_argument('--early-stop',action=argparse.BooleanOptionalAction,default=None)
+    train.add_argument('--patience',type=int)
+    train.add_argument('--min-delta',type=float)
     args = parser.parse_args(argv)
     if args.command=='split-q1282':
         from .datasets.q_split import create_q_bundle
@@ -85,6 +96,19 @@ def main(argv=None):
         overrides['device'] = args.device
     if args.command=='train' and args.batch is not None:
         overrides['global_batch'] = args.batch
+    if args.command == 'train':
+        for name in ('epochs','updates','updates_per_epoch'):
+            if getattr(args,name) is not None:
+                overrides[name] = getattr(args,name)
+        stopping = {key:value for key,value in dict(enabled=args.early_stop,
+            patience=args.patience,min_delta=args.min_delta).items() if value is not None}
+        if stopping:
+            overrides['early_stopping'] = stopping
+    source = {key:value for key,value in dict(intensity_mode=args.intensity_mode,
+        intensity_semantics=args.source_semantics,mean=args.source_mean,std=args.source_std,
+        gray_window=args.source_window).items() if value is not None}
+    if source:
+        overrides['input_source'] = source
     config = options(args.config,overrides)
     from .observability.events import Stage
     with Stage(None,'model_command',heartbeat_seconds=config['logging']['heartbeat_seconds'],
@@ -99,7 +123,11 @@ def execute(args,config,train_model,predict_model):
     else:
         prompts = yaml.safe_load(Path(args.prompts).read_text(encoding='utf-8')) if args.prompts else None
         label_classes = list(map(int,args.label_classes.split(','))) if args.label_classes else None
-        result = predict_model(config,args.prepared,args.checkpoint,args.output,args.case,prompts,
+        checkpoint = args.checkpoint
+        if checkpoint in ('best','latest'):
+            stage = 'local' if config['model']=='q_route1' else 'sequence'
+            checkpoint = str(Path(config.get('checkpoint_dir') or config['run_dir'])/stage/(checkpoint+'.pt'))
+        result = predict_model(config,args.prepared,checkpoint,args.output,args.case,prompts,
             prompt_mode=args.prompt_mode,label_classes=label_classes,box_seed=args.box_seed,
             box_max_shift=args.box_max_shift,official_weights=args.official_weights,
             test_set=args.test_set,test_group=args.test_group)

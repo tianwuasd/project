@@ -26,6 +26,8 @@ from ..observability.progress import Progress
 from ..preprocessing.prepare import load_prepared, validate_prepared_config
 from ..preprocessing.offline_store import storage_lease, validate_storage
 from .checkpoint import load_checkpoint, save_checkpoint, tensors_equal,require_resume_device,verify_optimizer_device
+from .attempts import settle_attempts, claim_attempt, finish_attempt, remaining_attempts, is_technical
+from .stopping import selection_options, update_selection
 from .build_gate import BuildGate
 from .coordinator import HostCoordinator
 from .memory_guard import MemoryGuard, alive
@@ -175,6 +177,7 @@ def checkpoint(output, model, optimizer, scaler, progress, job, receipt, device,
 
 
 @logged("training_rank", config_argument=1, config_key="config")
+@settle_attempts
 def run_rank(rank, job, gate, stop_event):
     config, world, output = job["config"], job["world"], Path(job["config"]["run_dir"])
     settings, resources = config["training"], config["resources"]
@@ -330,6 +333,15 @@ def run_rank(rank, job, gate, stop_event):
                         next_growth = perf_counter() + resources["growth_seconds"]
                     next_adapt = perf_counter() + resources["adapt_seconds"]
                 phase = progress["phase"]
+                attempt = None
+                if phase == 'train' and is_technical(config):
+                    remaining = remaining_attempts(config, 'train') if rank == 0 else None
+                    remaining = all_objects(remaining, world)[0]
+                    if remaining == 0:
+                        reason = 'attempt_limit'
+                        break
+                    attempt = claim_attempt(config, 'train') if rank == 0 else None
+                    attempt = all_objects(attempt, world)[0]
                 cursor = progress["attempts"] if phase == "train" else progress["val_step"]
                 if queued_phase != (phase, progress["epoch"]):
                     if supply.queue:
@@ -376,6 +388,7 @@ def run_rank(rank, job, gate, stop_event):
                 timings["input_wait_seconds"] += perf_counter() - mark
                 mark = perf_counter()
                 if phase == "train":
+                    updates_before = progress['updates']
                     wrapped.train()
                     if settings["epochs"]:
                         lr = settings["learning_rate"] * (1 - progress["epoch"] / settings["epochs"]) ** settings["poly_power"]
@@ -403,6 +416,9 @@ def run_rank(rank, job, gate, stop_event):
                             changed = True
                     else:
                         progress["skipped"] += 1
+                    if rank == 0:
+                        finish_attempt(config, 'train', attempt,
+                            'successful' if progress['updates'] > updates_before else 'skipped')
                     last_loss = float(loss.detach())
                 else:
                     wrapped.eval()
@@ -444,6 +460,9 @@ def run_rank(rank, job, gate, stop_event):
                 if phase == "validation" and progress["val_step"] == val_steps:
                     progress.update(epoch=progress["epoch"] + 1, phase="train",
                                     validation_loss=progress["val_sum"] / val_steps)
+                    stopping = selection_options(settings.get('early_stopping', {}), 'stunet')
+                    progress['selection'] = update_selection(progress.get('selection'),
+                        progress['validation_loss'], progress['epoch'], stopping)
                     if rank == 0:
                         event(output, "epoch", epoch=progress["epoch"], validation_loss=progress["validation_loss"])
                 if (phase == "train" and progress["attempts"] % settings["save_every_attempts"] == 0) or \
@@ -451,6 +470,9 @@ def run_rank(rank, job, gate, stop_event):
                     mark = perf_counter()
                     checkpoint(output, model, optimizer, scaler, progress, job, receipt, device, rank)
                     timings["checkpoint_seconds"] += perf_counter() - mark
+                if progress.get('selection', {}).get('stop'):
+                    reason = 'early_stopping'
+                    break
                 if phase == "validation" and progress["phase"] == "train" and progress["epoch"] < (settings["epochs"] or 1):
                     peaks = all_objects(peak_reserved + peak_non_allocator, world)
                     if rank == 0:
