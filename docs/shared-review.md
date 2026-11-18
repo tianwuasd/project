@@ -6,7 +6,7 @@
 
 | 字段 | 必需内容 |
 | --- | --- |
-| engine_root、engine_commit、training_engine_commit | 实际生产目录及完整SHA；版本不相同时停止本次路线，旧事件保留原版本 |
+| engine_root、engine_commit | 实际生产目录及最终预测完整SHA，须对应目录HEAD |
 | python | 已有生产解释器 |
 | simulator_root | D:/projects/test，仅读取既有源码和profile，调用纯虚拟资源决策场景 |
 | roles | train=[ct_1001]、validation=[ct_1012]、test=[] |
@@ -17,10 +17,14 @@
 | cleanup_owner | 同轮共享模型/数组最后消费者的清理责任人 |
 | source_images | 恰好ct_1001与ct_1012的原地影像路径，用nibabel读取头部进行输出几何评价 |
 | models | stu/q/med三项，每项包含config、prepared、best_record、best_path_field；Med包含prompt_mode及external模式的prompts路径 |
+| models每项的training_commits | 不重复的实际训练完整SHA列表，保留首次/恢复及各阶段的全部实际来源，不以最终SHA重写旧证据 |
+| models每项的version_reviews | 训练SHA为键；每项包含production_commit、approved_changed_files完整列表、secretary_review_reference。SHA不同时须有秘书最终逐项审核记录 |
 | models每项的geometry_sources | 两例实际小区域输入NIfTI路径，核对小区域shape/affine，不能据此宣称完整原图回填通过 |
 | training_event_logs | 按stu/q_base/q_localizer/q_local/med_sequence列阶段2原始事件路径；成功更新只从已解释的优化器更新事件统计，缺事件或未知事件语义保持未验证 |
 
 best_record为真实阶段2选模记录JSON，best_path_field为其中指向模型文件的字段名称，相对路径按记录所在目录解释。它应对应实际验证最佳模型，不能提供手工编造的记录。STU命令为`predict --config CONFIG --checkpoint best --preprocessed-source PREPARED --output OUTPUT --case CASE`，保留selected_best所得实际文件路径供核对最终加载来源，不将此文件路径传给STU枚举参数。Q/Med使用`models predict --config CONFIG --prepared PREPARED --checkpoint BEST_PATH --output OUTPUT --device cpu --case CASE`。Med同时转交真实提示模式和提示文件。生产CLI缺少显式--checkpoint时只读检查立即报告未接入，禁止自行改latest冒充best。配置必须是阶段2明确交接的本轮CPU技术配置。
+
+工具对每个实际训练SHA执行`git diff --no-renames --name-only -z TRAINING FINAL --`，比较全仓库差异文件列表与秘书批准列表，必须完全一致；不按CPU补丁名称自动放行，不限缩目录隐藏其他差异。记录实际训练SHA、最终预测SHA、完整差异及秘书审核引用。即使文件差异为空但SHA不同，也需要对应审核记录。缺少最终审核或名单不一致时拒绝交接，不重新训练、不重置台账。此核对仅允许所列版本关系，不将旧训练证据转记为最终SHA训练通过。
 
 第一步只请求ct_1001，第二步同目录请求ct_1001和ct_1012。工具核对第一例文件大小/修改时间没有变化，提取第二步新增原始事件中的prediction_reused或model_case_reused，并用源图和输出的真实shape/affine核对几何；不从配置生成restored或geometry=True。原始production summary随结果保留。当前逐项完整验收仍输出INCOMPLETE，交由最终审核根据真实记录列明缺项。
 

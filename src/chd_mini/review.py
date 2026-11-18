@@ -12,6 +12,7 @@ import numpy as np
 from .attempts import AttemptLedger
 from .contracts import TOOL_ROOT, confined, git, read_json, write_json
 from .runner import inventory
+from .version_review import full_commit, model_versions
 
 
 ROLES = dict(train=['ct_1001'], validation=['ct_1012'], test=[])
@@ -61,14 +62,15 @@ def build_review(handoff):
         raise ValueError('报告根不符合本轮共享许可')
     engine = Path(handoff['engine_root']).resolve(strict=True)
     actual = git(engine, 'rev-parse', 'HEAD')
-    if actual != handoff['engine_commit'] or actual != handoff['training_engine_commit']:
-        raise ValueError('生产版本与阶段2训练证据不对应，须保留版本差异并重新审核')
+    if actual != full_commit(handoff['engine_commit']):
+        raise ValueError('生产目录与最终交接版本不对应')
     ledger = AttemptLedger(handoff['attempt_ledger']).read()
     if any(r['outcome'] == 'started' for r in ledger['attempts']):
         raise ValueError('阶段2仍有未结算尝试，不能开始阶段3')
-    steps = []
+    steps, versions = [], {}
     for model in MODELS:
         item = handoff['models'][model]
+        versions[model] = model_versions(engine, model, item, actual)
         checkpoint = selected_best(item)
         cli = engine / 'src/chd_segmentation' / ('cli.py' if model == 'stu' else 'models_cli.py')
         if '--checkpoint' not in flags(cli):
@@ -79,7 +81,7 @@ def build_review(handoff):
             requested = [arg for name in cases for arg in ('--case', name)]
             steps.append(dict(name=model+'_'+label, model=model, output=output,
                               checkpoint=checkpoint, args=args+requested))
-    return dict(steps=steps, ledger=ledger, engine_commit=actual,
+    return dict(steps=steps, ledger=ledger, engine_commit=actual, model_versions=versions,
                 scope='zero_additional_training', roles=ROLES)
 
 
@@ -184,6 +186,7 @@ class ReviewFinalizer:
                 wall_seconds=perf_counter()-self.started,
                 error=None if kind is None else ''.join(traceback.format_exception(kind,error,trace)),
                 production_commit=self.plan['engine_commit'],
+                model_versions=self.plan.get('model_versions', {}),
                 geometry_scope='两例实际交接小区域；完整原图回填未验证')
             write_json(self.reports/'review.json', summary)
             # 最终容量只记录，不在此处抛出额度错误阻止清理。
