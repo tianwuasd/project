@@ -45,8 +45,8 @@ def bind_prepared_source(prepared, path, case_ids=None):
     return result
 
 
-def medsam_case(entry, input_source):
-    from ..models.medsam2.intensity import convert_image, resolve_intensity
+def intensity_policy(entry,input_source):
+    from ..models.medsam2.intensity import resolve_intensity
     source = entry.get('intensity', {})
     if source.get('kind') == 'ct_normalized':
         stats = (source.get('statistics') or {}).get('0', {})
@@ -57,7 +57,12 @@ def medsam_case(entry, input_source):
         source = dict(source, semantics='windowed_uint8')
     if entry.get('medsam_windowed'):
         source = dict(source, semantics='windowed_uint8', gray_window=entry.get('gray_window'))
-    policy = resolve_intensity(input_source, source)
+    return resolve_intensity(input_source,source)
+
+
+def medsam_case(entry, input_source):
+    from ..models.medsam2.intensity import convert_image
+    policy = intensity_policy(entry,input_source)
     image, conversion = convert_image(entry['image'], policy)
     return dict(entry, image=image, medsam_windowed=True, intensity_conversion=conversion,
                 gray_window=policy.get('gray_window'))

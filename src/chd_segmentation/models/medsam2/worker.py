@@ -202,7 +202,7 @@ def main(payload,rank,common,allocation,gate,memory):
             gate=gate,rank=rank)
         improved = False
         if validation is not None:
-            value = sum(all_states(validation['value']))/allocation['world']
+            value = validation['value']
             selection = update_selection(selection, value, trainer.epoch, stopping)
             improved = selection['improved']
             history[-1]['validation'] = validation

@@ -41,6 +41,7 @@ def execution_config(config):
         raise ValueError('MedSAM2官方DistributedSampler要求全局batch可均分到各卡')
     patch = [config['frames'],config['resolution'],config['resolution']] if config['model']=='medsam2' else [config['patch']]*3
     return dict(model=config['model'],resources=resources,run_dir=config['run_dir'],
+        input_source=config.get('input_source',{}),
         scope='technical' if config['technical'] else 'formal',pretrained=config['pretrained'],
         logging=config.get('logging',DEFAULTS['logging']),
         work_root=config['work_root'] or str(Path(config['run_dir']).parent),

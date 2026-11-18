@@ -127,6 +127,38 @@ class ReviewRegressions(unittest.TestCase):
         self.assertEqual(set(records),{'ct_1001','ct_1012'})
         self.assertEqual(records['ct_1001']['checkpoint'],records['ct_1012']['checkpoint'])
 
+    def test_med_validation_rounds_cover_each_real_case_once(self):
+        from chd_segmentation.models.medsam2.validation import validation_rounds,aggregate_validation
+        from chd_segmentation.artifacts.store import read_json
+        names = [row['case_id'] for row in self.prepared['manifest']['cases']]
+        for world in (1,2,3):
+            rounds = validation_rounds(names,world)
+            self.assertEqual([name for group in rounds for name in group if name is not None],names)
+            self.assertTrue(all(len(group)==world for group in rounds))
+        evaluation = read_json(self.root/'result/stu-evaluation.json')
+        observations = [dict(case_id=row['case_id'],loss=next(item['dice'] for item in row['classes'].values()
+            if item['dice'] is not None)) for row in evaluation['cases']]
+        rows = {row['case_id']:row for row in self.prepared['manifest']['cases']}
+        result = aggregate_validation(names,rows,[[observations[1]],[],[observations[0]]])
+        self.assertEqual(result['aggregation_unit'],'case')
+        self.assertAlmostEqual(result['value'],sum(row['loss'] for row in observations)/len(observations))
+        with self.assertRaises(ValueError):
+            aggregate_validation(names,rows,[observations,observations])
+
+    def test_med_workspace_uses_the_actual_processed_grid(self):
+        from chd_segmentation.models.memory import case_estimates
+        from chd_segmentation.models.workflow import options
+        import math
+        config = options(self.root/'course/med.json')
+        records = case_estimates(config,self.prepared,'prediction')
+        for row in records:
+            pointer = self.prepared['storage']['cases'][row['case_id']]
+            voxels = math.prod(pointer['shape_czyx'][1:])
+            self.assertEqual(row['processed_voxels'],voxels)
+            self.assertEqual(row['conversion_workspace_bytes'],voxels*24)
+            self.assertEqual(row['retained_case_bytes'],voxels*10)
+            self.assertEqual(row['propagation_history_bytes'],pointer['shape_czyx'][1]*7*4*2**20)
+
 
 if __name__=='__main__':
     unittest.main()
