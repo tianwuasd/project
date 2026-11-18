@@ -152,7 +152,7 @@ def process_pending(config, prepared, root, identity, pending, pointers, catalog
         workers -= 1
     request = RuntimeRequest(str(Path(config['run_dir']).resolve()), 'preprocess',
         Path(config['work_root'])/'resources', config['run_dir'], r,
-        ResourceDemand(workspace_bytes=capacity, cpu_slots=cores))
+        ResourceDemand(workspace_bytes=capacity, cpu_slots=cores, allow_partial_cpu=True))
     before, started = len(pointers), perf_counter()
     runtime = deepcopy(config)
     runtime['_case_estimates'] = {record['case_id']: record for record in estimates}
