@@ -5,14 +5,18 @@ def summarize_run(invocations, ledger, versions, elapsed):
     counts = {}
     for stage in STAGES:
         rows = [r for r in ledger["attempts"] if r["stage"] == stage]
+        events = [e for r in invocations if r.get('stage') == stage
+                  for e in r.get('receipt', {}).get('optimizer_update_events', [])]
+        positions = {e['update'] for e in events if type(e.get('update')) is int and e['update'] > 0}
         counts[stage] = {"attempts": len(rows),
-                         "successful_updates": sum(r["outcome"] == "successful" for r in rows),
+                         "ledger_successful": sum(r["outcome"] == "successful" for r in rows),
+                         "successful_updates": len(positions) if positions else None,
                          "outcomes": [r["outcome"] for r in rows]}
     completed = bool(invocations) and all(r["state"] == "completed" for r in invocations)
     coverage = {}
     for stage in STAGES:
         receipts = [r.get("receipt", {}) for r in invocations if r.get("stage") == stage]
-        coverage[stage] = {"successful_update": counts[stage]["successful_updates"] > 0,
+        coverage[stage] = {"successful_update": bool(counts[stage]["successful_updates"]),
                            "restored": any(r.get("restored") is True for r in receipts),
                            "best": any(bool(r.get("best_path")) for r in receipts)}
     required = all(all(items.values()) for items in coverage.values())
