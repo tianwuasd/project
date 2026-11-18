@@ -70,7 +70,9 @@ class ResourceSession:
                 amount = max(demand.memory_bytes, current)
                 cpu_available = max(0, int(facts['cores']*r.get('cpu_fraction', .8))-
                                     sum(row.get('cpu_slots', 0) for row in peers))
-                self.cpu_slots = min(demand.cpu_slots, cpu_available)
+                # 只有能按获批数量调整布局的调用者才允许部分授予。
+                self.cpu_slots = min(demand.cpu_slots, cpu_available) if demand.allow_partial_cpu else (
+                    demand.cpu_slots if cpu_available >= demand.cpu_slots else 0)
                 self.gpus = []
                 if observed is not None:
                     from .registry import gpu_decision
@@ -91,6 +93,8 @@ class ResourceSession:
                 event(self.request.run_dir, 'waiting_resources', stage=self.request.stage,
                       seconds=monotonic()-began, wait_forever=limit is None,
                       reason='CPU、GPU或内存额度不足', requested_bytes=demand.memory_bytes,
+                      requested_cpu_slots=demand.cpu_slots, available_cpu_slots=cpu_available,
+                      allow_partial_cpu=demand.allow_partial_cpu,
                       project_accounted_bytes=project, system_headroom_bytes=headroom)
                 last_log = monotonic()
             if limit is not None and monotonic()-began >= limit:
