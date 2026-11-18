@@ -19,7 +19,9 @@ from torch.nn.parallel import DistributedDataParallel
 
 from ..artifacts.store import digest, operation_lock, read_json, require_output, write_json
 from ..compatibility import compatible_code
-from ..data.supply import BatchSupply, batch_index
+from ..data.supply import batch_index
+from .batches import BatchSupply
+from .session import admitted_training, memory_for
 from ..models.stunet.adapter import StunetAdapter, WEIGHT_SHA256
 from ..observability.events import event, logged, stage
 from ..observability.progress import Progress
@@ -123,22 +125,7 @@ def host_wait(job, rank, index, phase):
 def group_memory(job, rank, index, amount):
     with ExitStack() as cleanup:
         if rank == 0:
-            memory = cleanup.enter_context(MemoryGuard(job["config"], "training_batch", owner=job["owner"]))
-            granted = cleanup.enter_context(memory.admit(amount, label="global_batch_host_buffers"))
-            job["memory_granted"].value = granted is not None
-        host_wait(job, rank, index, "group_memory_ready")
-        try:
-            yield bool(job["memory_granted"].value)
-        finally:
-            if sys.exc_info()[0] is None:
-                host_wait(job, rank, index, "group_memory_released")
-
-
-@contextmanager
-def group_memory(job, rank, index, amount):
-    with ExitStack() as cleanup:
-        if rank == 0:
-            memory = cleanup.enter_context(MemoryGuard(job["config"], "training_batch", owner=job["owner"]))
+            memory = cleanup.enter_context(memory_for(job))
             granted = cleanup.enter_context(memory.admit(amount, label="global_batch_host_buffers"))
             job["memory_granted"].value = granted is not None
         host_wait(job, rank, index, "group_memory_ready")
@@ -289,7 +276,8 @@ def run_rank(rank, job, gate, stop_event):
             offset = sum(job["shares"][:rank])
             slots = list(range(offset, offset + job["shares"][rank]))
             supply = cleanup.enter_context(BatchSupply(job["prepared"], config, slots,
-                job["supply"]["workers"][rank], job["supply"]["cache_bytes"][rank], gate, job["owner"], rank, cancel=stop_event))
+                job["supply"]["workers"][rank], job["supply"]["cache_bytes"][rank], gate, job["owner"], rank,
+                cancel=stop_event, prefetch=job['supply']['prefetch'], handle=job['resource_handle']))
             batch_cleanup = cleanup.enter_context(ExitStack())
             if rank == 0:
                 event(output, "resume" if job["resume"] else "start", identity=job["identity"], restored_exact=restored,
@@ -556,8 +544,6 @@ def run_rank(rank, job, gate, stop_event):
 
 @logged("training")
 def train(config, prepared_path, resume=False, stop_after=None):
-    from ..preflight import quick_check
-    event(config["run_dir"], "quick_check", report=quick_check(config, "train", prepared_path))
     with stage(config, "training_inputs", prepared=str(prepared_path), resume=resume):
         prepared = load_prepared(prepared_path)
         validate_prepared_config(prepared, config)
@@ -600,7 +586,7 @@ def train(config, prepared_path, resume=False, stop_after=None):
                     admission["resources"].update(gpu_count=old_world, min_gpus=None)
                     event(output, "fixed_world_resume", world=old_world, reason="当前完整检查点位于 epoch 内部")
                 del previous_state
-            with resource_lease(admission, prepared, spec, previous_world=old_world) as allocation:
+            with admitted_training(admission, prepared, spec, previous_world=old_world) as allocation:
                 if not resume:
                     write_json(output / "run.json", {"identity": identity, "scientific": scientific,
                                "config": config, "prepared": prepared})
@@ -640,7 +626,7 @@ def launch_group(config, prepared, spec, identity, allocation, resume, stop_afte
     context = mp.get_context("spawn")
     gate = BuildGate(context, allocation["supply"]["reader_slots"], allocation["supply"]["workspace_capacity_bytes"],
                      allocation["supply"]["case_estimates"])
-    stop_event = context.Event()
+    stop_event = allocation['resource_handle'].cancel
     job["coordinator"] = HostCoordinator(context, world)
     job["pressure_event"] = context.Event()
     job["pause_event"] = context.Event()
@@ -656,7 +642,7 @@ def launch_group(config, prepared, spec, identity, allocation, resume, stop_afte
         os.environ[key] = "1"
     previous_handlers = {sig: signal.signal(sig, lambda *_: stop_event.set()) for sig in (signal.SIGINT, signal.SIGTERM)}
     try:
-        with MemoryGuard(config, "training", owner=allocation["owner"], cancel=stop_event) as memory:
+        with memory_for(job) as memory:
             with memory.admit(job["stage_memory"]["checkpoint_reserve_bytes"],
                               label="checkpoint_reserve", reserve=True) as reserve:
                 if reserve is None:
@@ -680,7 +666,6 @@ def launch_group(config, prepared, spec, identity, allocation, resume, stop_afte
                             stop_event.set()
     finally:
         stop_event.set()
-        close_members(config, allocation["owner"])
         for sig, handler in previous_handlers.items():
             signal.signal(sig, handler)
         for key, value in {**env_previous, "CUDA_VISIBLE_DEVICES": previous_visible}.items():

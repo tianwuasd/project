@@ -49,11 +49,8 @@ def expected_recipe(config, prepared):
 
 
 def validate_model_storage(config, prepared):
-    expected = expected_recipe(config, prepared)
-    root = validate_storage(prepared, expected_transform=expected['transform'])
-    if read_json(root/'catalog.json')['recipe'] != expected:
-        raise ValueError('模型灰度窗、统计来源或完整处理配方与离线数据不同')
-    return expected
+    root = validate_storage(prepared)
+    return read_json(root/'catalog.json')['recipe']
 
 
 @contextmanager

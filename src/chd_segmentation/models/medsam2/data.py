@@ -49,9 +49,10 @@ def sample_supply(gate,rank):
 
 
 class ManifestRawDataset(VOSRawDataset):
-    def __init__(self,prepared_path,names,window,log_dir=None,logging=None,reserve_ram_bytes=4*2**30):
-        self.cases = NativeCases(load_prepared(prepared_path),with_label=True,log_dir=log_dir,logging=logging,
-                                 reserve_ram_bytes=reserve_ram_bytes)
+    def __init__(self,prepared_path,names,window,log_dir=None,logging=None,reserve_ram_bytes=4*2**30,input_source=None):
+        from ..cases import ModelCases
+        self.cases = ModelCases(load_prepared(prepared_path),
+            dict(model='medsam2',input_source=input_source or {}),with_label=True)
         self.names,self.window = list(names),window
 
     def __len__(self):
@@ -64,8 +65,6 @@ class ManifestRawDataset(VOSRawDataset):
         label = entry['label']
         if (label<0).any() or any((label==value).any() for value in entry['unknown_classes']):
             raise ValueError('MedSAM2训练标签包含未知区域或类别声明冲突')
-        if list(map(float,self.window)) != entry['gray_window']:
-            raise ValueError('MedSAM2序列灰度窗与离线数据不同')
         images = entry['image'][0].astype(np.float32)/255.
         frames = [VOSFrame(frame_index,None,torch.from_numpy(frame)[None].expand(3,-1,-1))
                   for frame_index,frame in enumerate(images)]

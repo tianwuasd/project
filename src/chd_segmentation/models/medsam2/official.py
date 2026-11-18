@@ -39,7 +39,7 @@ def effective_config(config,prepared,prepared_path,root,names):
     window = resolve_window(config,prepared)
     raw = dict(_target_='chd_segmentation.models.medsam2.data.ManifestRawDataset',
                prepared_path=str(Path(prepared_path).resolve()),names=names,window=window,
-               log_dir=str(root),logging=config['logging'])
+               log_dir=str(root),logging=config['logging'], input_source=config.get('input_source', {}))
     leaf = recipe.trainer.data.train.datasets[0].dataset.datasets[0]
     leaf._target_ = 'chd_segmentation.models.medsam2.data.HeartVOSDataset'
     leaf.video_dataset = OmegaConf.create(raw)

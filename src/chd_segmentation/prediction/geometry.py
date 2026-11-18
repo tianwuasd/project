@@ -4,7 +4,7 @@ from nnunetv2.preprocessing.resampling.default_resampling import resample_data_o
 
 def restore_source(probabilities, geometry):
     plan = geometry.get('source_plan')
-    if geometry.get('medsam_native') and plan is None:
+    if geometry.get('medsam_native') and not plan:
         xyz = probabilities.argmax(0).astype(np.uint8).transpose(2, 1, 0)
     else:
         if plan is None:
@@ -37,7 +37,7 @@ def map_prompts(prompts, geometry, input_space):
     if input_space != 'source_xyz':
         raise ValueError('提示空间必须为source_xyz或input_dhw')
     plan = geometry.get('source_plan')
-    native = geometry.get('medsam_native') and plan is None
+    native = geometry.get('medsam_native') and not plan
     forward = [0, 1, 2] if native else plan['transpose_forward']
     roi_start = np.asarray([pair[0] for pair in geometry['roi_xyz']])
     crop = np.zeros(3) if native else np.asarray([pair[0] for pair in geometry['properties']['bbox_used_for_cropping']])

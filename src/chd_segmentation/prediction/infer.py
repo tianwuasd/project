@@ -76,7 +76,7 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None):
     options = config["prediction"]
     torch.set_num_threads(config["resources"]["cpu_threads"])
     device = device_for(config)
-    with operation_lock(output), storage_lease(prepared, config), prediction_snapshot(config["run_dir"]) as pointer:
+    with operation_lock(output), storage_lease(prepared, config), prediction_snapshot(config["run_dir"], options.get('checkpoint','latest')) as pointer:
         task_path = output/'prediction-task.json'
         task = dict(training_run=str(Path(config['run_dir']).resolve()), dataset=prepared['dataset'],
             source=prepared.get('storage'), geometry=prepared['plan'], technical=prepared['technical'],

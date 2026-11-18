@@ -48,11 +48,9 @@ def execution_config(config):
 
 
 def resource_spec(config,prepared,stage):
-    from .workflow import source_identity
     return dict(resource_model=config['model'],stage=stage,patch=config['patch'],local_size=config['local_size'],
         frames=config['frames'],resolution=config['resolution'],technical=config['technical'],
-        source=digest(source_identity(config)),method=config['method'],prepared=prepared['identity'],
-        parents={key:file_digest(path) for key,path in config['parents'].items()})
+        method=config['method'],prepared=prepared['identity'],parents=config['parents'])
 
 
 @contextmanager
@@ -87,7 +85,27 @@ def admitted(config,prepared,stage,topology=None):
         budget = deepcopy(prepared)
         budget['manifest']['cases'] = [dict(row,roles=['train']) for row in prepared['manifest']['cases']
                                       if row['case_id'] in names]
-    with resource_lease(common,budget,spec,stage='prediction' if stage=='prediction' else 'train') as allocation:
+    from ..acceleration import ResourceSession, RuntimeRequest, ResourceDemand
+    from ..training.budget import cpu_plan
+    world = common['resources']['gpu_count'] if common['resources']['device'] == 'cuda' else common['resources']['cpu_processes']
+    supply = cpu_plan(common, budget, world, stage='prediction' if stage=='prediction' else 'train')
+    amount = supply['ram_bytes'] if supply['admitted'] else supply.get('minimum_bytes', 0)
+    if amount <= 0:
+        raise RuntimeError('模型供数无法建立有效工作集预算：'+supply.get('reason', '未知原因'))
+    demand = ResourceDemand(fixed_bytes=int(amount), cpu_slots=world,
+        gpu_count=world if common['resources']['device']=='cuda' else 0,
+        gpu_ids=common['resources']['gpu_ids'], local_batches=layout(common['training']['batch'], world,
+            common['resources']['batch_layout']))
+    request = RuntimeRequest(str(Path(config['run_dir']).resolve()), stage, root/'resources',
+        common['run_dir'], common['resources'], demand)
+    with ResourceSession(request) as session:
+        if not supply['admitted']:
+            supply = cpu_plan(common, budget, world, stage='prediction' if stage=='prediction' else 'train')
+            if not supply['admitted']:
+                raise RuntimeError('公共准入后模型供数预算仍不可用：'+supply['reason'])
+        common['resource_handle'] = session.handle
+        allocation = dict(owner=session.handle.owner, gpus=session.allocation.gpus,
+            world=world, supply=supply)
         allocation['shares'] = layout(common['training']['batch'],allocation['world'],common['resources']['batch_layout'])
         if config['model']=='medsam2' and len(set(allocation['shares']))!=1:
             raise ValueError('MedSAM2官方训练要求各进程均分全局batch')
@@ -99,6 +117,13 @@ def all_states(value):
     values = [None]*dist.get_world_size()
     dist.all_gather_object(values,value)
     return values
+
+
+def model_memory(common):
+    from ..acceleration.legacy import SessionGuard
+    guard = SessionGuard(common['resource_handle'])
+    guard.config = common
+    return guard
 
 
 def pressure(common,device,ready,rank,phase,memory,release=None):
@@ -153,7 +178,7 @@ def rank_entry(rank,payload,common,allocation,gate,port):
     with (root/f'rank{rank}.log').open('a',encoding='utf-8') as log,redirect_stdout(log),redirect_stderr(log), \
             Stage(root,'model_worker',heartbeat_seconds=common['logging']['heartbeat_seconds'],
                   model=payload['config']['model'],rank=rank,operation=payload.get('operation','train')), \
-            MemoryGuard(common, 'model_rank', owner=allocation['owner']) as memory:
+            model_memory(common) as memory:
         register_member(common,allocation['owner'])
         os.environ.update(MASTER_ADDR='127.0.0.1',MASTER_PORT=str(port),RANK=str(rank),LOCAL_RANK=str(rank),
                           WORLD_SIZE=str(allocation['world']))
@@ -256,10 +281,9 @@ def _run_workers(payload,common,allocation):
             os.environ.clear()
             os.environ.update(previous)
         cleanup.callback(restore_environment)
-        cleanup.callback(close_members,common,allocation['owner'])
         os.environ.clear()
         os.environ.update(environment)
-        memory = cleanup.enter_context(MemoryGuard(common, 'model_execution', owner=allocation['owner']))
+        memory = cleanup.enter_context(model_memory(common))
         reserve = allocation['supply']['model_memory']['checkpoint_reserve_bytes']
         ticket = cleanup.enter_context(memory.admit(reserve, label='checkpoint_reserve', reserve=True))
         if ticket is None:

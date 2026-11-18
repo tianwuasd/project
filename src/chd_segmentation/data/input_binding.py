@@ -26,6 +26,13 @@ def load_case(binding, case_id, with_label=True):
 def medsam_case(entry, input_source):
     from ..models.medsam2.intensity import convert_image, resolve_intensity
     source = entry.get('intensity', {})
+    if source.get('kind') == 'ct_normalized':
+        stats = (source.get('statistics') or {}).get('0', {})
+        source = dict(source, semantics='zscore_clipped_hu', mean=stats.get('mean'), std=stats.get('std'),
+            gray_window=[stats['percentile_00_5'], stats['percentile_99_5']]
+                if 'percentile_00_5' in stats and 'percentile_99_5' in stats else None)
+    if source.get('kind') == 'native_window_uint8':
+        source = dict(source, semantics='windowed_uint8')
     if entry.get('medsam_windowed'):
         source = dict(source, semantics='windowed_uint8', gray_window=entry.get('gray_window'))
     policy = resolve_intensity(input_source, source)

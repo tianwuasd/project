@@ -10,7 +10,7 @@ from ..observability.events import event, logged, stage
 
 def case_data_identity(prepared, row):
     return digest({"dataset": prepared["dataset"], "labels": prepared["dataset_json"]["labels"],
-                   "image_sha256": row["sha256"]["image"], "spacing_xyz": row["spacing_xyz"],
+                   "image_sha256": row.get('sha256', {}).get('image', row.get('image')), "spacing_xyz": row["spacing_xyz"],
                    "geometry_policy": row["geometry_policy"], "unknown_classes": row["unknown_classes"],
                    "ignore_label_ids": row.get("ignore_label_ids", []), "plan": prepared["plan"],
                    "technical": prepared["technical"]})
@@ -33,17 +33,14 @@ def evaluate(prediction_dir, prepared, output, config):
     selection = [(row, records[row["case_id"]]) for row in prepared["manifest"]["cases"] if row["case_id"] in records]
     if not selection:
         raise ValueError("没有与当前评价清单匹配的预测")
-    identity = digest({"cases": [{"data": case_data_identity(prepared, row), "label": row["sha256"].get("label"),
-                                 "prediction": receipt["sha256"], "checkpoint": receipt["checkpoint_sha256"]}
+    identity = digest({"cases": [{"data": case_data_identity(prepared, row), "label": row.get('label'),
+                                 "prediction": receipt.get('identity', receipt['file']),
+                                 "checkpoint": receipt.get('checkpoint', receipt.get('checkpoint_file',receipt.get('checkpoint_sha256')))}
                                 for row, receipt in selection], "metric": "supervised-dice-v2"})
     for index, (row, receipt) in enumerate(selection, 1):
         if receipt["data_identity"] != case_data_identity(prepared, row) or \
-                receipt.get("reference_sha256") not in (None, row["sha256"]["label"]):
+                receipt.get("reference_sha256") not in (None, row.get('sha256', {}).get('label')):
             raise ValueError("预测与评价的数据、类别或标签版本不同")
-        with stage(config, "evaluation_verify", case_id=row["case_id"], completed=index - 1, total=len(selection)):
-            if file_digest(row["label"]) != row["sha256"]["label"] or \
-                    file_digest(Path(prediction_dir) / receipt["file"]) != receipt["sha256"]:
-                raise ValueError("评价来源标签或预测摘要不一致")
     if output.exists():
         previous = read_json(output)
         if previous.get("identity") != identity:
@@ -65,6 +62,8 @@ def evaluate(prediction_dir, prepared, output, config):
         prediction_image, reference_image = nib.load(path), nib.load(row["label"])
         if prediction_image.shape != reference_image.shape:
             raise ValueError("评价标签与预测原图尺寸不同")
+        if not np.allclose(prediction_image.affine, reference_image.affine, rtol=0, atol=1e-5):
+            raise ValueError('评价标签与预测空间不同')
         prediction = np.asanyarray(prediction_image.dataobj[roi])
         truth = np.asanyarray(reference_image.dataobj[roi])
         if not np.isfinite(truth).all() or not np.equal(truth, np.rint(truth)).all():

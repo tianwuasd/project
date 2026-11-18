@@ -129,9 +129,8 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
     rows = prediction_rows(config, prepared, case_ids, test_set, test_group)
     label_mode = prompt_mode == 'label-box'
     if config['model'] == 'medsam2':
-        from .medsam2.data import NativeCases
-        dataset = NativeCases(prepared, with_label=label_mode, log_dir=Path(config['run_dir'])/'prediction',
-                              logging=config['logging'],reserve_ram_bytes=config['execution']['reserve_ram_bytes'])
+        from .cases import ModelCases
+        dataset = ModelCases(prepared, config, with_label=label_mode)
     else:
         dataset = dataset_for(prepared, False,dict(reserve_ram_bytes=config['execution']['reserve_ram_bytes'],
             cache_bytes=config['execution']['cache_bytes']),Path(config['run_dir'])/'prediction',config['logging'])
@@ -178,11 +177,8 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
             raise ValueError('模型概率的类别、网格或有限性无效')
         metrics = supervised_dice(probability.argmax(0), truth, classes, entry['unknown_classes'],
             protocol['prompted_classes']) if label_mode else None
-        if config['model'] == 'medsam2':
-            from .medsam2.data import restore_native
-            native = restore_native(probability, entry)
-        else:
-            native = restore(probability, entry, prepared['plan'])
+        from ..prediction.geometry import restore_source
+        native = restore_source(probability, entry)
         path = root/(name+'.nii.gz')
         if path.exists() and name not in completed:
             raise FileExistsError('预测文件没有完成记录：'+str(path))

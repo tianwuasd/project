@@ -8,6 +8,7 @@ import yaml
 
 DEFAULTS = {
     "model": "stunet", "scope": "formal", "fold": 0, "result_root": None, "plan": None,
+    "input_source": {"path": None}, "checkpoint_dir": None,
     "preprocessing": {"root": None, "statistics_source": "main-train", "execution": "auto", "block_bytes": 64 * 1024 ** 2,
                       "read_block_bytes": 64 * 1024 ** 2,
                       "auto_blocks": True, "max_block_bytes": 512 * 1024 ** 2,
@@ -22,8 +23,10 @@ DEFAULTS = {
                  "epochs": None, "steps_per_epoch": 250, "validation_steps": 50, "poly_power": 0.9,
                  "learning_rate": 0.001, "momentum": 0.99, "weight_decay": 3e-5,
                  "seed": 20261113, "precision": "fp32", "foreground_fraction": 0.33,
-                 "save_every_attempts": 250},
-    "prediction": {"overlap": 0.5, "window_batch": 1, "blend": "gaussian", "export_space": "source"},
+                 "save_every_attempts": 250,
+                 "early_stopping": {"enabled": False, "monitor": "validation_loss", "mode": "min",
+                    "patience": 20, "min_delta": .0001, "unit": "completed_validation_epoch"}},
+    "prediction": {"overlap": 0.5, "window_batch": 1, "blend": "gaussian", "export_space": "source", "checkpoint": "latest"},
     "resources": {"device": "cpu", "cpu_threads": 2, "cache_bytes": 1024 ** 3, "cache_entries": 16,
                   "reserve_ram_bytes": 4 * 1024 ** 3, "cpu_fraction": 0.8, "ram_fraction": 0.8,
                   "workers": "auto", "max_workers": 32, "prefetch": 2, "readers": "auto", "max_readers": 8,

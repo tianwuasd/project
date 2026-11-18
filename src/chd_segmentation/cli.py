@@ -37,7 +37,7 @@ def main(argv=None):
     check.add_argument("--prepared")
     train = commands.add_parser("train")
     train.add_argument("--config", required=True)
-    train.add_argument("--prepared", required=True)
+    train.add_argument("--prepared", "--preprocessed-source", dest='prepared', required=True)
     train.add_argument("--resume", action="store_true")
     train.add_argument("--stop-after", type=int)
     train.add_argument("--device", choices=("cpu", "cuda"))
@@ -56,6 +56,8 @@ def main(argv=None):
     predict.add_argument("--config", required=True)
     predict.add_argument("--output", required=True)
     predict.add_argument("--inputs")
+    predict.add_argument('--checkpoint', choices=('best','latest'))
+    predict.add_argument('--preprocessed-source')
     predict.add_argument("--case", action="append")
     evaluate = commands.add_parser("evaluate")
     evaluate.add_argument("--config", required=True)
@@ -114,6 +116,11 @@ def main(argv=None):
             if value is not None:
                 training[key] = value
         overrides.update(resources=resources, training=training)
+    if args.command == 'predict':
+        if args.checkpoint is not None:
+            overrides['prediction'] = dict(checkpoint=args.checkpoint)
+        if args.preprocessed_source is not None:
+            overrides['input_source'] = dict(path=args.preprocessed_source)
     if args.command not in ("status", "bind-inputs", "data-info"):
         config = load_config(args.config, overrides)
         event(log_directory(config), "command_ready", command=args.command, dataset=config["dataset"],
