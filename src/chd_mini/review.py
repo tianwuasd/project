@@ -124,15 +124,46 @@ def geometry(item, output):
     return result
 
 
-def prediction_events_from_console(path):
+def prediction_events(summary):
+    path = Path(summary['event_log'])
+    start, end = summary['start_offset'], summary['end_offset']
+    if not path.is_absolute() or type(start) is not int or type(end) is not int:
+        raise ValueError('生产事件必须给出绝对路径及整数字节区间')
+    if not 0 <= start < end <= path.stat().st_size or end-start > 512*1024:
+        raise ValueError('生产事件字节区间无效、为空或超过本步保留额度')
+    with path.open('rb') as stream:
+        if start:
+            stream.seek(start-1)
+            if stream.read(1) != b'\n':
+                raise ValueError('事件起始偏移不在JSONL行边界')
+        stream.seek(start)
+        payload = stream.read(end-start)
+    if len(payload) != end-start or not payload.endswith(b'\n'):
+        raise ValueError('事件区间已截断或末尾记录未提交完整')
     events = []
-    for number, line in enumerate(Path(path).read_text(encoding='utf-8').splitlines(), 1):
-        if line.lstrip().startswith('{') and '"event":' in line:
+    position = start
+    for line in payload.splitlines(keepends=True):
+        next_position = position+len(line)
+        if line.strip():
             row = json.loads(line)
             if row.get('event') in ('prediction_reused', 'model_case_reused', 'prediction', 'model_case_completed'):
                 if row.get('case_id') in ('ct_1001', 'ct_1012'):
-                    events.append(dict(source_console=str(path), source_line=number, record=row))
+                    events.append(dict(source_event_log=str(path), range_start_offset=start, range_end_offset=end,
+                                       record_start_offset=position, record_end_offset=next_position, record=row))
+        position = next_position
+    if not events:
+        raise ValueError('本次生产事件区间缺少真实预测/复用事件')
     return events
+
+
+def require_prediction_events(step, events):
+    records = [item['record'] for item in events]
+    completed = {r.get('case_id') for r in records if r.get('event') in ('prediction','model_case_completed')}
+    reused = {r.get('case_id') for r in records if r.get('event') in ('prediction_reused','model_case_reused')}
+    valid = 'ct_1001' in completed if step['name'].endswith('_first') else (
+        'ct_1001' in reused and 'ct_1012' in completed)
+    if not valid:
+        raise ValueError('本次事件未证明所请求的病例完成或逐例接续，禁止以mtime补齐')
 
 
 def capacity(handoff):
@@ -263,8 +294,13 @@ def _execute_steps(handoff, plan, root, reports, records, before, process_paths,
         process_paths.append(process_path)
         receipt = supervise(command, handoff['engine_root'], env, reports/(step['name']+'.log'),
                              1200, 512*1024, 16*1024**3, process_path)
-        item = dict(step=step, process=receipt,
-                    production_events=prediction_events_from_console(reports/(step['name']+'.log')))
+        summary = read_json(Path(step['output'])/'summary.json')
+        write_json(reports/(step['name']+'.production-summary.json'), summary)
+        item = dict(step=step, process=receipt, production_summary=summary,
+                    production_events=prediction_events(summary))
+        records.append(item)
+        write_json(reports/'execution.json', records)
+        require_prediction_events(step,item['production_events'])
         first = Path(step['output'])/'ct_1001.nii.gz'
         stamp = [first.stat().st_size, first.stat().st_mtime_ns]
         if step['name'].endswith('_first'):
@@ -274,8 +310,6 @@ def _execute_steps(handoff, plan, root, reports, records, before, process_paths,
             item['reuse_events'] = [r for r in item['production_events'] if r['record']['event'] in
                                    ('prediction_reused', 'model_case_reused') and r['record']['case_id'] == 'ct_1001']
             item['geometry'] = geometry(handoff['models'][step['model']], step['output'])
-            item['production_summary'] = read_json(Path(step['output'])/'summary.json')
-        records.append(item)
         write_json(reports/'execution.json', records)
         if AttemptLedger(handoff['attempt_ledger']).read() != plan['ledger']:
             raise RuntimeError('阶段3改变共享训练台账，立即终止')
