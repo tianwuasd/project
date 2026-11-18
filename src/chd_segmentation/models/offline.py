@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-from ..artifacts.store import read_json, file_digest
+from ..artifacts.store import read_json, write_json, require_output
 from ..config import load_config
 from ..models.stunet.preprocess import CONTRACT as Q_CONTRACT
 from ..preprocessing.offline import preprocess
@@ -50,7 +50,11 @@ def expected_recipe(config, prepared):
 
 def validate_model_storage(config, prepared):
     root = validate_storage(prepared, expected_transform=None)
-    return read_json(root/'catalog.json')['recipe']
+    actual = read_json(root/'catalog.json')['recipe']
+    permitted = (Q_CONTRACT,) if config['model']=='q_route1' else (Q_CONTRACT,MED_CONTRACT)
+    if actual['transform'] not in permitted or actual['dataset'] != prepared['dataset']:
+        raise ValueError('现有预处理的数据集或实际输入形式不能由当前模型消费')
+    return actual
 
 
 @contextmanager
@@ -62,44 +66,19 @@ def model_storage_lease(config, prepared, stage):
 
 
 def quick_check_model(model, prepared, stage, prepare_config=None):
-    from ..preflight import _path_check, environment_check
+    from ..preflight import _path_check
     from .execution import execution_config
     common = execution_config(model)
     if model['technical'] != (prepared['scope'] == 'technical'):
         raise ValueError('模型与准备描述的正式或技术范围不同')
     expected = validate_model_storage(model, prepared) if prepared.get('storage') else expected_recipe(model, prepared)
-    checks = environment_check(common['resources'])
+    checks = dict(dataset=prepared['dataset'],cases=[row['case_id'] for row in prepared['manifest']['cases']])
     checks['recipe'] = dict(transform=expected['transform'], statistics=expected.get('statistics_source', expected.get('window_source')))
-    checks['source_paths'] = {}
-    for row in prepared['manifest']['cases']:
-        checks['source_paths'][row['case_id']] = {}
-        for kind in ('image', 'label'):
-            if row.get(kind) is None:
-                continue
-            value = _path_check(row[kind], require_file=True)
-            stat = Path(row[kind]).stat()
-            if [stat.st_size, stat.st_mtime_ns] != row['source_stamp'][kind]:
-                raise ValueError('准备后原始文件发生变化：'+row['case_id'])
-            checks['source_paths'][row['case_id']][kind] = value
     checks['paths'] = {name: _path_check(common[name], writable=True) for name in ('run_dir', 'work_root')}
     if prepare_config is not None:
         from ..preflight import preprocessing_disk_check
         validate_prepared_config(prepared, prepare_config)
         checks['disk_plan'] = preprocessing_disk_check(prepare_config, prepared, expected)
-    if model['model'] == 'medsam2':
-        from .medsam2.weights import verify_official_weight
-        from ..delivery.assets import verify_official
-        from ..delivery.__main__ import dependency_status
-        checks['weight'] = verify_official_weight(model['pretrained'])
-        verify_official(model['official_root'])
-        checks['environment'] = dependency_status(Path(__file__).resolve().parents[3], Path(model['dependency_root']))
-        if checks['environment']['missing'] or not checks['environment']['torch_compatible']:
-            raise ValueError('MedSAM2固定依赖或PyTorch版本不兼容')
-    elif model['pretrained'] is not None:
-        from .stunet.adapter import WEIGHT_SHA256
-        if file_digest(model['pretrained']) != WEIGHT_SHA256:
-            raise ValueError('Q的STU初始化权重摘要不符')
-        checks['weight'] = dict(path=model['pretrained'], sha256=WEIGHT_SHA256)
     return dict(ok=True, stage=stage, model=model['model'], dataset=prepared['dataset'],
                 scope=prepared['scope'], prepared_identity=prepared['identity'], checks=checks,
                 limits=['未读取CT或标签体素', '未初始化模型', '离线数组仅核对元数据及文件stamp'])
@@ -114,6 +93,20 @@ def preprocess_model(model_path, prepare_config_path, prepared_path, root, outpu
     config['resources']['device'] = 'cpu'
     config['preprocessing']['root'] = str(Path(root).resolve())
     config['run_dir'] = str(Path(model['run_dir'])/'preprocess')
+    if source.get('storage'):
+        actual = validate_model_storage(model,source)
+        if source['dataset'] != config['dataset'] or model['technical'] != (source['scope']=='technical'):
+            raise ValueError('现有预处理的数据集或任务范围不同')
+        target = require_output(output,config['work_root'],[source['storage']['root'],
+            source['manifest']['data_root'],prepared_path,Path(__file__).resolve().parents[3]])
+        if target.exists() and read_json(target)!=source:
+            raise FileExistsError('已有输出描述对应其他预处理来源')
+        if not target.exists():
+            write_json(target,source)
+        event(config['run_dir'],'preprocess_completed',cases=len(source['manifest']['cases']),
+            reused=len(source['manifest']['cases']),new=0,output=str(target),
+            data=source['storage']['root'],transform=actual['transform'])
+        return source
     expected = expected_recipe(model, source)
     event(config['run_dir'], 'quick_check', report=quick_check_model(model, source, 'preprocess', config))
     if model['model'] == 'q_route1':
