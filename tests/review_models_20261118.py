@@ -5,6 +5,7 @@ import gc
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 from time import perf_counter
 
@@ -178,6 +179,37 @@ def command(args):
     main(command_args)
 
 
+def supervised(args):
+    engine, root, reports = setup(args)
+    tool = engine.parent/'chd-segmentation-assistant3'
+    sys.path.insert(0,str(tool/'src'))
+    from chd_mini.windows_job import supervise
+    from chd_segmentation.artifacts.store import read_json,write_json
+    tag = args.tag or '-'.join((args.stage or 'inputs',args.phase,'resume' if args.resume else 'first',str(args.stop_after)))
+    receipt = reports/(tag+'-job.json')
+    command_line = [sys.executable,'-B',str(Path(__file__).resolve()),'--settings',args.settings,
+        '--work',str(root),'--reports',str(reports),'--phase',args.phase,'--stop-after',str(args.stop_after)]
+    if args.stage:
+        command_line += ['--stage',args.stage]
+    if args.resume:
+        command_line += ['--resume']
+    source = subprocess.run(['git','-C',str(engine),'rev-parse','HEAD'],check=True,capture_output=True,text=True).stdout.strip()
+    environment = dict(os.environ,PYTHONUTF8='1',PYTHONIOENCODING='utf-8',PYTHONDONTWRITEBYTECODE='1')
+    try:
+        supervise(command_line,engine,environment,reports/(tag+'.log'),timeout=1800,
+            log_limit=1024*1024,ram_limit=16*2**30,receipt_path=receipt)
+    finally:
+        files = [path for path in root.rglob('*') if path.is_file()]
+        inventory = dict(files=len(files),bytes=sum(path.stat().st_size for path in files))
+        result = read_json(receipt)
+        result.update(source_commit=source,tool_commit=subprocess.run(['git','-C',str(tool),'rev-parse','HEAD'],
+            check=True,capture_output=True,text=True).stdout.strip(),ram_limit_bytes=16*2**30,
+            cases=dict(train=['ct_1001'],validation=['ct_1012'],test=[]),work_inventory=inventory)
+        write_json(receipt,result)
+        if inventory['files']>200 or inventory['bytes']>8*2**30:
+            raise RuntimeError('本阶段工作产物超过批准额度')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--settings',required=True)
@@ -187,8 +219,12 @@ if __name__ == '__main__':
     parser.add_argument('--stage',choices=('stu','q_base','q_localizer','q_local','med_sequence'))
     parser.add_argument('--resume',action='store_true')
     parser.add_argument('--stop-after',type=int,choices=(1,2),default=1)
+    parser.add_argument('--supervise',action='store_true')
+    parser.add_argument('--tag')
     arguments = parser.parse_args()
-    if arguments.phase=='prepare':
+    if arguments.supervise:
+        supervised(arguments)
+    elif arguments.phase=='prepare':
         prepare(arguments)
     elif arguments.phase=='inspect':
         inspect_inputs(arguments)

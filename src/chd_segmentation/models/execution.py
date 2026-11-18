@@ -80,6 +80,10 @@ def admitted(config,prepared,stage,topology=None):
     if stage!='prediction':
         from .workflow import training_names,validated_q_groups
         names = set(training_names(config,prepared,stage))
+        if config['technical']:
+            from .roles import technical_names
+            names.update(technical_names(config['technical_roles'],stage,'validation',
+                [row['case_id'] for row in prepared['manifest']['cases']]))
         if config['model']=='q_route1' and not config['technical']:
             names.update(validated_q_groups(config,prepared)['C'])
         budget = deepcopy(prepared)
