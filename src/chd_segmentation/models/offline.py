@@ -49,7 +49,7 @@ def expected_recipe(config, prepared):
 
 
 def validate_model_storage(config, prepared):
-    root = validate_storage(prepared)
+    root = validate_storage(prepared, expected_transform=None)
     return read_json(root/'catalog.json')['recipe']
 
 

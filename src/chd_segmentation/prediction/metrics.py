@@ -4,7 +4,7 @@ from time import perf_counter
 import nibabel as nib
 import numpy as np
 
-from ..artifacts.store import digest, file_digest, read_json, require_result_output, write_json
+from ..artifacts.store import digest, read_json, require_result_output, write_json
 from ..observability.events import event, logged, stage
 
 

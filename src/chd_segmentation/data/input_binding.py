@@ -23,6 +23,23 @@ def load_case(binding, case_id, with_label=True):
     return binding.source.open(case_id, with_label=with_label)
 
 
+def bind_prepared_source(prepared, path):
+    from copy import deepcopy
+    from ..artifacts.store import digest
+    from ..preprocessing.inputs import resolve_preprocessed
+    names = [row['case_id'] for row in prepared['manifest']['cases']]
+    source = resolve_preprocessed(path,dataset=prepared['dataset'],case_ids=names)
+    catalog = source.catalog
+    if catalog['recipe']['scope'] != prepared['scope']:
+        raise ValueError('当前任务与指定预处理的正式或技术范围不同')
+    result = deepcopy(prepared)
+    result['storage'] = dict(format=catalog['format'],root=str(source.root),complete=True,
+        recipe_identity=catalog['recipe_identity'],cases=source.cases)
+    result['plan'] = deepcopy(catalog['recipe'].get('plan',prepared['plan']))
+    result['identity'] = digest(dict(dataset=result['dataset'],cases=names,storage=result['storage']))
+    return result
+
+
 def medsam_case(entry, input_source):
     from ..models.medsam2.intensity import convert_image, resolve_intensity
     source = entry.get('intensity', {})

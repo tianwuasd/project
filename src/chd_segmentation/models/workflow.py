@@ -138,18 +138,23 @@ def validated_q_groups(config,prepared):
             not isinstance(groups[key],list) or not groups[key] for key in groups):
         raise ValueError('Q分组必须包含非空A/B/C/D病例名单')
     rows = {row['case_id']:row for row in prepared['manifest']['cases']}
+    frozen = prepared['manifest'].get('split_source',{}).get('format')=='q1282' or any('q_group' in row for row in rows.values())
+    unit = prepared['manifest'].get('split_source',{}).get('unit',
+        'case' if prepared['dataset']=='imagechd' else 'patient')
+    if unit not in ('case','patient') or frozen and unit != 'patient':
+        raise ValueError('Q划分单位无效或与1282冻结患者协议不符')
     seen_patients,seen_cases = set(),set()
     for role in 'ABCD':
         names = groups[role]
         if any(not isinstance(name,str) for name in names) or len(set(names))!=len(names) or \
                 not set(names)<=rows.keys() or seen_cases & set(names):
             raise ValueError('Q分组病例重复、重叠或未登记')
-        patients = {rows[name].get('patient') for name in names}
-        if seen_patients & patients or not all(patients):
+        patients = {rows[name].get('patient') for name in names} if unit=='patient' else set()
+        if unit=='patient' and (seen_patients & patients or not all(patients)):
             raise ValueError('Q患者分组重叠或缺少患者身份')
         seen_cases.update(names)
         seen_patients.update(patients)
-    if prepared['manifest'].get('split_source',{}).get('format')=='q1282' or any('q_group' in row for row in rows.values()):
+    if frozen:
         expected = {key:set() for key in 'ABCD'}
         source_roles = dict(A={'train'},B={'train'},C={'development'},
                             D={'source_test','target_primary','target_secondary'})

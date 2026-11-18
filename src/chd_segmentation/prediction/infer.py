@@ -1,3 +1,4 @@
+from contextlib import ExitStack
 from copy import deepcopy
 import os
 from pathlib import Path
@@ -18,6 +19,7 @@ from ..observability.events import event, logged, stage
 from ..training.checkpoint import load_checkpoint, prediction_snapshot
 from ..training.engine import code_identity, device_for
 from ..training.resources import resource_lease
+from ..training.session import admitted_training, memory_for
 from ..preprocessing.prepare import validate_prepared_config
 from ..preprocessing.offline_store import storage_lease
 from .metrics import case_data_identity
@@ -28,35 +30,42 @@ from .restore import restore
 def predict(config, output, inputs=None, case_ids=None, manifest=None):
     if inputs is not None and manifest is not None:
         raise ValueError("预测输入文件与已验证清单只能指定一种")
-    if config["resources"]["device"] == "cpu":
-        return _predict(config, output, inputs, case_ids, manifest)
-    if torch.cuda.is_initialized():
+    if config['resources']['device']=='cuda' and torch.cuda.is_initialized():
         raise RuntimeError("GPU 预测需要新的命令进程，以使用准入后的可见设备")
     runtime = deepcopy(config)
-    runtime["resources"].update(gpu_count=1, min_gpus=None, batch_layout=None, share=False, workers=0)
+    runtime["resources"].update(gpu_count=1, cpu_processes=1, min_gpus=None, batch_layout=None, share=False, workers=0)
+    runtime['training']['batch'] = 1
     if runtime["resources"]["gpu_ids"] is not None and len(runtime["resources"]["gpu_ids"]) != 1:
         raise ValueError("单次预测仅使用一张卡，请配置一个 gpu_ids 或使用自动选卡")
     training = read_json(Path(config["run_dir"]) / "run.json")
     previous = os.environ.get("CUDA_VISIBLE_DEVICES")
     prepared = deepcopy(training["prepared"])
+    if inputs is not None:
+        prepared['manifest'] = load_manifest(inputs,prepared['dataset'],prepared['scope'])
     if manifest is not None:
         prepared["manifest"] = manifest
-    with resource_lease(runtime, prepared, training["scientific"]["spec"], stage="predict") as allocation:
-        os.environ["CUDA_VISIBLE_DEVICES"] = allocation["gpus"][0]["uuid"]
+    if config.get('input_source',{}).get('path'):
+        from ..data.input_binding import bind_prepared_source
+        prepared = bind_prepared_source(prepared,config['input_source']['path'])
+    with admitted_training(runtime, prepared, training["scientific"]["spec"], stage="prediction") as allocation:
+        runtime['resource_handle'] = allocation['resource_handle']
+        if allocation['gpus']:
+            os.environ["CUDA_VISIBLE_DEVICES"] = allocation["gpus"][0]["uuid"]
         try:
-            return _predict(runtime, output, inputs, case_ids, manifest)
+            return _predict(runtime, output, inputs, case_ids, manifest, prepared_source=prepared)
         finally:
-            torch.cuda.empty_cache()
+            if allocation['gpus']:
+                torch.cuda.empty_cache()
             if previous is None:
                 os.environ.pop("CUDA_VISIBLE_DEVICES", None)
             else:
                 os.environ["CUDA_VISIBLE_DEVICES"] = previous
 
 
-def _predict(config, output, inputs=None, case_ids=None, manifest=None):
+def _predict(config, output, inputs=None, case_ids=None, manifest=None, prepared_source=None):
     started = perf_counter()
     training = read_json(Path(config["run_dir"]) / "run.json")
-    prepared = deepcopy(training["prepared"])
+    prepared = deepcopy(prepared_source if prepared_source is not None else training["prepared"])
     if config['dataset'] != prepared['dataset']:
         raise ValueError('预测配置与输入数据集不同')
     if inputs is not None:
@@ -76,7 +85,9 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None):
     options = config["prediction"]
     torch.set_num_threads(config["resources"]["cpu_threads"])
     device = device_for(config)
-    with operation_lock(output), storage_lease(prepared, config), prediction_snapshot(config["run_dir"], options.get('checkpoint','latest')) as pointer:
+    with ExitStack() as cleanup, operation_lock(output), storage_lease(prepared, config), prediction_snapshot(config["run_dir"], options.get('checkpoint','latest')) as pointer:
+        memory = cleanup.enter_context(memory_for(dict(config=config,resource_handle=config['resource_handle'])))
+        case_cleanup = cleanup.enter_context(ExitStack())
         task_path = output/'prediction-task.json'
         task = dict(training_run=str(Path(config['run_dir']).resolve()), dataset=prepared['dataset'],
             source=prepared.get('storage'), geometry=prepared['plan'], technical=prepared['technical'],
@@ -87,7 +98,11 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None):
                 raise ValueError('已有预测任务的模型运行、来源或几何参数不同，请使用新的输出目录')
             pointer = recorded['pointer']
         else:
-            write_json(task_path, dict(task=task, pointer=pointer))
+            from ..models.workflow import save_state
+            selected = load_checkpoint(config['run_dir'],training['identity'],pointer=pointer)
+            save_state(output/'selected-model.pt',{key:selected[key] for key in ('identity','model','spec')})
+            del selected
+            write_json(task_path, dict(task=task, pointer=pointer, snapshot='selected-model.pt'))
         completed = read_json(output / "predictions.json") if (output / "predictions.json").exists() else {"cases": {}}
         dataset = CaseDataset(prepared, config["resources"], with_label=False, log_dir=log_dir,
                               logging=config.get("logging"))
@@ -117,14 +132,17 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None):
                 entry = dataset.get(name)
             if model is None:
                 with stage(config, "prediction_model_load", device=str(device)):
-                    state = load_checkpoint(config["run_dir"], training["identity"], pointer=pointer)
+                    state = torch.load(output/'selected-model.pt',map_location='cpu',weights_only=False)
+                    if state['identity'] != training['identity']:
+                        raise ValueError('固定预测模型与当前训练运行不同')
                     model = StunetAdapter.build(state["spec"]).to(device).eval()
                     model.load_state_dict(state["model"], strict=True)
                     spec = state["spec"]
                     del state
             footprint = int(entry["image"].size * (spec["num_classes"] * 12 + 8))
-            if psutil.virtual_memory().available < config["resources"]["reserve_ram_bytes"] + footprint:
-                raise MemoryError("整例概率融合内存不足")
+            ticket = case_cleanup.enter_context(memory.admit(footprint,label='prediction_probabilities'))
+            if ticket is None:
+                raise InterruptedError('整例预测已取消')
             read_seconds = perf_counter() - mark
             mark = perf_counter()
 
@@ -168,6 +186,7 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None):
             results.append(receipt)
             del native, probabilities, logits, entry
             dataset.clear()
+            case_cleanup.close()
         summary = {"state": "completed", "scope": prepared["scope"], "cases": results,
                    "new": len(results) - reused, "reused": reused, "seconds": perf_counter() - started}
         write_json(output / "summary.json", summary)

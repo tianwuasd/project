@@ -1,5 +1,7 @@
 import argparse
 from copy import deepcopy
+from functools import partial
+import gc
 import json
 import os
 from pathlib import Path
@@ -43,7 +45,7 @@ def prepare(args):
         row.update(image=str(Path(settings['data_root'])/(name+'_image.nii.gz')),
                    label=str(Path(settings['data_root'])/(name+'_label.nii.gz')), roles=[role])
         selected.append(row)
-    manifest.update(dataset='imagechd', scope='technical', data_root=settings['data_root'], cases=selected,
+    manifest.update(dataset='imagechd', scope='technical', data_root=settings['data_root'], binding_required=False, cases=selected,
                     plan_scope='technical')
     course = root/'course'
     write_json(course/'manifest.json', manifest)
@@ -81,11 +83,99 @@ def prepare(args):
     med = dict(common,model='medsam2',run_dir=str(course/'runs/Med'),accumulation=1,batch=1,workers=0,
         frames=8,resolution=512,epochs=75,pretrained=str(engine/'data/model_weights/MedSAM2_latest.pt'),
         official_root=str(engine/'vendor/MedSAM2'),dependency_root=str(engine/'env/medsam2'),
-        input_source=dict(intensity_mode='source_window'))
+        input_source=dict(intensity_mode='auto'))
     write_json(course/'med.json',med)
     write_json(reports/'prepare.json',dict(state='completed',roles=roles['base'],cases=list(ids),
         source=str(course/'shared-offline.json'),seconds=perf_counter()-began,
         arrays={key:val for key,val in offline['storage'].items() if key!='cases'}))
+
+
+def inspect_inputs(args):
+    engine, root, reports = setup(args)
+    from chd_segmentation.artifacts.store import write_json
+    from chd_segmentation.config import load_config
+    from chd_segmentation.preprocessing.prepare import load_prepared
+    from chd_segmentation.preprocessing.offline import preprocess
+    from chd_segmentation.models.workflow import options, adapter
+    from chd_segmentation.models.offline import validate_model_storage
+    from chd_segmentation.models.cases import ModelCases
+    from chd_segmentation.models.medsam2.native import produce_native_case, native_recipe, resolve_window
+    from chd_segmentation.models.medsam2.official import effective_config
+    from chd_segmentation.models.stunet.adapter import StunetAdapter
+    import torch
+    torch.set_num_threads(1)
+    course = root/'course'
+    source = load_prepared(course/'source.json')
+    shared = load_prepared(course/'shared-offline.json')
+    stu = load_config(course/'stu.json')
+    spec = StunetAdapter.spec(stu, source['plan'])
+    model = StunetAdapter.build(spec)
+    weight = StunetAdapter.load_pretrained(model, stu['pretrained'])
+    del model
+    gc.collect()
+    checks = dict(stu_initialization=weight)
+    for stage in ('base','localizer'):
+        q = options(course/('q-'+stage+'.json'))
+        bundle = adapter(q, shared, stage)
+        checks['q_'+stage] = dict(parameters=sum(p.numel() for p in bundle.model.parameters()))
+        del bundle
+        gc.collect()
+    med = options(course/'med.json')
+    native_config = deepcopy(stu)
+    native_config['preprocessing'].update(root=str(root/'data/native'), statistics_source='MedSAM2-training')
+    window = resolve_window(med, source)
+    native = load_prepared(course/'med-native.json') if (course/'med-native.json').exists() else preprocess(
+        native_config, course/'source.json', course/'med-native.json', method_label='MedSAM2',
+        producer=partial(produce_native_case,window=window),
+        recipe_builder=partial(native_recipe,window=window,derived_window=True))
+    checks['med_sources'] = {}
+    for label, prepared in (('shared_stu',shared),('native',native)):
+        validate_model_storage(med,prepared)
+        cases = ModelCases(prepared,med,with_label=True)
+        entry = cases.get('ct_1001')
+        checks['med_sources'][label] = dict(shape=list(entry['image'].shape),
+            dtype=str(entry['image'].dtype),intensity=entry['intensity_conversion'])
+        cases.clear()
+    recipe = effective_config(med, shared, course/'med-offline.json',course/'runs/Med/sequence',['ct_1001'])
+    from hydra.utils import instantiate
+    leaf = recipe['trainer']['data']['train']['datasets'][0]['dataset']['datasets'][0]
+    dataset = instantiate(leaf)
+    sample = dataset[0]
+    checks['med_official_sample'] = dict(type=type(sample).__name__,frames=len(sample.frames))
+    bundle = adapter(med,shared,'sequence')
+    checks['med_initialization'] = dict(parameters=sum(p.numel() for p in bundle.model.parameters()))
+    write_json(reports/'inspect.json',dict(state='completed',checks=checks,optimizer_updates=0))
+
+
+def command(args):
+    engine, root, reports = setup(args)
+    os.environ['CHD_MINI_TOOL_ROOT'] = str(engine.parent/'chd-segmentation-assistant3')
+    os.environ['CHD_MINI_ATTEMPT_LEDGER'] = str(reports.parent/'attempts.json')
+    os.environ['CHD_MINI_STAGE'] = args.stage
+    from chd_segmentation.cli import main
+    course = root/'course'
+    stage = args.stage
+    model_stage = stage.removeprefix('q_') if stage.startswith('q_') else 'sequence'
+    config = course/('stu.json' if stage=='stu' else 'med.json' if stage=='med_sequence' else 'q-'+model_stage+'.json')
+    prepared = course/('med-offline.json' if stage=='med_sequence' else 'shared-offline.json')
+    if args.phase=='train':
+        command_args = ['train','--config',str(config),'--prepared',str(prepared),'--stop-after',str(args.stop_after)]
+        if stage!='stu':
+            command_args = ['models']+command_args+['--stage',model_stage]
+        if args.resume:
+            command_args += ['--resume']
+    elif args.phase=='predict':
+        command_args = ['predict','--config',str(config),'--output',str(root/'result'/stage),'--checkpoint','best']
+        if stage!='stu':
+            command_args = ['models']+command_args+['--prepared',str(prepared)]
+        if stage=='med_sequence':
+            command_args += ['--prompt-mode','label-box']
+        for name in (('ct_1001','ct_1012') if args.resume else ('ct_1001',)):
+            command_args += ['--case',name]
+    else:
+        command_args = ['evaluate','--config',str(course/'stu.json'),'--prepared',str(prepared),
+            '--predictions',str(root/'result'/stage),'--output',str(root/'result'/(stage+'-evaluation.json'))]
+    main(command_args)
 
 
 if __name__ == '__main__':
@@ -93,6 +183,14 @@ if __name__ == '__main__':
     parser.add_argument('--settings',required=True)
     parser.add_argument('--work',required=True)
     parser.add_argument('--reports',required=True)
-    parser.add_argument('--phase',choices=('prepare',),required=True)
+    parser.add_argument('--phase',choices=('prepare','inspect','train','predict','evaluate'),required=True)
+    parser.add_argument('--stage',choices=('stu','q_base','q_localizer','q_local','med_sequence'))
+    parser.add_argument('--resume',action='store_true')
+    parser.add_argument('--stop-after',type=int,choices=(1,2),default=1)
     arguments = parser.parse_args()
-    prepare(arguments)
+    if arguments.phase=='prepare':
+        prepare(arguments)
+    elif arguments.phase=='inspect':
+        inspect_inputs(arguments)
+    else:
+        command(arguments)

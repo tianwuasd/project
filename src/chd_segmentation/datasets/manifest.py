@@ -47,7 +47,8 @@ def load_manifest(path, dataset, scope, allow_unassigned=False):
             raise ValueError("ImageCHD 仅接收完整或缺 MYO 的监督协议")
         if set(row.get("known_absent_classes", [])) & unknown:
             raise ValueError("真实缺如与未知类别不能重叠")
-        if scope == "formal" and not allow_unassigned and "predict" not in row["roles"] and not row.get("patient"):
+        unit = value.get('split_source', {}).get('unit', 'case' if dataset=='imagechd' else 'patient')
+        if scope == "formal" and unit=='patient' and not allow_unassigned and "predict" not in row["roles"] and not row.get("patient"):
             raise ValueError("正式划分缺少患者身份")
         expected = "shared_index_excel" if dataset == "chd1282" else "matching_affine_author_spacing"
         if row["geometry_policy"] != expected:

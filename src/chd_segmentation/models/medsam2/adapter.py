@@ -93,10 +93,7 @@ class MedSAM2Adapter:
         model_config['fill_hole_area'] = 0
         predictor = instantiate(OmegaConf.create(model_config),_recursive_=True).to(self.device).eval()
         predictor.load_state_dict(self.model.state_dict(),strict=True)
-        from .native import resolve_window
-        window = resolve_window(self.config,self.prepared)
-        if entry['gray_window'] != window:
-            raise ValueError('MedSAM2预测窗口与离线数据不同')
+        window = entry['gray_window']
         image = FrameSequence(entry['image'],self.config['resolution'],window,
             self.config['execution'].get('reserve_ram_bytes',4*2**30),windowed=True)
         depth,height,width = entry['image'].shape[1:]

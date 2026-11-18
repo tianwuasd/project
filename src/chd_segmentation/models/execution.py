@@ -92,12 +92,12 @@ def admitted(config,prepared,stage,topology=None):
     amount = supply['ram_bytes'] if supply['admitted'] else supply.get('minimum_bytes', 0)
     if amount <= 0:
         raise RuntimeError('模型供数无法建立有效工作集预算：'+supply.get('reason', '未知原因'))
-    demand = ResourceDemand(fixed_bytes=int(amount), cpu_slots=world,
+    demand = ResourceDemand(fixed_bytes=int(amount), cpu_slots=int(supply.get('cpu_slots', world)),
         gpu_count=world if common['resources']['device']=='cuda' else 0,
         gpu_ids=common['resources']['gpu_ids'], local_batches=layout(common['training']['batch'], world,
             common['resources']['batch_layout']))
     request = RuntimeRequest(str(Path(config['run_dir']).resolve()), stage, root/'resources',
-        common['run_dir'], common['resources'], demand)
+        common['run_dir'], dict(common['resources'],gpu_spec=spec), demand)
     with ResourceSession(request) as session:
         if not supply['admitted']:
             supply = cpu_plan(common, budget, world, stage='prediction' if stage=='prediction' else 'train')
