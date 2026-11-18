@@ -159,6 +159,30 @@ class ReviewRegressions(unittest.TestCase):
             self.assertEqual(row['retained_case_bytes'],voxels*10)
             self.assertEqual(row['propagation_history_bytes'],pointer['shape_czyx'][1]*7*4*2**20)
 
+    def test_missing_gpu_observation_cannot_become_complete_capacity_evidence(self):
+        from chd_segmentation.acceleration.measurements import complete_peak,process_vram_observation
+        from chd_segmentation.acceleration.registry import inventory
+        observed = inventory()
+        if observed:
+            record = process_vram_observation(observed[0]['uuid'],os.getpid())
+            self.assertIsNone(record['bytes'])
+            self.assertIsNone(complete_peak([dict(peak_vram_bytes=record['bytes'])]))
+
+    def test_explicit_backend_selection_does_not_initialize_cuda(self):
+        import torch
+        import torch.distributed as dist
+        from chd_segmentation.acceleration.distributed import distributed_backend
+        self.assertFalse(torch.cuda.is_initialized())
+        self.assertEqual(distributed_backend('cpu'),'gloo')
+        with self.assertRaises(ValueError):
+            distributed_backend('cpu','nccl')
+        if torch.cuda.is_available():
+            self.assertEqual(distributed_backend('cuda','gloo'),'gloo')
+            if not dist.is_nccl_available():
+                with self.assertRaises(RuntimeError):
+                    distributed_backend('cuda')
+        self.assertFalse(torch.cuda.is_initialized())
+
 
 if __name__=='__main__':
     unittest.main()

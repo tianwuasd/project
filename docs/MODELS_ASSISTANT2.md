@@ -56,6 +56,8 @@ python -B run.py models train --config /path/to/medsam2.yaml --prepared /path/to
 
 MedSAM2保存官方 `checkpoints/checkpoint.pt`，同一文件包含模型、优化器、进度及`_chd`中的完整随机状态、提示随机状态和运行身份。写入完成并同步磁盘后原子替换，阶段锁在读取和写入前取得，持续到训练子进程退出。`official-config.json`记录实际完整配方。运行使用官方Trainer和train_epoch，数据增强、RandomUniformSampler、AdamW、余弦调度、0.9逐层学习率衰减、0.1梯度裁剪均取自官方FLARE25配置。默认学习率5e-5、图像编码器3e-5、weight decay 0.1；bias与LayerNorm权重按官方配置不衰减。默认8帧、最多3目标、512分辨率、batch2、75epoch，batch和worker可按资源修改。
 
+MedSAM2可在模型配置中显式设置distributed_backend: gloo。默认CPU选择Gloo、CUDA选择NCCL；库未提供所选后端时直接报告，不自动更换。Windows单卡CUDA/Gloo需在获准环境先做真实通信检查，参数级支持不表示完整模型或显存容量已验证。CPU预算包含最多3目标的计算图；本机16GiB范围的官方前向已因内存不足停止，完整训练与恢复仍需适当资源的实际验证。
+
 Q基座配置的updates填写40000，定位器填写5000，局部网络填写20000；正式累积次数为4。基座学习率预热1000次、其他阶段500次，之后采用r2余弦日程。局部前2000次只监督初始分割及q，后18000次加入三步求解。`method`支持M07及同监督M02；候选按真实错误、正确关键结构及其他候选分层，空层重新归一化，概率扰动比例为20%。`key_references`可登记候选与独立关键结构参考，没有该参考时不会将候选登记为已正确关键结构。候选抽样和扰动随机状态均保存恢复。
 
 ```text
@@ -81,6 +83,8 @@ MedSAM2使用[固定官方提交332f30d](https://github.com/bowang-lab/MedSAM2/t
 官方源码在vendor/MedSAM2，额外依赖在env/medsam2，官方权重在data/model_weights/MedSAM2_latest.pt，均被Git忽略并保留复用。权重来自[官方Hugging Face仓库固定版本](https://huggingface.co/wanglab/MedSAM2/tree/e4a6f35edd7e091619cbc0750f462f1574e23955)，容量156040129字节，SHA-256为 `c92743b99f00d078bf32a3afcc38aaa9faf1c1692dffe3eaa7a90938c1991060`。下载交付时独立核验；常规训练直接由官方初始化器严格加载参数，预测按实际模型结构与参数键加载。
 
 常规运行记录实际配置的权重路径、文件容量和已导入源码位置，沿用已有交付记录；未重新核实的输入明确标记configured_pretrained及official_verified=false。直接权重预测的训练更新数标为未核实，不据参数键把任意同结构模型写成官方零更新状态。
+
+模型GPU统计分别记录Torch allocator峰值和外部进程显存。外部指标缺失时保留None及原因，完整peak_vram_bytes为None，不据此写入共享或自动降卡容量记录；已保存的训练结果继续完成收尾。普通可观测路径保持原Torch峰值与外部占用合并口径。
 
 额外依赖列于requirements-medsam2.txt。运行需要实际可用的依赖与API；必要导入或参数读取失败时直接报告。模型预处理不依赖初始化权重或严格Torch版本文字。独立安装不修改助手1的Python环境。
 

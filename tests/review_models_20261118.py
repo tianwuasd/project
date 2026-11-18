@@ -468,6 +468,8 @@ def supervised(args):
         command_line += ['--prepared',str(Path(args.prepared).resolve(strict=True))]
     if args.config is not None:
         command_line += ['--config',str(Path(args.config).resolve(strict=True))]
+    if args.execute_cuda:
+        command_line += ['--execute-cuda']
     source = subprocess.run(['git','-C',str(engine),'rev-parse','HEAD'],check=True,capture_output=True,text=True).stdout.strip()
     environment = dict(os.environ,PYTHONUTF8='1',PYTHONIOENCODING='utf-8',PYTHONDONTWRITEBYTECODE='1')
     try:
@@ -491,7 +493,7 @@ if __name__ == '__main__':
     parser.add_argument('--settings',required=True)
     parser.add_argument('--work',required=True)
     parser.add_argument('--reports',required=True)
-    parser.add_argument('--phase',choices=('prepare','inspect','backend-parameters','granted-plan','resource-integration','q-base-fork','startup-check','preprocess-reuse','q-inputs','q-local-inputs','med-supervision','restore','train','predict','evaluate'),required=True)
+    parser.add_argument('--phase',choices=('prepare','inspect','cuda-collective','backend-parameters','granted-plan','resource-integration','q-base-fork','startup-check','preprocess-reuse','q-inputs','q-local-inputs','med-supervision','restore','train','predict','evaluate'),required=True)
     parser.add_argument('--stage',choices=('stu','q_base','q_localizer','q_local','med_sequence'))
     parser.add_argument('--resume',action='store_true')
     parser.add_argument('--stop-after',type=int,choices=(1,2),default=1)
@@ -499,6 +501,7 @@ if __name__ == '__main__':
     parser.add_argument('--tag')
     parser.add_argument('--prepared')
     parser.add_argument('--config')
+    parser.add_argument('--execute-cuda',action='store_true')
     arguments = parser.parse_args()
     if arguments.supervise:
         supervised(arguments)
@@ -510,6 +513,9 @@ if __name__ == '__main__':
         check(arguments)
     elif arguments.phase=='backend-parameters':
         from review_backend_20261118 import check
+        check(arguments)
+    elif arguments.phase=='cuda-collective':
+        from review_cuda_collective_20261118 import check
         check(arguments)
     elif arguments.phase=='prepare':
         prepare(arguments)
