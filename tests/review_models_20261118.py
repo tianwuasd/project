@@ -326,6 +326,7 @@ def inspect_q_local(args):
     source = Path(args.prepared).resolve(strict=True)
     prepared = load_prepared(source)
     config = options(root/'course/q-local.json')
+    config = dict(config,run_dir=str(root/'checks/q-local-inputs'))
     bundle = adapter(config,prepared,'local')
     dataset = CaseDataset(prepared,dict(cache_bytes=0),with_label=True)
     bundle.prepare_training(dataset,['ct_1001'])
@@ -339,6 +340,24 @@ def inspect_q_local(args):
     write_json(reports/'q-local-inputs.json',dict(state='completed',prepared_source=str(source),
         training_case='ct_1001',validation_case='ct_1012',loss=loss,validation_loss=validation,optimizer_updates=0))
     dataset.clear()
+
+
+def inspect_preprocess_reuse(args):
+    engine, root, reports = setup(args)
+    from chd_segmentation.artifacts.store import read_json,write_json
+    from chd_segmentation.models.offline import preprocess_model
+    course = root/'course'
+    checks = {}
+    for name,model,prepared in (('q_stu','q-base.json','shared-offline.json'),
+            ('med_stu','med.json','shared-offline.json'),('med_native','med.json','med-native.json')):
+        source = read_json(course/prepared)
+        result = preprocess_model(course/model,course/'stu.json',course/prepared,
+            source['storage']['root'],course/('reuse-'+name+'.json'))
+        if result['storage']!=source['storage']:
+            raise ValueError('预处理复用入口改变了已有数组来源')
+        checks[name] = dict(prepared_source=str(course/prepared),root=result['storage']['root'],
+            reused_cases=list(result['storage']['cases']),new_arrays=0)
+    write_json(reports/'preprocess-reuse.json',dict(state='completed',checks=checks,optimizer_updates=0))
 
 
 def supervised(args):
@@ -380,7 +399,7 @@ if __name__ == '__main__':
     parser.add_argument('--settings',required=True)
     parser.add_argument('--work',required=True)
     parser.add_argument('--reports',required=True)
-    parser.add_argument('--phase',choices=('prepare','inspect','q-inputs','q-local-inputs','med-supervision','restore','train','predict','evaluate'),required=True)
+    parser.add_argument('--phase',choices=('prepare','inspect','preprocess-reuse','q-inputs','q-local-inputs','med-supervision','restore','train','predict','evaluate'),required=True)
     parser.add_argument('--stage',choices=('stu','q_base','q_localizer','q_local','med_sequence'))
     parser.add_argument('--resume',action='store_true')
     parser.add_argument('--stop-after',type=int,choices=(1,2),default=1)
@@ -402,5 +421,7 @@ if __name__ == '__main__':
         inspect_q_local(arguments)
     elif arguments.phase=='med-supervision':
         inspect_med_supervision(arguments)
+    elif arguments.phase=='preprocess-reuse':
+        inspect_preprocess_reuse(arguments)
     else:
         command(arguments)
