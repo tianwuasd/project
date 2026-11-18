@@ -28,6 +28,7 @@ def check(args):
     torch.set_num_threads(1)
     began = perf_counter()
     config = load_config(root/'course/stu.json')
+    config['work_root'] = str(root)
     config['run_dir'] = str(root/'checks/resource-integration')
     config['resources'].update(workers=1, max_workers=1, prefetch=1, wait_seconds=15)
     prepared = load_prepared(root/'course/shared-offline.json')
