@@ -157,7 +157,7 @@ def rebalance_supply(job, supply, gate, device, rank, stop_event, proposal=None)
         from ..acceleration import attach, SafeBoundary
         from .session import supply_demand, supply_layout
         applied = attach(job['resource_handle']).request_replan(
-            supply_demand(proposal, world, config['resources'], job['shares']),
+            supply_demand(proposal, world, config['resources'], job['shares'],gpus=job['gpus']),
             safe_boundary=SafeBoundary('batch_consumed', control), layout=supply_layout(proposal))
         if applied['applied']['layout'] != supply_layout(proposal):
             raise RuntimeError('公共会话应用的供数布局与请求不同')
@@ -623,7 +623,7 @@ def launch_group(config, prepared, spec, identity, allocation, resume, stop_afte
         if len(state["rank_rng"]) != world and not boundary:
             raise ValueError("当前检查点处于 epoch 内部，恢复时需要原进程数量")
         del state
-    shares = layout(config["training"]["batch"], world, config["resources"]["batch_layout"])
+    shares = allocation['shares']
     with socket.socket() as rendezvous:
         rendezvous.bind(("127.0.0.1", 0))
         port = rendezvous.getsockname()[1]

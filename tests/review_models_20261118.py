@@ -267,6 +267,34 @@ def inspect_restore(args):
     torch.set_num_threads(1)
     ledger = reports.parent/'attempts.json'
     before = read_json(ledger)
+    if args.stage=='stu':
+        from dataclasses import asdict
+        from importlib.metadata import version
+        from chd_segmentation.config import load_config
+        from chd_segmentation.preprocessing.prepare import load_prepared
+        from chd_segmentation.models.stunet.adapter import StunetAdapter,WEIGHT_SHA256
+        from chd_segmentation.training.engine import code_identity
+        from chd_segmentation.compatibility import compatible_code
+        from chd_segmentation.artifacts.store import digest
+        config = load_config(root/'course/stu.json')
+        prepared = load_prepared(root/'course/shared-offline.json')
+        previous = read_json(root/'course/runs/STU/run.json')
+        target = code_identity()
+        current = dict(prepared_identity=prepared['identity'],model='stunet',
+            spec=asdict(StunetAdapter.spec(config,prepared['plan'])),training=config['training'],
+            pretrained=WEIGHT_SHA256,code_identity=target,
+            versions={name:version(name) for name in ('torch','monai','nnunetv2','numpy','scipy')})
+        expected = dict(current,code_identity=previous['scientific']['code_identity'])
+        if previous['scientific']!=expected or digest(expected)!=previous['identity']:
+            raise ValueError('真实旧STU运行的科学设置与当前配置不同')
+        if not compatible_code(previous['scientific']['code_identity'],target) or compatible_code('0'*64,target):
+            raise ValueError('精确代码兼容记录缺失或意外放行未知摘要')
+        if read_json(ledger)!=before:
+            raise ValueError('零更新兼容核对改变了唯一台账')
+        write_json(reports/'stu-compatibility.json',dict(state='completed',
+            source=previous['scientific']['code_identity'],target=target,scientific_equal=True,
+            exact_edge=True,unknown_rejected=True,optimizer_step_calls=0,ledger_unchanged=True))
+        return
     if args.stage not in ('q_base','q_localizer'):
         raise ValueError('只读恢复检查需要明确Q基础或定位器阶段')
     stage = args.stage.removeprefix('q_')

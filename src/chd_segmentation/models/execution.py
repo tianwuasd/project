@@ -70,6 +70,7 @@ def admitted(config,prepared,stage,topology=None):
     common['model_stage'] = stage
     if stage=='prediction':
         common['training']['batch'] = 1
+        common['training']['precision'] = 'fp32'
     if topology is not None:
         requested_layout = common['resources']['batch_layout']
         if requested_layout is not None and requested_layout!=topology['shares']:
@@ -95,25 +96,23 @@ def admitted(config,prepared,stage,topology=None):
     amount = supply['ram_bytes'] if supply['admitted'] else supply.get('minimum_bytes', 0)
     if amount <= 0:
         raise RuntimeError('模型供数无法建立有效工作集预算：'+supply.get('reason', '未知原因'))
-    from ..training.session import supply_demand,supply_layout
+    from ..training.session import supply_demand,supply_layout,supply_planner
     shares = layout(common['training']['batch'],world,common['resources']['batch_layout'])
     demand = supply_demand(supply,world,common['resources'],shares)
     request = RuntimeRequest(str(Path(config['run_dir']).resolve()), stage, root/'resources',
         common['run_dir'], dict(common['resources'],gpu_spec=spec,max_wait=common['resources']['wait_seconds'],
-            precision=config['precision'],previous_world=topology['world'] if topology is not None else None), demand)
-    with ResourceSession(request,layout=supply_layout(supply)) as session:
-        if not supply['admitted']:
-            supply = cpu_plan(common, budget, world, stage='prediction' if stage=='prediction' else 'train',
-                              allocation=session.allocation, estimates=supply['case_estimates'])
-            if not supply['admitted']:
-                raise RuntimeError('公共准入后模型供数预算仍不可用：'+supply['reason'])
-            from ..acceleration import SafeBoundary
-            session.replan(supply_demand(supply,world,common['resources'],shares),
-                safe_boundary=SafeBoundary('before_case'),layout=supply_layout(supply))
+            precision=common['training']['precision'],previous_world=topology['world'] if topology is not None else None), demand)
+    with ResourceSession(request,layout=supply_layout(supply),planner=supply_planner(common,budget,
+            'prediction' if stage=='prediction' else 'train',supply['case_estimates'])) as session:
+        applied = session.allocation
         common['resource_handle'] = session.handle
+        common['resources'] = dict(common['resources'],batch_layout=applied.shares,
+            cpu_processes=applied.world,
+            gpu_count=applied.world if applied.gpus else common['resources']['gpu_count'],
+            min_gpus=applied.world if applied.gpus else common['resources']['min_gpus'],
+            gpu_ids=[gpu['uuid'] for gpu in applied.gpus] if applied.gpus else common['resources']['gpu_ids'])
         allocation = dict(owner=session.handle.owner, gpus=session.allocation.gpus,
-            world=world, supply=supply)
-        allocation['shares'] = layout(common['training']['batch'],allocation['world'],common['resources']['batch_layout'])
+            world=applied.world,supply=applied.supply,shares=applied.shares)
         if config['model']=='medsam2' and len(set(allocation['shares']))!=1:
             raise ValueError('MedSAM2官方训练要求各进程均分全局batch')
         allocation['spec'] = spec
