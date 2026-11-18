@@ -5,6 +5,7 @@ import gc
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 from time import perf_counter
@@ -360,6 +361,29 @@ def inspect_preprocess_reuse(args):
     write_json(reports/'preprocess-reuse.json',dict(state='completed',checks=checks,optimizer_updates=0))
 
 
+def inspect_startup(args):
+    engine, root, reports = setup(args)
+    from chd_segmentation.artifacts.store import read_json,write_json
+    from chd_segmentation.models.startup import check_start
+    source = read_json(root/'course/q-wide-offline.json')
+    directory = root/'checks/metadata-only-local'
+    directory.mkdir(parents=True,exist_ok=False)
+    event_path = directory/'events.jsonl'
+    shutil.copyfile(reports/'q-local-zero-events.jsonl',event_path)
+    check_start(directory,'q_route1',source['identity'],'local')
+    saved_root = root/'course/runs/Q-wide/local'
+    program = 'from chd_segmentation.models.startup import check_start; import sys; check_start(sys.argv[1],"q_route1",sys.argv[2],"local")'
+    rejected = subprocess.run([sys.executable,'-B','-c',program,str(saved_root),source['identity']],
+        env=dict(os.environ,PYTHONPATH=str(engine/'src')),capture_output=True,text=True,check=False)
+    if rejected.returncode==0 or 'FileExistsError' not in rejected.stderr:
+        raise ValueError('已保存模型的fresh初始化没有按预期拒绝')
+    removed = event_path.stat().st_size
+    event_path.unlink()
+    directory.rmdir()
+    write_json(reports/'startup-check.json',dict(state='completed',metadata_only_accepted=True,
+        real_saved_model_fresh_rejected=True,optimizer_updates=0,cleanup_files=1,cleanup_bytes=removed))
+
+
 def supervised(args):
     engine, root, reports = setup(args)
     tool = engine.parent/'chd-segmentation-assistant3'
@@ -399,7 +423,7 @@ if __name__ == '__main__':
     parser.add_argument('--settings',required=True)
     parser.add_argument('--work',required=True)
     parser.add_argument('--reports',required=True)
-    parser.add_argument('--phase',choices=('prepare','inspect','preprocess-reuse','q-inputs','q-local-inputs','med-supervision','restore','train','predict','evaluate'),required=True)
+    parser.add_argument('--phase',choices=('prepare','inspect','startup-check','preprocess-reuse','q-inputs','q-local-inputs','med-supervision','restore','train','predict','evaluate'),required=True)
     parser.add_argument('--stage',choices=('stu','q_base','q_localizer','q_local','med_sequence'))
     parser.add_argument('--resume',action='store_true')
     parser.add_argument('--stop-after',type=int,choices=(1,2),default=1)
@@ -423,5 +447,7 @@ if __name__ == '__main__':
         inspect_med_supervision(arguments)
     elif arguments.phase=='preprocess-reuse':
         inspect_preprocess_reuse(arguments)
+    elif arguments.phase=='startup-check':
+        inspect_startup(arguments)
     else:
         command(arguments)
