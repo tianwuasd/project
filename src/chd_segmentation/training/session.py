@@ -30,7 +30,8 @@ def admitted_training(config, prepared, spec, previous_world=None, stage='train'
     demand = supply_demand(supply, world, resources, shares)
     request = RuntimeRequest(str(Path(config['run_dir']).resolve()), stage,
         Path(config['work_root'])/'resources', config['run_dir'],
-        dict(resources,gpu_spec=spec,max_wait=resources['wait_seconds']), demand)
+        dict(resources,gpu_spec=spec,max_wait=resources['wait_seconds'],precision=config['training']['precision'],
+             previous_world=previous_world), demand)
     with ResourceSession(request, layout=supply_layout(supply)) as session:
         if not supply['admitted']:
             supply = cpu_plan(config, prepared, world, stage=stage, allocation=session.allocation,

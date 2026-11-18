@@ -27,7 +27,7 @@ class CaseDataset:
         self.rows = prepared["manifest"]["cases"]
         self.by_id = {row["case_id"]: index for index, row in enumerate(self.rows)}
         self.source = resolve_preprocessed(prepared['storage']['root'], dataset=prepared['dataset'],
-            case_ids=list(self.by_id))
+            case_ids=list(self.by_id),storage=prepared['storage'])
         self.with_label = with_label
         self.cache, self.cached_bytes = OrderedDict(), 0
         self.budget = resources["cache_bytes"]

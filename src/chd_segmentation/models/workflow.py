@@ -303,6 +303,10 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
         from ..training.checkpoint import require_resume_device
         require_resume_device(previous['config']['device'],device)
     initial_sha = initialization_digest(config,previous['initialization_sha256'] if previous else None)
+    source_changed = False
+    if previous is not None:
+        from .contracts import require_resume_contract
+        source_changed = require_resume_contract(previous['config'],previous['prepared'],config,prepared,stage)
     bundle = adapter(dict(config,device=str(device),seed=seed+rank),prepared,stage,initialize=not resume,
         parent_states=previous.get('parent_models') if previous else None)
     model = bundle.model.to(device)
@@ -361,7 +365,8 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
         rng.bit_generator.state = local_state['data_rng']
         if device.type=='cuda':
             torch.cuda.set_rng_state(local_state['cuda_rng'],device)
-        bundle.restore_extra(local_state['extra'])
+        if not source_changed:
+            bundle.restore_extra(local_state['extra'])
         from ..training.checkpoint import tensors_equal
         restored = (tensors_equal(model.state_dict(),state['model']) and
             tensors_equal(optimizer.state_dict(),state['optimizer']) and
@@ -371,12 +376,16 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
             np.array_equal(np.random.get_state()[1],local_state['numpy_rng'][1]) and
             np.random.get_state()[2:]==local_state['numpy_rng'][2:] and
             (device.type!='cuda' or torch.equal(torch.cuda.get_rng_state(device),local_state['cuda_rng'])) and
-            tensors_equal(bundle.extra_state(),local_state['extra']) and
+            (source_changed or tensors_equal(bundle.extra_state(),local_state['extra'])) and
             rng.bit_generator.state==local_state['data_rng'])
         if not restored:
             raise ValueError('Q模型、优化器或逐进程随机状态未完整恢复')
+        if source_changed:
+            restored = False
         update,history,best = state['update'],state['history'],state['best']
-        selection = state.get('selection')
+        if source_changed:
+            best = None
+        selection = None if source_changed else state.get('selection')
     reason = None
     saved_at = perf_counter()
     peak_vram = 0
@@ -491,6 +500,7 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
             state = dict(identity=identity,model=model.state_dict(),optimizer=optimizer.state_dict(),rank_states=rank_states,
                 batch_layout=allocation['shares'],
                 update=update,history=history,config=config,prepared_identity=prepared['identity'],stage=stage,
+                selection_source_changed=source_changed,
                 spec=bundle.spec,training_cases=names,scope=prepared['scope'],best=best,
                 selection=selection, attempt=attempt)
             state.update(prepared=prepared,initialization_sha256=initial_sha)

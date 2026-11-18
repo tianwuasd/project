@@ -1,6 +1,5 @@
 from copy import deepcopy
 from pathlib import Path
-import subprocess
 import sys
 
 import numpy as np
@@ -15,19 +14,10 @@ from . import UPSTREAM_COMMIT
 
 def activate(config, *, inference=False):
     root = Path(config['official_root']).resolve(strict=True)
-    if not inference:
-        sha = subprocess.run(['git','-C',str(root),'rev-parse','HEAD'],check=True,capture_output=True,text=True).stdout.strip()
-        if sha!=UPSTREAM_COMMIT:
-            raise ValueError('MedSAM2官方提交不匹配')
-        changed = subprocess.run(['git','-C',str(root),'status','--porcelain','--untracked-files=no'],check=True,capture_output=True,text=True).stdout
-        if changed:
-            raise ValueError('MedSAM2官方源码包含修改')
     sys.path.insert(0,str(root))
     if config['dependency_root']:
         sys.path.insert(0,str(Path(config['dependency_root']).resolve(strict=True)))
     import sam2
-    if not inference and Path(sam2.__file__).resolve()!=root/'sam2/__init__.py':
-        raise ValueError('MedSAM2导入来源不匹配')
     return root
 
 
@@ -60,6 +50,8 @@ class MedSAM2Adapter:
         if stage!='sequence':
             raise ValueError('MedSAM2阶段必须为sequence')
         root = activate(config, inference=not initialize)
+        import sam2
+        self.imported_source = str(Path(sam2.__file__).resolve())
         from hydra.utils import instantiate
         from omegaconf import OmegaConf
         self.config,self.prepared = config,prepared
@@ -134,5 +126,8 @@ class MedSAM2Adapter:
                         scores[class_id,index] = logits[position,0].float().cpu()
         probability = scores.softmax(0).numpy()
         return probability,dict(prompt_sources=[item['source'] for item in items],prompt_space='native_dhw',
-                                upstream_commit=UPSTREAM_COMMIT,frames=depth,postprocess_extension=False,
+                                configured_official_root=self.config['official_root'],
+                                imported_sam2=self.imported_source,
+                                declared_upstream_commit=UPSTREAM_COMMIT,source_reverified=False,
+                                frames=depth,postprocess_extension=False,
                                 propagation_steps=propagation_steps)

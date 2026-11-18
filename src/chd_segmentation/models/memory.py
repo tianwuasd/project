@@ -21,7 +21,7 @@ def case_estimates(config,prepared,stage):
     if prepared.get('storage'):
         from ..preprocessing.inputs import resolve_preprocessed
         source = resolve_preprocessed(prepared['storage']['root'],dataset=prepared['dataset'],
-            case_ids=[row['case_id'] for row in rows])
+            case_ids=[row['case_id'] for row in rows],storage=prepared['storage'])
     for row in rows:
         stored = prepared.get('storage',{}).get('cases',{}).get(row['case_id'])
         entry = source.open(row['case_id'],with_label=False) if stored is not None else None

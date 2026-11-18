@@ -121,7 +121,7 @@ def main(payload,rank,common,allocation,gate,memory):
         if trainer.device.type=='cuda':
             torch.cuda.set_rng_state(state['cuda_rng'],trainer.device)
         history = extra['history']
-        selection = extra.get('selection')
+        selection = None if payload.get('selection_source_changed') else extra.get('selection')
         successful_updates = extra.get('successful_updates', trainer.steps['train'])
         del state
     limit = payload['stop_after']
@@ -179,11 +179,8 @@ def main(payload,rank,common,allocation,gate,memory):
                 if rank == 0:
                     finish_attempt(config, 'sequence', active_attempt, 'successful' if step_succeeded else 'skipped')
             loader = BoundedLoader(loader, min(1, remaining), claim, finish)
-        if len(loader)<1:
-            raise ValueError('MedSAM2当前训练名单不足以形成一个实际batch')
-        if limit is not None and trainer.steps['train']+len(loader)>limit:
-            from .bounded_loader import BoundedLoader
-            loader = BoundedLoader(loader, limit-trainer.steps['train'], lambda: None)
+        from .bounded_loader import require_complete_epoch
+        require_complete_epoch(steps=trainer.steps['train'],limit=limit,batches=len(loader))
         mark = perf_counter()
         before = trainer.steps['train']
         result = trainer.train_epoch(loader)
@@ -201,10 +198,8 @@ def main(payload,rank,common,allocation,gate,memory):
             validation_names = [row['case_id'] for row in payload['prepared']['manifest']['cases']
                                 if 'validation' in row['roles']]
         from .validation import validate_sequences
-        from .data import sample_supply
-        sample_supply(None, rank)
-        validation = validate_sequences(trainer, recipe, payload['prepared'], validation_names, config['seed'])
-        sample_supply(gate, rank)
+        validation = validate_sequences(trainer, recipe, payload['prepared'], validation_names, config['seed'],
+            gate=gate,rank=rank)
         improved = False
         if validation is not None:
             value = sum(all_states(validation['value']))/allocation['world']

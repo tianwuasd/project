@@ -53,6 +53,15 @@ def resource_spec(config,prepared,stage):
         method=config['method'],prepared=prepared['identity'],parents=config['parents'])
 
 
+def training_budget(config,prepared,stage):
+    from .workflow import stage_case_names
+    names = set(stage_case_names(config,prepared,stage))
+    budget = deepcopy(prepared)
+    budget['manifest']['cases'] = [dict(row,roles=['train']) for row in prepared['manifest']['cases']
+                                  if row['case_id'] in names]
+    return budget
+
+
 @contextmanager
 def admitted(config,prepared,stage,topology=None):
     common = execution_config(config)
@@ -78,17 +87,7 @@ def admitted(config,prepared,stage,topology=None):
     spec = resource_spec(config,prepared,stage)
     budget = prepared
     if stage!='prediction':
-        from .workflow import training_names,validated_q_groups
-        names = set(training_names(config,prepared,stage))
-        if config['technical']:
-            from .roles import technical_names
-            names.update(technical_names(config['technical_roles'],stage,'validation',
-                [row['case_id'] for row in prepared['manifest']['cases']]))
-        if config['model']=='q_route1' and not config['technical']:
-            names.update(validated_q_groups(config,prepared)['C'])
-        budget = deepcopy(prepared)
-        budget['manifest']['cases'] = [dict(row,roles=['train']) for row in prepared['manifest']['cases']
-                                      if row['case_id'] in names]
+        budget = training_budget(config,prepared,stage)
     from ..acceleration import ResourceSession, RuntimeRequest, ResourceDemand
     from ..training.budget import cpu_plan
     world = common['resources']['gpu_count'] if common['resources']['device'] == 'cuda' else common['resources']['cpu_processes']
@@ -100,7 +99,8 @@ def admitted(config,prepared,stage,topology=None):
     shares = layout(common['training']['batch'],world,common['resources']['batch_layout'])
     demand = supply_demand(supply,world,common['resources'],shares)
     request = RuntimeRequest(str(Path(config['run_dir']).resolve()), stage, root/'resources',
-        common['run_dir'], dict(common['resources'],gpu_spec=spec,max_wait=common['resources']['wait_seconds']), demand)
+        common['run_dir'], dict(common['resources'],gpu_spec=spec,max_wait=common['resources']['wait_seconds'],
+            precision=config['precision'],previous_world=topology['world'] if topology is not None else None), demand)
     with ResourceSession(request,layout=supply_layout(supply)) as session:
         if not supply['admitted']:
             supply = cpu_plan(common, budget, world, stage='prediction' if stage=='prediction' else 'train',

@@ -1,3 +1,10 @@
+def require_complete_epoch(*,steps,limit,batches):
+    if batches<1:
+        raise ValueError('MedSAM2当前训练名单不足以形成一个实际batch')
+    if limit is not None and steps<limit<steps+batches:
+        raise ValueError('MedSAM2停止位置必须位于完整官方epoch边界')
+
+
 class BoundedLoader:
     def __init__(self, loader, count, claim, finish=None):
         self.loader, self.count, self.claim = loader, min(len(loader), count), claim

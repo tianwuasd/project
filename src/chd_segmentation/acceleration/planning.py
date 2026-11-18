@@ -35,7 +35,7 @@ def case_estimates(config, prepared, stage):
     if prediction and prepared.get('storage') is not None:
         from ..preprocessing.inputs import resolve_preprocessed
         source = resolve_preprocessed(prepared['storage']['root'],dataset=prepared['dataset'],
-            case_ids=[row['case_id'] for row in prepared['manifest']['cases']])
+            case_ids=[row['case_id'] for row in prepared['manifest']['cases']],storage=prepared['storage'])
     for row in prepared["manifest"]["cases"]:
         if stage == "train" and not set(row["roles"]) & {"train", "validation"}:
             continue

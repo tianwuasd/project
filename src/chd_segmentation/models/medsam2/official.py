@@ -71,7 +71,8 @@ def train_official(config,prepared_path,stage,resume=False,stop_after=None):
 def _train_locked(config,prepared,prepared_path,root,stage,resume,stop_after):
     if config['frames']!=8 or config['resolution']!=512 or config['accumulation']!=1 or config['freeze_image_encoder']:
         raise ValueError('MedSAM2官方配方需要8帧、512分辨率、无梯度累积且训练全部模型')
-    receipt = dict(path=config['pretrained'], sha256=None, source='configured_official_weight')
+    from .weights import configured_weight
+    receipt = configured_weight(config['pretrained'])
     from ..workflow import training_names,checked_identity
     from ..execution import admitted,run_workers
     names = training_names(config,prepared,stage)
@@ -85,9 +86,12 @@ def _train_locked(config,prepared,prepared_path,root,stage,resume,stop_after):
         check_start(root,config['model'],prepared['identity'],stage)
     if resume and not (root/'checkpoints/checkpoint.pt').is_file():
         raise FileNotFoundError('MedSAM2恢复需要完整官方检查点')
+    source_changed = False
     if resume:
         from ...training.checkpoint import require_resume_device
         previous_input = read_json(root/'worker-input.json')
+        from ..contracts import require_resume_contract
+        source_changed = require_resume_contract(previous_input['config'],previous_input['prepared'],config,prepared,stage)
         previous_names = previous_input['recipe']['trainer']['data']['train']['datasets'][0]['dataset']['datasets'][0]['video_dataset']['names']
         if (previous_input['stage']!=stage or previous_input['config']['model']!=config['model'] or
             previous_input['prepared']['dataset']!=prepared['dataset'] or
@@ -99,7 +103,8 @@ def _train_locked(config,prepared,prepared_path,root,stage,resume,stop_after):
     previous = read_json(root/'identity.json')['identity'] if resume else None
     identity = checked_identity(config,prepared,stage,previous=previous)
     payload = dict(config=config,prepared=prepared,recipe=recipe,identity=identity,weight=receipt,stage=stage,
-                   prepared_path=str(Path(prepared_path).resolve()),resume=resume,stop_after=stop_after)
+                   prepared_path=str(Path(prepared_path).resolve()),resume=resume,stop_after=stop_after,
+                   selection_source_changed=source_changed)
     topology = read_json(root/'execution-topology.json') if resume else None
     with admitted(config,prepared,stage,topology) as (common,allocation):
         return run_workers(payload,common,allocation)

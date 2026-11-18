@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 
-def validate_sequences(trainer, recipe, prepared, names, seed):
+def validate_sequences(trainer, recipe, prepared, names, seed, *, gate, rank):
     from hydra.utils import instantiate
     from training.utils.data_utils import collate_fn
     if not names:
@@ -30,12 +30,16 @@ def validate_sequences(trainer, recipe, prepared, names, seed):
     try:
         model.eval()
         dataset = instantiate(leaf)
+        gate.start(rank,f'med-validation:{trainer.epoch}',[1]*gate.world,trainer.device)
         for index, name in enumerate(names):
             random.seed(seed+index)
             np.random.seed(seed+index)
             torch.manual_seed(seed+index)
             model.rng = np.random.default_rng(seed+index)
-            batch = collate_fn([dataset[index]], dict_key='all').to(trainer.device)
+            with gate.build(rank,index,0):
+                batch = collate_fn([dataset[index]], dict_key='all').to(trainer.device)
+            gate.mark_ready(rank)
+            gate.deliver(rank)
             with torch.no_grad(), torch.autocast(trainer.device.type, dtype=torch.bfloat16,
                     enabled=trainer.device.type == 'cuda' and trainer.optim_conf.amp.enabled):
                 losses, _, _ = trainer._step(batch, model, 'val')
@@ -46,6 +50,7 @@ def validate_sequences(trainer, recipe, prepared, names, seed):
             patients.setdefault(key, []).append(value)
             cases.append(dict(case_id=name, loss=value))
             del batch, losses
+            gate.finish(rank,f'med-validation:{trainer.epoch}',trainer.device)
     finally:
         random.setstate(saved['python'])
         np.random.set_state(saved['numpy'])

@@ -18,3 +18,11 @@ def verify_official_weight(path):
     if path.stat().st_size!=OFFICIAL_WEIGHT['bytes'] or file_digest(path)!=OFFICIAL_WEIGHT['sha256']:
         raise ValueError('MedSAM2官方初始化权重的容量或摘要不匹配')
     return dict(OFFICIAL_WEIGHT,path=str(path))
+
+
+def configured_weight(path):
+    path = Path(path).resolve(strict=True)
+    stat = path.stat()
+    return dict(path=str(path),bytes=stat.st_size,stamp=[stat.st_size,stat.st_mtime_ns],
+        source='configured_pretrained',official_verified=False,sha256=None,
+        declared_official_revision=OFFICIAL_WEIGHT['revision'])

@@ -111,6 +111,9 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None, prepared
             del selected
             write_json(task_path, dict(task=task, pointer=pointer, snapshot='selected-model.pt'))
         completed = read_json(output / "predictions.json") if (output / "predictions.json").exists() else {"cases": {}}
+        from .commit import CaseCommit
+        commits = CaseCommit(output,digest(task))
+        commits.recover(completed['cases'],lambda records: write_json(output/'predictions.json',dict(cases=records)))
         dataset = CaseDataset(prepared, config["resources"], with_label=False, log_dir=log_dir,
                               logging=config.get("logging"))
         model, state = None, None
@@ -174,8 +177,6 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None, prepared
             image.header.set_xyzt_units(entry["source_units"] if options["export_space"] == "source" else "mm")
             pending = path.with_name(path.stem + ".pending.nii.gz")
             event(log_dir, "prediction_writing", case_id=name, file=str(path))
-            nib.save(image, pending)
-            os.replace(pending, path)
             receipt = {"case_id": name, "identity": identity, "file": path.name,
                        "data_identity": case_data_identity(prepared, row), "dataset": prepared["dataset"],
                        "reference_sha256": row.get("sha256", {}).get("label"),
@@ -185,8 +186,11 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None, prepared
                        "unknown_classes": row["unknown_classes"], "reused": False,
                        "timing": {"load_seconds": read_seconds, "sliding_window_seconds": compute_seconds,
                                   "restore_write_seconds": perf_counter() - mark, **entry["timing"]}}
-            completed["cases"][name] = receipt
-            write_json(output / "predictions.json", completed)
+            commits.begin(name,receipt,path.name,pending.name)
+            nib.save(image, pending)
+            receipt['timing']['restore_write_seconds'] = perf_counter()-mark
+            commits.ready(receipt)
+            commits.recover(completed['cases'],lambda records: write_json(output/'predictions.json',dict(cases=records)))
             event(log_dir, "prediction", case_id=name, scope=prepared["scope"], timing=receipt["timing"],
                   completed=len(results) + 1, total=len(requested), bytes=path.stat().st_size)
             results.append(receipt)
