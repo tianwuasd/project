@@ -29,6 +29,8 @@ best_record为真实阶段2选模记录JSON，best_path_field为其中指向模�
 
 部分模式仅为秘书明确交接的可用模型生成步骤，不为不可用模型读取配置、best路径或权重，不以官方预训练权重补充训练证据。报告始终INCOMPLETE，target_models保留stu/q/med，unavailable_models原样记录具体原因。Q某阶段有效更新与继续更新恢复分别记录，不能用一次更新代替恢复验证；增加训练尝试仍需独立授权。
 
+AttemptLedger新增`limits()`，返回`stage_limits`与`total_limit`。无同名`.approval.json`时仍为每阶段2/总10。本轮秘书根据用户明确批准写入attempts.approval.json，严格绑定run_id与解析后的ledger_path，明确协议、全部字段及授权说明；仅接受q_base=3、其他阶段2、总11这一个例外。read/claim均核对批准文件及上限，原记录与outcome保持不变。助手2计算remaining时取该阶段上限减累计次数与总上限减全部次数的较小值，不能在调用方固定写成2/10。阶段3继续仅读台账，不能领取Q base第三次或Q localizer第三次。
+
 第一步只请求ct_1001，第二步同目录请求ct_1001和ct_1012。工具核对第一例文件大小/修改时间没有变化，提取第二步新增原始事件中的prediction_reused或model_case_reused，并用源图和输出的真实shape/affine核对几何；不从配置生成restored或geometry=True。原始production summary随结果保留。当前逐项完整验收仍输出INCOMPLETE，交由最终审核根据真实记录列明缺项。
 
 Q/Med的实际prediction run_dir随checkpoint/prepared/output/names/prompts/protocol变化，first和resume可以使用不同事件文件。阶段3直接提取每次生产命令标准输出中原始JSON事件：生产observability.events.event默认console=True，实际model_case_reused也保留该行为。原始stdout逐步单独保存，提取结果登记文件和行号，避免扫描阶段2旧日志或推算目录后漏记。缺少实际复用事件时保留缺证据，mtime不独立构成通过条件。

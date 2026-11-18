@@ -13,6 +13,33 @@ class AttemptLedger:
     def __init__(self, path):
         self.path = Path(path)
 
+    def _limits(self, state):
+        defaults = dict(stage_limits={stage: 2 for stage in STAGES}, total_limit=10)
+        approval_path = self.path.with_suffix('.approval.json')
+        if not approval_path.exists():
+            return defaults
+        approval = read_json(approval_path)
+        fields = {'protocol','run_id','ledger_path','stage_limits','total_limit',
+                  'authorization_date_local','user_reply','scope'}
+        if set(approval) != fields or approval['protocol'] != 'chd-mini-attempt-approval-v1':
+            raise ValueError('尝试批准文件协议或字段无效')
+        if approval['run_id'] != state['run_id'] or Path(approval['ledger_path']).resolve() != self.path.resolve():
+            raise ValueError('尝试批准文件与本轮台账身份不符')
+        if any(not isinstance(approval[k],str) or not approval[k].strip()
+               for k in ('run_id','ledger_path','authorization_date_local','user_reply','scope')):
+            raise ValueError('尝试批准文件缺少明确授权记录')
+        approved = approval['stage_limits']
+        expected = {**defaults['stage_limits'], 'q_base': 3}
+        if (not isinstance(approved,dict) or set(approved) != set(STAGES) or
+                any(type(n) is not int for n in approved.values()) or approved != expected or
+                type(approval['total_limit']) is not int or approval['total_limit'] != 11):
+            raise ValueError('本次批准仅允许Q基础模型3次、其他阶段2次、总计11次')
+        return dict(stage_limits=dict(approved), total_limit=approval['total_limit'])
+
+    def limits(self):
+        state = self.read()
+        return self._limits(state)
+
     def initialize(self, run_id):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with FileLock(str(self.path) + ".lock", timeout=0):
@@ -21,19 +48,22 @@ class AttemptLedger:
                 if state["run_id"] != run_id:
                     raise ValueError("尝试记录属于其他运行")
             else:
-                write_json(self.path, {"protocol": "chd-mini-attempt-v1", "run_id": run_id,
-                                       "attempts": []})
+                state = {"protocol": "chd-mini-attempt-v1", "run_id": run_id, "attempts": []}
+                self._limits(state)
+                write_json(self.path, state)
 
     def read(self):
         state = read_json(self.path)
         if state["protocol"] != "chd-mini-attempt-v1":
             raise ValueError("尝试记录协议不受支持")
+        limits = self._limits(state)
         counts = {stage: 0 for stage in STAGES}
         for row in state["attempts"]:
             counts[row["stage"]] += 1
             if row["number"] != counts[row["stage"]] or row["outcome"] not in (*OUTCOMES, "started"):
                 raise ValueError("尝试记录次序或状态无效")
-        if len(state["attempts"]) > 10 or any(n > 2 for n in counts.values()):
+        if (len(state["attempts"]) > limits['total_limit'] or
+                any(n > limits['stage_limits'][stage] for stage,n in counts.items())):
             raise ValueError("尝试记录超过批准上限")
         return state
 
@@ -42,10 +72,11 @@ class AttemptLedger:
             raise ValueError("未知训练阶段")
         with FileLock(str(self.path) + ".lock", timeout=0):
             state = self.read()
+            limits = self._limits(state)
             rows = [row for row in state["attempts"] if row["stage"] == stage]
             if any(row["outcome"] == "started" for row in state["attempts"]):
                 raise RuntimeError("存在未结算尝试，须确认进程退出并登记中断")
-            if len(rows) >= 2 or len(state["attempts"]) >= 10:
+            if len(rows) >= limits['stage_limits'][stage] or len(state["attempts"]) >= limits['total_limit']:
                 raise RuntimeError("本轮累计尝试额度已经耗尽")
             number = len(rows) + 1
             state["attempts"].append({"stage": stage, "number": number, "outcome": "started"})
