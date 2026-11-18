@@ -1,27 +1,47 @@
 from contextlib import contextmanager
 import hashlib
+import os
 from time import perf_counter
 
 import torch
 
 from ..observability.events import event
 from .memory import alive
+from .runtime import attach
 
 
 class CpuReady:
-    def __init__(self,context,world,root,owner=None,cancel=None):
+    def __init__(self,context,world,root,owner=None,cancel=None,handle=None):
         self.world,self.root = world,root
-        self.owner,self.cancel = owner,cancel
+        self.owner,self.cancel = owner,handle.cancel if handle is not None else cancel
+        self.handle,self._client,self._client_pid = handle,None,None
         self.condition = context.Condition()
         self.generation = context.Value('q',0)
         self.arrived = context.Array('q',[-1]*world)
         self.phases = context.Array('q',[0]*world)
 
-    def require_active(self):
+    @property
+    def client(self):
+        if self.handle is None:
+            return None
+        if self._client_pid != os.getpid():
+            self._client,self._client_pid = attach(self.handle),os.getpid()
+        return self._client
+
+    def require_active(self,started=None):
         if self.owner is not None and not alive(self.owner):
             raise RuntimeError('模型协调进程已经退出，停止CPU等候')
         if self.cancel is not None and self.cancel.is_set():
-            raise RuntimeError('模型任务已取消，停止CPU等候')
+            raise InterruptedError('模型任务已取消，停止CPU等候')
+        if self.client is not None:
+            self.client.snapshot()
+            limit = self.handle.resources.get('max_wait')
+            if started is not None and limit is not None and perf_counter()-started >= limit:
+                raise TimeoutError('已达到显式模型供数等待时限')
+
+    def wait_seconds(self,started):
+        limit = None if self.handle is None else self.handle.resources.get('max_wait')
+        return 1. if limit is None else max(.001,min(1.,limit-(perf_counter()-started)))
 
     def wait(self,rank,phase,device=None):
         started = perf_counter()
@@ -43,8 +63,8 @@ class CpuReady:
                 self.generation.value += 1
                 self.condition.notify_all()
             while self.generation.value==generation:
-                self.require_active()
-                self.condition.wait(timeout=5)
+                self.require_active(started)
+                self.condition.wait(timeout=self.wait_seconds(started))
                 if self.generation.value==generation:
                     event(self.root,'model_cpu_wait',rank=rank,phase=phase,
                           waiting_seconds=perf_counter()-completed,device_collective_submitted=False)
@@ -54,7 +74,7 @@ class CpuReady:
 
 
 class OrderedSupply:
-    def __init__(self,context,shares,slots,ready,root,capacity_bytes=0,estimates=(),unit='item'):
+    def __init__(self,context,shares,slots,ready,root,capacity_bytes=0,estimates=(),unit='item',handle=None):
         if slots<1 or not shares or any(value<1 for value in shares):
             raise ValueError('供数名额和训练份额必须为正')
         self.ready,self.root,self.world = ready,root,len(shares)
@@ -72,12 +92,19 @@ class OrderedSupply:
         self.capacity = capacity_bytes
         self.estimates = {row['case_id']:row['workspace_bytes'] for row in estimates}
         self.phase = context.Array('c',256)
+        self.handle = handle if handle is not None else ready.handle
+        if self.handle is not None and ready.handle is None:
+            raise ValueError('共享病例门控需要CpuReady使用同一个ResourceHandle')
+        self._tickets = {}
 
     def snapshot(self):
         with self.condition:
-            return dict(phase=self.phase.value.decode('utf-8'),batch=self.batch.value,active=self.active.value,reader_slots=self.slots,
+            readers = self.slots if self.handle is None else self.handle.state['reader_slots']
+            capacity = self.capacity if self.handle is None else self.handle.state['workspace_capacity']
+            return dict(phase=self.phase.value.decode('utf-8'),batch=self.batch.value,active=self.active.value,
+                reader_slots=readers,active_readers=self.active.value if self.handle is None else self.handle.state['active_readers'],
                 built=list(self.built),quotas=list(self.quotas),waiting=list(self.waiting),
-                active_workspace_bytes=sum(self.reserved),workspace_capacity_bytes=self.capacity,
+                active_workspace_bytes=sum(self.reserved),workspace_capacity_bytes=capacity,
                 samples_built_complete=[int(q>0 and b==q) for b,q in zip(self.built,self.quotas)],
                 ready_depth=list(self.queued),consumer_active=list(self.consumer_active),queue_unit=self.unit,
                 ready_depth_min=0,ready_depth_max=1)
@@ -116,11 +143,22 @@ class OrderedSupply:
         self.ready.require_active()
         amount = self.estimates[name]
         started = perf_counter()
+        if self.handle is not None:
+            if rank in self._tickets:
+                raise RuntimeError('当前病例尚未释放工作空间')
+            ticket = self.ready.client.case(amount,purpose='model_case:'+name)
+            ticket.__enter__()
+            self._tickets[rank] = ticket
+            with self.condition:
+                self.reserved[rank] = amount
+            event(self.root,'model_case_workspace',rank=rank,case_id=name,case_estimate_bytes=amount,
+                  workspace_wait_seconds=perf_counter()-started,**self.snapshot())
+            return
         with self.condition:
             if self.reserved[rank] or amount<1 or amount>self.capacity:
                 raise MemoryError('病例工作空间预留无效或超过已准入预算')
             while sum(self.reserved)+amount>self.capacity:
-                self.ready.require_active()
+                self.ready.require_active(started)
                 self.condition.wait(timeout=1)
             self.ready.require_active()
             self.reserved[rank] = amount
@@ -137,21 +175,26 @@ class OrderedSupply:
             if batch==self.batch.value and position<self.built[rank]:
                 raise ValueError('病例构建序号已经完成')
             self.waiting[rank] += 1
-            while not (batch==self.batch.value and position==self.built[rank] and
-                       all(b>=min(position,q) for b,q in zip(self.built,self.quotas)) and
-                       self.active.value<self.slots):
-                self.ready.require_active()
-                self.condition.wait(timeout=5)
-            self.waiting[rank] -= 1
-            self.active.value += 1
+            try:
+                while not (batch==self.batch.value and position==self.built[rank] and
+                           all(b>=min(position,q) for b,q in zip(self.built,self.quotas)) and
+                           self.active.value<self.slots):
+                    self.ready.require_active(started)
+                    self.condition.wait(timeout=self.ready.wait_seconds(started))
+                self.active.value += 1
+            finally:
+                self.waiting[rank] -= 1
         admitted = perf_counter()
-        event(self.root,'model_build_started',rank=rank,batch=batch,position=position,
-              admission_wait_seconds=admitted-started,**{k:v for k,v in self.snapshot().items() if k!='batch'})
         finished = False
         try:
+            event(self.root,'model_build_started',rank=rank,batch=batch,position=position,
+                  admission_wait_seconds=admitted-started,**{k:v for k,v in self.snapshot().items() if k!='batch'})
             yield
             finished = True
         finally:
+            ticket = self._tickets.pop(rank,None)
+            if ticket is not None:
+                ticket.__exit__(None,None,None)
             with self.condition:
                 self.active.value -= 1
                 self.reserved[rank] = 0
