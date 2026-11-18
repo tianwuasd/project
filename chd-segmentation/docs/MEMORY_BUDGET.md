@@ -1,0 +1,13 @@
+# 内存额度与运行期调整
+
+resources.memory_margin_fraction 默认0.5，可手动设置有限非负数。公共cpu_plan先在扣除余量后的预算内选择可运行布局，再按估算值乘以1.5申请任务额度；返回estimated_ram_bytes、margin_bytes、ram_bytes和minimum_bytes。CPU、缓存、队列和病例工作空间的实际布局不因增加余量而额外创建副本。
+
+整机物理内存及有效cgroup约束、配置ram_fraction、reserve_ram_bytes、项目100GB和更低memory_limit_bytes继续参与准入。可用资源不足时降低可选供数配置或等待，不能通过增加余量突破上限。
+
+运行期父进程每秒采样已登记进程RSS。普通缓冲或病例工作空间申请不足时，客户端登记正在等待的数量、用途和进程出生身份。父进程根据真实RSS、未兑现预留、空闲病例池及待申请量计算所需容量，再增加同一比例的余量。重新检查其他任务额度和当前整机余量后，仅增加本任务内存额度，保留GPU UUID、batch份额、worker、病例池和预取布局。容量更新写入active.json，plan_generation递增，随后通知等待进程继续。
+
+真实余量不足时保持可取消等待，显式max_wait仍生效；取消、超时、取得额度和进程退出都会移除等待登记。不会为满足申请释放外部任务的资源。内存增长无需等待当前训练批次结束；改变供数布局仍通过原安全边界执行。供数配置比较包含ram_bytes，能够识别仅内存额度变化。
+
+run_dir/events.jsonl及外层重定向日志记录memory_capacity_increased和memory_capacity_waiting，字段包含previous_bytes、required_bytes、requested_bytes、available_budget_bytes和等待用途。需要判断等待时应查看本次运行日期与PID。
+
+本次只改资源预算和准入衔接。已有数据、预处理配方、模型、优化器与训练游标继续按现有合同核验；完整检查点通过--resume恢复。两例CPU短流程覆盖STU-Net两进程累计两次更新及恢复，不能代替服务器CUDA/NCCL、全量训练或其他模型的验收。

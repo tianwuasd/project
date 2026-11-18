@@ -92,7 +92,7 @@ def any_rank(value, device, world):
 
 
 def supply_settings(plan):
-    return {key: plan[key] for key in ("workers", "cache_bytes", "reader_slots", "prefetch", "workspace_capacity_bytes")}
+    return {key: plan[key] for key in ("workers", "cache_bytes", "reader_slots", "prefetch", "workspace_capacity_bytes", "ram_bytes")}
 
 
 def next_batch_index(progress, settings):

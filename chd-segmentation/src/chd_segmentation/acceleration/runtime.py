@@ -191,6 +191,10 @@ class ResourceSession:
                     sampling_seconds=monotonic()-began)
                 self.condition.notify_all()
 
+            if hasattr(self, 'allocation'):
+                from .elastic_memory import grow_memory
+                grow_memory(self, spare)
+
     def _monitor(self):
         try:
             while not self.stopping.wait(1.):
@@ -212,7 +216,7 @@ class ResourceSession:
             layout=self.requested_layout,plan_generation=0,replanning=False,replan_request=None,replan_result=None,
             cpu_slots=self.cpu_slots,gpus=self.gpus,world=self.world,shares=self.shares,
             precision=self.request.resources.get('precision'))
-        self.state.update(claims={},unrealized_bytes=0)
+        self.state.update(claims={},unrealized_bytes=0,waiting={})
         manager_member = identity(psutil.Process(self.manager._process.pid))
         manager_member['baseline_rss'] = psutil.Process(manager_member['pid']).memory_info().rss
         self.members = self.manager.dict({self.owner['pid']: self.owner, manager_member['pid']: manager_member})

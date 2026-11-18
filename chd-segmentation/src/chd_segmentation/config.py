@@ -29,6 +29,7 @@ DEFAULTS = {
     "prediction": {"overlap": 0.5, "window_batch": 1, "blend": "gaussian", "export_space": "source", "checkpoint": "latest"},
     "resources": {"device": "cpu", "cpu_threads": 2, "cache_bytes": 1024 ** 3, "cache_entries": 16,
                   "reserve_ram_bytes": 4 * 1024 ** 3, "cpu_fraction": 0.8, "ram_fraction": 0.8,
+                  "memory_margin_fraction": 0.5,
                   "workers": "auto", "max_workers": 32, "prefetch": 2, "readers": "auto", "max_readers": 8,
                   "gpu_count": 1, "gpu_ids": None, "batch_layout": None, "cpu_processes": 1,
                   "wait_seconds": None, "max_wait": None, "release_and_regroup": False, "poll_seconds": 2, "share": False,
@@ -185,6 +186,9 @@ def load_config(path, overrides=None):
 
 
 def validate_resources(r,batch):
+    margin = r['memory_margin_fraction']
+    if type(margin) not in (int, float) or not math.isfinite(margin) or margin < 0:
+        raise ValueError('memory_margin_fraction必须为有限非负数')
     if type(r["cache_entries"]) is not int or r["cache_entries"] < 1:
         raise ValueError("缓存病例数上限必须为正整数")
     if r['memory_pressure_action'] not in ('wait', 'stop'):

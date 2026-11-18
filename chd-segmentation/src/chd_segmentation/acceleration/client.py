@@ -3,6 +3,9 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from time import monotonic
 from uuid import uuid4
+import os
+
+import psutil
 
 from .contracts import BoundaryDecision, Reservation, ResourceSnapshot
 from .accounting import add_claim, remove_claim, available
@@ -39,11 +42,29 @@ class ResourceClient:
         return BoundaryDecision('continue', 'eligible')
 
     @contextmanager
+    def _pending(self, token, amount, purpose, kind):
+        h = self.handle
+        def register():
+            rows = dict(h.state.get('waiting', {}))
+            rows[token] = dict(bytes=amount, purpose=purpose, kind=kind,
+                pid=os.getpid(), birth=psutil.Process().create_time())
+            h.state['waiting'] = rows
+            h.condition.notify_all()
+        try:
+            yield register
+        finally:
+            with h.condition:
+                rows = dict(h.state.get('waiting', {}))
+                rows.pop(token, None)
+                h.state['waiting'] = rows
+                h.condition.notify_all()
+
+    @contextmanager
     def reserve(self, amount_bytes, *, purpose, wait=True):
         if type(amount_bytes) is not int or amount_bytes < 0:
             raise ValueError('资源申请字节数必须为非负整数')
         h, began, acquired, token = self.handle, monotonic(), False, uuid4().hex
-        with h.condition:
+        with self._pending(token, amount_bytes, purpose, 'ordinary') as pending, h.condition:
             while True:
                 if h.state.get('monitor_failed'):
                     raise RuntimeError('资源监控异常结束，停止新增分配')
@@ -61,6 +82,7 @@ class ResourceClient:
                     raise TimeoutError('已达到显式资源等待时限')
                 if not wait:
                     break
+                pending()
                 self._wait(began)
         try:
             yield Reservation(amount_bytes, purpose) if acquired else None
@@ -77,7 +99,7 @@ class ResourceClient:
         if type(amount_bytes) is not int or amount_bytes < 1:
             raise ValueError('病例工作空间必须为正整数字节数')
         h, began, acquired, token = self.handle, monotonic(), False, uuid4().hex
-        with h.condition:
+        with self._pending(token, amount_bytes, purpose, 'case') as pending, h.condition:
             while True:
                 if h.state.get('monitor_failed'):
                     raise RuntimeError('资源监控异常结束，停止病例构建')
@@ -102,6 +124,7 @@ class ResourceClient:
                     raise TimeoutError('已达到显式病例额度等待时限')
                 if not wait:
                     break
+                pending()
                 self._wait(began)
         try:
             yield Reservation(amount_bytes,purpose) if acquired else None

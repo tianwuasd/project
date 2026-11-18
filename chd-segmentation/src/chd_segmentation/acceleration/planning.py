@@ -93,6 +93,17 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
         budget = max(0,min(int(facts['total_bytes']*r['ram_fraction']),
             facts['available_bytes']+credit-r['reserve_ram_bytes'])-pending)
         cores = max(0,max(1,math.floor(facts['cores']*r['cpu_fraction']))-sum(p['cpu_slots'] for p in peers))
+    available_budget = budget
+    margin = r.get('memory_margin_fraction', .5)
+    budget = math.floor(budget / (1 + margin))
+    def finish(result):
+        result.update(budget_bytes=available_budget, planning_budget_bytes=budget, memory_margin_fraction=margin)
+        result['minimum_bytes'] = math.ceil(result['minimum_bytes'] * (1 + margin))
+        if result['admitted']:
+            estimated = result['ram_bytes']
+            result.update(estimated_ram_bytes=estimated, ram_bytes=math.ceil(estimated * (1 + margin)))
+            result['margin_bytes'] = result['ram_bytes'] - estimated
+        return result
     reports = estimates if estimates is not None else case_estimates(config, prepared, stage)
     if stage == "preprocess" and config.get("pending_case_ids") is not None:
         reports = [row for row in reports if row["case_id"] in config["pending_case_ids"]]
@@ -112,7 +123,7 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
                   "reason": "离线预处理等待 CPU/RAM 安全余量"}
         if cores < 1:
             result.update(reason="已登记CPU额度不足，等待其他任务释放", available_cpu_slots=cores)
-            return result
+            return finish(result)
         for count in range(cap, -1, -1):
             fixed = (count + 2) * GIB
             if fixed + case_bytes > budget:
@@ -125,7 +136,7 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
                           breakdown={"processes_bytes": fixed, "case_workspaces_bytes": workspace, "queue_bytes": 0,
                                      "cache_total_bytes": 0, "cache_instances": 0})
             break
-        return result
+        return finish(result)
     profile = None
     retained,worker_bytes,cache_limit = 0,GIB,r['cache_bytes']
     fixed_workers = None
@@ -172,13 +183,13 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
         result["stage_memory"] = stage_reserve
     if cores < world+sum(minimum_workers):
         result.update(reason="已登记CPU额度不足，等待其他任务释放", available_cpu_slots=cores)
-        return result
+        return finish(result)
     if budget < minimum:
         result["reason"] = "单个病例构建及零 worker 的最小预算仍不足，等待主机内存释放"
-        return result
+        return finish(result)
     if fixed_workers is not None and sum(fixed_workers)>cap:
         result['reason'] = '模型恢复需要原worker数量，等待相应CPU供数额度'
-        return result
+        return finish(result)
     counts = [sum(fixed_workers)] if fixed_workers is not None else range(cap,-1,-1)
     for count in counts:
         if fixed_workers is not None:
@@ -218,5 +229,5 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
                 rank_prediction_bytes=sum(profile['rank_case_bytes']))
         if stage_reserve is not None:
             result["stage_memory"] = stage_memory(config, prepared, prefetch=prefetch)
-        return result
+        return finish(result)
     raise AssertionError("零 worker 最小预算未被实际规划覆盖")
