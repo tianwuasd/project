@@ -59,7 +59,7 @@ def case_estimates(config, prepared, stage):
     return reports
 
 
-def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates=None):
+def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates=None, allocation=None):
     r = config["resources"]
     facts = host_capacity()
     credit = private_bytes(own)
@@ -67,6 +67,9 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
     budget = max(0, min(int(facts["total_bytes"] * r["ram_fraction"]),
                         facts["available_bytes"] + credit - r["reserve_ram_bytes"]) - pending)
     cores = max(0, max(1, math.floor(facts["cores"] * r["cpu_fraction"])) - sum(p["cpu_slots"] for p in peers))
+    if allocation is not None:
+        budget = allocation.memory_bytes
+        cores = allocation.cpu_threads
     reports = estimates if estimates is not None else case_estimates(config, prepared, stage)
     if stage == "preprocess" and config.get("pending_case_ids") is not None:
         reports = [row for row in reports if row["case_id"] in config["pending_case_ids"]]

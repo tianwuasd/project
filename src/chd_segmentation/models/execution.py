@@ -103,7 +103,8 @@ def admitted(config,prepared,stage,topology=None):
         common['run_dir'], dict(common['resources'],gpu_spec=spec,max_wait=common['resources']['wait_seconds']), demand)
     with ResourceSession(request,layout=supply_layout(supply)) as session:
         if not supply['admitted']:
-            supply = cpu_plan(common, budget, world, stage='prediction' if stage=='prediction' else 'train')
+            supply = cpu_plan(common, budget, world, stage='prediction' if stage=='prediction' else 'train',
+                              allocation=session.allocation, estimates=supply['case_estimates'])
             if not supply['admitted']:
                 raise RuntimeError('公共准入后模型供数预算仍不可用：'+supply['reason'])
             from ..acceleration import SafeBoundary

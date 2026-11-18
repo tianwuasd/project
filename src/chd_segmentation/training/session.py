@@ -33,7 +33,8 @@ def admitted_training(config, prepared, spec, previous_world=None, stage='train'
         dict(resources,gpu_spec=spec,max_wait=resources['wait_seconds']), demand)
     with ResourceSession(request, layout=supply_layout(supply)) as session:
         if not supply['admitted']:
-            supply = cpu_plan(config, prepared, world, stage=stage)
+            supply = cpu_plan(config, prepared, world, stage=stage, allocation=session.allocation,
+                              estimates=supply['case_estimates'])
             if not supply['admitted']:
                 raise RuntimeError('公共准入后训练供数规划仍不可用：'+supply['reason'])
             session.replan(supply_demand(supply,world,resources,shares),
