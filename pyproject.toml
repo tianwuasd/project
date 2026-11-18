@@ -2,4 +2,4 @@
 name = "chd-mini-workflow"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = ["psutil>=7", "filelock>=3", "joblib>=1.5", "fsspec>=2025"]
+dependencies = ["psutil>=7", "filelock>=3", "joblib>=1.5", "fsspec>=2025", "nibabel>=5", "numpy>=1.26", "pywin32>=306; sys_platform == 'win32'"]

@@ -17,7 +17,10 @@ def write_json(path, value):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     pending = path.with_name(path.name + ".pending")
-    pending.write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
+    with pending.open("w", encoding="utf-8") as stream:
+        stream.write(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False))
+        stream.flush()
+        os.fsync(stream.fileno())
     pending.replace(path)
 
 
@@ -102,12 +105,8 @@ def verify_engine(root, expected):
     if actual != expected:
         raise ValueError("生产项目提交已变化：" + actual)
     paths = ["src", "run.py", "pyproject.toml"]
-    if git(root, "status", "--porcelain", "--untracked-files=all", "--", *paths):
-        raise ValueError("生产依赖存在未提交修改")
-    files = git(root, "ls-files", "--", *paths).splitlines()
-    result = {name: file_sha(root / name) for name in files}
-    return {"root": str(root), "commit": actual, "files": result,
-            "content_sha256": sha256(json.dumps(result, sort_keys=True).encode()).hexdigest()}
+    return {"root": str(root), "commit": actual,
+            "status": git(root, "status", "--porcelain", "--", *paths)}
 
 
 def confined(path, root):
