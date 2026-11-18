@@ -4,11 +4,11 @@ from ..artifacts.store import digest, file_digest, operation_lock, read_json, re
 from ..datasets.manifest import LABELS, load_manifest
 from ..datasets.splits import apply_split
 from ..observability.events import event, logged, stage
-from .planning import resolve_plan, validate_auto_plan
 
 
 @logged("prepare")
 def prepare(config, output):
+    from .planning import resolve_plan, validate_auto_plan
     with stage(config, "manifest_and_split", manifest=config["manifest"], fold=config["fold"]):
         manifest = apply_split(load_manifest(config["manifest"], config["dataset"], config["scope"],
                                             allow_unassigned=config["split"]["path"] is not None), config)

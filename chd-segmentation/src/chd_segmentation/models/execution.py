@@ -20,6 +20,8 @@ from ..training.resources import resource_lease,layout,register_member,close_mem
 
 
 def execution_config(config):
+    if config['model'] in ('totalsegmentator','medsam3'):
+        raise ValueError('独立预测模型通过standalone_prediction使用公共acceleration')
     resources = _merge(DEFAULTS['resources'],config['execution'])
     device = torch.device(config['device'])
     resources['device'] = device.type

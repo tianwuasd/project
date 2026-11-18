@@ -1,0 +1,38 @@
+model: medsam3
+run_dir: /data4/zhangruichen/course/chd-segmentation/runs/medsam3
+work_root: /data4/zhangruichen/course/chd-segmentation
+output: /data4/zhangruichen/result/chd-segmentation/medsam3
+device: cuda
+threads: 2
+input_source:
+  path: null
+  intensity_semantics: hu
+execution:
+  gpu_count: 1
+  workers: 0
+  ram_fraction: 0.8
+  cpu_fraction: 0.8
+  memory_limit_bytes: 100000000000
+backend:
+  source_commit: 84f43118b5b67b50abad81d7c946681ebb97dcda
+  official_root: /data4/zhangruichen/data/pretrained/MedSAM3/source
+  base_weights: /data4/zhangruichen/data/pretrained/SAM3/sam3.pt
+  lora_weights: /data4/zhangruichen/data/pretrained/MedSAM3/best_lora_weights.pt
+  tokenizer: /data4/zhangruichen/data/pretrained/MedSAM3/source/sam3/assets/bpe_simple_vocab_16e6.txt.gz
+  lora_config: /data4/zhangruichen/data/pretrained/MedSAM3/source/configs/full_lora_config.yaml
+  model_memory_bytes: 12884901888
+  gray_window: [-160, 240]
+  slice_direction: axial
+  detection_threshold: 0.5
+  nms_iou_threshold: 0.5
+  class_prompts:
+    LV: left ventricle
+    RV: right ventricle
+    LA: left atrium
+    RA: right atrium
+    Myo: myocardium
+    AO: aorta
+    PA: pulmonary artery
+    SVC: superior vena cava
+    IVC: inferior vena cava
+    PV: pulmonary vein

@@ -47,6 +47,11 @@ def evaluation_records(completed,prepared,checkpoint):
 def predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=None,
             prompt_mode='external', label_classes=None, box_seed=2024, box_max_shift=20,
             official_weights=False, test_set=None, test_group=None):
+    if config['model'] in ('totalsegmentator','medsam3'):
+        if checkpoint is not None or prompts is not None or prompt_mode!='external' or label_classes is not None or official_weights:
+            raise ValueError('独立预测模型使用backend权重与解剖文本配置，不接受旧模型提示或检查点参数')
+        from .standalone_prediction import predict as predict_standalone
+        return predict_standalone(config,prepared_path,output,case_ids,test_set,test_group)
     from .execution import admitted, run_workers
     from .offline import model_storage_lease
     prepared = load_prepared(prepared_path)

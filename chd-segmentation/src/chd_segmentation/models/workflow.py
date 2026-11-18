@@ -13,7 +13,6 @@ import torch
 import yaml
 
 from ..artifacts.store import digest, file_digest, read_json, write_json
-from ..data.dataset import CaseDataset
 from ..preprocessing.prepare import load_prepared
 from ..training.attempts import settle_attempts
 
@@ -22,6 +21,9 @@ def options(path,overrides=None):
     path = Path(path)
     content = path.read_text(encoding='utf-8')
     raw = json.loads(content) if path.suffix.lower()=='.json' else yaml.safe_load(content)
+    if isinstance(raw, dict) and raw.get('model') in ('totalsegmentator','medsam3'):
+        from .standalone_config import options as prediction_options
+        return prediction_options(raw,path,overrides)
     if overrides:
         overrides = deepcopy(overrides)
         if 'global_batch' in overrides:
@@ -125,6 +127,8 @@ def resources(config):
 
 
 def adapter(config, prepared, stage, initialize=True, parent_states=None):
+    from .contracts import require_capability
+    require_capability(config['model'],'train')
     if config['model']=='q_route1':
         from .q_route1.adapter import QAdapter
         return QAdapter(config,prepared,stage,initialize=initialize,parent_states=parent_states)
@@ -194,6 +198,7 @@ def training_names(config, prepared, stage):
 
 
 def dataset_for(prepared, with_label, resources=None, log_dir=None, logging=None):
+    from ..data.dataset import CaseDataset
     if resources is None:
         resources = dict(reserve_ram_bytes=4*2**30,cache_bytes=512*2**20)
     return CaseDataset(prepared,resources,with_label=with_label,log_dir=log_dir,logging=logging)
@@ -251,6 +256,8 @@ def initialization_digest(config,previous=None):
 
 
 def train(config, prepared_path, stage, resume=False, stop_after=None):
+    from .contracts import require_capability
+    require_capability(config['model'],'train')
     from ..training.stopping import resolve_budget
     config = dict(config, **resolve_budget(config, config['model'], stage))
     config.pop('unit', None)
@@ -285,6 +292,7 @@ def train(config, prepared_path, stage, resume=False, stop_after=None):
 
 @settle_attempts
 def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
+    from ..data.dataset import CaseDataset
     from .execution import all_states,synchronize_gradients,pressure,rank_measurement
     from ..training.resources import record_peaks
     config,prepared,stage = payload['config'],payload['prepared'],payload['stage']

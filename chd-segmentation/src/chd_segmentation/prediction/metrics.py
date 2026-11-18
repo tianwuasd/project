@@ -42,7 +42,8 @@ def evaluate(prediction_dir, prepared, output, config):
             raise ValueError("预测与评价的数据、类别或标签版本不同")
     identity = digest({"cases": [{"data": receipt['data_identity'], "label": row.get('label'),
                                  "prediction": receipt.get('identity', receipt['file']),
-                                 "checkpoint": receipt.get('checkpoint', receipt.get('checkpoint_file',receipt.get('checkpoint_sha256')))}
+                                 "checkpoint": receipt.get('checkpoint', receipt.get('checkpoint_file',receipt.get('checkpoint_sha256'))),
+                                 **({'uncovered_classes':receipt['uncovered_classes']} if receipt.get('uncovered_classes') else {})}
                                 for row, receipt in selection], "metric": "supervised-dice-v2"})
     if output.exists():
         previous = read_json(output)
@@ -78,17 +79,18 @@ def evaluate(prediction_dir, prepared, output, config):
         valid = (truth >= 0) & (truth < classes)
         by_class = {}
         for c in range(1, classes):
-            if c in row["unknown_classes"]:
+            if c in row["unknown_classes"] or c in receipt.get('uncovered_classes',[]):
                 continue
             target, found = (truth == c) & valid, (prediction == c) & valid
             reference_count, predicted_count = int(target.sum()), int(found.sum())
             by_class[str(c)] = {"reference_voxels": reference_count, "predicted_voxels": predicted_count,
                                 "dice": float(2 * (target & found).sum() / (reference_count + predicted_count))
                                 if reference_count + predicted_count else None}
-        results.append({"case_id": row["case_id"], "scope": receipt["scope"], "roi_xyz": receipt["roi_xyz"], "classes": by_class})
+        results.append({"case_id": row["case_id"], "scope": receipt["scope"], "roi_xyz": receipt["roi_xyz"], "classes": by_class,
+                        "uncovered_classes": receipt.get('uncovered_classes',[])})
         event(config["run_dir"], "evaluation_case_completed", case_id=row["case_id"], completed=len(results),
               total=len(selection), seconds=perf_counter() - mark, supervised_classes=list(by_class),
-              skipped_unknown_classes=row["unknown_classes"])
+              skipped_unknown_classes=row["unknown_classes"],skipped_uncovered_classes=receipt.get('uncovered_classes',[]))
     aggregates = {}
     for c in range(1, classes):
         values = [row["classes"][str(c)]["dice"] for row in results

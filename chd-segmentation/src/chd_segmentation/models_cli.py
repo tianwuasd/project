@@ -10,8 +10,14 @@ def wait_seconds(value):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description='MedSAM2与Q路线一r2模型入口',allow_abbrev=False)
+    parser = argparse.ArgumentParser(description='Q、MedSAM2、TotalSegmentator与MedSAM3模型入口',allow_abbrev=False)
     commands = parser.add_subparsers(dest='command',required=True)
+    configure = commands.add_parser('configure',help='生成独立预测模型正式配置')
+    configure.add_argument('--model',choices=('totalsegmentator','medsam3'),required=True)
+    configure.add_argument('--prepared',required=True)
+    configure.add_argument('--server-root',default='/data4/zhangruichen')
+    configure.add_argument('--input-source')
+    configure.add_argument('--device',choices=('cpu','cuda'),default='cuda')
     split = commands.add_parser('split-q1282',help='从冻结1282迁移包生成独立的Q组合')
     split.add_argument('--source',required=True)
     split.add_argument('--output',required=True)
@@ -28,8 +34,8 @@ def main(argv=None):
     predict = commands.add_parser('predict')
     predict.add_argument('--config',required=True)
     predict.add_argument('--prepared','--preprocessed-source',dest='prepared',required=True)
-    predict.add_argument('--checkpoint',required=True)
-    predict.add_argument('--output',required=True)
+    predict.add_argument('--checkpoint')
+    predict.add_argument('--output')
     predict.add_argument('--case',action='append')
     predict.add_argument('--prompts')
     predict.add_argument('--prompt-mode',choices=('external','label-box'),default='external')
@@ -64,6 +70,10 @@ def main(argv=None):
     train.add_argument('--patience',type=int)
     train.add_argument('--min-delta',type=float)
     args = parser.parse_args(argv)
+    if args.command=='configure':
+        from .models.prediction_configs import generate
+        print(json.dumps(generate(args.model,args.prepared,args.server_root,args.input_source,args.device),ensure_ascii=False))
+        return
     if args.command=='split-q1282':
         from .datasets.q_split import create_q_bundle
         print(json.dumps(create_q_bundle(args.source,args.output,args.seed),ensure_ascii=False,allow_nan=False))
@@ -110,6 +120,8 @@ def main(argv=None):
     if source:
         overrides['input_source'] = source
     config = options(args.config,overrides)
+    from .models.contracts import require_capability
+    require_capability(config['model'],args.command)
     from .observability.events import Stage
     with Stage(None,'model_command',heartbeat_seconds=config['logging']['heartbeat_seconds'],
                model=config['model'],operation=args.command):
@@ -121,6 +133,8 @@ def execute(args,config,train_model,predict_model):
     if args.command=='train':
         result = train_model(config,args.prepared,args.stage,args.resume,args.stop_after)
     else:
+        if config['model'] not in ('totalsegmentator','medsam3') and (args.checkpoint is None or args.output is None):
+            raise ValueError('Q与MedSAM2预测必须指定checkpoint及output')
         prompts = yaml.safe_load(Path(args.prompts).read_text(encoding='utf-8')) if args.prompts else None
         label_classes = list(map(int,args.label_classes.split(','))) if args.label_classes else None
         checkpoint = args.checkpoint

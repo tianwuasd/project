@@ -1,0 +1,10 @@
+TotalSegmentator==2.18.0
+nnunetv2==2.8.1
+torch>=2.8
+nibabel>=5.3
+numpy>=1.26
+scipy>=1.15
+PyYAML>=6
+psutil>=7
+filelock>=3
+packaging>=24

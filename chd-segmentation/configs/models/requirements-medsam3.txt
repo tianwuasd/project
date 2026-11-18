@@ -1,0 +1,9 @@
+torch>=2.7
+torchvision>=0.19
+nibabel>=5.3
+numpy>=1.26
+scipy>=1.15
+PyYAML>=6
+psutil>=7
+filelock>=3
+packaging>=24

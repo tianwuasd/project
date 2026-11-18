@@ -87,6 +87,8 @@ def quick_check_model(model, prepared, stage, prepare_config=None):
 
 def preprocess_model(model_path, prepare_config_path, prepared_path, root, output):
     model = options(model_path)
+    from .contracts import require_capability
+    require_capability(model['model'],'preprocess')
     config = load_config(prepare_config_path)
     source = load_prepared(prepared_path)
     config = deepcopy(config)

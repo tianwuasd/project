@@ -1,6 +1,16 @@
 from copy import deepcopy
 
 
+CAPABILITIES = {'q_route1': {'train','predict','preprocess'},
+    'medsam2': {'train','predict','preprocess'},
+    'totalsegmentator': {'predict'}, 'medsam3': {'predict'}}
+
+
+def require_capability(model, operation):
+    if operation not in CAPABILITIES.get(model,set()):
+        raise ValueError(model+'不支持'+operation)
+
+
 RUNTIME_FIELDS = {'run_dir','threads','dependency_root','official_root','execution','work_root',
     'device','logging','checkpoint_dir','attempt_ledger','save_every_updates','save_every_seconds','distributed_backend'}
 INFERENCE_FIELDS = ('model','method','max_candidates','patch','local_size','frames','resolution','seed','gray_window')

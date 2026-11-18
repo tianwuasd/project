@@ -1,0 +1,21 @@
+model: totalsegmentator
+run_dir: /data4/zhangruichen/course/chd-segmentation/runs/totalsegmentator
+work_root: /data4/zhangruichen/course/chd-segmentation
+output: /data4/zhangruichen/result/chd-segmentation/totalsegmentator
+device: cuda
+threads: 2
+input_source:
+  path: null
+  intensity_semantics: hu
+execution:
+  gpu_count: 1
+  workers: 0
+  ram_fraction: 0.8
+  cpu_fraction: 0.8
+  memory_limit_bytes: 100000000000
+backend:
+  version: 2.18.0
+  task: heartchambers_highres
+  fast: false
+  weights_dir: /data4/zhangruichen/data/pretrained/TotalSegmentator
+  model_memory_bytes: 4294967296
