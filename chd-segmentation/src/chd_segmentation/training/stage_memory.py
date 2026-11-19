@@ -4,12 +4,17 @@ import math
 from ..models.stunet.adapter import StunetAdapter
 
 
-def prediction_workspace(shape_czyx, source_shape_xyz, roi_xyz, classes):
+def prediction_workspace(shape_czyx, source_shape_xyz, roi_xyz, classes, options=None, patch=None):
     working = math.prod(shape_czyx[1:])*(classes*12+8)
     native_voxels = math.prod(high-low for low,high in roi_xyz)
     restored = native_voxels*(classes*8+10)+math.prod(source_shape_xyz)*2
-    return dict(probability_workspace_bytes=working,restore_workspace_bytes=restored,
-                prediction_workspace_bytes=working+restored)
+    result = dict(probability_workspace_bytes=working,restore_workspace_bytes=restored,
+                  prediction_workspace_bytes=working+restored)
+    if options is not None:
+        window = math.prod(patch) * (shape_czyx[0] * 12 + classes * 16 + 16) * options['window_batch']
+        result.update(whole_workspace_bytes=working+restored, prediction_window_bytes=window,
+                      prediction_execution_requested=options['execution'])
+    return result
 
 
 def stage_memory(config, prepared, prefetch=None):

@@ -26,7 +26,8 @@ DEFAULTS = {
                  "save_every_attempts": 250,
                  "early_stopping": {"enabled": False, "monitor": "validation_loss", "mode": "min",
                     "patience": 20, "min_delta": .0001, "unit": "completed_validation_epoch"}},
-    "prediction": {"overlap": 0.5, "window_batch": 1, "blend": "gaussian", "export_space": "source", "checkpoint": "latest"},
+    "prediction": {"overlap": 0.5, "window_batch": 1, "blend": "gaussian", "export_space": "source", "checkpoint": "latest",
+                   "execution": "auto", "block_bytes": 64 * 1024 ** 2, "max_block_bytes": 512 * 1024 ** 2},
     "resources": {"device": "cpu", "cpu_threads": 2, "cache_bytes": 1024 ** 3, "cache_entries": 16,
                   "reserve_ram_bytes": 4 * 1024 ** 3, "cpu_fraction": 0.8, "ram_fraction": 0.8,
                   "memory_margin_fraction": 0.5,
@@ -179,6 +180,10 @@ def load_config(path, overrides=None):
         raise ValueError("预测窗口参数无效")
     if p["export_space"] not in ("source", "working"):
         raise ValueError("导出空间必须为 source 或 working")
+    if p['execution'] not in ('auto', 'whole', 'blocks'):
+        raise ValueError('prediction.execution必须为auto、whole或blocks')
+    if any(type(p[k]) is not int or p[k] < 1024 ** 2 for k in ('block_bytes', 'max_block_bytes')) or p['block_bytes'] > p['max_block_bytes']:
+        raise ValueError('预测块预算必须为至少1MiB的整数，最大值不得小于起始值')
     if r["cpu_threads"] < 1 or r["cache_bytes"] < 0 or r["reserve_ram_bytes"] < 0:
         raise ValueError("资源预算无效")
     validate_resources(r,t['batch'])

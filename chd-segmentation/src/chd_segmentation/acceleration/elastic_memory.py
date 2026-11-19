@@ -8,6 +8,8 @@ from filelock import FileLock
 from ..artifacts.store import read_json, write_json
 from ..observability.events import event
 from .memory import alive
+from .limits import memory_ceiling, project_usage
+from .host import host_capacity
 
 
 def memory_floor(state):
@@ -49,10 +51,9 @@ def grow_memory(session, spare):
         rows = [row for row in read_json(root / 'active.json') if alive(row)]
         own = next(row for row in rows if row['pid'] == session.owner['pid'] and row['birth'] == session.owner['birth'])
         peers = [row for row in rows if row is not own]
-        limit = min(100_000_000_000, r.get('memory_limit_bytes', 100_000_000_000),
-                    *(row.get('memory_limit_bytes', 100_000_000_000) for row in peers))
+        limit = memory_ceiling(r, host_capacity())
         rss = h.state['task_rss']
-        peer_used = sum(max(row['ram_bytes'], row.get('rss_bytes', 0)) for row in peers)
+        peer_used = project_usage(peers, r)
         peer_pending = sum(max(0, row['ram_bytes'] - row.get('rss_bytes', 0)) for row in peers)
         budget = min(limit - peer_used, rss + spare - peer_pending)
         target = math.ceil(required * (1 + r.get('memory_margin_fraction', .5)))

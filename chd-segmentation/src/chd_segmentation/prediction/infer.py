@@ -24,6 +24,8 @@ from ..preprocessing.offline_store import storage_lease
 from .metrics import case_data_identity
 from .restore import restore
 from .log_cursor import start_event_range,finish_event_range
+from .blocks import window_probabilities, restore_blocks
+from .workspace import PredictionWorkspace
 
 
 @logged("prediction")
@@ -33,7 +35,8 @@ def predict(config, output, inputs=None, case_ids=None, manifest=None):
     if config['resources']['device']=='cuda' and torch.cuda.is_initialized():
         raise RuntimeError("GPU 预测需要新的命令进程，以使用准入后的可见设备")
     runtime = deepcopy(config)
-    runtime["resources"].update(gpu_count=1, cpu_processes=1, min_gpus=None, batch_layout=None, share=False, workers=0)
+    runtime["resources"].update(gpu_count=1, cpu_processes=1, min_gpus=None, batch_layout=None, share=False,
+                                workers=0, cache_bytes=0, prefetch=1, memory_policy='host_fraction')
     runtime['training']['batch'] = 1
     if runtime["resources"]["gpu_ids"] is not None and len(runtime["resources"]["gpu_ids"]) != 1:
         raise ValueError("单次预测仅使用一张卡，请配置一个 gpu_ids 或使用自动选卡")
@@ -54,6 +57,7 @@ def predict(config, output, inputs=None, case_ids=None, manifest=None):
         runtime['resource_handle'] = allocation['resource_handle']
         runtime['prediction_case_estimates'] = {row['case_id']:row['workspace_bytes']
             for row in allocation['supply']['case_estimates']}
+        runtime['prediction_case_plans'] = {row['case_id']:row for row in allocation['supply']['case_estimates']}
         if allocation['gpus']:
             os.environ["CUDA_VISIBLE_DEVICES"] = allocation["gpus"][0]["uuid"]
         try:
@@ -89,6 +93,8 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None, prepared
     if not requested or not requested <= names:
         raise ValueError("预测病例不存在于输入清单中")
     options = config["prediction"]
+    scientific_options = {key:value for key,value in options.items()
+                          if key not in ('execution','block_bytes','max_block_bytes')}
     torch.set_num_threads(config["resources"]["cpu_threads"])
     device = device_for(config)
     with ExitStack() as cleanup, operation_lock(output), storage_lease(prepared, config), prediction_snapshot(config["run_dir"], options.get('checkpoint','latest')) as pointer:
@@ -97,7 +103,7 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None, prepared
         task_path = output/'prediction-task.json'
         task = dict(training_run=str(Path(config['run_dir']).resolve()), dataset=prepared['dataset'],
             source=prepared.get('storage'), geometry=prepared['plan'], technical=prepared['technical'],
-            available_cases=sorted(names), prediction=options)
+            available_cases=sorted(names), prediction=scientific_options)
         if task_path.exists():
             recorded = read_json(task_path)
             if recorded['task'] != task:
@@ -124,7 +130,7 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None, prepared
             event(log_dir, "prediction_case_started", case_id=name, completed=len(results), total=len(requested))
             identity = digest({"checkpoint": pointer.get('sha256', pointer['file']), "plan": training["scientific"]["prepared_identity"],
                                "row": row,
-                               "options": options, "technical": prepared["technical"]})
+                               "options": scientific_options, "technical": prepared["technical"]})
             path = output / f"{name}.nii.gz"
             previous = completed["cases"].get(name)
             if previous and previous["identity"] == identity:
@@ -139,7 +145,14 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None, prepared
             mark = perf_counter()
             amount = config['prediction_case_estimates'][name]
             case_cleanup.enter_context(memory.client.case(amount,purpose='prediction_case:'+name))
-            event(log_dir,'prediction_case_admitted',case_id=name,workspace_bytes=amount)
+            plan = config['prediction_case_plans'][name]
+            execution, block_bytes = plan['prediction_execution'], plan['prediction_block_bytes']
+            event(log_dir,'prediction_case_admitted',case_id=name,workspace_bytes=amount,
+                  execution=execution, block_bytes=block_bytes, whole_workspace_bytes=plan['whole_workspace_bytes'])
+            workspace = None
+            if execution == 'blocks':
+                workspace = case_cleanup.enter_context(PredictionWorkspace(config,
+                    dict(output=str(output), case_id=name, identity=identity),block_bytes,memory))
             with stage(config, "prediction_case_load", case_id=name):
                 entry = dataset.get(name)
             if model is None:
@@ -160,17 +173,22 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None, prepared
 
             with stage(config, "sliding_window", case_id=name, shape=list(entry["image"].shape),
                        patch=spec["patch"], overlap=options["overlap"], window_batch=options["window_batch"]), torch.inference_mode():
-                logits = sliding_window_inference(
-                    torch.from_numpy(entry["image"])[None], roi_size=tuple(spec["patch"]),
-                    sw_batch_size=options["window_batch"], predictor=predictor, overlap=options["overlap"],
-                    mode=options["blend"], sw_device=device, device=torch.device("cpu"), progress=False)
-                if not torch.isfinite(logits).all():
-                    raise ValueError("滑窗预测出现非有限数值")
-                probabilities = logits[0].float().softmax(0).numpy()
+                if execution == 'blocks':
+                    probabilities = window_probabilities(entry['image'],predictor,tuple(spec['patch']),
+                        spec['num_classes'],options,device,workspace)
+                else:
+                    logits = sliding_window_inference(
+                        torch.from_numpy(entry["image"])[None], roi_size=tuple(spec["patch"]),
+                        sw_batch_size=options["window_batch"], predictor=predictor, overlap=options["overlap"],
+                        mode=options["blend"], sw_device=device, device=torch.device("cpu"), progress=False)
+                    if not torch.isfinite(logits).all():
+                        raise ValueError("滑窗预测出现非有限数值")
+                    probabilities = logits[0].float().softmax(0).numpy()
+                    del logits
             compute_seconds = perf_counter() - mark
             mark = perf_counter()
             with stage(config, "prediction_restore", case_id=name, target_shape_xyz=entry["source_shape_xyz"]):
-                native = restore(probabilities, entry, prepared["plan"])
+                native = restore_blocks(probabilities,entry,workspace) if execution == 'blocks' else restore(probabilities, entry, prepared["plan"])
             affine = entry["source_affine"] if options["export_space"] == "source" else entry["working_affine"]
             image = nib.Nifti1Image(native, np.asarray(affine))
             image.header.set_xyzt_units(entry["source_units"] if options["export_space"] == "source" else "mm")
@@ -182,6 +200,7 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None, prepared
                        "checkpoint_sha256": pointer.get('sha256'), "checkpoint_file": pointer['file'],
                        "shape_xyz": entry["source_shape_xyz"], "affine": affine, "roi_xyz": entry["roi_xyz"],
                        "scope": prepared["scope"], "export_space": options["export_space"],
+                       "execution": execution, "block_bytes": block_bytes if execution == 'blocks' else None,
                        "unknown_classes": row["unknown_classes"], "reused": False,
                        "timing": {"load_seconds": read_seconds, "sliding_window_seconds": compute_seconds,
                                   "restore_write_seconds": perf_counter() - mark, **entry["timing"]}}
@@ -193,7 +212,7 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None, prepared
             event(log_dir, "prediction", case_id=name, scope=prepared["scope"], timing=receipt["timing"],
                   completed=len(results) + 1, total=len(requested), bytes=path.stat().st_size)
             results.append(receipt)
-            del native, probabilities, logits, entry, image
+            del native, probabilities, entry, image
             dataset.clear()
             case_cleanup.close()
         summary = {"state": "completed", "scope": prepared["scope"], "cases": results,

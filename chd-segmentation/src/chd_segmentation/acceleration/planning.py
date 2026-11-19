@@ -49,7 +49,7 @@ def case_estimates(config, prepared, stage):
                 from ..training.stage_memory import prediction_workspace
                 entry = source.open(row['case_id'],with_label=False)
                 memory = prediction_workspace(item['shape_czyx'],entry['source_shape_xyz'],entry['roi_xyz'],
-                    len(prepared['dataset_json']['labels']))
+                    len(prepared['dataset_json']['labels']),config['prediction'],config['training']['patch'])
                 reports[-1].update(memory,workspace_bytes=memory['prediction_workspace_bytes']+item['locations_bytes'])
             continue
         native = list(nib.load(row["image"]).shape)
@@ -153,8 +153,21 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
         from ..training.stage_memory import stage_memory
         stage_reserve = stage_memory(config, prepared, prefetch=1)
         base += stage_reserve["checkpoint_reserve_bytes"] + world * stage_reserve["model_load_per_rank_bytes"]
-        if r["device"] == "cpu":
+        if r["device"] == "cpu" and stage not in ('predict','prediction'):
             base += stage_reserve["batch_bytes"]
+    if config.get('model', 'stunet') == 'stunet' and stage in ('predict','prediction'):
+        # 在扣除进程、模型和50%余量后的实际额度内选择整例或分块。
+        reports = [dict(row) for row in reports]
+        for row in reports:
+            available_case = max(0, budget-base-patch_bytes*4)
+            wanted = row['prediction_execution_requested']
+            execution = 'whole' if wanted == 'whole' or wanted == 'auto' and row['whole_workspace_bytes'] <= available_case else 'blocks'
+            block = max(config['prediction']['block_bytes'], min(config['prediction']['max_block_bytes'],
+                max(0, available_case-row['prediction_window_bytes']-256*1024**2)//4))
+            row.update(prediction_execution=execution, prediction_block_bytes=block)
+            row['workspace_bytes'] = (row['whole_workspace_bytes'] if execution == 'whole' else
+                row['prediction_window_bytes']+4*block+256*1024**2)
+        case_bytes = max(row['workspace_bytes'] for row in reports)
     if config.get('model') in ('medsam2','q_route1'):
         from ..models.memory import memory_profile
         profile = memory_profile(config,prepared,config['model_stage'],shares,reports)
@@ -204,7 +217,7 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
         fixed = base + count * worker_bytes + instances * retained
         prefetch = 1
         queues = patch_bytes*3
-        extra_stage = 0 if stage_reserve is None or r["device"] != "cpu" else (
+        extra_stage = 0 if stage_reserve is None or r["device"] != "cpu" or stage in ('predict','prediction') else (
             stage_memory(config, prepared, prefetch=2)["batch_bytes"] - stage_reserve["batch_bytes"])
         local_threads = sum(w == 0 for w in workers)
         if (profile is None and r["prefetch"] >= 2 and world + count + local_threads <= cores and

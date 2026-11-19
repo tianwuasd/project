@@ -20,6 +20,7 @@ from .memory import identity, alive, system_headroom
 from .timing import TimingBook
 from .accounting import reconcile
 from .admission import select_admission
+from .limits import memory_ceiling, project_usage
 
 
 def attach(handle):
@@ -86,8 +87,8 @@ class ResourceSession:
                 path = root / 'active.json'
                 rows = [row for row in (read_json(path) if path.exists() else []) if alive(row)]
                 peers = [row for row in rows if row['pid'] != self.owner['pid'] or row['birth'] != self.owner['birth']]
-                limit = min(100_000_000_000, r.get('memory_limit_bytes', 100_000_000_000))
-                project = sum(max(row.get('ram_bytes', 0), row.get('rss_bytes', 0)) for row in peers)
+                limit = memory_ceiling(r, facts)
+                project = project_usage(peers, r)
                 pending = sum(max(0, row.get('ram_bytes', 0)-row.get('rss_bytes', 0)) for row in peers)
                 current = psutil.Process().memory_info().rss
                 if hasattr(self, 'members'):
@@ -116,6 +117,7 @@ class ResourceSession:
                     rows = peers + [{**self.owner, 'members': list(self.members.values()) if hasattr(self,'members') else [],
                         'ram_bytes': amount, 'rss_bytes': current, 'cpu_slots': cpu_slots,
                         'uuids': [g['uuid'] for g in gpus], 'memory_limit_bytes': limit,
+                        'memory_policy': r.get('memory_policy', 'project_limit'),
                         'layout': applied_layout, 'reader_slots': selected.reader_slots,
                         'workspace_capacity': selected.workspace_bytes if selected.reader_slots else 0,
                         'plan_generation': generation,'world':world,'shares':shares,'precision':r.get('precision')}]
@@ -178,7 +180,8 @@ class ResourceSession:
             own['rss_bytes'] = rss
             project = sum(max(row.get('ram_bytes', 0), row.get('rss_bytes', 0)) for row in self.rows)
             pending = sum(max(0, row.get('ram_bytes', 0)-row.get('rss_bytes', 0)) for row in self.rows)
-            limit = min(100_000_000_000, r.get('memory_limit_bytes', 100_000_000_000))
+            limit = memory_ceiling(r, facts)
+            limited_project = project_usage(self.rows, r)
             with self.condition:
                 fixed_rss = sum(m.get('baseline_rss',0) for m in members if alive(m))
                 reconcile(self.state,rss,fixed_rss)
@@ -187,7 +190,7 @@ class ResourceSession:
                     headroom=max(0, min(self.capacity-rss, spare-pending+max(0,self.capacity-rss))),
                     task_rss=rss, peak_task_rss=max(rss,self.state.get('peak_task_rss',0)),
                     fixed_rss=fixed_rss,
-                    paused=spare-pending<0 or project>limit or rss>self.capacity,
+                    paused=spare-pending<0 or limited_project>limit or rss>self.capacity,
                     sampling_seconds=monotonic()-began)
                 self.condition.notify_all()
 

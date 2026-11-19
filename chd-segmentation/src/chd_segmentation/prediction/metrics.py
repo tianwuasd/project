@@ -1,11 +1,11 @@
 from pathlib import Path
 from time import perf_counter
 
-import nibabel as nib
 import numpy as np
 
 from ..artifacts.store import digest, read_json, require_result_output, write_json
 from ..observability.events import event, logged, stage
+from .evaluation_blocks import count_labels
 
 
 def case_data_identity(prepared, row, *, include_generation=False):
@@ -62,29 +62,8 @@ def evaluate(prediction_dir, prepared, output, config):
               completed=len(results), total=len(selection))
         path = Path(prediction_dir) / receipt["file"]
         roi = tuple(slice(begin, end) for begin, end in receipt["roi_xyz"])
-        prediction_image, reference_image = nib.load(path), nib.load(row["label"])
-        if prediction_image.shape != reference_image.shape:
-            raise ValueError("评价标签与预测原图尺寸不同")
-        if not np.allclose(prediction_image.affine, reference_image.affine, rtol=0, atol=1e-5):
-            raise ValueError('评价标签与预测空间不同')
-        prediction = np.asanyarray(prediction_image.dataobj[roi])
-        truth = np.asanyarray(reference_image.dataobj[roi])
-        if not np.isfinite(truth).all() or not np.equal(truth, np.rint(truth)).all():
-            raise ValueError("评价标签不是有限整数")
-        truth = truth.astype(np.int16)
-        truth[np.isin(truth, row.get("ignore_label_ids", []))] = -1
-        if not ((truth >= -1) & (truth < classes)).all():
-            raise ValueError("评价标签超出协议范围")
-        valid = (truth >= 0) & (truth < classes)
-        by_class = {}
-        for c in range(1, classes):
-            if c in row["unknown_classes"]:
-                continue
-            target, found = (truth == c) & valid, (prediction == c) & valid
-            reference_count, predicted_count = int(target.sum()), int(found.sum())
-            by_class[str(c)] = {"reference_voxels": reference_count, "predicted_voxels": predicted_count,
-                                "dice": float(2 * (target & found).sum() / (reference_count + predicted_count))
-                                if reference_count + predicted_count else None}
+        by_class = count_labels(path,row['label'],roi,classes,row['unknown_classes'],
+                               row.get('ignore_label_ids',[]),config)
         results.append({"case_id": row["case_id"], "scope": receipt["scope"], "roi_xyz": receipt["roi_xyz"], "classes": by_class})
         event(config["run_dir"], "evaluation_case_completed", case_id=row["case_id"], completed=len(results),
               total=len(selection), seconds=perf_counter() - mark, supervised_classes=list(by_class),
