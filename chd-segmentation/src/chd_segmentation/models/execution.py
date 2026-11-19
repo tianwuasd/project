@@ -55,10 +55,21 @@ def resource_spec(config,prepared,stage):
 
 
 def training_budget(config,prepared,stage):
-    from .workflow import stage_case_names
+    from .workflow import stage_case_names, training_names, validated_q_groups
     names = set(stage_case_names(config,prepared,stage))
     budget = deepcopy(prepared)
-    budget['manifest']['cases'] = [dict(row,roles=['train']) for row in prepared['manifest']['cases']
+    train = set(training_names(config,prepared,stage))
+    if config['technical']:
+        from .roles import technical_names
+        validation = set(technical_names(config['technical_roles'],stage,'validation',list(names)))
+    elif config['model']=='q_route1':
+        validation = set(validated_q_groups(config,prepared)['C'])
+    else:
+        validation = {row['case_id'] for row in prepared['manifest']['cases'] if 'validation' in row['roles']}
+    budget['q_validation_names'] = sorted(validation)
+    budget['manifest']['cases'] = [dict(row,roles=(['train'] if row['case_id'] in train else []) +
+                                                       (['validation'] if row['case_id'] in validation else []))
+                                  for row in prepared['manifest']['cases']
                                   if row['case_id'] in names]
     return budget
 

@@ -42,9 +42,17 @@ def case_estimates(config,prepared,stage):
             voxels=math.prod(map(int,target))
             working=0 if stored is not None else voxels*64
             case=max(1,stored['locations_bytes']*2) if stored is not None else native*32+working
+            block = config['resources'].get('validation_block_bytes',64*1024**2)
+            bounded_validation = 8*block + math.prod(config['training']['patch'])*11*32 + 256*2**20
+            validation_names = prepared.get('q_validation_names')
+            is_validation = row['case_id'] in validation_names if validation_names is not None else 'validation' in row['roles']
+            retained = max(voxels*6,stored['array_bytes']+stored['locations_bytes']) if stored is not None else voxels*6
+            if stage=='base' and stored is not None:
+                retained = stored['locations_bytes'] + math.prod(config['training']['patch'])*16
             records.append(dict(case_id=row['case_id'],native_shape_xyz=input_shape.tolist(),working_shape=target.tolist(),
                 native_read_bytes=0 if stored is not None else native*32,working_bytes=working,workspace_bytes=case,
-                retained_case_bytes=max(voxels*6,stored['array_bytes']+stored['locations_bytes']) if stored is not None else voxels*6,
+                retained_case_bytes=retained, validation_workspace_bytes=bounded_validation if is_validation else 0,
+                is_validation=is_validation,
                 mapped_file_bytes=stored['array_bytes'] if stored is not None else 0,
                 rank_prediction_bytes=voxels*(11*32+288)+native*classes*8+original_voxels*2))
         else:
@@ -100,7 +108,8 @@ def memory_profile(config,prepared,stage,shares,records=None):
         if stage in ('local','prediction'):
             rank_case=[prediction for _ in shares]
         elif stage=='base':
-            rank_case=[prediction if rank==0 else 0 for rank in range(len(shares))]
+            validation = max(row['validation_workspace_bytes'] for row in records)
+            rank_case=[validation if rank==0 else 0 for rank in range(len(shares))]
         else:
             rank_case=[prediction//5 for _ in shares]
     checkpoint = 0 if stage == 'prediction' else (6*Path(config['pretrained']).stat().st_size if config['model'] == 'medsam2' else 4*checkpoint_weight)+16*2**20

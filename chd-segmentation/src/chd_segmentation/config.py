@@ -31,6 +31,7 @@ DEFAULTS = {
     "resources": {"device": "cpu", "cpu_threads": 2, "cache_bytes": 1024 ** 3, "cache_entries": 16,
                   "reserve_ram_bytes": 4 * 1024 ** 3, "cpu_fraction": 0.8, "ram_fraction": 0.8,
                   "memory_margin_fraction": 0.5,
+                  "validation_block_bytes": 64 * 1024 ** 2,
                   "workers": "auto", "max_workers": 32, "prefetch": 2, "readers": "auto", "max_readers": 8,
                   "gpu_count": 1, "gpu_ids": None, "batch_layout": None, "cpu_processes": 1,
                   "wait_seconds": None, "max_wait": None, "release_and_regroup": False, "poll_seconds": 2, "share": False,
@@ -191,6 +192,9 @@ def load_config(path, overrides=None):
 
 
 def validate_resources(r,batch):
+    block = r.get('validation_block_bytes', 64 * 1024 ** 2)
+    if type(block) is not int or not 1024**2 <= block <= 512*1024**2:
+        raise ValueError('验证块预算必须是1MiB至512MiB的整数字节')
     margin = r['memory_margin_fraction']
     if type(margin) not in (int, float) or not math.isfinite(margin) or margin < 0:
         raise ValueError('memory_margin_fraction必须为有限非负数')

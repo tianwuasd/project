@@ -284,25 +284,5 @@ class QAdapter:
         return (result if internal else export_probabilities(result,self.prepared['dataset'])),dict(candidates=len(candidates),solver=SOLVER,rois=diagnostics)
 
     def validate(self,dataset,names):
-        patients = {}
-        rows = {row['case_id']:row for row in self.prepared['manifest']['cases']}
-        aggregation_unit = 'patient' if all(rows[name].get('patient') for name in names) else 'case'
-        for completed,name in enumerate(names,1):
-            entry = dataset.get(name)
-            support = allowed(entry['label'],entry['unknown_classes'],self.prepared['dataset'])
-            valid = torch.from_numpy(entry['label']>=0)[None,None]
-            if self.stage=='localizer':
-                image = torch.from_numpy(entry['image'])[None].to(self.device)
-                heat,mask = build_heatmap_targets(support,entry['label']>=0,entry.get('processed_spacing',
-                    self.prepared['plan']['configurations']['3d_fullres']['spacing']))
-                value = localizer_loss(self.model(image,valid.to(self.device))['logits'].float(),heat.to(self.device),mask.to(self.device))
-            else:
-                probability = self.base_probability(entry)[0].numpy() if self.stage=='base' else self.predict(entry,internal=True)[0]
-                logits = torch.from_numpy(probability).clamp_min(1e-8).log()[None]
-                value = segmentation_loss(logits,torch.from_numpy(support)[None],valid)
-            key = rows[name]['patient'] if aggregation_unit == 'patient' else name
-            patients.setdefault(key,[]).append(float(value))
-            if self.config['logging']['case_details']:
-                event(Path(self.config['run_dir'])/self.stage,'q_validation_case_completed',case_id=name,
-                    cases_completed=completed,cases_total=len(names),loss=float(value),aggregation_unit=aggregation_unit)
-        return float(np.mean([np.mean(values) for values in patients.values()]))
+        from .validation import validate
+        return validate(self,dataset,names)

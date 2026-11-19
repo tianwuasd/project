@@ -484,6 +484,7 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                     event(root,'model_validation_started',stage=stage,update=update,cases=len(validation_names))
                 gate.start(rank,f'q-validation:{update}',[len(validation_names)]+[0]*(allocation['world']-1),device)
                 dataset.mode,dataset.position = 'validation',0
+                bundle.validation_guard = memory
                 with torch.no_grad():
                     value = bundle.validate(dataset,validation_names) if rank==0 else None
                 gate.finish(rank,f'q-validation:{update}',device)
