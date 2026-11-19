@@ -1,0 +1,17 @@
+prepared: /data4/zhangruichen/course/chd-segmentation/prepared/ImageCHD-STUNet-20261115_fold0_source.json
+model_folder: /data4/zhangruichen/data/pretrained/TotalSegmentator/nnunet/results/Dataset301_heart_highres_1559subj/nnUNetTrainer__nnUNetPlans__3d_fullres
+license_home: auto
+work_root: /data4/zhangruichen/course/chd-segmentation
+run_dir: /data4/zhangruichen/course/chd-segmentation/runs/ImageCHD-TotalSegmentator-fold0
+data_root: /data4/zhangruichen/data/chd-segmentation
+dataset_dir: /data4/zhangruichen/data/chd-segmentation/ImageCHD-TotalSegmentator-fold0
+result_root: /data4/zhangruichen/result/chd-segmentation
+train_ram_bytes: 25769803776
+prepare_ram_bytes: 25769803776
+prediction_ram_bytes: 25769803776
+cpu_slots: 3
+epochs: 200
+batch: 4
+gpu_count: 2
+gpu_ids: null
+learning_rate: 0.001

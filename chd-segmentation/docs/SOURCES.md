@@ -7,5 +7,6 @@
 - GPU/CPU：固定旧 ImageCHD 版本 `de4a07e052c1a1468fa390bf7495399c73f386d3` 的 fleet、parallel_policy、distributed_engine，以及旧1282版本的 GPU isolation/resources，借鉴 UUID 核验、NCCL 显式设备绑定、全局 batch 分担、统一预算及逐进程恢复。实现独立保存在当前项目，运行不依赖相邻旧工程。
 - 数据划分：ImageCHD 的 preprocessing/cohort.py 保留历史97例角色再排除质量问题病例，辅助病例仅训练；1282 的 preparation.py 使用 Scheme A 患者分层与种子20261104，读取原冻结 cohort.json，训练/开发角色沿用原记录。
 - 确定性预处理：直接调用 nnU-Net 2.8.1 的 DefaultPreprocessor、PlansManager 和重采样函数；仅将前景坐标收集改为有界抽样。MONAI 1.5.2 组织 Dataset/Compose 和滑窗推断。
+- TotalSegmentator 微调：使用 TotalSegmentator 2.18.0 的本地源计划与获授权权重，调用 nnU-Net 2.8.1 的预处理、网络初始化和官方预训练参数加载器。目标头按 ImageCHD 八类重新初始化，心肌缺失标注继续使用本项目部分监督损失。配置和运行说明见 TOTAL_FINETUNING.md；许可号码与模型权重保留在私有服务器目录。
 
 患者数据、Excel、人工复核政策、原始划分和运行回执保留在私有工作目录，不随代码分发。8/11 类数据空间和损失配方分别保留。

@@ -108,4 +108,6 @@ python -B -m unittest discover -s tests -v
 
 ## 来源
 
+ImageCHD fold0 的 TotalSegmentator 微调使用独立 nnU-Net 环境，复用冻结病例划分和 AAOCA 私有许可配置。初始化权重、许可检查、两卡训练及恢复命令见 [TotalSegmentator 微调](docs/TOTAL_FINETUNING.md)。
+
 STU-Net-S 结构源自 uni-medical/STU-Net，Apache-2.0，上游文件 blob `85587aca5fdf1180dc266a138f3ae97c231875b2`。骨干按固定官方权重 SHA256 加载，输出头独立初始化。部分监督分别保留原 ImageCHD 与 1282 工程的计算方式，详细依据见随交付保存的开发计划。

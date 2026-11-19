@@ -14,6 +14,7 @@ chd-segmentation = "chd_segmentation.cli:main"
 
 [project.optional-dependencies]
 inputs = ["openpyxl>=3.1"]
+total = ["TotalSegmentator==2.18.0"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
