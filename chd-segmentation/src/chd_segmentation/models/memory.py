@@ -105,13 +105,17 @@ def memory_profile(config,prepared,stage,shares,records=None):
                for batch in shares]
         queue_per_sample=patch*16
         cache_bytes=config['resources']['cache_bytes']
-        if stage in ('local','prediction'):
+        validation = max(row['validation_workspace_bytes'] for row in records)
+        training = [row for row in records if not row['is_validation']]
+        training_prediction = max((row['rank_prediction_bytes'] for row in training), default=0)
+        if stage == 'prediction':
             rank_case=[prediction for _ in shares]
+        elif stage == 'local':
+            rank_case=[max(training_prediction,validation) for _ in shares]
         elif stage=='base':
-            validation = max(row['validation_workspace_bytes'] for row in records)
-            rank_case=[validation if rank==0 else 0 for rank in range(len(shares))]
+            rank_case=[validation for _ in shares]
         else:
-            rank_case=[prediction//5 for _ in shares]
+            rank_case=[max(training_prediction//5,validation) for _ in shares]
     checkpoint = 0 if stage == 'prediction' else (6*Path(config['pretrained']).stat().st_size if config['model'] == 'medsam2' else 4*checkpoint_weight)+16*2**20
     return dict(protocol='chd-model-memory-v2',model=config['model'],stage=stage,
         coordinator_bytes=GIB+checkpoint,checkpoint_reserve_bytes=checkpoint,

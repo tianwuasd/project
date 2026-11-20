@@ -21,7 +21,7 @@
 
 - 不均分 Q 份额时当前样本公平获得构建名额。
 - MedSAM2 多 worker 的后续任务不能阻塞当前批次。
-- rank0 验证和保存期间其他 rank 不提前提交 collective。
+- 各rank完成本组验证、以及rank0完成保存前，其他rank不提前提交collective。
 - 官方 sampler、增强随机数及恢复 worker 布局保持一致。
 - CUDA 同步后释放缓冲；本机只做 CPU，CUDA 部分须明确未覆盖。
 

@@ -78,7 +78,8 @@ def run(args):
             support = torch.from_numpy(allowed(entry['label'], entry['unknown_classes'], 'imagechd'))[None]
             valid = torch.from_numpy(entry['label']>=0)[None, None]
             expected_loss = float(segmentation_loss(expected.clamp_min(1e-8).log()[None], support, valid))
-        with ValidationWorkspace(config, dict(case=name, stage='reference'), 1024**2) as workspace:
+        with ValidationWorkspace(config, dict(case=name, stage='reference'), 1024**2,
+                                 storage=args.storage,array_budget_bytes=512*1024**2) as workspace:
             probability = window_probabilities(entry['image'], bundle.model, [32]*3, 11,
                 dict(overlap=.5, blend='gaussian', window_batch=1), 'cpu', workspace)
             difference = float(np.max(np.abs(probability-expected.numpy())))
@@ -90,7 +91,8 @@ def run(args):
             reference = locator(image, valid)
             target, mask = build_heatmap_targets(support[0].numpy(), entry['label']>=0, entry['processed_spacing'])
             target_loss = float(localizer_loss(reference['logits'], target, mask))
-        with ValidationWorkspace(config, dict(case=name, stage='localizer'), 1024**2) as workspace:
+        with ValidationWorkspace(config, dict(case=name, stage='localizer'), 1024**2,
+                                 storage=args.storage,array_budget_bytes=512*1024**2) as workspace:
             out, features = localizer_forward(locator, entry['image'], entry['label']>=0, 'cpu', workspace)
             logit_error = float(np.max(np.abs(out-reference['logits'][0].numpy())))
             feature_error = float(np.max(np.abs(features-reference['features'][0].numpy())))
@@ -114,7 +116,8 @@ def run(args):
         local.model.eval()
         with torch.inference_mode():
             original, _ = local.predict(entry, internal=True)
-        with ValidationWorkspace(config, dict(case=name, stage='local'), 1024**2) as workspace:
+        with ValidationWorkspace(config, dict(case=name, stage='local'), 1024**2,
+                                 storage=args.storage,array_budget_bytes=512*1024**2) as workspace:
             probability = window_probabilities(entry['image'], local.base, [32]*3, 11,
                 dict(overlap=.5, blend='gaussian', window_batch=1), 'cpu', workspace)
             actual = local_probability(local, entry, probability, workspace)
@@ -169,5 +172,6 @@ if __name__ == '__main__':
     for name in ('work-root', 'report', 'manifest', 'data-root', 'pretrained'):
         parser.add_argument('--'+name, required=True)
     parser.add_argument('--padding-only', action='store_true')
+    parser.add_argument('--storage', choices=('disk','memory'), default='disk')
     args = parser.parse_args()
     (run_padding if args.padding_only else run)(args)

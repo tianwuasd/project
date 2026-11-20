@@ -1,4 +1,5 @@
 from contextlib import ExitStack,contextmanager,redirect_stdout,redirect_stderr
+from dataclasses import asdict
 from copy import deepcopy
 from datetime import timedelta
 import os
@@ -35,6 +36,7 @@ def execution_config(config):
     elif 'workers' not in config['execution']:
         resources['workers'] = config['workers']
     validate_resources(resources,batch)
+    resources['technical_cpu'] = bool(config['technical'] and device.type == 'cpu' and sys.platform == 'win32')
     world = resources['gpu_count'] if device.type=='cuda' else resources['cpu_processes']
     shares = layout(batch,world,resources['batch_layout'])
     if config['model']=='medsam2' and len(set(shares))!=1:
@@ -124,10 +126,12 @@ def admitted(config,prepared,stage,topology=None):
             min_gpus=applied.world if applied.gpus else common['resources']['min_gpus'],
             gpu_ids=[gpu['uuid'] for gpu in applied.gpus] if applied.gpus else common['resources']['gpu_ids'])
         allocation = dict(owner=session.handle.owner, gpus=session.allocation.gpus,
-            world=applied.world,supply=applied.supply,shares=applied.shares)
+            world=applied.world,supply=applied.supply,shares=applied.shares,
+            resource_demand=asdict(session.applied_demand),resource_layout=session.requested_layout)
         if config['model']=='medsam2' and len(set(allocation['shares']))!=1:
             raise ValueError('MedSAM2官方训练要求各进程均分全局batch')
         allocation['spec'] = spec
+        common['resource_session'] = session
         yield common,allocation
 
 
@@ -204,7 +208,8 @@ def record_model_peaks(common,spec,gpus,shares,measurements):
 
 def rank_entry(rank,payload,common,allocation,gate,port):
     payload = deepcopy(payload)
-    payload['config']['execution'] = dict(common['resources'],workers=sum(allocation['supply']['workers']))
+    execution = {key:value for key,value in common['resources'].items() if key != 'technical_cpu'}
+    payload['config']['execution'] = dict(execution,workers=sum(allocation['supply']['workers']))
     payload['config']['execution']['cache_bytes'] = allocation['supply']['cache_bytes'][rank]
     root = Path(payload['config']['run_dir'])/payload['stage']
     with (root/f'rank{rank}.log').open('a',encoding='utf-8') as log,redirect_stdout(log),redirect_stderr(log), \
@@ -260,6 +265,8 @@ def run_workers(payload,common,allocation):
 
 
 def _run_workers(payload,common,allocation):
+    common = dict(common)
+    session = common.pop('resource_session')
     root = Path(payload['config']['run_dir'])/payload['stage']
     root.mkdir(parents=True,exist_ok=True)
     if payload['config']['model']=='medsam2' and payload.get('operation')!='predict':
@@ -321,19 +328,23 @@ def _run_workers(payload,common,allocation):
         ticket = cleanup.enter_context(memory.admit(reserve, label='checkpoint_reserve', reserve=True))
         if ticket is None:
             raise RuntimeError('模型准备已取消，完整检查点保持原位置')
-        succeeded, last_console, last_done = False, 0., None
+        succeeded, last_console, last_done, last_validation = False, 0., None, 0.
         path = root/('progress-predict.json' if payload.get('operation') == 'predict' else 'progress-train.json')
         try:
             processes = torch.multiprocessing.spawn(rank_entry,args=(payload,common,allocation,gate,port),
                                                     nprocs=allocation['world'],join=False)
             from time import perf_counter
             while not processes.join(timeout=1):
+                session.service_replans()
                 memory.boundary()
                 if path.is_file():
                     progress = read_json(path)
                     if progress['done'] != last_done or perf_counter()-last_console >= 15:
                         console_progress(progress)
                         last_console, last_done = perf_counter(), progress['done']
+                if payload['config']['model'] == 'q_route1':
+                    from .q_route1.validation_runtime import display_progress
+                    last_validation = display_progress(root, allocation['world'], last_validation)
             succeeded = True
             if path.is_file():
                 console_progress(read_json(path))

@@ -14,7 +14,7 @@ class LayerInference:
         self.workspace, self.device = workspace, device
 
     def sections(self, shape, channels):
-        return tiles(shape, max(1, self.workspace.block_bytes // (max(1, channels) * 32)))
+        return tiles(shape, max(1, self.workspace.compute_block_bytes // (max(1, channels) * 32)))
 
     def tensor(self, value, section):
         return torch.from_numpy(np.array(value[(slice(None), *section)], copy=True))[None].to(self.device)

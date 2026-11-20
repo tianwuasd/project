@@ -32,6 +32,8 @@ DEFAULTS = {
                   "reserve_ram_bytes": 4 * 1024 ** 3, "cpu_fraction": 0.8, "ram_fraction": 0.8,
                   "memory_margin_fraction": 0.5,
                   "validation_block_bytes": 64 * 1024 ** 2,
+                  "validation_auto_blocks": True, "validation_max_block_bytes": None,
+                  "validation_storage": "auto",
                   "workers": "auto", "max_workers": 32, "prefetch": 2, "readers": "auto", "max_readers": 8,
                   "gpu_count": 1, "gpu_ids": None, "batch_layout": None, "cpu_processes": 1,
                   "wait_seconds": None, "max_wait": None, "release_and_regroup": False, "poll_seconds": 2, "share": False,
@@ -193,8 +195,13 @@ def load_config(path, overrides=None):
 
 def validate_resources(r,batch):
     block = r.get('validation_block_bytes', 64 * 1024 ** 2)
-    if type(block) is not int or not 1024**2 <= block <= 512*1024**2:
-        raise ValueError('验证块预算必须是1MiB至512MiB的整数字节')
+    if type(block) is not int or not 1024**2 <= block <= r['memory_limit_bytes']:
+        raise ValueError('验证起始块预算必须至少1MiB且不超过项目内存上限')
+    maximum = r.get('validation_max_block_bytes')
+    if maximum is not None and (type(maximum) is not int or not block <= maximum <= r['memory_limit_bytes']):
+        raise ValueError('验证最大块预算必须不小于起始块且不超过项目内存上限')
+    if type(r.get('validation_auto_blocks', True)) is not bool or r.get('validation_storage', 'auto') not in ('auto', 'memory', 'disk'):
+        raise ValueError('验证自动分块开关或存储方式无效')
     margin = r['memory_margin_fraction']
     if type(margin) not in (int, float) or not math.isfinite(margin) or margin < 0:
         raise ValueError('memory_margin_fraction必须为有限非负数')

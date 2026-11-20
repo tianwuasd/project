@@ -2,6 +2,8 @@
 
 MedSAM2官方序列及Q路线一r2使用独立的`run.py models`入口。模型数据配方与STU处理分别核对，训练前通过模型离线入口保存对应输入；模型说明见[模型入口与验收](docs/MODELS_ASSISTANT2.md)，分组及提示规则见[1282组合与标签框](docs/Q1282_AND_LABEL_BOX.md)。发布使用main，助手2部署目录及更新参数见[发布与更新](docs/ASSISTANT2_PUBLICATION.md)。
 
+Q独立验证支持多卡按病例分担、按100 GB项目额度选择内存或大块磁盘处理，并显示各rank的病例与块进度；资源与手动设置见[Q验证资源](docs/Q_VALIDATION_RESOURCES.md)。
+
 版本 0.1.0。当前接入 STU-Net-S 的 CHD1282（11 类）和 ImageCHD（8 类）流程：准备计划、统一离线预处理、训练、完整状态恢复、MONAI 滑窗预测、原数组网格导出、独立评价和短测。两数据集共用网络代码，分别训练权重。训练支持 CPU、1–4 卡 CUDA/DDP、自动或手动选卡、固定全局 batch 分担和有界 CPU 供数。
 
 完整离线数据合同、冻结在线版本、每折独立统计、数据复用/引用和服务器全流程命令见 [离线预处理](docs/OFFLINE_DATA_CONTRACT.md)。`prepare` 保存来源描述，`preprocess` 将固定转换写入 data 专用目录，`train` 仅接受完整离线描述。旧在线任务使用冻结分支和原目录继续；离线训练使用新的 run_dir。

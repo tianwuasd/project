@@ -316,23 +316,10 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
     model.train()
     optimizer = bundle.optimizer()
     identity = checked_identity(config,prepared,stage,initial_sha,previous['identity'] if previous else None)
-    class AdmittedCases(CaseDataset):
-        position = 0
-        mode = 'candidates'
-
-        def get(self,name):
-            if self.mode=='candidates':
-                gate.ready.wait(rank,f'q-candidate:{self.position}:{name}',device)
-            with gate.build(rank,gate.batch.value,self.position):
-                gate.reserve(rank,name)
-                entry = super().get(name)
-            gate.mark_ready(rank)
-            gate.deliver(rank)
-            self.position += 1
-            return entry
+    from .supply import AdmittedCases
     dataset = AdmittedCases(selected_prepared(prepared,stage_case_names(config,prepared,stage)),dict(reserve_ram_bytes=common['resources']['reserve_ram_bytes'],
         cache_bytes=allocation['supply']['cache_bytes'][rank]),with_label=True,
-        log_dir=root,logging=config['logging'])
+        log_dir=root,logging=config['logging'],rank=rank,gate=gate,device=device)
     from ..observability.progress import Progress
     from ..observability.events import event
     feedback = Progress(dict(common,run_dir=str(root)),'train',total=config['updates'],unit='updates') if rank==0 else None
@@ -482,13 +469,8 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                     feedback.update(phase='独立验证')
                     feedback.snapshot(force=True)
                     event(root,'model_validation_started',stage=stage,update=update,cases=len(validation_names))
-                gate.start(rank,f'q-validation:{update}',[len(validation_names)]+[0]*(allocation['world']-1),device)
-                dataset.mode,dataset.position = 'validation',0
-                bundle.validation_guard = memory
-                with torch.no_grad():
-                    value = bundle.validate(dataset,validation_names) if rank==0 else None
-                gate.finish(rank,f'q-validation:{update}',device)
-                value = all_states(value)[0]
+                from .q_route1.validation_runtime import validate_parallel
+                value = validate_parallel(bundle,dataset,validation_names,rank,common,allocation,gate,device,memory,update)
                 model.train()
                 selection = update_selection(selection, value, update, stopping)
                 improved, best = selection['improved'], selection['best']

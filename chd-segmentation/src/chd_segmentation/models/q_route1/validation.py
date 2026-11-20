@@ -1,4 +1,6 @@
+from contextlib import nullcontext
 from pathlib import Path
+from time import perf_counter
 
 import numpy as np
 import torch
@@ -77,20 +79,46 @@ def local_probability(bundle, entry, probability, workspace):
     return probability
 
 
-def validate(bundle, dataset, names):
-    patients = {}
+def validate_records(bundle, dataset, names):
+    records = []
     config = bundle.config
-    rows = {row['case_id']: row for row in bundle.prepared['manifest']['cases']}
-    aggregation = 'patient' if all(rows[name].get('patient') for name in names) else 'case'
-    block_bytes = config['execution'].get('validation_block_bytes', 64*1024**2)
+    settings = config['execution']
     bundle.current_name, bundle.current_frozen = None, None
     for completed, name in enumerate(names, 1):
+        started = perf_counter()
         entry = dataset.get(name)
         entry = dict(entry, processed_spacing=entry.get('processed_spacing',
                      bundle.prepared['plan']['configurations']['3d_fullres']['spacing']))
         identity = dict(prepared=bundle.prepared['identity'], stage=bundle.stage, case_id=name,
                         run_dir=config['run_dir'])
-        with ValidationWorkspace(config, identity, block_bytes, getattr(bundle, 'validation_guard', None)) as workspace:
+        policy = getattr(bundle, 'validation_policy', None)
+        block_bytes = settings.get('validation_block_bytes', 64*1024**2)
+        array_budget, storage, rank, quota = 0, 'disk', 0, 0
+        if policy is not None:
+            quota, rank = policy['quota_bytes'], policy['rank']
+            demand = policy['demands'][name] if 'demands' in policy else policy['demand']
+            if 'handle' in policy:
+                handle = policy['handle']
+                with handle.condition:
+                    finished = handle.state['q_validation_finished']
+                available = sum(value for done,value in zip(finished,policy['shared_quotas']) if done)
+                quota += available // max(1, finished.count(False))
+            storage = settings.get('validation_storage', 'auto')
+            if storage == 'auto':
+                storage = 'memory' if demand['arrays'] + demand['minimum'] <= quota else 'disk'
+            array_budget = demand['arrays'] if storage == 'memory' else 0
+            block_bytes = min(demand['transient'], quota - array_budget)
+            if block_bytes < demand['minimum']:
+                raise MemoryError('验证内存额度不能容纳指定存储方式和最小计算块')
+        guard = getattr(bundle, 'validation_guard', None)
+        root = Path(config['run_dir']) / bundle.stage
+        event(root, 'q_validation_case_started', case_id=name, rank=rank,
+              storage=storage, block_bytes=block_bytes, array_budget_bytes=array_budget, quota_bytes=quota)
+        claim = guard.admit(quota, label='q_validation_case:'+name, reserve=True) if guard is not None else nullcontext(True)
+        with claim as ready, ValidationWorkspace(dict(config, run_dir=str(root)), identity, block_bytes, guard,
+                storage=storage, array_budget_bytes=array_budget, rank=rank) as workspace:
+            if ready is None:
+                raise InterruptedError('验证额度等待已取消')
             if bundle.stage == 'localizer':
                 valid = validity(entry, workspace, True)
                 logits, features = localizer_forward(bundle.model, entry['image'], valid, bundle.device, workspace)
@@ -107,10 +135,17 @@ def validate(bundle, dataset, names):
             if not np.isfinite(value):
                 raise FloatingPointError('Q验证损失非有限')
             workspace.release(entry['image'], entry['label'])
-        key = rows[name]['patient'] if aggregation == 'patient' else name
-        patients.setdefault(key, []).append(value)
         if config['logging']['case_details']:
-            event(Path(config['run_dir'])/bundle.stage, 'q_validation_case_completed', case_id=name,
+            event(root, 'q_validation_case_completed', case_id=name, rank=rank,
                   cases_completed=completed, cases_total=len(names), loss=value,
-                  aggregation_unit=aggregation, execution='disk_blocks', block_bytes=block_bytes)
-    return float(np.mean([np.mean(values) for values in patients.values()]))
+                  execution=storage, block_bytes=block_bytes, seconds=perf_counter()-started)
+        records.append(dict(case_id=name, loss=value))
+        if hasattr(dataset, 'clear'):
+            dataset.clear()
+    return records
+
+
+def validate(bundle, dataset, names):
+    from .validation_runtime import aggregate
+    rows = {row['case_id']: row for row in bundle.prepared['manifest']['cases']}
+    return aggregate(validate_records(bundle, dataset, names), names, rows)

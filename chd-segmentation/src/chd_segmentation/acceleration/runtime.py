@@ -20,7 +20,7 @@ from .memory import identity, alive, system_headroom
 from .timing import TimingBook
 from .accounting import reconcile
 from .admission import select_admission
-from .limits import memory_ceiling, project_usage
+from .limits import host_fraction, memory_ceiling, project_usage
 
 
 def attach(handle):
@@ -82,7 +82,7 @@ class ResourceSession:
                 history.append((monotonic(), observed))
                 while len(history)>1 and history[-1][0]-history[1][0] >= r.get('share_window_seconds',30):
                     history.pop(0)
-            headroom, _ = system_headroom(facts, min(.8, r.get('ram_fraction', .8)), r.get('reserve_ram_bytes', 4*2**30))
+            headroom, _ = system_headroom(facts, host_fraction(r), r.get('reserve_ram_bytes', 4*2**30))
             with self.control_lock, FileLock(str(root / '.resource.lock')):
                 path = root / 'active.json'
                 rows = [row for row in (read_json(path) if path.exists() else []) if alive(row)]
@@ -167,7 +167,7 @@ class ResourceSession:
             members = list(self.members.values())
             rss = sum(psutil.Process(m['pid']).memory_info().rss for m in members if alive(m))
             r = self.request.resources
-            spare, _ = system_headroom(facts, min(.8, r.get('ram_fraction', .8)), r.get('reserve_ram_bytes', 4*2**30))
+            spare, _ = system_headroom(facts, host_fraction(r), r.get('reserve_ram_bytes', 4*2**30))
             root = Path(self.request.registry_root)
             if not hasattr(self, 'last_registry') or monotonic()-self.last_registry >= 5.:
                 with FileLock(str(root / '.resource.lock')):

@@ -166,7 +166,7 @@ class OrderedSupply:
               workspace_wait_seconds=perf_counter()-started,**self.snapshot())
 
     @contextmanager
-    def build(self,rank,batch,position):
+    def build(self,rank,batch,position,ordered=True):
         started = perf_counter()
         self.ready.require_active()
         with self.condition:
@@ -177,7 +177,7 @@ class OrderedSupply:
             self.waiting[rank] += 1
             try:
                 while not (batch==self.batch.value and position==self.built[rank] and
-                           all(b>=min(position,q) for b,q in zip(self.built,self.quotas)) and
+                           (not ordered or all(b>=min(position,q) for b,q in zip(self.built,self.quotas))) and
                            self.active.value<self.slots):
                     self.ready.require_active(started)
                     self.condition.wait(timeout=self.ready.wait_seconds(started))
