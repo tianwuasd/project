@@ -10,6 +10,11 @@ def wait_seconds(value):
 
 
 def main(argv=None):
+    import sys
+    actual = sys.argv[1:] if argv is None else argv
+    if actual[:1] == ['medsam3']:
+        from .models.medsam3.cli import main as medsam3_main
+        return medsam3_main(actual[1:])
     parser = argparse.ArgumentParser(description='MedSAM2与Q路线一r2模型入口',allow_abbrev=False)
     commands = parser.add_subparsers(dest='command',required=True)
     split = commands.add_parser('split-q1282',help='从冻结1282迁移包生成独立的Q组合')
@@ -63,7 +68,7 @@ def main(argv=None):
     train.add_argument('--early-stop',action=argparse.BooleanOptionalAction,default=None)
     train.add_argument('--patience',type=int)
     train.add_argument('--min-delta',type=float)
-    args = parser.parse_args(argv)
+    args = parser.parse_args(actual)
     if args.command=='split-q1282':
         from .datasets.q_split import create_q_bundle
         print(json.dumps(create_q_bundle(args.source,args.output,args.seed),ensure_ascii=False,allow_nan=False))

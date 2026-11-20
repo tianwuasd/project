@@ -1,0 +1,39 @@
+model: medsam3
+# 以下路径由私有运行配置填写；相对路径以配置文件目录为基准。
+manifest: ../../private/chd1282_manifest.json
+data_root: ../../private/data/CHD
+cohort: ../../private/chd1282_cohort.json
+work_root: ../../private/work/medsam3
+registry_root: ../../private/work/resources
+python: ../../private/env/medsam3/python.exe
+official_root: ../../private/dependencies/MedSAM3
+official_config: ../../private/dependencies/MedSAM3/configs/full_lora_config.yaml
+base_weights: ../../private/weights/sam3.pt
+lora_weights: ../../private/weights/best_lora_weights.pt
+bpe_path: ../../private/dependencies/MedSAM3/sam3/assets/bpe_simple_vocab_16e6.txt.gz
+device: cuda
+precision: fp32
+resolution: 1008
+geometry_policy: shared_index_excel
+spacing_policy: author_excel
+orientation_evidence: RAS研究约定；需填写本批抽查记录来源，不声明恢复扫描坐标
+intensity_evidence: 项目假设缩放后NIfTI为HU；未认证扫描校准
+intensity_semantics: hu
+gray_window: [-160, 240]
+detection_threshold: 0.5
+nms_iou_threshold: 0.5
+# 全部切片模式；技术验证改为selected并逐例填写预先确定的零基索引。
+coverage: all
+slices: null
+fixed_ram_bytes: 8589934592
+workspace_bytes: 1073741824
+estimated_vram_bytes: 8589934592
+heartbeat_seconds: 15
+worker_timeout_seconds: 900
+resources:
+  memory_limit_bytes: 100000000000
+  ram_fraction: 0.8
+  cpu_fraction: 0.8
+  cpu_threads: 2
+  wait_seconds: 900
+  share: false
