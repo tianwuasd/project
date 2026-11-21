@@ -10,7 +10,7 @@ import torch
 
 from ...acceleration import ResourceDemand, SafeBoundary
 from ...acceleration.host import host_capacity
-from ...acceleration.limits import host_fraction, memory_ceiling, project_usage
+from ...acceleration.limits import host_fraction, memory_ceiling, project_usage, reserve_margin
 from ...acceleration.memory import alive, system_headroom
 from ...artifacts.store import read_json, write_json
 from ...observability.events import event
@@ -94,21 +94,25 @@ def request_budget(common, allocation, memory, demands, update):
     original = ResourceDemand(**allocation['resource_demand'])
     base = original.memory_bytes
     settings = common['resources']
-    margin = 1 + settings['memory_margin_fraction']
+    preferred = settings['memory_margin_fraction']
     desires = [row['desired'] if row else 0 for row in demands]
     minimums = [row['minimum'] if row else 0 for row in demands]
     available = available_budget(common, memory.client.handle)
-    # 只预留实际病例需要的空间；所有rank的增量共同计入50%余量。
-    minimum = base + math.ceil(sum(minimums) * margin)
+    minimum = base + sum(minimums)
     if minimum > memory_ceiling(settings, host_capacity()):
-        raise MemoryError('验证最小布局加安全余量后超过主机或项目上限')
-    target = max(minimum, min(available, base + math.ceil(sum(desires) * margin)))
-    quotas = divide_budget(desires, minimums, int((target - base) / margin))
+        raise MemoryError('验证原始最小布局超过主机或项目上限')
+    raw = max(sum(minimums),min(sum(desires),int(max(0,available-base)/(1+preferred))))
+    buffered = reserve_margin(raw,max(0,available-base),preferred)
+    target = base + buffered['memory_bytes']
+    quotas = divide_budget(desires,minimums,raw)
     updated = replace(original, fixed_bytes=original.fixed_bytes + target - base)
     applied = memory.client.request_replan(updated, safe_boundary=SafeBoundary('before_case', update),
                                            layout=allocation['resource_layout'])
     return dict(memory_bytes=applied['memory_bytes'], quotas=quotas, base_bytes=base,
-                safety_margin=margin, available_bytes=available)
+                safety_margin=1+buffered['memory_margin_fraction'],available_bytes=available,
+                raw_minimum_bytes=minimum,raw_increment_bytes=raw,
+                requested_memory_margin_fraction=preferred,
+                memory_margin_fraction=buffered['memory_margin_fraction'],margin_bytes=buffered['margin_bytes'])
 
 
 def validate_parallel(bundle, dataset, names, rank, common, allocation, gate, device, memory, update):

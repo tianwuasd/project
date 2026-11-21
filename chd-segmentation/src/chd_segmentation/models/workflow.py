@@ -1,4 +1,5 @@
 from copy import deepcopy
+from contextlib import nullcontext
 from dataclasses import asdict
 import json
 import os
@@ -312,6 +313,7 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
         source_changed = require_resume_contract(previous['config'],previous['prepared'],config,prepared,stage)
     bundle = adapter(dict(config,device=str(device),seed=seed+rank),prepared,stage,initialize=not resume,
         parent_states=previous.get('parent_models') if previous else None)
+    bundle.training_guard = memory
     model = bundle.model.to(device)
     model.train()
     optimizer = bundle.optimizer()
@@ -407,11 +409,21 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
             for micro in range(allocation['shares'][rank]):
                 sample_started = perf_counter()
                 entry = bundle.sample(dataset,names,rng)
-                with torch.autocast(device.type,dtype=torch.bfloat16,enabled=config['precision']=='bf16'):
-                    loss = bundle.loss(entry,rng,update)
-                if not torch.isfinite(loss):
-                    raise FloatingPointError('模型训练损失非有限')
-                (loss/config['accumulation']).backward()
+                reservation = nullcontext()
+                if stage == 'localizer':
+                    from .q_route1.training_inputs import input_plan
+                    planned = input_plan(entry['label'].shape,entry['processed_spacing'],
+                                         common['resources']['validation_block_bytes'])
+                    amount = planned['workspace_bytes']+planned['retained_bytes']+planned['backward_bytes']
+                    reservation = memory.admit(amount,label='q_localizer_training_case')
+                with reservation as ticket:
+                    if stage == 'localizer' and ticket is None:
+                        raise InterruptedError('定位器病例等待已取消')
+                    with torch.autocast(device.type,dtype=torch.bfloat16,enabled=config['precision']=='bf16'):
+                        loss = bundle.loss(entry,rng,update)
+                    if not torch.isfinite(loss):
+                        raise FloatingPointError('模型训练损失非有限')
+                    (loss/config['accumulation']).backward()
                 loss_sum += float(loss.detach())/config['accumulation']
                 del loss,entry
                 from ..observability.events import event
@@ -443,7 +455,7 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 if not replicas_equal:
                     raise ValueError('Q各进程更新后的模型参数不一致')
             if device.type=='cuda':
-                observed = rank_measurement(device,allocation,rank)
+                observed = rank_measurement(device,allocation,rank,common)
                 if observed['peak_vram_bytes'] is None:
                     vram_complete = False
                 else:
@@ -519,7 +531,7 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
             if selection and selection['stop']:
                 reason = 'early_stopping'
                 break
-        measurement = rank_measurement(device,allocation,rank)
+        measurement = rank_measurement(device,allocation,rank,common)
         if device.type=='cuda':
             if not vram_complete or measurement['peak_vram_bytes'] is None:
                 measurement.update(peak_vram_bytes=None,vram_complete=False)

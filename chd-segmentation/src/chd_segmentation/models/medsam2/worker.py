@@ -88,7 +88,7 @@ def main(payload,rank,common,allocation,gate,memory):
         def update(self,n=1,reset_peak_usage=True):
             nonlocal observed_peak,vram_complete
             if self.device.type!='cpu':
-                observed = rank_measurement(self.device,allocation,rank)
+                observed = rank_measurement(self.device,allocation,rank,common)
                 if observed['peak_vram_bytes'] is None:
                     vram_complete = False
                 else:
@@ -251,7 +251,7 @@ def main(payload,rank,common,allocation,gate,memory):
         save_state(root/'latest.pt',state)
     gate.ready.wait(rank,'med-export-written',device)
     dist.barrier()
-    measurement = rank_measurement(trainer.device,allocation,rank)
+    measurement = rank_measurement(trainer.device,allocation,rank,common)
     if trainer.device.type=='cuda':
         if not vram_complete or measurement['peak_vram_bytes'] is None:
             measurement.update(peak_vram_bytes=None,vram_complete=False)

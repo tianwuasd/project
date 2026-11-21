@@ -1,4 +1,5 @@
 from dataclasses import asdict
+from contextlib import nullcontext
 from pathlib import Path
 
 from monai.inferers import sliding_window_inference
@@ -229,15 +230,25 @@ class QAdapter:
             return sum(float(w)*segmentation_loss(value.float(),F.interpolate(target.float(),size=value.shape[2:],mode='nearest').bool(),
                 F.interpolate(valid.float(),size=value.shape[2:],mode='nearest').bool()) for w,value in zip(weights,outputs))
         if self.stage=='localizer':
-            x = torch.from_numpy(entry['image'])[None].to(self.device)
-            label = entry['label']
-            support = allowed(label,entry['unknown_classes'],self.prepared['dataset'])
-            valid = torch.from_numpy(label>=0)[None,None].to(self.device)
-            heat,mask = build_heatmap_targets(support,label>=0,entry.get('processed_spacing',
-                self.prepared['plan']['configurations']['3d_fullres']['spacing']))
+            from .training_inputs import prepare_inputs,input_plan
+            settings = self.config['execution']
+            block = settings.get('validation_block_bytes',64*2**20)
+            plan = input_plan(entry['label'].shape,entry['processed_spacing'],block)
+            if self.device.type == 'cuda':
+                free,total = torch.cuda.mem_get_info(self.device)
+                reserve = max(settings.get('vram_reserve_bytes',4*2**30),
+                              total*settings.get('vram_reserve_fraction',.1))
+                if plan['device_workspace_bytes'] > free-reserve:
+                    raise MemoryError('完整粗网格定位器超过当前显存余量；需要更大显存设备或等价分层反向实现')
+            x,valid,heat,mask = prepare_inputs(entry,self.prepared['dataset'],block,
+                guard=getattr(self,'training_guard',None),log_dir=Path(self.config['run_dir'])/self.stage,
+                heartbeat_seconds=self.config['logging']['heartbeat_seconds'])
             if not mask.any():
                 raise ValueError('定位器输入缺少可监督区域')
-            return localizer_loss(self.model(x,valid)['logits'].float(),heat.to(self.device),mask.to(self.device))
+            saved = torch.autograd.graph.save_on_cpu(pin_memory=False) if self.device.type=='cuda' else nullcontext()
+            with saved:
+                logits = self.model.forward_pooled(x.to(self.device),valid.to(self.device))['logits'].float()
+                return localizer_loss(logits,heat.to(self.device),mask.to(self.device))
         with torch.no_grad():
             probability,features,candidates = self.frozen(entry)
             if self.picked is None or self.picked.case!=entry['case_id']:

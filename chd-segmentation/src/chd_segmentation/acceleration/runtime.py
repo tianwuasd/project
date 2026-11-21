@@ -19,8 +19,8 @@ from .host import host_capacity
 from .memory import identity, alive, system_headroom
 from .timing import TimingBook
 from .accounting import reconcile
-from .admission import select_admission
-from .limits import host_fraction, memory_ceiling, project_usage
+from .admission import select_admission, minimum_host_bytes
+from .limits import host_fraction, memory_ceiling, project_usage, raw_capacity
 
 
 def attach(handle):
@@ -72,13 +72,21 @@ class ResourceSession:
                         raise InterruptedError('资源重规划请求已经结束等待')
             facts = host_capacity()
             r = self.request.resources
+            hard_limit = raw_capacity(r,facts)
+            raw_minimum, hard_plans = minimum_host_bytes(self.request,demand,
+                self.planner if initial else None,facts,hard_limit)
+            if raw_minimum > hard_limit:
+                event(self.request.run_dir,'resource_request_impossible',stage=self.request.stage,
+                      raw_minimum_bytes=raw_minimum,hard_limit_bytes=hard_limit,alternatives=hard_plans,
+                      reason='所有允许布局的原始最小工作集超过硬上限；需要调整执行策略或配置')
+                raise MemoryError(f'原始最小工作集{raw_minimum}字节超过硬上限{hard_limit}字节；请调整执行策略或配置')
             observed = None
             if demand.gpu_count and keep_gpus is None:
                 from .registry import inventory
                 owned = [self.owner['pid']]
                 if hasattr(self, 'members'):
                     owned.extend(m['pid'] for m in self.members.values() if alive(m))
-                observed = inventory(owned_pids=owned)
+                observed = inventory(owned_pids=owned,resources=r,cancel=self.cancel,log_dir=self.request.run_dir)
                 history.append((monotonic(), observed))
                 while len(history)>1 and history[-1][0]-history[1][0] >= r.get('share_window_seconds',30):
                     history.pop(0)
@@ -138,12 +146,21 @@ class ResourceSession:
                     self.applied_plan = dict(layout=applied_layout,supply=plan['supply'])
                     self.world,self.shares = world,shares
                     self.admission_decision = decision
+                    event(self.request.run_dir,'resource_admission_memory',stage=self.request.stage,
+                          memory_bytes=amount,raw_minimum_bytes=raw_minimum,hard_limit_bytes=hard_limit,
+                          policy_budget_bytes=budget,
+                          estimated_ram_bytes=plan['supply'].get('estimated_ram_bytes'),
+                          requested_memory_margin_fraction=r.get('memory_margin_fraction',.5),
+                          memory_margin_fraction=plan['supply'].get('memory_margin_fraction'),
+                          margin_bytes=plan['supply'].get('margin_bytes'))
                     return
             limit = r.get('max_wait')
             if monotonic()-last_log >= 15.:
                 event(self.request.run_dir, 'waiting_resources', stage=self.request.stage,
                       seconds=monotonic()-began, wait_forever=limit is None,
                       reason=decision['reason'], requested_bytes=demand.memory_bytes,
+                      raw_minimum_bytes=raw_minimum,hard_limit_bytes=hard_limit,
+                      requested_memory_margin_fraction=r.get('memory_margin_fraction',.5),
                       requested_cpu_slots=demand.cpu_slots, available_cpu_slots=cpu_available,
                       requested_gpu_count=demand.gpu_count,precision=r.get('precision'),
                       memory_budget_bytes=budget,alternatives=decision['alternatives'],

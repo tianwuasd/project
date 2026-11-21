@@ -27,7 +27,8 @@ def supply_planner(config,prepared,stage,estimates):
         candidate['resources']['batch_layout'] = shares
         supply = cpu_plan(candidate,prepared,world,stage=stage,estimates=estimates,
             bounds=dict(memory_budget_bytes=memory_budget_bytes,cpu_budget_slots=cpu_budget_slots,facts=facts))
-        result = dict(admitted=supply['admitted'],minimum_bytes=supply['minimum_bytes'],reason=supply['reason'])
+        result = dict(admitted=supply['admitted'],minimum_bytes=supply['minimum_bytes'],
+                      raw_minimum_bytes=supply['raw_minimum_bytes'],reason=supply['reason'])
         if supply['admitted']:
             result.update(demand=supply_demand(supply,world,candidate['resources'],shares),
                 layout=supply_layout(supply),supply=supply)

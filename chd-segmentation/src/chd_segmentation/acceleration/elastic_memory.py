@@ -1,5 +1,4 @@
 from dataclasses import replace
-import math
 from pathlib import Path
 from time import monotonic
 
@@ -8,7 +7,7 @@ from filelock import FileLock
 from ..artifacts.store import read_json, write_json
 from ..observability.events import event
 from .memory import alive
-from .limits import memory_ceiling, project_usage
+from .limits import memory_ceiling, project_usage, reserve_margin
 from .host import host_capacity
 
 
@@ -56,10 +55,13 @@ def grow_memory(session, spare):
         peer_used = project_usage(peers, r)
         peer_pending = sum(max(0, row['ram_bytes'] - row.get('rss_bytes', 0)) for row in peers)
         budget = min(limit - peer_used, rss + spare - peer_pending)
-        target = math.ceil(required * (1 + r.get('memory_margin_fraction', .5)))
-        fields = dict(required_bytes=required, requested_bytes=target, available_budget_bytes=budget,
+        plan = reserve_margin(required,budget,r.get('memory_margin_fraction', .5))
+        target = plan['memory_bytes']
+        fields = dict(required_bytes=required, requested_bytes=plan['requested_memory_bytes'], available_budget_bytes=budget,
+                      requested_memory_margin_fraction=plan['requested_memory_margin_fraction'],
+                      memory_margin_fraction=plan['memory_margin_fraction'],margin_bytes=plan['margin_bytes'],
                       previous_bytes=session.capacity, waiting=list(waiting.values()))
-        if target > budget:
+        if not plan['admitted']:
             if monotonic() - getattr(session, 'memory_wait_log', -float('inf')) >= 15:
                 event(session.request.run_dir, 'memory_capacity_waiting', **fields)
                 session.memory_wait_log = monotonic()

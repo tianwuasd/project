@@ -39,6 +39,7 @@ DEFAULTS = {
                   "wait_seconds": None, "max_wait": None, "release_and_regroup": False, "poll_seconds": 2, "share": False,
                   "min_gpus": None, "adapt_seconds": 30, "growth_seconds": 60,
                   "pressure_retries": 3,
+                  "gpu_query_timeout_seconds": 30, "gpu_query_retries": 2, "gpu_query_retry_seconds": 2,
                   "memory_limit_bytes": 100_000_000_000, "memory_sample_seconds": 1.,
                   "memory_snapshot_seconds": 15., "memory_pressure_seconds": 90.,
                   "memory_pressure_action": "wait",
@@ -194,6 +195,8 @@ def load_config(path, overrides=None):
 
 
 def validate_resources(r,batch):
+    from .acceleration.gpu_query import query_settings
+    query_settings(r)
     block = r.get('validation_block_bytes', 64 * 1024 ** 2)
     if type(block) is not int or not 1024**2 <= block <= r['memory_limit_bytes']:
         raise ValueError('验证起始块预算必须至少1MiB且不超过项目内存上限')

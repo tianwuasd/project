@@ -4,7 +4,6 @@ import io
 import math
 import os
 from pathlib import Path
-import subprocess
 import time
 
 from filelock import FileLock
@@ -16,6 +15,7 @@ from ..artifacts.store import digest, file_digest, read_json, write_json
 from ..observability.events import event
 from ..training.budget import case_estimates, cpu_plan
 from .host import host_capacity
+from .gpu_query import query_nvidia_smi, query_nvidia_smi_batch
 from .memory import (MEMORY_LIMIT_BYTES, alive as memory_alive, fresh_snapshot,
                            memory_decision, pending_bytes, same_process, system_headroom)
 
@@ -29,14 +29,14 @@ def layout(batch, world, manual=None):
     return shares
 
 
-def inventory(owned_pids=(), visible_devices="inherited"):
-    raw = subprocess.run(["nvidia-smi", "--query-gpu=index,uuid,memory.total,memory.free,utilization.gpu",
-                          "--format=csv,noheader,nounits"], check=True, capture_output=True, text=True, timeout=5).stdout
+def inventory(owned_pids=(), visible_devices="inherited", *, resources=None, cancel=None, log_dir=None):
+    raw,apps = query_nvidia_smi_batch([
+        ["--query-gpu=index,uuid,memory.total,memory.free,utilization.gpu","--format=csv,noheader,nounits"],
+        ["--query-compute-apps=gpu_uuid,pid","--format=csv,noheader,nounits"]],
+        resources=resources,cancel=cancel,log_dir=log_dir)
     rows = [{"index": int(i), "uuid": u.strip(), "total": int(t) * 1024 ** 2,
              "free": int(f) * 1024 ** 2, "utilization": int(v)}
             for i, u, t, f, v in csv.reader(io.StringIO(raw))]
-    apps = subprocess.run(["nvidia-smi", "--query-compute-apps=gpu_uuid,pid", "--format=csv,noheader,nounits"],
-                          check=True, capture_output=True, text=True, timeout=5).stdout
     applications = list(csv.reader(io.StringIO(apps)))
     busy = {row[0].strip() for row in applications if row and int(row[1]) not in owned_pids}
     owned = {row[0].strip() for row in applications if row and int(row[1]) in owned_pids}
@@ -62,9 +62,9 @@ def capacity_key(config, spec, local_batch, world=None):
                    "versions": {name: version(name) for name in ("torch", "monai", "nnunetv2")}})
 
 
-def process_vram(uuid, pid):
-    raw = subprocess.run(["nvidia-smi", "--query-compute-apps=gpu_uuid,pid,used_gpu_memory",
-                          "--format=csv,noheader,nounits"], check=True, capture_output=True, text=True, timeout=5).stdout
+def process_vram(uuid, pid, *, resources=None, cancel=None, log_dir=None):
+    raw = query_nvidia_smi(["--query-compute-apps=gpu_uuid,pid,used_gpu_memory",
+                           "--format=csv,noheader,nounits"], resources=resources, cancel=cancel, log_dir=log_dir)
     entries = [int(amount) * 1024 ** 2 for gpu, process, amount in csv.reader(io.StringIO(raw))
                if gpu.strip() == uuid and int(process) == pid]
     if len(entries) != 1:
@@ -215,7 +215,8 @@ def available_world(config, spec, allocation):
         if len(own) != 1:
             raise RuntimeError("训练资源所有权已经失效")
         owned = {m["pid"] for p in own for m in [p, *p.get("members", [])] if alive(m)}
-    observed = inventory(owned, allocation.get("allowed_visible_devices"))
+    observed = inventory(owned, allocation.get("allowed_visible_devices"),
+                         resources=config['resources'], log_dir=config['run_dir'])
     sampled_at = time.monotonic()
     with FileLock(str(root / ".resource.lock")):
         rows = active_peers(root / "active.json")
@@ -333,7 +334,7 @@ def resource_lease(config, prepared, spec, stage="train", previous_world=None):
           inherited_visible_devices=os.environ.get("CUDA_VISIBLE_DEVICES"))
     while True:
         if config["resources"]["device"] == "cuda":
-            observed = inventory()
+            observed = inventory(resources=resources, log_dir=config['run_dir'])
             history.append((time.monotonic(), observed))
             window = config["resources"]["share_window_seconds"]
             while len(history) > 1 and history[-1][0] - history[1][0] >= window:

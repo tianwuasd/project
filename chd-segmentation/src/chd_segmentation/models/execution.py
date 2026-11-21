@@ -181,14 +181,16 @@ def verify_device(device,allocation,rank):
         torch.cuda.reset_peak_memory_stats(device)
 
 
-def rank_measurement(device,allocation,rank):
+def rank_measurement(device,allocation,rank,common=None):
     memory = psutil.Process().memory_info()
     peak,allocated,reserved,external = None,None,None,dict(bytes=None,reason='cpu_execution')
     if device.type=='cuda':
         torch.cuda.synchronize(device)
         from ..acceleration.measurements import process_vram_observation
         allocated,reserved = torch.cuda.max_memory_allocated(device),torch.cuda.max_memory_reserved(device)
-        external = process_vram_observation(allocation['gpus'][rank]['uuid'],os.getpid())
+        common = common or {}
+        external = process_vram_observation(allocation['gpus'][rank]['uuid'],os.getpid(),
+            resources=common.get('resources'),cancel=common.get('memory_cancel'),log_dir=common.get('run_dir'))
         if external['bytes'] is not None:
             peak = reserved+max(0,external['bytes']-torch.cuda.memory_reserved(device))
     return dict(rank=rank,rss_bytes=memory.rss,peak_rss_bytes=memory.peak_wset if sys.platform=='win32' else None,
@@ -238,7 +240,7 @@ def rank_entry(rank,payload,common,allocation,gate,port):
             summary = _predict(applied,payload['prepared_path'],payload['checkpoint'],payload['output'],
                 payload['case_ids'],payload['prompts'],memory=memory,**payload.get('prediction_options',{}))
             write_json(root/'summary.json',summary)
-            measurement = rank_measurement(device,allocation,rank)
+            measurement = rank_measurement(device,allocation,rank,common)
             record_model_peaks(common,allocation['spec'],allocation['gpus'],allocation['shares'],[measurement])
         elif payload['config']['model']=='medsam2':
             from .medsam2.worker import main

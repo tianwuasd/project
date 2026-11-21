@@ -41,6 +41,20 @@ class ResourceClient:
         self.wait_started = None
         return BoundaryDecision('continue', 'eligible')
 
+    def wait_active(self):
+        began = monotonic()
+        while True:
+            value = self.snapshot()
+            if value.cancelled:
+                raise InterruptedError('已持有额度的计算已取消')
+            if not value.paused:
+                return
+            limit = self.handle.resources.get('max_wait')
+            if limit is not None and monotonic()-began >= limit:
+                raise TimeoutError('已持有额度的计算等待达到显式时限')
+            if self.handle.cancel.wait(.2):
+                raise InterruptedError('已持有额度的计算已取消')
+
     @contextmanager
     def _pending(self, token, amount, purpose, kind):
         h = self.handle
