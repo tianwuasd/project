@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aaoca-cta-reproduction"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26", "scipy>=1.11", "nibabel>=5.2", "SimpleITK>=2.4", "psutil>=7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

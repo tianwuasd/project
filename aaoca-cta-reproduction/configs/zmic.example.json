@@ -1,0 +1,21 @@
+{
+  "state_root": "/srv/research/course/aaoca-cta-reproduction",
+  "aaoca_root": "/srv/research/data/AAOCA",
+  "aaoca_pairs": "/srv/research/course/aaoca-cta-reproduction/inputs/aaoca_pairs.csv",
+  "imagechd_root": "/srv/research/data/ImageCHD_dataset",
+  "imagechd_manifest": "/srv/research/course/aaoca-cta-reproduction/inputs/imagechd_manifest.json",
+  "seed": 20261121,
+  "candidate_train": 12,
+  "candidate_validation": 4,
+  "holdout_prediction": 4,
+  "roi_mm": [80, 80, 60],
+  "offset_index_mm": [-10, 10, 10],
+  "imagechd_orientation_policy": "preserve_header_axis_directions_with_author_spacing",
+  "max_memory_bytes": 100000000000,
+  "host_memory_fraction": 0.8,
+  "max_work_bytes": 1073741824,
+  "max_work_files": 60,
+  "smoke_cases": [],
+  "diagnoses": null,
+  "author_model": null
+}
