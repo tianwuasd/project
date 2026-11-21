@@ -1,12 +1,15 @@
 __pycache__/
 *.pyc
 .venv/
+.deps/
 project.local.json
 private/
 work/
 reports/
 results/
 weights/
+data/
+course/
 build/
 *.egg-info/
 AGENTS.md

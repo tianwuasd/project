@@ -8,7 +8,7 @@
 
 只补传清单引用且服务器缺少的CT及匹配定位标签，保留各数据根内的相对目录；复用已有同源ImageCHD文件。首次bind-inputs检查全部条目的路径与大小，后续只核对选中病例。大小相同不能证明内容相同，不做文件哈希校验。
 
-诊断Excel可存同一inputs目录，当前检查仅接受UTF-8 CSV的 `patient_key,aaoca_present,origin_left,high_risk,reviewer,reference` 字段，确认及转换仍待完成。空白为未知。无需上传病历全文、OCR、旧报告或STU模型；作者分类权重尚未取得。
+诊断复核表可存同一inputs目录，接受canonical CSV或XLSX/XLSM的 `patient_key,aaoca_present,origin_left,high_risk,reviewer,reference,review_status,ct_matched` 字段。只有明确确认且与当前CT匹配的值进入监督，空白为未知；详细条件见`CLASSIFICATION.md`。作者分类权重尚未取得。
 
 ## 代码更新与依赖
 
@@ -27,6 +27,6 @@ python3 -B "$CODE/update.py" --force --mirror auto --sha "$SHA"
 "$PY" -B "$CODE/run.py" check-training --config "$COURSE/inputs/project.server.json"
 ```
 
-bind-inputs不需要原Windows患者索引，不改变角色/别名，已有不同绑定时停止。需要一例裁剪时使用prepare --case并将输出写入course/logs。没有分类训练或预测入口；所需功能和未验范围详见CAPABILITIES.md。
+bind-inputs不需要原Windows患者索引，不改变角色/别名，已有不同绑定时停止。需要一例裁剪时使用prepare --case并将输出写入course/logs。分类入口包括prepare-classification、export-confirmed-labels、train和predict；训练恢复及预测尚未进行数值验收。具体运行条件见CLASSIFICATION.md，已验范围见CAPABILITIES.md。
 
 Linux/POSIX直接通过SimpleITK读取原标签路径，不创建硬链接或副本，允许标签与course工作目录处于不同文件系统。Windows仍使用同一文件系统内的ASCII硬链接入口，源标签目录不写临时文件；跨卷或不支持硬链接时直接停止，不自动复制标签。该部署修正的Linux执行路径尚未在本机实测。

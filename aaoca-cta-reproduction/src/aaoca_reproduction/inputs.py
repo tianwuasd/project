@@ -79,7 +79,7 @@ def export_inputs(config, manifest, server_root=None):
     else:
         if server_root is None or not PurePosixPath(server_root).is_absolute():
             raise ValueError("首次导出需要--server-root指定Linux服务器的绝对根目录")
-        for key in ("state_root", "aaoca_root", "aaoca_pairs", "imagechd_root", "imagechd_manifest"):
+        for key in ("state_root", "data_root", "course_root", "aaoca_root", "aaoca_pairs", "imagechd_root", "imagechd_manifest"):
             relative = PurePosixPath(settings[key]).relative_to("/srv/research")
             settings[key] = str(PurePosixPath(server_root) / relative)
         config_reused = save_frozen(config_path, settings)

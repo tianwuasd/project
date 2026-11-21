@@ -10,7 +10,7 @@ import psutil
 from scipy import ndimage
 import SimpleITK as sitk
 
-from .records import RELEASE, check_work, event, identity, measure, read_json, signature, wait_memory, write_json
+from .records import RELEASE, admit_stage, check_work, event, identity, measure, read_json, signature, write_json
 
 
 def effective_affine(image, case):
@@ -82,27 +82,70 @@ def load_localization(case, image, directory):
     return structures["LV"][0], structures["AO"][0], {k: v[1] for k, v in structures.items()}
 
 
-def center_of_interest(lv, aorta):
+def center_of_interest(lv, aorta, config=None, memory_plan=None):
+    if memory_plan is None:
+        memory_plan = []
     if lv.shape != aorta.shape or not lv.any() or not aorta.any():
         raise ValueError("定位需要同网格且非空的LV和主动脉")
     # 只在两个结构并集外扩两层的区域内计算，保留作者原有定位定义。
-    coordinates = np.nonzero(lv | aorta)
-    start = np.asarray([max(int(axis.min()) - 2, 0) for axis in coordinates])
-    stop = [min(int(axis.max()) + 3, lv.shape[i]) for i, axis in enumerate(coordinates)]
+    if config is not None:
+        memory_plan.append(admit_stage(config, "localization_bbox", {"union_bool": int(lv.size)}))
+    union = lv | aorta
+    bounds = ndimage.find_objects(union, max_label=1)[0]
+    del union
+    start = np.asarray([max(axis.start - 2, 0) for axis in bounds])
+    stop = [min(axis.stop + 2, lv.shape[i]) for i, axis in enumerate(bounds)]
     slices = tuple(slice(int(a), int(b)) for a, b in zip(start, stop))
+    local_voxels = int(np.prod(np.asarray(stop) - start))
+    if config is not None:
+        memory_plan.append(admit_stage(config, "localization_dilation", {
+            "two_dilated_masks_and_overlap": 3 * local_voxels,
+            "morphology_workspace_bound": 16 * local_voxels}))
     dilated_lv = ndimage.binary_dilation(lv[slices])
     dilated_ao = ndimage.binary_dilation(aorta[slices])
     overlap = dilated_lv & dilated_ao
     if overlap.any():
+        if config is not None:
+            memory_plan.append(admit_stage(config, "intersection_coordinates", {
+                "nonzero_and_coordinate_stack": int(np.count_nonzero(overlap)) * 6 * np.dtype(np.intp).itemsize}))
         # 原作者在全局坐标求均值后取整；局部坐标须先加回起点。
         center = np.round(np.asarray(np.where(overlap)).mean(axis=1) + start).astype(int)
         mode = "dilated_intersection_mean"
     else:
+        if config is not None:
+            memory_plan.append(admit_stage(config, "local_distance_transform", {
+                "edt_indices_float64_vectors_and_reduction": 64 * local_voxels}))
         distance = ndimage.distance_transform_edt(~dilated_ao)
         distance[~dilated_lv] = np.inf
         center = np.asarray(np.unravel_index(np.argmin(distance), distance.shape)) + start
         mode = "nearest_point_on_dilated_lv"
     return center, mode
+
+
+def localization_memory_plan(case, image, directory):
+    voxels = int(np.prod(image.shape))
+    if case["dataset"] == "imagechd":
+        label = nib.load(case["label"])
+        itemsize = label.get_data_dtype().itemsize
+        if label.dataobj.slope != 1 or label.dataobj.inter != 0:
+            itemsize = max(itemsize, 8)
+        label_bytes = int(np.prod(label.shape)) * itemsize
+        components = 1
+    else:
+        with ascii_label(case["label"], directory) as path:
+            reader = sitk.ImageFileReader()
+            reader.SetFileName(str(path))
+            reader.ReadImageInformation()
+            pixel_sizes = {sitk.sitkUInt8: 1, sitk.sitkInt8: 1, sitk.sitkVectorUInt8: 1, sitk.sitkVectorInt8: 1,
+                           sitk.sitkUInt16: 2, sitk.sitkInt16: 2, sitk.sitkVectorUInt16: 2, sitk.sitkVectorInt16: 2,
+                           sitk.sitkUInt32: 4, sitk.sitkInt32: 4, sitk.sitkVectorUInt32: 4, sitk.sitkVectorInt32: 4,
+                           sitk.sitkFloat32: 4, sitk.sitkVectorFloat32: 4, sitk.sitkFloat64: 8, sitk.sitkVectorFloat64: 8}
+            if reader.GetPixelID() not in pixel_sizes:
+                raise ValueError("标签像素类型尚无明确内存核算")
+            components = reader.GetNumberOfComponents()
+            label_bytes = int(np.prod(reader.GetSize())) * components * pixel_sizes[reader.GetPixelID()]
+    return {"label_buffer": label_bytes, "decoder_buffer_bound": label_bytes,
+            "two_boolean_masks": 2 * voxels}, components
 
 
 def author_reference_center(lv, aorta):
@@ -115,31 +158,16 @@ def author_reference_center(lv, aorta):
     return np.asarray(np.unravel_index(np.argmin(distance), distance.shape))
 
 
-def prepare_case(case, config, directory, verify_center=False):
+def crop_in_memory(case, config, directory, verify_center=False):
     directory = Path(directory).resolve()
-    work = (config["project_root"] / "work").resolve()
-    if not directory.is_relative_to(work) or directory == work:
-        raise ValueError("裁剪输出必须位于本工程work的专用子目录")
     for key in ("image", "label"):
         if signature(case[key]) != case["source_stat"][key]:
             raise ValueError("冻结后输入影像或标签的文件状态已变化")
-    method = {"author_release": RELEASE, "roi_mm": config["roi_mm"],
-              "offset_index_mm": config["offset_index_mm"],
-              "imagechd_orientation_policy": config["imagechd_orientation_policy"]}
-    key = identity({"case": case, "method": method})
-    receipt, output = directory / "prepared.json", directory / "crop.nii.gz"
-    if receipt.exists():
-        previous = read_json(receipt)
-        if previous["identity"] != key or signature(output) != previous["output_stat"]:
-            raise ValueError("已有裁剪与当前输入、方法或输出文件状态不一致")
-        return {**previous, "reused": True}
-    if directory.exists() and any(directory.iterdir()):
-        raise ValueError("裁剪目录已有未完成内容，请核对后清理本任务副产物")
     image = nib.load(case["image"])
-    estimate = int(np.prod(image.shape)) * 12 + 512 * 2**20
-    wait_memory(config, int(estimate * 1.5))
     directory.mkdir(parents=True, exist_ok=True)
     check_work(config)
+    allocations, components = localization_memory_plan(case, image, directory)
+    memory_plan = [admit_stage(config, "label_read_and_masks", allocations)]
     timings = {}
     event("prepare_started", case_id=case["case_id"], localization=case["localization"])
     with measure() as measured:
@@ -147,7 +175,7 @@ def prepare_case(case, config, directory, verify_center=False):
         lv, aorta, structures = load_localization(case, image, directory)
         timings["label_load_seconds"] = perf_counter() - tic
         tic = perf_counter()
-        center, center_mode = center_of_interest(lv, aorta)
+        center, center_mode = center_of_interest(lv, aorta, config, memory_plan)
         timings["localization_seconds"] = perf_counter() - tic
         center_check = None
         if verify_center:
@@ -169,6 +197,9 @@ def prepare_case(case, config, directory, verify_center=False):
         start = np.asarray([max(0, min(int(shifted[i] - size[i] / 2), image.shape[i] - int(size[i])))
                             for i in range(3)])
         slices = tuple(slice(int(a), int(a + b)) for a, b in zip(start, size))
+        memory_plan.append(admit_stage(config, "ct_roi_read", {
+            "source_xy_slab_buffer_bound": int(np.prod(image.shape[:2])) * int(size[2]) * image.get_data_dtype().itemsize,
+            "roi_float32_and_conversion": int(np.prod(size)) * 8}))
         tic = perf_counter()
         crop = np.asarray(image.dataobj[slices], dtype=np.float32)
         timings["image_crop_read_seconds"] = perf_counter() - tic
@@ -180,32 +211,58 @@ def prepare_case(case, config, directory, verify_center=False):
         if not np.allclose(nib.affines.apply_affine(cropped_affine, [0, 0, 0]),
                            nib.affines.apply_affine(affine, start), atol=1e-6, rtol=0):
             raise AssertionError("裁剪起点的物理坐标不一致")
-        pending = directory / "crop.pending.nii.gz"
-        if crop.nbytes * 2 > config["max_work_bytes"] or psutil.disk_usage(str(directory)).free < crop.nbytes * 2:
-            raise OSError("裁剪文件磁盘预算不足")
-        tic = perf_counter()
-        result = nib.Nifti1Image(crop, cropped_affine)
-        result.header.set_xyzt_units("mm")
-        nib.save(result, pending)
-        pending.replace(output)
-        timings["save_seconds"] = perf_counter() - tic
-        record = {"identity": key, "case_id": case["case_id"], "localization": case["localization"],
+        record = {"case_id": case["case_id"], "localization": case["localization"],
                   "author_release": RELEASE, "reused": False, "structures": structures,
                   "source_shape": list(image.shape), "source_header_spacing": list(map(float, image.header.get_zooms())),
                   "effective_spacing_xyz": spacing.tolist(), "orientation": list(nib.aff2axcodes(affine)),
                   "spacing_evidence": case.get("spacing_evidence", "native_CT_geometry"),
-                  "orientation_policy": method["imagechd_orientation_policy"] if case["dataset"] == "imagechd" else "native_CT_header",
+                  "orientation_policy": config["imagechd_orientation_policy"] if case["dataset"] == "imagechd" else "native_CT_header",
+                  "source_header_affine": image.affine.tolist(), "effective_source_affine": affine.tolist(),
                   "center_index": center.tolist(), "center_mode": center_mode,
                   "offset_index_voxels": offset.tolist(), "offset_RAS_mm": (affine[:3, :3] @ offset).tolist(),
                   "crop_start": start.tolist(), "crop_shape": size.tolist(),
                   "requested_roi_mm": config["roi_mm"], "actual_roi_mm": (size * spacing).tolist(),
                   "source_FOV_smaller_than_ROI": bool(np.any(np.asarray(image.shape) * spacing < config["roi_mm"])),
                   "crop_affine": cropped_affine.tolist(), "center_check": center_check,
-                  "timing": timings, "training_updates": 0, "model_prediction": False,
-                  "output_stat": signature(output)}
+                  "timing": timings, "memory_estimates": memory_plan, "label_components": components,
+                  "training_updates": 0, "model_prediction": False}
     record["measurement"] = measured
+    return crop, record
+
+
+def prepare_case(case, config, directory, verify_center=False):
+    directory = Path(directory).resolve()
+    work = (config["project_root"] / "work").resolve()
+    if not directory.is_relative_to(work) or directory == work:
+        raise ValueError("裁剪输出必须位于本工程work的专用子目录")
+    method = {"author_release": RELEASE, "roi_mm": config["roi_mm"],
+              "offset_index_mm": config["offset_index_mm"],
+              "imagechd_orientation_policy": config["imagechd_orientation_policy"]}
+    key = identity({"case": case, "method": method})
+    receipt, output = directory / "prepared.json", directory / "crop.nii.gz"
+    for name in ("image", "label"):
+        if signature(case[name]) != case["source_stat"][name]:
+            raise ValueError("冻结后输入影像或标签的文件状态已变化")
+    if receipt.exists():
+        previous = read_json(receipt)
+        if previous["identity"] != key or signature(output) != previous["output_stat"]:
+            raise ValueError("已有裁剪与当前输入、方法或输出文件状态不一致")
+        return {**previous, "reused": True}
+    if directory.exists() and any(directory.iterdir()):
+        raise ValueError("裁剪目录已有未完成内容，请核对后清理本任务副产物")
+    crop, record = crop_in_memory(case, config, directory, verify_center)
+    if crop.nbytes * 2 > config["max_work_bytes"] or psutil.disk_usage(str(directory)).free < crop.nbytes * 2:
+        raise OSError("裁剪文件磁盘预算不足")
+    tic = perf_counter()
+    result = nib.Nifti1Image(crop, np.asarray(record["crop_affine"]))
+    result.header.set_xyzt_units("mm")
+    pending = directory / "crop.pending.nii.gz"
+    nib.save(result, pending)
+    pending.replace(output)
+    record["timing"]["save_seconds"] = perf_counter() - tic
+    record.update(identity=key, output_stat=signature(output))
     record["work_inventory"] = check_work(config)
     write_json(receipt, record)
-    event("prepare_completed", case_id=case["case_id"], seconds=measured["seconds"],
-          crop_shape=size.tolist(), actual_roi_mm=record["actual_roi_mm"])
+    event("prepare_completed", case_id=case["case_id"], seconds=record["measurement"]["seconds"],
+          crop_shape=record["crop_shape"], actual_roi_mm=record["actual_roi_mm"])
     return record

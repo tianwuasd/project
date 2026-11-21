@@ -103,7 +103,7 @@ def save_audit(config):
     template = root / "private" / "diagnosis-template.csv"
     if not template.exists():
         with template.open("w", encoding="utf-8-sig", newline="") as stream:
-            writer = csv.DictWriter(stream, fieldnames=["patient_key", *TASKS, "reviewer", "reference"])
+            writer = csv.DictWriter(stream, fieldnames=["patient_key", *TASKS, "reviewer", "reference", "review_status", "ct_matched"])
             writer.writeheader()
             writer.writerows({"patient_key": row["patient_key"]} for row in manifest["cases"]
                              if row["dataset"] == "aaoca")
@@ -122,27 +122,19 @@ def check_training(config, manifest):
     if path is None:
         return {"ready": False, "reason": "没有医生确认的病例分类标签表",
                 "confirmed_diagnostic_labels": dict.fromkeys(TASKS, 0), "training_updates": 0}
-    with Path(path).open(encoding="utf-8-sig", newline="") as stream:
-        rows = list(csv.DictReader(stream))
+    from .labels import read_label_rows, reviewed_labels
+
+    reviews = reviewed_labels(read_label_rows(path, config.get("diagnosis_sheet")), manifest)
     patients = {row["patient_key"]: row for row in manifest["cases"] if row["dataset"] == "aaoca"}
-    seen = set()
     counts = {task: {role: Counter() for role in ("candidate_train", "candidate_validation")} for task in TASKS}
-    for row in rows:
-        key = row["patient_key"]
-        if key in seen or key not in patients:
-            raise ValueError("诊断表患者重复或不在冻结候选清单中")
-        seen.add(key)
+    for key, review in reviews.items():
         for task in TASKS:
-            value = row[task].strip()
-            if value == "":
+            value = review["labels"][task]
+            if value is None:
                 continue
-            if value not in ("0", "1") or not row["reviewer"].strip() or not row["reference"].strip():
-                raise ValueError("分类真值需要0/1、确认者和参考诊断来源")
-            if task != "aaoca_present" and row["aaoca_present"].strip() != "1":
-                raise ValueError("起源与风险真值只能用于明确AAOCA阳性的病例")
             role = patients[key]["role"]
             if role in counts[task]:
                 counts[task][role][value] += 1
-    ready = {task: all(set(counts[task][role]) == {"0", "1"} for role in counts[task]) for task in TASKS}
+    ready = {task: all(set(counts[task][role]) == {0, 1} for role in counts[task]) for task in TASKS}
     return {"ready": all(ready.values()), "ready_by_task": ready, "counts": counts,
             "reason": "各任务的候选训练与验证需要医生确认的两个类别；候选分组还需按标签复核"}

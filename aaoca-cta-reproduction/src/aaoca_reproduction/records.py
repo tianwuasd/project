@@ -38,6 +38,8 @@ def load_config(path):
     path = Path(path).resolve(strict=True)
     value = read_json(path)
     value["project_root"] = (path.parent / value.get("state_root", ".")).resolve()
+    value["data_root"] = (path.parent / value.get("data_root", str(value["project_root"] / "data"))).resolve()
+    value["course_root"] = (path.parent / value.get("course_root", str(value["project_root"] / "course"))).resolve()
     for key in ("aaoca_root", "aaoca_pairs", "imagechd_root", "imagechd_manifest"):
         value[key] = (path.parent / value[key]).resolve()
     if not 0 < value["host_memory_fraction"] <= 0.8:
@@ -59,7 +61,7 @@ def event(name, **fields):
 
 
 def wait_memory(config, additional_bytes):
-    if additional_bytes > config["max_memory_bytes"]:
+    if additional_bytes + psutil.Process().memory_info().rss > config["max_memory_bytes"]:
         raise MemoryError("本例预计占用超过配置的任务内存预算")
     while True:
         memory = psutil.virtual_memory()
@@ -69,6 +71,17 @@ def wait_memory(config, additional_bytes):
         event("waiting_memory", requested_bytes=additional_bytes,
               available_bytes=memory.available, host_reserve_bytes=int(reserve))
         sleep(5)
+
+
+def admit_stage(config, stage, arrays):
+    raw = sum(int(value) for value in arrays.values())
+    additional = int(raw * 1.5) + 64 * 2**20
+    record = {"stage": stage, "allocation_estimates": arrays, "estimated_additional_bytes": additional,
+              "resident_rss_before_bytes": psutil.Process().memory_info().rss,
+              "safety_factor": 1.5, "fixed_overhead_bytes": 64 * 2**20, "measured_allocation": False}
+    event("memory_admission", **record)
+    wait_memory(config, additional)
+    return record
 
 
 def check_work(config):
