@@ -145,7 +145,7 @@ def environment(config):
     return dict(os.environ, nnUNet_raw=str(root / "raw"),
                 nnUNet_preprocessed=str(root / "preprocessed"),
                 nnUNet_results=str(config["run_dir"] / "checkpoints"),
-                nnUNet_extTrainer=str(Path(__file__).parent), nnUNet_compile="false",
+                nnUNet_extTrainer=str(Path(__file__).parent / "nnunet_trainers"), nnUNet_compile="false",
                 PYTHONPATH=os.pathsep.join(filter(None, (str(Path(__file__).parents[2]), os.environ.get("PYTHONPATH")))),
                 nnUNet_n_proc_DA="0", nnUNet_wandb_enabled="0",
                 OMP_NUM_THREADS="1", MKL_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1")
