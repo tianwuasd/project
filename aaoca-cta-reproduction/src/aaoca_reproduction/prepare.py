@@ -23,6 +23,11 @@ def effective_affine(image, case):
 
 @contextmanager
 def ascii_label(path, directory):
+    if os.name != "nt":
+        yield Path(path)
+        return
+    if Path(path).stat().st_dev != directory.stat().st_dev:
+        raise ValueError("Windows标签ASCII入口要求源文件与工作目录在同一文件系统")
     link = directory / "source-label.seg.nrrd"
     if link.exists():
         raise FileExistsError("本例存在未清理的标签入口，请先核对本任务状态")

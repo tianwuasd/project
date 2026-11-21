@@ -28,3 +28,5 @@ python3 -B "$CODE/update.py" --force --mirror auto --sha "$SHA"
 ```
 
 bind-inputs不需要原Windows患者索引，不改变角色/别名，已有不同绑定时停止。需要一例裁剪时使用prepare --case并将输出写入course/logs。没有分类训练或预测入口；所需功能和未验范围详见CAPABILITIES.md。
+
+Linux/POSIX直接通过SimpleITK读取原标签路径，不创建硬链接或副本，允许标签与course工作目录处于不同文件系统。Windows仍使用同一文件系统内的ASCII硬链接入口，源标签目录不写临时文件；跨卷或不支持硬链接时直接停止，不自动复制标签。该部署修正的Linux执行路径尚未在本机实测。
