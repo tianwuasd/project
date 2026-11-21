@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 from time import perf_counter
@@ -84,13 +85,15 @@ def main():
         if any(p.is_symlink() or not p.resolve().is_relative_to(task) for p in owned):
             raise RuntimeError("同步测试文件归属异常，保留目录")
         size = sum(p.stat().st_size for p in owned)
-        print(json.dumps({"state": "passed" if success else "failed", "seconds": perf_counter() - start,
+        print(json.dumps({"synchronization": "passed" if success else "failed", "seconds": perf_counter() - start,
                           "files": len(owned), "bytes": size, "training_updates": 0,
                           "scope": "Windows Git initial install and exact repeat using actual remote commits"},
                          ensure_ascii=False), flush=True)
         # 所有Git子进程均已结束，路径已核实为本轮新建独占目录。
+        for path in owned:
+            path.chmod(path.stat().st_mode | stat.S_IWRITE)
         shutil.rmtree(task)
-        print(json.dumps({"cleanup": {"deleted_files": len(owned), "released_bytes": size,
+        print(json.dumps({"state": "passed" if success else "failed", "cleanup": {"deleted_files": len(owned), "released_bytes": size,
                                       "task_directory_absent": not task.exists()}}), flush=True)
         if len(owned) > 60 or size > 20 * 2**20:
             raise OSError("同步测试超过本轮60文件或20MiB预算")
