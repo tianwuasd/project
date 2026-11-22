@@ -160,7 +160,7 @@ def execute(config, operation, deadline, resume=False, checkpoint='best', output
             optim.load_state_dict(saved['optimizer'])
             state.update(step=saved['step'], best_loss=saved['best_loss'])
             torch.set_rng_state(saved['rng'])
-            torch.cuda.set_rng_state_all(saved['cuda_rng'])
+            torch.cuda.set_rng_state(saved['cuda_rng'])
         return model, optim
 
     def save(name):
@@ -168,7 +168,7 @@ def execute(config, operation, deadline, resume=False, checkpoint='best', output
         torch.save(dict(identity=config['training_identity'], revision=REVISION,
             head={k: v.detach().cpu() for k, v in model.mask_decoder.semantic_projection.state_dict().items()},
             optimizer=optimizer.state_dict(), step=state['step'], best_loss=state['best_loss'],
-            rng=torch.get_rng_state(), cuda_rng=torch.cuda.get_rng_state_all()), pending)
+            rng=torch.get_rng_state(), cuda_rng=torch.cuda.get_rng_state()), pending)
         os.replace(pending, run / (name+'.pt'))
 
     def boundary():
@@ -215,9 +215,9 @@ def execute(config, operation, deadline, resume=False, checkpoint='best', output
 
     def validate():
         values, dice = [], []
-        with torch.inference_mode():
-            for row in val:
-                active()
+        for row in val:
+            active()
+            with torch.inference_mode():
                 loss, logits, truth, mask = forward(row)
                 prediction = logits[mask] > 0
                 reference = truth[mask] > .5
