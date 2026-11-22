@@ -1,0 +1,8 @@
+base_config: sam3.yaml
+prepared: ../../private/sam3_semantic_slices.json
+run_dir: ../../private/work/sam3/semantic-training
+label_evidence: 需填写真实标签名称、类别编号与冻结患者划分的核对来源
+updates: 1000
+validate_every: 20
+learning_rate: 0.0001
+seed: 20261122

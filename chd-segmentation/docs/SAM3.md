@@ -1,5 +1,27 @@
 # SAM3 原模型有限切片检查
 
+## 语义头训练与微调
+
+入口为check-training、train、validate和segment，独立模板configs/models/sam3_finetune.yaml引用已有SAM3基础配置；--prepared与--preprocessed-source显式指定已有切片登记。轻量check-training只检查登记、路径、患者划分和固定材料大小，不读取体素、不加载模型、不创建输出。
+
+当前研究配方保留完整官方图像模型和1008输入，冻结其余参数，只训练真实mask_decoder.semantic_projection，使用有效像素BCE和Dice。官方Transformers forward提供可微semantic_seg；该配方不宣称复现官方Hydra检测器全参数训练。原始模型实例预测入口保留，segment专门使用训练后的语义头，不将未训练的实例输出当作微调结果。官方训练机制参考[官方训练文档](https://github.com/facebookresearch/sam3/blob/main/README_TRAIN.md)。
+
+已有切片登记JSON采用format=sam3_semantic_slices_v1，samples每项显式包含id、patient、role(train或val)、slice、label_id和prompt；类别名称来源填写label_evidence，未知目标类别拒绝训练，训练验证按患者分离。原始模式另填image、label，均为真实同网格NIfTI；严格核对shape和affine，切片image[:,:,k].T及同索引真实标签逐片读取。已有预处理模式另填prepared，指向已有NPZ，必须含rgb:uint8[H,W,3]、labels:整数[H,W]、valid:bool[H,W]，valid标识真实监督区域；ignore_label_ids继续排除忽略值。文件路径相对登记JSON，类标不能从模型输出构造。程序不生成新的预处理副本。登记与模型处理分开，规范化、窗化和1008 processor在模型读取时执行。
+
+```powershell
+python -B run.py models sam3 check-training --config <TRAIN_CONFIG> --prepared <SLICE_MANIFEST>
+python -B run.py models sam3 train --config <TRAIN_CONFIG> --deadline <UNIX_SECONDS> --stop-after 1
+python -B run.py models sam3 train --config <TRAIN_CONFIG> --deadline <UNIX_SECONDS> --resume --stop-after 1
+python -B run.py models sam3 validate --config <TRAIN_CONFIG> --deadline <UNIX_SECONDS> --checkpoint best
+python -B run.py models sam3 segment --config <TRAIN_CONFIG> --deadline <UNIX_SECONDS> --checkpoint best --output <NEW_OUTPUT>
+```
+
+latest.pt在每次完成更新后以pending和os.replace保存；best.pt由固定验证集平均BCE+Dice损失改善时保存。检查点只保存实际训练语义头、AdamW状态、更新位置、Torch CPU/CUDA随机状态、最佳值及严格身份，加载时依赖同版完整原模型；不生成完整权重副本。采样顺序由已完成更新位置决定；续训必须匹配源文件大小/修改时间、患者划分、提示、强度语义和优化参数。验证与segment读取登记中的val切片，segment恢复i,j顺序并保存有效区域与已处理切片coverage；当前接口不扩展为未登记病例或全体积预测。
+
+公共ResourceSession准入、wait_active及固定截止负责资源等待。阶段边界暂停时保存latest，释放模型和优化器、清空CUDA缓存后等待；恢复从真实检查点重新加载。固定100GB/整机80%、显式进程内存及显存动态余量继续适用，缺少资源不自动缩小网络。日志记录启动、更新、验证和恢复，run_dir由文件锁保护。新运行不得覆盖已有目录，续训显式--resume；训练原模型只读。所有训练、验证和预测产物必须在具体许可范围内生成。
+
+训练代码尚未完成真实梯度更新、检查点恢复或训练结果预测验收。语法、入口及依赖接口检查不能代替上述实测；历史r3只证明原模型零训练单片流程。Linux训练未测试。
+
 入口为 `run.py models sam3 inspect|predict`。使用 ModelScope `facebook/sam3` 固定 revision `96f3e1b404ba14f2cfac60ee6ae87c269a7b7923`，Transformers 5.24.0 的 Sam3Model/Sam3Processor，直接读取 model.safetensors，不需要转换权重。SAM License 随官方材料保存。
 
 配置模板为 `configs/models/sam3.yaml`。将本地模型、独立依赖、CHD1282 manifest/cohort、实际数据根、几何与强度证据填入私有配置。解释器复用已有真实 PyTorch/CUDA 环境，新增依赖从显式 target 目录导入；不修改共享环境。材料工具 `src/chd_segmentation/models/sam3/materials.py` 使用官方 SDK，固定一套十文件和十一依赖，监督时限和产物范围。
