@@ -96,11 +96,13 @@ def execute(root, handle):
         write_json(root / 'summary.json', summary)
         del inputs, outputs, processed, masks, restored, rgb
     elapsed = perf_counter() - began
+    memory = psutil.Process().memory_info()
     summary.update(state='completed', total_seconds=elapsed,
                    slices_per_second=len(summary['completed_slices']) / elapsed,
                    peak_cuda_allocated_bytes=torch.cuda.max_memory_allocated(),
                    peak_cuda_reserved_bytes=torch.cuda.max_memory_reserved(),
-                   peak_worker_rss_bytes=psutil.Process().memory_info().peak_wset,
+                   peak_worker_rss_bytes=memory.peak_wset if os.name == 'nt' else None,
+                   peak_worker_rss_note='Windows peak_wset' if os.name == 'nt' else '本平台未测量worker历史RSS峰值；进程组采样由公共监督器记录',
                    coverage=dict(kind='selected_slices', indices=config['selected']['slices'],
                                  source_shape=config['selected']['source']['shape'],
                                  uncomputed='未推断，不能作为背景', array_axes='instance,i,j', slice_axis='k'))
