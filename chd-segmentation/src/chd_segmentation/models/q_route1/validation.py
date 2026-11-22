@@ -93,6 +93,8 @@ def validate_records(bundle, dataset, names):
                         run_dir=config['run_dir'])
         policy = getattr(bundle, 'validation_policy', None)
         block_bytes = settings.get('validation_block_bytes', 64*1024**2)
+        if bundle.stage == 'localizer' and policy is None:
+            block_bytes = settings.get('localizer_block_bytes',2*1024**3)
         array_budget, storage, rank, quota = 0, 'disk', 0, 0
         if policy is not None:
             quota, rank = policy['quota_bytes'], policy['rank']

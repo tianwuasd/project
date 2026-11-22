@@ -83,7 +83,7 @@ def compare(args):
         padding = [v for n in reversed(label.shape) for v in (0,(-n)%32)]
         expected = (F.avg_pool3d(F.pad(image,padding,mode='replicate'),4,4),
                     F.avg_pool3d(F.pad(valid.float(),padding),4,4),heat,mask)
-        actual = prepare_inputs(entry,'imagechd',64*2**20)
+        actual = prepare_inputs(entry,'imagechd',2*2**30)
         errors = []
         for a,b in zip(expected,actual):
             if a.dtype == torch.bool:
@@ -113,7 +113,7 @@ def compare(args):
             maximum = max(maximum,float((expected_grad-parameter.grad).abs().max()))
             torch.testing.assert_close(expected_grad,parameter.grad,atol=2e-5,rtol=2e-4)
         torch.testing.assert_close(loss,other,atol=1e-6,rtol=1e-6)
-        estimate = input_plan(label.shape,entry['processed_spacing'],64*2**20)
+        estimate = input_plan(label.shape,entry['processed_spacing'],2*2**30)
         assert saved <= estimate['backward_bytes']
         results.append(dict(case_id=name,shape=list(label.shape),input_errors=errors,
                             supervised=int(mask.sum()),target_nonzero=[int((value>0).sum()) for value in heat[0]],

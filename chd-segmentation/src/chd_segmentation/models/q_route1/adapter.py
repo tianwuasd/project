@@ -143,7 +143,7 @@ class QAdapter:
         size = self.config['local_size']
         start = tuple(int(np.floor(c-(size-1)/2+.5)) for c in candidate.center)
         image = torch.from_numpy(entry['image'])[None]
-        inputs,editable = crop_local_input(image,probability,start,size,torch.ones_like(image,dtype=torch.bool))
+        inputs,editable = crop_local_input(image,probability,start,size)
         grids = np.meshgrid(*(np.arange(s,s+size) for s in start),indexing='ij')
         inside = np.ones((size,)*3,dtype=bool)
         for grid,n in zip(grids,entry['label'].shape):
@@ -154,13 +154,35 @@ class QAdapter:
         return inputs,editable,support
 
     @torch.no_grad()
+    def locate(self,entry):
+        from .training_inputs import pooled_image
+
+        settings = self.config['execution']
+        if self.device.type == 'cuda':
+            count = int(np.prod([(n+31)//32*8 for n in entry['image'].shape[1:]]))
+            free,total = torch.cuda.mem_get_info(self.device)
+            reserve = max(settings.get('vram_reserve_bytes',4*2**30),
+                          total*settings.get('vram_reserve_fraction',.1))
+            if count*512+128*2**20 > free-reserve:
+                raise MemoryError('定位器粗网格前向超过当前显存余量')
+        guard = getattr(self,'training_guard',None)
+        count = int(np.prod([(n+31)//32*8 for n in entry['image'].shape[1:]]))
+        amount = count*(32 if self.device.type=='cuda' else 512)
+        claim = guard.admit(amount,label='q_local_locator_retained') if guard is not None else nullcontext(True)
+        with claim as ticket:
+            if ticket is None:
+                raise InterruptedError('局部定位输入等待已取消')
+            image,valid = pooled_image(entry,settings.get('localizer_block_bytes',2*2**30),guard=guard)
+            return self.locator.forward_pooled(image.to(self.device),valid.to(self.device))
+
+    @torch.no_grad()
     def frozen(self,entry):
         if entry['case_id']==self.current_name:
             return self.current_frozen
         self.current_name,self.current_frozen = None,None
         image = torch.from_numpy(entry['image'])[None]
         probability = self.base_probability(entry)
-        located = self.locator(image.to(self.device),torch.ones_like(image,dtype=torch.bool).to(self.device))
+        located = self.locate(entry)
         candidates = select_candidates(located['heatmap'][0].float().cpu().numpy(),image.shape[2:],[4,4,8],.2,.8)
         self.current_name = entry['case_id']
         self.current_frozen = probability,located['features'].float().cpu(),candidates
@@ -220,20 +242,20 @@ class QAdapter:
     def loss(self,entry,rng,update):
         size = self.config['patch']
         image,label = sample_patch(entry,[size]*3,rng,.33)
-        x = torch.from_numpy(image)[None].to(self.device)
-        support = allowed(label,entry['unknown_classes'],self.prepared['dataset'])
-        valid = torch.from_numpy(label>=0)[None,None].to(self.device)
-        target = torch.from_numpy(support)[None].to(self.device)
         if self.stage=='base':
+            x = torch.from_numpy(image)[None].to(self.device)
+            support = allowed(label,entry['unknown_classes'],self.prepared['dataset'])
+            valid = torch.from_numpy(label>=0)[None,None].to(self.device)
+            target = torch.from_numpy(support)[None].to(self.device)
             outputs = self.model(x)
             weights = np.asarray([.5**i for i in range(len(outputs))]);weights/=weights.sum()
             return sum(float(w)*segmentation_loss(value.float(),F.interpolate(target.float(),size=value.shape[2:],mode='nearest').bool(),
                 F.interpolate(valid.float(),size=value.shape[2:],mode='nearest').bool()) for w,value in zip(weights,outputs))
         if self.stage=='localizer':
-            from .training_inputs import prepare_inputs,input_plan
+            from .training_inputs import prepare_inputs,training_plan
             settings = self.config['execution']
-            block = settings.get('validation_block_bytes',64*2**20)
-            plan = input_plan(entry['label'].shape,entry['processed_spacing'],block)
+            block = settings.get('localizer_block_bytes',2*2**30)
+            plan = training_plan(entry['label'].shape,entry['processed_spacing'],settings)
             if self.device.type == 'cuda':
                 free,total = torch.cuda.mem_get_info(self.device)
                 reserve = max(settings.get('vram_reserve_bytes',4*2**30),
@@ -273,9 +295,8 @@ class QAdapter:
         if self.stage!='local':
             raise ValueError('Q完整预测需要local阶段检查点')
         image = torch.from_numpy(entry['image'])[None]
-        fov = torch.ones_like(image,dtype=torch.bool)
         probability = self.base_probability(entry)
-        located = self.locator(image.to(self.device),fov.to(self.device))
+        located = self.locate(entry)
         candidates = select_candidates(located['heatmap'][0].float().cpu().numpy(),image.shape[2:],[4,4,8],.2,.8)
         candidates = candidates[:self.config['max_candidates']]
         fusion = ProbabilityFusion(probability)
@@ -283,7 +304,7 @@ class QAdapter:
         size = self.config['local_size']; margin=size//8; core_size=size-2*margin
         for candidate in candidates:
             start = tuple(int(np.floor(c-(size-1)/2+.5)) for c in candidate.center)
-            inputs,editable = crop_local_input(image,probability,start,size,fov)
+            inputs,editable = crop_local_input(image,probability,start,size)
             context = sample_context(located['features'].float().cpu(),candidate.center,samples=size//8)
             out = self.model(inputs.to(self.device),context.to(self.device),editable.to(self.device))
             final,trace = infer_local(out,editable.to(self.device),self.config['method'],SOLVER)

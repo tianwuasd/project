@@ -9,6 +9,7 @@ import psutil
 
 from .contracts import BoundaryDecision, Reservation, ResourceSnapshot
 from .accounting import add_claim, remove_claim, available
+from .wait_diagnostics import reservation_snapshot,emit_reservation_wait
 
 
 class ResourceClient:
@@ -78,26 +79,37 @@ class ResourceClient:
         if type(amount_bytes) is not int or amount_bytes < 0:
             raise ValueError('资源申请字节数必须为非负整数')
         h, began, acquired, token = self.handle, monotonic(), False, uuid4().hex
-        with self._pending(token, amount_bytes, purpose, 'ordinary') as pending, h.condition:
+        last_log = -float('inf')
+        with self._pending(token, amount_bytes, purpose, 'ordinary') as pending:
             while True:
-                if h.state.get('monitor_failed'):
-                    raise RuntimeError('资源监控异常结束，停止新增分配')
-                if h.cancel.is_set():
-                    raise InterruptedError('资源等待已取消')
-                free = available(h.state,protect_pool=amount_bytes>0)
-                if not h.state['paused'] and not h.state.get('replanning',False) and amount_bytes <= free and (amount_bytes > 0 or free > 0):
-                    h.state['reserved'] += amount_bytes
-                    if amount_bytes:
-                        add_claim(h.state,token,amount_bytes,'ordinary')
-                    acquired = True
-                    break
-                limit = h.resources.get('max_wait')
-                if limit is not None and monotonic() - began >= limit:
+                record = None
+                with h.condition:
+                    if h.state.get('monitor_failed'):
+                        raise RuntimeError('资源监控异常结束，停止新增分配')
+                    if h.cancel.is_set():
+                        raise InterruptedError('资源等待已取消')
+                    free = available(h.state,protect_pool=amount_bytes>0)
+                    if not h.state['paused'] and not h.state.get('replanning',False) and amount_bytes <= free and (amount_bytes > 0 or free > 0):
+                        h.state['reserved'] += amount_bytes
+                        if amount_bytes:
+                            add_claim(h.state,token,amount_bytes,'ordinary')
+                        acquired = True
+                        break
+                    limit = h.resources.get('max_wait')
+                    timed_out = limit is not None and monotonic()-began >= limit
+                    if wait:
+                        pending()
+                    if timed_out or wait and monotonic()-last_log >= 15:
+                        record = reservation_snapshot(h.state,amount_bytes,purpose,free,began,limit)
+                        last_log = monotonic()
+                if record is not None:
+                    emit_reservation_wait(record,timed_out)
+                if timed_out:
                     raise TimeoutError('已达到显式资源等待时限')
                 if not wait:
                     break
-                pending()
-                self._wait(began)
+                with h.condition:
+                    self._wait(began)
         try:
             yield Reservation(amount_bytes, purpose) if acquired else None
         finally:

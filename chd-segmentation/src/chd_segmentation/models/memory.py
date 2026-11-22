@@ -61,9 +61,10 @@ def case_estimates(config,prepared,stage):
                 retained = stored['locations_bytes'] + math.prod(config['training']['patch'])*16
             localizer = None
             if stage == 'localizer':
-                from .q_route1.training_inputs import input_plan
-                localizer = input_plan(target,spacing,block)
-                case = localizer['workspace_bytes'] + (stored['locations_bytes']*2 if stored is not None else 0)
+                from .q_route1.training_inputs import training_plan
+                localizer = training_plan(target,spacing,config['resources'])
+                if stored is not None:
+                    case = 2*64*1024+stored['locations_bytes']*2
                 retained = localizer['retained_bytes']
             records.append(dict(case_id=row['case_id'],native_shape_xyz=input_shape.tolist(),working_shape=target.tolist(),
                 native_read_bytes=0 if stored is not None else native*32,working_bytes=working,workspace_bytes=case,

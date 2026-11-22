@@ -45,7 +45,7 @@ def aggregate(records, names, rows):
     return value
 
 
-def case_demand(stage, shape, patch, settings):
+def case_demand(stage, shape, patch, settings, spacing=None):
     voxels = math.prod(shape)
     padded = math.prod(max(n, p) for n, p in zip(shape, patch))
     arrays = (48 * padded if stage == 'base' else (96 if stage == 'localizer' else 160) * padded)
@@ -56,6 +56,15 @@ def case_demand(stage, shape, patch, settings):
     if not settings.get('validation_auto_blocks', True):
         transient = min(transient, settings.get('validation_block_bytes', 64*MIB))
     minimum = min(max(MIB, transient), settings.get('validation_block_bytes', 64*MIB))
+    if stage == 'localizer':
+        from .training_inputs import input_plan
+        if spacing is None:
+            raise ValueError('定位器验证预算需要实际毫米间距')
+        target_minimum = input_plan(shape,spacing,100_000_000_000)['minimum_workspace_bytes']
+        if maximum is not None and maximum < target_minimum:
+            raise MemoryError('验证最大块预算无法容纳定位监督halo')
+        minimum = max(minimum,target_minimum)
+        transient = max(transient,minimum)
     return dict(arrays=arrays, transient=max(MIB, transient), minimum=minimum,
                 desired=arrays + max(MIB, transient))
 
@@ -126,7 +135,8 @@ def validate_parallel(bundle, dataset, names, rank, common, allocation, gate, de
     if rank == 0:
         event(root, 'q_validation_assignment', update=update, assignments=groups,
               world_size=allocation['world'], cases=len(names))
-    demand_by_case = {name: case_demand(bundle.stage, shapes[name], bundle.spec['patch'], common['resources'])
+    spacing = bundle.prepared['plan']['configurations']['3d_fullres']['spacing']
+    demand_by_case = {name: case_demand(bundle.stage, shapes[name], bundle.spec['patch'], common['resources'],spacing)
                       for name in names}
     demands = [max((demand_by_case[name] for name in group), key=lambda item:item['desired']) if group else None
                for group in groups]

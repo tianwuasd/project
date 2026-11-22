@@ -184,7 +184,7 @@ class ResourceSession:
             members = list(self.members.values())
             rss = sum(psutil.Process(m['pid']).memory_info().rss for m in members if alive(m))
             r = self.request.resources
-            spare, _ = system_headroom(facts, host_fraction(r), r.get('reserve_ram_bytes', 4*2**30))
+            spare, scopes = system_headroom(facts, host_fraction(r), r.get('reserve_ram_bytes', 4*2**30))
             root = Path(self.request.registry_root)
             if not hasattr(self, 'last_registry') or monotonic()-self.last_registry >= 5.:
                 with FileLock(str(root / '.resource.lock')):
@@ -204,6 +204,10 @@ class ResourceSession:
                 reconcile(self.state,rss,fixed_rss)
                 self.state.update(sampled_at=datetime.now(timezone.utc).isoformat(), sampled_monotonic=monotonic(),
                     host=facts, project_bytes=project,
+                    system_headroom_bytes=spare,pending_bytes=pending,
+                    limited_project_bytes=limited_project,project_limit_bytes=limit,
+                    memory_scopes=[dict(scope=row['scope'] if row['scope'] in ('physical','windows_job','windows_process') else 'cgroup',
+                        **{key:value for key,value in row.items() if key!='scope'}) for row in scopes[:16]],
                     headroom=max(0, min(self.capacity-rss, spare-pending+max(0,self.capacity-rss))),
                     task_rss=rss, peak_task_rss=max(rss,self.state.get('peak_task_rss',0)),
                     fixed_rss=fixed_rss,
@@ -237,6 +241,7 @@ class ResourceSession:
             cpu_slots=self.cpu_slots,gpus=self.gpus,world=self.world,shares=self.shares,
             precision=self.request.resources.get('precision'))
         self.state.update(claims={},unrealized_bytes=0,waiting={})
+        self.state['diagnostics_dir'] = str(self.request.run_dir)
         manager_member = identity(psutil.Process(self.manager._process.pid))
         manager_member['baseline_rss'] = psutil.Process(manager_member['pid']).memory_info().rss
         self.members = self.manager.dict({self.owner['pid']: self.owner, manager_member['pid']: manager_member})

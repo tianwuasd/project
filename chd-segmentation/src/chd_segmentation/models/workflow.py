@@ -411,10 +411,9 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 entry = bundle.sample(dataset,names,rng)
                 reservation = nullcontext()
                 if stage == 'localizer':
-                    from .q_route1.training_inputs import input_plan
-                    planned = input_plan(entry['label'].shape,entry['processed_spacing'],
-                                         common['resources']['validation_block_bytes'])
-                    amount = planned['workspace_bytes']+planned['retained_bytes']+planned['backward_bytes']
+                    from .q_route1.training_inputs import training_plan
+                    planned = training_plan(entry['label'].shape,entry['processed_spacing'],common['resources'])
+                    amount = planned['retained_bytes']+planned['backward_bytes']
                     reservation = memory.admit(amount,label='q_localizer_training_case')
                 with reservation as ticket:
                     if stage == 'localizer' and ticket is None:
