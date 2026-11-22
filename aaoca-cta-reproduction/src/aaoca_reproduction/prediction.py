@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from sklearn.metrics import average_precision_score, roc_auc_score
 
-from .classification import LABEL_MAPS, build_model, load_weights, require_direction_review, validate_descriptor
+from .classification import LABEL_MAPS, build_model, coverage_reviews, load_weights, prediction_direction, validate_descriptor
 from .data import load_array, prepared_receipt
 from .labels import read_label_rows, reviewed_labels, validate_manifest
 from .preprocessing import network_tensor
@@ -50,7 +50,8 @@ def predict(config, manifest):
     candidates = {r["case_id"]: r for r in manifest["cases"] if r["role"] == "predict"}
     rows = [candidates[key] for key in requested]
     receipts = [prepared_receipt(row, config) for row in rows]
-    review = require_direction_review(config, receipts)
+    review = prediction_direction(config, receipts)
+    coverage = coverage_reviews(config, rows, receipts)
     descriptors = settings["weights"]
     count = {"five_initializations": 5, "single_model": 1, "partial_ensemble": len(descriptors)}[settings["ensemble_mode"]]
     if len(descriptors) != count or not 1 <= count <= 5:
@@ -61,6 +62,9 @@ def predict(config, manifest):
     if len(set(members)) != count or any(index not in range(5) for index in members):
         raise ValueError("初始化成员编号重复或越界")
     weight_paths = [validate_descriptor(item, task)[0] for item in descriptors]
+    strategies = {(item["strategy"], item.get("experiment_name")) for item in descriptors}
+    if len(strategies) != 1:
+        raise ValueError("集成成员必须来自同一明确实验策略")
     if len(set(weight_paths)) != count:
         raise ValueError("同一权重文件不能充当多个初始化成员")
     truths = reviewed_labels(read_label_rows(config["diagnoses"], config.get("diagnosis_sheet")), manifest) if config.get("diagnoses") else {}
@@ -76,7 +80,7 @@ def predict(config, manifest):
     device = classification_device(config, settings.get("estimated_gpu_working_bytes", admission["plan"]["estimated_gpu_working_bytes"]))
     started = perf_counter()
     run_identity = identity({"task": task, "weights": [(d, signature(p)) for d, p in zip(descriptors, weight_paths)],
-                             "inputs": [p["identity"] for p in receipts], "direction": review})
+                             "inputs": [p["identity"] for p in receipts], "direction": review, "coverage": coverage})
     directory.mkdir(parents=True, exist_ok=True)
     results = [{"case_id": row["case_id"], "patient_key": row["patient_key"], "task": task,
                 "preprocessing_id": receipt["identity"], "members": [], "ensemble_mode": settings["ensemble_mode"]}
@@ -125,7 +129,10 @@ def predict(config, manifest):
         report = {"identity": run_identity, "task": task, "results": results, "metrics": metrics(valid_truth, valid_probability),
                   "unknown_or_inapplicable": len(results) - len(valid_truth), "memory": memory,
                   "seconds": perf_counter() - started, "initialization_members": count,
-                  "full_five_initializations": count == 5, "direction_review": review}
+                  "full_five_initializations": count == 5, "direction_review": review, "coverage_reviews": coverage,
+                  "direction_status": review["direction_status"],
+                  "evaluation_scope": "exploratory_predictions_with_confirmed_reference_only",
+                  "paper_performance_validated": False, "clinical_diagnostic_validity": "not_established"}
         if len(json.dumps(report, ensure_ascii=False).encode("utf-8")) * 2 > budget:
             raise OSError("预测结果超过获准保存预算")
         write_json(directory / "predictions.json", report)

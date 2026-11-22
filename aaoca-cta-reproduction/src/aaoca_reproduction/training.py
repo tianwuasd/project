@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import os
 import random
 from time import perf_counter
 
@@ -7,7 +8,7 @@ import numpy as np
 import torch
 
 from .augmentations import AuthorAugmentation
-from .classification import LEARNING_RATES, build_model, load_weights, model_contract, model_metadata, require_direction_review, validate_model_metadata
+from .classification import LEARNING_RATES, build_model, coverage_reviews, load_weights, model_contract, model_metadata, require_direction_review, training_strategy, validate_model_metadata
 from .data import load_batch, prepared_receipt
 from .labels import task_partitions
 from .records import event, identity, write_json
@@ -43,6 +44,15 @@ def save_checkpoint(path, model, optimizer, scheduler, state, run_identity, meta
     pending.replace(path)
 
 
+def save_update_attempts(path, run_identity, attempted_updates):
+    pending = path.with_suffix(path.suffix + ".pending")
+    with pending.open("w", encoding="utf-8") as stream:
+        json.dump({"schema": 1, "identity": run_identity, "attempted_updates": attempted_updates}, stream)
+        stream.flush()
+        os.fsync(stream.fileno())
+    pending.replace(path)
+
+
 def run_budget(directory, budget, pending_estimate):
     files = list(directory.rglob("*"))
     if any(p.is_symlink() or not p.resolve().is_relative_to(directory.resolve()) for p in files):
@@ -55,6 +65,7 @@ def run_budget(directory, budget, pending_estimate):
 def train(config, manifest, resume=False):
     settings = config["classification"]
     task = settings["task"]
+    strategy = training_strategy(settings, task)
     meta = model_metadata(task)
     if settings["learning_rate_recipe"] not in LEARNING_RATES:
         raise ValueError("必须具名选择论文或发布版学习率")
@@ -75,6 +86,7 @@ def train(config, manifest, resume=False):
     train_inputs = [prepared_receipt(row, config) for row in train_rows]
     validation_inputs = [prepared_receipt(row, config) for row in validation_rows]
     direction = require_direction_review(config, train_inputs + validation_inputs)
+    coverage = coverage_reviews(config, train_rows + validation_rows, train_inputs + validation_inputs, require_verified=True)
     pretrained = settings.get("pretrained_detection")
     if task != "aaoca_present":
         if pretrained is None:
@@ -89,12 +101,13 @@ def train(config, manifest, resume=False):
     if directory == course or not directory.is_relative_to(course):
         raise ValueError("训练状态和日志须存于course专用运行目录")
     latest = directory / "latest.pt"
+    attempts_path = directory / "update-attempts.json"
     if resume != latest.exists():
         raise ValueError("已有完整latest需显式resume；新任务不接受缺失latest的恢复")
     if not resume and directory.exists() and any(directory.iterdir()):
         raise FileExistsError("新训练目录含既有内容")
     semantic_settings = {k: v for k, v in settings.items() if k != "max_update_attempts"}
-    run_identity = identity({"settings": semantic_settings, "model": model_contract(task), "direction": direction,
+    run_identity = identity({"settings": semantic_settings, "model": model_contract(task), "direction": direction, "coverage": coverage,
                              "train": [(r["patient_key"], r["target"], p["identity"]) for r, p in zip(train_rows, train_inputs)],
                              "validation": [(r["patient_key"], r["target"], p["identity"]) for r, p in zip(validation_rows, validation_inputs)]})
     resources = configure_cpu(config)
@@ -118,7 +131,8 @@ def train(config, manifest, resume=False):
         state = {"epoch": 0, "phase": "train", "order": [], "cursor": 0,
                  "train_loss_sum": 0.0, "train_batches": 0, "val_loss_sum": 0.0, "val_batches": 0,
                  "attempted_updates": 0, "successful_updates": 0, "best_loss": float("inf"),
-                 "bad_epochs": 0, "complete": False, "member_index": member, "seed": seed,
+                 "bad_epochs": 0, "complete": False, "member_index": member, "seed": seed, "strategy": strategy,
+                 "coverage_reviews": coverage,
                  "training_patient_keys": [r["patient_key"] for r in train_rows],
                  "validation_patient_keys": [r["patient_key"] for r in validation_rows],
                  "cohort_identity": identity({"task": task,
@@ -129,11 +143,19 @@ def train(config, manifest, resume=False):
             if checkpoint["schema"] != 1 or checkpoint["identity"] != run_identity:
                 raise ValueError("恢复检查点的输入、方法、模型或配置身份不匹配")
             validate_model_metadata(checkpoint["model_meta"], task)
+            if checkpoint["state"]["strategy"] != strategy:
+                raise ValueError("恢复检查点的实际训练策略不符")
             model.load_state_dict(checkpoint["model"], strict=True)
             optimizer.load_state_dict(checkpoint["optimizer"])
             scheduler.load_state_dict(checkpoint["scheduler"])
             state, initialization = checkpoint["state"], checkpoint["initialization"]
             restore_random(checkpoint["random"], device)
+            attempts = json.loads(attempts_path.read_text(encoding="utf-8"))
+            if (attempts["schema"] != 1 or attempts["identity"] != run_identity
+                    or type(attempts["attempted_updates"]) is not int
+                    or attempts["attempted_updates"] < state["attempted_updates"]):
+                raise ValueError("更新尝试记录身份、次数或与检查点的先后关系不符")
+            state["attempted_updates"] = attempts["attempted_updates"]
         directory.mkdir(parents=True, exist_ok=True)
         parameter_count = sum(p.numel() for p in model.parameters())
         pending_bytes = parameter_count * 16 + 8 * 2**20
@@ -143,11 +165,12 @@ def train(config, manifest, resume=False):
         started = perf_counter()
         if not resume:
             write_json(directory / "run.json", {"identity": run_identity, "settings": settings, "model": meta,
-                       "resources": resources, "admission": admission, "direction": direction,
+                       "resources": resources, "admission": admission, "direction": direction, "coverage_reviews": coverage,
                        "parameter_count": parameter_count, "precision": "float32", "workers": 0,
                        "train_patients": [r["patient_key"] for r in train_rows],
                        "validation_patients": [r["patient_key"] for r in validation_rows]})
-            run_budget(directory, budget, pending_bytes)
+            run_budget(directory, budget, pending_bytes + 1024)
+            save_update_attempts(attempts_path, run_identity, 0)
             save_checkpoint(latest, model, optimizer, scheduler, state, run_identity, meta, initialization)
         with (directory / "events.jsonl").open("a", encoding="utf-8") as log:
             while state["epoch"] < epochs and not state["complete"]:
@@ -163,6 +186,10 @@ def train(config, manifest, resume=False):
                             return {"directory": str(directory), "identity": run_identity, "state": state,
                                     "memory": memory, "stop_reason": "authorized_update_limit"}
                         indices = state["order"][state["cursor"]:state["cursor"] + batch_size]
+                        # 在供数及模型计算前持久预占次数，中断后也保留该次尝试。
+                        run_budget(directory, budget, 1024)
+                        save_update_attempts(attempts_path, run_identity, state["attempted_updates"] + 1)
+                        state["attempted_updates"] += 1
                         images, targets = load_batch(train_rows, train_inputs, indices, augmentation)
                         optimizer.zero_grad(set_to_none=True)
                         loss = loss_function(model(images.to(device)), targets.to(device))
@@ -172,7 +199,6 @@ def train(config, manifest, resume=False):
                         torch.nn.utils.clip_grad_norm_(model.parameters(), 1, error_if_nonfinite=True)
                         optimizer.step()
                         state["cursor"] += len(indices)
-                        state["attempted_updates"] += 1
                         state["successful_updates"] += 1
                         state["train_loss_sum"] += float(loss.item())
                         state["train_batches"] += 1
