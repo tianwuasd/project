@@ -74,6 +74,11 @@ def execute(root, handle):
         guard.check_active()
         with torch.inference_mode(), torch.autocast('cuda', dtype=torch.bfloat16):
             outputs = model(**inputs)
+        torch.cuda.synchronize()
+        summary.update(forward_completed=True, forward_seconds=perf_counter()-started,
+                       peak_cuda_allocated_bytes=torch.cuda.max_memory_allocated(),
+                       peak_cuda_reserved_bytes=torch.cuda.max_memory_reserved())
+        write_json(root / 'summary.json', summary)
         if not all(torch.isfinite(t).all().item() for t in
                    (outputs.pred_masks, outputs.pred_logits, outputs.pred_boxes)):
             raise ValueError('SAM3输出包含非有限值')
@@ -82,7 +87,14 @@ def execute(root, handle):
         masks = processed['masks'].cpu().numpy().astype(np.uint8)
         boxes = processed['boxes'].float().cpu().numpy()
         scores = processed['scores'].float().cpu().numpy()
-        if masks.shape[1:] != rgb.shape[:2] or boxes.shape != (len(masks), 4) or scores.shape != (len(masks),):
+        summary['postprocess_shapes'] = dict(masks=list(masks.shape), boxes=list(boxes.shape), scores=list(scores.shape))
+        write_json(root / 'summary.json', summary)
+        if masks.ndim != 3 or boxes.shape != (len(masks), 4) or scores.shape != (len(masks),):
+            raise ValueError('官方实例数量或形状合同不同')
+        # 官方零实例路径不执行resize；空集合只恢复空间尺寸，不产生阳性掩膜。
+        if len(masks) == 0:
+            masks = masks.reshape((0, *rgb.shape[:2]))
+        if masks.shape[1:] != rgb.shape[:2]:
             raise ValueError('原始切片与官方还原掩膜的形状不同')
         # 模型行列为 j,i；保存时恢复为实例,i,j，不构造未处理切片的背景体积。
         restored = masks.transpose(0, 2, 1).copy()
