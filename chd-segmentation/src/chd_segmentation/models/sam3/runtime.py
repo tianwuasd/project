@@ -35,8 +35,8 @@ def stop_worker(worker, cancel, state):
 
 
 def inspect_inputs(config, case, slices):
-    if not 1 <= len(slices) <= 2 or len(set(slices)) != len(slices):
-        raise ValueError('只允许一至两个不重复切片')
+    if len(slices) != 1:
+        raise ValueError('只允许一张切片')
     for name, size in FILES.items():
         if (Path(config['weights']) / name).stat().st_size != size:
             raise ValueError('本地固定版本材料缺失或大小不同：' + name)
@@ -133,9 +133,20 @@ def predict(config, case, slices, output, deadline):
                             raise TimeoutError('SAM3达到固定检查截止时间')
                         if session.cancel.is_set():
                             raise InterruptedError('公共资源监督器已停止')
+                        # 保存公共监控诊断；6beebc0增加的字段保留原名和实际值。
+                        with session.condition:
+                            state['resource_monitor'] = {key: session.state.get(key) for key in
+                                ('sampled_at', 'sampled_monotonic', 'paused', 'pressure_reasons',
+                                 'monitor_failed', 'monitor_error', 'capacity', 'task_rss',
+                                 'peak_task_rss', 'limited_project_bytes', 'project_limit_bytes',
+                                 'system_headroom_bytes', 'pending_bytes', 'memory_scopes')}
                         snapshot = guard.client.snapshot()
                         if snapshot.cancelled:
                             raise InterruptedError('公共资源监督器取消本次检查')
+                        if snapshot.sample_age_seconds > 30:
+                            raise TimeoutError('公共资源监控超过30秒没有新样本')
+                        if snapshot.paused:
+                            raise MemoryError('公共资源监控暂停本次单片检查，诊断见execution.json')
                         rss = session.state['task_rss']
                         state['observed_peak_group_rss_bytes'] = max(state.get('observed_peak_group_rss_bytes', 0), rss)
                         if rss > config['ram_limit_bytes'] or psutil.virtual_memory().percent > 80:
