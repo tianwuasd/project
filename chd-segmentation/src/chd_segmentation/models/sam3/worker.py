@@ -105,5 +105,3 @@ def execute(root, handle):
                                  source_shape=config['selected']['source']['shape'],
                                  uncomputed='未推断，不能作为背景', array_axes='instance,i,j', slice_axis='k'))
     write_json(root / 'summary.json', summary)
-
-
