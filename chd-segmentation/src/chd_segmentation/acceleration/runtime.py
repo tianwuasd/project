@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from copy import deepcopy
 import multiprocessing as mp
 import os
+import sys
 from pathlib import Path
 from threading import Event, RLock
 from time import monotonic, sleep
@@ -187,7 +188,7 @@ class ResourceSession:
             spare, scopes = system_headroom(facts, host_fraction(r), r.get('reserve_ram_bytes', 4*2**30))
             root = Path(self.request.registry_root)
             if not hasattr(self, 'last_registry') or monotonic()-self.last_registry >= 5.:
-                with FileLock(str(root / '.resource.lock')):
+                with FileLock(str(root / '.resource.lock'), timeout=10):
                     self.rows = [row for row in read_json(root/'active.json') if alive(row)]
                     own = next(row for row in self.rows if row['pid']==self.owner['pid'] and row['birth']==self.owner['birth'])
                     own.update(rss_bytes=rss, members=[m for m in members if m != self.owner])
@@ -199,6 +200,13 @@ class ResourceSession:
             pending = sum(max(0, row.get('ram_bytes', 0)-row.get('rss_bytes', 0)) for row in self.rows)
             limit = memory_ceiling(r, facts)
             limited_project = project_usage(self.rows, r)
+            pressure = []
+            if spare-pending < 0:
+                pressure.append('host_reservation_headroom')
+            if limited_project > limit:
+                pressure.append('project_limit')
+            if rss > self.capacity:
+                pressure.append('task_capacity')
             with self.condition:
                 fixed_rss = sum(m.get('baseline_rss',0) for m in members if alive(m))
                 reconcile(self.state,rss,fixed_rss)
@@ -211,7 +219,7 @@ class ResourceSession:
                     headroom=max(0, min(self.capacity-rss, spare-pending+max(0,self.capacity-rss))),
                     task_rss=rss, peak_task_rss=max(rss,self.state.get('peak_task_rss',0)),
                     fixed_rss=fixed_rss,
-                    paused=spare-pending<0 or limited_project>limit or rss>self.capacity,
+                    paused=bool(pressure), pressure_reasons=pressure,
                     sampling_seconds=monotonic()-began)
                 self.condition.notify_all()
 
@@ -224,6 +232,9 @@ class ResourceSession:
             while not self.stopping.wait(1.):
                 self._sample()
         finally:
+            error = sys.exception()
+            if error is not None:
+                self.state['monitor_error'] = dict(type=type(error).__name__, message=str(error))
             self.state['monitor_failed'] = not self.stopping.is_set()
 
     def __enter__(self):
@@ -333,10 +344,10 @@ class ResourceSession:
         self.stopping.set()
         self.executor.shutdown(wait=True)
         root = Path(self.request.registry_root)
-        with FileLock(str(root/'.resource.lock')):
-            rows = read_json(root/'active.json')
-            write_json(root/'active.json', [r for r in rows if r['pid']!=self.owner['pid'] or r['birth']!=self.owner['birth']], durable=False)
         try:
+            with FileLock(str(root/'.resource.lock'), timeout=10):
+                rows = read_json(root/'active.json')
+                write_json(root/'active.json', [r for r in rows if r['pid']!=self.owner['pid'] or r['birth']!=self.owner['birth']], durable=False)
             self.future.result()
         finally:
             self.manager.shutdown()

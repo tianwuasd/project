@@ -20,6 +20,7 @@ from chd_segmentation.artifacts.store import file_digest, operation_lock, read_j
 from chd_segmentation.datasets.manifest import LABELS
 from chd_segmentation.observability.events import event
 from .total_inputs import RAW_EXPORT, export_case
+from .total_recovery import prediction_ready, supervise_child
 
 
 DATASET = "Dataset901_ImageCHDTotal"
@@ -319,7 +320,7 @@ def module_command(action, config_path):
     return [sys.executable, "-B", "-m", "chd_segmentation.finetuning.total", action, "--config", str(config_path)]
 
 
-def memory_budget(config, stage):
+def memory_budget(config, stage, *, cases=None):
     import nibabel as nib
     import numpy as np
     from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
@@ -330,7 +331,7 @@ def memory_budget(config, stage):
     spacing = np.asarray(manager.get_configuration(CONFIGURATION).spacing)
     transpose = source["transpose_forward"]
     native_max, resampled_max = 0, 0
-    for row in prepared["manifest"]["cases"]:
+    for row in prepared["manifest"]["cases"] if cases is None else cases:
         shape = np.asarray(nib.load(row["image"]).shape)
         target = np.ceil(shape[transpose] * np.asarray(row["spacing_xyz"])[transpose] / spacing) + 2
         native_max = max(native_max, math.prod(int(n) for n in shape))
@@ -350,7 +351,7 @@ def memory_budget(config, stage):
     return amount
 
 
-def resource(config, stage, gpus):
+def resource(config, stage, gpus, *, cases=None, minimum_bytes=0):
     shares = None
     gpu_ids = None
     if gpus:
@@ -359,7 +360,7 @@ def resource(config, stage, gpus):
         shares = [quotient + (rank < remainder) for rank in range(gpus)]
         if config["gpu_ids"] is not None:
             gpu_ids = config["gpu_ids"][:gpus]
-    amount = memory_budget(config, stage)
+    amount = max(memory_budget(config, stage, cases=cases), minimum_bytes)
     demand = ResourceDemand(fixed_bytes=amount, cpu_slots=config["cpu_slots"],
                             gpu_count=gpus, gpu_ids=gpu_ids, local_batches=shares)
     settings = dict(device="cuda" if gpus else "cpu", min_gpus=gpus or None, share=False,
@@ -404,6 +405,8 @@ def stop_process_group(process):
 
 
 def run_child(config, session, stage, command):
+    if stage == 'predict' and not prediction_ready(session, config['run_dir']):
+        return False
     env = environment(config)
     env["CUDA_VISIBLE_DEVICES"] = ",".join(gpu["uuid"] for gpu in session.allocation.gpus)
     log = config["run_dir"] / f"{stage}.log"
@@ -411,18 +414,9 @@ def run_child(config, session, stage, command):
         command, env=env, stdout=stream, stderr=subprocess.STDOUT, start_new_session=True
     ) as process:
         try:
-            while process.poll() is None:
-                for member in process_group_members(process.pid):
-                    pid = member["pid"]
-                    if session.handle.members.get(pid) != member:
-                        session.handle.members[pid] = member
-                if session.state.get("monitor_failed") or session.state.get("paused"):
-                    raise RuntimeError("微调进程超过资源预算或资源监控已停止")
-                sleep(0.5)
+            return supervise_child(config, session, stage, process, process_group_members)
         finally:
             stop_process_group(process)
-        if process.returncode:
-            raise subprocess.CalledProcessError(process.returncode, command)
 
 
 def train(config, resume):
@@ -500,6 +494,29 @@ def prediction_checkpoint(config, groups, choice):
     return checkpoint_path
 
 
+def reusable_prediction(prepared, row, saved, destination):
+    from chd_segmentation.prediction.metrics import case_data_identity
+
+    source = Path(row['image']).stat()
+    if [source.st_size, source.st_mtime_ns] != row['source_stamp']['image']:
+        raise ValueError(f"预测源影像已变化 {row['case_id']}")
+    if saved is None:
+        return False
+    if (saved['data_identity'] != case_data_identity(prepared, row) or
+            saved['file'] != destination.name or file_digest(destination) != saved['identity']):
+        raise ValueError(f"已有预测及其记录不一致 {row['case_id']}")
+    return True
+
+
+def pending_predictions(prepared, rows, output, checkpoint_sha256):
+    receipt = output/'predictions.json'
+    previous = read_json(receipt) if receipt.exists() else {'checkpoint':checkpoint_sha256,'cases':{}}
+    if previous['checkpoint'] != checkpoint_sha256:
+        raise ValueError('目标结果目录已有其他检查点的预测')
+    return [row for row in rows if not reusable_prediction(prepared, row,
+        previous['cases'].get(row['case_id']), output/f"{row['case_id']}.nii.gz")]
+
+
 def predict(config, config_path, role, choice):
     prepared, groups = frozen_cases(config)
     require_environment()
@@ -510,31 +527,55 @@ def predict(config, config_path, role, choice):
         state = dict(source_identity(config, hashes), plans=plan_digest)
         if read_json(run / "training.json") != {"prepared": state, "plans": plan_digest}:
             raise ValueError("训练记录与当前冻结数据或初始化权重不一致")
-        prediction_checkpoint(config, groups, choice)
+        checkpoint = prediction_checkpoint(config, groups, choice)
+        checkpoint_sha256 = file_digest(checkpoint)
         output = prediction_directory(config, prepared, role, choice)
-        with operation_lock(output), resource(config, "predict", gpus=1) as session:
-            command = module_command("_predict", config_path)
-            run_child(config, session, "predict", command + ["--role", role, "--checkpoint", choice])
+        command = module_command("_predict", config_path) + ["--role", role, "--checkpoint", choice]
+        with operation_lock(output):
+            minimum_bytes = 0
+            while True:
+                pending = pending_predictions(prepared, groups[role], output, checkpoint_sha256)
+                if not pending:
+                    event(run, 'total_prediction_completed', role=role, cases=len(groups[role]), reused=True)
+                    break
+                with resource(config, "predict", gpus=1, cases=pending, minimum_bytes=minimum_bytes) as session:
+                    completed = run_child(config, session, "predict", command)
+                    if not completed:
+                        minimum_bytes = max(minimum_bytes, math.ceil(session.state['peak_task_rss']*1.5))
+                if completed:
+                    if pending_predictions(prepared, groups[role], output, checkpoint_sha256):
+                        raise RuntimeError('Total预测进程退出后缺少完整病例记录')
+                    event(run, 'total_prediction_completed', role=role, cases=len(groups[role]), reused=False)
+                    break
+                event(run, 'total_prediction_waiting_recovery', role=role,
+                      message='本轮子进程已退出并释放资源，重新等待额度；已提交病例将复用')
+                sleep(2)
 
 
 def predict_child(config, role, choice):
-    import nibabel as nib
-    import numpy as np
     import torch
     from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 
-    from chd_segmentation.prediction.metrics import case_data_identity
-
     prepared, groups = frozen_cases(config)
     checkpoint_path = prediction_checkpoint(config, groups, choice)
-    checkpoint_sha256 = file_digest(checkpoint_path)
-    output = prediction_directory(config, prepared, role, choice)
-    receipt = output / "predictions.json"
-    raw, _, _ = locations(config)
     predictor = nnUNetPredictor(tile_step_size=0.5, use_gaussian=True, use_mirroring=False,
                                  perform_everything_on_device=False, device=torch.device("cuda", 0))
     predictor.initialize_from_trained_model_folder(str(checkpoint_path.parents[1]), use_folds=(0,),
                                                   checkpoint_name=checkpoint_path.name)
+    predict_cases(config, prepared, groups, role, choice, checkpoint_path, predictor)
+
+
+def predict_cases(config, prepared, groups, role, choice, checkpoint_path, predictor):
+    import nibabel as nib
+    import numpy as np
+
+    from chd_segmentation.prediction.metrics import case_data_identity
+
+    checkpoint_sha256 = file_digest(checkpoint_path)
+    output = prediction_directory(config, prepared, role, choice)
+    output.mkdir(parents=True, exist_ok=True)
+    receipt = output / "predictions.json"
+    raw, _, _ = locations(config)
     reader = predictor.plans_manager.image_reader_writer_class()
     previous = read_json(receipt) if receipt.exists() else {"checkpoint": checkpoint_sha256, "cases": {}}
     if previous["checkpoint"] != checkpoint_sha256:
@@ -542,20 +583,25 @@ def predict_child(config, role, choice):
     cases = previous["cases"]
     staging = config["run_dir"] / "prediction_work"
     staging.mkdir(exist_ok=True)
+    # 监督器释放资源后重启时，仅清理本任务已知病例的未提交文件。
+    for rows in groups.values():
+        for row in rows:
+            pending = staging / f"{row['case_id']}.nii.gz"
+            if pending.is_file():
+                pending.unlink()
+    for row in groups[role]:
+        pending = output / f"{row['case_id']}.pending.nii.gz"
+        if pending.is_file():
+            pending.unlink()
     for row in groups[role]:
         name = row["case_id"]
         source_path = Path(row["image"])
-        stat = source_path.stat()
-        if [stat.st_size, stat.st_mtime_ns] != row["source_stamp"]["image"]:
-            raise ValueError(f"预测源影像已变化 {name}")
         destination = output / f"{name}.nii.gz"
         case_identity = case_data_identity(prepared, row)
-        if name in cases:
-            saved = cases[name]
-            if (saved["data_identity"] != case_identity or saved["file"] != destination.name or
-                    file_digest(destination) != saved["identity"]):
-                raise ValueError(f"已有预测及其记录不一致 {name}")
+        if reusable_prediction(prepared, row, cases.get(name), destination):
+            event(config['run_dir'], 'total_prediction_reused', case_id=name, role=role)
             continue
+        event(config['run_dir'], 'total_prediction_case_started', case_id=name, role=role)
         source = nib.load(source_path)
         model_input = raw / ("imagesTs" if role == "test" else "imagesTr") / f"{name}_0000.nii.gz"
         data, properties = reader.read_images((str(model_input),))
