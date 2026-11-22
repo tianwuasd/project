@@ -15,12 +15,13 @@ estimated_ram_bytes: 3758096384
 estimated_vram_bytes: 5368709120
 ram_limit_bytes: 8589934592
 vram_limit_bytes: 7516192768
-worker_timeout_seconds: 600
+# 单片已验收配方：等待120秒、加载及推断360秒，另预留120秒诊断清理。
+worker_timeout_seconds: 360
 resources:
   cpu_threads: 2
   ram_fraction: 0.8
   memory_limit_bytes: 100000000000
-  wait_seconds: 180
+  wait_seconds: 120
   share: false
   # 默认保留生产预留；本次局部例外经用户明确许可后由私有运行配置指定。
   vram_reserve_bytes: 4294967296
