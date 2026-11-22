@@ -1,26 +1,17 @@
 import csv
 import io
-import subprocess
 import shutil
-from time import perf_counter,sleep
+
+from .gpu_query import query_nvidia_smi
 
 
-def process_vram_observation(uuid,pid):
+def process_vram_observation(uuid,pid, *, resources=None, cancel=None, log_dir=None):
     executable = shutil.which('nvidia-smi')
     if executable is None:
         return dict(bytes=None,reason='nvidia_smi_unavailable')
-    with subprocess.Popen([executable,'--query-compute-apps=gpu_uuid,pid,used_gpu_memory',
-            '--format=csv,noheader,nounits'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True) as process:
-        deadline = perf_counter()+5
-        while process.poll() is None and perf_counter()<deadline:
-            sleep(.02)
-        if process.poll() is None:
-            process.kill()
-            process.communicate()
-            return dict(bytes=None,reason='nvidia_smi_query_timeout')
-        stdout,_ = process.communicate()
-        if process.returncode:
-            return dict(bytes=None,reason='nvidia_smi_query_failed',exit_code=process.returncode)
+    stdout = query_nvidia_smi(['--query-compute-apps=gpu_uuid,pid,used_gpu_memory',
+                              '--format=csv,noheader,nounits'],
+                             resources=resources, cancel=cancel, log_dir=log_dir)
     rows = [row for row in csv.reader(io.StringIO(stdout)) if len(row)==3
             and row[0].strip()==uuid and row[1].strip()==str(pid)]
     if len(rows)!=1:

@@ -1,0 +1,26 @@
+model: sam3
+weights: ../../private/weights/sam3
+dependencies: ../../private/dependencies/sam3/site-packages
+manifest: ../../private/chd1282_manifest.json
+cohort: ../../private/chd1282_cohort.json
+data_root: ../../private/data/CHD
+work_root: ../../private/work/sam3
+registry_root: ../../private/work/resources
+orientation_evidence: 需填写本批RAS研究约定及作者间距的核对来源
+intensity_evidence: 需填写实际输入强度语义的核对来源
+intensity_semantics: hu
+gray_window: [-160, 240]
+prompt: aorta
+estimated_ram_bytes: 3758096384
+estimated_vram_bytes: 5368709120
+ram_limit_bytes: 8589934592
+vram_limit_bytes: 7516192768
+worker_timeout_seconds: 600
+resources:
+  cpu_threads: 2
+  ram_fraction: 0.8
+  memory_limit_bytes: 100000000000
+  wait_seconds: 180
+  share: false
+  # 默认保留生产预留；本次局部例外经用户明确许可后由私有运行配置指定。
+  vram_reserve_bytes: 4294967296

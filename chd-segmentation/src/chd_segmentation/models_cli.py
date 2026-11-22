@@ -12,6 +12,9 @@ def wait_seconds(value):
 def main(argv=None):
     import sys
     actual = sys.argv[1:] if argv is None else argv
+    if actual[:1] == ['sam3']:
+        from .models.sam3.cli import main as sam3_main
+        return sam3_main(actual[1:])
     if actual[:1] == ['medsam3']:
         from .models.medsam3.cli import main as medsam3_main
         return medsam3_main(actual[1:])

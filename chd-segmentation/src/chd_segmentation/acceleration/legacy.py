@@ -32,6 +32,9 @@ class SessionGuard:
         if self.client.boundary().action == 'stop':
             raise InterruptedError('当前任务已取消或达到显式等待时限')
 
+    def check_active(self):
+        self.client.wait_active()
+
     @contextmanager
     def admit(self, amount, label='allocation', wait=True, reserve=False, release=None):
         if release is not None and self.client.boundary().action == 'wait':

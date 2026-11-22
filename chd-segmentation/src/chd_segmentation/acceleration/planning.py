@@ -6,6 +6,7 @@ import numpy as np
 import psutil
 
 from .host import host_capacity
+from .limits import reserve_margin
 
 GIB = 1024 ** 3
 
@@ -94,14 +95,23 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
             facts['available_bytes']+credit-r['reserve_ram_bytes'])-pending)
         cores = max(0,max(1,math.floor(facts['cores']*r['cpu_fraction']))-sum(p['cpu_slots'] for p in peers))
     available_budget = budget
-    margin = r.get('memory_margin_fraction', .5)
+    requested_margin = r.get('memory_margin_fraction', .5)
+    margin = requested_margin
     budget = math.floor(budget / (1 + margin))
+    def apply_margin(minimum):
+        nonlocal budget, margin
+        planned = reserve_margin(minimum, available_budget, requested_margin)
+        margin = planned['memory_margin_fraction']
+        budget = max(0, int(available_budget)*minimum//planned['memory_bytes']) if minimum else max(0,int(available_budget))
     def finish(result):
-        result.update(budget_bytes=available_budget, planning_budget_bytes=budget, memory_margin_fraction=margin)
-        result['minimum_bytes'] = math.ceil(result['minimum_bytes'] * (1 + margin))
+        minimum = reserve_margin(result['minimum_bytes'],available_budget,requested_margin)
+        result.update(budget_bytes=available_budget, planning_budget_bytes=budget,
+                      requested_memory_margin_fraction=requested_margin, memory_margin_fraction=margin,
+                      raw_minimum_bytes=result['minimum_bytes'], minimum_bytes=minimum['memory_bytes'])
         if result['admitted']:
             estimated = result['ram_bytes']
-            result.update(estimated_ram_bytes=estimated, ram_bytes=math.ceil(estimated * (1 + margin)))
+            result.update(estimated_ram_bytes=estimated,
+                          ram_bytes=min(int(available_budget),math.ceil(estimated * (1 + margin))))
             result['margin_bytes'] = result['ram_bytes'] - estimated
         return result
     reports = estimates if estimates is not None else case_estimates(config, prepared, stage)
@@ -115,6 +125,7 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
         readers = r["max_readers"] if r["readers"] == "auto" else r["readers"]
         cap = max(0, min(requested, readers, len(reports), cores - 1))
         minimum = 2 * GIB + case_bytes
+        apply_margin(minimum)
         result = {"admitted": False, "facts": facts, "budget_bytes": budget, "own_uss_credit_bytes": credit,
                   "peer_pending_bytes": pending, "minimum_bytes": minimum, "case_estimate_bytes": case_bytes,
                   "case_estimates": reports, "requested": {"workers": r["workers"], "readers": r["readers"]},
@@ -183,6 +194,7 @@ def cpu_plan(config, prepared, world, peers=(), stage="train", own=(), estimates
     minimum_workers = fixed_workers if fixed_workers is not None else [0]*world
     minimum = (base+sum(minimum_workers)*worker_bytes+sum(max(1,w) for w in minimum_workers)*retained+
                case_bytes+patch_bytes*3)
+    apply_margin(minimum)
     result = {"admitted": False, "facts": facts, "budget_bytes": budget, "own_uss_credit_bytes": credit,
               "peer_pending_bytes": pending, "minimum_bytes": minimum, "case_estimate_bytes": case_bytes,
               "workers": list(minimum_workers), "cache_bytes": [0]*world, "prefetch": 1,

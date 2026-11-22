@@ -3,6 +3,27 @@ from dataclasses import replace
 from .contracts import ResourceDemand
 
 
+def minimum_host_bytes(request, demand, planner, facts, limit):
+    if planner is None:
+        return demand.memory_bytes, []
+    from .registry import layout as batch_layout
+    r = request.resources
+    maximum = demand.gpu_count or len(demand.local_batches or []) or r.get('cpu_processes',1)
+    minimum = (r.get('min_gpus') or maximum) if demand.gpu_count else maximum
+    records = []
+    for world in range(maximum,minimum-1,-1):
+        batch = sum(demand.local_batches or [1])
+        if r.get('gpu_spec',{}).get('resource_model') == 'medsam2' and batch % world:
+            continue
+        shares = batch_layout(batch,world,r.get('batch_layout'))
+        plan = planner(world=world,shares=shares,memory_budget_bytes=limit,
+                       cpu_budget_slots=max(facts['cores'],demand.cpu_slots),facts=facts)
+        records.append(dict(world=world,raw_minimum_bytes=plan.get('raw_minimum_bytes',plan['minimum_bytes'])))
+    if not records:
+        raise ValueError('没有符合批量分担的资源拓扑')
+    return min(row['raw_minimum_bytes'] for row in records), records
+
+
 def select_admission(request, demand, planner, *, facts, memory_budget_bytes, cpu_budget_slots,
                      occupied_bytes, history, peaks, peers, layout, keep_gpus=None, initial=True):
     resources = request.resources

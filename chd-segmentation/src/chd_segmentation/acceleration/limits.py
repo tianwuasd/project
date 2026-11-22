@@ -1,3 +1,25 @@
+import math
+
+
+def reserve_margin(required_bytes, budget_bytes, preferred_fraction=.5):
+    if required_bytes < 0 or not math.isfinite(preferred_fraction) or preferred_fraction < 0:
+        raise ValueError('原始内存需求和额外缓冲比例必须有效且非负')
+    required = int(required_bytes)
+    requested = math.ceil(required * (1 + preferred_fraction))
+    reserved = max(required, min(requested, max(0, int(budget_bytes))))
+    return dict(raw_required_bytes=required, memory_bytes=reserved,
+                requested_memory_bytes=requested, margin_bytes=reserved-required,
+                requested_memory_margin_fraction=preferred_fraction,
+                memory_margin_fraction=(reserved-required)/required if required else 0.,
+                admitted=required <= budget_bytes)
+
+
+def raw_capacity(resources, facts, occupied_bytes=0):
+    limit = min(memory_ceiling(resources, facts),
+                facts['total_bytes']-resources.get('reserve_ram_bytes', 4*2**30))
+    return max(0, int(limit)-int(occupied_bytes))
+
+
 def host_fraction(resources):
     maximum = 1. if resources.get('technical_cpu', False) and resources.get('device') == 'cpu' else .8
     return min(maximum, resources.get('ram_fraction', .8))
