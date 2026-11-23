@@ -96,6 +96,9 @@ class ResourceSession:
                 path = root / 'active.json'
                 rows = [row for row in (read_json(path) if path.exists() else []) if alive(row)]
                 peers = [row for row in rows if row['pid'] != self.owner['pid'] or row['birth'] != self.owner['birth']]
+                cpu_claims = [claim for row in rows if row not in peers
+                              for claim in row.get('model_cpu_claims',[]) if alive(claim)]
+                preparation_slots = sum(max(0,claim['threads']-1) for claim in cpu_claims)
                 limit = memory_ceiling(r, facts)
                 project = project_usage(peers, r)
                 pending = sum(max(0, row.get('ram_bytes', 0)-row.get('rss_bytes', 0)) for row in peers)
@@ -108,7 +111,7 @@ class ResourceSession:
                     with self.condition:
                         occupied += self.state.get('unrealized_bytes',0)
                 cpu_available = max(0, int(facts['cores']*r.get('cpu_fraction', .8))-
-                                    sum(row.get('cpu_slots', 0) for row in peers))
+                                    sum(row.get('cpu_slots', 0) for row in peers)-preparation_slots)
                 budget = min(limit-project,current+headroom-pending)
                 peak_path = root/'gpu-peaks.json'
                 peaks = read_json(peak_path) if observed is not None and peak_path.is_file() else {}
@@ -124,7 +127,8 @@ class ResourceSession:
                     applied_layout = self._layout(plan['layout'])
                     generation = self.state['plan_generation']+1 if hasattr(self,'state') else 0
                     rows = peers + [{**self.owner, 'members': list(self.members.values()) if hasattr(self,'members') else [],
-                        'ram_bytes': amount, 'rss_bytes': current, 'cpu_slots': cpu_slots,
+                        'ram_bytes': amount, 'rss_bytes': current, 'cpu_slots': cpu_slots+preparation_slots,
+                        'model_cpu_claims':cpu_claims,
                         'uuids': [g['uuid'] for g in gpus], 'memory_limit_bytes': limit,
                         'memory_policy': r.get('memory_policy', 'project_limit'),
                         'layout': applied_layout, 'reader_slots': selected.reader_slots,

@@ -47,7 +47,7 @@ def options(path,overrides=None):
                     work_root=None,execution={},logging=dict(heartbeat_seconds=15,case_details=True),
                     input_source={}, technical_roles={}, attempt_ledger=None, early_stopping={},
                     checkpoint_dir=None, updates_per_epoch=None, save_every_updates=250,
-                    save_every_seconds=300.,distributed_backend=None,training_cache={},resume_budget=False)
+                    save_every_seconds=300.,distributed_backend=None,training_cache={},resume_budget=False,cpu_preparation={})
     if not isinstance(raw, dict) or set(raw)-set(defaults):
         raise ValueError('模型配置字段无效')
     config = {**defaults, **raw}
@@ -55,6 +55,8 @@ def options(path,overrides=None):
         raise ValueError('resume_budget必须为布尔值')
     from .q_route1.training_cache import cache_options
     config['training_cache'] = cache_options(config['training_cache'])
+    from .q_route1.preparation import preparation_options
+    config['cpu_preparation'] = preparation_options(config['cpu_preparation'])
     if config['technical'] and config['updates'] is None:
         config['updates'] = 2
     from ..training.stopping import selection_options

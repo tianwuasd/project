@@ -29,12 +29,17 @@ MAPPING = {'chd1282':(0,1,2,3,4,6,7,5,9,10,8),'imagechd':tuple(range(8))}
 SOLVER = dict(steps=3,gamma=1.,lambda_=0.5,eta=1/3)
 
 
-def allowed(label, missing, dataset):
+def allowed(label, missing, dataset, parallel=None):
     mapping = np.asarray(MAPPING[dataset])
     if not ((label>=-1)&(label<len(mapping))).all():
         raise ValueError('Q来源标签超出对应数据集范围')
     mapped = mapping[label.clip(0)]
-    support = np.stack([mapped==index for index in range(11)])
+    if parallel is None:
+        support = np.stack([mapped==index for index in range(11)])
+    else:
+        support = np.empty((11,*label.shape),dtype=bool)
+        parallel.map(range(11),int(label.size*3),lambda index:mapped==index,
+                     lambda index,value:support.__setitem__(index,value))
     unknown = set(map(int,mapping[list(missing)])) | (set(range(11))-set(map(int,mapping)))
     for index in unknown:
         support[index] |= label==0
@@ -153,7 +158,7 @@ class QAdapter:
                 group['peak_lr'] = group['lr']
             group['lr'] = group['peak_lr']*factor
 
-    def crop(self,entry,candidate,probability):
+    def crop(self,entry,candidate,probability,parallel=True):
         size = self.config['local_size']
         start = tuple(int(np.floor(c-(size-1)/2+.5)) for c in candidate.center)
         image = torch.from_numpy(entry['image'])[None]
@@ -164,7 +169,10 @@ class QAdapter:
             inside &= (grid>=0)&(grid<n)
         indices = tuple(grid.clip(0,n-1) for grid,n in zip(grids,entry['label'].shape))
         raw = np.where(inside,entry['label'][indices],-1)
-        support = allowed(raw,entry['unknown_classes'],self.prepared['dataset'])
+        from .preparation import preparation
+        guard = getattr(self,'training_guard',None) if parallel else None
+        with preparation(self.config,guard,entry,stage=self.stage) as runtime:
+            support = allowed(raw,entry['unknown_classes'],self.prepared['dataset'],runtime)
         return inputs,editable,support
 
     @torch.no_grad()
@@ -186,7 +194,9 @@ class QAdapter:
         with claim as ticket:
             if ticket is None:
                 raise InterruptedError('局部定位输入等待已取消')
-            image,valid = pooled_image(entry,settings.get('localizer_block_bytes',2*2**30),guard=guard)
+            from .preparation import preparation
+            with preparation(self.config,guard,entry,stage=self.stage) as runtime:
+                image,valid = pooled_image(entry,settings.get('localizer_block_bytes',2*2**30),guard=guard,parallel=runtime)
             return self.locator.forward_pooled(image.to(self.device),valid.to(self.device))
 
     @torch.no_grad()
@@ -224,19 +234,29 @@ class QAdapter:
         for completed,name in enumerate(names,1):
             entry = dataset.get(name)
             probability,features,candidates = self.frozen(entry)
-            for index,candidate in enumerate(candidates):
-                inputs,editable,support = self.crop(entry,candidate,probability)
+            def inspect(index):
+                candidate = candidates[index]
+                inputs,editable,support = self.crop(entry,candidate,probability,parallel=False)
                 exact = (support.sum(0)==1)&editable[0,0].numpy()
                 supervised = (support.sum(0)<11)&editable[0,0].numpy()
                 if not supervised.any():
-                    continue
+                    return None
                 has_error = bool(((inputs[0,1:12].argmax(0).numpy()!=support.argmax(0))&exact).any())
                 reference = references.get(name,{}).get(str(index),{})
                 if reference and reference['candidate_start']!=list(candidate.start):
                     raise ValueError('Q关键结构参考没有绑定当前自动候选')
-                records.append(CandidateRecord(name,rows[name].get('patient') or name,self.prepared['dataset'],index,
+                return CandidateRecord(name,rows[name].get('patient') or name,self.prepared['dataset'],index,
                     has_error,bool(reference.get('correct_key_structure',False)),
-                    bool(reference.get('contains_correct_anomaly',False)),int(supervised.sum())))
+                    bool(reference.get('contains_correct_anomaly',False)),int(supervised.sum()))
+            from .preparation import preparation
+            with preparation(self.config,getattr(self,'training_guard',None),entry,stage=self.stage) as runtime:
+                if runtime is None:
+                    records.extend(value for index in range(len(candidates)) if (value:=inspect(index)) is not None)
+                else:
+                    def consume(index,value):
+                        if value is not None:
+                            records.append(value)
+                    runtime.map(range(len(candidates)),self.config['local_size']**3*192,inspect,consume)
             if self.config['logging']['case_details']:
                 event(Path(self.config['run_dir'])/self.stage,'q_candidates_completed',case_id=name,
                     cases_completed=completed,cases_total=len(names),candidates=len(candidates),records=len(records))
@@ -290,9 +310,12 @@ class QAdapter:
                 if plan['device_workspace_bytes'] > free-reserve:
                     raise MemoryError('完整粗网格定位器超过当前显存余量；需要更大显存设备或等价分层反向实现')
             def produce():
-                return prepare_inputs(entry,self.prepared['dataset'],block,
-                    guard=getattr(self,'training_guard',None),log_dir=Path(self.config['run_dir'])/self.stage,
-                    heartbeat_seconds=self.config['logging']['heartbeat_seconds'])
+                from .preparation import preparation
+                guard = getattr(self,'training_guard',None)
+                with preparation(self.config,guard,entry,stage=self.stage) as runtime:
+                    return prepare_inputs(entry,self.prepared['dataset'],block,
+                        guard=guard,log_dir=Path(self.config['run_dir'])/self.stage,
+                        heartbeat_seconds=self.config['logging']['heartbeat_seconds'],parallel=runtime)
             x,valid,heat,mask = self.training_cache.get(entry,produce,
                 int(np.prod(plan['pooled_shape'])*23)+65536)
             if not mask.any():

@@ -136,9 +136,14 @@ def pooled_block(entry, section, use_label):
             F.avg_pool3d(torch.from_numpy(valid)[None,None].float(),4,4)[0])
 
 
-def pooled_image(entry, block_bytes, *, use_label=False, guard=None):
+def pooled_image(entry, block_bytes, *, use_label=False, guard=None, parallel=None):
     grid = tuple(math.ceil(n/32)*8 for n in entry['image'].shape[1:])
     image,valid = torch.empty((1,*grid)),torch.empty((1,*grid))
+    if parallel is not None:
+        def consume(section,value):
+            image[(slice(None),*section)],valid[(slice(None),*section)] = value
+        parallel.sections(grid,(0,0,0),lambda section:pooled_block(entry,section,use_label),consume,per_voxel=16)
+        return image[None],valid[None]
     for section,amount,_,_ in planned_sections(grid,(0,0,0),block_bytes,guard,per_voxel=16):
         with boundary(guard,amount):
             x,mask = pooled_block(entry,section,use_label)
@@ -149,13 +154,22 @@ def pooled_image(entry, block_bytes, *, use_label=False, guard=None):
     return image[None],valid[None]
 
 
-def prepare_inputs(entry, dataset, block_bytes, *, guard=None, log_dir=None, heartbeat_seconds=15):
+def prepare_inputs(entry, dataset, block_bytes, *, guard=None, log_dir=None, heartbeat_seconds=15,parallel=None):
     shape = entry['label'].shape
     spacing = entry['processed_spacing']
     plan = input_plan(shape,spacing,block_bytes)
     grid = plan['pooled_shape']
     image,valid = np.empty((1,*grid),np.float32),np.empty((1,*grid),np.float32)
     heat,mask = np.empty((3,*grid),np.float32),np.empty((3,*grid),bool)
+    if parallel is not None:
+        def produce(section):
+            return (*pooled_block(entry,section,True),*target_block(entry,dataset,section,plan['halo']))
+        def consume(section,values):
+            x,validity,block_heat,block_mask = values
+            image[(slice(None),*section)],valid[(slice(None),*section)] = x.numpy(),validity.numpy()
+            heat[(slice(None),*section)],mask[(slice(None),*section)] = block_heat.numpy(),block_mask.numpy()
+        parallel.sections(grid,plan['halo'],produce,consume)
+        return tuple(torch.from_numpy(value)[None] for value in (image,valid,heat,mask))
     total = plan['blocks']
     began,last_log = perf_counter(),-float('inf')
     if log_dir is not None:

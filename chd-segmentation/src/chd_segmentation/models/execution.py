@@ -226,7 +226,8 @@ def rank_entry(rank,payload,common,allocation,gate,port):
             local_batch=allocation['shares'][rank],workers=allocation['supply']['workers'][rank],
             reserve_ram_bytes=common['resources']['reserve_ram_bytes'],
             cache_bytes=allocation['supply']['cache_bytes'][rank],
-            reader_slots=allocation['supply']['reader_slots'],prefetch=allocation['supply']['prefetch'],threads=1)
+            reader_slots=allocation['supply']['reader_slots'],prefetch=allocation['supply']['prefetch'],threads=1,
+            cpu_preparation=payload['config'].get('cpu_preparation',{}))
         with memory.admit(0, label='model_initialization') as ticket:
             if ticket is None:
                 raise RuntimeError('模型启动在取消或明确停止后结束，保留已有材料')

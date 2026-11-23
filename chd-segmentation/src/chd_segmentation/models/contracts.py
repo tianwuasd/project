@@ -3,7 +3,7 @@ from copy import deepcopy
 
 RUNTIME_FIELDS = {'run_dir','threads','dependency_root','official_root','execution','work_root',
     'device','logging','checkpoint_dir','attempt_ledger','save_every_updates','save_every_seconds','distributed_backend',
-    'training_cache','resume_budget'}
+    'training_cache','resume_budget','cpu_preparation'}
 INFERENCE_FIELDS = ('model','method','max_candidates','patch','local_size','frames','resolution','seed','gray_window')
 
 

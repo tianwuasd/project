@@ -81,6 +81,9 @@ def setup(root, code, seed, localizer_epochs=5, local_epochs=20, per_epoch=250):
             path = directory / name
             if path.exists() and read_json(path) != value:
                 previous = read_json(path)
+                for field in ('cpu_preparation','training_cache'):
+                    if field in previous and name in ('localizer.json','local.json'):
+                        value[field] = previous[field]
                 if name not in ('localizer.json','local.json'):
                     raise ValueError('已有Q配置与本次输入不同：' + str(path))
                 changed = {'updates','epochs','updates_per_epoch','validate_every','resume_budget'}
