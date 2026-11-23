@@ -35,6 +35,7 @@ class BlockExecution:
         self.activity_lock = threading.Lock()
         self.parallel_states = []
         self.current_threads = 1
+        self.thread_limit = self.ceiling
 
     def close(self):
         self.pool.shutdown(wait=True, cancel_futures=True)
@@ -123,12 +124,12 @@ class BlockExecution:
         now = perf_counter()
         if self.window_seconds >= self.settings["growth_seconds"]:
             previous = self.wanted
-            if self.last_rate is not None and len(jobs) > self.last_threads and rate < self.last_rate * .9:
-                self.wanted = max(1, self.last_threads)
+            if self.last_rate is not None and len(jobs) >= self.last_threads and rate < self.last_rate * .9:
+                self.wanted = max(1, self.last_threads if len(jobs) > self.last_threads else len(jobs) // 2)
                 self.cooldown_until = now + self.settings["growth_seconds"] * 4
             elif now >= self.cooldown_until:
                 self.last_threads, self.last_rate = len(jobs), rate
-                self.wanted = min(self.ceiling, len(jobs) * 2)
+                self.wanted = min(self.thread_limit, len(jobs) * 2)
             if self.settings["auto_blocks"]:
                 self.bytes = min(self.settings["max_block_bytes"], self.bytes * 2)
             self.last_adjust = now
@@ -138,7 +139,7 @@ class BlockExecution:
             self.adjustments = self.adjustments[-64:]
         return True
 
-    def _capacity(self):
+    def _capacity(self, *, block_bytes=None):
         facts, available = self._available()
         if facts["paused"]:
             self.workspace.release_pages()
@@ -146,17 +147,26 @@ class BlockExecution:
                 if ready is None:
                     raise MemoryError("病例等待已取消或按配置停止")
             facts, available = self._available()
-        threads = self.cpu.request(self.wanted)
+        minimum = min(4096, self.settings["block_bytes"])
+        memory_threads = self.ceiling
+        if block_bytes is not None:
+            # 先确定有效大块，再用剩余内存增加并发，避免线程增长挤小邻域计算块。
+            cap = max(minimum, min(block_bytes, available // 2))
+            memory_threads = max(1, available // (2 * cap))
+        requested = min(self.wanted, memory_threads)
+        threads = self.cpu.request(requested)
         while threads < 1:
             self._available()
             sleep(.25)
-            threads = self.cpu.request(self.wanted)
+            threads = self.cpu.request(requested)
+        self.thread_limit = max(1, min(self.ceiling, self.cpu.fair,
+                                      getattr(self.cpu, 'limit', self.cpu.fair), memory_threads))
         state = {"case_slots": self.cpu.slots, "granted_threads": threads, "fair_cap": self.cpu.fair}
         if not self.parallel_states or self.parallel_states[-1] != state:
             self.parallel_states.append(state)
             self.parallel_states = self.parallel_states[-64:]
-        minimum = min(4096, self.settings["block_bytes"])
-        cap = self.bytes if not self.settings["auto_blocks"] else min(self.bytes, max(minimum, available // (threads * 2)))
+        if block_bytes is None:
+            cap = self.bytes if not self.settings["auto_blocks"] else min(self.bytes, max(minimum, available // (threads * 2)))
         return threads, max(minimum, cap)
 
     def linear(self, shape, per_voxel, operation, label, extra=None, consume=None):

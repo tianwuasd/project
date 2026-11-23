@@ -57,6 +57,8 @@ def run(args,root,result):
         parallel_config = dict(config,cpu_preparation=dict(max_threads=2,block_bytes=minimum,
             max_block_bytes=minimum*2,growth_seconds=.01))
         retained = []
+        if args.block_priority:
+            check_block_priority(root,session,guard,config,entries[0],result)
         for entry in entries:
             began = perf_counter()
             expected = prepare_inputs(entry,'imagechd',2*2**30)
@@ -81,7 +83,7 @@ def run(args,root,result):
             for a,b in zip(pooled_image(entry,minimum),pooled):
                 torch.testing.assert_close(a,b,atol=0,rtol=0)
             np.testing.assert_array_equal(allowed(entry['label'],entry['unknown_classes'],'imagechd'),supports)
-            assert metrics['peak_case_threads']>1
+            assert 1<=metrics['peak_case_threads']<=2
             retained.append(actual)
             result['cases'].append(dict(case_id=entry['case_id'],shape=list(entry['label'].shape),
                 serial_seconds=serial_seconds,parallel_seconds=parallel_seconds,metrics=metrics,
@@ -89,6 +91,19 @@ def run(args,root,result):
         if args.preparation_only:
             check_resources(root,session,guard,parallel_config,entries[0],result)
             return
+        if args.block_priority:
+            from chd_segmentation.models.q_route1.training_cache import TrainingCache
+            cache = TrainingCache(dict(config,training_cache=dict(enabled=True)),prepared,'localizer')
+            calls = []
+            def produce():
+                calls.append(True)
+                return retained[0]
+            cached = cache.get(entries[0],produce,sum(v.numel()*v.element_size() for v in retained[0])+65536)
+            again = cache.get(entries[0],produce,sum(v.numel()*v.element_size() for v in retained[0])+65536)
+            assert len(calls)==1
+            for first,second in zip(cached,again):
+                torch.testing.assert_close(first,second,atol=0,rtol=0)
+            result['input_cache_reused'] = True
         locator = QAdapter(config,prepared,'localizer')
         optimizer = locator.optimizer()
         logits = locator.model.forward_pooled(*retained[0][:2])['logits']
@@ -142,6 +157,36 @@ def run(args,root,result):
     result['peak_rss_bytes'] = getattr(psutil.Process().memory_info(),'peak_wset',None)
 
 
+def check_block_priority(root,session,guard,config,entry,result):
+    with preparation(dict(config,cpu_preparation=dict(max_threads=32)),guard,entry) as runtime:
+        runner = runtime.executor
+        _,free = runner._available()
+        preferred = max(4096,free//4)
+        runner.wanted = 1
+        single = runner._capacity(block_bytes=preferred)
+        runner.wanted = 32
+        concurrent = runner._capacity(block_bytes=preferred)
+        assert single[1]==concurrent[1]==preferred
+        assert concurrent[0]*preferred*2<=free
+        with guard.client.reserve(free*3//4,purpose='real_block_priority_pressure',wait=False) as ticket:
+            assert ticket is not None
+            reduced = runner._capacity(block_bytes=preferred)
+        recovered = runner._capacity(block_bytes=preferred)
+        assert reduced[1]<preferred and recovered[1]==preferred
+        result['block_priority'] = dict(single=single,concurrent=concurrent,reduced=reduced,
+            recovered=recovered,free_bytes=free,thread_limit=runner.thread_limit)
+        copies = []
+        runner.wanted = 2
+        runtime.map(range(11),int(entry['label'].size*32),
+            lambda index:allowed(entry['label'],entry['unknown_classes'],'imagechd'),
+            lambda index,value:copies.append(value))
+        assert runner.max_active>1
+        for value in copies:
+            np.testing.assert_array_equal(value,copies[0])
+        result['parallel_real_support'] = runner.metrics()
+    assert not read_json(root/'resources/active.json')[0].get('model_cpu_claims')
+
+
 def check_resources(root,session,guard,parallel_config,entry,result):
     session._sample()
     with preparation(dict(parallel_config,cpu_preparation=dict(max_threads=2,block_bytes=2*2**30)),guard,entry) as runtime:
@@ -183,11 +228,15 @@ def main():
         parser.add_argument('--'+name,required=True)
     parser.add_argument('--zero-updates',action='store_true')
     parser.add_argument('--preparation-only',action='store_true')
+    parser.add_argument('--block-priority',action='store_true')
     args = parser.parse_args()
     if args.preparation_only:
         args.zero_updates = True
-    root = Path('D:/projects/back/t17/chd-q-cpu-parallel-20261123').resolve()
-    report = Path('D:/projects/back/sync-reports/chd-q-cpu-parallel-20261123')/('preparation-report.json' if args.preparation_only else 'zero-update-report.json' if args.zero_updates else 'report.json')
+    name = 'chd-q-block-priority-20261123' if args.block_priority else 'chd-q-cpu-parallel-20261123'
+    root = Path('D:/projects/back/t17')/name
+    report = Path('D:/projects/back/sync-reports')/name/('preparation-report.json' if args.preparation_only else 'zero-update-report.json' if args.zero_updates else 'report.json')
+    if args.block_priority and report.exists():
+        report = report.with_name('report-'+str(len(list(report.parent.glob('report*.json')))+1)+'.json')
     if root.exists():
         raise FileExistsError(root)
     root.mkdir(parents=True)
@@ -202,7 +251,7 @@ def main():
         result['state']='passed'
     finally:
         result['seconds']=perf_counter()-began
-        result['error']=str(sys.exception()) if sys.exception() else None
+        result['error']=repr(sys.exception()) if sys.exception() else None
         files = [p for p in root.rglob('*') if p.is_file()]
         assert len(files)<=100 and all(root in p.resolve().parents and not p.is_symlink() for p in files)
         amount = sum(p.stat().st_size for p in files)

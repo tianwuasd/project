@@ -53,7 +53,8 @@ class ModelCPU:
                         sum(r['cpu_slots'] for r in rows if r is not own))
             self.fair = max(0,cores//self.slots)
             spare = max(0,cores-base_slots-sum(max(0,r['threads']-1) for r in claims)+1)
-            granted = min(wanted,self.fair,spare)
+            self.limit = min(self.fair,spare)
+            granted = min(wanted,self.limit)
             if wanted:
                 claims.append(dict(self.member,threads=granted))
             own['model_cpu_claims'] = claims
@@ -121,8 +122,8 @@ class Preparation:
         runner._select_phase('q_prepare_blocks')
         done,total = 0,math.prod(shape)
         while pending:
-            threads,cap = runner._capacity()
             minimum = grid_plan((1,1,1),halo,runner.settings['max_block_bytes'],per_voxel)['minimum_workspace_bytes']
+            threads,cap = runner._capacity(block_bytes=max(minimum,runner.bytes))
             _,free = runner._available()
             threads = min(threads,max(1,free//max(1,2*minimum)))
             cap = max(cap,minimum)
@@ -181,8 +182,7 @@ class Preparation:
             self.report('small_items',total,total)
             return
         while pending:
-            threads,cap = runner._capacity()
-            threads = min(threads,max(1,cap*threads//amount))
+            threads,cap = runner._capacity(block_bytes=amount)
             jobs = [(pending.popleft(),amount,1) for _ in range(min(threads,len(pending)))]
             if not runner._apply(jobs,operation,'q_prepare_items',consume):
                 pending.extendleft(job[0] for job in reversed(jobs))
