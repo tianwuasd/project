@@ -409,37 +409,15 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 break
             attempt = claim_attempt(config, stage) if rank == 0 else None
             attempt = all_states(attempt)[0]
-            gate.start(rank,f'q-update:{update}',allocation['shares'],device)
-            dataset.mode,dataset.position = 'training',0
             optimizer.zero_grad(set_to_none=True)
-            if pressure(common,device,gate.ready,rank,f'q-update:{update}',memory,release=dataset.clear):
+            if pressure(common,device,gate.ready,rank,f'q-update:{update}',memory,release=dataset.clear,
+                        check_vram=stage!='localizer'):
                 reason = 'resource_pressure'
                 break
             bundle.schedule(optimizer,update)
-            loss_sum = 0.
-            for micro in range(allocation['shares'][rank]):
-                sample_started = perf_counter()
-                entry = bundle.sample(dataset,names,rng)
-                reservation = nullcontext()
-                if stage == 'localizer':
-                    from .q_route1.training_inputs import training_plan
-                    planned = training_plan(entry['label'].shape,entry['processed_spacing'],common['resources'])
-                    amount = planned['retained_bytes']+planned['backward_bytes']
-                    reservation = memory.admit(amount,label='q_localizer_training_case')
-                with reservation as ticket:
-                    if stage == 'localizer' and ticket is None:
-                        raise InterruptedError('定位器病例等待已取消')
-                    with torch.autocast(device.type,dtype=torch.bfloat16,enabled=config['precision']=='bf16'):
-                        loss = bundle.loss(entry,rng,update)
-                    if not torch.isfinite(loss):
-                        raise FloatingPointError('模型训练损失非有限')
-                    (loss/config['accumulation']).backward()
-                loss_sum += float(loss.detach())/config['accumulation']
-                del loss,entry
-                from ..observability.events import event
-                event(root,'model_sample_consumed',rank=rank,batch=update,position=micro,
-                    seconds=perf_counter()-sample_started,cuda_completion_checked_at='batch_boundary')
-            gate.finish(rank,f'q-update:{update}',device)
+            from .q_route1.training_retry import accumulate
+            loss_sum = accumulate(bundle,optimizer,dataset,names,rng,update,rank,allocation,
+                                  gate,device,memory,common)
             communication_started = perf_counter()
             synchronize_gradients(model)
             loss_sum = sum(all_states(loss_sum))
@@ -546,7 +524,7 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 feedback.update(done=update, new=update-resumed_update,
                     epoch=(update-1)//config['updates_per_epoch']+1,
                     step=(update-1)%config['updates_per_epoch']+1,
-                    pending=config['updates']-update, active=0,phase='当前更新已保存')
+                    pending=config['updates']-update, active=0,phase='当前更新已保存' if due else '优化器更新完成')
                 feedback.snapshot(force=True)
             if selection and selection['stop']:
                 reason = 'early_stopping'

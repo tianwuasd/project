@@ -148,11 +148,11 @@ def model_memory(common):
     return guard
 
 
-def pressure(common,device,ready,rank,phase,memory,release=None):
+def pressure(common,device,ready,rank,phase,memory,release=None,check_vram=True):
     r = common['resources']
     with memory.admit(0, label=phase, release=release) as ticket:
         low = ticket is None
-    if device.type=='cuda':
+    if device.type=='cuda' and check_vram:
         free,total = torch.cuda.mem_get_info(device)
         low |= free<max(r['vram_reserve_bytes'],total*r['vram_reserve_fraction'])
     ready.wait(rank, 'resource-ready:'+phase, device)

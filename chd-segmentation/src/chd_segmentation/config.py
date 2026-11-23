@@ -33,6 +33,7 @@ DEFAULTS = {
                   "memory_margin_fraction": 0.5,
                   "validation_block_bytes": 64 * 1024 ** 2,
                   "localizer_block_bytes": 2 * 1024 ** 3,
+                  "low_vram_block_bytes": 128 * 1024 ** 2,
                   "validation_auto_blocks": True, "validation_max_block_bytes": None,
                   "validation_storage": "auto",
                   "workers": "auto", "max_workers": 32, "prefetch": 2, "readers": "auto", "max_readers": 8,
@@ -196,6 +197,8 @@ def load_config(path, overrides=None):
 
 
 def validate_resources(r,batch):
+    if type(r.get('low_vram_block_bytes',128*1024**2)) is not int or r.get('low_vram_block_bytes',128*1024**2)<1:
+        raise ValueError('低显存卷积块预算需要正整数')
     from .acceleration.gpu_query import query_settings
     query_settings(r)
     block = r.get('validation_block_bytes', 64 * 1024 ** 2)

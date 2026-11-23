@@ -307,8 +307,11 @@ class QAdapter:
                 free,total = torch.cuda.mem_get_info(self.device)
                 reserve = max(settings.get('vram_reserve_bytes',4*2**30),
                               total*settings.get('vram_reserve_fraction',.1))
-                if plan['device_workspace_bytes'] > free-reserve:
-                    raise MemoryError('完整粗网格定位器超过当前显存余量；需要更大显存设备或等价分层反向实现')
+                event(Path(self.config['run_dir'])/self.stage,'q_vram_estimate',case_id=entry['case_id'],
+                    requested_bytes=plan['device_workspace_bytes'],free_bytes=free,total_bytes=total,
+                    reserved_bytes=torch.cuda.memory_reserved(self.device),
+                    allocated_bytes=torch.cuda.memory_allocated(self.device),reserve_bytes=int(reserve),
+                    exceeds_estimate=plan['device_workspace_bytes']>free-reserve,advisory_only=True)
             def produce():
                 from .preparation import preparation
                 guard = getattr(self,'training_guard',None)
@@ -320,6 +323,12 @@ class QAdapter:
                 int(np.prod(plan['pooled_shape'])*23)+65536)
             if not mask.any():
                 raise ValueError('定位器输入缺少可监督区域')
+            if getattr(self,'low_vram',False):
+                from .low_vram import OffloadedLocalizer
+                guard = getattr(self,'training_guard',None)
+                logits = OffloadedLocalizer(self.model,self.low_vram_block_bytes,
+                    guard.check_active if guard is not None else None).forward(x,valid)
+                return localizer_loss(logits,heat,mask)
             saved = torch.autograd.graph.save_on_cpu(pin_memory=False) if self.device.type=='cuda' else nullcontext()
             with saved:
                 logits = self.model.forward_pooled(x.to(self.device),valid.to(self.device))['logits'].float()
