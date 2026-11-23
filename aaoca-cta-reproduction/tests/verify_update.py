@@ -11,12 +11,11 @@ from time import perf_counter
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from update import shared_updater
+import update as updater
 
 
 def main():
     parser = argparse.ArgumentParser(description="实际GitHub提交的独立代码同步与清理；不读取病例")
-    parser.add_argument("--shared-updater", required=True)
     parser.add_argument("--base-sha", required=True)
     parser.add_argument("--sha", required=True)
     parser.add_argument("--branch", default="main")
@@ -26,7 +25,7 @@ def main():
                              check=True, capture_output=True).stdout.split(b"\0")
     source_files = [ROOT / name.decode("utf-8") for name in tracked if name]
     estimate_bytes = sum(p.stat().st_size for p in source_files) + 2 * 2**20
-    if len(source_files) + 32 > 60 or estimate_bytes > 20 * 2**20:
+    if len(source_files) + 32 > 96 or estimate_bytes > 20 * 2**20:
         raise OSError("实际源码数量加Git元数据预估超过本轮测试预算")
     task = Path(args.work).resolve()
     if task.exists():
@@ -42,7 +41,7 @@ def main():
 
         def budget():
             files = [p for p in task.rglob("*") if p.is_file()]
-            if len(files) > 60 or sum(p.stat().st_size for p in files) > 20 * 2**20:
+            if len(files) > 96 or sum(p.stat().st_size for p in files) > 20 * 2**20:
                 raise OSError("同步测试达到文件数或磁盘上限")
 
         def git(*command):
@@ -56,7 +55,6 @@ def main():
         git("fetch", "--depth=1", "--no-tags", "--filter=blob:none", "origin", args.base_sha)
         git("update-ref", "refs/heads/" + args.branch, args.base_sha)
         git("update-ref", "refs/remotes/origin/" + args.branch, args.base_sha)
-        updater = shared_updater(args.shared_updater)
         updater.BRANCH = args.branch
         repo = updater.GitRepository(code)
         repo.validate(force=True)
@@ -95,8 +93,8 @@ def main():
         shutil.rmtree(task)
         print(json.dumps({"state": "passed" if success else "failed", "cleanup": {"deleted_files": len(owned), "released_bytes": size,
                                       "task_directory_absent": not task.exists()}}), flush=True)
-        if len(owned) > 60 or size > 20 * 2**20:
-            raise OSError("同步测试超过本轮60文件或20MiB预算")
+        if len(owned) > 96 or size > 20 * 2**20:
+            raise OSError("同步测试超过本轮96文件或20MiB预算")
 
 
 if __name__ == "__main__":

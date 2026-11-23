@@ -1,5 +1,8 @@
 {
   "state_root": "/srv/research/course/aaoca-cta-reproduction",
+  "data_root": "/srv/research/data/aaoca-cta-reproduction",
+  "course_root": "/srv/research/course/aaoca-cta-reproduction",
+  "classification_recipe": "author_native_index",
   "aaoca_root": "/srv/research/data/AAOCA",
   "aaoca_pairs": "/srv/research/course/aaoca-cta-reproduction/inputs/aaoca_pairs.csv",
   "imagechd_root": "/srv/research/data/ImageCHD_dataset",

@@ -29,8 +29,6 @@ def bound_manifest(portable, config):
         seen.add(row["case_id"])
         if row["role"] not in {"candidate_train", "candidate_validation", "predict"}:
             raise ValueError("迁移清单含未知角色")
-        if row["dataset"] == "imagechd" and row["role"] != "predict":
-            raise ValueError("ImageCHD在本工程仅用于预测候选输入")
         patient = (row["dataset"], row["patient_key"])
         if patient in roles and roles[patient] != row["role"]:
             raise ValueError("同一患者不可分配到不同角色")
@@ -53,6 +51,9 @@ def bound_manifest(portable, config):
                 raise ValueError("迁移文件大小与冻结登记不一致")
             row[key], row["source_stat"][key] = str(target), stamp
         del row["expected_bytes"]
+    from .labels import validate_manifest
+
+    validate_manifest(result)
     return result
 
 
@@ -79,7 +80,7 @@ def export_inputs(config, manifest, server_root=None):
     else:
         if server_root is None or not PurePosixPath(server_root).is_absolute():
             raise ValueError("首次导出需要--server-root指定Linux服务器的绝对根目录")
-        for key in ("state_root", "aaoca_root", "aaoca_pairs", "imagechd_root", "imagechd_manifest"):
+        for key in ("state_root", "data_root", "course_root", "aaoca_root", "aaoca_pairs", "imagechd_root", "imagechd_manifest"):
             relative = PurePosixPath(settings[key]).relative_to("/srv/research")
             settings[key] = str(PurePosixPath(server_root) / relative)
         config_reused = save_frozen(config_path, settings)
