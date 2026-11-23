@@ -1,4 +1,4 @@
-# MedSAM3文本提示预测
+# MedSAM3医学LoRA微调与文本提示预测
 
 本模块对应论文《MedSAM3: Delving into Segment Anything with Medical Concepts》，作者仓库Joey-S-Liu/MedSAM3，固定提交84f43118b5b67b50abad81d7c946681ebb97dcda。使用本地SAM3基座和医学LoRA v1，保持作者的1008图像变换、逐文本前向、阈值、NMS及二值掩膜缩放语义。原始作者源码作为外部依赖，未复制到本工程。
 
@@ -11,9 +11,30 @@ python -B run.py models medsam3 predict --config PRIVATE_CONFIG --case CASE_ID -
 python -B run.py models medsam3 evaluate --config PRIVATE_CONFIG --case CASE_ID --output OUTPUT
 ```
 
-所有病例显式列出；多个病例重复--case。配置模板为configs/models/medsam3.yaml。该专用子入口不通过MedSAM2/Q训练分发，不继承旧模型的训练次数或豁免。没有MedSAM3训练入口。本次业务范围为文本提示预测及独立评价。
+所有病例显式列出；多个病例重复--case。基础配置模板为configs/models/medsam3.yaml。医学LoRA微调另使用configs/models/medsam3_finetune.yaml，包含check-training、train和validate入口；专用子入口不通过MedSAM2/Q训练分发，不继承旧模型的训练次数或豁免。
 
-当前只进行了源码语法和参数帮助检查；官方权重、隔离环境、真实前向、恢复、空间回写、公共资源会话和评价的端到端运行尚未验收。没有用无权重、模拟模块或伪造结果代替验证。依赖下载、安装及病例运行另需明确产物许可。
+当前通过了源码语法、六个命令的参数帮助和缺材料时的无模型/无目录写入检查；官方权重、隔离环境、真实前向、恢复、空间回写、公共资源会话和评价的端到端运行尚未验收。依赖下载、安装及病例运行另需明确产物许可。
+
+## 医学LoRA训练输入与恢复
+
+微调从base_config配置中的医学LoRA继续，保留rank16、alpha32及完整原生SAM3，训练dropout取官方full_lora_config.yaml。原模型参数冻结，只有lora_A/lora_B参与更新。损失沿用固定作者train_sam3_lora_native.py中的BinaryHungarianMatcherV2、分类/存在性、框L1/GIoU、掩膜focal/Dice及一对多匹配配置；每次更新处理一张切片，可含多个已知类别查询。多类别查询共享该片图像编码。作者入口：[固定版本训练源码](https://github.com/Joey-S-Liu/MedSAM3/blob/84f43118b5b67b50abad81d7c946681ebb97dcda/train_sam3_lora_native.py)。
+
+训练和验证病例名单显式指定，并保持冻结train/development角色及患者分离。直接读取已绑定原始清单，复用SourceReader的共享数组索引/作者间距核对，按基础配置coverage/slices选择切片。未知类别完全不生成训练查询；已知类别在某片缺如时保留该类别真实阴性查询，不要求每片阳性。语义标签按同类8邻域连通分量构造真实实例，框来自实例像素；不使用框或标签作为模型输入提示，文本来自固定类别映射。当前官方实例损失缺少像素忽略区域接口，遇到该区域明确终止，不将其作为背景监督。
+
+已有预处理路径可通过--prepared/--preprocessed-source指定登记JSON：format为medsam3_training_slices_v1，samples每项包含case_id、slice、file和source_stamp；file指向已有NPZ，其中rgb为uint8[H,W,3]、labels为整数[H,W]、valid为bool[H,W]。source_stamp含image、label各自的[字节数,mtime_ns]，必须对应既有源清单。已有RGB不重复窗化，官方1008变换仅在构造模型输入时执行；输入仍需保留原始来源登记。
+
+```text
+python -B run.py models medsam3 check-training --config PRIVATE_TRAIN_CONFIG
+python -B run.py models medsam3 train --config PRIVATE_TRAIN_CONFIG --stop-after 1 --deadline UNIX_SECONDS
+python -B run.py models medsam3 train --config PRIVATE_TRAIN_CONFIG --resume --stop-after 1 --deadline UNIX_SECONDS
+python -B run.py models medsam3 validate --config PRIVATE_TRAIN_CONFIG --checkpoint best --deadline UNIX_SECONDS
+```
+
+CPU按workers/prefetch有界预取真实切片；读取线程和Torch主线程合计受cpu_threads预算限制。训练必须显式选择CUDA，官方损失直接执行Triton内核。GPU按显式精度运行原生前向/反向，使用AdamW、warmup及cosine学习率。整机80%/项目100GB和显式ram_limit_bytes继续约束进程组；显存额度取配置上限与实际空闲扣除公共预留的较小值，至少保留1GiB。配置中的16GiB为上限，不代表实际分配或实测需求，不自动缩小模型或分辨率。
+
+每次完整更新原子保存latest.pt；验证平均官方损失改善时保存best.pt。检查点含全部医学LoRA张量、优化器、调度器、随机状态、更新位置、最佳值和来源身份。暂停边界保存latest，释放模型及优化器后等待，再从检查点真实恢复；固定deadline不续时。另保存latest_lora_weights.pt、best_lora_weights.pt，直接把其路径写入已有预测配置的lora_weights即可使用训练结果，其他输入和预测命令保持一致。
+
+训练检查点含优化器状态，容量大于仅推断LoRA；模板会保留best/latest及两份纯LoRA导出，实际测试前需按其总量申请产物范围。微调梯度、检查点恢复、CPU预取与GPU协同、训练后预测以及Linux训练均尚未实测，独立SAM3语义头的测试结论不用于本模块。
 
 ## 输入、空间和标签
 
@@ -51,3 +72,10 @@ coverage=all覆盖全部k；coverage=selected需要逐例指定零基切片索�
 - https://github.com/Joey-S-Liu/MedSAM3
 - https://huggingface.co/lal-Joey/MedSAM3_v1
 - https://huggingface.co/facebook/sam3
+## 医学LoRA微调接入记录（2026-11-23）
+
+目标：在现有独立分支，从现有MedSAM3-v1医学LoRA继续训练，复用原生SAM3完整图像模型、1008输入和官方检测/掩膜损失。保留现有预测入口及其他模型。
+
+实施步骤：①增加独立微调配置与check-training/train/validate入口；输入直接引用冻结病例清单、作者间距和可选已有切片NPZ；②使用官方Datapoint/collator、匹配器及分类/框/掩膜损失，未知类别不生成查询，真实阴性保留；出现像素忽略区域则明确拒绝该样本，避免将其当背景；③CPU有界读取与预取，GPU BF16，复用公共准入及暂停检查；④保存LoRA、优化器、随机状态、步数、最佳验证值和来源身份，原子写入latest/best，另导出兼容现有预测的纯LoRA权重；⑤退出续训及资源暂停后的恢复必须读取真实检查点；⑥只做无产物检查，材料补齐和1–2例有限真实训练另按具体范围取得许可。
+
+当前材料盘点：医学LoRA已存在；既定长期目录未发现原生sam3.pt。尚未发现符合MedSAM3现有numpy<2合同的专用解释器。共享解释器为NumPy2.4.4，缺少Triton、Decord、iopath、hydra-core、pycocotools、ftfy、huggingface-hub；官方检测/掩膜损失直接导入Triton，官方数据类直接导入Decord。实际环境必须通过这些原生模块导入与真实损失验证，当前未安装。本轮没有下载或转换权重，也没有修改共享环境。

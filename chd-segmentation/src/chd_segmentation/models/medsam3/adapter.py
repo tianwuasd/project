@@ -11,7 +11,7 @@ from .weights import import_official
 
 
 class MedSAM3Adapter:
-    def __init__(self, config):
+    def __init__(self, config, *, training=False):
         self.config = config
         official, lora, builder = import_official(config)
         self.official = official
@@ -27,7 +27,7 @@ class MedSAM3Adapter:
         # 使用本地基座及词表，显式禁止官方构建器联网下载。
         model = builder.build_sam3_image_model(
             device='cpu', checkpoint_path=None, load_from_HF=False,
-            bpe_path=config['bpe_path'], eval_mode=True, compile=False)
+            bpe_path=config['bpe_path'], eval_mode=not training, compile=False)
         state = torch.load(config['base_weights'], map_location='cpu', weights_only=True, mmap=True)
         state = state['model'] if 'model' in state else state
         detector = {key.removeprefix('detector.'): value for key, value in state.items()
@@ -35,7 +35,7 @@ class MedSAM3Adapter:
         model.load_state_dict(detector, strict=True)
         del detector, state
         settings = {key: value for key, value in raw.items() if key != 'dropout'}
-        model = lora.apply_lora_to_model(model, lora.LoRAConfig(**settings, dropout=0.))
+        model = lora.apply_lora_to_model(model, lora.LoRAConfig(**settings, dropout=raw['dropout'] if training else 0.))
         weights = torch.load(config['lora_weights'], map_location='cpu', weights_only=True)
         expected = {key for key in model.state_dict() if key.endswith(('.lora_A', '.lora_B'))}
         if not expected or set(weights) != expected:
@@ -44,7 +44,7 @@ class MedSAM3Adapter:
         if loaded.unexpected_keys or any(key in expected for key in loaded.missing_keys):
             raise ValueError('LoRA没有完整加载')
         del weights
-        self.model = model.to(self.device).eval()
+        self.model = model.to(self.device).train(training)
         self.transform = official.ComposeAPI(transforms=[
             official.RandomResizeAPI(sizes=1008, max_size=1008, square=True,
                                      consistent_transform=False),
