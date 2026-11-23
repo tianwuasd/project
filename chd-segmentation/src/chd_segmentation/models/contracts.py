@@ -2,7 +2,8 @@ from copy import deepcopy
 
 
 RUNTIME_FIELDS = {'run_dir','threads','dependency_root','official_root','execution','work_root',
-    'device','logging','checkpoint_dir','attempt_ledger','save_every_updates','save_every_seconds','distributed_backend'}
+    'device','logging','checkpoint_dir','attempt_ledger','save_every_updates','save_every_seconds','distributed_backend',
+    'training_cache','resume_budget'}
 INFERENCE_FIELDS = ('model','method','max_candidates','patch','local_size','frames','resolution','seed','gray_window')
 
 
@@ -17,7 +18,17 @@ def resume_contract(config,prepared,stage):
 
 
 def require_resume_contract(saved_config,saved_prepared,config,prepared,stage):
-    if resume_contract(saved_config,saved_prepared,stage)!=resume_contract(config,prepared,stage):
+    previous = resume_contract(saved_config,saved_prepared,stage)
+    current = resume_contract(config,prepared,stage)
+    if config['model']=='q_route1':
+        for value in (previous,current):
+            if value['settings'].get('updates_per_epoch') is None:
+                value['settings']['updates_per_epoch'] = 250
+    if config['model']=='q_route1' and config.get('resume_budget',False):
+        for value in (previous,current):
+            for key in ('updates','epochs','updates_per_epoch','validate_every'):
+                value['settings'].pop(key,None)
+    if previous!=current:
         raise ValueError('恢复的科学设置、训练验证划分或类别监督语义不同')
     return (saved_prepared['storage']!=prepared['storage'] or saved_prepared['plan']!=prepared['plan']
         or saved_prepared['technical']!=prepared['technical']

@@ -25,6 +25,10 @@ def options(path,overrides=None):
     raw = json.loads(content) if path.suffix.lower()=='.json' else yaml.safe_load(content)
     if overrides:
         overrides = deepcopy(overrides)
+        if 'epochs' in overrides and 'updates' not in overrides:
+            raw['updates'] = None
+        if 'updates' in overrides and 'epochs' not in overrides:
+            raw['epochs'] = None
         if 'global_batch' in overrides:
             overrides['accumulation' if raw['model']=='q_route1' else 'batch'] = overrides.pop('global_batch')
         if 'execution' in overrides:
@@ -43,10 +47,14 @@ def options(path,overrides=None):
                     work_root=None,execution={},logging=dict(heartbeat_seconds=15,case_details=True),
                     input_source={}, technical_roles={}, attempt_ledger=None, early_stopping={},
                     checkpoint_dir=None, updates_per_epoch=None, save_every_updates=250,
-                    save_every_seconds=300.,distributed_backend=None)
+                    save_every_seconds=300.,distributed_backend=None,training_cache={},resume_budget=False)
     if not isinstance(raw, dict) or set(raw)-set(defaults):
         raise ValueError('模型配置字段无效')
     config = {**defaults, **raw}
+    if type(config['resume_budget']) is not bool:
+        raise ValueError('resume_budget必须为布尔值')
+    from .q_route1.training_cache import cache_options
+    config['training_cache'] = cache_options(config['training_cache'])
     if config['technical'] and config['updates'] is None:
         config['updates'] = 2
     from ..training.stopping import selection_options
@@ -326,7 +334,8 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
     from ..observability.events import event
     feedback = Progress(dict(common,run_dir=str(root)),'train',total=config['updates'],unit='updates') if rank==0 else None
     if rank==0:
-        feedback.update(done=previous['update'] if previous else 0,phase='准备候选')
+        feedback.update(done=previous['update'] if previous else 0,phase='准备候选',
+            epoch=(previous['update'] if previous else 0)//config['updates_per_epoch']+1)
         feedback.snapshot(force=True)
         event(root,'model_candidates_started',stage=stage,cases=len(names))
     candidates_started = perf_counter()
@@ -461,9 +470,13 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                     peak_vram = max(peak_vram,observed['peak_vram_bytes'])
             update += 1
             if rank==0:
-                feedback.update(done=update,new=update-resumed_update,step=update,phase='优化器更新完成')
+                feedback.update(done=update,new=update-resumed_update,
+                    epoch=(update-1)//config['updates_per_epoch']+1,
+                    step=(update-1)%config['updates_per_epoch']+1,phase='优化器更新完成')
                 feedback.snapshot(force=True)
-            history.append(dict(update=update,loss=loss_sum,gradient_norm=float(norm),seconds=perf_counter()-mark))
+            history.append(dict(update=update,loss=loss_sum,gradient_norm=float(norm),seconds=perf_counter()-mark,
+                epoch=(update-1)//config['updates_per_epoch']+1,
+                step_in_epoch=(update-1)%config['updates_per_epoch']+1))
             improved = False
             if update%config['validate_every']==0 or update==config['updates'] or update==stop_after:
                 if config['technical']:
@@ -506,6 +519,10 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 spec=bundle.spec,training_cases=names,scope=prepared['scope'],best=best,
                 selection=selection, attempt=attempt)
             state.update(prepared=prepared,initialization_sha256=initial_sha)
+            if previous is not None and config.get('resume_budget'):
+                state['budget_migration'] = dict(previous_updates=previous['config']['updates'],
+                    requested_updates=config['updates'], resumed_update=previous['update'],
+                    epochs=config['epochs'],updates_per_epoch=config['updates_per_epoch'])
             if stage=='local':
                 state['parent_models'] = bundle.parent_models
             if rank==0 and due:
@@ -524,7 +541,9 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 saved_at = perf_counter()
             gate.ready.wait(rank,f'q-checkpoint-written:{update}',device)
             if rank == 0:
-                feedback.update(done=update, new=update-resumed_update, step=update,
+                feedback.update(done=update, new=update-resumed_update,
+                    epoch=(update-1)//config['updates_per_epoch']+1,
+                    step=(update-1)%config['updates_per_epoch']+1,
                     pending=config['updates']-update, active=0,phase='当前更新已保存')
                 feedback.snapshot(force=True)
             if selection and selection['stop']:

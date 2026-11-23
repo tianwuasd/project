@@ -37,13 +37,22 @@ def update_selection(state, metric, position, options):
 
 def resolve_budget(config, model, stage):
     if model == 'q_route1':
-        defaults = dict(base=40000, localizer=5000, local=20000)
+        defaults = dict(base=40000, localizer=1250, local=5000)
         updates = config.get('updates')
-        if config.get('epochs') is not None:
-            per_epoch = config.get('updates_per_epoch')
+        epochs = config.get('epochs')
+        per_epoch = config.get('updates_per_epoch')
+        if per_epoch is None:
+            per_epoch = 250
+        if type(per_epoch) is not int or per_epoch<1:
+            raise ValueError('Q的每轮更新数量必须为正整数')
+        if updates is None and epochs is None and stage!='base':
+            epochs = 5 if stage=='localizer' else 20
+        if epochs is not None:
+            if type(epochs) is not int or epochs < 1:
+                raise ValueError('Q的epoch数量必须为正整数')
             if type(per_epoch) is not int or per_epoch < 1:
-                raise ValueError('Q的epoch预算需要显式正整数updates_per_epoch')
-            converted = config['epochs'] * per_epoch
+                raise ValueError('Q的epoch预算需要正整数updates_per_epoch')
+            converted = epochs * per_epoch
             if updates is not None and updates != converted:
                 raise ValueError('Q的updates与epoch换算预算冲突')
             updates = converted
@@ -51,7 +60,7 @@ def resolve_budget(config, model, stage):
             updates = defaults[stage]
         if type(updates) is not int or updates < 1:
             raise ValueError('Q更新预算必须为正整数')
-        return dict(updates=updates, epochs=config.get('epochs'), unit='updates')
+        return dict(updates=updates, epochs=epochs, updates_per_epoch=per_epoch, unit='updates')
     epochs = config.get('epochs')
     if model == 'stunet' and epochs is None and not config.get('use_model_default', False):
         attempts = config.get('attempts', 1000)

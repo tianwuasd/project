@@ -109,6 +109,18 @@ class QAdapter:
             self.locator.load_state_dict(parents['localizer']['model'],strict=True)
             self.model = LocalNetwork(method=config['method'])
         self.model.to(self.device)
+        from .training_cache import TrainingCache
+        import hashlib
+        parents_key = None
+        if self.parent_models is not None:
+            checksum = hashlib.sha256()
+            for stage_name,state in sorted(self.parent_models.items()):
+                checksum.update(stage_name.encode())
+                for name,value in sorted(state['model'].items()):
+                    checksum.update(name.encode())
+                    checksum.update(value.detach().cpu().contiguous().reshape(-1).view(torch.uint8).numpy().tobytes())
+            parents_key = checksum.hexdigest()
+        self.training_cache = TrainingCache(config,prepared,stage,parents_key)
 
     def optimizer(self):
         groups = []
@@ -133,6 +145,8 @@ class QAdapter:
     def schedule(self,optimizer,update):
         warmup = 1000 if self.stage=='base' else 500
         total = {'base':40000,'localizer':5000,'local':20000}[self.stage] if self.config['technical'] else self.config['updates']
+        if total<=warmup:
+            warmup = max(1,total//10)
         factor = (update+1)/warmup if update<warmup else .01+.99*(1+np.cos(np.pi*(update-warmup)/(total-warmup)))/2
         for group in optimizer.param_groups:
             if 'peak_lr' not in group:
@@ -180,12 +194,24 @@ class QAdapter:
         if entry['case_id']==self.current_name:
             return self.current_frozen
         self.current_name,self.current_frozen = None,None
-        image = torch.from_numpy(entry['image'])[None]
-        probability = self.base_probability(entry)
-        located = self.locate(entry)
-        candidates = select_candidates(located['heatmap'][0].float().cpu().numpy(),image.shape[2:],[4,4,8],.2,.8)
+        from .candidates import Candidate
+        def produce():
+            probability = self.base_probability(entry)
+            located = self.locate(entry)
+            candidates = select_candidates(located['heatmap'][0].float().cpu().numpy(),entry['label'].shape,[4,4,8],.2,.8)
+            return dict(probability=probability,features=located['features'].float().cpu(),
+                        candidates=[asdict(value) for value in candidates])
+        amount = int(entry['image'].size*48)+2**20
+        guard = getattr(self,'training_guard',None)
+        retained = guard.admit(amount,label='q_frozen_cache_retained') if guard is not None else nullcontext(True)
+        with retained as ticket:
+            if ticket is None:
+                raise InterruptedError('冻结上游缓存内存等待已取消')
+            value = self.training_cache.get(entry,produce,amount)
+        probability,features = value['probability'],value['features']
+        candidates = [Candidate(**value) for value in value['candidates']]
         self.current_name = entry['case_id']
-        self.current_frozen = probability,located['features'].float().cpu(),candidates
+        self.current_frozen = probability,features,candidates
         return self.current_frozen
 
     def prepare_training(self,dataset,names):
@@ -214,6 +240,7 @@ class QAdapter:
             if self.config['logging']['case_details']:
                 event(Path(self.config['run_dir'])/self.stage,'q_candidates_completed',case_id=name,
                     cases_completed=completed,cases_total=len(names),candidates=len(candidates),records=len(records))
+            del probability,features
         self.sampler = CandidateSampler(records,self.config['seed'])
 
     def sample(self,dataset,names,rng):
@@ -262,9 +289,12 @@ class QAdapter:
                               total*settings.get('vram_reserve_fraction',.1))
                 if plan['device_workspace_bytes'] > free-reserve:
                     raise MemoryError('完整粗网格定位器超过当前显存余量；需要更大显存设备或等价分层反向实现')
-            x,valid,heat,mask = prepare_inputs(entry,self.prepared['dataset'],block,
-                guard=getattr(self,'training_guard',None),log_dir=Path(self.config['run_dir'])/self.stage,
-                heartbeat_seconds=self.config['logging']['heartbeat_seconds'])
+            def produce():
+                return prepare_inputs(entry,self.prepared['dataset'],block,
+                    guard=getattr(self,'training_guard',None),log_dir=Path(self.config['run_dir'])/self.stage,
+                    heartbeat_seconds=self.config['logging']['heartbeat_seconds'])
+            x,valid,heat,mask = self.training_cache.get(entry,produce,
+                int(np.prod(plan['pooled_shape'])*23)+65536)
             if not mask.any():
                 raise ValueError('定位器输入缺少可监督区域')
             saved = torch.autograd.graph.save_on_cpu(pin_memory=False) if self.device.type=='cuda' else nullcontext()

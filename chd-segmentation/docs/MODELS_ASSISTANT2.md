@@ -58,7 +58,7 @@ MedSAM2保存官方 `checkpoints/checkpoint.pt`，同一文件包含模型、优
 
 MedSAM2可在模型配置中显式设置distributed_backend: gloo。默认CPU选择Gloo、CUDA选择NCCL；库未提供所选后端时直接报告，不自动更换。Windows单卡CUDA/Gloo需在获准环境先做真实通信检查，参数级支持不表示完整模型或显存容量已验证。CPU预算包含最多3目标的计算图；本机16GiB范围的官方前向已因内存不足停止，完整训练与恢复仍需适当资源的实际验证。
 
-Q基座配置的updates填写40000，定位器填写5000，局部网络填写20000；正式累积次数为4。基座学习率预热1000次、其他阶段500次，之后采用r2余弦日程。局部前2000次只监督初始分割及q，后18000次加入三步求解。`method`支持M07及同监督M02；候选按真实错误、正确关键结构及其他候选分层，空层重新归一化，概率扰动比例为20%。`key_references`可登记候选与独立关键结构参考，没有该参考时不会将候选登记为已正确关键结构。候选抽样和扰动随机状态均保存恢复。
+Q基座预算为40000次更新；定位器默认5个epoch，局部网络默认20个epoch，每epoch默认250次更新，共1250/5000次。`--epochs`和`--updates-per-epoch`可以手动指定；直接使用`--updates`时按更新次数控制。正式累积次数为4。基座学习率预热1000次、其他阶段500次，之后采用r2余弦日程；总预算不超过预热长度时预热占总预算十分之一，至少一次。局部前2000次只监督初始分割及q，剩余更新加入三步求解。`method`支持M07及同监督M02；候选按真实错误、正确关键结构及其他候选分层，空层重新归一化，概率扰动比例为20%。`key_references`可登记候选与独立关键结构参考，没有该参考时不会将候选登记为已正确关键结构。候选抽样和扰动随机状态均保存恢复。缓存与已有成果接续见[Q的epoch与训练缓存](Q_EPOCHS_CACHE.md)。
 
 ```text
 python -B run.py models predict --config /path/to/q-local.yaml --prepared /path/to/prepared.json --checkpoint /path/to/q/local/best.pt --output /path/to/result/q

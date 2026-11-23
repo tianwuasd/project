@@ -5,7 +5,10 @@ device: cuda
 precision: fp32
 seed: 20261111
 technical: false
-updates: 5000
+epochs: 5
+updates_per_epoch: 250
+validate_every: 250
+resume_budget: true
 accumulation: 4
 patch: 128
 local_size: 128
