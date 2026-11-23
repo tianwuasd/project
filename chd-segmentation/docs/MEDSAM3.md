@@ -34,7 +34,7 @@ CPU按workers/prefetch有界预取真实切片；读取线程和Torch主线程�
 
 每次完整更新原子保存latest.pt；验证平均官方损失改善时保存best.pt。检查点含全部医学LoRA张量、优化器、调度器、随机状态、更新位置、最佳值和来源身份。暂停边界保存latest，释放模型及优化器后等待，再从检查点真实恢复；固定deadline不续时。另保存latest_lora_weights.pt、best_lora_weights.pt，直接把其路径写入已有预测配置的lora_weights即可使用训练结果，其他输入和预测命令保持一致。
 
-训练检查点含优化器状态，容量大于仅推断LoRA；模板会保留best/latest及两份纯LoRA导出，实际测试前需按其总量申请产物范围。微调梯度、检查点恢复、CPU预取与GPU协同、训练后预测以及Linux训练均尚未实测，独立SAM3语义头的测试结论不用于本模块。
+训练检查点含优化器状态，容量大于仅推断LoRA；模板会保留best/latest及两份纯LoRA导出，实际测试前需按其总量申请产物范围。Triton、Torch、Hugging Face、Matplotlib和CUDA缓存及临时文件均定向到该训练目录的runtime-cache子目录，纳入同一产物范围。微调梯度、检查点恢复、CPU预取与GPU协同、训练后预测以及Linux训练均尚未实测，独立SAM3语义头的测试结论不用于本模块。
 
 ## 输入、空间和标签
 

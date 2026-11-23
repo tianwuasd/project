@@ -7,6 +7,14 @@ def execute(payload, handle, gpus):
     root = Path(payload['config']['training']['run_dir'])
     stream = (root/'training.log').open('a', encoding='utf-8')
     sys.stdout = sys.stderr = stream
+    cache = root/'runtime-cache'
+    temporary = cache/'temporary'
+    temporary.mkdir(parents=True, exist_ok=True)
+    os.environ.update({key:str(cache/name) for key,name in {
+        'TRITON_CACHE_DIR':'triton', 'TORCHINDUCTOR_CACHE_DIR':'inductor',
+        'TORCH_HOME':'torch', 'HF_HOME':'huggingface', 'MPLCONFIGDIR':'matplotlib',
+        'XDG_CACHE_HOME':'xdg', 'CUDA_CACHE_PATH':'cuda',
+        'TMPDIR':'temporary', 'TMP':'temporary', 'TEMP':'temporary'}.items()})
     os.environ.update(HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1', PYTHONDONTWRITEBYTECODE='1')
     if gpus:
         os.environ['CUDA_VISIBLE_DEVICES'] = gpus[0]['uuid']
