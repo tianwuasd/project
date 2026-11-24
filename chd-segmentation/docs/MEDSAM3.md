@@ -13,7 +13,7 @@ python -B run.py models medsam3 evaluate --config PRIVATE_CONFIG --case CASE_ID 
 
 所有病例显式列出；多个病例重复--case。基础配置模板为configs/models/medsam3.yaml。医学LoRA微调另使用configs/models/medsam3_finetune.yaml，包含check-training、train和validate入口；专用子入口不通过MedSAM2/Q训练分发，不继承旧模型的训练次数或豁免。
 
-当前通过了源码语法、六个命令的参数帮助和缺材料时的无模型/无目录写入检查；官方权重、隔离环境、真实前向、恢复、空间回写、公共资源会话和评价的端到端运行尚未验收。依赖下载、安装及病例运行另需明确产物许可。
+当前通过了源码语法、六个命令的参数帮助、缺材料时的无模型/无目录写入检查，以及Windows独立Conda环境的真实依赖导入和原生接口检查。SAM3基座及医学LoRA文件已齐备；真实模型前向、训练更新、恢复、空间回写、公共资源会话和评价的端到端运行尚未验收。病例运行需按具体范围确认产物。
 
 ## 医学LoRA训练输入与恢复
 
@@ -78,4 +78,18 @@ coverage=all覆盖全部k；coverage=selected需要逐例指定零基切片索�
 
 实施步骤：①增加独立微调配置与check-training/train/validate入口；输入直接引用冻结病例清单、作者间距和可选已有切片NPZ；②使用官方Datapoint/collator、匹配器及分类/框/掩膜损失，未知类别不生成查询，真实阴性保留；出现像素忽略区域则明确拒绝该样本，避免将其当背景；③CPU有界读取与预取，GPU BF16，复用公共准入及暂停检查；④保存LoRA、优化器、随机状态、步数、最佳验证值和来源身份，原子写入latest/best，另导出兼容现有预测的纯LoRA权重；⑤退出续训及资源暂停后的恢复必须读取真实检查点；⑥只做无产物检查，材料补齐和1–2例有限真实训练另按具体范围取得许可。
 
-2026-11-24材料核对：医学LoRA与原生sam3.pt已齐备。原生权重大小3,450,062,241字节，SHA256为9999e2341ceef5e136daa386eecb55cb414446a00ac2b55eb2dfd2f7c3cf8c9e；用户提供文件及长期保存副本均与facebook/sam3固定版本3c879f39826c281e95690f02c7821c4de09afae7的官方文件记录一致，未进行权重格式转换。该核对确认文件完整性，模型加载及真实训练尚未验证。专用环境仍待准备和验证：需要numpy<2及Triton、Decord等原生依赖；官方检测/掩膜损失直接导入Triton，官方数据类直接导入Decord。本次未修改共享环境。
+2026-11-24材料核对：医学LoRA与原生sam3.pt已齐备。原生权重大小3,450,062,241字节，SHA256为9999e2341ceef5e136daa386eecb55cb414446a00ac2b55eb2dfd2f7c3cf8c9e；用户提供文件及长期保存副本均与facebook/sam3固定版本3c879f39826c281e95690f02c7821c4de09afae7的官方文件记录一致，未进行权重格式转换。该核对确认文件完整性，模型加载及真实训练尚未验证。
+
+## Windows独立Conda环境（2026-11-24）
+
+依赖清单为requirements-medsam3-windows.txt。已安装Python3.11.18、NumPy1.26.4、PyTorch2.9.1+cu126、torchvision0.24.1+cu126、triton-windows3.5.1.post24与Decord0.6.0，pip check通过。Triton采用维护者提供的Windows发行包，版本匹配依据为其[Windows说明](https://github.com/woct0rdho/triton-windows/tree/readme)。
+
+tests/verify_medsam3_environment.py实际导入固定作者的infer_sam、lora_layers、模型构建器、Datapoint/collator、匹配器和官方损失，检查实际依赖属于独立解释器，并确认CUDA可识别。本机该检查耗时16.54秒，病例读取0、训练更新0；未创建模型，未执行CUDA内核，不据此认定显存容量、真实损失反向或模型恢复已通过。
+
+```text
+conda create -n chd-medsam3 --override-channels -c conda-forge python=3.11 pip "vc14_runtime>=14.42"
+conda run -n chd-medsam3 python -m pip install --index-url https://pypi.org/simple -r requirements-medsam3-windows.txt
+conda run -n chd-medsam3 python -B tests/verify_medsam3_environment.py --official-root OFFICIAL_MEDSAM3_ROOT
+```
+
+私有运行配置中的python应指向该独立环境的解释器；共享研究环境和显卡驱动保持原配置。安装日志、完整版本清单和环境检查记录保存于私有安装目录；完成后清理本次专用安装缓存，保留可复用环境与记录。
