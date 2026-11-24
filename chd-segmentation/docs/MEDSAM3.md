@@ -78,4 +78,4 @@ coverage=all覆盖全部k；coverage=selected需要逐例指定零基切片索�
 
 实施步骤：①增加独立微调配置与check-training/train/validate入口；输入直接引用冻结病例清单、作者间距和可选已有切片NPZ；②使用官方Datapoint/collator、匹配器及分类/框/掩膜损失，未知类别不生成查询，真实阴性保留；出现像素忽略区域则明确拒绝该样本，避免将其当背景；③CPU有界读取与预取，GPU BF16，复用公共准入及暂停检查；④保存LoRA、优化器、随机状态、步数、最佳验证值和来源身份，原子写入latest/best，另导出兼容现有预测的纯LoRA权重；⑤退出续训及资源暂停后的恢复必须读取真实检查点；⑥只做无产物检查，材料补齐和1–2例有限真实训练另按具体范围取得许可。
 
-当前材料盘点：医学LoRA已存在；既定长期目录未发现原生sam3.pt。尚未发现符合MedSAM3现有numpy<2合同的专用解释器。共享解释器为NumPy2.4.4，缺少Triton、Decord、iopath、hydra-core、pycocotools、ftfy、huggingface-hub；官方检测/掩膜损失直接导入Triton，官方数据类直接导入Decord。实际环境必须通过这些原生模块导入与真实损失验证，当前未安装。本轮没有下载或转换权重，也没有修改共享环境。
+2026-11-24材料核对：医学LoRA与原生sam3.pt已齐备。原生权重大小3,450,062,241字节，SHA256为9999e2341ceef5e136daa386eecb55cb414446a00ac2b55eb2dfd2f7c3cf8c9e；用户提供文件及长期保存副本均与facebook/sam3固定版本3c879f39826c281e95690f02c7821c4de09afae7的官方文件记录一致，未进行权重格式转换。该核对确认文件完整性，模型加载及真实训练尚未验证。专用环境仍待准备和验证：需要numpy<2及Triton、Decord等原生依赖；官方检测/掩膜损失直接导入Triton，官方数据类直接导入Decord。本次未修改共享环境。
