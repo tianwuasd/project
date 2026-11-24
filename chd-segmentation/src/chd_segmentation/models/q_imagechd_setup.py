@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 
-BUDGETS = dict(base=40000, localizer=5000, local=20000)
+BUDGETS = dict(base=40000, localizer=1250, local=5000)
 
 
 def split_groups(manifest, seed):
@@ -31,9 +31,9 @@ def split_groups(manifest, seed):
     return groups
 
 
-def stage_config(root, directory, pretrained, stage, seed):
+def stage_config(root, directory, pretrained, stage, seed, localizer_epochs=5, local_epochs=20, per_epoch=250):
     run = root / 'course/chd-segmentation/runs/ImageCHD-Q-R2_fold0'
-    return dict(model='q_route1', run_dir=str(run),
+    result = dict(model='q_route1', run_dir=str(run),
                 work_root=str(root / 'course/chd-segmentation'), device='cuda',
                 precision='fp32', seed=seed, technical=False, updates=BUDGETS[stage],
                 accumulation=4, patch=128, local_size=128, learning_rate=.0002,
@@ -43,9 +43,13 @@ def stage_config(root, directory, pretrained, stage, seed):
                 if stage == 'local' else {},
                 execution=dict(gpu_count=2, min_gpus=2, workers=0, share=False,
                                wait_seconds=None))
+    if stage!='base':
+        result.update(updates=None,epochs=localizer_epochs if stage=='localizer' else local_epochs,
+                      updates_per_epoch=per_epoch,validate_every=per_epoch,resume_budget=True)
+    return result
 
 
-def setup(root, code, seed):
+def setup(root, code, seed, localizer_epochs=5, local_epochs=20, per_epoch=250):
     sys.path.insert(0, str(code / 'src'))
     from filelock import FileLock
     from chd_segmentation.artifacts.store import read_json, write_json
@@ -64,7 +68,8 @@ def setup(root, code, seed):
         raise FileNotFoundError(pretrained)
     directory = course / 'configs/ImageCHD-Q-R2_fold0'
     outputs = {'groups.json': groups, 'prepared.json': prepared}
-    outputs.update({stage + '.json': stage_config(root, directory, pretrained, stage, seed)
+    outputs.update({stage + '.json': stage_config(root, directory, pretrained, stage, seed,
+                    localizer_epochs,local_epochs,per_epoch)
                     for stage in BUDGETS})
     outputs['input.json'] = dict(stunet_run=str(course / 'runs/ImageCHD-STUNet-20261115_fold0'),
                                 prepared_identity=prepared['identity'], actual_recipe=actual,
@@ -75,23 +80,42 @@ def setup(root, code, seed):
         for name, value in outputs.items():
             path = directory / name
             if path.exists() and read_json(path) != value:
-                raise ValueError('已有Q配置与本次输入不同：' + str(path))
+                previous = read_json(path)
+                for field in ('cpu_preparation','training_cache'):
+                    if field in previous and name in ('localizer.json','local.json'):
+                        value[field] = previous[field]
+                if name not in ('localizer.json','local.json'):
+                    raise ValueError('已有Q配置与本次输入不同：' + str(path))
+                changed = {'updates','epochs','updates_per_epoch','validate_every','resume_budget'}
+                if {k:v for k,v in previous.items() if k not in changed} != {
+                        k:v for k,v in value.items() if k not in changed}:
+                    raise ValueError('已有Q配置包含其他手动设置，请通过models train入口接续：' + str(path))
         for name, value in outputs.items():
-            if not (directory / name).exists():
+            if not (directory / name).exists() or read_json(directory/name)!=value:
                 write_json(directory / name, value)
         for stage in BUDGETS:
             validated_q_groups(options(directory / (stage + '.json')), prepared)
     print(json.dumps(dict(config_directory=str(directory), groups={k: len(v) for k, v in groups.items()},
-                          reused_preprocessed_root=prepared['storage']['root'], budgets=BUDGETS),
+                          reused_preprocessed_root=prepared['storage']['root'],
+                          budgets=dict(base=40000,localizer=localizer_epochs*per_epoch,local=local_epochs*per_epoch),
+                          epochs=dict(localizer=localizer_epochs,local=local_epochs),updates_per_epoch=per_epoch),
                      ensure_ascii=False), flush=True)
     return directory
 
 
 def run_stages(root, code, directory):
     from chd_segmentation.artifacts.store import read_json
+    from chd_segmentation.models.workflow import options
+    from chd_segmentation.training.stopping import resolve_budget
 
     run = root / 'course/chd-segmentation/runs/ImageCHD-Q-R2_fold0'
-    for stage, updates in BUDGETS.items():
+    for stage in BUDGETS:
+        config = options(directory/(stage+'.json'))
+        updates = resolve_budget(config,'q_route1',stage)['updates']
+        summary = run/stage/'summary.json'
+        if summary.exists() and (run/stage/'best.pt').is_file() and read_json(summary)['update']>=updates:
+            print(json.dumps(dict(stage=stage,state='reused_completed',updates=read_json(summary)['update'])),flush=True)
+            continue
         command = [sys.executable, '-u', '-B', str(code / 'run.py'), 'models', 'train',
                    '--config', str(directory / (stage + '.json')),
                    '--prepared', str(directory / 'prepared.json'), '--stage', stage,
@@ -100,7 +124,7 @@ def run_stages(root, code, directory):
         if (run / stage / 'latest.pt').is_file():
             command.append('--resume')
         subprocess.run(command, check=True)
-        if read_json(run / stage / 'summary.json')['update'] != updates:
+        if read_json(run / stage / 'summary.json')['update'] < updates:
             raise RuntimeError('当前阶段尚未完成，停止后续阶段：' + stage)
 
 
@@ -147,13 +171,19 @@ def main():
     parser.add_argument('--seed', type=int, default=20261111)
     parser.add_argument('--run', action='store_true')
     parser.add_argument('--stop', action='store_true')
+    parser.add_argument('--localizer-epochs',type=int,default=5)
+    parser.add_argument('--local-epochs',type=int,default=20)
+    parser.add_argument('--updates-per-epoch',type=int,default=250)
     args = parser.parse_args()
     if args.run and args.stop:
         parser.error('--run与--stop不能同时使用')
     if args.stop:
         stop(args.root.resolve(), args.code.resolve())
         return
-    directory = setup(args.root.resolve(), args.code.resolve(), args.seed)
+    if min(args.localizer_epochs,args.local_epochs,args.updates_per_epoch)<1:
+        parser.error('epoch及每轮更新数量必须为正整数')
+    directory = setup(args.root.resolve(), args.code.resolve(), args.seed,
+                      args.localizer_epochs,args.local_epochs,args.updates_per_epoch)
     if args.run:
         run_stages(args.root.resolve(), args.code.resolve(), directory)
 

@@ -186,6 +186,8 @@ def _predict(config, prepared_path, checkpoint, output, case_ids=None, prompts=N
             checkpoint = str(snapshot)
         del state
         bundle.model.to(config['device']).eval()
+        if config['model']=='q_route1':
+            bundle.training_guard = memory
     dataset_prepared = selected_prepared(prepared,[row['case_id'] for row in rows])
     label_mode = prompt_mode == 'label-box'
     dataset = None

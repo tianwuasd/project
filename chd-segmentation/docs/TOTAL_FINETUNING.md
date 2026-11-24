@@ -53,6 +53,7 @@ export PYTHONPATH="$PWD/src"
 - `prepare` 读取既有冻结的 ImageCHD fold0 来源描述，按完整原始 HU 影像和已核实病例间距导出 NIfTI，空间单位写为毫米。重复准备时核对逐病例的来源、处理规则和已导出文件摘要，复用已完整导出的病例。冻结的训练和验证名单写入 nnU-Net 的 `splits_final.json`，原测试病例单独保存影像输入。训练病例生成 `dataset_fingerprint.json`，CT 归一化继续使用源计划的统计。目标输出头按 ImageCHD 的八个类别初始化，预先检查其他所有参数及缓冲区的键和形状。训练与推断均采用完整病例和 nnU-Net 自身的预处理，保留主动脉与肺动脉的可用视野。
 - `train` 默认等待两张空闲的 CUDA 卡并独占使用，全局批量4，每卡2个样本。默认200轮，每轮250次训练更新和50次验证迭代，初始学习率0.001。首次准备前可用 `epochs`、`batch`、`gpu_count`、`learning_rate` 调整训练，`gpu_ids` 可指定与卡数相同的设备索引或 UUID。`gpu_ids: null` 由资源管理器选择空闲设备。心肌未标注的病例继续使用既有部分标注损失，按有监督类别计算验证指标。
 - 中断后在 `train` 命令加 `--resume`。恢复前核验冻结来源、初始化权重、预处理计划、训练记录及检查点。训练目录保留 `checkpoint_latest.pth`、`checkpoint_best.pth`、`checkpoint_final.pth` 各自适用的状态。
+- nnU-Net的外部训练器目录固定为 `src/chd_segmentation/finetuning/nnunet_trainers`，仅包含训练器发现入口。入口按完整包名加载原 `total_trainer.py`，子进程继承项目 `src` 路径。加载入口不改变训练器实现及其准备数据签名，已完成的准备可以复用。可运行 `python -B tests/verify_total_trainer_discovery.py` 检查两个独立CPU进程的真实训练器发现，零训练更新，不生成测试文件。
 - `predict` 可选择验证集或测试集。使用微调后检查点的目标类别定义，输出对应 ImageCHD 类别编号及原始 NIfTI 几何。生成标准 `predictions.json`，可交给项目现有的 `evaluate` 命令，继续按有监督类别计算 Dice。完整病例预测按此命令单独启动。
 
 ## 输出位置

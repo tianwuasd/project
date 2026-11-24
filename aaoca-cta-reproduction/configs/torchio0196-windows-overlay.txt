@@ -1,0 +1,9 @@
+# 独立安装目录；复用已核查研究环境的其他依赖，不自动安装传递依赖。
+torchio==0.19.6
+Deprecated==1.2.14
+humanize==4.9.0
+typer==0.9.0
+click==8.1.7
+shellingham==1.5.4
+rich==13.7.1
+wrapt==1.16.0

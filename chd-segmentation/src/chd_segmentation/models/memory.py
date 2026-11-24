@@ -1,4 +1,5 @@
 import math
+from functools import lru_cache
 from pathlib import Path
 
 import nibabel as nib
@@ -8,6 +9,15 @@ from ..datasets.manifest import LABELS
 
 
 GIB=2**30
+
+
+@lru_cache(maxsize=1)
+def localizer_weight_bytes():
+    import torch
+    from .q_route1.localizer import Localizer
+    with torch.device('meta'):
+        model = Localizer()
+    return sum(value.numel()*value.element_size() for value in (*model.parameters(),*model.buffers()))
 
 
 def case_estimates(config,prepared,stage):
@@ -49,12 +59,21 @@ def case_estimates(config,prepared,stage):
             retained = max(voxels*6,stored['array_bytes']+stored['locations_bytes']) if stored is not None else voxels*6
             if stage=='base' and stored is not None:
                 retained = stored['locations_bytes'] + math.prod(config['training']['patch'])*16
+            localizer = None
+            if stage == 'localizer':
+                from .q_route1.training_inputs import training_plan
+                localizer = training_plan(target,spacing,config['resources'])
+                if stored is not None:
+                    case = 2*64*1024+stored['locations_bytes']*2
+                retained = localizer['retained_bytes']
             records.append(dict(case_id=row['case_id'],native_shape_xyz=input_shape.tolist(),working_shape=target.tolist(),
                 native_read_bytes=0 if stored is not None else native*32,working_bytes=working,workspace_bytes=case,
                 retained_case_bytes=retained, validation_workspace_bytes=bounded_validation if is_validation else 0,
                 is_validation=is_validation,
                 mapped_file_bytes=stored['array_bytes'] if stored is not None else 0,
                 rank_prediction_bytes=voxels*(11*32+288)+native*classes*8+original_voxels*2))
+            if localizer is not None:
+                records[-1].update(localizer=localizer)
         else:
             from ..data.input_binding import intensity_policy
             mode = intensity_policy(entry,config.get('input_source',{}))['mode'] if entry is not None else 'source_window'
@@ -101,6 +120,8 @@ def memory_profile(config,prepared,stage,shares,records=None):
         patch=math.prod(config['training']['patch'])
         # 无初始化权重的定位器和局部阶段按128MiB状态规划，包含其完整保存及历史余量。
         checkpoint_weight = (Path(config['pretrained']).stat().st_size if config['pretrained'] is not None else 128*2**20) if stage != 'prediction' else 0
+        if stage == 'localizer':
+            checkpoint_weight = localizer_weight_bytes()
         fixed=[GIB+4*checkpoint_weight+(patch*512*batch if config['resources']['device']=='cpu' and stage!='prediction' else 0)
                for batch in shares]
         queue_per_sample=patch*16
@@ -114,6 +135,11 @@ def memory_profile(config,prepared,stage,shares,records=None):
             rank_case=[max(training_prediction,validation) for _ in shares]
         elif stage=='base':
             rank_case=[validation for _ in shares]
+        elif stage == 'localizer':
+            backwards = max((row['localizer']['backward_bytes']+row['localizer']['workspace_bytes']
+                             for row in training),default=0)
+            validation_ranks = min(len(shares),sum(row['is_validation'] for row in records))
+            rank_case=[max(backwards,validation if rank<validation_ranks else 0) for rank in range(len(shares))]
         else:
             rank_case=[max(training_prediction//5,validation) for _ in shares]
     checkpoint = 0 if stage == 'prediction' else (6*Path(config['pretrained']).stat().st_size if config['model'] == 'medsam2' else 4*checkpoint_weight)+16*2**20

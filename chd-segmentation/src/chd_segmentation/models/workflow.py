@@ -1,4 +1,5 @@
 from copy import deepcopy
+from contextlib import nullcontext
 from dataclasses import asdict
 import json
 import os
@@ -24,6 +25,10 @@ def options(path,overrides=None):
     raw = json.loads(content) if path.suffix.lower()=='.json' else yaml.safe_load(content)
     if overrides:
         overrides = deepcopy(overrides)
+        if 'epochs' in overrides and 'updates' not in overrides:
+            raw['updates'] = None
+        if 'updates' in overrides and 'epochs' not in overrides:
+            raw['epochs'] = None
         if 'global_batch' in overrides:
             overrides['accumulation' if raw['model']=='q_route1' else 'batch'] = overrides.pop('global_batch')
         if 'execution' in overrides:
@@ -42,10 +47,16 @@ def options(path,overrides=None):
                     work_root=None,execution={},logging=dict(heartbeat_seconds=15,case_details=True),
                     input_source={}, technical_roles={}, attempt_ledger=None, early_stopping={},
                     checkpoint_dir=None, updates_per_epoch=None, save_every_updates=250,
-                    save_every_seconds=300.,distributed_backend=None)
+                    save_every_seconds=300.,distributed_backend=None,training_cache={},resume_budget=False,cpu_preparation={})
     if not isinstance(raw, dict) or set(raw)-set(defaults):
         raise ValueError('模型配置字段无效')
     config = {**defaults, **raw}
+    if type(config['resume_budget']) is not bool:
+        raise ValueError('resume_budget必须为布尔值')
+    from .q_route1.training_cache import cache_options
+    config['training_cache'] = cache_options(config['training_cache'])
+    from .q_route1.preparation import preparation_options
+    config['cpu_preparation'] = preparation_options(config['cpu_preparation'])
     if config['technical'] and config['updates'] is None:
         config['updates'] = 2
     from ..training.stopping import selection_options
@@ -312,6 +323,7 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
         source_changed = require_resume_contract(previous['config'],previous['prepared'],config,prepared,stage)
     bundle = adapter(dict(config,device=str(device),seed=seed+rank),prepared,stage,initialize=not resume,
         parent_states=previous.get('parent_models') if previous else None)
+    bundle.training_guard = memory
     model = bundle.model.to(device)
     model.train()
     optimizer = bundle.optimizer()
@@ -324,7 +336,8 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
     from ..observability.events import event
     feedback = Progress(dict(common,run_dir=str(root)),'train',total=config['updates'],unit='updates') if rank==0 else None
     if rank==0:
-        feedback.update(done=previous['update'] if previous else 0,phase='准备候选')
+        feedback.update(done=previous['update'] if previous else 0,phase='准备候选',
+            epoch=(previous['update'] if previous else 0)//config['updates_per_epoch']+1)
         feedback.snapshot(force=True)
         event(root,'model_candidates_started',stage=stage,cases=len(names))
     candidates_started = perf_counter()
@@ -396,28 +409,15 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 break
             attempt = claim_attempt(config, stage) if rank == 0 else None
             attempt = all_states(attempt)[0]
-            gate.start(rank,f'q-update:{update}',allocation['shares'],device)
-            dataset.mode,dataset.position = 'training',0
             optimizer.zero_grad(set_to_none=True)
-            if pressure(common,device,gate.ready,rank,f'q-update:{update}',memory,release=dataset.clear):
+            if pressure(common,device,gate.ready,rank,f'q-update:{update}',memory,release=dataset.clear,
+                        check_vram=stage!='localizer'):
                 reason = 'resource_pressure'
                 break
             bundle.schedule(optimizer,update)
-            loss_sum = 0.
-            for micro in range(allocation['shares'][rank]):
-                sample_started = perf_counter()
-                entry = bundle.sample(dataset,names,rng)
-                with torch.autocast(device.type,dtype=torch.bfloat16,enabled=config['precision']=='bf16'):
-                    loss = bundle.loss(entry,rng,update)
-                if not torch.isfinite(loss):
-                    raise FloatingPointError('模型训练损失非有限')
-                (loss/config['accumulation']).backward()
-                loss_sum += float(loss.detach())/config['accumulation']
-                del loss,entry
-                from ..observability.events import event
-                event(root,'model_sample_consumed',rank=rank,batch=update,position=micro,
-                    seconds=perf_counter()-sample_started,cuda_completion_checked_at='batch_boundary')
-            gate.finish(rank,f'q-update:{update}',device)
+            from .q_route1.training_retry import accumulate
+            loss_sum = accumulate(bundle,optimizer,dataset,names,rng,update,rank,allocation,
+                                  gate,device,memory,common)
             communication_started = perf_counter()
             synchronize_gradients(model)
             loss_sum = sum(all_states(loss_sum))
@@ -443,16 +443,20 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 if not replicas_equal:
                     raise ValueError('Q各进程更新后的模型参数不一致')
             if device.type=='cuda':
-                observed = rank_measurement(device,allocation,rank)
+                observed = rank_measurement(device,allocation,rank,common)
                 if observed['peak_vram_bytes'] is None:
                     vram_complete = False
                 else:
                     peak_vram = max(peak_vram,observed['peak_vram_bytes'])
             update += 1
             if rank==0:
-                feedback.update(done=update,new=update-resumed_update,step=update,phase='优化器更新完成')
+                feedback.update(done=update,new=update-resumed_update,
+                    epoch=(update-1)//config['updates_per_epoch']+1,
+                    step=(update-1)%config['updates_per_epoch']+1,phase='优化器更新完成')
                 feedback.snapshot(force=True)
-            history.append(dict(update=update,loss=loss_sum,gradient_norm=float(norm),seconds=perf_counter()-mark))
+            history.append(dict(update=update,loss=loss_sum,gradient_norm=float(norm),seconds=perf_counter()-mark,
+                epoch=(update-1)//config['updates_per_epoch']+1,
+                step_in_epoch=(update-1)%config['updates_per_epoch']+1))
             improved = False
             if update%config['validate_every']==0 or update==config['updates'] or update==stop_after:
                 if config['technical']:
@@ -495,6 +499,10 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 spec=bundle.spec,training_cases=names,scope=prepared['scope'],best=best,
                 selection=selection, attempt=attempt)
             state.update(prepared=prepared,initialization_sha256=initial_sha)
+            if previous is not None and config.get('resume_budget'):
+                state['budget_migration'] = dict(previous_updates=previous['config']['updates'],
+                    requested_updates=config['updates'], resumed_update=previous['update'],
+                    epochs=config['epochs'],updates_per_epoch=config['updates_per_epoch'])
             if stage=='local':
                 state['parent_models'] = bundle.parent_models
             if rank==0 and due:
@@ -513,13 +521,15 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 saved_at = perf_counter()
             gate.ready.wait(rank,f'q-checkpoint-written:{update}',device)
             if rank == 0:
-                feedback.update(done=update, new=update-resumed_update, step=update,
-                    pending=config['updates']-update, active=0,phase='当前更新已保存')
+                feedback.update(done=update, new=update-resumed_update,
+                    epoch=(update-1)//config['updates_per_epoch']+1,
+                    step=(update-1)%config['updates_per_epoch']+1,
+                    pending=config['updates']-update, active=0,phase='当前更新已保存' if due else '优化器更新完成')
                 feedback.snapshot(force=True)
             if selection and selection['stop']:
                 reason = 'early_stopping'
                 break
-        measurement = rank_measurement(device,allocation,rank)
+        measurement = rank_measurement(device,allocation,rank,common)
         if device.type=='cuda':
             if not vram_complete or measurement['peak_vram_bytes'] is None:
                 measurement.update(peak_vram_bytes=None,vram_complete=False)

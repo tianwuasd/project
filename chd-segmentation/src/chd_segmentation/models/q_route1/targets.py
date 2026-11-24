@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 
 
-def build_heatmap_targets(allowed, valid, spacing, radius=8., sigma=4.):
+def build_heatmap_targets(allowed, valid, spacing, radius=8., sigma=4., source_region=None):
     if allowed.shape[0] != 11 or allowed.dtype != bool or valid.dtype != bool:
         raise ValueError('定位监督需要11类允许集合和有效视野')
     if len(spacing) != 3 or min(spacing) <= 0:
@@ -28,6 +28,13 @@ def build_heatmap_targets(allowed, valid, spacing, radius=8., sigma=4.):
         else:
             dist = distance(classes)
             target = np.exp(-dist**2/(2*sigma*sigma))*(dist<=radius)
+        if source_region is not None:
+            for axis,(begin,end) in enumerate(source_region):
+                selection = [slice(None)]*3
+                selection[axis] = slice(0,begin)
+                target[tuple(selection)] = 0
+                selection[axis] = slice(end,None)
+                target[tuple(selection)] = 0
         maps.append(target.astype(np.float32))
         masks.append(reliable)
     target = torch.from_numpy(np.stack(maps))[None]

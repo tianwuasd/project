@@ -32,6 +32,8 @@ DEFAULTS = {
                   "reserve_ram_bytes": 4 * 1024 ** 3, "cpu_fraction": 0.8, "ram_fraction": 0.8,
                   "memory_margin_fraction": 0.5,
                   "validation_block_bytes": 64 * 1024 ** 2,
+                  "localizer_block_bytes": 2 * 1024 ** 3,
+                  "low_vram_block_bytes": 128 * 1024 ** 2,
                   "validation_auto_blocks": True, "validation_max_block_bytes": None,
                   "validation_storage": "auto",
                   "workers": "auto", "max_workers": 32, "prefetch": 2, "readers": "auto", "max_readers": 8,
@@ -195,6 +197,8 @@ def load_config(path, overrides=None):
 
 
 def validate_resources(r,batch):
+    if type(r.get('low_vram_block_bytes',128*1024**2)) is not int or r.get('low_vram_block_bytes',128*1024**2)<1:
+        raise ValueError('低显存卷积块预算需要正整数')
     from .acceleration.gpu_query import query_settings
     query_settings(r)
     block = r.get('validation_block_bytes', 64 * 1024 ** 2)
@@ -203,6 +207,9 @@ def validate_resources(r,batch):
     maximum = r.get('validation_max_block_bytes')
     if maximum is not None and (type(maximum) is not int or not block <= maximum <= r['memory_limit_bytes']):
         raise ValueError('验证最大块预算必须不小于起始块且不超过项目内存上限')
+    localizer_block = r.get('localizer_block_bytes', 2 * 1024 ** 3)
+    if type(localizer_block) is not int or localizer_block < 1024**2:
+        raise ValueError('定位器块预算必须是至少1MiB的整数字节数')
     if type(r.get('validation_auto_blocks', True)) is not bool or r.get('validation_storage', 'auto') not in ('auto', 'memory', 'disk'):
         raise ValueError('验证自动分块开关或存储方式无效')
     margin = r['memory_margin_fraction']

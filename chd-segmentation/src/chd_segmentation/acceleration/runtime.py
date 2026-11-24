@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from copy import deepcopy
 import multiprocessing as mp
 import os
+import sys
 from pathlib import Path
 from threading import Event, RLock
 from time import monotonic, sleep
@@ -95,6 +96,9 @@ class ResourceSession:
                 path = root / 'active.json'
                 rows = [row for row in (read_json(path) if path.exists() else []) if alive(row)]
                 peers = [row for row in rows if row['pid'] != self.owner['pid'] or row['birth'] != self.owner['birth']]
+                cpu_claims = [claim for row in rows if row not in peers
+                              for claim in row.get('model_cpu_claims',[]) if alive(claim)]
+                preparation_slots = sum(max(0,claim['threads']-1) for claim in cpu_claims)
                 limit = memory_ceiling(r, facts)
                 project = project_usage(peers, r)
                 pending = sum(max(0, row.get('ram_bytes', 0)-row.get('rss_bytes', 0)) for row in peers)
@@ -107,7 +111,7 @@ class ResourceSession:
                     with self.condition:
                         occupied += self.state.get('unrealized_bytes',0)
                 cpu_available = max(0, int(facts['cores']*r.get('cpu_fraction', .8))-
-                                    sum(row.get('cpu_slots', 0) for row in peers))
+                                    sum(row.get('cpu_slots', 0) for row in peers)-preparation_slots)
                 budget = min(limit-project,current+headroom-pending)
                 peak_path = root/'gpu-peaks.json'
                 peaks = read_json(peak_path) if observed is not None and peak_path.is_file() else {}
@@ -123,7 +127,8 @@ class ResourceSession:
                     applied_layout = self._layout(plan['layout'])
                     generation = self.state['plan_generation']+1 if hasattr(self,'state') else 0
                     rows = peers + [{**self.owner, 'members': list(self.members.values()) if hasattr(self,'members') else [],
-                        'ram_bytes': amount, 'rss_bytes': current, 'cpu_slots': cpu_slots,
+                        'ram_bytes': amount, 'rss_bytes': current, 'cpu_slots': cpu_slots+preparation_slots,
+                        'model_cpu_claims':cpu_claims,
                         'uuids': [g['uuid'] for g in gpus], 'memory_limit_bytes': limit,
                         'memory_policy': r.get('memory_policy', 'project_limit'),
                         'layout': applied_layout, 'reader_slots': selected.reader_slots,
@@ -184,10 +189,10 @@ class ResourceSession:
             members = list(self.members.values())
             rss = sum(psutil.Process(m['pid']).memory_info().rss for m in members if alive(m))
             r = self.request.resources
-            spare, _ = system_headroom(facts, host_fraction(r), r.get('reserve_ram_bytes', 4*2**30))
+            spare, scopes = system_headroom(facts, host_fraction(r), r.get('reserve_ram_bytes', 4*2**30))
             root = Path(self.request.registry_root)
             if not hasattr(self, 'last_registry') or monotonic()-self.last_registry >= 5.:
-                with FileLock(str(root / '.resource.lock')):
+                with FileLock(str(root / '.resource.lock'), timeout=10):
                     self.rows = [row for row in read_json(root/'active.json') if alive(row)]
                     own = next(row for row in self.rows if row['pid']==self.owner['pid'] and row['birth']==self.owner['birth'])
                     own.update(rss_bytes=rss, members=[m for m in members if m != self.owner])
@@ -199,15 +204,26 @@ class ResourceSession:
             pending = sum(max(0, row.get('ram_bytes', 0)-row.get('rss_bytes', 0)) for row in self.rows)
             limit = memory_ceiling(r, facts)
             limited_project = project_usage(self.rows, r)
+            pressure = []
+            if spare-pending < 0:
+                pressure.append('host_reservation_headroom')
+            if limited_project > limit:
+                pressure.append('project_limit')
+            if rss > self.capacity:
+                pressure.append('task_capacity')
             with self.condition:
                 fixed_rss = sum(m.get('baseline_rss',0) for m in members if alive(m))
                 reconcile(self.state,rss,fixed_rss)
                 self.state.update(sampled_at=datetime.now(timezone.utc).isoformat(), sampled_monotonic=monotonic(),
                     host=facts, project_bytes=project,
+                    system_headroom_bytes=spare,pending_bytes=pending,
+                    limited_project_bytes=limited_project,project_limit_bytes=limit,
+                    memory_scopes=[dict(scope=row['scope'] if row['scope'] in ('physical','windows_job','windows_process') else 'cgroup',
+                        **{key:value for key,value in row.items() if key!='scope'}) for row in scopes[:16]],
                     headroom=max(0, min(self.capacity-rss, spare-pending+max(0,self.capacity-rss))),
                     task_rss=rss, peak_task_rss=max(rss,self.state.get('peak_task_rss',0)),
                     fixed_rss=fixed_rss,
-                    paused=spare-pending<0 or limited_project>limit or rss>self.capacity,
+                    paused=bool(pressure), pressure_reasons=pressure,
                     sampling_seconds=monotonic()-began)
                 self.condition.notify_all()
 
@@ -220,6 +236,9 @@ class ResourceSession:
             while not self.stopping.wait(1.):
                 self._sample()
         finally:
+            error = sys.exception()
+            if error is not None:
+                self.state['monitor_error'] = dict(type=type(error).__name__, message=str(error))
             self.state['monitor_failed'] = not self.stopping.is_set()
 
     def __enter__(self):
@@ -237,6 +256,7 @@ class ResourceSession:
             cpu_slots=self.cpu_slots,gpus=self.gpus,world=self.world,shares=self.shares,
             precision=self.request.resources.get('precision'))
         self.state.update(claims={},unrealized_bytes=0,waiting={})
+        self.state['diagnostics_dir'] = str(self.request.run_dir)
         manager_member = identity(psutil.Process(self.manager._process.pid))
         manager_member['baseline_rss'] = psutil.Process(manager_member['pid']).memory_info().rss
         self.members = self.manager.dict({self.owner['pid']: self.owner, manager_member['pid']: manager_member})
@@ -328,10 +348,10 @@ class ResourceSession:
         self.stopping.set()
         self.executor.shutdown(wait=True)
         root = Path(self.request.registry_root)
-        with FileLock(str(root/'.resource.lock')):
-            rows = read_json(root/'active.json')
-            write_json(root/'active.json', [r for r in rows if r['pid']!=self.owner['pid'] or r['birth']!=self.owner['birth']], durable=False)
         try:
+            with FileLock(str(root/'.resource.lock'), timeout=10):
+                rows = read_json(root/'active.json')
+                write_json(root/'active.json', [r for r in rows if r['pid']!=self.owner['pid'] or r['birth']!=self.owner['birth']], durable=False)
             self.future.result()
         finally:
             self.manager.shutdown()

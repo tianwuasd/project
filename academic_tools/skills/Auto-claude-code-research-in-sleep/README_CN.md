@@ -14,6 +14,16 @@
 
 📦 *上面是直接安装 skills 的用法。想一条命令装好?ARIS 也提供独立 CLI 和插件:* [![ARIS-Code CLI 下载量](https://img.shields.io/github/downloads/wanshuiyin/Auto-claude-code-research-in-sleep/total?style=flat&logo=rust&logoColor=white&label=ARIS-Code%20%E7%8B%AC%E7%AB%8B%20CLI&color=2E7D32)](docs/ARIS-Code-README_CN.md) · [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757?style=flat&logo=anthropic&logoColor=white)](#plugins) · [![Codex CLI plugin](https://img.shields.io/badge/Codex_CLI-plugin-000000?style=flat&logo=openai&logoColor=white)](#plugins) · [![DeepSeek Harness plugin](https://img.shields.io/badge/DeepSeek_Harness-dsh--aris-4D6BFE?style=flat)](https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/blob/dsh-aris/README_CN.md)
 
+**🤝 SuperARIS：你的个人科研 Agent，背后有一支持续协作的团队。**
+
+把 ARIS 工作流交给一支常驻团队：主 Agent 统筹，工程与写作并行，每位成员都能按需读取 ARIS 技能与项目上下文。直接与 Codex 推进实验、与 Gemini 讨论和写作，也可以使用全 Codex 团队。主 Agent 主动跟进交付，项目文件承载跨会话记忆；现有的临时 MCP worker 和独立 reviewer 继续参与协作。
+
+**[项目主页](https://wanshuiyin.github.io/SuperARIS/) · [GitHub](https://github.com/wanshuiyin/SuperARIS)**
+
+[![SuperARIS 演示：个人科研 Agent 与常驻协作团队](https://raw.githubusercontent.com/wanshuiyin/SuperARIS/main/assets/demo-zh.gif)](https://wanshuiyin.github.io/SuperARIS/media/demo-zh.mp4)
+
+*演示预览 · 点击观看 1080p 高清视频（约 21 秒）。*
+
 ❗ ![IMPORTANT](https://img.shields.io/badge/IMPORTANT-red?style=flat-square) **codex-cli 0.154.0 删掉了 `codex mcp-server`——ARIS 所有审稿调用原来都走这个入口。对 ARIS 没有任何影响：** `codex` MCP 现在是 ARIS 自己用 `codex exec` 复写的桥接（`mcp-servers/codex-exec/`），工具名、返回形状一模一样，82 个 skill 零改动，`ultra` 档和按线程续聊都在。只需重新注册一次——**[已经装了？→ 快速开始 2b 步](#quick-start)** · **[新装 → 第 2 步](#quick-start)** · [更新说明](#whats-new)。
 
 **🧩 ARIS 家族** —— 同一套方法,干别的活。每个一行,细节在各自仓库。
@@ -204,6 +214,8 @@ ARIS 读论文 → 找弱点 → 克隆代码 → 针对*那些*弱点用*那套
 ## 2. 📢 最近更新
 
 > ⚠️ ARIS 内置 skills 更新：运行 `bash tools/smart_update.sh --apply`（Codex 用 `smart_update_codex.sh`）；外部组件按对应条目的安装说明准备。
+
+- **2026-11-04** — 🔎 **社区项目推荐：Absent Author**——面向 AI 辅助论文的证据目录与作者自查、审稿检查技能，帮助研究者在投稿前核对主张与证据，也为审稿人提供可核查的问题线索。[详细介绍 →](#absent-author)
 
 - **2026-11-01** — ⏱️ **Codex Goal 效率提醒 Goal Pulse**——复用 [HERO 的 Goal Pulse](https://github.com/wanshuiyin/HERO-Anti-OverDefense/tree/main/skills/goal-pulse)，每 30 分钟以中英双语提醒主代理推进长任务。用户启动、恢复 Goal，或主代理接手 active Goal 时，默认读取并为当前线程启用，无需另外点名。支持兼容 Codex app-server 的 macOS/Linux 环境；[安装与行为说明](skills/skills-codex/README.md#goal-pulse-for-codex-goals)，唯一实现由 HERO 维护。
 
@@ -663,7 +675,7 @@ ARIS 全流程完成并进入投稿/审稿阶段的真实项目。**所列分数
 
 🎉 **社区 Skills（13 个）：** [research-refine](skills/research-refine/SKILL.md) · [experiment-plan](skills/experiment-plan/SKILL.md) · [research-refine-pipeline](skills/research-refine-pipeline/SKILL.md) · [grant-proposal](skills/grant-proposal/SKILL.md) · [paper-poster](skills/paper-poster/SKILL.md) (deprecated → [paper-poster-html](skills/paper-poster-html/SKILL.md)) · [paper-slides](skills/paper-slides/SKILL.md) · [mermaid-diagram](skills/mermaid-diagram/SKILL.md) · [proof-writer](skills/proof-writer/SKILL.md) · [comm-lit-review](skills/comm-lit-review/SKILL.md) · [dse-loop](skills/dse-loop/SKILL.md) · [idea-discovery-robot](skills/idea-discovery-robot/SKILL.md) · [paper-illustration](skills/paper-illustration/SKILL.md) · [skills-codex](skills/skills-codex/)
 
-🌐 **外部项目 & 文档（14 个）：** [rosetta](https://github.com/SyntaxSmith/rosetta) · [open-source-hardening-skills](https://github.com/zeyuzhangzyz/open-source-hardening-skills) · [CitationClaw](https://github.com/VisionXLab/CitationClaw) · [auto-hparam-tuning](https://github.com/zxh0916/auto-hparam-tuning) · [paper-to-course](https://github.com/KaguraTart/paper-to-course) · [deep-research-skills](https://github.com/Weizhena/deep-research-skills) · [Antigravity 适配指南](docs/ANTIGRAVITY_ADAPTATION_CN.md) · [OpenClaw 适配指南](docs/OPENCLAW_ADAPTATION.md) · [Cursor 适配指南](docs/CURSOR_ADAPTATION.md) · [Trae 适配指南](docs/TRAE_ARIS_RUNBOOK_CN.md) · [posterly](https://github.com/Chenruishuo/posterly) · [Claude Fleet](https://github.com/tianyilt/claude-fleet) · [anti-defensive-writing-Skill](https://github.com/Adkid-Zephyr/anti-defensive-writing-Skill) · [OrcaReplay](https://github.com/Continuum-AI-Corp/OrcaReplay)
+🌐 **外部项目 & 文档（15 个）：** [Absent Author](#absent-author) · [rosetta](https://github.com/SyntaxSmith/rosetta) · [open-source-hardening-skills](https://github.com/zeyuzhangzyz/open-source-hardening-skills) · [CitationClaw](https://github.com/VisionXLab/CitationClaw) · [auto-hparam-tuning](https://github.com/zxh0916/auto-hparam-tuning) · [paper-to-course](https://github.com/KaguraTart/paper-to-course) · [deep-research-skills](https://github.com/Weizhena/deep-research-skills) · [Antigravity 适配指南](docs/ANTIGRAVITY_ADAPTATION_CN.md) · [OpenClaw 适配指南](docs/OPENCLAW_ADAPTATION.md) · [Cursor 适配指南](docs/CURSOR_ADAPTATION.md) · [Trae 适配指南](docs/TRAE_ARIS_RUNBOOK_CN.md) · [posterly](https://github.com/Chenruishuo/posterly) · [Claude Fleet](https://github.com/tianyilt/claude-fleet) · [anti-defensive-writing-Skill](https://github.com/Adkid-Zephyr/anti-defensive-writing-Skill) · [OrcaReplay](https://github.com/Continuum-AI-Corp/OrcaReplay)
 
 > 🙌 感谢每一位贡献者！为了 README 的可读性，下方表格折叠展示——但每个 skill 和项目都同样珍贵。欢迎 PR！
 
@@ -689,10 +701,11 @@ ARIS 全流程完成并进入投稿/审稿阶段的真实项目。**所列分数
 </details>
 
 <details>
-<summary><b>🌐 外部项目 & 文档（14 个）</b> — 点击展开</summary>
+<summary><b>🌐 外部项目 & 文档（15 个）</b> — 点击展开</summary>
 
 | 名称 | 领域 | 描述 |
 |------|------|------|
+| 🔎 [Absent Author](https://github.com/THUROI0787/absent-author) | 论文审读 / 作者责任 | 带来源的证据目录与作者自查、审稿检查技能，关注研究把关、结果核验与写作质量。[详细介绍 →](#absent-author) |
 | 🪨 [rosetta](https://github.com/SyntaxSmith/rosetta) | Pro 级 ChatGPT MCP | Node 程序化访问 **ChatGPT Pro / `gpt-5.5-pro` / DeepResearch**——通过 Chrome CDP Fetch 拦截 + WebSocket second-leg streaming 实现。自带 MCP server（Claude Code / Codex / Cline），是 Oracle MCP 在 `— reviewer: oracle-pro` 高 tier review 上的另一种实现路径。支持多轮对话、并发、live token deltas、15 分钟 idle-timeout watchdog（长 Pro thinking 不会被误杀）。MIT，by [@SyntaxSmith](https://github.com/SyntaxSmith) |
 | 📣 [anti-defensive-writing-Skill](https://github.com/Adkid-Zephyr/anti-defensive-writing-Skill) | 发布会写作原则 | 「论文是发布会,不是工作汇报」:十二条反防御性写作规则——围绕最强优势组织、只打赢得了的比赛、每个实验都有论证职责、禁用自我削弱表达。Skill(中/英)+ 复制即用提示词。其中四条已并入 ARIS 写作契约。MIT,by [@Adkid-Zephyr](https://github.com/Adkid-Zephyr) |
 | 🔁 [OrcaReplay](https://github.com/Continuum-AI-Corp/OrcaReplay) | 可复现 | 录下一次 agent 运行（Claude Code、Codex、OpenClaw、goose），离线原样回放，或从任意一步换个模型分叉——过夜跑坏了不用再跑一夜去查。注意：录像里是完整的请求/响应字节，prompt 和 key 都在，未发表的东西放哪儿自己掂量。Apache-2.0。 |
@@ -709,6 +722,17 @@ ARIS 全流程完成并进入投稿/审稿阶段的真实项目。**所列分数
 | 🛰️ [Claude Fleet](https://github.com/tianyilt/claude-fleet) | 看板 / DevEx | 本地**只读**看板，同时盯住一堆并行的 Claude Code / Codex 窗口——triage（干活 / 等你 / 跑完）、一键 Focus、~50ms 全文搜 transcript、skill/memory 用量分析。by [@tianyilt](https://github.com/tianyilt) |
 
 </details>
+
+<a id="absent-author"></a>
+
+### 🔎 Absent Author：让 AI 辅助研究有据可查、有人负责
+
+由香港城市大学 Ruoyu Zhao 等研究者发起的开源项目 [Absent Author](https://github.com/THUROI0787/absent-author)，整理了带来源、误判说明和反证提示的证据目录，并针对不同论文类型给出检查指引。项目提供两项面向 Claude Code、Codex 等能够读取 `SKILL.md` 的 agent 的技能：
+
+- **[`paper-author-pass`](https://github.com/THUROI0787/absent-author/tree/main/skills/paper-author-pass)：作者投稿前自查。** 从研究问题与核心论证出发，梳理主张与证据的对应关系，核对引用和数字，再改进表达；需要作者判断的问题会交还作者，帮助研究者在署名前确认自己理解、能够解释并愿意为这项工作负责。
+- **[`paper-slop-screen`](https://github.com/THUROI0787/absent-author/tree/main/skills/paper-slop-screen)：审稿与合作者检查。** 分别考察写作、研究引导与论文质量，将发现落到具体位置和原文，提供可核查的问题及后续追问，并结合反证和论文类型减少误判。
+
+项目参考并明确致谢了 **ARIS、HERO 和 Anti-Autoresearch**，也记录了我们后续的改进。感谢团队认真阅读这些公开工作，并将经验继续发展为作者和审稿人都能使用的工具。欢迎大家[试用项目](https://github.com/THUROI0787/absent-author)、提交真实案例和误判反馈，一起改进 AI 辅助科研的质量与责任机制。
 
 <a id="workflows"></a>
 <a id="-workflows"></a>

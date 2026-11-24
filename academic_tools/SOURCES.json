@@ -1,86 +1,85 @@
 {
   "schema_version": 1,
-  "snapshot_date": "2026-11-01",
+  "snapshot_date": "2026-11-24",
   "timezone": "Asia/Shanghai",
-  "generated_at": "2026-11-01T13:46:12.480544+08:00",
+  "generated_at": "2026-11-24T15:09:59.588238+08:00",
   "representation": "Exact upstream Git trees, including executable modes, symlinks, and pinned gitlinks; repository history is not vendored.",
   "summary": {
     "repositories": 13,
-    "updated": 7,
-    "already_current": 6,
-    "files": 20692,
-    "tracked_bytes": 717219276,
+    "updated": 9,
+    "already_current": 4,
+    "files": 21008,
+    "tracked_bytes": 769493683,
     "gitlinks": 5,
-    "symlinks": 5
+    "symlinks": 0
   },
   "repositories": [
     {
       "name": "academic-research-skills",
-      "checked_at": "2026-11-01T13:46:08.148406+08:00",
+      "checked_at": "2026-11-24T15:09:22.023592+08:00",
       "origin": "https://github.com/Imbad0202/academic-research-skills.git",
-      "before": "cfd081d8f309ec65254d9f9f04c845ee78b1ec1d",
+      "before": "f2d109ea815f4b2f68a2eeee1ed9630bfc0cb302",
       "branch": "main",
-      "after": "f2d109ea815f4b2f68a2eeee1ed9630bfc0cb302",
-      "remote": "f2d109ea815f4b2f68a2eeee1ed9630bfc0cb302",
-      "changed_commits": 22,
-      "commit_date": "2026-10-31T11:36:19+08:00",
-      "commit_subject": "docs(i18n): add Brazilian Portuguese README (README.pt-BR.md) (#1033)",
+      "after": "1d42587c373890394edf0d0f9976069e13804b34",
+      "remote": "1d42587c373890394edf0d0f9976069e13804b34",
+      "changed_commits": 61,
+      "commit_date": "2026-11-24T09:13:16+08:00",
+      "commit_subject": "Require text on both titles before an identifier match (#1166)",
       "status": "updated",
-      "tree": "c92f73b7b188091e322712152447a8d4f8054986",
+      "tree": "f114f61400b754b3553e7a8849ab5393556eb288",
       "submodules": [],
       "license_files": [
         "LICENSE",
         "NOTICE.md"
       ],
-      "file_count": 2865,
-      "tracked_bytes": 40349619,
+      "file_count": 2882,
+      "tracked_bytes": 40883327,
       "skill_md_count": 5,
       "modes": {
-        "100644": 2832,
-        "100755": 28,
-        "120000": 5
+        "100644": 2854,
+        "100755": 28
       },
       "largest_file": {
         "path": "CHANGELOG.md",
-        "bytes": 836337
+        "bytes": 911568
       },
       "local_path": "skills/academic-research-skills",
-      "commit_url": "https://github.com/Imbad0202/academic-research-skills/commit/f2d109ea815f4b2f68a2eeee1ed9630bfc0cb302"
+      "commit_url": "https://github.com/Imbad0202/academic-research-skills/commit/1d42587c373890394edf0d0f9976069e13804b34"
     },
     {
       "name": "academic-research-skills-codex",
-      "checked_at": "2026-11-01T13:46:08.660612+08:00",
+      "checked_at": "2026-11-24T15:09:23.922355+08:00",
       "origin": "https://github.com/Imbad0202/academic-research-skills-codex.git",
-      "before": "71528d9349bcdacfbe94111f06d9e2d82215a44d",
+      "before": "a1556557887f345aac99bdc6027e008e91fef236",
       "branch": "main",
-      "after": "a1556557887f345aac99bdc6027e008e91fef236",
-      "remote": "a1556557887f345aac99bdc6027e008e91fef236",
+      "after": "82725acb393c4410ac6f47634a7f51b40a162fa4",
+      "remote": "82725acb393c4410ac6f47634a7f51b40a162fa4",
       "changed_commits": 4,
-      "commit_date": "2026-10-27T13:56:26+08:00",
-      "commit_subject": "docs: add Windows marketplace recovery guide (#43)",
+      "commit_date": "2026-11-06T13:13:31+08:00",
+      "commit_subject": "fix(codex): keep the upstream entry name in Claude channel docs",
       "status": "updated",
-      "tree": "4bc3d8732551a1b931a37a19c0055137117dde6e",
+      "tree": "6d7f8907c276bcbb580a4b7b3a7ef74883f740b5",
       "submodules": [],
       "license_files": [
         "LICENSE"
       ],
-      "file_count": 5342,
-      "tracked_bytes": 77990405,
+      "file_count": 5352,
+      "tracked_bytes": 78275341,
       "skill_md_count": 2,
       "modes": {
-        "100644": 5286,
+        "100644": 5296,
         "100755": 56
       },
       "largest_file": {
         "path": "plugins/ars-codex/skills/academic-research-suite/ars/CHANGELOG.md",
-        "bytes": 834613
+        "bytes": 845380
       },
       "local_path": "skills/academic-research-skills-codex",
-      "commit_url": "https://github.com/Imbad0202/academic-research-skills-codex/commit/a1556557887f345aac99bdc6027e008e91fef236"
+      "commit_url": "https://github.com/Imbad0202/academic-research-skills-codex/commit/82725acb393c4410ac6f47634a7f51b40a162fa4"
     },
     {
       "name": "AI-Research-SKILLs",
-      "checked_at": "2026-11-01T13:46:09.110646+08:00",
+      "checked_at": "2026-11-24T15:09:24.166316+08:00",
       "origin": "https://github.com/Orchestra-Research/AI-Research-SKILLs.git",
       "before": "773a52944ba4747a18bd4ae9ade53fff041adcbc",
       "branch": "main",
@@ -111,26 +110,26 @@
     },
     {
       "name": "Auto-claude-code-research-in-sleep",
-      "checked_at": "2026-11-01T13:46:09.310384+08:00",
+      "checked_at": "2026-11-24T15:09:28.426015+08:00",
       "origin": "https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep.git",
-      "before": "43a5daf6f8a2db7b87b48cb51d45c6ddb3c9a6d3",
+      "before": "c485faa59a68e51c6575dea67ca57abc7a6a2b9c",
       "branch": "main",
-      "after": "c485faa59a68e51c6575dea67ca57abc7a6a2b9c",
-      "remote": "c485faa59a68e51c6575dea67ca57abc7a6a2b9c",
-      "changed_commits": 30,
-      "commit_date": "2026-11-01T13:01:46+08:00",
-      "commit_subject": "Merge pull request #489 from wanshuiyin/docs/goal-pulse-chinese-news",
+      "after": "4ba94ae2a1c1fbbb14858750dd8764cabf6c28bd",
+      "remote": "4ba94ae2a1c1fbbb14858750dd8764cabf6c28bd",
+      "changed_commits": 20,
+      "commit_date": "2026-11-19T18:40:49+08:00",
+      "commit_subject": "Merge pull request #501 from divya0795/fix/watchdog-session-timeout",
       "status": "updated",
-      "tree": "b133f963bf7e0101129447f690544f6576b7a1e9",
+      "tree": "401fc78981617d43776b2f1ac958b38a3065d313",
       "submodules": [],
       "license_files": [
         "LICENSE"
       ],
-      "file_count": 767,
-      "tracked_bytes": 39149136,
+      "file_count": 768,
+      "tracked_bytes": 39176686,
       "skill_md_count": 197,
       "modes": {
-        "100644": 735,
+        "100644": 736,
         "100755": 32
       },
       "largest_file": {
@@ -138,21 +137,21 @@
         "bytes": 8525922
       },
       "local_path": "skills/Auto-claude-code-research-in-sleep",
-      "commit_url": "https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/commit/c485faa59a68e51c6575dea67ca57abc7a6a2b9c"
+      "commit_url": "https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/commit/4ba94ae2a1c1fbbb14858750dd8764cabf6c28bd"
     },
     {
       "name": "auto-empirical",
-      "checked_at": "2026-11-01T13:46:09.761085+08:00",
+      "checked_at": "2026-11-24T15:09:32.333373+08:00",
       "origin": "https://github.com/brycewang-stanford/Auto-Empirical-Research-Skills.git",
-      "before": "09097ed9533ff9155cc1b64dd16b779d5e323074",
+      "before": "8dd077b5410c71b1866ea0bb116db45c7cafca62",
       "branch": "main",
-      "after": "8dd077b5410c71b1866ea0bb116db45c7cafca62",
-      "remote": "8dd077b5410c71b1866ea0bb116db45c7cafca62",
-      "changed_commits": 13,
-      "commit_date": "2026-10-30T13:37:50+08:00",
-      "commit_subject": "chore(skills/42): resync ARIS to upstream 5854b99 (#83)",
+      "after": "87549b03a622f7bc146ec4860475dadc357320ef",
+      "remote": "87549b03a622f7bc146ec4860475dadc357320ef",
+      "changed_commits": 7,
+      "commit_date": "2026-11-23T15:29:24Z",
+      "commit_subject": "chore(images): refresh star-history chart",
       "status": "updated",
-      "tree": "9b8e671e56d79de94e5dc6ff17cddb8848f44af4",
+      "tree": "c6ab5fd7b9b5e0cefcc7a5dccaef06dd0c0a6949",
       "submodules": [
         {
           "path": "skills/69-Paper-WorkFlow",
@@ -163,7 +162,7 @@
         "LICENSE"
       ],
       "file_count": 4856,
-      "tracked_bytes": 97116315,
+      "tracked_bytes": 97115668,
       "skill_md_count": 1262,
       "modes": {
         "100644": 4785,
@@ -175,21 +174,21 @@
         "bytes": 2751949
       },
       "local_path": "skills/auto-empirical",
-      "commit_url": "https://github.com/brycewang-stanford/Auto-Empirical-Research-Skills/commit/8dd077b5410c71b1866ea0bb116db45c7cafca62"
+      "commit_url": "https://github.com/brycewang-stanford/Auto-Empirical-Research-Skills/commit/87549b03a622f7bc146ec4860475dadc357320ef"
     },
     {
       "name": "claude-scholar",
-      "checked_at": "2026-11-01T13:46:10.240428+08:00",
+      "checked_at": "2026-11-24T15:09:35.146631+08:00",
       "origin": "https://github.com/Galaxy-Dawn/claude-scholar.git",
       "before": "d394fb599ed9e6ea2212a9e6daa864345fe97a26",
       "branch": "main",
-      "after": "d394fb599ed9e6ea2212a9e6daa864345fe97a26",
-      "remote": "d394fb599ed9e6ea2212a9e6daa864345fe97a26",
-      "changed_commits": 0,
-      "commit_date": "2026-10-19T18:08:11+08:00",
-      "commit_subject": "Merge pull request #57 from Galaxy-Dawn/docs/ofox-first-sponsor",
-      "status": "current",
-      "tree": "12881baa9d11aa2c79208d7dddf75e8424f8fd4d",
+      "after": "1cb9760c21f5075e30d69592edb3e7c8d4d907e1",
+      "remote": "1cb9760c21f5075e30d69592edb3e7c8d4d907e1",
+      "changed_commits": 9,
+      "commit_date": "2026-11-23T14:16:22+08:00",
+      "commit_subject": "docs(readme): backfill recent news",
+      "status": "updated",
+      "tree": "a51b5abe73f862f4789cd1b65bd0b82c58f91248",
       "submodules": [
         {
           "path": "plugins/marketplaces/ai-research-skills",
@@ -211,11 +210,11 @@
       "license_files": [
         "LICENSE"
       ],
-      "file_count": 589,
-      "tracked_bytes": 8224377,
+      "file_count": 592,
+      "tracked_bytes": 8249197,
       "skill_md_count": 45,
       "modes": {
-        "100644": 566,
+        "100644": 569,
         "160000": 4,
         "100755": 23
       },
@@ -224,11 +223,11 @@
         "bytes": 1860811
       },
       "local_path": "skills/claude-scholar",
-      "commit_url": "https://github.com/Galaxy-Dawn/claude-scholar/commit/d394fb599ed9e6ea2212a9e6daa864345fe97a26"
+      "commit_url": "https://github.com/Galaxy-Dawn/claude-scholar/commit/1cb9760c21f5075e30d69592edb3e7c8d4d907e1"
     },
     {
       "name": "codex-claude-academic-skills",
-      "checked_at": "2026-11-01T13:46:10.447149+08:00",
+      "checked_at": "2026-11-24T15:09:35.402998+08:00",
       "origin": "https://github.com/zLanqing/codex-claude-academic-skills.git",
       "before": "7ed6377f0efb6a38951b48ef03b19d996e454b1f",
       "branch": "main",
@@ -258,38 +257,38 @@
     },
     {
       "name": "nature-skills",
-      "checked_at": "2026-11-01T13:46:10.645783+08:00",
+      "checked_at": "2026-11-24T15:09:38.949486+08:00",
       "origin": "https://github.com/Yuan1z0825/nature-skills.git",
-      "before": "b0de5a9ec3f8439433c742782f4fbbe582a253d7",
+      "before": "c1cee246a489a676e3c80cae9e282da4b58cf19a",
       "branch": "main",
-      "after": "c1cee246a489a676e3c80cae9e282da4b58cf19a",
-      "remote": "c1cee246a489a676e3c80cae9e282da4b58cf19a",
-      "changed_commits": 16,
-      "commit_date": "2026-11-01T02:24:08Z",
-      "commit_subject": "chore: update star history",
+      "after": "c6701dbea29afa7c596d029b957b7edc92130ea5",
+      "remote": "c6701dbea29afa7c596d029b957b7edc92130ea5",
+      "changed_commits": 32,
+      "commit_date": "2026-11-22T22:37:36+08:00",
+      "commit_subject": "Use white-background Nature AI service image",
       "status": "updated",
-      "tree": "c0c908e527a51497187e72579ae66cf9031d3f92",
+      "tree": "0d3920cb8902776d3ed3f2b2e262d3691678c828",
       "submodules": [],
       "license_files": [
         "LICENSE"
       ],
-      "file_count": 884,
-      "tracked_bytes": 45264317,
+      "file_count": 897,
+      "tracked_bytes": 46015215,
       "skill_md_count": 24,
       "modes": {
-        "100644": 855,
+        "100644": 868,
         "100755": 29
       },
       "largest_file": {
-        "path": "skills/nature-figure/assets/figures4papers/figure_Cflows/figures/diffusion_swiss_roll.png",
-        "bytes": 1794980
+        "path": "assets/nature-ai-gpt-claude-service.png",
+        "bytes": 1866658
       },
       "local_path": "skills/nature-skills",
-      "commit_url": "https://github.com/Yuan1z0825/nature-skills/commit/c1cee246a489a676e3c80cae9e282da4b58cf19a"
+      "commit_url": "https://github.com/Yuan1z0825/nature-skills/commit/c6701dbea29afa7c596d029b957b7edc92130ea5"
     },
     {
       "name": "paper-craft-skills",
-      "checked_at": "2026-11-01T13:46:11.070968+08:00",
+      "checked_at": "2026-11-24T15:09:39.195465+08:00",
       "origin": "https://github.com/zsyggg/paper-craft-skills.git",
       "before": "3be47a2a53cc35a411c587bca5231a08de57287a",
       "branch": "main",
@@ -318,38 +317,38 @@
     },
     {
       "name": "PaperSpine",
-      "checked_at": "2026-11-01T13:46:11.267733+08:00",
+      "checked_at": "2026-11-24T15:09:45.482169+08:00",
       "origin": "https://github.com/WUBING2023/PaperSpine.git",
       "before": "42312b8d9c76ab25990cddfd76e3622276854118",
       "branch": "main",
-      "after": "42312b8d9c76ab25990cddfd76e3622276854118",
-      "remote": "42312b8d9c76ab25990cddfd76e3622276854118",
-      "changed_commits": 0,
-      "commit_date": "2026-10-14T12:01:29+08:00",
-      "commit_subject": "docs: label homepage atlas image as a snapshot",
-      "status": "current",
-      "tree": "980eb6dcd4dcbecd4d6fd2932b2a11f96932b73b",
+      "after": "f68989ccea75312d57884e0c1df423b77fb4ba3c",
+      "remote": "f68989ccea75312d57884e0c1df423b77fb4ba3c",
+      "changed_commits": 34,
+      "commit_date": "2026-11-20T23:24:51+08:00",
+      "commit_subject": "Keep the PaperSpine hero headline in English across locales",
+      "status": "updated",
+      "tree": "1a4f42a98e1e28c31ceb9fef2712ccf6092ef16e",
       "submodules": [],
       "license_files": [
         "LICENSE"
       ],
-      "file_count": 1451,
-      "tracked_bytes": 61330460,
-      "skill_md_count": 7,
+      "file_count": 1717,
+      "tracked_bytes": 111936892,
+      "skill_md_count": 14,
       "modes": {
-        "100644": 1450,
+        "100644": 1716,
         "100755": 1
       },
       "largest_file": {
-        "path": "website/assets/video/paperspine5-promo.mp4",
-        "bytes": 11564149
+        "path": "paperspine5/core/07_发布页/v6/science/paperspine-v6-press-kit.zip",
+        "bytes": 15902759
       },
       "local_path": "skills/PaperSpine",
-      "commit_url": "https://github.com/WUBING2023/PaperSpine/commit/42312b8d9c76ab25990cddfd76e3622276854118"
+      "commit_url": "https://github.com/WUBING2023/PaperSpine/commit/f68989ccea75312d57884e0c1df423b77fb4ba3c"
     },
     {
       "name": "Research-Paper-Writing-Skills",
-      "checked_at": "2026-11-01T13:46:11.472239+08:00",
+      "checked_at": "2026-11-24T15:09:45.740734+08:00",
       "origin": "https://github.com/Master-cai/Research-Paper-Writing-Skills.git",
       "before": "77e7c2c1ba06f7d71844873147665437a03aac1b",
       "branch": "main",
@@ -379,23 +378,23 @@
     },
     {
       "name": "scientific-agent-skills",
-      "checked_at": "2026-11-01T13:46:11.670082+08:00",
+      "checked_at": "2026-11-24T15:09:57.655442+08:00",
       "origin": "https://github.com/K-Dense-AI/scientific-agent-skills.git",
-      "before": "593377bb048752abb0152deab9fbb1083a6087df",
+      "before": "5f2bc0341354fd5590aef76a533ada1e1e5b4e62",
       "branch": "main",
-      "after": "5f2bc0341354fd5590aef76a533ada1e1e5b4e62",
-      "remote": "5f2bc0341354fd5590aef76a533ada1e1e5b4e62",
-      "changed_commits": 1,
-      "commit_date": "2026-10-26T09:36:14Z",
+      "after": "c21d13b3cc2894680229ba9959a53281acb9200e",
+      "remote": "c21d13b3cc2894680229ba9959a53281acb9200e",
+      "changed_commits": 4,
+      "commit_date": "2026-11-23T09:18:26Z",
       "commit_subject": "chore: update security scan report [skip ci]",
       "status": "updated",
-      "tree": "557aacccc13b9e9c8c14a5d97e2c2b5229b65c13",
+      "tree": "31ebd978f00022ad335ab0a189bfabe014f909b3",
       "submodules": [],
       "license_files": [
         "LICENSE.md"
       ],
       "file_count": 2780,
-      "tracked_bytes": 290918089,
+      "tracked_bytes": 290921981,
       "skill_md_count": 177,
       "modes": {
         "100644": 2736,
@@ -406,37 +405,37 @@
         "bytes": 23042128
       },
       "local_path": "skills/scientific-agent-skills",
-      "commit_url": "https://github.com/K-Dense-AI/scientific-agent-skills/commit/5f2bc0341354fd5590aef76a533ada1e1e5b4e62"
+      "commit_url": "https://github.com/K-Dense-AI/scientific-agent-skills/commit/c21d13b3cc2894680229ba9959a53281acb9200e"
     },
     {
       "name": "WenyuChiou-ai-research-skills",
-      "checked_at": "2026-11-01T13:46:12.141385+08:00",
+      "checked_at": "2026-11-24T15:09:59.511302+08:00",
       "origin": "https://github.com/WenyuChiou/ai-research-skills.git",
-      "before": "22ac7e0c91fcc8208bb86b1167a7fe009d397642",
+      "before": "8547d889612ca624d523f39d20d35a97dbd87802",
       "branch": "main",
-      "after": "8547d889612ca624d523f39d20d35a97dbd87802",
-      "remote": "8547d889612ca624d523f39d20d35a97dbd87802",
-      "changed_commits": 39,
-      "commit_date": "2026-10-30T17:49:36-04:00",
-      "commit_subject": "docs(install): Make Hub CLI prerequisites operation-specific (#107)",
+      "after": "b3b615748f9050ba16d912dee0369b273fbc1cf0",
+      "remote": "b3b615748f9050ba16d912dee0369b273fbc1cf0",
+      "changed_commits": 7,
+      "commit_date": "2026-11-12T23:12:56-05:00",
+      "commit_subject": "docs: allow authorized engineering without repeated confirmation (#114)",
       "status": "updated",
-      "tree": "c875824f2314303db500c2db09c0b590a5c48e88",
+      "tree": "be776a36856a3e4118b3a0fbb2b36f98c90f4cdb",
       "submodules": [],
       "license_files": [
         "LICENSE"
       ],
-      "file_count": 156,
-      "tracked_bytes": 10241852,
+      "file_count": 162,
+      "tracked_bytes": 10284670,
       "skill_md_count": 0,
       "modes": {
-        "100644": 156
+        "100644": 162
       },
       "largest_file": {
         "path": "docs/img/pipeline-overview.png",
         "bytes": 1648034
       },
       "local_path": "skills/WenyuChiou-ai-research-skills",
-      "commit_url": "https://github.com/WenyuChiou/ai-research-skills/commit/8547d889612ca624d523f39d20d35a97dbd87802"
+      "commit_url": "https://github.com/WenyuChiou/ai-research-skills/commit/b3b615748f9050ba16d912dee0369b273fbc1cf0"
     }
   ]
 }

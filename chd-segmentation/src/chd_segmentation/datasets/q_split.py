@@ -124,11 +124,14 @@ def create_q_bundle(source, output, seed=20261104):
     experiment['config']['split'].update(path='q1282_split.json', format='q1282', unit='patient')
     experiment['config']['training']['patch'] = [128]*3
     model_configs = []
-    for stage, updates in (('base', 40000), ('localizer', 5000), ('local', 20000)):
+    for stage, updates in (('base', 40000), ('localizer', None), ('local', None)):
         config = dict(model='q_route1', device='cuda', precision='fp32', technical=False, seed=20261111,
             run_dir='BIND_INPUTS_REQUIRED', work_root='BIND_INPUTS_REQUIRED', groups='q_groups.json',
             updates=updates, accumulation=4, patch=128, local_size=128, learning_rate=.0002,
             validate_every=1000, method='M07', execution=dict(gpu_count=2, workers=0))
+        if stage!='base':
+            config.update(epochs=5 if stage=='localizer' else 20,updates_per_epoch=250,
+                          validate_every=250,resume_budget=True)
         model_configs.append(dict(filename=f'q1282_{stage}.yaml', stage=stage, config=config))
     new_descriptor = dict(datasets={'chd1282': dict(info, split='q1282_split.json')},
         experiments=[experiment], model_configs=model_configs, immutable_files=frozen,

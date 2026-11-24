@@ -55,7 +55,7 @@
 
 ### 1.1 创始人介绍
 
-大家好，我是 `nature-skills` 的创立者袁一哲。感谢大家持续关注本项目。我们在抖音更新了许多视频教程，大家可以根据名称检索查看，希望能够真正帮助到科研工作。
+大家好，我是 `nature-skills` 的创立者袁一哲。感谢大家持续关注本项目。我们在抖音更新了许多视频教程，大家可以根据名称检索查看，希望能够真正帮助到科研工作。目前正在寻找工作，欢迎添加下方二维码与我取得联系。
 
 ### 1.2 自营 GPT / Claude 代充与成品号
 
@@ -669,4 +669,4 @@ description: >-
 
 ## 8. Star 历史
 
-[![Star History Chart](assets/star-history-20261101T022408Z.svg)](https://star-history.com/#Yuan1z0825/nature-skills&Date)
+[![Star History Chart](assets/star-history-20261122T022513Z.svg)](https://star-history.com/#Yuan1z0825/nature-skills&Date)

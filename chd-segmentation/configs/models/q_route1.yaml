@@ -5,7 +5,10 @@ precision: fp32
 threads: 2
 seed: 20261111
 technical: false
-updates: 20000
+epochs: 20
+updates_per_epoch: 250
+validate_every: 250
+resume_budget: true
 accumulation: 4
 patch: 128
 local_size: 128

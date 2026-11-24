@@ -465,7 +465,8 @@ def run_rank(rank, job, gate, stop_event):
                     peak_reserved = max(peak_reserved, torch.cuda.max_memory_reserved(device))
                     if perf_counter() >= next_vram_sample:
                         query_started = perf_counter()
-                        actual_vram = process_vram(job["gpus"][rank]["uuid"], os.getpid())
+                        actual_vram = process_vram(job["gpus"][rank]["uuid"], os.getpid(),
+                                                  resources=resources,cancel=stop_event,log_dir=output)
                         peak_non_allocator = max(peak_non_allocator, actual_vram - torch.cuda.memory_reserved(device))
                         timings["resource_query_seconds"] += perf_counter() - query_started
                         next_vram_sample = perf_counter() + vram_sample_seconds
@@ -528,7 +529,8 @@ def run_rank(rank, job, gate, stop_event):
                 torch.cuda.synchronize(device)
                 peak_reserved = max(peak_reserved, torch.cuda.max_memory_reserved(device))
                 query_started = perf_counter()
-                actual_vram = process_vram(job["gpus"][rank]["uuid"], os.getpid())
+                actual_vram = process_vram(job["gpus"][rank]["uuid"], os.getpid(),
+                                          resources=resources,cancel=stop_event,log_dir=output)
                 peak_non_allocator = max(peak_non_allocator, actual_vram - torch.cuda.memory_reserved(device))
                 timings["resource_query_seconds"] += perf_counter() - query_started
             changed = changed and not torch.equal(next(model.parameters()).detach().cpu(), before_parameter)

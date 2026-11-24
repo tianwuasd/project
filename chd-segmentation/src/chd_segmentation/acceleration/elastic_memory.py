@@ -41,7 +41,7 @@ def grow_memory(session, spare):
         if required <= session.capacity:
             return
     root, r = Path(session.request.registry_root), session.request.resources
-    with FileLock(str(root / '.resource.lock')), h.condition:
+    with FileLock(str(root / '.resource.lock'), timeout=10), h.condition:
         if h.cancel.is_set() or h.state.get('replanning', False):
             return
         required, waiting = memory_floor(h.state)
@@ -72,9 +72,17 @@ def grow_memory(session, spare):
         session.rows, session.capacity = rows, target
         session.applied_demand = replace(session.applied_demand,
             fixed_bytes=session.applied_demand.fixed_bytes + target - h.state['capacity'])
+        pressure = []
+        if spare-peer_pending < 0:
+            pressure.append('host_reservation_headroom')
+        if rss > target:
+            pressure.append('task_capacity')
+        if peer_used+target > limit:
+            pressure.append('project_limit')
         h.state.update(capacity=target, plan_generation=generation, project_bytes=peer_used+target,
+            limited_project_bytes=peer_used+target, project_limit_bytes=limit,
             headroom=max(0, min(target-rss, spare-peer_pending)),
-            paused=spare-peer_pending < 0 or rss > target or peer_used+target > limit)
+            paused=bool(pressure), pressure_reasons=pressure)
         session.allocation.memory_bytes = target
         session.allocation.applied = session._applied()
         h.condition.notify_all()

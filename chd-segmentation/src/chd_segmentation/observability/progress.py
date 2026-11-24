@@ -202,7 +202,7 @@ class Progress:
             if self._metrics_at is None or now - self._metrics_at >= 15:
                 self.cpu_percent = psutil.cpu_percent(interval=None)
                 if self.config.get("resources", {}).get("device") == "cuda":
-                    self.gpus = inventory()
+                    self.gpus = inventory(resources=self.config['resources'],log_dir=self.directory)
                 self._metrics_at = now
             memory_path = self.directory / "memory.json"
             raw_resource = self.resource or (read_json(memory_path) if memory_path.exists() else {})

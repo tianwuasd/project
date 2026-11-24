@@ -16,6 +16,9 @@ class Localizer(nn.Module):
         padding = [v for n in reversed(image.shape[2:]) for v in (0,(-n)%32)]
         x = F.avg_pool3d(F.pad(image,padding,mode='replicate'),4,4)
         mask = F.avg_pool3d(F.pad(valid.float(),padding),4,4)
+        return self.forward_pooled(x,mask)
+
+    def forward_pooled(self, x, mask):
         l0 = self.l0(torch.cat((x,mask),1))
         l1 = self.l1(l0)
         l2 = self.l2(l1)

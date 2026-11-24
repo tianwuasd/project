@@ -1,4 +1,5 @@
 from dataclasses import asdict
+from contextlib import nullcontext
 from pathlib import Path
 
 from monai.inferers import sliding_window_inference
@@ -28,12 +29,17 @@ MAPPING = {'chd1282':(0,1,2,3,4,6,7,5,9,10,8),'imagechd':tuple(range(8))}
 SOLVER = dict(steps=3,gamma=1.,lambda_=0.5,eta=1/3)
 
 
-def allowed(label, missing, dataset):
+def allowed(label, missing, dataset, parallel=None):
     mapping = np.asarray(MAPPING[dataset])
     if not ((label>=-1)&(label<len(mapping))).all():
         raise ValueError('Q来源标签超出对应数据集范围')
     mapped = mapping[label.clip(0)]
-    support = np.stack([mapped==index for index in range(11)])
+    if parallel is None:
+        support = np.stack([mapped==index for index in range(11)])
+    else:
+        support = np.empty((11,*label.shape),dtype=bool)
+        parallel.map(range(11),int(label.size*3),lambda index:mapped==index,
+                     lambda index,value:support.__setitem__(index,value))
     unknown = set(map(int,mapping[list(missing)])) | (set(range(11))-set(map(int,mapping)))
     for index in unknown:
         support[index] |= label==0
@@ -108,6 +114,18 @@ class QAdapter:
             self.locator.load_state_dict(parents['localizer']['model'],strict=True)
             self.model = LocalNetwork(method=config['method'])
         self.model.to(self.device)
+        from .training_cache import TrainingCache
+        import hashlib
+        parents_key = None
+        if self.parent_models is not None:
+            checksum = hashlib.sha256()
+            for stage_name,state in sorted(self.parent_models.items()):
+                checksum.update(stage_name.encode())
+                for name,value in sorted(state['model'].items()):
+                    checksum.update(name.encode())
+                    checksum.update(value.detach().cpu().contiguous().reshape(-1).view(torch.uint8).numpy().tobytes())
+            parents_key = checksum.hexdigest()
+        self.training_cache = TrainingCache(config,prepared,stage,parents_key)
 
     def optimizer(self):
         groups = []
@@ -132,37 +150,78 @@ class QAdapter:
     def schedule(self,optimizer,update):
         warmup = 1000 if self.stage=='base' else 500
         total = {'base':40000,'localizer':5000,'local':20000}[self.stage] if self.config['technical'] else self.config['updates']
+        if total<=warmup:
+            warmup = max(1,total//10)
         factor = (update+1)/warmup if update<warmup else .01+.99*(1+np.cos(np.pi*(update-warmup)/(total-warmup)))/2
         for group in optimizer.param_groups:
             if 'peak_lr' not in group:
                 group['peak_lr'] = group['lr']
             group['lr'] = group['peak_lr']*factor
 
-    def crop(self,entry,candidate,probability):
+    def crop(self,entry,candidate,probability,parallel=True):
         size = self.config['local_size']
         start = tuple(int(np.floor(c-(size-1)/2+.5)) for c in candidate.center)
         image = torch.from_numpy(entry['image'])[None]
-        inputs,editable = crop_local_input(image,probability,start,size,torch.ones_like(image,dtype=torch.bool))
+        inputs,editable = crop_local_input(image,probability,start,size)
         grids = np.meshgrid(*(np.arange(s,s+size) for s in start),indexing='ij')
         inside = np.ones((size,)*3,dtype=bool)
         for grid,n in zip(grids,entry['label'].shape):
             inside &= (grid>=0)&(grid<n)
         indices = tuple(grid.clip(0,n-1) for grid,n in zip(grids,entry['label'].shape))
         raw = np.where(inside,entry['label'][indices],-1)
-        support = allowed(raw,entry['unknown_classes'],self.prepared['dataset'])
+        from .preparation import preparation
+        guard = getattr(self,'training_guard',None) if parallel else None
+        with preparation(self.config,guard,entry,stage=self.stage) as runtime:
+            support = allowed(raw,entry['unknown_classes'],self.prepared['dataset'],runtime)
         return inputs,editable,support
+
+    @torch.no_grad()
+    def locate(self,entry):
+        from .training_inputs import pooled_image
+
+        settings = self.config['execution']
+        if self.device.type == 'cuda':
+            count = int(np.prod([(n+31)//32*8 for n in entry['image'].shape[1:]]))
+            free,total = torch.cuda.mem_get_info(self.device)
+            reserve = max(settings.get('vram_reserve_bytes',4*2**30),
+                          total*settings.get('vram_reserve_fraction',.1))
+            if count*512+128*2**20 > free-reserve:
+                raise MemoryError('定位器粗网格前向超过当前显存余量')
+        guard = getattr(self,'training_guard',None)
+        count = int(np.prod([(n+31)//32*8 for n in entry['image'].shape[1:]]))
+        amount = count*(32 if self.device.type=='cuda' else 512)
+        claim = guard.admit(amount,label='q_local_locator_retained') if guard is not None else nullcontext(True)
+        with claim as ticket:
+            if ticket is None:
+                raise InterruptedError('局部定位输入等待已取消')
+            from .preparation import preparation
+            with preparation(self.config,guard,entry,stage=self.stage) as runtime:
+                image,valid = pooled_image(entry,settings.get('localizer_block_bytes',2*2**30),guard=guard,parallel=runtime)
+            return self.locator.forward_pooled(image.to(self.device),valid.to(self.device))
 
     @torch.no_grad()
     def frozen(self,entry):
         if entry['case_id']==self.current_name:
             return self.current_frozen
         self.current_name,self.current_frozen = None,None
-        image = torch.from_numpy(entry['image'])[None]
-        probability = self.base_probability(entry)
-        located = self.locator(image.to(self.device),torch.ones_like(image,dtype=torch.bool).to(self.device))
-        candidates = select_candidates(located['heatmap'][0].float().cpu().numpy(),image.shape[2:],[4,4,8],.2,.8)
+        from .candidates import Candidate
+        def produce():
+            probability = self.base_probability(entry)
+            located = self.locate(entry)
+            candidates = select_candidates(located['heatmap'][0].float().cpu().numpy(),entry['label'].shape,[4,4,8],.2,.8)
+            return dict(probability=probability,features=located['features'].float().cpu(),
+                        candidates=[asdict(value) for value in candidates])
+        amount = int(entry['image'].size*48)+2**20
+        guard = getattr(self,'training_guard',None)
+        retained = guard.admit(amount,label='q_frozen_cache_retained') if guard is not None else nullcontext(True)
+        with retained as ticket:
+            if ticket is None:
+                raise InterruptedError('冻结上游缓存内存等待已取消')
+            value = self.training_cache.get(entry,produce,amount)
+        probability,features = value['probability'],value['features']
+        candidates = [Candidate(**value) for value in value['candidates']]
         self.current_name = entry['case_id']
-        self.current_frozen = probability,located['features'].float().cpu(),candidates
+        self.current_frozen = probability,features,candidates
         return self.current_frozen
 
     def prepare_training(self,dataset,names):
@@ -175,22 +234,33 @@ class QAdapter:
         for completed,name in enumerate(names,1):
             entry = dataset.get(name)
             probability,features,candidates = self.frozen(entry)
-            for index,candidate in enumerate(candidates):
-                inputs,editable,support = self.crop(entry,candidate,probability)
+            def inspect(index):
+                candidate = candidates[index]
+                inputs,editable,support = self.crop(entry,candidate,probability,parallel=False)
                 exact = (support.sum(0)==1)&editable[0,0].numpy()
                 supervised = (support.sum(0)<11)&editable[0,0].numpy()
                 if not supervised.any():
-                    continue
+                    return None
                 has_error = bool(((inputs[0,1:12].argmax(0).numpy()!=support.argmax(0))&exact).any())
                 reference = references.get(name,{}).get(str(index),{})
                 if reference and reference['candidate_start']!=list(candidate.start):
                     raise ValueError('Q关键结构参考没有绑定当前自动候选')
-                records.append(CandidateRecord(name,rows[name].get('patient') or name,self.prepared['dataset'],index,
+                return CandidateRecord(name,rows[name].get('patient') or name,self.prepared['dataset'],index,
                     has_error,bool(reference.get('correct_key_structure',False)),
-                    bool(reference.get('contains_correct_anomaly',False)),int(supervised.sum())))
+                    bool(reference.get('contains_correct_anomaly',False)),int(supervised.sum()))
+            from .preparation import preparation
+            with preparation(self.config,getattr(self,'training_guard',None),entry,stage=self.stage) as runtime:
+                if runtime is None:
+                    records.extend(value for index in range(len(candidates)) if (value:=inspect(index)) is not None)
+                else:
+                    def consume(index,value):
+                        if value is not None:
+                            records.append(value)
+                    runtime.map(range(len(candidates)),self.config['local_size']**3*192,inspect,consume)
             if self.config['logging']['case_details']:
                 event(Path(self.config['run_dir'])/self.stage,'q_candidates_completed',case_id=name,
                     cases_completed=completed,cases_total=len(names),candidates=len(candidates),records=len(records))
+            del probability,features
         self.sampler = CandidateSampler(records,self.config['seed'])
 
     def sample(self,dataset,names,rng):
@@ -219,25 +289,50 @@ class QAdapter:
     def loss(self,entry,rng,update):
         size = self.config['patch']
         image,label = sample_patch(entry,[size]*3,rng,.33)
-        x = torch.from_numpy(image)[None].to(self.device)
-        support = allowed(label,entry['unknown_classes'],self.prepared['dataset'])
-        valid = torch.from_numpy(label>=0)[None,None].to(self.device)
-        target = torch.from_numpy(support)[None].to(self.device)
         if self.stage=='base':
+            x = torch.from_numpy(image)[None].to(self.device)
+            support = allowed(label,entry['unknown_classes'],self.prepared['dataset'])
+            valid = torch.from_numpy(label>=0)[None,None].to(self.device)
+            target = torch.from_numpy(support)[None].to(self.device)
             outputs = self.model(x)
             weights = np.asarray([.5**i for i in range(len(outputs))]);weights/=weights.sum()
             return sum(float(w)*segmentation_loss(value.float(),F.interpolate(target.float(),size=value.shape[2:],mode='nearest').bool(),
                 F.interpolate(valid.float(),size=value.shape[2:],mode='nearest').bool()) for w,value in zip(weights,outputs))
         if self.stage=='localizer':
-            x = torch.from_numpy(entry['image'])[None].to(self.device)
-            label = entry['label']
-            support = allowed(label,entry['unknown_classes'],self.prepared['dataset'])
-            valid = torch.from_numpy(label>=0)[None,None].to(self.device)
-            heat,mask = build_heatmap_targets(support,label>=0,entry.get('processed_spacing',
-                self.prepared['plan']['configurations']['3d_fullres']['spacing']))
+            from .training_inputs import prepare_inputs,training_plan
+            settings = self.config['execution']
+            block = settings.get('localizer_block_bytes',2*2**30)
+            plan = training_plan(entry['label'].shape,entry['processed_spacing'],settings)
+            if self.device.type == 'cuda':
+                free,total = torch.cuda.mem_get_info(self.device)
+                reserve = max(settings.get('vram_reserve_bytes',4*2**30),
+                              total*settings.get('vram_reserve_fraction',.1))
+                event(Path(self.config['run_dir'])/self.stage,'q_vram_estimate',case_id=entry['case_id'],
+                    requested_bytes=plan['device_workspace_bytes'],free_bytes=free,total_bytes=total,
+                    reserved_bytes=torch.cuda.memory_reserved(self.device),
+                    allocated_bytes=torch.cuda.memory_allocated(self.device),reserve_bytes=int(reserve),
+                    exceeds_estimate=plan['device_workspace_bytes']>free-reserve,advisory_only=True)
+            def produce():
+                from .preparation import preparation
+                guard = getattr(self,'training_guard',None)
+                with preparation(self.config,guard,entry,stage=self.stage) as runtime:
+                    return prepare_inputs(entry,self.prepared['dataset'],block,
+                        guard=guard,log_dir=Path(self.config['run_dir'])/self.stage,
+                        heartbeat_seconds=self.config['logging']['heartbeat_seconds'],parallel=runtime)
+            x,valid,heat,mask = self.training_cache.get(entry,produce,
+                int(np.prod(plan['pooled_shape'])*23)+65536)
             if not mask.any():
                 raise ValueError('定位器输入缺少可监督区域')
-            return localizer_loss(self.model(x,valid)['logits'].float(),heat.to(self.device),mask.to(self.device))
+            if getattr(self,'low_vram',False):
+                from .low_vram import OffloadedLocalizer
+                guard = getattr(self,'training_guard',None)
+                logits = OffloadedLocalizer(self.model,self.low_vram_block_bytes,
+                    guard.check_active if guard is not None else None).forward(x,valid)
+                return localizer_loss(logits,heat,mask)
+            saved = torch.autograd.graph.save_on_cpu(pin_memory=False) if self.device.type=='cuda' else nullcontext()
+            with saved:
+                logits = self.model.forward_pooled(x.to(self.device),valid.to(self.device))['logits'].float()
+                return localizer_loss(logits,heat.to(self.device),mask.to(self.device))
         with torch.no_grad():
             probability,features,candidates = self.frozen(entry)
             if self.picked is None or self.picked.case!=entry['case_id']:
@@ -262,9 +357,8 @@ class QAdapter:
         if self.stage!='local':
             raise ValueError('Q完整预测需要local阶段检查点')
         image = torch.from_numpy(entry['image'])[None]
-        fov = torch.ones_like(image,dtype=torch.bool)
         probability = self.base_probability(entry)
-        located = self.locator(image.to(self.device),fov.to(self.device))
+        located = self.locate(entry)
         candidates = select_candidates(located['heatmap'][0].float().cpu().numpy(),image.shape[2:],[4,4,8],.2,.8)
         candidates = candidates[:self.config['max_candidates']]
         fusion = ProbabilityFusion(probability)
@@ -272,7 +366,7 @@ class QAdapter:
         size = self.config['local_size']; margin=size//8; core_size=size-2*margin
         for candidate in candidates:
             start = tuple(int(np.floor(c-(size-1)/2+.5)) for c in candidate.center)
-            inputs,editable = crop_local_input(image,probability,start,size,fov)
+            inputs,editable = crop_local_input(image,probability,start,size)
             context = sample_context(located['features'].float().cpu(),candidate.center,samples=size//8)
             out = self.model(inputs.to(self.device),context.to(self.device),editable.to(self.device))
             final,trace = infer_local(out,editable.to(self.device),self.config['method'],SOLVER)

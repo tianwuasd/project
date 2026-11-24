@@ -10,8 +10,8 @@ def model_configs(root, code, assets):
     result = {}
     run = course/'runs/CHD1282-Q/20261115-offline'
     for stage, template, updates in [('base', 'q_base', 40000),
-                                      ('localizer', 'q_localizer', 5000),
-                                      ('local', 'q_route1', 20000)]:
+                                      ('localizer', 'q_localizer', None),
+                                      ('local', 'q_route1', None)]:
         cfg = yaml.safe_load((code/'configs/models'/f'{template}.yaml').read_text(encoding='utf-8'))
         cfg.update(run_dir=str(run), work_root=str(course), updates=updates,
                    groups=str(course/'inputs/q1282/q_groups.json'),

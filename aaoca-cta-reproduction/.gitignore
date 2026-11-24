@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+.deps/
+project.local.json
+private/
+work/
+reports/
+results/
+weights/
+data/
+course/
+build/
+*.egg-info/
+AGENTS.md
+HANDOFF.md
+src/aaoca_reproduction/clinical_evidence.py
