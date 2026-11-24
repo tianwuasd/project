@@ -2,6 +2,7 @@ from contextlib import contextmanager
 import os
 import threading
 import math
+from time import monotonic, sleep
 
 import psutil
 import SimpleITK as sitk
@@ -29,10 +30,27 @@ def classification_device(config, estimated_gpu_bytes=0):
             raise ValueError("CUDA设备不可用或未明确指定索引")
         if not isinstance(estimated_gpu_bytes, int) or estimated_gpu_bytes <= 0:
             raise ValueError("CUDA执行前须提供获准且有依据的显存工作集估计")
-        free, total = torch.cuda.mem_get_info(device)
-        usable = free - max(4 * 2**30, int(total * 0.1))
-        if estimated_gpu_bytes > usable:
-            raise MemoryError("所选设备空闲显存不足，停止等待资源安排")
+        started = monotonic()
+        last_notice = None
+        while True:
+            free, total = torch.cuda.mem_get_info(device)
+            reserve = max(4 * 2**30, int(total * 0.1))
+            if estimated_gpu_bytes > total - reserve:
+                raise MemoryError("所选单卡总容量扣除保护余量后不足以容纳显存预算，无法通过等待满足")
+            usable = free - reserve
+            now = monotonic()
+            if estimated_gpu_bytes <= usable:
+                event("classification_gpu_admitted", device=str(device),
+                      requested_bytes=estimated_gpu_bytes, free_bytes=free,
+                      reserve_bytes=reserve, usable_bytes=usable, waited_seconds=now - started)
+                break
+            if last_notice is None or now - last_notice >= 60:
+                event("waiting_gpu", device=str(device), requested_bytes=estimated_gpu_bytes,
+                      free_bytes=free, total_bytes=total, reserve_bytes=reserve,
+                      usable_bytes=usable, waited_seconds=now - started,
+                      poll_seconds=5, timeout_seconds=None)
+                last_notice = now
+            sleep(5)
     return device
 
 
