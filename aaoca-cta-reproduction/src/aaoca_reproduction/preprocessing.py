@@ -10,6 +10,7 @@ import torch
 import torchio as tio
 
 from .prepare import crop_in_memory
+from .exclusions import read_exclusion, save_exclusion
 from .records import CLASSIFICATION_TARGET, RELEASE, admit_stage, event, identity, measure, read_json, signature, write_json
 from .resources import configure_cpu, memory_guard
 
@@ -123,11 +124,22 @@ def prepare_classification(case, config, directory, verify_author=False):
     if directory == root or not directory.is_relative_to(root):
         raise ValueError("正式分类预处理必须位于配置data_root的专用子目录")
     recipe = method(config)
+    key = preprocessing_identity(case, recipe)
+    excluded = read_exclusion(case, config, directory)
+    if excluded is not None:
+        if excluded["identity"] != key:
+            raise ValueError("定位排除记录的预处理方法身份已变化，需要重新核对该例")
+        return {**excluded, "reused": True}
+    receipt = directory / "classification.json"
+    if not Path(case["label"]).exists() and not receipt.exists():
+        if signature(case["image"]) != case["source_stat"]["image"]:
+            raise ValueError("冻结后选中影像状态已变化")
+        if directory.exists() and any(directory.iterdir()):
+            raise FileExistsError("缺失分割的病例目录包含未知或未完成文件")
+        return save_exclusion(case, config, directory, "missing_label_file", {}, key)
     for name in ("image", "label"):
         if signature(case[name]) != case["source_stat"][name]:
             raise ValueError("冻结后选中输入文件状态已变化")
-    key = preprocessing_identity(case, recipe)
-    receipt = directory / "classification.json"
     if receipt.exists():
         previous = read_json(receipt)
         if previous["identity"] != key:
@@ -143,8 +155,10 @@ def prepare_classification(case, config, directory, verify_author=False):
     applied_resources = configure_cpu(config)
     with measure() as measured, memory_guard(config) as guarded:
         tic = perf_counter()
-        crop, crop_record = crop_in_memory(case, config, directory, verify_center=verify_author)
+        crop, crop_record = crop_in_memory(case, config, directory, verify_center=verify_author, allow_missing=True)
         timings["crop_seconds"] = perf_counter() - tic
+        if crop is None:
+            return save_exclusion(case, config, directory, crop_record["reason"], crop_record, key)
         memory_estimate = admit_stage(config, "torchio_resample_and_quantization", {
             "crop_and_bspline_working_buffers": int(crop.nbytes) * 8,
             "target_buffers_and_float64_geometry_checks": int(np.prod(TARGET)) * 80,

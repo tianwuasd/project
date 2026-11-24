@@ -40,7 +40,7 @@ def ascii_label(path, directory):
         link.unlink()
 
 
-def load_localization(case, image, directory):
+def load_localization(case, image, directory, allow_missing=False):
     if case["dataset"] == "imagechd":
         label = nib.load(case["label"])
         if label.shape != image.shape or not np.allclose(label.affine, image.affine, atol=1e-5, rtol=0):
@@ -78,6 +78,9 @@ def load_localization(case, image, directory):
                 structures[kind] = (np.transpose(values == value, (2, 1, 0)),
                                     {"name": name, "value": value, "layer": layer})
     if set(structures) != {"LV", "AO"}:
+        if allow_missing:
+            return (structures.get("LV", (None,))[0], structures.get("AO", (None,))[0],
+                    {k: v[1] for k, v in structures.items()})
         raise ValueError("既有粗分割缺少明确命名的左室腔或主动脉")
     return structures["LV"][0], structures["AO"][0], {k: v[1] for k, v in structures.items()}
 
@@ -158,7 +161,17 @@ def author_reference_center(lv, aorta):
     return np.asarray(np.unravel_index(np.argmin(distance), distance.shape))
 
 
-def crop_in_memory(case, config, directory, verify_center=False):
+def localization_status(lv, aorta):
+    if lv is not None and aorta is not None and lv.shape != aorta.shape:
+        raise ValueError("左心室与主动脉定位网格不一致")
+    counts = {"LV": None if lv is None else int(np.count_nonzero(lv)),
+              "AO": None if aorta is None else int(np.count_nonzero(aorta))}
+    reason = ("missing_localization_structures" if None in counts.values() else
+              "empty_localization_structures" if 0 in counts.values() else None)
+    return {"reason": reason, "voxel_counts": counts}
+
+
+def crop_in_memory(case, config, directory, verify_center=False, allow_missing=False):
     directory = Path(directory).resolve()
     for key in ("image", "label"):
         if signature(case[key]) != case["source_stat"][key]:
@@ -172,8 +185,13 @@ def crop_in_memory(case, config, directory, verify_center=False):
     event("prepare_started", case_id=case["case_id"], localization=case["localization"])
     with measure() as measured:
         tic = perf_counter()
-        lv, aorta, structures = load_localization(case, image, directory)
+        lv, aorta, structures = load_localization(case, image, directory, allow_missing=allow_missing)
         timings["label_load_seconds"] = perf_counter() - tic
+        status = localization_status(lv, aorta)
+        if status["reason"] is not None:
+            if allow_missing:
+                return None, {**status, "structures": structures}
+            raise ValueError("定位结构缺失或为空：" + str(status["voxel_counts"]))
         tic = perf_counter()
         center, center_mode = center_of_interest(lv, aorta, config, memory_plan)
         timings["localization_seconds"] = perf_counter() - tic

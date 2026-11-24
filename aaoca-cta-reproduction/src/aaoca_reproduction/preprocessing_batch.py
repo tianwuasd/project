@@ -8,6 +8,7 @@ from time import perf_counter
 import psutil
 
 from .labels import validate_manifest
+from .exclusions import SKIP_FILE
 from .records import CLASSIFICATION_TARGET, event, read_json, signature, write_json
 
 
@@ -36,7 +37,7 @@ def batch_lock(path):
 
 
 def recover_partial(directory, case, key, previous):
-    if not directory.exists() or (directory / "classification.json").exists():
+    if not directory.exists() or (directory / "classification.json").exists() or (directory / SKIP_FILE).exists():
         return {"files": 0, "bytes": 0}
     paths = list(directory.iterdir())
     if not paths:
@@ -47,7 +48,7 @@ def recover_partial(directory, case, key, previous):
     for name in ("image", "label"):
         if signature(case[name]) != case["source_stat"][name]:
             raise ValueError("未完成病例源输入已变化，拒绝清理")
-    allowed = {"normalized.pending.nii.gz", "normalized.nii.gz", "training_xyz.pending.npy",
+    allowed = {SKIP_FILE + ".pending", "normalized.pending.nii.gz", "normalized.nii.gz", "training_xyz.pending.npy",
                "training_xyz.npy", "classification.json.pending", "source-label.seg.nrrd"}
     for path in paths:
         if path.name not in allowed or path.is_symlink() or not path.is_file():
@@ -103,7 +104,7 @@ def run_batch(config, cases, root, progress_path, plan):
         recovery_records.append(previous["inflight"])
     progress = {"state": "running", "started_utc": datetime.now(timezone.utc).isoformat(),
                 "pid": process.pid, "process_created": process.create_time(), "plan": plan,
-                "completed": [], "current_case": None, "reused_count": 0, "remaining": len(cases),
+                "completed": [], "skipped": [], "skipped_count": 0, "current_case": None, "reused_count": 0, "remaining": len(cases),
                 "inflight": None, "recovery_records": recovery_records}
     for case in cases:
         directory = root / case["case_id"]
@@ -119,14 +120,23 @@ def run_batch(config, cases, root, progress_path, plan):
         recovery_records[:] = [record for record in recovery_records if record != progress["inflight"]]
         item = {"case_id": case["case_id"], "reused": result["reused"],
                 "seconds": perf_counter() - began, "identity": result["identity"]}
-        progress["completed"].append(item)
+        skipped = result.get("state") == "skipped"
+        if skipped:
+            item["reason"] = result["reason"]
+            progress["skipped"].append(item)
+        else:
+            progress["completed"].append(item)
         progress.update(completed_count=len(progress["completed"]), seconds=perf_counter() - started,
-                        reused_count=progress["reused_count"] + int(item["reused"]),
-                        remaining=len(cases) - len(progress["completed"]), inflight=None)
+                        skipped_count=len(progress["skipped"]),
+                        reused_count=progress["reused_count"] + int(item["reused"] and not skipped),
+                        remaining=len(cases) - len(progress["completed"]) - len(progress["skipped"]), inflight=None)
         write_json(progress_path, progress)
-        event("classification_dataset_case_completed", **item, completed=progress["completed_count"], total=len(cases))
+        event("classification_dataset_case_skipped" if skipped else "classification_dataset_case_completed",
+              **item, completed=progress["completed_count"], skipped=progress["skipped_count"],
+              remaining=progress["remaining"], total=len(cases))
     progress.update(state="completed", current_case=None, seconds=perf_counter() - started)
     write_json(progress_path, progress)
-    return {"state": "completed", "cases": len(cases), "reused": sum(item["reused"] for item in progress["completed"]),
+    return {"state": "completed", "cases": len(cases), "completed": len(progress["completed"]),
+            "skipped": len(progress["skipped"]), "reused": sum(item["reused"] for item in progress["completed"]),
             "seconds": progress["seconds"], "output_root": str(root), "progress": str(progress_path),
             "training_updates": 0}

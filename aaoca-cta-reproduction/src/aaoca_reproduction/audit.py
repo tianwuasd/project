@@ -6,6 +6,7 @@ from pathlib import Path
 import random
 
 from .records import RELEASE, read_json, signature, write_json
+from .exclusions import usable_cases
 
 
 TASKS = ("aaoca_present", "origin_left", "high_risk")
@@ -164,9 +165,12 @@ def check_training(config, manifest):
     policy = config.get("label_policy", "confirmed")
     reviews = reviewed_labels(read_label_rows(path, config.get("diagnosis_sheet")), manifest, policy,
                                aaoca_root=config["aaoca_root"])
-    patients = {row["patient_key"]: row for row in manifest["cases"]}
+    usable, exclusions = usable_cases(manifest["cases"], config)
+    patients = {row["patient_key"]: row for row in usable}
     counts = {task: {role: Counter() for role in ("candidate_train", "candidate_validation")} for task in TASKS}
     for key, review in reviews.items():
+        if key not in patients:
+            continue
         for task in TASKS:
             value = review["labels"][task]
             if value is None:
@@ -193,6 +197,7 @@ def check_training(config, manifest):
     missing = {task: {role: sorted({0, 1} - set(counts[task][role])) for role in counts[task]}
                for task in TASKS}
     return {"ready": all(ready[task] for task in active), "active_tasks": active, "ready_by_task": ready, "counts": counts,
+            "localization_exclusions": exclusions,
             "ct_binding_states": dict(Counter(review["ct_binding_state"] for review in reviews.values())),
             "ct_binding_states_by_task": {task: dict(Counter(review["ct_bindings"][task]["ct_binding_state"]
                                                              for review in reviews.values())) for task in TASKS},

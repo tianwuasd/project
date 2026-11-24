@@ -8,6 +8,7 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 
 from .classification import LABEL_MAPS, build_model, coverage_reviews, load_weights, prediction_direction, validate_descriptor
 from .data import load_array, prepared_receipt
+from .exclusions import usable_cases
 from .labels import read_label_rows, reviewed_labels, validate_manifest
 from .preprocessing import network_tensor
 from .records import event, identity, signature, write_json
@@ -49,6 +50,9 @@ def predict(config, manifest):
         raise ValueError("预测需显式列出不重复病例，禁止自动处理全部队列")
     candidates = {r["case_id"]: r for r in manifest["cases"] if r["role"] == "predict"}
     rows = [candidates[key] for key in requested]
+    rows, exclusions = usable_cases(rows, config)
+    if not rows:
+        raise ValueError("所选预测病例均因定位分割缺失或为空而被排除")
     receipts = [prepared_receipt(row, config) for row in rows]
     review = prediction_direction(config, receipts)
     coverage = coverage_reviews(config, rows, receipts)
@@ -142,6 +146,7 @@ def predict(config, manifest):
                 confirmed_truth.append(confirmed_value)
                 confirmed_probability.append(probability)
         report = {"identity": run_identity, "task": task, "results": results, "metrics": metrics(valid_truth, valid_probability),
+                  "localization_exclusions": exclusions,
                   "unknown_or_inapplicable": len(results) - len(valid_truth), "memory": memory,
                   "seconds": perf_counter() - started, "initialization_members": count,
                   "full_five_initializations": count == 5, "direction_review": review, "coverage_reviews": coverage,

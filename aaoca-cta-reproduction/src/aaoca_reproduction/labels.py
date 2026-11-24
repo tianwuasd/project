@@ -4,6 +4,8 @@ from collections import Counter
 from copy import deepcopy
 from pathlib import Path, PurePosixPath
 
+from .exclusions import usable_cases
+
 
 TASKS = ("aaoca_present", "origin_left", "high_risk")
 COLUMNS = ("patient_key", *TASKS, "reviewer", "reference", "review_status", "ct_matched")
@@ -291,7 +293,7 @@ def task_partitions(config, manifest, task):
         raise ValueError("未知分类任务")
     if config.get("diagnoses") is None:
         raise ValueError("分类需要明确提供diagnoses诊断表")
-    cases = validate_manifest(manifest)
+    cases, _ = usable_cases(validate_manifest(manifest), config)
     policy = config.get("label_policy", "confirmed")
     reviewed = reviewed_labels(read_label_rows(config["diagnoses"], config.get("diagnosis_sheet")), manifest, policy,
                                aaoca_root=config["aaoca_root"])
