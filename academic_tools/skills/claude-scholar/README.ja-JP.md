@@ -28,6 +28,10 @@
 
 ## 最新ニュース
 
+- **2026-11-23** · Claude Code を手動インストールした場合に、ホームディレクトリのパスに空白があってもフックが動作し、終了コードが保持されるようにしました。発表用の文献キャンバスは、明示的な依頼がある場合のみ作成・更新されます。[Codex 版](https://github.com/Galaxy-Dawn/claude-scholar/tree/codex)に Granola の会議メモを Obsidian に取り込む機能とインストール診断を追加しました。
+- **2026-10-19** · インストール先のパスに空白がある場合の Claude Code プラグインのフックを修正し、Windows の書き込み先チェックを改善しました。オプションの Parallel Search の設定手順も追加しました。
+- **2026-09-23** · `paper-miner` が抽出した執筆パターンを複数の執筆スキルで再利用でき、アップグレードやアンインストール後も保持されるようにしました。Codex のネイティブエージェント検出も改善しました。
+- **2026-08-27** · Claude Code、Codex、OpenCode で、論文の広報に Xquik を任意で利用できるようにしました。
 - **2026-06-03**: **Kimi Code CLI ブランチを追加し、Kimi からの力強い支援に感謝** — `kimi` ブランチを Claude Scholar の Kimi Code CLI 版として追加しました。本プロジェクトへの Kimi チームの継続的で力強い支援に感謝します。
 - **2026-05-14**: **`expression-skill` を中核のコミュニケーション層に据え、`planning-with-files` を既定の永続 planning 層として戻し、Nature 執筆スタックも拡張** — [`expression-skill`](./skills/expression-skill/README.md) を、報告・計画・ファイル操作・多段の技術作業における結論先行の表現規律として明示しました。さらに [`planning-with-files`](./skills/planning-with-files/SKILL.md) を、複雑な作業で `task_plan.md` / `notes.md` を使う既定の on-disk planning / progress-tracking workflow として再導入しました。あわせて、章構成の起草と論証構築向けに [`nature-writing`](./skills/nature-writing/README.md) を導入し、[`nature-polishing`](./skills/nature-polishing/README.md) を上流の最新 article-pattern 版へ更新し、[`nature-response`](./skills/nature-response/README.md) と [`nature-data`](./skills/nature-data/README.md) も journal-writing スタックに維持しています。
 - **2026-05-13**: **根拠ゲート付き研究ワークフローと `Sources/Papers` ルーティングを整理** — Evidence Records、claim strength、Claim Promotion Gate を共有する `research-contract.md` を追加しました。研究アイデア出し、Zotero 取り込み、文献統合、結果レポート、論文執筆、rebuttal ワークフローを同じ根拠契約に接続し、プロジェクトの論文ソースノートはまず `Sources/Papers` に置き、根拠ゲートを通った主張だけを `Knowledge` や `Writing` へ進める方針を明確にしました。
@@ -136,9 +140,15 @@ bash /tmp/claude-scholar/scripts/setup.sh
 - 既存の`~/.claude/CLAUDE.md`を保持し、リポジトリ版を`~/.claude/CLAUDE.scholar.md`としてインストール
 - 既存の`~/.claude/CLAUDE.zh-CN.md`を保持し、リポジトリ版を`~/.claude/CLAUDE.zh-CN.scholar.md`としてインストール
 - 既存の`env`、モデル/プロバイダー設定、APIキー、パーミッション、現在の`mcpServers`値を保持
-- 既存のフックセットを置き換えるのではなく、不足しているフックエントリを追加
+- 不足している Scholar フックを追加し、識別できた旧版の既定起動コマンドを更新
 
 **CLAUDEに関する重要事項**: 既に独自の`~/.claude/CLAUDE.md`や`~/.claude/CLAUDE.zh-CN.md`をお持ちの場合、インストール後に`~/.claude/CLAUDE.scholar.md`と`~/.claude/CLAUDE.zh-CN.scholar.md`を確認し、必要なClaude Scholarのセクションを手動で統合してください。別名で配置された補助ファイルは自動的には適用されません。
+
+**手動で設定した旧版フックの更新。** インストーラーを再実行すると、`settings.json` をバックアップし、Scholar の既定の起動コマンドを5つ更新します。新しいコマンドは空白を含むホームパスに対応し、フックの終了コードを保持します。
+
+- 同じイベントとマッチャーでは、異なるユーザー設定を1つずつ残します。`async`、`timeout`、`statusMessage` も保持され、再インストールしても結果は同じです。
+- セットアップでは独自のコマンドや別のマッチャーの設定を保持します。
+- 選択インストールでは、起動コマンドを [`settings.json.template`](settings.json.template) と照合してください。
 
 アップデート方法:
 
@@ -159,7 +169,7 @@ bash scripts/uninstall.sh
 - `~/.claude/.claude-scholar-manifest.txt`: Claude Scholar が実際に管理するファイル一覧
 - `~/.claude/.claude-scholar-install-state`: 安全なアンインストールに使う ownership メタデータ
 
-アンインストーラーは install state に記録されたファイルと settings エントリだけを削除し、現在のリポジトリ内容から所有権を推測しません。
+アンインストーラーはインストール記録に従って管理対象のファイルと設定項目を削除します。スクリプトや共通ヘルパーが削除された Scholar 起動コマンドも取り除き、元の設定は `~/.claude/.claude-scholar-backups/uninstall-*/settings.json` に保存します。
 
 ### オプション2: ミニマルインストール
 

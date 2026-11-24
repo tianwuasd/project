@@ -1,6 +1,6 @@
 ---
 name: nature-paper2word
-description: "Compile an academic Markdown manuscript into a journal- or school-compliant Word (.docx): declared typography, native OMML equations, three-line tables, cross-references, per-section page numbers, CSL bibliographies (GB/T 7714, APA, Nature, IEEE), and pre/post-export quality gates. 把学术论文的 Markdown 稿件导出为符合期刊或学位论文规范的 Word：摘要、公式编号、三线表、题注、交叉引用、目录域、参考文献。Use when the user wants a submission-ready .docx — 论文转 Word、学位论文排版、期刊投稿排版、prepare submission docx — or a readable copy of a manuscript. Not for PDF, HTML or LaTeX output, and not for slide decks or grant forms."
+description: "Compile an academic Markdown manuscript into a journal- or school-compliant Word (.docx): declared typography, native OMML equations, three-line tables, cross-references, per-section page numbers, CSL bibliographies (GB/T 7714, APA, Nature, IEEE), and pre/post-export quality gates. 把学术论文的 Markdown 稿件导出为符合期刊或学位论文规范的 Word：摘要、公式编号、三线表、题注、交叉引用、目录域、参考文献。Use when the user wants a submission-ready .docx — 论文转 Word、学位论文排版、期刊投稿排版、prepare submission docx — or a readable copy of a manuscript. Not for PDF, HTML or LaTeX output, and not for slide decks or grant forms. Also use for reference-paper reformatting and format requirements supplied as PDF, Word, images or pasted text, with automatic image-text recognition. 参考论文样式提取、按参考文档重排版、期刊排版要求、图片与扫描件识别。"
 license: MIT
 ---
 
@@ -11,8 +11,14 @@ requirements always produce a byte-identical `.docx`. Do not substitute a hand-w
 python-docx script; run the installed pipeline.
 
 **Before the first export in a session, confirm the engine is available**: `md-to-word --version`
-must print a version. This skill ships documentation only; if the command is missing, install it
+must print a version. The export engine is installed separately; if the command is missing, install it
 with `pip install md-to-word-docx`, then run the check again.
+
+Check the capability rather than the version, since the version here would go stale:
+
+```bash
+md-to-word --help | grep -- --base-template   # present = a school template can be kept as the base
+```
 
 **The full vocabulary lives in the manual inside the package**, not here. `md-to-word --contract`
 prints its absolute path (Chinese or English, following the manuscript). Everything below is order
@@ -22,11 +28,19 @@ of work; every spelling is looked up in the manual.
 
 | Scenario | What the user says | What to do |
 |---|---|---|
-| Journal or school compliance | "format it for Nature / my university" | Get a target `.docx` template or a written spec, then build a requirements file. |
-| Existing requirements | "use our lab's spec file" | Pass it with `-r`. |
+| Journal or school compliance | "format it using these journal instructions" | Read [format-requirements](references/format-requirements.md); extract requirements from PDF, Word, images or pasted text, then build the engine requirements file. |
+| Reference-paper reformatting | "format manuscript A like paper B" | Read [reference-layout](references/reference-layout.md); inspect actual reference paragraphs, map their roles, then extract and verify the requirements. |
+| Existing requirements | "use our lab's spec file" | Pass it with `-f`. |
+| Thesis with the school's own `.docx` | "use our school's template" | `--base-template` pours the body into the school file: its cover, originality statement and front matter stay byte for byte, only the body is replaced. Pick the cut point with `--keep-until <text>` (never past its contents page). The export either verifies — front matter node-for-node, and page-by-page where Word is installed — or writes nothing. See the manual's §9. |
 | Baseline export (no explicit spec) | "turn this into a Word file" | Normalize the manuscript to the contract, then export with the built-in preset. The preset is a complete, valid format, not a provisional default. |
 
-State the chosen preset or requirements path in one line, then proceed. Without `-r` the only file
+Input format and purpose are separate: a Word or PDF may contain written submission rules,
+a template or an example paper. Read explicit requirements as text; inspect example layout
+when needed. Automatically read images and scanned pages with available image-reading or OCR
+tools, checking the recognized rules against the image. Handle mixed documents page by page.
+The host performs this intake; the paragraph-sample helper accepts DOCX only.
+
+State the chosen preset or requirements path in one line, then proceed. Without `-f` the only file
 picked up is one named exactly **`format.txt`** beside the manuscript; no other `.txt` is guessed at
 (if one is there, the run names it in a reminder). With no `format.txt`, the preset follows the
 **manuscript's language**: `zh-academic` for Chinese, `en-nature` for everything else. The run reports
@@ -39,7 +53,9 @@ number rather than emitting a document that looks acceptable while its formattin
 ## 2. Bring the manuscript to the input contract
 
 The source may be pasted text, `.txt`, `.md`, an old `.docx`, or a PDF. Normalize it to Markdown
-first; never edit the user's original file in place.
+first; never edit the user's original file in place. For a reference-paper request, identify source
+and reference roles separately using the linked workflow before normalization. Existing DOCX
+objects are reconstructed by export; check their content rather than assuming native preservation.
 
 - **Headings**: `#`, `##`, `###`, consecutive and unskipped; a heading that carries its own number
   (`1.`, `2.1`) needs as many `#` as its number has levels.
@@ -83,13 +99,18 @@ first; never edit the user's original file in place.
    font, size, bold, italic, alignment, line spacing, space before, space after, indent. Every style
    line must be complete; missing fields are errors.
 3. **Reverse-engineer a target `.docx`** — `md-to-word-template target.docx -o format.txt`, then
-   review the "to confirm" list at the end of the draft.
+   review the "to confirm" list at the end of the draft. This reads known style definitions;
+   reference papers using custom styles or direct formatting need the paragraph-sample workflow
+   in [reference-layout](references/reference-layout.md).
+4. **Written journal requirements** — extract the rules using
+   [format-requirements](references/format-requirements.md), then translate supported properties
+   into the engine vocabulary. Keep stated requirements separate from inferred sample layout.
 
 Each property has exactly one accepted spelling (two in total: the canonical Chinese and English
 forms); anything else is a hard error with a line number. Full table: manual §3.1. Style names:
 §3.4. Presets are the reference examples — `md-to-word --contract` prints their paths.
 
-Throughout this file, `format.txt` means *the format requirements file* — any path works, `-r` takes
+Throughout this file, `format.txt` means *the format requirements file* — any path works, `-f` takes
 it.
 
 Citation style comes from `csl:` with a bundled file name (manual §7) or a path to the user's own
@@ -102,7 +123,7 @@ Run the installed command from the manuscript's directory:
 
 ```bash
 md-to-word manuscript.md -o manuscript.docx
-md-to-word manuscript.md -r format.txt -o manuscript.docx
+md-to-word manuscript.md -f format.txt -o manuscript.docx
 md-to-word --contract          # contract + paths to the manual and presets
 ```
 
@@ -133,6 +154,12 @@ not seem to take effect.
 
 ## 6. Verify before delivery
 
+- For reference-paper requests, first verify role and property coverage against the reference
+  samples as described in [reference-layout](references/reference-layout.md). A successful export
+  checks the supplied requirements, not whether they fully describe the reference paper.
+- For supplied instructions, compare the output against the original clauses and their page,
+  paragraph or image locations, including recognized numbers and units. Report requirements
+  the engine cannot apply separately from those verified by its export checks.
 - Confirm the `.docx` exists and the command exited `0`.
 - Report the applied preset or requirements file, the citation style, and anything the run warned
   about.
