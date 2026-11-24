@@ -2,6 +2,7 @@
 torch @ https://download.pytorch.org/whl/cu126/torch-2.9.1%2Bcu126-cp311-cp311-win_amd64.whl
 torchvision @ https://download.pytorch.org/whl/cu126/torchvision-0.24.1%2Bcu126-cp311-cp311-win_amd64.whl
 triton-windows==3.5.1.post24
+accelerate==1.12.0
 numpy==1.26.4
 scipy==1.13.1
 Pillow==12.0.0

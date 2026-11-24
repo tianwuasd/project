@@ -56,7 +56,7 @@ def capacity_key(config, spec, local_batch, world=None):
     from importlib.metadata import version
     if spec.get('resource_model') == 'medsam3':
         source = Path(__file__).parents[1]/'models'/'medsam3'
-        return digest(dict(model='medsam3', spec=spec, batch=local_batch,
+        return digest(dict(model='medsam3', spec={k:v for k,v in spec.items() if k != 'capacity_probe_bytes'}, batch=local_batch,
             precision=config['training']['precision'],
             world=config['resources']['gpu_count'] if world is None else world,
             implementation={name:file_digest(source/name) for name in
@@ -126,21 +126,24 @@ def gpu_decision(config, spec, history, peaks, peers, world=None, require_measur
                 if local_batch not in keys:
                     keys[local_batch] = capacity_key(config, spec, local_batch, world)
                 measured = peaks.get(g["uuid"], {}).get(keys[local_batch])
+                probe = spec.get('capacity_probe_bytes', 0) if spec.get('resource_model') == 'medsam3' else 0
+                if type(probe) is not int or probe < 0:
+                    raise ValueError('首次容量检查显存上限无效')
                 samples = [next((a for a in snapshot if a["uuid"] == g["uuid"]), None) for _, snapshot in history]
-                if measured is None:
+                if measured is None and not probe:
                     reason = "缺少此显卡同配方的显存峰值记录"
-                elif type(measured) not in (int, float) or not math.isfinite(measured) or measured <= 0:
+                elif measured is not None and (type(measured) not in (int, float) or not math.isfinite(measured) or measured <= 0):
                     raise ValueError("GPU 显存峰值记录必须为有限正数")
                 elif history[-1][0] - history[0][0] < r["share_window_seconds"] or any(a is None or not a["busy"] for a in samples):
                     reason = "繁忙显卡的连续观察窗口不足"
                 elif np.percentile([a["utilization"] for a in samples], 90) > r["share_utilization"]:
                     reason = "繁忙显卡的窗口利用率超过共享阈值"
-                elif min(a["free"] for a in samples) < measured * r["peak_margin"] + reserve:
+                elif min(a["free"] for a in samples) < (probe if measured is None else measured * r["peak_margin"]) + reserve:
                     reason = "繁忙显卡的窗口剩余显存不足"
                 else:
-                    reason = "eligible_shared"
+                    reason = "eligible_capacity_probe" if measured is None else "eligible_shared"
             reports[column]["ranks"][str(rank)] = {"batch": local_batch, "reason": reason}
-            allowed[rank, column] = reason in ("eligible_idle", "eligible_shared")
+            allowed[rank, column] = reason in ("eligible_idle", "eligible_shared", "eligible_capacity_probe")
     # 有效组合先最少使用繁忙卡，再比较空闲显存；同时解决不同每卡 batch 的完整匹配。
     size = len(shares)
     maximum_free = max(1, max(g["free"] for g in selected))

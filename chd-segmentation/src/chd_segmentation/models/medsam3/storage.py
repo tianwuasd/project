@@ -9,7 +9,7 @@ import numpy as np
 
 from ...artifacts.store import read_json, write_json
 from ...observability.events import event
-from ..stunet.streaming import local_image
+from ...artifacts.nifti import local_image
 from . import PROTOCOL
 
 
@@ -85,7 +85,7 @@ def export_case(root, original, state):
         header.set_slope_inter(1., 0.)
         result = original.__class__(values, original.affine, header)
         nib.save(result, pending)
-        with pending.open('rb') as stream:
+        with pending.open('r+b') as stream:
             os.fsync(stream.fileno())
         pending.replace(destination)
         del result

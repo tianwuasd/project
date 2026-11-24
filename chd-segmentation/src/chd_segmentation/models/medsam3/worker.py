@@ -26,6 +26,12 @@ def run(config, rows, output, handle, gpus, dependency_record, stop_after):
         actual = actual if actual.startswith('GPU-') else 'GPU-' + actual
         if actual.lower() != gpus[0]['uuid'].lower():
             raise ValueError('MedSAM3实际GPU与公共准入结果不符')
+        if config.get('capacity_probe_bytes', 0):
+            free, total = torch.cuda.mem_get_info()
+            cap = min(config['capacity_probe_bytes'], free-max(2**30, config['resources']['vram_reserve_bytes']))
+            if cap <= 0:
+                raise MemoryError('首次容量检查缺少显存余量')
+            torch.cuda.set_per_process_memory_fraction(cap/total)
         torch.cuda.reset_peak_memory_stats()
     root = Path(output)
     recipe = digest({key: config[key] for key in (

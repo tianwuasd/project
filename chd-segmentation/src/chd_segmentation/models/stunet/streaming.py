@@ -1,6 +1,5 @@
 from contextlib import contextmanager
 import ctypes
-import gzip
 from itertools import product
 import os
 import shutil
@@ -17,6 +16,7 @@ from nnunetv2.preprocessing.resampling.default_resampling import compute_new_sha
 from ...observability.events import event
 from ...observability.progress import console_progress, resource_summary
 from ...artifacts.store import read_json, write_json
+from ...artifacts.nifti import local_image
 from ...artifacts.cache import release_private_mapping, discard_file_pages
 from ...preprocessing.validation import SourceReader
 from .preprocess import bounded_locations
@@ -179,30 +179,6 @@ class BlockWorkspace:
         if self.execution is not None:
             self.execution.close()
             self.execution = None
-
-
-def local_image(image, source, name, workspace):
-    if source.suffix.lower() != ".gz" or workspace.config["technical"]["roi_xyz"] is not None:
-        return image
-    target = workspace.path / (name + ".nii")
-    with gzip.open(source, "rb") as incoming, target.open("xb") as outgoing:
-        workspace.streams.append(outgoing)
-        try:
-            count = 0
-            while True:
-                with workspace.allocation(8 * 1024 ** 2, "decompress"):
-                    block = incoming.read(4 * 1024 ** 2)
-                    if not block:
-                        break
-                    outgoing.write(block)
-                    count += 1
-                    workspace.report("decompress", count)
-                    del block
-            outgoing.flush()
-            os.fsync(outgoing.fileno())
-        finally:
-            workspace.streams.remove(outgoing)
-    return nib.load(target, mmap="r", keep_file_open=False)
 
 
 def unique_values(array, workspace):

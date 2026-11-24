@@ -23,7 +23,9 @@ def request(config, output, evaluation=False):
         dependencies={key:[Path(config[key]).stat().st_size,Path(config[key]).stat().st_mtime_ns]
                       for key in ('base_weights','lora_weights','official_config','bpe_path')}
         if not evaluation else {})
-    if not evaluation and config['device'] == 'cuda':
+    if not evaluation and config.get('capacity_probe_bytes', 0):
+        resources['gpu_spec']['capacity_probe_bytes'] = config['capacity_probe_bytes']
+    if not evaluation and config['device'] == 'cuda' and not config.get('capacity_probe_bytes', 0):
         resources['vram_reserve_bytes'] += config['estimated_vram_bytes']
     gpu_count = int(resources['device'] == 'cuda')
     demand = ResourceDemand(

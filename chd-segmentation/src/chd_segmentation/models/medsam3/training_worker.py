@@ -47,6 +47,8 @@ def train(payload, handle):
         free, total = torch.cuda.mem_get_info()
         reserve = max(2**30, config['resources']['vram_reserve_bytes'])
         cap = min(training['vram_limit_bytes'], free-reserve)
+        if config.get('capacity_probe_bytes', 0):
+            cap = min(cap, config['capacity_probe_bytes'])
         if cap <= 0 or config['precision'] == 'bf16' and not torch.cuda.is_bf16_supported():
             raise RuntimeError('显存余量不足或不支持请求的CUDA BF16')
         torch.cuda.set_per_process_memory_fraction(cap/total)

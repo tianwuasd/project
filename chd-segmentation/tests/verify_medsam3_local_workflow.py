@@ -20,6 +20,7 @@ def main():
         parser.add_argument('--'+key, required=True)
     parser.add_argument('--deadline', type=float)
     parser.add_argument('--prepare-only', action='store_true')
+    parser.add_argument('--capacity-probe', action='store_true')
     args = parser.parse_args()
     deadline = time.time()+1200 if args.deadline is None else args.deadline
     if not time.time() < deadline <= time.time()+1200:
@@ -134,7 +135,8 @@ def main():
             bpe_path=str(official/'sam3/assets/bpe_simple_vocab_16e6.txt.gz'), precision='bf16',
             orientation_evidence='沿用CHD1282的RAS研究约定；保留原始affine，仅按共享数组索引核对',
             intensity_evidence='沿用CHD1282缩放后NIfTI为HU的项目假设，未认证扫描校准；来源为冻结迁移清单',
-            coverage='selected', slices=slices, fixed_ram_bytes=8*2**30, workspace_bytes=512*2**20,
+            coverage='selected', slices=slices, fixed_ram_bytes=2*2**30, workspace_bytes=512*2**20,
+            capacity_probe_bytes=13*2**29 if args.capacity_probe else 0,
             estimated_vram_bytes=6*2**30, worker_timeout_seconds=1200)
         base['resources'].update(cpu_threads=4, wait_seconds=90, reserve_ram_bytes=4*2**30,
             vram_reserve_bytes=2**30, memory_limit_bytes=16*2**30, share=True)

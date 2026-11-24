@@ -26,10 +26,12 @@ def load_config(path):
         intensity_semantics='hu', source_mean=None, source_std=None, prompts=PROMPTS,
         detection_threshold=.5, nms_iou_threshold=.5, coverage='all', slices=None,
         fixed_ram_bytes=8 * 2**30, workspace_bytes=2**30, estimated_vram_bytes=8 * 2**30,
-        resources={}, heartbeat_seconds=15, worker_timeout_seconds=900)
+        resources={}, heartbeat_seconds=15, worker_timeout_seconds=900, capacity_probe_bytes=0)
     if not isinstance(raw, dict) or not required <= raw.keys() or set(raw) - required - defaults.keys():
         raise ValueError('MedSAM3配置缺少必需字段或包含未知字段')
     config = {**defaults, **raw}
+    if type(config['capacity_probe_bytes']) is not int or config['capacity_probe_bytes'] < 0:
+        raise ValueError('首次容量检查显存上限需要非负整数')
     if config['model'] != 'medsam3' or config['resolution'] != 1008:
         raise ValueError('MedSAM3固定使用所选官方1008图像配方')
     if config['device'] not in ('cpu','cuda') or config['precision'] not in ('fp32','bf16'):
