@@ -21,6 +21,7 @@ def main():
     parser.add_argument('--deadline', type=float)
     parser.add_argument('--prepare-only', action='store_true')
     parser.add_argument('--capacity-probe', action='store_true')
+    parser.add_argument('--checkpoint-only', action='store_true')
     args = parser.parse_args()
     deadline = time.time()+1200 if args.deadline is None else args.deadline
     if not time.time() < deadline <= time.time()+1200:
@@ -198,6 +199,11 @@ def main():
             report['state'] = 'preprocessing_passed'
             return
         limit = ['--deadline',str(deadline)]
+        if args.checkpoint_only:
+            from chd_segmentation.models.medsam3.finetune import settings,check,training_contract
+            from chd_segmentation.artifacts.store import digest
+            old_config = settings(train_path)
+            old_contract = training_contract(old_config,check(old_config))
         stage('train_first', ['train','--config',str(train_path),'--stop-after','1',*limit])
         import torch
         first = torch.load(root/'work/train/latest.pt', map_location='cpu', weights_only=True)
@@ -206,6 +212,15 @@ def main():
         delta1 = sum((first['lora'][k]-v).abs().sum().item() for k,v in initial.items())
         assert delta1 > 0
         del initial
+        if args.checkpoint_only:
+            if 'contract' in first:
+                assert first['contract_identity'] == digest(first['contract'])
+            else:
+                assert first['identity'] == digest(old_contract)
+                write_json(root/'work/train/resume-proof.v1.json',dict(identity=first['identity'],contract=old_contract))
+            report.update(state='checkpoint_saved',completed_updates=1,lora_delta_first=delta1,
+                          checkpoint_identity=first['identity'])
+            return
         stage('train_resume', ['train','--config',str(train_path),'--resume','--stop-after','1',*limit])
         second = torch.load(root/'work/train/latest.pt', map_location='cpu', weights_only=True)
         assert second['step'] == 2 and second['optimizer']['state']
@@ -225,7 +240,7 @@ def main():
             validation=read_json(root/'work/train/validation.json'),
             prediction=read_json(prediction/'summary.json'), evaluation=read_json(prediction/'evaluation.json'))
     finally:
-        if report['state'] not in ('passed','preprocessing_passed'):
+        if report['state'] not in ('passed','preprocessing_passed','checkpoint_saved'):
             report['state'] = 'failed'
             report['failure'] = str(sys.exc_info()[1])
         report['seconds'] = time.monotonic()-began

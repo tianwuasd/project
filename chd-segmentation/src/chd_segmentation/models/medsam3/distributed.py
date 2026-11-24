@@ -13,9 +13,14 @@ def topology(config):
     return dict(world=world,batch=batch,shares=layout(batch,world,resources['batch_layout'] if 'training' in config else None))
 
 
-def require_topology(saved, expected):
-    if saved != expected:
-        raise ValueError('恢复需要相同的卡数、全局批量及逐rank份额')
+def require_topology(saved, expected, complete_update=False):
+    from ...acceleration.registry import layout
+    for value in (saved,expected):
+        layout(value['batch'],value['world'],value['shares'])
+    changed = saved != expected
+    if changed and (not complete_update or saved['batch'] != expected['batch']):
+        raise ValueError('调整卡数和份额需要完整更新边界，且global batch保持相同')
+    return changed
 
 
 def claim_prediction_slice(handle, limit):
@@ -54,3 +59,20 @@ def restore_rng(value):
     torch.set_rng_state(value['torch'])
     if value['cuda'] is not None:
         torch.cuda.set_rng_state(value['cuda'])
+
+
+def resumed_rng(states, rank, world, step):
+    if not states or not 0 <= rank < world:
+        raise ValueError('恢复缺少有效逐rank随机状态')
+    if rank < len(states):
+        return states[rank]
+    from hashlib import sha256
+    import random
+    import numpy as np
+    import torch
+    seed = int.from_bytes(sha256(states[0]['torch'].numpy().tobytes()+
+        f':{world}:{rank}:{step}'.encode()).digest()[:8],'little') % 2**63
+    random.seed(seed)
+    np.random.seed(seed % 2**32)
+    torch.manual_seed(seed)
+    return rng_state()

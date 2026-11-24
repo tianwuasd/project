@@ -84,7 +84,8 @@ def training_contract(config,checked):
 def run(config, operation, resume=False, stop_after=None, checkpoint='best', deadline=None):
     from .training_worker import execute
     from .launcher import launch
-    from .distributed import topology
+    from .distributed import topology,require_topology
+    from .resume import scientific_contract,implementation,resume_identity
     if operation not in ('train', 'validate') or checkpoint not in ('best', 'latest'):
         raise ValueError('医学LoRA操作或检查点无效')
     if stop_after is not None and (type(stop_after) is not int or stop_after < 1):
@@ -103,15 +104,30 @@ def run(config, operation, resume=False, stop_after=None, checkpoint='best', dea
         raise FileExistsError('新训练目录已存在；续训需显式--resume')
     if operation == 'validate' or resume:
         (root/(('latest' if resume else checkpoint)+'.pt')).resolve(strict=True)
-    signature = digest(training_contract(config,checked))
-    resources_config = deepcopy(config)
-    remaining = cutoff-time.time()
-    resources_config['resources']['max_wait'] = min(remaining, config['resources']['max_wait']) if config['resources']['max_wait'] is not None else remaining
-    req = replace(request(resources_config, root), stage='medsam3_lora_'+operation)
-    payload = dict(config=config, topology=topology(config), sources=checked['sources'], environment=checked['environment'],
-        dependencies=checked['dependencies'], identity=signature, operation=operation, resume=resume,
-        stop_after=stop_after, checkpoint=checkpoint, deadline=cutoff)
-    with operation_lock(root), ResourceSession(req) as session:
-        launch(config,checked['environment'],session,execute,(payload,session.handle,session.allocation.gpus),
-            payload['topology']['world'],cutoff)
+    with operation_lock(root):
+        contract = scientific_contract(config,checked)
+        code = implementation()
+        signature,migration = digest(contract),dict(kind='new')
+        if resume or operation == 'validate':
+            import torch
+            path = root/(('latest' if resume else checkpoint)+'.pt')
+            saved = torch.load(path,map_location='cpu',weights_only=True)
+            signature,migration = resume_identity(saved,config,checked,contract,root/'resume-proof.v1.json')
+            complete = saved.get('complete_update',migration['kind']=='legacy_contract_verified')
+            changed = require_topology(saved['topology'],topology(config),complete)
+            if len(saved['rank_rng']) != saved['topology']['world']:
+                raise ValueError('旧检查点缺少完整逐rank随机状态')
+            migration.update(checkpoint_sha256=file_digest(path),previous_topology=saved['topology'],
+                topology_changed=changed,code_changed=saved.get('implementation')!=code)
+            del saved
+        resources_config = deepcopy(config)
+        remaining = cutoff-time.time()
+        resources_config['resources']['max_wait'] = min(remaining,config['resources']['max_wait']) if config['resources']['max_wait'] is not None else remaining
+        req = replace(request(resources_config,root),stage='medsam3_lora_'+operation)
+        payload = dict(config=config,topology=topology(config),sources=checked['sources'],environment=checked['environment'],
+            dependencies=checked['dependencies'],identity=signature,contract=contract,implementation=code,migration=migration,
+            operation=operation,resume=resume,stop_after=stop_after,checkpoint=checkpoint,deadline=cutoff)
+        with ResourceSession(req) as session:
+            launch(config,checked['environment'],session,execute,(payload,session.handle,session.allocation.gpus),
+                payload['topology']['world'],cutoff)
     return read_json(root/('validation.json' if operation == 'validate' else 'training.json'))

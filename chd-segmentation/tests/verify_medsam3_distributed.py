@@ -29,7 +29,7 @@ def objective(module,features,padding,index):
 def worker(rank,args,port):
     sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
     from chd_segmentation.acceleration.distributed import synchronize_gradients,all_states,distributed_backend
-    from chd_segmentation.models.medsam3.distributed import rank_indices,rng_state,restore_rng,require_topology,validation_rounds
+    from chd_segmentation.models.medsam3.distributed import rank_indices,rng_state,restore_rng,require_topology,validation_rounds,resumed_rng
     from chd_segmentation.artifacts.store import write_json
     dist.init_process_group(distributed_backend('cpu'),init_method=f'tcp://127.0.0.1:{port}',rank=rank,world_size=2,
         timeout=timedelta(seconds=45))
@@ -59,6 +59,11 @@ def worker(rank,args,port):
     restore_rng(stored_states[rank])
     assert draws == (random.random(),float(np.random.random()),float(torch.rand(())))
     assert not torch.equal(states[0]['torch'],states[1]['torch'])
+    expanded = resumed_rng(states[:1],1,2,1)
+    again = resumed_rng(states[:1],1,2,1)
+    assert torch.equal(expanded['torch'],again['torch']) and expanded['python'] == again['python']
+    assert expanded['numpy'] == again['numpy'] and not torch.equal(expanded['torch'],states[0]['torch'])
+    assert require_topology(dict(world=1,batch=2,shares=[2]),dict(world=2,batch=2,shares=[1,1]),True)
     actual_prompts = ['aorta','pulmonary artery']
     empty_rounds = list(validation_rounds(actual_prompts[:1],2,rank))
     assert len(empty_rounds) == 1 and empty_rounds[0] == ('aorta' if rank == 0 else None)

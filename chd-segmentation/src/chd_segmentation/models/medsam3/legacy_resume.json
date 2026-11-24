@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "sources": [
+    {
+      "commit": "c245efacf934faba5c8f236c11bbec8ca70c7852",
+      "implementation": {
+        "adapter": "e5e1adb69f8a46ab1c71707aa63a64cf2ddf5b70efbc2fe6119b1abcacb52ac2",
+        "config": "ee7fa44a3c5432d361b134e46269f8b3067df1160c4043b68d0b5f50da65cc9b",
+        "input": "ad410b13ed8525dc41dc8f49bed526b71aa3a0f326f9dfc28f9e5064b64af20d",
+        "training_data": "b48c4aad6ba1bf515902c91f0405d350d71fbb2682782602f5f3456005c90b07",
+        "training_worker": "6146cfa0f9b6d72df9b2fad6d54634e73429d62f479860924ba12eee9f232c5d",
+        "finetune": "c86dbcf259b42d1c72f6c5b3ea3b0c648a45ae359442c2f831054d42122c6030",
+        "distributed": "48532b2d4f7ef1a6da976115bf43636955d891ce602f7d601a68afc58974b6f4",
+        "launcher": "d2d94deece4af537ca5c2fdee0221b7b6cfb3540b1a6b9fcd6eafd3092de3a25",
+        "gradient_sync": "b6252a5bfe83db44412aaff3030112e3bd82ee9db559c5866c5d73b057702f11"
+      }
+    }
+  ]
+}

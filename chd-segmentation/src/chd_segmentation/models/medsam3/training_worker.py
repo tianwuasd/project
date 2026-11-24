@@ -38,7 +38,9 @@ def train(payload, handle, rank, world, coordinator, gpus):
     from ...artifacts.store import write_json
     from ...observability.events import event
     from ...acceleration.distributed import all_states,synchronize_gradients,distributed_backend
-    from .distributed import rank_indices,require_topology,rng_state,restore_rng,validation_rounds
+    from .distributed import rank_indices,require_topology,rng_state,restore_rng,validation_rounds,resumed_rng
+    from ...training.checkpoint import verify_optimizer_device,tensors_equal
+    from ...artifacts.store import digest
 
     verify_worker_environment(payload['environment'])
     config, training = payload['config'], payload['config']['training']
@@ -70,7 +72,7 @@ def train(payload, handle, rank, world, coordinator, gpus):
             raise RuntimeError('显存余量不足或不支持请求的CUDA BF16')
         torch.cuda.set_per_process_memory_fraction(cap/total)
         torch.cuda.reset_peak_memory_stats()
-    state = dict(step=0, best_loss=float('inf'))
+    state = dict(step=0, best_loss=float('inf'), validation_pending=False)
 
     def combine(values, maximum=False):
         tensor = torch.tensor(values,dtype=torch.float64,device=device)
@@ -89,9 +91,12 @@ def train(payload, handle, rank, world, coordinator, gpus):
     def build(checkpoint=None):
         saved = torch.load(checkpoint, map_location='cpu', weights_only=True) if checkpoint is not None else None
         if saved is not None:
-            require_topology(saved['topology'],payload['topology'])
-            if saved['identity'] != payload['identity'] or len(saved['rank_rng']) != world:
+            require_topology(saved['topology'],payload['topology'],
+                saved.get('complete_update',payload['migration']['kind']=='legacy_contract_verified'))
+            if saved['identity'] != payload['identity'] or len(saved['rank_rng']) != saved['topology']['world']:
                 raise ValueError('检查点与来源、配方或逐rank随机状态不匹配')
+            if 'contract' in saved and saved['contract'] != payload['contract']:
+                raise ValueError('子进程恢复的科学合同与准入记录不同')
         engine = MedSAM3Adapter(config, training=True)
         from sam3.train.matcher import BinaryHungarianMatcherV2, BinaryOneToManyMatcher
         from sam3.train.loss.loss_fns import IABCEMdetr, Boxes, Masks
@@ -124,19 +129,32 @@ def train(payload, handle, rank, world, coordinator, gpus):
             if loaded.unexpected_keys or any(k in expected for k in loaded.missing_keys):
                 raise ValueError('训练LoRA恢复不完整')
             optimizer.load_state_dict(saved['optimizer'])
+            verify_optimizer_device(optimizer)
             scheduler.load_state_dict(saved['scheduler'])
-            state.update(step=saved['step'], best_loss=saved['best_loss'])
-            restore_rng(saved['rank_rng'][rank])
-            event(root, 'medsam3_lora_restored', rank=rank,step=state['step'], optimizer_states=len(optimizer.state))
+            state.update(step=saved['step'], best_loss=saved['best_loss'],
+                validation_pending=saved.get('validation_pending',saved['step'] > 0))
+            rng = resumed_rng(saved['rank_rng'],rank,world,state['step'])
+            restore_rng(rng)
+            current_lora = {k:v for k,v in engine.model.state_dict().items() if k in expected}
+            if (not tensors_equal(current_lora,saved['lora']) or
+                not tensors_equal(optimizer.state_dict(),saved['optimizer']) or
+                not tensors_equal(scheduler.state_dict(),saved['scheduler']) or
+                not tensors_equal(rng_state(),rng)):
+                raise ValueError('LoRA、优化器、调度器或随机状态未完整恢复')
+            event(root,'medsam3_lora_restored',rank=rank,step=state['step'],optimizer_states=len(optimizer.state),
+                restored_state=True,restored_exact=not payload['migration'].get('topology_changed',False)
+                    and not payload['migration'].get('code_changed',False),migration=payload['migration'])
         return engine, criterion, optimizer, scheduler
 
     def save(name):
         states = all_states(rng_state())
         if rank == 0:
             lora = {k:v.detach().cpu() for k,v in engine.model.state_dict().items() if k.endswith(('.lora_A','.lora_B'))}
-            saved = dict(identity=payload['identity'],topology=payload['topology'],rank_rng=states,
+            saved = dict(identity=payload['identity'],contract=payload['contract'],contract_identity=digest(payload['contract']),
+                implementation=payload['implementation'],migration=payload['migration'],complete_update=True,
+                topology=payload['topology'],rank_rng=states,
                 lora=lora,optimizer=optimizer.state_dict(),scheduler=scheduler.state_dict(),
-                step=state['step'],best_loss=state['best_loss'])
+                step=state['step'],best_loss=state['best_loss'],validation_pending=state['validation_pending'])
             atomic_torch(root/(name+'.pt'),saved)
             atomic_torch(root/(name+'_lora_weights.pt'),lora)
             event(root,'medsam3_lora_checkpoint',name=name,step=state['step'],world=world)
@@ -207,6 +225,16 @@ def train(payload, handle, rank, world, coordinator, gpus):
             event(root, 'medsam3_lora_validation', **result)
         return result
 
+    def finish_validation():
+        if not state['validation_pending']:
+            return
+        result = validate()
+        state['validation_pending'] = False
+        if result['loss'] < state['best_loss']:
+            state['best_loss'] = result['loss']
+            save('best')
+        save('latest')
+
     client.wait_active()
     path = root/'latest.pt' if payload['resume'] else root/(payload['checkpoint']+'.pt') if payload['operation'] == 'validate' else None
     engine, criterion, optimizer, scheduler = build(path)
@@ -221,6 +249,7 @@ def train(payload, handle, rank, world, coordinator, gpus):
         if world > 1:
             dist.destroy_process_group()
         return
+    finish_validation()
     end = min(training['updates'], state['step']+payload['stop_after']) if payload['stop_after'] else training['updates']
     began = perf_counter()
     source = payload['sources']['train']
@@ -247,13 +276,9 @@ def train(payload, handle, rank, world, coordinator, gpus):
         if rank == 0:
             event(root,'medsam3_lora_update',step=state['step'],loss=loss,gradient_norm=float(norm),
                 seconds=perf_counter()-mark,global_batch=training['batch'],world=world)
+        state['validation_pending'] = state['step'] % training['validate_every'] == 0 or state['step'] == end
         save('latest')
-        if state['step'] % training['validate_every'] == 0 or state['step'] == end:
-            result = validate()
-            if result['loss'] < state['best_loss']:
-                state['best_loss'] = result['loss']
-                save('best')
-            save('latest')
+        finish_validation()
     result = dict(step=state['step'], best_loss=state['best_loss'], seconds=perf_counter()-began,
         topology=payload['topology'],
         completed=state['step'] == training['updates'], trained_parameters='medical_lora_only',

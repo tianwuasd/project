@@ -13,15 +13,37 @@ python -B run.py models medsam3 evaluate --config PRIVATE_CONFIG --case CASE_ID 
 
 所有病例显式列出；多个病例重复--case。基础配置模板为configs/models/medsam3.yaml。医学LoRA微调另使用configs/models/medsam3_finetune.yaml，包含check-training、train和validate入口；专用子入口不通过MedSAM2/Q训练分发，不继承旧模型的训练次数或豁免。
 
-当前通过了源码语法、六个命令的参数帮助、缺材料时的无模型/无目录写入检查，以及Windows独立Conda环境的真实依赖导入和原生接口检查。SAM3基座及医学LoRA文件已齐备；真实模型前向、训练更新、恢复、空间回写、公共资源会话和评价的端到端运行尚未验收。病例运行需按具体范围确认产物。
+已通过Windows独立Conda环境的真实依赖导入、单GPU两例局部训练、保存恢复、训练后预测、空间回写、公共资源会话和独立评价。实际两进程CPU/Gloo检查覆盖梯度归约、随机状态和组内退出。完整多GPU/NCCL、Linux训练及全量分割效果尚未验收。病例运行需按具体范围确认产物。
 
 ## 医学LoRA训练输入与恢复
 
-微调从base_config配置中的医学LoRA继续，保留rank16、alpha32及完整原生SAM3，训练dropout取官方full_lora_config.yaml。原模型参数冻结，只有lora_A/lora_B参与更新。损失沿用固定作者train_sam3_lora_native.py中的BinaryHungarianMatcherV2、分类/存在性、框L1/GIoU、掩膜focal/Dice及一对多匹配配置；每次更新处理一张切片，可含多个已知类别查询。多类别查询共享该片图像编码。作者入口：[固定版本训练源码](https://github.com/Joey-S-Liu/MedSAM3/blob/84f43118b5b67b50abad81d7c946681ebb97dcda/train_sam3_lora_native.py)。
+微调从base_config配置中的医学LoRA继续，保留rank16、alpha32及完整原生SAM3，训练dropout取官方full_lora_config.yaml。原模型参数冻结，只有lora_A/lora_B参与更新。损失沿用固定作者train_sam3_lora_native.py中的BinaryHungarianMatcherV2、分类/存在性、框L1/GIoU、掩膜focal/Dice及一对多匹配配置；每个样本为一张切片，一次更新处理固定global batch个样本，可含多个已知类别查询。多类别查询共享该片图像编码。作者入口：[固定版本训练源码](https://github.com/Joey-S-Liu/MedSAM3/blob/84f43118b5b67b50abad81d7c946681ebb97dcda/train_sam3_lora_native.py)。
 
 训练和验证病例名单显式指定，并保持冻结train/development角色及患者分离。直接读取已绑定原始清单，复用SourceReader的共享数组索引/作者间距核对，按基础配置coverage/slices选择切片。未知类别完全不生成训练查询；已知类别在某片缺如时保留该类别真实阴性查询，不要求每片阳性。语义标签按同类8邻域连通分量构造真实实例，框来自实例像素；不使用框或标签作为模型输入提示，文本来自固定类别映射。当前官方实例损失缺少像素忽略区域接口，遇到该区域明确终止，不将其作为背景监督。
 
 已有预处理路径可通过--prepared/--preprocessed-source指定登记JSON：format为medsam3_training_slices_v1，samples每项包含case_id、slice、file和source_stamp；file指向已有NPZ，其中rgb为uint8[H,W,3]、labels为整数[H,W]、valid为bool[H,W]。source_stamp含image、label各自的[字节数,mtime_ns]，必须对应既有源清单。已有RGB不重复窗化，官方1008变换仅在构造模型输入时执行；输入仍需保留原始来源登记。
+
+### 如何预处理
+
+默认prepared为null，训练自动调用training_data.read_slice读取绑定的CT和标签，无需先执行独立预处理命令。先按coverage/slices选取原始轴向切片image[:,:,k]，转置为行j/列i；默认将HU截取到[-160,240]，线性映射并取整为uint8，再复制成三通道RGB。标签使用相同切片和转置，保留原始类别编号。同类像素按8邻域构造实例掩膜及框，固定类别文本由配置提供。
+
+原始切片和已有NPZ均在构造模型输入时执行作者变换：Resize到1008×1008、ToTensor到[0,1]、以mean=0.5/std=0.5归一化到[-1,1]，框和掩膜同步变换。输入不做三维等间距重采样；作者Excel间距和共享数组索引用于来源、网格核对，原始空间假设见下文。
+
+已有NPZ保存的是上述窗化后的原尺寸RGB、整数标签和valid，尚未执行1008变换。复用时将登记JSON写入训练配置prepared，或执行：
+
+```text
+python -B run.py models medsam3 train --config PRIVATE_TRAIN_CONFIG --prepared PREPARED_INDEX
+```
+
+当前生产入口支持自动读取原图和消费已有NPZ，没有独立的models medsam3 prepare命令。局部测试中的--prepare-only用于两例输入构造检查；通用NPZ批量生成命令尚未提供。训练原图路径每次取片通过Nibabel读取，已有NPZ可避免训练中反复读取压缩NIfTI。
+
+### 恢复兼容
+
+恢复校验使用完整科学合同，数据、权重及词表按实际内容摘要绑定；精度、类别文本、预处理语义、global batch和优化配方保持检查。workers、prefetch、CPU预算、RAM/显存限额、等待及运行路径可调整，恢复后保留原训练身份。源码摘要保存在来源记录中，源码变化不会单独导致科学身份改变；更改科学行为仍须更新合同。
+
+旧摘要格式仅接受legacy_resume.json登记来源及可核验的原合同。原配置能重建旧摘要时直接核验；调整旧运行字段前须保留摘要与检查点一致的resume-proof.v1.json。缺少可核验来源时明确拒绝。该规则支持登记的c245efac/222eaa53实现，不承诺任意历史检查点兼容。
+
+完整优化器更新边界允许在固定global batch下改变rank数；原rank恢复已保存RNG，新rank按main的原则确定性派生随机状态。拓扑或实现发生变化时记录迁移，不能据此承诺逐位相同的数值轨迹。待完成验证状态写入latest，恢复时先补验证再继续训练；没有该字段的旧检查点保守地补做验证，最终步也执行此检查。
 
 ```text
 python -B run.py models medsam3 check-training --config PRIVATE_TRAIN_CONFIG
@@ -30,11 +52,11 @@ python -B run.py models medsam3 train --config PRIVATE_TRAIN_CONFIG --resume --s
 python -B run.py models medsam3 validate --config PRIVATE_TRAIN_CONFIG --checkpoint best --deadline UNIX_SECONDS
 ```
 
-CPU按workers/prefetch有界预取真实切片；读取线程和Torch主线程合计受cpu_threads预算限制。训练必须显式选择CUDA，官方损失直接执行Triton内核。GPU按显式精度运行原生前向/反向，使用AdamW、warmup及cosine学习率。整机80%/项目100GB和显式ram_limit_bytes继续约束进程组；显存额度取配置上限与实际空闲扣除公共预留的较小值，至少保留1GiB。配置中的16GiB为上限，不代表实际分配或实测需求，不自动缩小模型或分辨率。
+CPU按workers/prefetch有界预取真实切片；读取线程和Torch主线程合计受cpu_threads预算限制。训练必须显式选择CUDA，官方损失直接执行Triton内核。GPU按显式精度运行原生前向/反向，使用AdamW、warmup及cosine学习率。整机80%/项目100GB和显式ram_limit_bytes继续约束进程组；显存额度取配置上限与实际空闲扣除公共预留的较小值，至少保留1GiB。配置限额表示允许的上限，实际分配和峰值另行测量，不自动缩小模型或分辨率。
 
 每次完整更新原子保存latest.pt；验证平均官方损失改善时保存best.pt。检查点含全部医学LoRA张量、优化器、调度器、随机状态、更新位置、最佳值和来源身份。暂停边界保存latest，释放模型及优化器后等待，再从检查点真实恢复；固定deadline不续时。另保存latest_lora_weights.pt、best_lora_weights.pt，直接把其路径写入已有预测配置的lora_weights即可使用训练结果，其他输入和预测命令保持一致。
 
-训练检查点含优化器状态，容量大于仅推断LoRA；模板会保留best/latest及两份纯LoRA导出，实际测试前需按其总量申请产物范围。Triton、Torch、Hugging Face、Matplotlib和CUDA缓存及临时文件均定向到该训练目录的runtime-cache子目录，纳入同一产物范围。微调梯度、检查点恢复、CPU预取与GPU协同、训练后预测以及Linux训练均尚未实测，独立SAM3语义头的测试结论不用于本模块。
+训练检查点含优化器状态，容量大于仅推断LoRA；模板会保留best/latest及两份纯LoRA导出，实际测试前需按其总量申请产物范围。Triton、Torch、Hugging Face、Matplotlib和CUDA缓存及临时文件均定向到该训练目录的runtime-cache子目录，纳入同一产物范围。单GPU微调梯度、检查点恢复、CPU预取与GPU协同、训练后预测已在两例范围实测；Linux及完整多GPU训练尚未实测。
 
 ## 输入、空间和标签
 
@@ -46,7 +68,7 @@ RAS仅为经抽查支持的研究约定，原数组(i,j,k)的+i右、+j前、+k�
 
 每次按k取image[:,:,k]，转置为行j/列i，再灰度复制RGB，使用官方1008变换；返回时先恢复原切片大小，再转置回i/j。HU取NIfTI实际缩放值属于项目假设，证据通过intensity_evidence记录。固定CT窗默认[-160,240]为本工程设计参数；窗化线性映射到uint8，不采用逐片min/max。明确的windowed_uint8可以直接输入，标准化值必须提供mean/std；不尝试恢复已截断的信息。
 
-输入压缩NIfTI复用models/stunet/streaming.py的有界解压，每个病例、每种原件只生成一份.nii映射及完成记录。恢复时核对已登记的来源路径、大小、mtime及空间合同，不重新解压；直接提供未压缩原件时原地映射。缓存不能跨不同来源合同误用，不重复扫描所有病例或重算原件摘要。原始数据只读。
+预测输入压缩NIfTI复用artifacts/nifti.py的有界解压，每个病例、每种原件只生成一份.nii映射及完成记录。恢复时核对已登记的来源路径、大小、mtime及空间合同，不重新解压；直接提供未压缩原件时原地映射。缓存不能跨不同来源合同误用。训练恢复的科学合同另计算来源文件内容摘要；原始数据只读。
 
 ## 覆盖、保存与恢复
 
@@ -58,9 +80,9 @@ coverage=all覆盖全部k；coverage=selected需要逐例指定零基切片索�
 
 ## 环境、资源与权重
 
-父进程复用主工程ResourceSession和SessionGuard；默认min(100GB,整机80%)、共享资源目录登记、准入等待、单worker及单片供数，不继承Q3局部测试豁免。GPU准入在公共显存预留之外增加显式estimated_vram_bytes预算，此值是保守估计，不能称为实测峰值；当前模板在8GiB显卡上可能持续等待，需要用户选择合法可行的资源与精度配置。不会静默切换CPU、精度或缩小分辨率。日志按阶段、解压块、病例、切片、模型加载和复用输出；worker有显式时间上限。
+父进程复用主工程ResourceSession和公共多进程启动器；默认min(100GB,整机80%)、共享资源目录登记和准入等待，每rank按预算逐片供数，不继承Q3局部测试豁免。GPU准入在公共显存预留之外增加显式estimated_vram_bytes预算，此值是保守估计，不能称为实测峰值；模板请求的卡数和容量须符合实际设备。不会静默切换CPU、精度或缩小分辨率。日志按阶段、解压块、病例、切片、模型加载和复用输出；worker有显式时间上限。
 
-模型worker使用指定Python。启动前在该解释器的-I -B模式只读核对sys.executable、numpy版本/文件和torch文件；numpy须小于2，两项依赖均须来自该解释器prefix。spawn启动数据中的sys.path替换为该解释器实际路径及本工程源码路径，同时临时移除PYTHONHOME/PYTHONPATH并禁用user site；启动完成恢复父进程设置。该实现显式使用CPython multiprocessing.spawn准备接口，接口缺失即失败。子进程再次核对实际导入证据后才加载模型；独立环境未准备前，此路径隔离尚未经过真实子进程验收。
+模型worker使用指定Python。启动前在该解释器的-I -B模式只读核对sys.executable、numpy版本/文件和torch文件；numpy须小于2，两项依赖均须来自该解释器prefix。spawn启动数据中的sys.path替换为该解释器实际路径及本工程源码路径，同时临时移除PYTHONHOME/PYTHONPATH并禁用user site；启动完成恢复父进程设置。该实现显式使用CPython multiprocessing.spawn准备接口，接口缺失即失败。子进程再次核对实际导入证据后才加载模型；独立环境路径隔离已通过本机真实子进程检查。
 
 官方代码Git版本须固定且已跟踪源码干净；词表、配置、基座和LoRA须为本地有效文件。构建器设置load_from_HF=False，所有worker使用离线模式；基座detector权重严格加载，LoRA键集合和加载结果必须完整匹配。尺寸错误或缺失直接终止，不能换用普通SAM3或其他医学模型。
 
@@ -114,10 +136,18 @@ capacity_probe_bytes默认为0。--capacity-probe显式启用首次有界容量�
 
 公共配置以main为准。MedSAM3复用ResourceSession、ResourceDemand、HostCoordinator、layout、distributed_backend、all_states和synchronize_gradients，资源等待、CPU及主机内存保护沿用公共实现。模板配置为双卡、全局batch4、CPU总线程4；RAM声明及工作区按全部rank累计。单卡检查显式设置gpu_count1及batch1，不将双卡请求自动替换为单卡执行。
 
-每个rank持有完整原生模型，按公共layout分担固定全局批量，并逐样本累积官方损失。每个样本损失除以global batch；各rank的可训练LoRA梯度求和后统一裁剪、更新，某rank未使用而其他rank使用的参数补零参与归约。[2,2]和[2,1]分别对应全局4和3，不随卡数增加采样量。完整检查点保存卡数、global batch、份额及逐rank的Python/NumPy/Torch/CUDA RNG，恢复拒绝改变拓扑、精度、数据或已登记实现；公共梯度归约源码摘要也进入身份。
+每个rank持有完整原生模型，按公共layout分担固定全局批量，并逐样本累积官方损失。每个样本损失除以global batch；各rank的可训练LoRA梯度求和后统一裁剪、更新，某rank未使用而其他rank使用的参数补零参与归约。[2,2]和[2,1]分别对应全局4和3，不随卡数增加采样量。完整检查点保存卡数、global batch、份额及逐rank的Python/NumPy/Torch/CUDA RNG。在完整更新边界可改变拓扑；精度、数据和科学配方继续校验，公共梯度归约源码摘要保存为来源证据。
 
 训练每次全局更新的读取池关闭后才验证。验证按相同轮次数同步，各rank每轮最多读取一个样本；该轮无样本的rank同样经过资源边界。预测按病例分配到各rank，切片进度由病例独立提交。--stop-after-slices使用全组共享额度，中断报告保留已完成病例；父进程合并各rank结果。公共启动器记录各子进程出生身份，任一rank失败、取消或达到截止时停止本组。
 
-tests/verify_medsam3_distributed.py使用真实官方文本层及医学LoRA，实际两进程CPU/Gloo完成[1,1]、[2,1]、[2,2]归约检查，最大梯度绝对差3.73e-9；逐rank RNG实际保存/重读、拓扑变化拒绝、全局预测额度和空验证rank同步检查通过。实际不存在的检查点使一个rank失败，监督器停止同组其他rank，退出及资源释放检查通过。该检查使用main现有Torch2.12.1环境；真实文本/权重材料由原生MedSAM3环境生成并在结束后清理。原生Windows Torch2.9.1的Gloo初始化在本机失败，此环境的完整模型检查使用单GPU。
+tests/verify_medsam3_distributed.py使用真实官方文本层及医学LoRA，实际两进程CPU/Gloo完成[1,1]、[2,1]、[2,2]归约检查，最大梯度绝对差3.73e-9；逐rank RNG实际保存/重读、完整边界拓扑检查、新rank确定性随机状态派生、全局预测额度和空验证rank同步检查通过。实际不存在的检查点使一个rank失败，监督器停止同组其他rank，退出及资源释放检查通过。该检查使用main现有Torch2.12.1环境；真实文本/权重材料由原生MedSAM3环境生成并在结束后清理。原生Windows Torch2.9.1的Gloo初始化在本机失败，此环境的完整模型检查使用单GPU。
 
 多GPU训练需要提供NCCL的目标环境；本次没有实际多GPU/NCCL硬件验证，未确认多卡完整模型训练、恢复、按病例并行预测或持续吞吐提升。显存容量按每卡完整模型核算，不将多张卡的显存合并成单模型容量。资源暂停后的完整GPU恢复仍需目标环境实测。
+
+## 运行资源变更后的恢复检查（2026-11-24）
+
+同一冻结训练及development各一例、各一个主动脉切片，旧c245efac实现真实更新一次后保存检查点。新版将CPU线程4改为2、读取线程1改为0、预取2改为1、RAM上限16改为12 GiB、显存上限7改为6.5 GiB，实际恢复916组优化器状态并完成第二次更新，所有Adam步数为2，原训练身份保留，LoRA变化量大于零。第一、第二次更新分别11.70秒和4.68秒；训练PyTorch显存保留峰值5.877 GiB。旧阶段CLI进程组RSS峰值2.461 GiB，新恢复阶段RSS峰值未测量。
+
+新旧合同均拒绝精度、global batch、学习率及来源类别改变。额外检查在相同两例中各选相邻两片，仅构造原图来源合同，不执行模型更新；真实最终步检查点重新恢复并补做验证，优化器与LoRA逐元素保持相同，validation_pending清除。该补充流程耗时167.47秒。两rank真实文本LoRA/Gloo检查通过；六个命令接口串行检查通过，Windows并行CLI受到公共代码锁限制。
+
+本轮完整模型更新共两次，检查范围不包含全量效果。测试目录resume-compat-regression保留resume-final-report.json、resume-boundaries.json、resume-cleanup.json及运行日志；已清理78个切片、检查点和缓存文件，释放616,788,270字节，保留记录小于20 MiB，至用户主动删除。具体来源路径、摘要、分阶段耗时及未测量项见私有报告。
