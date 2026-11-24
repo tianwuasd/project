@@ -1,10 +1,10 @@
 # 分类模块与执行条件
 
-本文件描述生产接口及已测范围。2026-11-22已用一例AAOCA和一例ImageCHD完成预处理，严格加载作者三任务各model_1，并完成6次CPU预测；各任务均为单成员、未知参考2例、已确认参考0例。另已完成零更新检查点的同进程磁盘往返及CPU随机状态恢复。训练更新、完整训练续跑、CUDA、五成员集成和科研性能仍未验收。预处理基础候选为`3aaae97397dd397edb8a2a907c4716e4e3163b75`，分类生产修复为`8cd4ffc`，预测测试入口为`ea4b39c`。
+本文件描述生产接口及已测范围。2026-11-22已用一例AAOCA和一例ImageCHD完成预处理，严格加载作者三任务各model_1，并完成6次CPU预测；各任务均为单成员、未知参考2例、已确认参考0例。2026-11-24两例统一RAS预处理及复用、完整SENet154在64³明确小测输入下的两次真实训练更新、跨进程接续、两轮验证、best/latest、一次预测和清理通过。该小测不验证正式215×215×85训练容量、实际CUDA多卡或科研性能。
 
 ## 输入与确认监督
 
-预处理回执阶段必须为`normalized_xyz`，目标XYZ为215×215×85，模型输入BCZXY为1×1×85×215×215。训练读取float16存储并转float32，推理读取float32；均不重复按HU量化。`prepared_inputs`可逐例显式指向既有预处理目录，默认使用`data_root/aaoca-classification/<case_id>`。只接受方法、源文件stat和输出stat均匹配的回执，不直接接收STU/Q数组。
+目标XYZ为215×215×85，模型输入BCZXY为1×1×85×215×215。训练读取float16存储并转float32，推理读取float32；均不重复按HU量化。`prepared_inputs`可逐例显式指向既有预处理目录，默认使用`data_root/aaoca-classification/<case_id>`。旧配方按方法、源文件stat和输出stat核对回执；新本地适配使用`prepared_input_policy=compatible`，只要求同一病例的normalized.nii.gz、training_xyz.npy符合形状、RAS方向、存储类型和0到1有限数值合同，来源作为记录保留，不强制由本工程生成。STU标准化数值不能直接当成此合同输入。完整检查点仍记录实际使用输出的文件状态，改变已使用数据后应新建运行。
 
 先心助理继续复用已有中文整理成果和逐条证据，交付含英文`data`、`evidence`、`definitions`的工作簿；可以另含完整诊断页。生产直接读取`data`，不另行生成CSV或要求用户重建表格。其他多表格式仍需`diagnosis_sheet`明确指定。
 
@@ -36,13 +36,25 @@
 
 ## 配置字段
 
+### 统一解剖方向的本地适配
+
+固定作者版本[b134e621的utils.py](https://github.com/AI-in-Cardiovascular-Medicine/AAOCA/blob/b134e621943f60f20caf6a9272aa85ceeeb441f8/utils.py)将读取后的数组按单位网格送入TorchIO。其固定依赖[deep-utils 1.3.57的NIBUtils](https://github.com/pooya-mohammadi/deep_utils/blob/1.3.57/deep_utils/medical/nib_utils/nib_utils.py#L10-L25)使用nib.load/get_fdata，保留源数组方向。作者代码没有提供统一RAS或LPS的处理，也没有公开可证明全部训练病例物理方向的资料。
+
+新配置明确使用`classification_recipe=canonical_ras_v1`、`training_policy=local_adaptation`、`prepared_input_policy=compatible`。定位仍从同一CT的LV/AO分割取得中心，按有效源仿射转换到RAS毫米坐标；ROI为80×80×60mm，`offset_ras_mm=[10,0,10]`表示向患者右侧和上方各移动10mm。这是本地适配偏移，不能声称等同作者的源索引偏移。以ROI体素中心构造正交RAS目标网格，一次TorchIO B-spline重采样为215×215×85，图像范围以外填充HU=-1024，再执行相同HU裁剪和256级量化。记录源/目标/网络仿射、角点往返检查以及物理ROI是否超出原CT；输出尺寸完整不代表冠脉开口和近端确实被覆盖。
+
+本地适配训练按实际输入的RAS合同检查方向，缺少人工覆盖记录保持unverified并记录，不生成审批或医生身份。训练可运行与临床覆盖、论文性能验证分别报告。旧author_native_index及其方向/覆盖人工审核要求继续保留，已有运行不自动改方法。作者现成权重在新RAS适配上的分布等价性未证实。
+
+`generate-run-configs --config BASE --output NEW_DIR --gpu-count 1 --batch-size 1 --epochs 300 --device cuda:0`生成两份配置：`project.<task>.preprocess.json`和`project.<task>.train.json`；`--check`只输出计划。检测选择从头策略，侧别保留真实检测父权重声明，缺少父权重直接停止。保留原清单及标签来源、公共参数，旧方向/覆盖登记放入provenance字段；旧配置不改。不同配置内容不能覆盖同名文件。新训练运行目录位于course/runs/<task>-canonical-v1，已有latest须显式`--resume`。
+
+旧结果重做前先执行`reset-preprocessing --config BASE --check`，核对其root、文件数和容量，再用`--confirm-output-root 完整root`执行。只允许该root内、当前清单病例目录中的已知预处理/跳过文件；未知文件、软链接及源CT冲突均停止。共享输出锁阻止与预处理、训练或预测同时操作；原始CT、分割、配置、best/latest和其他项目不删除。执行会永久删除确认范围的旧预处理，恢复旧方法需保留原配置和重新生成其输入。
+
 `classification_recipe=author_native_index`保留源索引。正式train必须提供`direction_review`：`approved=true`、`reviewer`、`reference`、`recipe`及3×3的`reference_direction_matrix_RAS`。逐例实际归一化方向矩阵必须与审核参考一致，LPS/RAS相反输入不会自动通过。该字段必须来自真实影像方向审核，不可为启动任务编造。
 
 探索性predict在明确使用author_native_index时允许作者参照尚未确认，记录direction_status=unverified、原审核记录及逐例实际源方向、源/有效源/裁剪/目标/网络仿射和世界位移。缺少审核不会生成reviewer或approval，也不会重排数组或猜测参照。如果显式approved=true，则仍使用同一严格方向核对，缺来源或实际方向矛盾直接停止。该探索性输入的作者训练分布等价性未验证，不因此宣称科学复现或临床有效性；train及论文效果声明的要求保持。
 
 顶层`coverage_reviews`按实际`case_id`索引；每项含与本次回执一致的`preprocessing_id`，并分别含`ostium`和`proximal_course`人工判读。两项各有`status`（`verified`、`unverified`、`not_evaluable`）和`included`。已核实时included须为布尔值；其余状态保持null。已核实或不可评价均需非空`reviewer,reference,review_date`，日期采用ISO年月日。来源须能追溯同一CT与审核范围，目标近端由阅片者明确，不能由LV/AO接触点或单个开口点推断整段包含。源码只验证登记完整性，不自动完成阅片或验证来源真实性。
 
-缺少覆盖记录按`unverified`读取。正式train要求所选各例的开口和目标近端均独立`verified`且included=true；缺项、不可评价或截断在模型创建前停止。探索性predict记录两处真实覆盖状态，允许未核实、不可评价或明确截断，已有记录的身份及字段仍须一致。预测回执明确evaluation_scope为探索性且仅采用已确认参考计算指标，paper_performance_validated=false、clinical_diagnostic_validity=not_established，不因输出概率宣称论文标准覆盖或临床诊断有效。方向按上述探索性记录及显式批准时的一致性要求独立检查。
+缺少覆盖记录按`unverified`读取。author_native_index的train要求所选各例的开口和目标近端均独立`verified`且included=true；缺项、不可评价或截断在模型创建前停止。本地适配保留真实覆盖状态并按所声明输入合同运行。探索性predict记录两处真实覆盖状态，允许未核实、不可评价或明确截断，已有记录的身份及字段仍须一致。预测回执明确evaluation_scope为探索性且仅采用适用来源参考计算指标，paper_performance_validated=false、clinical_diagnostic_validity=not_established，不因输出概率宣称论文标准覆盖或临床诊断有效。方向按所声明配方及显式批准时的一致性要求独立检查。
 
 登记、原预处理、check-training及标签导出继续读取既有配置，不强制这些新增字段；check-training只检查监督，不代表全部正式运行条件已通过。现有未知标签与两例未核实覆盖保持原状态，迁移配置不能自动生成确认值。
 
@@ -57,9 +69,9 @@
 |`estimated_gpu_working_bytes`|可选正整数；省略时自动估算，空闲显存扣除max(4GiB,10%总显存)后须容纳|
 |`artifact_budget_bytes`|可选正整数覆盖；默认按实际参数与状态估算检查点，或按预测病例/成员数估算结果|
 
-CPU线程由顶层`cpu_threads`控制，当前数据供给为workers=0、prefetch=0。主存采样和设备选择集中在resources；超限终止本进程，检查点原子保存保护上一份完整状态。此机制不保证拦截瞬时OOM，也不构成操作系统硬隔离。没有GPU独占调度、扩卡或分布式分类验收。
+CPU线程由顶层`cpu_threads`控制，当前数据供给为workers=0、prefetch=0。主存采样和设备选择集中在resources；超限终止本进程，检查点原子保存保护上一份完整状态。此机制不保证拦截瞬时OOM，也不构成操作系统硬隔离。没有GPU独占调度或动态扩卡。
 
-单卡CUDA训练和预测在加载模型前检查所选`cuda:N`的实时空闲显存，保留max(4GiB,10%总显存)。暂时不足时每5秒检查，无超时；首次等待及其后每60秒输出`waiting_gpu`事件，满足预算后输出`classification_gpu_admitted`并继续。无需新增配置字段，不改变batch、设备、训练配方或已有检查点身份。无效设备、驱动错误及预算超过单卡总容量减保护余量时直接报错。该检查不预占显卡，资源随后被其他进程使用仍可能造成实际运行OOM；运行中OOM没有自动等待恢复。CPU路径保持原行为。
+CUDA训练用`gpu_count`选择固定设备数量，默认1；必须不超过全局batch。`device=cuda:N`为首卡，省略`gpu_ids`时选择从N起的连续可见卡，也可明确列出所选编号。多卡使用DataParallel，每卡保存模型副本，共享主卡优化器；汇总logits后计算全局BCE均值。每卡预算按ceil(batch/gpu_count)估算。各卡分别保留max(4GiB,10%总显存)，所有所选卡同时满足预算才开始；每5秒检查且无超时，每60秒输出waiting_gpu。训练成功准入事件为classification_gpu_group_admitted。预测固定单卡，须设gpu_count=1，并沿用classification_gpu_admitted事件。无效设备、驱动错误和总容量无法容纳预算直接停止。准入不预占设备，运行中OOM没有自动等待恢复，实际CUDA多卡尚未验收。
 
 ## 训练与恢复
 
@@ -81,7 +93,7 @@ CPU线程由顶层`cpu_threads`控制，当前数据供给为workers=0、prefetc
 
 `max_update_attempts`限制整个运行累计更新尝试数。每批供数及forward/backward/step前，将累计次数写入独立小文件`update-attempts.json`，flush/fsync后原子替换；失败或中断也消耗已预占次数。恢复必须同时具备身份一致、次数不小于latest内次数的登记文件，缺失或损坏直接停止；累计次数取该文件，模型/optimizer、消费位置及RNG仍取完整latest。最近检查点之后丢失的计算需要重新尝试并再次计数，不自动退还次数。完整检查点保持既定间隔，每次预占只写小登记文件。达到上限时先保存完整latest并停止，不自动追加训练或验证。新的具体授权可以明确提高该停止上限并以`--resume`接续；模型/数据/划分等语义设置须保持一致。有latest时必须显式resume，缺latest或身份不同直接停止。
 
-best和latest均为完整同一时点状态。保存前按真实参数量估算临时容量，并核对批准预算。五个初始化采用同一训练/验证患者划分，每次运行需显式选成员；本入口不会自行连续启动五次训练。增强按固定作者六类MONAI与三类TorchIO分支实现，常量归一化或增强后尺寸异常直接停止。原文/代码随机种子未知，本地受控种子是可恢复适配，不声称重现作者随机轨迹。
+best和latest均为完整同一时点状态，多卡保存未包装的模型参数及所选各卡RNG，恢复后再包装。run.json保留实际代码SHA、工作区状态和完整解析配置；检查点保留初始化代码来源。恢复配置、输入、分组及消费位置保持一致，代码版本作为来源记录。保存前按真实参数量估算临时容量，并核对批准预算。五个初始化采用同一训练/验证患者划分，每次运行需显式选成员；本入口不会自行连续启动五次训练。增强按固定作者六类MONAI与三类TorchIO分支实现，常量归一化或增强后尺寸异常直接停止。原文/代码随机种子未知，本地受控种子是可恢复适配，不声称重现作者随机轨迹。
 
 ## 权重和预测
 
@@ -94,6 +106,16 @@ best和latest均为完整同一时点状态。保存前按真实参数量估算�
 各成员先sigmoid，再概率平均，严格大于0.5为1。后两项报告为以AAOCA为条件的原始分类分数；无对应确认参考者不计入指标。报告明确患者/扫描分母、未知与不适用数、成员概率、预处理身份和权重来源，无两类时AUC和平均精确率不可估计。单成员结果不标为五成员评估。
 
 模型实例计算、训练、实际预测及新增依赖/权重下载须分别按具体许可执行。r2两例预处理已完成，结果及清理记录见`PREPROCESSING_ACCEPTANCE_20261121.md`；该验收不扩大分类模型运行范围。
+
+## 统一方向与接续小测
+
+2026-11-24获准两例CPU双线程流程实测218.828秒。完整215×215×85预处理入口31.547秒，实际处理23.234秒（0.08608例/秒），第二次入口8.094秒复用两例，目标RAS及角点往返检查通过。完整SENet154只在run_purpose=smoke、smoke_input_shape=[64,64,64]、max_update_attempts≤2且两例范围下接受小输入；输出检查点登记test_only，正式预测不能误用。
+
+首次更新入口40.156秒，第一次接续56.031秒完成第一轮验证及第二次更新，第二次接续42.063秒完成第二轮验证，累计attempted_updates=successful_updates=2、complete=true。best/latest各约2.04GB，均为真实模型/AdamW moment/调度器/RNG及消费状态。一次真实预测入口28.671秒通过有限概率检查；小测预测不用于性能结论。Windows Job进程组提交内存峰6718066688字节，训练worker采样RSS峰4201332736字节，0GPU，显存未测量。
+
+reset预检查及实际执行分别2.922/3.172秒，删除两例6个预处理文件20898554字节，保留锁；其余15个本批文件4089055243字节随后自动清理，全部测试进程退出、专目录不存在，四个源文件stat不变。前序失败及本次通过记录合并保存在私有reports/canonical-pipeline-20261124.json，不公开病例数据。
+
+Windows维护测试入口为tests/canonical_smoke.py与windows_job_runner.py，复用现有pywin32，参数显式指定两个病例、私有BASE、已批准测试目录和报告；--dependency-dir及可选--extra-site-dir仅引用已有依赖，不安装。配置/控制记录不含真实病例的公开示例。实际Linux CUDA、显存不足转足够后的自动继续、多个真实GPU、全量和正式完整尺寸训练未在本批验证。
 
 ## 两例作者分类权重验收
 

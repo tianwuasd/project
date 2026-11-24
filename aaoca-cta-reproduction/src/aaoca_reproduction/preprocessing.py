@@ -17,22 +17,29 @@ from .resources import configure_cpu, memory_guard
 
 TARGET = CLASSIFICATION_TARGET
 RECIPE = "author_native_index"
+CANONICAL_RECIPE = "canonical_ras_v1"
 
 
 def method(config):
     if version("torchio") != "0.19.6":
         raise RuntimeError("作者重采样要求真实TorchIO 0.19.6")
-    if config.get("classification_recipe") != RECIPE:
-        raise ValueError("本入口仅实现显式author_native_index配方")
+    if config.get("classification_recipe") not in {RECIPE, CANONICAL_RECIPE}:
+        raise ValueError("需要明确author_native_index或canonical_ras_v1配方")
     if config["roi_mm"] != [80, 80, 60] or config["offset_index_mm"] != [-10, 10, 10]:
         raise ValueError("作者配方要求固定裁剪毫米尺寸与源索引偏移")
-    return {"schema": 1, "author_release": RELEASE, "recipe": RECIPE, "target_xyz": list(TARGET),
+    result = {"schema": 1, "author_release": RELEASE, "recipe": RECIPE, "target_xyz": list(TARGET),
             "roi_mm": config["roi_mm"], "offset_index_mm": config["offset_index_mm"],
             "imagechd_orientation_policy": config["imagechd_orientation_policy"],
             "torchio": version("torchio"), "interpolation": "bspline", "resample_input_grid": "unit_identity",
             "normalization": "floor((clip(HU,-1024,1024)+1024)/2048*255)/255",
             "network_axes": "BCZXY", "training_storage": "float16_XYZ", "inference_storage": "float32_XYZ",
             "author_reference_direction_confirmed": False, "formal_mixed_classification_ready": False}
+    if config["classification_recipe"] == CANONICAL_RECIPE:
+        result.update(recipe=CANONICAL_RECIPE, resample_input_grid="physical_RAS",
+                      offset_ras_mm=config.get("offset_ras_mm", [10, 0, 10]),
+                      output_direction="RAS_identity", outside_HU=-1024,
+                      reproduction_scope="local_adaptation_author_world_direction_unknown")
+    return result
 
 
 def network_tensor(array):
@@ -49,11 +56,43 @@ def preprocessing_identity(case, recipe):
     return identity({"source": source, "method": recipe})
 
 
-def resample_crop(crop, crop_affine, verify_author=False):
+def resample_crop(crop, crop_affine, verify_author=False, reference_affine=None):
     if version("torchio") != "0.19.6":
         raise RuntimeError("作者重采样要求真实TorchIO 0.19.6")
     if crop.ndim != 3 or min(crop.shape) < 2 or not np.isfinite(crop).all():
         raise ValueError("分类裁剪需要三维、各轴至少两体素且数值有限")
+    if reference_affine is not None:
+        if verify_author:
+            raise ValueError("物理RAS适配不能登记为作者裸数组逐值复现")
+        target_affine = np.asarray(reference_affine, dtype=float)
+        image = tio.ScalarImage(tensor=(crop + 1024)[None], affine=crop_affine)
+        sampled = tio.Resample(target=(TARGET, target_affine), image_interpolation="bspline")(image)
+        data = sampled.data[0].numpy() - 1024
+        if tuple(data.shape) != TARGET or not np.isfinite(data).all() or not np.allclose(sampled.affine, target_affine):
+            raise ValueError("实际物理重采样网格或数组不符合RAS合同")
+        normalized = np.asarray(np.floor((np.clip(data, -1024, 1024) + 1024) / 2048 * 255) / 255, dtype=np.float32)
+        direction = target_affine[:3, :3] / np.linalg.norm(target_affine[:3, :3], axis=0)
+        if not np.allclose(direction, np.eye(3), atol=1e-6, rtol=0):
+            raise ValueError("物理重采样输出必须为正交RAS方向")
+        permutation = np.eye(4)[:, [2, 0, 1, 3]]
+        corners = np.asarray(list(product(*[(0, x - 1) for x in TARGET])))
+        world = nib.affines.apply_affine(target_affine, corners)
+        recovered = nib.affines.apply_affine(np.linalg.inv(target_affine), world)
+        probe = np.asarray([7, 13, 19])
+        probe_zxy = probe[[2, 0, 1]]
+        tensor = network_tensor(normalized)
+        if not np.allclose(recovered, corners, atol=1e-6, rtol=0):
+            raise AssertionError("RAS角点世界坐标逆变换不一致")
+        if tensor[0, 0, *probe_zxy].item() != float(normalized[tuple(probe)]):
+            raise AssertionError("RAS真实数组的ZXY转置不一致")
+        if not np.allclose(nib.affines.apply_affine(target_affine, probe),
+                           nib.affines.apply_affine(target_affine @ permutation, probe_zxy), atol=1e-6, rtol=0):
+            raise AssertionError("RAS网络坐标到世界坐标不一致")
+        return normalized, {"target_affine": target_affine.tolist(), "network_affine": (target_affine @ permutation).tolist(),
+            "target_axis_codes": list(nib.aff2axcodes(target_affine)), "target_shape_xyz": list(TARGET),
+            "network_shape": list(network_tensor(normalized).shape), "round_trip_checked": True,
+            "direction_RAS": direction.tolist(), "author_check": None, "corner_voxel_centers_RAS_mm": world.tolist(),
+            "intensity_range": [float(normalized.min()), float(normalized.max())]}
     ratio = np.asarray(crop.shape, dtype=float) / np.asarray(TARGET)
     unit_image = tio.ScalarImage(tensor=np.asarray(crop, dtype=np.float32)[None], affine=np.eye(4))
     sampled = tio.Resample(target=tuple(ratio), image_interpolation="bspline")(unit_image)
@@ -164,7 +203,8 @@ def prepare_classification(case, config, directory, verify_author=False):
             "target_buffers_and_float64_geometry_checks": int(np.prod(TARGET)) * 80,
             "author_reference_buffers": int(np.prod(TARGET)) * 24 if verify_author else 0})
         tic = perf_counter()
-        normalized, geometry = resample_crop(crop, np.asarray(crop_record["crop_affine"]), verify_author)
+        normalized, geometry = resample_crop(crop, np.asarray(crop_record["crop_affine"]), verify_author,
+                                             reference_affine=crop_record.get("target_affine"))
         timings["resample_normalize_seconds"] = perf_counter() - tic
         output_bytes = normalized.nbytes * 3
         if output_bytes > config["max_work_bytes"] or psutil.disk_usage(str(directory)).free < output_bytes:
@@ -188,5 +228,5 @@ def prepare_classification(case, config, directory, verify_author=False):
               "training_updates": 0, "model_prediction": False,
               "outputs": {p.name: signature(p) for p in (output, training)}}
     write_json(receipt, record)
-    event("classification_prepared", case_id=case["case_id"], seconds=measured["seconds"], recipe=RECIPE)
+    event("classification_prepared", case_id=case["case_id"], seconds=measured["seconds"], recipe=recipe["recipe"])
     return record

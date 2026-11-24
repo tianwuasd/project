@@ -58,7 +58,7 @@ DATA须为本项目长期模型预处理目录。`--runtime-root`和`--data-root
 
 本批清单保持已经组织的患者角色及逐例用户确认来源；不重新audit、重置分组或覆盖旧manifest。check-training.ready仅表示对应任务训练/验证的标签与CT绑定条件。classification保留BASE已有的公共参数（例如device、batch_size、epochs、学习率配方、seed和资源预算），更新task与预测候选编号；任务改变时移除strategy、pretrained_detection、weights，避免将另一个任务的权重或初始化方式传入。相同任务保留这些声明时核对任务适用性，真实权重文件仍由运行入口严格加载。旧run_directory和prediction_directory均不带入新批次，须显式选择新任务输出目录。保留/移除字段列入绑定结果和回执；源配置不修改。完整训练/预测条件及方向、覆盖、定位几何、权重来源仍需单独确认，新增计算遵守具体范围。
 
-两例三任务单成员CPU预测及零更新检查点同进程保存加载已验收；有更新的训练恢复、CUDA、五成员集成和诊断性能尚未验收，见`CAPABILITIES.md`。
+两例三任务作者单成员CPU预测已验收；两例统一RAS预处理及完整SENet154在64³小输入下的两次更新、跨进程接续、验证和预测通过。完整尺寸训练容量、CUDA多卡、五成员集成及诊断性能尚未验收，见`CAPABILITIES.md`。
 
 ## 独立分类预处理
 
@@ -77,5 +77,22 @@ tail -f "$COURSE/logs/classification-preprocessing.log"
 停止原进程后重新运行同一命令即可核对并复用完成病例；共享输出根下的.batch.lock防止不同任务对共同病例重复启动。未完成目录只有在进度记录证明同一病例、源/方法身份与完整路径且实际源stat未变时才清理本批已知文件再重做，原完成回执和未知文件保持保护；Windows遗留标签入口还须samefile确认。未知归属、未知文件、源变化或旧进程仍在时停止并报告完整路径，先人工核对，不能删除完整classification.json来强行重做。不要同时启动同一数据目录的批次和单例生产者。清理与接续实际写出范围须以真实短测记录为准。
 
 STU-Net fold0离线图像是百分位裁剪/均值标准差归一化、nnU-Net空间重采样结果，不能直接当作作者分类输入；裁剪外区域和截断HU不可精确恢复。可以继续使用原CT、原LV/AO标签、间距及来源记录。本工程仍从原HU定位80×80×60mm ROI，按源索引偏移，经TorchIO0.19.6 B-spline到XYZ215×215×85，再做HU[-1024,1024]的256级量化；网络BCZXY，训练float16存储、推理float32。拒绝直接使用STU图像的依据是强度和几何处理不同，不以fold名称或缺回执本身代替方法判断。
+
+## 重建统一方向输入与训练配置
+
+已有BASE继续用于引用原清单和数据根。先用reset-preprocessing的--check打印清理目录及容量，再以同一完整root作为--confirm-output-root确认删除；操作只清理受管理的病例预处理目录，保护原CT、分割和course训练成果，活动训练/预测持有共享锁时停止。只有用户已明确要求重做这些结果时执行删除。
+
+```bash
+OUT="$COURSE/configs/canonical-v1"
+"$PY" -B "$CODE/run.py" generate-run-configs --config "$BASE" --output "$OUT" \
+  --device cuda:0 --gpu-count 1 --batch-size 1 --epochs 300
+PREP="$OUT/project.aaoca_present.preprocess.json"
+TRAIN="$OUT/project.aaoca_present.train.json"
+"$PY" -B "$CODE/run.py" prepare-dataset --config "$PREP" --check
+```
+
+--check不生成预处理；正式后台启动将prepare-dataset的config改为PREP，完成后再用train --config TRAIN。新配置采用canonical_ras_v1、本地适配策略和兼容输入合同，统一物理RAS，方向和覆盖的未知记录保留。只从检测并集入口预处理一次；侧别后续采用同一新配方和data_root，依实际父检测权重再生成侧别训练配置。原清单、Excel、分组不重建。
+
+默认单卡；固定两卡需生成时明确--gpu-count 2 --batch-size 2，保持相同全局batch需使用原batch并保证batch≥卡数。暂时显存不足持续等待全部所选卡，不自动增加batch或换卡；单卡总容量无法满足直接停止。完整检查点恢复使用同一配置和--resume。主机内存上限与既有预算保留，生成器不扩大资源权限。代码记录SHA和完整解析配置，旧配置及运行目录保留供恢复；新物理预处理不混入原索引运行。
 
 公开测试入口使用显式AAOCA_TEST_ROOT指定已批准工作目录；依赖安装辅助入口通过--work-root指定目录。仅语法、帮助及导入检查不会运行这些测试或安装；真实病例计算仍需具体许可。

@@ -13,7 +13,7 @@ from .records import CLASSIFICATION_TARGET, event, read_json, signature, write_j
 
 
 @contextmanager
-def batch_lock(path):
+def batch_lock(path, shared=False):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a+b") as stream:
         if os.name == "nt":
@@ -22,10 +22,10 @@ def batch_lock(path):
                 stream.write(b"0")
                 stream.flush()
             stream.seek(0)
-            msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+            msvcrt.locking(stream.fileno(), msvcrt.LK_NBRLCK if shared else msvcrt.LK_NBLCK, 1)
         else:
             import fcntl
-            fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(stream.fileno(), (fcntl.LOCK_SH if shared else fcntl.LOCK_EX) | fcntl.LOCK_NB)
         try:
             yield
         finally:

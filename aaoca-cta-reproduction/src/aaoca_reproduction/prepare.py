@@ -2,6 +2,7 @@ from contextlib import contextmanager
 import os
 from pathlib import Path
 import re
+import threading
 from time import perf_counter
 
 import nibabel as nib
@@ -11,6 +12,9 @@ from scipy import ndimage
 import SimpleITK as sitk
 
 from .records import RELEASE, admit_stage, check_work, event, identity, measure, read_json, signature, write_json
+
+
+LABEL_PATH_LOCK = threading.RLock()
 
 
 def effective_affine(image, case):
@@ -26,18 +30,17 @@ def ascii_label(path, directory):
     if os.name != "nt":
         yield Path(path)
         return
-    if Path(path).stat().st_dev != directory.stat().st_dev:
-        raise ValueError("Windows标签ASCII入口要求源文件与工作目录在同一文件系统")
-    link = directory / "source-label.seg.nrrd"
-    if link.exists():
-        raise FileExistsError("本例存在未清理的标签入口，请先核对本任务状态")
-    os.link(path, link)
-    try:
-        yield link
-    finally:
-        if not os.path.samefile(path, link):
-            raise RuntimeError("标签临时入口已变化，拒绝删除")
-        link.unlink()
+    path = Path(path).resolve(strict=True)
+    if not path.name.isascii():
+        raise ValueError("Windows原标签文件名须为ASCII；父目录可含中文")
+    # SITK的Windows文件接口无法处理中文父目录；只在同步读取期间改变工作目录。
+    with LABEL_PATH_LOCK:
+        previous = Path.cwd()
+        os.chdir(path.parent)
+        try:
+            yield Path(path.name)
+        finally:
+            os.chdir(previous)
 
 
 def load_localization(case, image, directory, allow_missing=False):
@@ -208,12 +211,33 @@ def crop_in_memory(case, config, directory, verify_center=False, allow_missing=F
                             "center": actual.tolist(), "scope": "real_local_label_region"}
         affine = effective_affine(image, case)
         spacing = np.linalg.norm(affine[:3, :3], axis=0)
-        offset = np.asarray([int(mm / step) for mm, step in zip(config["offset_index_mm"], spacing)])
-        size = np.asarray([min(int(mm / step), image.shape[i])
-                           for i, (mm, step) in enumerate(zip(config["roi_mm"], spacing))])
-        shifted = center + offset
-        start = np.asarray([max(0, min(int(shifted[i] - size[i] / 2), image.shape[i] - int(size[i])))
-                            for i in range(3)])
+        physical = config.get("classification_recipe") == "canonical_ras_v1"
+        target_affine = None
+        if physical:
+            from .records import CLASSIFICATION_TARGET
+            offset_world = np.asarray(config.get("offset_ras_mm", [10, 0, 10]), dtype=float)
+            if offset_world.shape != (3,) or not np.isfinite(offset_world).all():
+                raise ValueError("统一方向偏移需为三个有限RAS毫米值")
+            roi = np.asarray(config["roi_mm"], dtype=float)
+            target_spacing = roi / np.asarray(CLASSIFICATION_TARGET)
+            target_affine = np.diag([*target_spacing, 1.0])
+            target_affine[:3, 3] = nib.affines.apply_affine(affine, center) + offset_world - roi / 2 + target_spacing / 2
+            from itertools import product
+            corners = np.asarray(list(product(*[(0, n - 1) for n in CLASSIFICATION_TARGET])))
+            source_corners = nib.affines.apply_affine(np.linalg.inv(affine) @ target_affine, corners)
+            start = np.maximum(np.floor(source_corners.min(axis=0)).astype(int) - 3, 0)
+            stop = np.minimum(np.ceil(source_corners.max(axis=0)).astype(int) + 4, image.shape)
+            size = stop - start
+            if np.any(size < 2):
+                raise ValueError("统一物理ROI与原CT没有足够交集")
+            offset = np.linalg.solve(affine[:3, :3], offset_world)
+        else:
+            offset = np.asarray([int(mm / step) for mm, step in zip(config["offset_index_mm"], spacing)])
+            size = np.asarray([min(int(mm / step), image.shape[i])
+                               for i, (mm, step) in enumerate(zip(config["roi_mm"], spacing))])
+            shifted = center + offset
+            start = np.asarray([max(0, min(int(shifted[i] - size[i] / 2), image.shape[i] - int(size[i])))
+                                for i in range(3)])
         slices = tuple(slice(int(a), int(a + b)) for a, b in zip(start, size))
         memory_plan.append(admit_stage(config, "ct_roi_read", {
             "source_xy_slab_buffer_bound": int(np.prod(image.shape[:2])) * int(size[2]) * image.get_data_dtype().itemsize,
@@ -238,6 +262,8 @@ def crop_in_memory(case, config, directory, verify_center=False, allow_missing=F
                   "source_header_affine": image.affine.tolist(), "effective_source_affine": affine.tolist(),
                   "center_index": center.tolist(), "center_mode": center_mode,
                   "offset_index_voxels": offset.tolist(), "offset_RAS_mm": (affine[:3, :3] @ offset).tolist(),
+                  "target_affine": target_affine.tolist() if physical else None,
+                  "physical_ROI_partly_outside_source": bool(np.any(source_corners < 0) or np.any(source_corners > np.asarray(image.shape) - 1)) if physical else None,
                   "crop_start": start.tolist(), "crop_shape": size.tolist(),
                   "requested_roi_mm": config["roi_mm"], "actual_roi_mm": (size * spacing).tolist(),
                   "source_FOV_smaller_than_ROI": bool(np.any(np.asarray(image.shape) * spacing < config["roi_mm"])),

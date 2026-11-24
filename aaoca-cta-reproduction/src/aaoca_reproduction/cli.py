@@ -12,7 +12,7 @@ from .records import load_config
 def main():
     parser = argparse.ArgumentParser(description="AAOCA论文复现：输入核查与明确病例定位裁剪")
     parser.add_argument("action", choices=("audit", "prepare", "prepare-classification", "prepare-dataset", "check-training", "check-label-registry", "organize-two-tasks", "bind-dataset", "export-inputs", "bind-inputs",
-                                          "export-confirmed-labels", "train", "predict"))
+                                          "export-confirmed-labels", "generate-run-configs", "reset-preprocessing", "train", "predict"))
     parser.add_argument("--config", default="project.local.json")
     parser.add_argument("--case")
     parser.add_argument("--inputs")
@@ -26,9 +26,14 @@ def main():
     parser.add_argument("--imagechd-root")
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--gpu-count", type=int, default=1)
+    parser.add_argument("--batch-size", type=int, default=1)
+    parser.add_argument("--epochs", type=int, default=300)
+    parser.add_argument("--device", default="cuda:0")
+    parser.add_argument("--confirm-output-root")
     args = parser.parse_args()
-    if args.check and args.action not in {"bind-dataset", "prepare-dataset"}:
-        parser.error("--check仅适用于bind-dataset/prepare-dataset，不会模拟执行其他动作")
+    if args.check and args.action not in {"bind-dataset", "prepare-dataset", "generate-run-configs", "reset-preprocessing"}:
+        parser.error("--check仅适用于绑定、预处理计划、配置生成和清理计划")
     config = load_config(args.config)
     if any((args.runtime_root, args.data_root, args.aaoca_root, args.imagechd_root)):
         if args.action != "bind-dataset":
@@ -40,6 +45,12 @@ def main():
                 config[key] = Path(getattr(args, key)).resolve()
     if args.action == "audit":
         _, result = save_audit(config)
+    elif args.action == "generate-run-configs":
+        from .workflow import generate_run_configs
+        if not args.output:
+            parser.error("生成配置须用--output指定独立目录，原配置不改")
+        result = generate_run_configs(config, args.config, args.output, gpus=args.gpu_count,
+                    batch_size=args.batch_size, epochs=args.epochs, device=args.device, check=args.check)
     elif args.action == "bind-dataset":
         from .migration import bind_dataset
         if not args.inputs or not args.diagnoses or not args.output:
@@ -69,6 +80,9 @@ def main():
         result = prepare_dataset(config, manifest, check=args.check)
     elif args.action == "check-training":
         result = check_training(config, manifest)
+    elif args.action == "reset-preprocessing":
+        from .reset_preprocessing import reset_preprocessing
+        result = reset_preprocessing(config, manifest, confirm_root=args.confirm_output_root, check=args.check)
     elif args.action == "organize-two-tasks":
         from .datasets import organize_two_tasks
         if not args.inputs or not args.output:

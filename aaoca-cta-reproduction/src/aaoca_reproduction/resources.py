@@ -2,6 +2,7 @@ from contextlib import contextmanager
 import os
 import threading
 import math
+from copy import deepcopy
 from time import monotonic, sleep
 
 import psutil
@@ -54,6 +55,59 @@ def classification_device(config, estimated_gpu_bytes=0):
     return device
 
 
+def smoke_shape(config):
+    shape = config["classification"].get("smoke_input_shape")
+    if shape is None:
+        return None
+    if config.get("run_purpose") != "smoke" or shape != [64, 64, 64] or not 1 <= config["classification"].get("max_update_attempts", 0) <= 2:
+        raise ValueError("64³输入仅允许明确小测及最多两次更新")
+    return tuple(shape)
+
+
+def training_devices(config):
+    settings = config["classification"]
+    count = settings.get("gpu_count", 1)
+    if type(count) is not int or count < 1 or count > int(settings["batch_size"]):
+        raise ValueError("显卡数量须为正整数且不超过全局batch")
+    primary = torch.device(settings["device"])
+    if primary.type == "cpu":
+        if count != 1:
+            raise ValueError("CPU不接受多CUDA设备配置")
+        return [primary]
+    if primary.type != "cuda" or primary.index is None or not torch.cuda.is_available():
+        raise ValueError("需明确可用的cuda:N设备")
+    indices = settings.get("gpu_ids", list(range(primary.index, primary.index + count)))
+    if len(indices) != count or len(set(indices)) != count or any(type(i) is not int or not 0 <= i < torch.cuda.device_count() for i in indices):
+        raise ValueError("所选显卡编号不可用或数量不符")
+    if indices[0] != primary.index:
+        raise ValueError("device必须对应gpu_ids中的首卡")
+    local = deepcopy(config)
+    local["classification"]["batch_size"] = math.ceil(int(settings["batch_size"]) / count)
+    estimate = settings.get("estimated_gpu_working_bytes", model_resource_plan(local, True)["estimated_gpu_working_bytes"])
+    if type(estimate) is not int or estimate <= 0:
+        raise ValueError("每卡显存工作集预算必须为正整数")
+    devices = [torch.device("cuda", i) for i in indices]
+    started, last_notice = monotonic(), None
+    while True:
+        snapshots = []
+        for device in devices:
+            free, total = torch.cuda.mem_get_info(device)
+            reserve = max(4 * 2**30, int(total * 0.1))
+            if estimate > total - reserve:
+                raise MemoryError("所选卡总容量无法容纳每卡工作集预算：" + str(device))
+            snapshots.append({"device": str(device), "free_bytes": free, "reserve_bytes": reserve, "usable_bytes": free - reserve})
+        now = monotonic()
+        if all(s["usable_bytes"] >= estimate for s in snapshots):
+            event("classification_gpu_group_admitted", devices=snapshots, per_gpu_requested_bytes=estimate,
+                  global_batch=settings["batch_size"], waited_seconds=now - started)
+            return devices
+        if last_notice is None or now - last_notice >= 60:
+            event("waiting_gpu", devices=snapshots, per_gpu_requested_bytes=estimate,
+                  waited_seconds=now - started, poll_seconds=5, timeout_seconds=None)
+            last_notice = now
+        sleep(5)
+
+
 def model_resource_plan(config, training):
     from .classification import build_model
 
@@ -66,7 +120,8 @@ def model_resource_plan(config, training):
         model = build_model(settings["task"])
     parameters = sum(p.numel() for p in model.parameters())
     state_bytes = sum(t.numel() * t.element_size() for t in model.state_dict().values())
-    shape = (85, 215, 215)
+    small = smoke_shape(config)
+    shape = (small[2], small[0], small[1]) if small else (85, 215, 215)
     activation_sizes = []
 
     def convolution(layer, spatial):
@@ -96,7 +151,7 @@ def model_resource_plan(config, training):
                 shape = convolution(component.conv, shape)
             if hasattr(block.project, "conv"):
                 convolution(block.project.conv, incoming)
-    input_bytes = batch * 85 * 215 * 215 * 4
+    input_bytes = batch * (math.prod(small) if small else 85 * 215 * 215) * 4
     activation_estimate = sum(activation_sizes) * 6 + input_bytes * 4 if training else max(activation_sizes) * 3 + input_bytes * 2
     device_working = state_bytes * (4 if training else 1) + activation_estimate
     cpu = torch.device(settings["device"]).type == "cpu"

@@ -313,6 +313,10 @@ def task_partitions(config, manifest, task):
                 item["label_provenance"]["task_ct_binding"] = review["ct_bindings"][task]
             partitions[case["role"]].append(item)
     for partition in partitions.values():
+        if config.get("run_purpose") == "smoke":
+            if not partition or len(cases) > 2 or not 1 <= config["classification"].get("max_update_attempts", 0) <= 2:
+                raise ValueError("小测仅允许两例及最多两次更新，训练和验证均需真实病例")
+            continue
         if {item["target"] for item in partition} != {0, 1}:
             raise ValueError("任务" + task + "按" + policy + "策略的训练集与验证集须各有CT匹配的0/1两类")
     return partitions["candidate_train"], partitions["candidate_validation"]

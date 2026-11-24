@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 import os
 import random
+import subprocess
 from time import perf_counter
 
 import numpy as np
@@ -9,18 +10,27 @@ import torch
 
 from .augmentations import AuthorAugmentation
 from .classification import LEARNING_RATES, build_model, coverage_reviews, load_weights, model_contract, model_metadata, require_direction_review, training_strategy, validate_model_metadata
-from .data import load_batch, prepared_receipt
+from .data import guard_inputs, load_batch, prepared_receipt
 from .labels import task_partitions
 from .records import event, identity, write_json
-from .resources import admit_model, classification_device, configure_cpu, memory_guard
+from .resources import admit_model, training_devices, configure_cpu, memory_guard, smoke_shape
 
 
-def random_state(device):
+def code_provenance():
+    root = Path(__file__).resolve().parents[2]
+    def git(*args):
+        return subprocess.run(["git", "-C", str(root), *args], check=True,
+                              capture_output=True, text=True).stdout.strip()
+    return {"sha": git("rev-parse", "HEAD"), "modified_files": git("status", "--porcelain", "--untracked-files=no", "--", ".").splitlines()}
+
+
+def random_state(device, devices=None):
     state = np.random.get_state()
     return {"python": random.getstate(), "numpy": [state[0], state[1].tolist(), state[2], state[3], state[4]],
             "torch_cpu": torch.get_rng_state(),
             "torch_cuda": torch.cuda.get_rng_state(device) if device.type == "cuda" else None,
-            "cuda_device": str(device) if device.type == "cuda" else None}
+            "cuda_device": str(device) if device.type == "cuda" else None,
+            "torch_cuda_devices": {str(d): torch.cuda.get_rng_state(d) for d in (devices or [])}}
 
 
 def restore_random(state, device):
@@ -32,12 +42,17 @@ def restore_random(state, device):
         if state["cuda_device"] != str(device) or device.type != "cuda":
             raise ValueError("恢复时所选CUDA随机状态设备不一致")
         torch.cuda.set_rng_state(state["torch_cuda"], device)
+        for name, value in state.get("torch_cuda_devices", {}).items():
+            torch.cuda.set_rng_state(value, torch.device(name))
 
 
 def save_checkpoint(path, model, optimizer, scheduler, state, run_identity, meta, initialization):
-    value = {"schema": 1, "identity": run_identity, "model_meta": meta, "model": model.state_dict(),
+    parallel = isinstance(model, torch.nn.DataParallel)
+    core = model.module if parallel else model
+    devices = [torch.device("cuda", i) for i in model.device_ids] if parallel else []
+    value = {"schema": 1, "identity": run_identity, "model_meta": meta, "model": core.state_dict(),
              "optimizer": optimizer.state_dict(), "scheduler": scheduler.state_dict(), "scaler": None,
-             "state": dict(state), "random": random_state(next(model.parameters()).device), "initialization": initialization,
+             "state": dict(state), "random": random_state(next(model.parameters()).device, devices), "initialization": initialization,
              "data_workers": 0, "prefetch": 0, "augmentation_rng": "numpy-derived-per-sample-MONAI-and-global-python-torch"}
     pending = path.with_suffix(path.suffix + ".pending")
     torch.save(value, pending)
@@ -62,8 +77,10 @@ def run_budget(directory, budget, pending_estimate):
         raise OSError("训练检查点及日志将超出获准产物容量")
 
 
+@guard_inputs
 def train(config, manifest, resume=False):
     settings = config["classification"]
+    code = code_provenance()
     task = settings["task"]
     strategy = training_strategy(settings, task)
     meta = model_metadata(task)
@@ -86,7 +103,9 @@ def train(config, manifest, resume=False):
     train_inputs = [prepared_receipt(row, config) for row in train_rows]
     validation_inputs = [prepared_receipt(row, config) for row in validation_rows]
     direction = require_direction_review(config, train_inputs + validation_inputs)
-    coverage = coverage_reviews(config, train_rows + validation_rows, train_inputs + validation_inputs, require_verified=True)
+    coverage = coverage_reviews(config, train_rows + validation_rows, train_inputs + validation_inputs,
+                                require_verified=config.get("training_policy") != "local_adaptation")
+    small = smoke_shape(config)
     pretrained = settings.get("pretrained_detection")
     if task != "aaoca_present":
         if pretrained is None:
@@ -114,19 +133,24 @@ def train(config, manifest, resume=False):
         run_identity = identity({"base": run_identity, "label_policy": config["label_policy"],
                                  "labels": [(row["patient_key"], row["label_provenance"])
                                             for row in train_rows + validation_rows]})
+    if config.get("training_policy") == "local_adaptation" or small:
+        run_identity = identity({"base": run_identity, "training_policy": config.get("training_policy"),
+                                 "run_purpose": config.get("run_purpose", "training")})
     resources = configure_cpu(config)
     admission = admit_model(config)
     budget = budget if budget is not None else admission["plan"]["checkpoint_capacity_estimate_bytes"]
-    device = classification_device(config, settings.get("estimated_gpu_working_bytes", admission["plan"]["estimated_gpu_working_bytes"]))
+    devices = training_devices(config)
+    device = devices[0]
     random.seed(seed)
     np.random.seed(seed)
     torch.random.default_generator.manual_seed(seed)
     if device.type == "cuda":
-        with torch.cuda.device(device):
-            torch.cuda.manual_seed(seed)
+        for selected in devices:
+            with torch.cuda.device(selected):
+                torch.cuda.manual_seed(seed)
     with memory_guard(config) as memory:
         model = build_model(task).to(device)
-        initialization = {"source": "MONAI_Kaiming_from_scratch", "seed": seed}
+        initialization = {"source": "MONAI_Kaiming_from_scratch", "seed": seed, "code": code}
         if not resume and pretrained is not None:
             initialization = load_weights(model, pretrained, "aaoca_present")
         optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATES[settings["learning_rate_recipe"]], weight_decay=0.01)
@@ -137,6 +161,7 @@ def train(config, manifest, resume=False):
                  "attempted_updates": 0, "successful_updates": 0, "best_loss": float("inf"),
                  "bad_epochs": 0, "complete": False, "member_index": member, "seed": seed, "strategy": strategy,
                  "coverage_reviews": coverage,
+                 "test_only": bool(small), "smoke_input_shape": list(small) if small else None,
                  "training_patient_keys": [r["patient_key"] for r in train_rows],
                  "validation_patient_keys": [r["patient_key"] for r in validation_rows],
                  "cohort_identity": identity({"task": task,
@@ -166,6 +191,8 @@ def train(config, manifest, resume=False):
                 raise ValueError("更新尝试记录身份、次数或与检查点的先后关系不符")
             state["attempted_updates"] = attempts["attempted_updates"]
             del checkpoint
+        if len(devices) > 1:
+            model = torch.nn.DataParallel(model, device_ids=[d.index for d in devices], output_device=device.index)
         directory.mkdir(parents=True, exist_ok=True)
         parameter_count = sum(p.numel() for p in model.parameters())
         pending_bytes = parameter_count * 16 + 8 * 2**20
@@ -175,6 +202,7 @@ def train(config, manifest, resume=False):
         started = perf_counter()
         if not resume:
             write_json(directory / "run.json", {"identity": run_identity, "settings": settings, "model": meta,
+                       "code": code, "resolved_config": json.loads(json.dumps(config, default=str)),
                        "label_policy": config.get("label_policy", "confirmed"),
                        "label_sources": state.get("label_sources", {}),
                        "resources": resources, "admission": admission, "direction": direction, "coverage_reviews": coverage,
@@ -202,7 +230,7 @@ def train(config, manifest, resume=False):
                         run_budget(directory, budget, 1024)
                         save_update_attempts(attempts_path, run_identity, state["attempted_updates"] + 1)
                         state["attempted_updates"] += 1
-                        images, targets = load_batch(train_rows, train_inputs, indices, augmentation)
+                        images, targets = load_batch(train_rows, train_inputs, indices, augmentation, smoke_shape=small)
                         optimizer.zero_grad(set_to_none=True)
                         loss = loss_function(model(images.to(device)), targets.to(device))
                         if not torch.isfinite(loss):
@@ -229,7 +257,7 @@ def train(config, manifest, resume=False):
                     with torch.no_grad():
                         while state["cursor"] < len(validation_rows):
                             indices = list(range(state["cursor"], min(state["cursor"] + batch_size, len(validation_rows))))
-                            images, targets = load_batch(validation_rows, validation_inputs, indices)
+                            images, targets = load_batch(validation_rows, validation_inputs, indices, smoke_shape=small)
                             loss = loss_function(model(images.to(device)), targets.to(device))
                             if not torch.isfinite(loss):
                                 raise ValueError("验证损失不是有限值")

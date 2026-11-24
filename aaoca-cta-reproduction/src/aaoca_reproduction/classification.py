@@ -117,6 +117,8 @@ def load_weights(model, descriptor, task):
     provenance = {"descriptor": descriptor, "file_stat": stamp}
     if descriptor["format"] == "local_complete_checkpoint":
         validate_model_metadata(value["model_meta"], task)
+        if bool(value["state"].get("test_only")) != bool(descriptor.get("test_only")):
+            raise ValueError("小测检查点必须显式登记test_only，不能作为正式模型使用")
         if descriptor["strategy"] != value["state"]["strategy"]:
             raise ValueError("权重声明与实际检查点训练策略不符")
         if int(descriptor["member_index"]) != value["state"]["member_index"]:
@@ -140,6 +142,8 @@ def load_weights(model, descriptor, task):
 
 
 def prediction_direction(config, receipts):
+    if config.get("training_policy") == "local_adaptation":
+        return require_direction_review(config, receipts)
     review = config.get("direction_review")
     if review and review.get("approved") is True:
         require_direction_review(config, receipts)
@@ -159,6 +163,17 @@ def prediction_direction(config, receipts):
 
 
 def require_direction_review(config, receipts):
+    if config.get("training_policy") == "local_adaptation":
+        if config.get("prepared_input_policy") != "compatible" or config["classification_recipe"] != "canonical_ras_v1":
+            raise ValueError("本地适配须明确使用统一RAS兼容输入合同")
+        for receipt in receipts:
+            affine = np.asarray(receipt["geometry"]["target_affine"])
+            direction = affine[:3, :3] / np.linalg.norm(affine[:3, :3], axis=0)
+            if not np.allclose(direction, np.eye(3), atol=1e-5, rtol=0):
+                raise ValueError("实际输入物理方向不符合RAS合同")
+        return {"direction_status": "canonical_RAS_contract_checked", "author_reference_confirmed": False,
+                "recipe": "canonical_ras_v1", "review": config.get("direction_review"),
+                "reproduction_scope": "local_adaptation", "inputs": [r["identity"] for r in receipts]}
     review = config.get("direction_review")
     if not review or review.get("approved") is not True or not review.get("reviewer") or not review.get("reference"):
         raise ValueError("正式分类缺少经确认的作者参照方向或获准独立适配配方")

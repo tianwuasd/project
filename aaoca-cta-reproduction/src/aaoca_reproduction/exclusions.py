@@ -26,9 +26,11 @@ def read_exclusion(case, config, directory=None):
         return None
     record = read_json(path)
     if (record["state"] != "skipped" or record["reason"] not in SKIP_REASONS
-            or record["source_identity"] != identity(exclusion_source(case, config))
+            or (config.get("prepared_input_policy") != "compatible" and record["source_identity"] != identity(exclusion_source(case, config)))
             or record["case_id"] != case["case_id"] or (directory / "classification.json").exists()):
         raise ValueError("定位排除记录与当前源、方法或完整结果冲突")
+    if config.get("prepared_input_policy") == "compatible":
+        return record
     for name in ("image", "label"):
         if name == "label" and record["reason"] == "missing_label_file":
             if Path(case[name]).exists():

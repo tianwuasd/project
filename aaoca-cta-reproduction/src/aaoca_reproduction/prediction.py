@@ -7,12 +7,12 @@ import torch
 from sklearn.metrics import average_precision_score, roc_auc_score
 
 from .classification import LABEL_MAPS, build_model, coverage_reviews, load_weights, prediction_direction, validate_descriptor
-from .data import load_array, prepared_receipt
+from .data import guard_inputs, load_array, prepared_receipt
 from .exclusions import usable_cases
 from .labels import read_label_rows, reviewed_labels, validate_manifest
 from .preprocessing import network_tensor
 from .records import event, identity, signature, write_json
-from .resources import admit_model, classification_device, configure_cpu, memory_guard
+from .resources import admit_model, classification_device, configure_cpu, memory_guard, smoke_shape
 
 
 def metrics(truth, probabilities):
@@ -36,9 +36,15 @@ def metrics(truth, probabilities):
             "average_precision": float(average_precision_score(labels, scores)) if both else None}
 
 
+@guard_inputs
 def predict(config, manifest):
     settings = config["classification"]
     task = settings["task"]
+    if settings.get("gpu_count", 1) != 1:
+        raise ValueError("预测逐病例单卡执行，请明确gpu_count=1")
+    small = smoke_shape(config)
+    if any(d.get("test_only") for d in settings["weights"]) and not small:
+        raise ValueError("小测模型仅允许在明确的小测配置中预测")
     if task not in LABEL_MAPS:
         raise ValueError("未知预测任务")
     validate_manifest(manifest)
@@ -48,7 +54,8 @@ def predict(config, manifest):
     requested = settings["prediction_case_ids"]
     if not requested or len(set(requested)) != len(requested):
         raise ValueError("预测需显式列出不重复病例，禁止自动处理全部队列")
-    candidates = {r["case_id"]: r for r in manifest["cases"] if r["role"] == "predict"}
+    candidates = {r["case_id"]: r for r in manifest["cases"]
+                  if r["role"] == "predict" or (small and r["role"] == "candidate_validation")}
     rows = [candidates[key] for key in requested]
     rows, exclusions = usable_cases(rows, config)
     if not rows:
@@ -105,7 +112,13 @@ def predict(config, manifest):
             model = model.to(device).eval()
             with torch.no_grad():
                 for index, receipt in enumerate(receipts):
-                    tensor = network_tensor(load_array(receipt, training=False)).to(device)
+                    array = load_array(receipt, training=False)
+                    if small:
+                        start = [(n - s) // 2 for n, s in zip(array.shape, small)]
+                        array = array[tuple(slice(a, a + s) for a, s in zip(start, small))]
+                        tensor = torch.tensor(array.copy(), dtype=torch.float32).permute(2, 0, 1)[None, None].to(device)
+                    else:
+                        tensor = network_tensor(array).to(device)
                     logit = model(tensor).reshape(-1)
                     if logit.numel() != 1 or not torch.isfinite(logit).all():
                         raise ValueError("实际模型未产生有限单logit")
@@ -146,6 +159,7 @@ def predict(config, manifest):
                 confirmed_truth.append(confirmed_value)
                 confirmed_probability.append(probability)
         report = {"identity": run_identity, "task": task, "results": results, "metrics": metrics(valid_truth, valid_probability),
+                  "test_only": bool(small),
                   "localization_exclusions": exclusions,
                   "unknown_or_inapplicable": len(results) - len(valid_truth), "memory": memory,
                   "seconds": perf_counter() - started, "initialization_members": count,
