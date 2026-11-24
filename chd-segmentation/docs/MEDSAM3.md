@@ -13,6 +13,20 @@ python -B run.py models medsam3 evaluate --config PRIVATE_CONFIG --case CASE_ID 
 
 所有病例显式列出；多个病例重复--case。基础配置模板为configs/models/medsam3.yaml。医学LoRA微调另使用configs/models/medsam3_finetune.yaml，包含check-training、train和validate入口；专用子入口不通过MedSAM2/Q训练分发，不继承旧模型的训练次数或豁免。
 
+### 在服务器生成私有配置
+
+共享CHD1282清单已完成bind-inputs绑定后，在服务器项目目录执行：
+
+```bash
+python -B run.py models medsam3 configure --root /data4/zhangruichen
+```
+
+命令在course/chd-segmentation/configs内生成medsam3.yaml及medsam3_finetune.yaml，无需从本机上传两份YAML。data_root取已绑定清单中的真实绝对目录；训练和development名单来自冻结cohort，执行included/index_scan筛选并检查患者分离，内部及外部测试不进入名单。原完整迁移包对应训练590例、development128例，子集清单只包含其实际登记病例。
+
+配置沿用main模板的精度、双卡、固定global batch4及预算。默认引用根目录下env/chd-medsam3/bin/python、data/dependencies/MedSAM3和data/pretrained/MedSAM3；路径不同可增加--python、--official-root和--weights-dir，清单和划分可用--manifest、--cohort指定。不存在的材料在missing_materials列出；生成成功不表示环境、Git来源、GPU容量或模型运行已通过。材料齐备后再执行check-training和有界局部测试。
+
+该命令只读清单元数据，不扫描病例体素、不下载或安装依赖、不启动训练。已有相同配置复用且不修改时间；任意一份已有配置不同则保留原文件并拒绝写入。私有配置包含病例编号，不上传公开代码仓库。
+
 已通过Windows独立Conda环境的真实依赖导入、单GPU两例局部训练、保存恢复、训练后预测、空间回写、公共资源会话和独立评价。实际两进程CPU/Gloo检查覆盖梯度归约、随机状态和组内退出。完整多GPU/NCCL、Linux训练及全量分割效果尚未验收。病例运行需按具体范围确认产物。
 
 ## 医学LoRA训练输入与恢复
