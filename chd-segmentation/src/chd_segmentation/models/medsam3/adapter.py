@@ -10,6 +10,12 @@ from torch.nn import functional as F
 from .weights import import_official
 
 
+def input_transform(official):
+    return official.ComposeAPI(transforms=[
+        official.RandomResizeAPI(sizes=1008, max_size=1008, square=True, consistent_transform=False),
+        official.ToTensorAPI(), official.NormalizeAPI(mean=[.5]*3, std=[.5]*3)])
+
+
 class MedSAM3Adapter:
     def __init__(self, config, *, training=False):
         self.config = config
@@ -45,10 +51,7 @@ class MedSAM3Adapter:
             raise ValueError('LoRA没有完整加载')
         del weights
         self.model = model.to(self.device).train(training)
-        self.transform = official.ComposeAPI(transforms=[
-            official.RandomResizeAPI(sizes=1008, max_size=1008, square=True,
-                                     consistent_transform=False),
-            official.ToTensorAPI(), official.NormalizeAPI(mean=[.5] * 3, std=[.5] * 3)])
+        self.transform = input_transform(official)
         # 复用官方Datapoint构造，不通过保存图片或更改官方源码传入切片。
         self.datapoint = official.SAM3LoRAInference.create_datapoint
 

@@ -17,6 +17,12 @@ def request(config, output, evaluation=False):
     resources = deepcopy(config['resources'])
     resources['device'] = 'cpu' if evaluation else config['device']
     resources['memory_policy'] = 'host_fraction'
+    resources['gpu_spec'] = dict(resource_model='medsam3', resolution=1008,
+        queries=len(config['training']['classes']) if 'training' in config else len(config['prompts']),
+        stage='training' if 'training' in config else 'prediction',
+        dependencies={key:[Path(config[key]).stat().st_size,Path(config[key]).stat().st_mtime_ns]
+                      for key in ('base_weights','lora_weights','official_config','bpe_path')}
+        if not evaluation else {})
     if not evaluation and config['device'] == 'cuda':
         resources['vram_reserve_bytes'] += config['estimated_vram_bytes']
     gpu_count = int(resources['device'] == 'cuda')

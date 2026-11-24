@@ -121,7 +121,7 @@ def stream(items, config, workers, prefetch, deadline):
         yield consume()
 
 
-def datapoint(engine, sample):
+def datapoint(config, transform, sample):
     import torch
     from PIL import Image
     from scipy.ndimage import label
@@ -134,7 +134,7 @@ def datapoint(engine, sample):
         components, count = label(labels == class_id, structure=np.ones((3, 3), dtype=bool))
         ids = []
         for component in range(1, count+1):
-            if (len(objects)+1)*1008**2+1008**2*12 > engine.config['workspace_bytes']:
+            if (len(objects)+1)*1008**2+1008**2*12 > config['workspace_bytes']:
                 raise MemoryError('真实实例掩膜构建超过声明的工作区，未丢弃实例')
             mask = components == component
             ys, xs = np.nonzero(mask)
@@ -142,10 +142,10 @@ def datapoint(engine, sample):
             ids.append(object_id)
             objects.append(Object(bbox=torch.tensor([xs.min(), ys.min(), xs.max()+1, ys.max()+1], dtype=torch.float32),
                 area=float(mask.sum()), object_id=object_id, segment=torch.from_numpy(mask)))
-        queries.append(FindQueryLoaded(query_text=engine.config['prompts'][class_id], image_id=0,
+        queries.append(FindQueryLoaded(query_text=config['prompts'][class_id], image_id=0,
             object_ids_output=ids, is_exhaustive=True, query_processing_order=0,
             inference_metadata=InferenceMetadata(coco_image_id=0, original_image_id=0,
                 original_category_id=class_id, original_size=(height, width), object_id=-1, frame_index=0)))
     image = Image.fromarray(rgb)
     point = Datapoint(find_queries=queries, images=[SAMImage(data=image, objects=objects, size=(height, width))], raw_images=[image])
-    return engine.transform(point)
+    return transform(point)

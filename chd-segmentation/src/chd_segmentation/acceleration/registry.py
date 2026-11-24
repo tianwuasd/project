@@ -54,6 +54,15 @@ def inventory(owned_pids=(), visible_devices="inherited", *, resources=None, can
 
 def capacity_key(config, spec, local_batch, world=None):
     from importlib.metadata import version
+    if spec.get('resource_model') == 'medsam3':
+        source = Path(__file__).parents[1]/'models'/'medsam3'
+        return digest(dict(model='medsam3', spec=spec, batch=local_batch,
+            precision=config['training']['precision'],
+            world=config['resources']['gpu_count'] if world is None else world,
+            implementation={name:file_digest(source/name) for name in
+                            ('adapter.py','training_data.py','training_worker.py')},
+            versions={name:version(name) for name in ('torch','torchvision','numpy','triton-windows')}
+                if os.name == 'nt' else {name:version(name) for name in ('torch','torchvision','numpy','triton')}))
     return digest({"model": spec.get('resource_model','stunet'), "spec": spec, "batch": local_batch,
                    "precision": config["training"]["precision"],
                    "world": config["resources"]["gpu_count"] if world is None else world,

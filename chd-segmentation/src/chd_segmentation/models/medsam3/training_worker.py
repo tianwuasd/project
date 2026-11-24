@@ -146,7 +146,7 @@ def train(payload, handle):
     def loss_for(sample):
         from sam3.model.model_misc import SAM3Output
         from sam3.train.loss.loss_fns import CORE_LOSS_KEY
-        point = datapoint(engine, sample)
+        point = datapoint(config, engine.transform, sample)
         batch = engine.official.collate_fn_api([point], dict_key='input', with_seg_masks=True)['input']
         batch = engine.official.copy_data_to_device(batch, device, non_blocking=False)
         with torch.autocast(device.type, dtype=torch.bfloat16, enabled=device.type == 'cuda' and config['precision'] == 'bf16'):
