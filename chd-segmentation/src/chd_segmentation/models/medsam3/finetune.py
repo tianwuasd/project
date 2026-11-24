@@ -1,17 +1,11 @@
-from contextlib import ExitStack
 from copy import deepcopy
 from dataclasses import replace
-import multiprocessing as mp
-from multiprocessing import spawn
-import os
 from pathlib import Path
 import time
 
 import yaml
 
 from ...acceleration import ResourceSession
-from ...acceleration.legacy import SessionGuard
-from ...acceleration.memory import identity
 from ...artifacts.store import digest, file_digest, operation_lock, read_json, require_output
 from .config import load_config
 from .environment import inspect_environment
@@ -25,12 +19,12 @@ def settings(path, prepared=None):
     defaults = dict(prepared=None, classes=list(range(1, 11)), workers=1, prefetch=2,
                     updates=1000, validate_every=20, learning_rate=.00005, seed=42,
                     warmup_steps=100, max_seconds=14400, ram_limit_bytes=16*2**30,
-                    vram_limit_bytes=16*2**30)
+                    vram_limit_bytes=16*2**30, batch=1)
     required = {'base_config', 'run_dir', 'train_cases', 'val_cases'}
     if not isinstance(raw, dict) or not required <= raw.keys() or set(raw)-required-defaults.keys():
         raise ValueError('医学LoRA训练配置字段无效')
     training = {**defaults, **raw}
-    for name in ('updates', 'validate_every', 'prefetch', 'max_seconds', 'ram_limit_bytes', 'vram_limit_bytes'):
+    for name in ('updates', 'validate_every', 'prefetch', 'max_seconds', 'ram_limit_bytes', 'vram_limit_bytes', 'batch'):
         if type(training[name]) is not int or training[name] < 1:
             raise ValueError('训练预算必须为正整数：'+name)
     if type(training['workers']) is not int or training['workers'] < 0 or training['prefetch'] < training['workers']:
@@ -46,12 +40,15 @@ def settings(path, prepared=None):
     if any(not isinstance(training[k], list) or not training[k] for k in ('train_cases', 'val_cases')):
         raise ValueError('需要显式训练和验证病例名单')
     config = load_config(path.parent/training['base_config'])
+    from ...config import validate_resources
+    validate_resources(config['resources'],training['batch'])
     if config['device'] != 'cuda':
         raise ValueError('官方MedSAM3训练损失使用Triton，需要显式CUDA设备')
-    if training['workers'] >= config['resources']['cpu_threads']:
+    world = config['resources']['gpu_count']
+    if world*(training['workers']+1) > config['resources']['cpu_threads']:
         raise ValueError('CPU预算需同时覆盖读取线程和主线程')
     if (training['ram_limit_bytes'] > 100_000_000_000 or
-            config['fixed_ram_bytes']+config['workspace_bytes'] > training['ram_limit_bytes']):
+            world*(config['fixed_ram_bytes']+config['workspace_bytes']) > training['ram_limit_bytes']):
         raise ValueError('原始工作集与训练内存上限不相容')
     training['run_dir'] = str((path.parent/training['run_dir']).resolve())
     training['prepared'] = str(Path(prepared).resolve(strict=True)) if prepared else (
@@ -74,22 +71,20 @@ def check(config):
     return dict(ready=True, model_loaded=False, sources=sources, dependencies=record, environment=environment)
 
 
-def stop(worker, cancel):
-    cancel.set()
-    if worker.pid is not None and worker.is_alive():
-        worker.terminate()
-        worker.join(timeout=5)
-        if worker.is_alive():
-            worker.kill()
-            worker.join(timeout=5)
-        if worker.is_alive():
-            raise RuntimeError('医学LoRA工作进程未退出，禁止清理')
-    worker.close()
+def training_contract(config,checked):
+    implementation = {name:file_digest(Path(__file__).with_name(name+'.py')) for name in
+        ('adapter','config','input','training_data','training_worker','finetune','distributed','launcher')}
+    implementation['gradient_sync'] = file_digest(Path(__file__).parents[2]/'acceleration'/'distributed.py')
+    return dict(sources=checked['sources'],dependencies=checked['dependencies'],implementation=implementation,
+        training={k:v for k,v in config['training'].items() if k not in ('run_dir','prepared','max_seconds')},
+        science={k:config[k] for k in ('precision','gray_window','intensity_semantics','source_mean','source_std',
+            'prompts','geometry_policy','spacing_policy','orientation_evidence','intensity_evidence')})
 
 
 def run(config, operation, resume=False, stop_after=None, checkpoint='best', deadline=None):
-    import psutil
     from .training_worker import execute
+    from .launcher import launch
+    from .distributed import topology
     if operation not in ('train', 'validate') or checkpoint not in ('best', 'latest'):
         raise ValueError('医学LoRA操作或检查点无效')
     if stop_after is not None and (type(stop_after) is not int or stop_after < 1):
@@ -108,60 +103,15 @@ def run(config, operation, resume=False, stop_after=None, checkpoint='best', dea
         raise FileExistsError('新训练目录已存在；续训需显式--resume')
     if operation == 'validate' or resume:
         (root/(('latest' if resume else checkpoint)+'.pt')).resolve(strict=True)
-    implementation = {name: file_digest(Path(__file__).with_name(name+'.py'))
-                      for name in ('adapter','config','input','training_data','training_worker','finetune')}
-    signature = digest(dict(sources=checked['sources'], dependencies=checked['dependencies'],
-        implementation=implementation,
-        training={k:v for k,v in training.items() if k not in ('run_dir','prepared','max_seconds')},
-        science={k:config[k] for k in ('gray_window','intensity_semantics','source_mean','source_std',
-                                      'prompts','geometry_policy','spacing_policy','orientation_evidence','intensity_evidence')}))
+    signature = digest(training_contract(config,checked))
     resources_config = deepcopy(config)
     remaining = cutoff-time.time()
     resources_config['resources']['max_wait'] = min(remaining, config['resources']['max_wait']) if config['resources']['max_wait'] is not None else remaining
     req = replace(request(resources_config, root), stage='medsam3_lora_'+operation)
-    payload = dict(config=config, sources=checked['sources'], environment=checked['environment'],
+    payload = dict(config=config, topology=topology(config), sources=checked['sources'], environment=checked['environment'],
         dependencies=checked['dependencies'], identity=signature, operation=operation, resume=resume,
         stop_after=stop_after, checkpoint=checkpoint, deadline=cutoff)
-    with operation_lock(root), ResourceSession(req) as session, ExitStack() as cleanup:
-        context = mp.get_context('spawn')
-        worker = context.Process(target=execute, args=(payload, session.handle, session.allocation.gpus))
-        cleanup.callback(stop, worker, session.cancel)
-        previous_executable, previous_preparation = spawn.get_executable(), spawn.get_preparation_data
-        project = Path(__file__).resolve().parents[4]
-        previous_environment = {k:os.environ.get(k) for k in ('PYTHONPATH','PYTHONHOME','PYTHONNOUSERSITE','PYTHONSAFEPATH','PYTHONDONTWRITEBYTECODE')}
-        def prepare(name):
-            data = previous_preparation(name)
-            data['sys_path'] = [str(project/'src'), str(project), *checked['environment']['paths']]
-            return data
-        try:
-            spawn.get_preparation_data = prepare
-            mp.set_executable(config['python'])
-            for k in ('PYTHONPATH','PYTHONHOME'):
-                os.environ.pop(k, None)
-            os.environ.update(PYTHONNOUSERSITE='1', PYTHONSAFEPATH='1', PYTHONDONTWRITEBYTECODE='1')
-            worker.start()
-        finally:
-            spawn.get_preparation_data = previous_preparation
-            mp.set_executable(previous_executable)
-            for k,v in previous_environment.items():
-                if v is None:
-                    os.environ.pop(k, None)
-                else:
-                    os.environ[k] = v
-        member = identity(psutil.Process(worker.pid))
-        member['baseline_rss'] = 0
-        session.members[member['pid']] = member
-        with SessionGuard(session.handle) as guard:
-            while worker.is_alive():
-                if time.time() >= cutoff:
-                    raise TimeoutError('医学LoRA达到固定总截止')
-                snapshot = guard.client.snapshot()
-                if snapshot.cancelled or snapshot.sample_age_seconds > 30:
-                    raise InterruptedError('公共资源监控取消或采样过期')
-                if session.state['task_rss'] > training['ram_limit_bytes']:
-                    raise MemoryError('医学LoRA超过显式进程组内存上限')
-                worker.join(timeout=.5)
-        worker.join()
-        if worker.exitcode:
-            raise RuntimeError(f'医学LoRA工作进程退出{worker.exitcode}，见training.log')
+    with operation_lock(root), ResourceSession(req) as session:
+        launch(config,checked['environment'],session,execute,(payload,session.handle,session.allocation.gpus),
+            payload['topology']['world'],cutoff)
     return read_json(root/('validation.json' if operation == 'validate' else 'training.json'))

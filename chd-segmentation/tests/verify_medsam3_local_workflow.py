@@ -139,13 +139,13 @@ def main():
             capacity_probe_bytes=13*2**29 if args.capacity_probe else 0,
             estimated_vram_bytes=6*2**30, worker_timeout_seconds=1200)
         base['resources'].update(cpu_threads=4, wait_seconds=90, reserve_ram_bytes=4*2**30,
-            vram_reserve_bytes=2**30, memory_limit_bytes=16*2**30, share=True)
+            vram_reserve_bytes=2**30, memory_limit_bytes=16*2**30, share=True,gpu_count=1,batch_layout=None)
         base_path = root/'base.yaml'
         base_path.write_text(yaml.safe_dump(base, allow_unicode=True), encoding='utf-8')
         training = dict(base_config='base.yaml', run_dir=str(root/'work/train'),
             train_cases=[args.train_case], val_cases=[args.val_case], classes=[5], updates=2,
             validate_every=1, warmup_steps=0, learning_rate=.00005, seed=42, workers=1,
-            prefetch=2, prepared=None, max_seconds=1200, ram_limit_bytes=16*2**30, vram_limit_bytes=7*2**30)
+            prefetch=2, prepared=None, max_seconds=1200, ram_limit_bytes=16*2**30, vram_limit_bytes=7*2**30,batch=1)
         config = load_config(base_path)
         samples = entries(config, training)
         from chd_segmentation.models.medsam3.weights import import_official

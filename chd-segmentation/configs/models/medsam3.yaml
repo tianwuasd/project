@@ -34,6 +34,10 @@ resources:
   memory_limit_bytes: 100000000000
   ram_fraction: 0.8
   cpu_fraction: 0.8
-  cpu_threads: 2
+  # CPU线程为全部rank的总额；gpu_ids为空时由公共调度选择可用显卡。
+  cpu_threads: 4
+  gpu_count: 2
+  gpu_ids: null
+  batch_layout: null
   wait_seconds: 900
   share: false

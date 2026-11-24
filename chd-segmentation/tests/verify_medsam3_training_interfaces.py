@@ -1,5 +1,6 @@
 from pathlib import Path
 import subprocess
+import runpy
 import sys
 
 
@@ -8,6 +9,9 @@ def main():
     sys.path.insert(0, str(root/'src'))
     from chd_segmentation.models.medsam3.finetune import settings, check
     config = settings(root/'configs/models/medsam3_finetune.yaml')
+    updater = runpy.run_path(str(root/'update.py'))
+    assert updater['allowed']('requirements-medsam3-windows.txt')
+    assert not updater['allowed']('.runs/private-config.yaml')
     run = Path(config['training']['run_dir'])
     existed = run.exists()
     result = check(config)

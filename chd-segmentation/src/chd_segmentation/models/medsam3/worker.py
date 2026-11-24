@@ -10,17 +10,35 @@ from .input import open_image, rgb_slice, slices_for, source_record
 from .storage import atomic_array, export_case, mapped_image
 
 
-def run(config, rows, output, handle, gpus, dependency_record, stop_after):
+def execute(config, rows, output, handle, gpus, dependency_record, stop_after,rank,world,coordinator,port):
+    import sys
+    from ...acceleration.runtime import attach
+    attach(handle)
+    root = Path(output)
+    stream = (root/f'prediction.rank{rank}.log').open('a',encoding='utf-8')
+    sys.stdout = sys.stderr = stream
+    cache = root/'runtime-cache'/f'rank{rank}'
+    (cache/'temporary').mkdir(parents=True,exist_ok=True)
+    for key,name in {'TRITON_CACHE_DIR':'triton','CUDA_CACHE_PATH':'cuda','MPLCONFIGDIR':'matplotlib',
+        'TORCH_HOME':'torch','HF_HOME':'huggingface','TEMP':'temporary','TMP':'temporary','TMPDIR':'temporary'}.items():
+        os.environ[key] = str(cache/name)
+    coordinator.register(rank)
+    coordinator.wait(rank,0,'startup_ready')
+    run(config,rows[rank::world],output,handle,[gpus[rank]] if gpus else [],dependency_record,stop_after,rank,world)
+
+
+def run(config, rows, output, handle, gpus, dependency_record, stop_after,rank=0,world=1):
     os.environ.update(HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1', PYTHONDONTWRITEBYTECODE='1')
     os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(gpu['uuid'] for gpu in gpus)
     import torch
     import psutil
     from .environment import verify_worker_environment
     from .adapter import MedSAM3Adapter
+    from .distributed import claim_prediction_slice
 
     environment = verify_worker_environment(config['environment'])
     event(output, 'medsam3_environment_verified', **environment)
-    torch.set_num_threads(config['resources']['cpu_threads'])
+    torch.set_num_threads(config['resources']['cpu_threads']//world)
     if gpus:
         actual = str(torch.cuda.get_device_properties(0).uuid)
         actual = actual if actual.startswith('GPU-') else 'GPU-' + actual
@@ -85,6 +103,11 @@ def run(config, rows, output, handle, gpus, dependency_record, stop_after):
                     reused += 1
                     event(root, 'medsam3_slice_reused', case_id=row['case_id'], slice=index)
                     continue
+                if not claim_prediction_slice(handle,stop_after):
+                    write_json(root/f'summary.rank{rank}.json',dict(protocol=PROTOCOL,
+                        state='interrupted_at_slice_boundary',cases=completed,rank=rank,
+                        new_slices=new,reused_slices=reused,seconds=perf_counter()-started))
+                    return
                 if engine is None:
                     boundary()
                     load_started = perf_counter()
@@ -104,10 +127,6 @@ def run(config, rows, output, handle, gpus, dependency_record, stop_after):
                 progress.update(case_id=row['case_id'], completed_slices=new,
                     reused_slices=reused, slice=index)
                 del rgb, labels
-                if stop_after is not None and new >= stop_after:
-                    write_json(root / 'summary.json', dict(protocol=PROTOCOL, state='interrupted_at_slice_boundary',
-                        new_slices=new, reused_slices=reused, seconds=perf_counter() - started))
-                    return
             export_case(case_root, original, state)
             completed.append(row['case_id'])
             del image, original
@@ -115,10 +134,11 @@ def run(config, rows, output, handle, gpus, dependency_record, stop_after):
             torch.cuda.synchronize()
         memory = psutil.Process().memory_info()
         summary = dict(protocol=PROTOCOL, state='completed', cases=completed, new_slices=new,
+            rank=rank,
             reused_slices=reused, seconds=perf_counter() - started, model_initialized=engine is not None,
             rss_bytes=memory.rss, peak_rss_bytes=memory.peak_wset if os.name == 'nt' else None,
             torch_peak_vram_bytes=torch.cuda.max_memory_reserved() if gpus else None,
             coverage=config['coverage'],
             scope='technical_slices' if config['coverage'] == 'selected' else 'whole_volume',
             training_updates=0)
-        write_json(root / 'summary.json', summary)
+        write_json(root / f'summary.rank{rank}.json', summary)

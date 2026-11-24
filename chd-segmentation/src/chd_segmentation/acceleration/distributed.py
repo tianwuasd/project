@@ -2,6 +2,28 @@ import torch
 import torch.distributed as dist
 
 
+def all_states(value):
+    if not dist.is_initialized():
+        return [value]
+    values = [None]*dist.get_world_size()
+    dist.all_gather_object(values,value)
+    return values
+
+
+def synchronize_gradients(model):
+    if not dist.is_initialized():
+        return
+    for parameter in model.parameters():
+        if not parameter.requires_grad:
+            continue
+        present = torch.tensor(int(parameter.grad is not None),device=parameter.device)
+        dist.all_reduce(present,op=dist.ReduceOp.SUM)
+        if present.item():
+            if parameter.grad is None:
+                parameter.grad = torch.zeros_like(parameter)
+            dist.all_reduce(parameter.grad,op=dist.ReduceOp.SUM)
+
+
 def distributed_backend(device,requested=None):
     kind = torch.device(device).type
     if kind not in ('cpu','cuda') or requested not in (None,'gloo','nccl'):

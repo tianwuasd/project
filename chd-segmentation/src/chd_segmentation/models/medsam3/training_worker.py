@@ -3,11 +3,11 @@ from pathlib import Path
 import sys
 
 
-def execute(payload, handle, gpus):
+def execute(payload, handle, gpus, rank, world, coordinator, port):
     root = Path(payload['config']['training']['run_dir'])
-    stream = (root/'training.log').open('a', encoding='utf-8')
+    stream = (root/('training.log' if world == 1 else f'training.rank{rank}.log')).open('a', encoding='utf-8')
     sys.stdout = sys.stderr = stream
-    cache = root/'runtime-cache'
+    cache = root/'runtime-cache'/f'rank{rank}'
     temporary = cache/'temporary'
     temporary.mkdir(parents=True, exist_ok=True)
     os.environ.update({key:str(cache/name) for key,name in {
@@ -17,32 +17,49 @@ def execute(payload, handle, gpus):
         'TMPDIR':'temporary', 'TMP':'temporary', 'TEMP':'temporary'}.items()})
     os.environ.update(HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1', PYTHONDONTWRITEBYTECODE='1')
     if gpus:
-        os.environ['CUDA_VISIBLE_DEVICES'] = gpus[0]['uuid']
-    train(payload, handle)
+        os.environ['CUDA_VISIBLE_DEVICES'] = gpus[rank]['uuid']
+    os.environ.update(MASTER_ADDR='127.0.0.1',MASTER_PORT=str(port),RANK=str(rank),WORLD_SIZE=str(world))
+    coordinator.register(rank)
+    train(payload, handle, rank, world, coordinator, gpus)
 
 
-def train(payload, handle):
+def train(payload, handle, rank, world, coordinator, gpus):
     import gc
     import math
     import random
     from time import time, perf_counter
     import numpy as np
     import torch
+    import torch.distributed as dist
     from .environment import verify_worker_environment
     from .adapter import MedSAM3Adapter
     from .training_data import datapoint, stream
     from ...acceleration.runtime import attach
     from ...artifacts.store import write_json
     from ...observability.events import event
+    from ...acceleration.distributed import all_states,synchronize_gradients,distributed_backend
+    from .distributed import rank_indices,require_topology,rng_state,restore_rng,validation_rounds
 
     verify_worker_environment(payload['environment'])
     config, training = payload['config'], payload['config']['training']
     root, device = Path(training['run_dir']), torch.device(config['device'])
     client = attach(handle)
-    torch.set_num_threads(config['resources']['cpu_threads']-training['workers'])
-    random.seed(training['seed'])
-    np.random.seed(training['seed'])
-    torch.manual_seed(training['seed'])
+    torch.set_num_threads(config['resources']['cpu_threads']//world-training['workers'])
+    seed = (training['seed']+rank) % 2**32
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    coordinator.wait(rank,-1,'startup_ready')
+    if device.type == 'cuda':
+        actual = str(torch.cuda.get_device_properties(0).uuid)
+        actual = actual if actual.startswith('GPU-') else 'GPU-'+actual
+        if actual.lower() != gpus[rank]['uuid'].lower():
+            raise ValueError('医学LoRA实际GPU与获准UUID不同')
+    if world > 1:
+        from datetime import timedelta
+        dist.init_process_group(distributed_backend(device,config['resources'].get('distributed_backend')),
+            rank=rank,world_size=world,timeout=timedelta(seconds=config['resources']['collective_timeout_seconds']),
+            **({'device_id':torch.device('cuda',0)} if device.type == 'cuda' else {}))
     if device.type == 'cuda':
         free, total = torch.cuda.mem_get_info()
         reserve = max(2**30, config['resources']['vram_reserve_bytes'])
@@ -55,6 +72,12 @@ def train(payload, handle):
         torch.cuda.reset_peak_memory_stats()
     state = dict(step=0, best_loss=float('inf'))
 
+    def combine(values, maximum=False):
+        tensor = torch.tensor(values,dtype=torch.float64,device=device)
+        if world > 1:
+            dist.all_reduce(tensor,op=dist.ReduceOp.MAX if maximum else dist.ReduceOp.SUM)
+        return tensor.tolist()
+
     def atomic_torch(path, value):
         pending = path.with_name(path.name+'.pending')
         with pending.open('wb') as out:
@@ -64,6 +87,11 @@ def train(payload, handle):
         os.replace(pending, path)
 
     def build(checkpoint=None):
+        saved = torch.load(checkpoint, map_location='cpu', weights_only=True) if checkpoint is not None else None
+        if saved is not None:
+            require_topology(saved['topology'],payload['topology'])
+            if saved['identity'] != payload['identity'] or len(saved['rank_rng']) != world:
+                raise ValueError('检查点与来源、配方或逐rank随机状态不匹配')
         engine = MedSAM3Adapter(config, training=True)
         from sam3.train.matcher import BinaryHungarianMatcherV2, BinaryOneToManyMatcher
         from sam3.train.loss.loss_fns import IABCEMdetr, Boxes, Masks
@@ -88,10 +116,7 @@ def train(payload, handle):
                 return (step+1)/warmup
             return .5*(1+math.cos(math.pi*min(1.,(step-warmup)/max(1,training['updates']-warmup))))
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, scale)
-        if checkpoint is not None:
-            saved = torch.load(checkpoint, map_location='cpu', weights_only=True)
-            if saved['identity'] != payload['identity']:
-                raise ValueError('检查点与来源、划分、LoRA结构或优化设置不匹配')
+        if saved is not None:
             expected = {k for k in engine.model.state_dict() if k.endswith(('.lora_A','.lora_B'))}
             if set(saved['lora']) != expected:
                 raise ValueError('训练检查点LoRA键集合不同')
@@ -101,36 +126,34 @@ def train(payload, handle):
             optimizer.load_state_dict(saved['optimizer'])
             scheduler.load_state_dict(saved['scheduler'])
             state.update(step=saved['step'], best_loss=saved['best_loss'])
-            random.setstate(saved['python_rng'])
-            rng = saved['numpy_rng']
-            np.random.set_state((rng[0], np.asarray(rng[1], dtype=np.uint32), *rng[2:]))
-            torch.set_rng_state(saved['torch_rng'])
-            if device.type == 'cuda':
-                torch.cuda.set_rng_state(saved['cuda_rng'])
-            event(root, 'medsam3_lora_restored', step=state['step'], optimizer_states=len(optimizer.state))
+            restore_rng(saved['rank_rng'][rank])
+            event(root, 'medsam3_lora_restored', rank=rank,step=state['step'], optimizer_states=len(optimizer.state))
         return engine, criterion, optimizer, scheduler
 
     def save(name):
-        lora = {k:v.detach().cpu() for k,v in engine.model.state_dict().items() if k.endswith(('.lora_A','.lora_B'))}
-        rng = np.random.get_state()
-        saved = dict(identity=payload['identity'], lora=lora, optimizer=optimizer.state_dict(),
-            scheduler=scheduler.state_dict(), step=state['step'], best_loss=state['best_loss'],
-            python_rng=random.getstate(), numpy_rng=(rng[0],rng[1].tolist(),*rng[2:]), torch_rng=torch.get_rng_state(),
-            cuda_rng=torch.cuda.get_rng_state() if device.type == 'cuda' else None)
-        atomic_torch(root/(name+'.pt'), saved)
-        atomic_torch(root/(name+'_lora_weights.pt'), lora)
-        event(root, 'medsam3_lora_checkpoint', name=name, step=state['step'])
+        states = all_states(rng_state())
+        if rank == 0:
+            lora = {k:v.detach().cpu() for k,v in engine.model.state_dict().items() if k.endswith(('.lora_A','.lora_B'))}
+            saved = dict(identity=payload['identity'],topology=payload['topology'],rank_rng=states,
+                lora=lora,optimizer=optimizer.state_dict(),scheduler=scheduler.state_dict(),
+                step=state['step'],best_loss=state['best_loss'])
+            atomic_torch(root/(name+'.pt'),saved)
+            atomic_torch(root/(name+'_lora_weights.pt'),lora)
+            event(root,'medsam3_lora_checkpoint',name=name,step=state['step'],world=world)
+        coordinator.wait(rank,state['step'],'checkpoint_saved')
 
     def boundary():
         nonlocal engine, criterion, optimizer, scheduler
-        if time() >= payload['deadline']:
-            raise TimeoutError('医学LoRA达到固定截止')
+        coordinator.wait(rank,state['step'],'memory_boundary')
         snap = client.snapshot()
-        if snap.cancelled or snap.sample_age_seconds > 30:
-            raise InterruptedError('公共监控取消或采样过期')
-        if device.type == 'cuda' and torch.cuda.mem_get_info()[0] < max(2**30,config['resources']['vram_reserve_bytes']):
+        stop,paused,low = combine([int(time() >= payload['deadline'] or snap.cancelled or snap.sample_age_seconds > 30),
+            int(snap.paused),int(device.type == 'cuda' and torch.cuda.mem_get_info()[0] <
+                                  max(2**30,config['resources']['vram_reserve_bytes']))],maximum=True)
+        if stop:
+            raise InterruptedError('医学LoRA达到截止、取消或公共采样过期')
+        if low:
             raise MemoryError('显存空闲量低于声明的预留')
-        if snap.paused:
+        if paused:
             name = 'latest' if payload['operation'] == 'train' else payload['checkpoint']
             if payload['operation'] == 'train':
                 save(name)
@@ -167,55 +190,77 @@ def train(payload, handle):
 
     def validate():
         total, count = 0., 0
-        with stream(payload['sources']['val'], config, training['workers'], training['prefetch'], payload['deadline']) as samples:
-            for sample in samples:
-                boundary()
+        for item in validation_rounds(payload['sources']['val'],world,rank):
+            boundary()
+            if item is not None:
+                with stream([item],config,training['workers'],training['prefetch'],payload['deadline']) as samples:
+                    sample = next(iter(samples))
                 engine.model.eval()
                 with torch.no_grad():
                     value = loss_for(sample)
                     total += value.item()
                     count += 1
                     del value
-        result = dict(loss=total/count, samples=count, step=state['step'], metric='official_detection_mask_loss')
-        event(root, 'medsam3_lora_validation', **result)
+        total,count = combine([total,count])
+        result = dict(loss=total/count, samples=int(count), step=state['step'], metric='official_detection_mask_loss')
+        if rank == 0:
+            event(root, 'medsam3_lora_validation', **result)
         return result
 
     client.wait_active()
     path = root/'latest.pt' if payload['resume'] else root/(payload['checkpoint']+'.pt') if payload['operation'] == 'validate' else None
     engine, criterion, optimizer, scheduler = build(path)
     event(root, 'medsam3_lora_started', operation=payload['operation'], step=state['step'],
+        rank=rank,world=world,global_batch=training['batch'],local_samples=payload['topology']['shares'][rank],
         trainable_parameters=sum(p.numel() for p in engine.model.parameters() if p.requires_grad),
         reader_threads=training['workers'], prefetch=training['prefetch'])
     if payload['operation'] == 'validate':
-        write_json(root/'validation.json', validate())
+        result = validate()
+        if rank == 0:
+            write_json(root/'validation.json', result)
+        if world > 1:
+            dist.destroy_process_group()
         return
     end = min(training['updates'], state['step']+payload['stop_after']) if payload['stop_after'] else training['updates']
     began = perf_counter()
     source = payload['sources']['train']
-    items = (source[k % len(source)] for k in range(state['step'], end))
-    with stream(items, config, training['workers'], training['prefetch'], payload['deadline']) as samples:
-        for sample in samples:
-            boundary()
-            engine.model.train()
-            mark = perf_counter()
-            optimizer.zero_grad(set_to_none=True)
-            value = loss_for(sample)
-            value.backward()
-            norm = torch.nn.utils.clip_grad_norm_((p for p in engine.model.parameters() if p.requires_grad), 1., error_if_nonfinite=True)
-            optimizer.step()
-            scheduler.step()
-            state['step'] += 1
-            event(root, 'medsam3_lora_update', step=state['step'], loss=value.item(), gradient_norm=float(norm), seconds=perf_counter()-mark)
-            del value
+    shares = payload['topology']['shares']
+    for step in range(state['step'],end):
+        boundary()
+        engine.model.train()
+        mark = perf_counter()
+        optimizer.zero_grad(set_to_none=True)
+        local_loss = 0.
+        items = (source[k % len(source)] for k in rank_indices(step,training['batch'],shares,rank))
+        with stream(items,config,training['workers'],training['prefetch'],payload['deadline']) as samples:
+            for sample in samples:
+                value = loss_for(sample)
+                local_loss += value.item()
+                (value/training['batch']).backward()
+                del value
+        synchronize_gradients(engine.model)
+        norm = torch.nn.utils.clip_grad_norm_((p for p in engine.model.parameters() if p.requires_grad), 1., error_if_nonfinite=True)
+        optimizer.step()
+        scheduler.step()
+        state['step'] += 1
+        loss, = combine([local_loss/training['batch']])
+        if rank == 0:
+            event(root,'medsam3_lora_update',step=state['step'],loss=loss,gradient_norm=float(norm),
+                seconds=perf_counter()-mark,global_batch=training['batch'],world=world)
+        save('latest')
+        if state['step'] % training['validate_every'] == 0 or state['step'] == end:
+            result = validate()
+            if result['loss'] < state['best_loss']:
+                state['best_loss'] = result['loss']
+                save('best')
             save('latest')
-            if state['step'] % training['validate_every'] == 0 or state['step'] == end:
-                result = validate()
-                if result['loss'] < state['best_loss']:
-                    state['best_loss'] = result['loss']
-                    save('best')
-                save('latest')
     result = dict(step=state['step'], best_loss=state['best_loss'], seconds=perf_counter()-began,
+        topology=payload['topology'],
         completed=state['step'] == training['updates'], trained_parameters='medical_lora_only',
         peaks=dict(cuda_allocated=torch.cuda.max_memory_allocated() if device.type == 'cuda' else None,
                    cuda_reserved=torch.cuda.max_memory_reserved() if device.type == 'cuda' else None))
-    write_json(root/'training.json', result)
+    result['ranks'] = all_states(dict(rank=rank,peaks=result['peaks']))
+    if rank == 0:
+        write_json(root/'training.json', result)
+    if world > 1:
+        dist.destroy_process_group()

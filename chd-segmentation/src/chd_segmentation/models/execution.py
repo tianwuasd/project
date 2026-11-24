@@ -18,6 +18,7 @@ from ..observability.events import Stage,event
 from ..observability.progress import console_progress
 from ..training.memory_guard import MemoryGuard
 from ..training.resources import resource_lease,layout,register_member,close_members,host_capacity,process_vram,record_peaks
+from ..acceleration.distributed import all_states,synchronize_gradients
 
 
 def execution_config(config):
@@ -135,12 +136,6 @@ def admitted(config,prepared,stage,topology=None):
         yield common,allocation
 
 
-def all_states(value):
-    values = [None]*dist.get_world_size()
-    dist.all_gather_object(values,value)
-    return values
-
-
 def model_memory(common):
     from ..acceleration.legacy import SessionGuard
     guard = SessionGuard(common['resource_handle'])
@@ -159,16 +154,6 @@ def pressure(common,device,ready,rank,phase,memory,release=None,check_vram=True)
     flag = torch.tensor(int(low),device=device)
     dist.all_reduce(flag,op=dist.ReduceOp.MAX)
     return bool(flag.item())
-
-
-def synchronize_gradients(model):
-    for parameter in model.parameters():
-        present = torch.tensor(int(parameter.grad is not None),device=parameter.device)
-        dist.all_reduce(present,op=dist.ReduceOp.SUM)
-        if present.item():
-            if parameter.grad is None:
-                parameter.grad = torch.zeros_like(parameter)
-            dist.all_reduce(parameter.grad,op=dist.ReduceOp.SUM)
 
 
 def verify_device(device,allocation,rank):

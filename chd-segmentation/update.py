@@ -19,7 +19,7 @@ BRANCH = "main"
 SUBDIRECTORY = "chd-segmentation"
 OFFICIAL = "https://github.com/" + REPOSITORY + ".git"
 DEFAULT_NETWORK = {"mirrors": ["https://ghfast.top", "https://gh-proxy.com"], "probe_timeout_seconds": 10}
-ROOT_FILES = {".gitignore", ".gitattributes", "README.md", "pyproject.toml", "run.py", "smoke.py", "setup_env.py", "update.py", "launcher.py", "requirements-medsam2.txt"}
+ROOT_FILES = {".gitignore", ".gitattributes", "README.md", "pyproject.toml", "run.py", "smoke.py", "setup_env.py", "update.py", "launcher.py", "requirements-medsam2.txt", "requirements-medsam3-windows.txt"}
 
 
 def public_environment():

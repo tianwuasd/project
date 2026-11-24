@@ -72,11 +72,13 @@ def load_config(path):
     for key in path_fields:
         config[key] = str((path.parent / Path(config[key])).resolve())
     resources = _merge(DEFAULTS['resources'], config['resources'])
-    resources.update(device=config['device'], gpu_count=1, cpu_processes=1, min_gpus=None,
-                     workers=0, batch_layout=[1], precision=config['precision'])
+    resources.update(device=config['device'], cpu_processes=1, workers=0, precision=config['precision'])
+    if resources['min_gpus'] not in (None,resources['gpu_count']):
+        raise ValueError('MedSAM3检查点使用固定卡数；min_gpus需为空或等于gpu_count')
+    batch = sum(resources['batch_layout']) if resources['batch_layout'] else resources['gpu_count']
     if resources['ram_fraction'] > .8 or resources['memory_limit_bytes'] > 100_000_000_000:
         raise ValueError('MedSAM3不继承技术测试内存豁免')
-    validate_resources(resources, 1)
+    validate_resources(resources, batch)
     resources['max_wait'] = resources['wait_seconds']
     config['resources'] = resources
     return config
