@@ -1,4 +1,5 @@
 import argparse
+from collections import deque
 from pathlib import Path
 import os
 import shutil
@@ -228,6 +229,9 @@ def short(args):
     out=assert_output_location(args.output)
     if os.name=='posix' and out!=Path('/data4/zhangruichen/result/chd1282/.short-one'):
         raise ValueError('短测仅使用指定的独占目录')
+    receipt=Path(args.receipt).resolve()
+    if receipt.is_relative_to(out):
+        raise ValueError('验收记录应保留在短测目录之外')
     out.mkdir(parents=True,exist_ok=False)
     try:
         predict(args,owned_empty=True)
@@ -235,6 +239,14 @@ def short(args):
     finally:
         if out.resolve()!=out or out.is_symlink():
             raise ValueError('短测目录解析改变，停止清理')
+        receipt.parent.mkdir(parents=True,exist_ok=True)
+        workers=sorted((out/'logs').glob('*.log'),key=lambda x:x.stat().st_mtime_ns)
+        for name,path in [('short-worker.log',workers[-1] if workers else None),
+                          ('short-evaluation.log',out/'evaluation.log')]:
+            if path is not None and path.is_file():
+                with path.open('r',encoding='utf-8',errors='replace') as stream:
+                    tail=''.join(deque(stream,maxlen=1000))
+                (receipt.parent/name).write_text(tail,encoding='utf-8')
         shutil.rmtree(out)
 
 
