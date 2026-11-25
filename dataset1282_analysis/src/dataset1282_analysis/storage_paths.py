@@ -2,8 +2,8 @@ import os
 import posixpath
 from pathlib import Path, PurePosixPath
 
-SERVER_WORKSPACE = PurePosixPath('/data5/zhougaowei/zhangruichen_workspace')
-SERVER_DATA_ROOT = '/data_nas/zhangruichen/dataset1282_CHD_CT_back'
+SERVER_WORKSPACE = PurePosixPath('/data4/zhangruichen')
+SERVER_DATA_ROOT = '/data4/zhangruichen/data/dataset1282_CHD_CT_back'
 
 
 def _nas_path(path):
@@ -19,7 +19,7 @@ def assert_output_location(path):
     resolved = Path(path).expanduser().resolve()
     if _nas_path(resolved):
         raise ValueError('Resolved output path cannot be stored under /data_nas: ' + str(resolved))
-    if os.name != 'nt' and str(resolved).startswith('/data5/'):
+    if os.name != 'nt' and str(resolved).startswith('/data4/'):
         workspace = Path(str(SERVER_WORKSPACE)).resolve()
         if resolved != workspace and workspace not in resolved.parents:
             raise ValueError('Server outputs must be inside ' + str(workspace))
@@ -27,7 +27,7 @@ def assert_output_location(path):
 
 
 def default_server_work_root():
-    return str(SERVER_WORKSPACE / 'dataset1282_work')
+    return str(SERVER_WORKSPACE / 'course' / 'dataset1282_analysis')
 
 
 def validate_input_output_paths(data_root, outputs):

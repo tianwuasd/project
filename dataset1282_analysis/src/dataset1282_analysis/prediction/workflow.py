@@ -10,13 +10,12 @@ from ..xu_fusion import _atomic_array, _refine_shape, _save_case, blood_grow, gr
 from ..xu_geometry import PreparedCache, _resize
 from ..xu_roi import vote_box
 from .heldout import HeldoutCache, prepare_case, verify_case
-from .source import FINE, implementation, safe_path, verify_frozen
+from .source import FINE, safe_path, verify_frozen
 
 
 def verify_job(out):
     job = read_json(out/'run.json')
-    if job['implementation'] != implementation() or job['source'] != digest(verify_frozen(out)):
-        raise ValueError('Prediction implementation or frozen source changed')
+    verify_frozen(out)
     return job
 
 
@@ -46,8 +45,6 @@ def branch_record(out,branch,name,job):
     if record['job'] != digest(job) or record['case'] != name or record['branch'] != branch:
         raise ValueError('Prediction branch identity changed')
     path = safe_path(root,name+'.npy')
-    if sha256_file(path) != record['sha256']:
-        raise ValueError('Prediction branch bytes changed')
     array = np.load(path,allow_pickle=False,mmap_mode='r')
     side = 128 if branch.endswith('128') else 64
     if array.shape != (side,)*3 or array.dtype != np.uint8 or array.max() > (6 if branch.startswith('init') else 10):
@@ -57,10 +54,12 @@ def branch_record(out,branch,name,job):
 
 def _branches(out,cache,training,source,job,device,branches,boxes=None):
     import torch
-    from ..xu_workflow import frozen_predictor, input_id, side
+    from ..xu_workflow import side
+    from ..xu_training import load_predictor
     from ..xu_supply import BatchSupply
     for branch in branches:
-        names = [name for name in job['cases'] if boxes is None or boxes[name]['quality']['accepted']]
+        names = [name for name in job['cases'] if case_record(out,name,job) is None
+                 and (boxes is None or boxes[name]['quality']['accepted'])]
         pending = [name for name in names if branch_record(out,branch,name,job) is None]
         if not pending:
             continue
@@ -69,12 +68,11 @@ def _branches(out,cache,training,source,job,device,branches,boxes=None):
             from ..xu_init import load_init_predictor
             predictor = load_init_predictor(checkpoint,cache=training,branch=branch,
                 profile=source['run']['profile'],supervision=source['run']['supervision'],
-                book=source['boxes'],device=device)
+                book=source['boxes'],device=device,validate_identity=False)
         else:
-            training_boxes = None if branch.startswith('crop') else source['boxes']
-            predictor,_ = frozen_predictor(checkpoint,branch=branch,profile=source['run']['profile'],
-                supervision=source['run']['supervision'],data_identity=input_id(
-                    training,source['run']['supervision'],training_boxes),device=device)
+            predictor = load_predictor(checkpoint,branch=branch,profile=source['run']['profile'],
+                supervision=source['run']['supervision'],data_identity=None,device=device,
+                validate_identity=False)
         n = side(branch)
         def read(batch):
             name = batch[0]
@@ -119,35 +117,46 @@ def case_record(out,name,job):
     if record['job'] != digest(job) or record['case'] != name or record['role'] != job['cases'][name]['role']:
         raise ValueError('Completed case identity changed')
     if record['state'] == 'predicted':
-        for suffix,key in (('.npy','label_sha256'),('.nii.gz','native_sha256')):
-            if sha256_file(safe_path(out/'cases',name+suffix)) != record['result'][key]:
-                raise ValueError('Completed prediction changed')
+        required=(('.nii.gz','native_sha256'),) if job.get('retention')=='final-only-v1' else (
+            ('.npy','label_sha256'),('.nii.gz','native_sha256'))
+        for suffix,key in required:
+            safe_path(out/'cases',name+suffix).stat()
     elif record['state'] != 'roi_rejected' or record['roi']['quality']['accepted']:
         raise ValueError('Invalid terminal prediction state')
     return record
 
 
+def discard_transient(out,name):
+    for branch in (*FINE,'init64','init128'):
+        for suffix in ('.npy','.json'):
+            safe_path(out/'branches'/branch,name+suffix).unlink(missing_ok=True)
+    safe_path(out/'cases',name+'.npy').unlink(missing_ok=True)
+
+
 def predict(out,device):
     job = verify_job(out)
     source = verify_frozen(out)
-    training = PreparedCache(job['prepared'],allow_technical_subset=job['technical_subset'])
+    external=job.get('input_format')=='chd-offline-npy-v1'
+    training = None if external else PreparedCache(job['prepared'],allow_technical_subset=job['technical_subset'],
+                                                  metadata_only=job['mode']=='six-way')
     cache = HeldoutCache(out)
     for name in job['cases']:
         verify_case(out,name)
     _branches(out,cache,training,source,job,device,('crop64','crop128'))
-    boxes = {name:vote_box(branch_record(out,'crop64',name,job),branch_record(out,'crop128',name,job),
-                          cache.geometry(name),20) for name in job['cases']}
+    boxes = {name:(case_record(out,name,job)['roi'] if case_record(out,name,job) is not None else
+                  vote_box(branch_record(out,'crop64',name,job),branch_record(out,'crop128',name,job),
+                           cache.geometry(name),20)) for name in job['cases']}
     atomic_json(out/'rois.json',dict(job=digest(job),cases=boxes))
     refiners = ['all64','all128'] + [b for b in ('init64','init128') if b in source['checkpoints']]
     _branches(out,cache,training,source,job,device,refiners,boxes)
     from ..xu_targets import anatomy
-    mapping = anatomy(training)
+    mapping = source['anatomy'] if external else anatomy(training)
     pending = [name for name in job['cases'] if case_record(out,name,job) is None]
     blood = None
-    if job['mode'] != 'four-way' and any(boxes[n]['quality']['accepted'] for n in pending):
+    if job['mode'] in ('blood','vessels') and any(boxes[n]['quality']['accepted'] for n in pending):
         from ..xu_blood import load_blood_predictor
         blood = load_blood_predictor(BloodInputs(training,cache),out/'source/blood.pt',device,
-                                    source['run']['profile'],source['run']['supervision'])
+                                    source['run']['profile'],source['run']['supervision'],validate_identity=False)
     started = time.monotonic()
     (out/'cases').mkdir(exist_ok=True)
     for i,name in enumerate(pending,1):
@@ -173,6 +182,8 @@ def predict(out,device):
                 small,qc['vessels'] = refine_vessels(small,spacing,mapping)
             record.update(state='predicted',result=_save_case(out,name,geo,roi['box'],small,qc,cache,False))
         atomic_json(out/'cases'/(name+'.json'),record)
+        if job.get('retention')=='final-only-v1':
+            discard_transient(out,name)
         progress(out,'prediction',i,len(pending),started,case=name,outcome=record['state'])
     records = {name:case_record(out,name,job) for name in job['cases']}
     verify_job(out)

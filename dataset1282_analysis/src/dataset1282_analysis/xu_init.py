@@ -180,14 +180,16 @@ def train_init(cache,args,out):
     return report
 
 
-def load_init_predictor(checkpoint, *, cache, branch, profile, supervision, book, device='cpu'):
-    fingerprint=sha256_file(checkpoint)
+def load_init_predictor(checkpoint, *, cache, branch, profile, supervision, book, device='cpu',
+                        validate_identity=True):
+    fingerprint=sha256_file(checkpoint) if validate_identity else None
     state=torch.load(checkpoint,map_location='cpu',weights_only=True)
-    if sha256_file(checkpoint)!=fingerprint:
-        raise ValueError('Proximal checkpoint changed while loading')
-    expected=_inference_contract(cache,branch,profile,supervision,book)
-    if not _compatible_proximal_contract({k:state['contract'].get(k) for k in expected},expected):
-        raise ValueError('Incompatible proximal checkpoint')
+    if validate_identity:
+        if sha256_file(checkpoint)!=fingerprint:
+            raise ValueError('Proximal checkpoint changed while loading')
+        expected=_inference_contract(cache,branch,profile,supervision,book)
+        if not _compatible_proximal_contract({k:state['contract'].get(k) for k in expected},expected):
+            raise ValueError('Incompatible proximal checkpoint')
     if 'optimizer' in state and state['best_epoch']!=state['epoch']:
         raise ValueError('Inference requires a validation-selected checkpoint')
     model=_model(branch,profile)

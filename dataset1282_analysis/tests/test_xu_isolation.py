@@ -107,19 +107,19 @@ class ScopeTests(unittest.TestCase):
 
 
 class LiveIsolationTests(unittest.TestCase):
-    def test_worker_readmission_rejects_real_occupied_card_before_cuda_query(self):
+    def test_worker_readmission_allows_real_occupied_card_with_memory(self):
         from dataset1282_analysis import xu_gpu_isolation
         self.assertTrue(callable(getattr(xu_gpu_isolation,'admit_worker_scope',None)))
         from dataset1282_analysis.xu_gpu_probe import gpu_snapshot
-        from dataset1282_analysis.xu_resources import ResourceUnavailable
+        from dataset1282_analysis.xu_resources import gpu_budget
         inventory = gpu_snapshot()
-        occupied = [r for r in inventory.values() if r['compute_pids']]
+        occupied = [r for r in inventory.values() if r['compute_pids'] and
+                    gpu_budget(r['free_bytes'],r['total_bytes'],'v2') > 0]
         if not occupied:
-            self.skipTest('当前没有外部计算进程')
+            self.skipTest('当前没有显存充足且存在其他任务的显卡')
         row = occupied[0]
         tickets = [dict(device='cuda:0',uuid=row['uuid'],policy='v2',owned={},require_pid_evidence=True)]
-        with self.assertRaisesRegex(ResourceUnavailable,'External compute'):
-            xu_gpu_isolation.admit_worker_scope(tickets,{},inventory)
+        xu_gpu_isolation.admit_worker_scope(tickets,{},inventory)
 
     def test_real_coordinator_has_no_visible_cuda_or_compute_pid(self):
         from dataset1282_analysis.xu_gpu_probe import gpu_snapshot

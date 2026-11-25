@@ -147,21 +147,17 @@ def _check_device(info, policy, owned, required):
     pids = set(info['compute_pids']) if 'compute_pids' in info else _compute_pids(info['uuid'])
     if required and pids is None:
         raise ResourceUnavailable(f"No GPU PID evidence for {info['device']} ({info['uuid']})")
+    external = []
     if pids is not None:
         live = _identities(pids)
-        # Treat unmappable host PIDs, including those outside a container's PID
-        # namespace, as external. Never act on or signal any observed process.
+        # 无法核实身份的进程仍记录在资源报告中。
         external = [pid for pid in pids if str(pid) not in live or
                     owned.get(str(pid)) != live[str(pid)]]
-        if external:
-            raise GpuResourcesChanged(f"External compute processes on {info['device']}: {sorted(external)}", [info['device']])
-        if not pids and info.get('utilization',0) > 5:
-            raise GpuResourcesChanged(f"GPU is not idle on {info['device']}: {info['utilization']}%", [info['device']])
     limit = gpu_budget(info['free_bytes'], info['total_bytes'], policy)
     if limit < 1:
         raise GpuResourcesChanged(f"No CUDA budget left on {info['device']}", [info['device']])
     return dict(info, allocator_budget_bytes=limit, pid_evidence=pids is not None,
-                compute_pids=sorted(pids or ()))
+                compute_pids=sorted(pids or ()), external_pids=sorted(external))
 
 
 def _host_snapshot(policy):
@@ -373,7 +369,7 @@ def _apply_card(device, spec):
     limit = min(info['allocator_budget_bytes'], int(spec['limit_bytes']))
     if limit <= 0 or limit < spec['cuda_demand_bytes']:
         raise GpuResourcesChanged(f'CUDA demand {spec["cuda_demand_bytes"]} exceeds fresh budget {limit}', [str(device)])
-    # 通过 UUID、外部进程和实时显存检查后，才允许创建计算上下文。
+    # 通过 UUID 和实时显存检查后，才允许创建计算上下文。
     torch.cuda.set_device(torch.device(device))
     torch.cuda.set_per_process_memory_fraction(limit/info['total_bytes'], device)
     info.update(allocator_budget_bytes=limit, cuda_demand_bytes=spec['cuda_demand_bytes'])

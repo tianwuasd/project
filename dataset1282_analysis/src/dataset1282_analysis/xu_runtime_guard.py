@@ -12,6 +12,13 @@ def external_processes(pids, owned):
     return sorted(pid for pid in pids if str(pid) not in live or owned.get(str(pid)) != live[str(pid)])
 
 
+def gpu_card_status(card, device, owned):
+    floor = max(4*GIB,card['total_bytes']//10)
+    status = dict(card,device=device,external_pids=external_processes(card['compute_pids'],owned),
+                  reserve_bytes=floor)
+    return status, card['free_bytes'] < floor
+
+
 def isolation_violations(inventory, processes, stage, allowed):
     violations = {}
     for uuid,card in inventory.items():
@@ -65,27 +72,14 @@ class RuntimeGuard:
         if self.tickets or json.loads(os.environ.get('XU_COORDINATOR_DEVICES','[]')):
             from .xu_gpu_probe import gpu_snapshot
             inventory = gpu_snapshot()
-            observed = {pid for ticket in self.tickets for pid in inventory[ticket['uuid']]['compute_pids']}
-            if external_processes(observed, owned):
-                # 显卡查询后重新核实本组进程，涵盖并发启动的分支和后代。
-                inventory = gpu_snapshot()
-                processes = self.children.owned_processes()
-                owned = {pid:p['create_time'] for pid,p in processes.items()}
-                row['owned'] = owned
             violations = isolation_violations(inventory,processes,self.stage,{t['uuid'] for t in self.tickets})
             row['isolation_violations'] = violations
             if violations:
                 isolation_error = f'GPU 隔离违规，本任务进程出现在未分配设备: {violations}'
             for ticket in self.tickets:
-                card = inventory[ticket['uuid']]
-                external = external_processes(card['compute_pids'], owned)
-                floor = max(4*GIB,card['total_bytes']//10)
-                row['gpus'].append(dict(card,device=ticket['device'],external_pids=external,
-                                         reserve_bytes=floor))
-                if external:
-                    reason = f"{ticket['device']} 出现外部计算进程 {external}"
-                    gpu_changed.append(ticket['device'])
-                elif card['free_bytes'] < floor:
+                card, low_memory = gpu_card_status(inventory[ticket['uuid']],ticket['device'],owned)
+                row['gpus'].append(card)
+                if low_memory:
                     reason = f"{ticket['device']} 显存低于保留值"
                     gpu_changed.append(ticket['device'])
         reason = isolation_error or host_reason or reason

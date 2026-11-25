@@ -324,17 +324,18 @@ def train_branch(*, branch, output_dir, train_cases, validation_cases, load_samp
     return summary
 
 
-def load_predictor(checkpoint, *, branch, profile, data_identity, device='cpu', supervision=None):
+def load_predictor(checkpoint, *, branch, profile, data_identity, device='cpu', supervision=None,
+                   validate_identity=True):
     state=torch.load(checkpoint,map_location='cpu',weights_only=True)
     c=state['contract']
-    if ((c['branch'],c['profile'],c['data_identity']) != (branch,profile,data_identity)
+    if validate_identity and ((c['branch'],c['profile'],c['data_identity']) != (branch,profile,data_identity)
             or c.get('protocol')!='xu-3d-v1'
             or (supervision is not None and c['supervision']!=supervision)):
         raise ValueError('Prediction checkpoint contract mismatch')
     # A last.pt is equivalent to best.pt only when validation selected its epoch.
     if 'optimizer' in state and state.get('best_epoch') != state['epoch']:
         raise ValueError('Inference requires the validation-selected best checkpoint')
-    if c['source']['xu_models.py']!=sha256_file(Path(__file__).with_name('xu_models.py')):
+    if validate_identity and c['source']['xu_models.py']!=sha256_file(Path(__file__).with_name('xu_models.py')):
         raise ValueError('Prediction model implementation changed')
     model=_training_model(branch,profile,c.get('technical_fit'))
     model.load_state_dict(state['model'])

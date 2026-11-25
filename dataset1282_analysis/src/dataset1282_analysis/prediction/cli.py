@@ -9,13 +9,18 @@ from ..observability.status import operation_lock, write_status
 from ..storage_paths import assert_output_location
 from . import PROTOCOL
 from .heldout import GROUPS, plan_inputs
-from .source import freeze_source, implementation, inspect_source
+from .source import FINE, freeze_source, implementation, inspect_source, verify_frozen
 
 
 def validate_output(args):
     from ..xu_pipeline import ROOT
     out = assert_output_location(args.output)
     config = read_json(args.config)
+    previous=getattr(args,'reuse_prediction',None)
+    if previous is not None:
+        previous=previous.resolve(strict=True)
+        if args.mode!='six-way' or out==previous or out in previous.parents or previous in out.parents:
+            raise ValueError('缓存复用要求six-way及独立的新输出目录')
     for protected in (args.prepared.resolve(),args.training.resolve(),Path(config['data_root']).resolve(),ROOT):
         if out == protected or out in protected.parents or protected in out.parents:
             raise ValueError('Prediction output must be separate from input and training')
@@ -29,7 +34,20 @@ def open_job(args):
     from ..xu_geometry import PreparedCache
     out = assert_output_location(args.output)
     config = validate_output(args)
-    cache = PreparedCache(args.prepared,allow_technical_subset=args.technical_subset)
+    cache = PreparedCache(args.prepared,allow_technical_subset=args.technical_subset,
+                           metadata_only=args.mode=='six-way')
+    path = out/'run.json'
+    if args.resume:
+        job = read_json(path)
+        source = verify_frozen(out)
+        if (Path(job['prepared']).resolve() != cache.run_dir or job['mode'] != args.mode
+                or Path(source['training']).resolve() != args.training.resolve()):
+            raise ValueError('Resume must use the selected prepared data, training and prediction mode')
+        from .heldout import select_cases
+        selected = select_cases(read_json(cache.run_dir/'cohort.json'), args.groups, args.cases)
+        if set(selected) != set(job['cases']):
+            raise ValueError('Resume must use the saved held-out case selection')
+        return out,cache,job
     cases = plan_inputs(cache,config,args.policy,args.groups,args.cases)
     source,_ = inspect_source(args.training,cache,args.mode)
     dataset = cache.run_dir/'preprocessed/Dataset282_CHDSource'
@@ -37,7 +55,6 @@ def open_job(args):
                mode=args.mode,cases=cases,technical_subset=args.technical_subset,
                plans=sha256_file(dataset/'nnUNetPlans.json'),dataset=sha256_file(dataset/'dataset.json'),
                implementation=implementation())
-    path = out/'run.json'
     if path.exists():
         if not args.resume or read_json(path) != job:
             raise ValueError('Resume requires identical held-out inputs, models and implementation')
@@ -59,7 +76,11 @@ def execute(args,out,owner,job,phase):
     from ..xu_fleet import needs_for_width
     from ..xu_supply_budget import batch_bytes
     from .heldout import HeldoutCache, prepare_memory
-    if phase == 'prepare' or args.device == 'cpu':
+    cached_only = job['mode']=='six-way' and all(
+        (out/'branches'/branch/(name+suffix)).is_file()
+        for name in job['cases'] for branch in (*FINE,'init64','init128')
+        for suffix in ('.json','.npy'))
+    if phase == 'prepare' or args.device == 'cpu' or cached_only:
         devices = ['cpu']
     else:
         pool = select_devices(args.device,None if args.device else args.devices,torch)
@@ -68,6 +89,18 @@ def execute(args,out,owner,job,phase):
         if not devices:
             raise ValueError('No authorized GPU remains after physical exclusions')
     if phase == 'prepare':
+        if job.get('input_format')=='chd-offline-npy-v1':
+            from .heldout import verify_case
+            for name in job['cases']:
+                verify_case(out,name)
+            print('CHT预处理输入读取通过；无需复制或重新预处理',flush=True)
+            return
+        if job['mode']=='six-way' and all((out/'prepared'/n/'complete.json').is_file() for n in job['cases']):
+            from .heldout import verify_case
+            for name in job['cases']:
+                verify_case(out,name)
+            print('所选病例的预处理缓存均已就绪，直接进入预测',flush=True)
+            return
         host = prepare_memory(job)
         cuda = 0
     else:
@@ -75,7 +108,7 @@ def execute(args,out,owner,job,phase):
         voxels = max(prod(cache.geometry(n).cache_shape) for n in job['cases'])
         host = max(batch_bytes(voxels,1,128)*2,
                    max(prod(row['shape'])*64 for row in job['cases'].values())) + 2*1024**3
-        cuda = needs_for_width('four-way' if job['mode']=='four-way' else 'with-blood',1,
+        cuda = needs_for_width(job['mode'] if job['mode'] in ('four-way','six-way') else 'with-blood',1,
                                read_json(out/'source/manifest.json')['run']['profile'])[0]
     args.resource_recovery = True
     args.resource_poll_seconds = args.wait_seconds
@@ -131,6 +164,9 @@ def run(args):
         try:
             out,_,job = open_job(args)
             print('Frozen held-out groups:',dict(Counter(r['role'] for r in job['cases'].values())),flush=True)
+            if getattr(args,'reuse_prediction',None):
+                from .reuse import reuse_prediction
+                reuse_prediction(args.reuse_prediction,out,job)
             execute(args,out,owner,job,'prepare')
             execute(args,out,owner,job,'predict')
             result = read_json(out/'complete.json')
@@ -150,7 +186,8 @@ def main(argv=None):
         p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--groups',choices=GROUPS,nargs='+',default=list(GROUPS))
     p.add_argument('--case',dest='cases',action='append')
-    p.add_argument('--mode',choices=('four-way','blood','vessels'),default='vessels')
+    p.add_argument('--mode',choices=('four-way','six-way','blood','vessels'),default='vessels')
+    p.add_argument('--reuse-prediction',type=Path,help='复用同模型、病例和空间的既有分支预测；只用于six-way')
     p.add_argument('--technical-subset',action='store_true')
     p.add_argument('--resume',action='store_true')
     selected = p.add_mutually_exclusive_group()

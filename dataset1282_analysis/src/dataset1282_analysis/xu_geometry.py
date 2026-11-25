@@ -136,8 +136,9 @@ class CaseGeometry:
 class PreparedCache:
     """A completed, role-checked 0.3.0 preparation. Large arrays verify on first use."""
 
-    def __init__(self, run_dir, *, allow_technical_subset=False):
+    def __init__(self, run_dir, *, allow_technical_subset=False, metadata_only=False):
         self.run_dir = Path(run_dir).resolve()
+        self.metadata_only = metadata_only
         request = read_json(self._path('request.json'))
         complete = read_json(self._path('complete.json'))
         self.request_digest = digest(request)
@@ -241,8 +242,14 @@ class PreparedCache:
         shape = qc['prepared_shape']
         if len(shape) != 4 or shape[0] != 1 or qc['supervision'] != self.supervision[name]:
             raise ValueError('Invalid cached geometry or supervision')
-        meta = read_json(self._artifact(f'stage-{name}', f'staged/{name}/metadata.json'))
         spacing = tuple(record['spacing'])
+        if self.metadata_only:
+            import pickle
+            path = self._artifact(f'process-{name}',f'{self._folder}/{name}.pkl')
+            with path.open('rb') as stream:
+                properties = pickle.load(stream)
+            return committed_geometry(record,qc,properties,self._forward,self.supervision[name])
+        meta = read_json(self._artifact(f'stage-{name}', f'staged/{name}/metadata.json'))
         if (meta['case'] != name or tuple(meta['source_spacing_xyz']) != spacing or
                 not np.allclose(meta['working_affine'], np.diag([*spacing,1]), rtol=0, atol=1e-6)):
             raise ValueError('Unsupported working orientation or spacing')
@@ -282,3 +289,17 @@ class PreparedCache:
                 volume.affine, np.diag([*geom.spacing_xyz,1]), rtol=1e-6, atol=1e-7):
             raise ValueError('Native evaluation grid mismatch')
         return np.asanyarray(volume.dataobj)
+
+
+def committed_geometry(record, qc, properties, forward, supervision):
+    shape,spacing=record['shape'],record['spacing']
+    bbox=properties['bbox_used_for_cropping']
+    if (list(properties['shape_before_cropping']) != [shape[2-i] for i in forward]
+            or list(properties['shape_after_cropping_and_before_resampling']) != [b-a for a,b in bbox]
+            or not np.allclose(properties['spacing'],np.asarray(spacing)[::-1],rtol=0,atol=1e-6)
+            or not np.allclose(properties['nibabel_stuff']['original_affine'],np.diag([*spacing,1.]),rtol=0,atol=1e-6)
+            or properties['partial_supervision'] != supervision or qc['supervision'] != supervision
+            or list(map(list,bbox)) != list(map(list,qc['bbox_transposed']))):
+        raise ValueError('已提交病例属性与冻结空间或监督信息不一致')
+    return CaseGeometry(tuple(shape),tuple(spacing),tuple(forward),tuple(map(tuple,bbox)),
+                        tuple(qc['prepared_shape'][1:]))

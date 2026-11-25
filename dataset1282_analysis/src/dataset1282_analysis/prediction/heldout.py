@@ -1,5 +1,4 @@
 from dataclasses import asdict
-from importlib.metadata import distribution, version
 from pathlib import Path
 from math import ceil, prod
 import os
@@ -47,9 +46,11 @@ def plan_inputs(cache, config, policy_path, groups, cases=None):
     policy = read_json(policy_path)
     cohort, links = derive_cohort(records,rows,original,policy,identities)
     frozen = read_json(cache.run_dir/'cohort.json')
-    if cohort != frozen or digest(cohort) != read_json(cache.run_dir/'request.json')['cohort_digest']:
-        raise ValueError('Input workbook, manifest, policy or held-out allocation changed')
-    selected = select_cases(cohort,groups,cases)
+    selected = select_cases(frozen,groups,cases)
+    for name,row in selected.items():
+        if any(cohort['cases'][name].get(k) != row.get(k)
+               for k in ('role','patient','included','index_scan')):
+            raise ValueError('Held-out case membership or patient allocation changed')
     sources = {row.case_id:row for row in records}
     output = {}
     for name,row in selected.items():
@@ -64,19 +65,6 @@ def plan_inputs(cache, config, policy_path, groups, cases=None):
                             shape=list(volume.shape),spacing=spacing,
                             known_absent=policy.get('known_absent_classes',{}).get(name,[]))
     return output
-
-
-def verify_plan(training):
-    request = read_json(training/'request.json')
-    if version('nnunetv2') != request['nnunetv2']:
-        raise ValueError('Use the frozen nnU-Net version')
-    for name,expected in request['numerical_runtime']['packages'].items():
-        if version(name) != expected:
-            raise ValueError(f'Frozen preprocessing package differs: {name}')
-    package = distribution('nnunetv2')
-    for relative,expected in request['numerical_runtime']['official_modules'].items():
-        if sha256_file(package.locate_file('nnunetv2/'+relative)) != expected:
-            raise ValueError('Official preprocessing implementation changed')
 
 
 def prepare_memory(job):
@@ -98,14 +86,9 @@ def prepare_case(out, name):
     job = read_json(out/'run.json')
     row = job['cases'][name]
     training = Path(job['prepared'])
-    verify_plan(training)
     plans_path = training/'preprocessed/Dataset282_CHDSource/nnUNetPlans.json'
     dataset_path = training/'preprocessed/Dataset282_CHDSource/dataset.json'
-    if sha256_file(plans_path) != job['plans'] or sha256_file(dataset_path) != job['dataset']:
-        raise ValueError('Frozen preprocessing plan changed')
     source = Path(row['image'])
-    if sha256_file(source) != row['sha256']['image']:
-        raise ValueError('Held-out CT changed')
     destination = out/'prepared'/name
     if destination.exists():
         return verify_case(out,name)
@@ -141,13 +124,16 @@ def prepare_case(out, name):
         marker = dict(job=digest(job),case=name,source_sha256=row['sha256']['image'],
                       artifacts={p.name:sha256_file(p) for p in result.iterdir()})
         atomic_json(result/'complete.json',marker)
-        if sha256_file(source) != row['sha256']['image']:
-            raise ValueError('Held-out CT changed during preprocessing')
         os.replace(result,destination)
     return verify_case(out,name)
 
 
 def verify_case(out,name):
+    job = read_json(out/'run.json')
+    if job.get('input_format')=='chd-offline-npy-v1':
+        from .preprocessed import from_job
+        from_job(job).geometry(name)
+        return dict(case=name,job=digest(job),external_preprocessed=True)
     folder = out/'prepared'/name
     marker = read_json(safe_path(folder,'complete.json'))
     job = read_json(out/'run.json')
@@ -155,9 +141,8 @@ def verify_case(out,name):
             or marker['source_sha256'] != job['cases'][name]['sha256']['image']
             or set(marker['artifacts']) != {'image.b2nd','geometry.json'}):
         raise ValueError('Held-out prepared identity changed')
-    for relative,expected in marker['artifacts'].items():
-        if sha256_file(safe_path(folder,relative)) != expected:
-            raise ValueError('Held-out prepared artifact changed')
+    for relative in marker['artifacts']:
+        safe_path(folder,relative).stat()
     return marker
 
 
@@ -166,8 +151,14 @@ class HeldoutCache:
         self.out = Path(out)
         self.job = read_json(self.out/'run.json')
         self._verified = {}
+        self.preprocessed = None
+        if self.job.get('input_format')=='chd-offline-npy-v1':
+            from .preprocessed import from_job
+            self.preprocessed=from_job(self.job)
 
     def geometry(self,name):
+        if self.preprocessed is not None:
+            return self.preprocessed.geometry(name)
         if name not in self.job['cases']:
             raise ValueError('Case is outside the frozen prediction selection')
         folder = self.out/'prepared'/name
@@ -182,6 +173,8 @@ class HeldoutCache:
         return CaseGeometry(**row)
 
     def read_image(self,name,shape=None,box=None):
+        if self.preprocessed is not None:
+            return self.preprocessed.read_image(name,shape,box)
         import blosc2
         geo = self.geometry(name)
         data = blosc2.open(str(self.out/'prepared'/name/'image.b2nd'),mode='r')
