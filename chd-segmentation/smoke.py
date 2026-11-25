@@ -11,12 +11,16 @@ from time import perf_counter
 from uuid import uuid4
 from unittest import TestCase
 
-from update import code_guard
+from code_runtime import pin
 
 if mp.current_process().name == "MainProcess":
-    _code_guard = code_guard(__file__)
-    _code_guard.__enter__()
-    atexit.register(_code_guard.__exit__, None, None, None)
+    _selected = pin(Path(__file__).resolve().parent)
+    if _selected != Path(__file__).resolve().parent:
+        import runpy
+        sys.path.insert(0, str(_selected))
+        sys.argv[0] = str(_selected / 'smoke.py')
+        runpy.run_path(sys.argv[0], run_name='__main__')
+        raise SystemExit(0)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 

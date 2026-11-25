@@ -1,6 +1,6 @@
 import argparse
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager, ExitStack
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -19,7 +19,7 @@ BRANCH = "main"
 SUBDIRECTORY = "chd-segmentation"
 OFFICIAL = "https://github.com/" + REPOSITORY + ".git"
 DEFAULT_NETWORK = {"mirrors": ["https://ghfast.top", "https://gh-proxy.com"], "probe_timeout_seconds": 10}
-ROOT_FILES = {".gitignore", ".gitattributes", "README.md", "pyproject.toml", "run.py", "smoke.py", "setup_env.py", "update.py", "launcher.py", "requirements-medsam2.txt", "requirements-medsam3-windows.txt"}
+ROOT_FILES = {".gitignore", ".gitattributes", "README.md", "pyproject.toml", "run.py", "smoke.py", "setup_env.py", "update.py", "code_runtime.py", "launcher.py", "requirements-medsam2.txt", "requirements-medsam3-windows.txt"}
 
 
 def public_environment():
@@ -49,7 +49,7 @@ def write_json(path, value):
 
 
 @contextmanager
-def file_lock(path, shared=False):
+def file_lock(path, shared=False, blocking=False):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a+b") as stream:
@@ -59,10 +59,11 @@ def file_lock(path, shared=False):
                 stream.write(b"0")
                 stream.flush()
             stream.seek(0)
-            msvcrt.locking(stream.fileno(), msvcrt.LK_NBRLCK if shared else msvcrt.LK_NBLCK, 1)
+            mode = (msvcrt.LK_RLCK if shared else msvcrt.LK_LOCK) if blocking else (msvcrt.LK_NBRLCK if shared else msvcrt.LK_NBLCK)
+            msvcrt.locking(stream.fileno(), mode, 1)
         else:
             import fcntl
-            fcntl.flock(stream.fileno(), (fcntl.LOCK_SH if shared else fcntl.LOCK_EX) | fcntl.LOCK_NB)
+            fcntl.flock(stream.fileno(), (fcntl.LOCK_SH if shared else fcntl.LOCK_EX) | (0 if blocking else fcntl.LOCK_NB))
         try:
             yield
         finally:
@@ -74,13 +75,13 @@ def file_lock(path, shared=False):
 
 
 @contextmanager
-def code_guard(source):
+def code_guard(source, blocking=False):
     code = Path(source).resolve().parent
     repo = Path(subprocess.run(["git", "-C", str(code), "rev-parse", "--show-toplevel"],
                               check=True, capture_output=True, text=True).stdout.strip()).resolve()
     git_dir = Path(subprocess.run(["git", "-C", str(code), "rev-parse", "--absolute-git-dir"],
                                  check=True, capture_output=True, text=True).stdout.strip()).resolve()
-    with file_lock(git_dir / "chd-code.lock", shared=True):
+    with file_lock(git_dir / "chd-code.lock", shared=True, blocking=blocking):
         yield repo
 
 
@@ -379,9 +380,7 @@ def synchronize(repo, runtime, commit, remove_legacy=False, force=False, relocat
     started, runtime = monotonic(), Path(runtime).resolve()
     if runtime.is_relative_to(repo.path) or repo.path.is_relative_to(runtime):
         raise ValueError("代码与过程目录必须独立")
-    with file_lock(runtime / ".code.lock"), file_lock(repo.path / ".git" / "chd-code.lock"), ExitStack() as locks:
-        for path in sorted((runtime / "runs").rglob(".run.lock")):
-            locks.enter_context(file_lock(path))
+    with file_lock(runtime / ".code.lock"), file_lock(repo.path / ".git" / "chd-code.lock"):
         relocate_from = None
         old_code = repo.path / "git" / SUBDIRECTORY
         if relocate and old_code.exists():
@@ -426,7 +425,7 @@ def synchronize(repo, runtime, commit, remove_legacy=False, force=False, relocat
         require_head(commit, repo.remote_head())
         deleted_bytes = sum(path.stat().st_size for path in obsolete)
         if legacy is not None:
-            # 已逐文件核验、持有任务锁，且路径严格限定为代码目录下的旧项目。
+            # 已逐文件核验、持有更新锁，且路径严格限定为代码目录下的旧项目。
             legacy_files(repo, runtime)
             shutil.rmtree(legacy)
         result = {"state": "synchronized", "forced": force, "tracked_code_clean": True, "sha": commit, "head": commit, "branch": BRANCH, "origin_branch": commit, "code": str(repo.path / SUBDIRECTORY), "repository": REPOSITORY, "network": repo.network_info, "file_count": len(files), "code_bytes": size, "download_seconds": downloaded, "checkout_verify_seconds": checkout_seconds, "seconds": monotonic() - started, "checked_at": datetime.now(timezone.utc).isoformat(), "legacy_cleanup": {"deleted_files": len(obsolete), "released_bytes": deleted_bytes}}

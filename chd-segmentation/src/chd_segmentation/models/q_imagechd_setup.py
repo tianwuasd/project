@@ -144,7 +144,7 @@ def stop(root, code):
         if process.pid == os.getpid() or process.info['username'] != owner:
             continue
         launcher = bool(launchers.intersection(argv)) and '--run' in argv
-        training = (str(code / 'run.py') in argv and 'models' in argv and 'train' in argv
+        training = (any(Path(value).name == 'run.py' for value in argv) and 'models' in argv and 'train' in argv
                     and '--config' in argv and argv.index('--config') + 1 < len(argv)
                     and argv[argv.index('--config') + 1] in configs)
         if launcher or training:
@@ -182,10 +182,13 @@ def main():
         return
     if min(args.localizer_epochs,args.local_epochs,args.updates_per_epoch)<1:
         parser.error('epoch及每轮更新数量必须为正整数')
-    directory = setup(args.root.resolve(), args.code.resolve(), args.seed,
+    code = Path(__file__).resolve().parents[3]
+    if not (code / '.snapshot.json').is_file():
+        code = args.code.resolve()
+    directory = setup(args.root.resolve(), code, args.seed,
                       args.localizer_epochs,args.local_epochs,args.updates_per_epoch)
     if args.run:
-        run_stages(args.root.resolve(), args.code.resolve(), directory)
+        run_stages(args.root.resolve(), code, directory)
 
 
 if __name__ == '__main__':
