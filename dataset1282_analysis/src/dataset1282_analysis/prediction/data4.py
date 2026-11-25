@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 import os
+import shutil
 
 from ..contracts import atomic_json, digest, read_json, sha256_file
 from ..observability.status import operation_lock, write_status
@@ -22,6 +23,8 @@ def check_data(prepared,cht_code,technical=False):
         raise ValueError('需等待1174例转换全部完成并写出prepared.json')
     source=PreprocessedInputs(prepared,cht_code,names)
     raw=Path(description['manifest']['data_root']).resolve(strict=True)
+    if os.name=='posix' and not raw.is_relative_to(Path('/data4/zhangruichen/data')):
+        raise ValueError('原始CT和GT必须绑定data4/data目录')
     seen=set()
     patients=set()
     for row in rows:
@@ -118,6 +121,8 @@ def build_models(args):
 
 def open_job(args,out):
     model_root=Path(args.models).resolve(strict=True)
+    if os.name=='posix' and not model_root.is_relative_to(Path('/data4/zhangruichen/result/chd1282')):
+        raise ValueError('预测模型必须位于正式result/chd1282目录')
     model=read_json(model_root/'models.json')
     if model['protocol']!='xu-sixway-models-data4-v1' or model['padding_percent']!=20 or set(model['checkpoints'])!=set(SIX):
         raise ValueError('需要已登记的六网络模型及20%取框')
@@ -173,12 +178,12 @@ def open_job(args,out):
     return job
 
 
-def predict(args):
+def predict(args, owned_empty=False):
     from .cli import execute
     out=assert_output_location(args.output)
     if os.name=='posix' and not out.is_relative_to(Path('/data4/zhangruichen/result/chd1282')):
         raise ValueError('预测结果应放在/data4/zhangruichen/result/chd1282')
-    if out.exists() and not args.resume:
+    if out.exists() and not args.resume and not (owned_empty and not any(out.iterdir())):
         raise ValueError('新预测使用独立输出目录')
     for protected in (Path(args.models).resolve(),Path(args.preprocessed).resolve().parent,
                       Path(args.cht_code).resolve()):
@@ -211,7 +216,26 @@ def acceptance(args):
     report=evaluate(out)
     atomic_json(args.receipt,dict(protocol='xu-data4-acceptance-v1',preprocessed=job['preprocessed'],
         preprocessed_identity=job['preprocessed_identity'],models=job['source'],cases=1,
-        checkpoints=read_json(out/'source/manifest.json')['checkpoints'],mode='six-way',evaluation=report))
+        checkpoints=read_json(out/'source/manifest.json')['checkpoints'],implementation=job['implementation'],
+        mode='six-way',evaluation=report))
+
+
+def short(args):
+    model=read_json(Path(args.models)/'models.json')
+    args.cases=[next(n for n,r in model['heldout'].items() if r['role']=='source_test')]
+    args.groups=['source_test']
+    args.resume=False
+    out=assert_output_location(args.output)
+    if os.name=='posix' and out!=Path('/data4/zhangruichen/result/chd1282/.short-one'):
+        raise ValueError('短测仅使用指定的独占目录')
+    out.mkdir(parents=True,exist_ok=False)
+    try:
+        predict(args,owned_empty=True)
+        acceptance(args)
+    finally:
+        if out.resolve()!=out or out.is_symlink():
+            raise ValueError('短测目录解析改变，停止清理')
+        shutil.rmtree(out)
 
 
 def main(argv=None):
@@ -241,6 +265,8 @@ def main(argv=None):
     run.add_argument('--devices',default='all-visible')
     run.add_argument('--exclude-physical-gpus',type=int,nargs='*',default=[0,1])
     run.add_argument('--resume',action='store_true')
+    single=commands.add_parser('short',parents=[run],add_help=False)
+    single.add_argument('--receipt',type=Path,required=True)
     args=p.parse_args(argv)
     if args.command=='check':
         check_data(args.preprocessed,args.cht_code,args.technical)
@@ -248,6 +274,8 @@ def main(argv=None):
         build_models(args)
     elif args.command=='accept':
         acceptance(args)
+    elif args.command=='short':
+        short(args)
     else:
         if args.threads<1 or not 1<=args.wait_seconds<=300:
             raise ValueError('线程和等待时间无效')

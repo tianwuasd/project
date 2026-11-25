@@ -20,6 +20,9 @@ class PreprocessedInputs:
         sys.path.insert(0,str(code/'src'))
         from chd_segmentation.preprocessing.inputs import resolve_preprocessed
         self.path=Path(prepared).resolve(strict=True)
+        if os.name=='posix' and not self.path.is_relative_to(
+                Path('/data4/zhangruichen/data/chd-segmentation/preprocessed')):
+            raise ValueError('预处理描述必须位于正式data4/preprocessed目录')
         self.prepared=read_json(self.path)
         storage=self.prepared['storage']
         if storage['format']!=FORMAT or not storage['complete']:

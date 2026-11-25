@@ -11,6 +11,7 @@ from ..contracts import atomic_json,read_json,sha256_file
 from .data4 import check_data
 from .preprocessed import PreprocessedInputs
 from .reuse import SIX
+from .source import implementation
 
 
 BASE=Path('/data4/zhangruichen')
@@ -62,7 +63,8 @@ def main(argv=None):
     receipt=read_json(args.receipt)
     names=list(receipt['evaluation']['cases'])
     if (receipt['protocol']!='xu-data4-acceptance-v1' or receipt['cases']!=1 or receipt['mode']!='six-way'
-            or receipt['checkpoints']!=model['checkpoints'] or Path(receipt['preprocessed']).resolve()!=current
+            or receipt['checkpoints']!=model['checkpoints'] or receipt['implementation']!=implementation()
+            or Path(receipt['preprocessed']).resolve()!=current
             or PreprocessedInputs(current,args.cht_code,names).identity!=receipt['preprocessed_identity']):
         raise ValueError('需要当前数据和当前模型的一例真实预测及评价验收')
     for branch in SIX:
@@ -157,9 +159,16 @@ def main(argv=None):
     if old_export.resolve()!=old_export or source.source.root.is_relative_to(old_export):
         raise ValueError('旧导出目录解析改变')
     shutil.rmtree(old_export)
+    for path in OLD.glob('dataset1282-zmic*'):
+        if path.is_file() and not path.is_symlink() and path.stat().st_size<=20*1024**2:
+            path.unlink()
+    remaining=[str(x) for x in OLD.iterdir()] if OLD.exists() else []
+    if OLD.exists() and not remaining:
+        OLD.rmdir()
     atomic_json(BASE/'result/chd1282/migration.json',dict(state='completed',
         raw=str(raw),preprocessed=str(current),models=str(model_root),checkpoints=str(model_root.parent/'checkpoints'),
-        results=str(runs),logs=str(BASE/'course/chd1282'),deleted=[str(OLD/'input'),str(OLD/'work'),str(old_export)]))
+        results=str(runs),logs=str(BASE/'course/chd1282'),remaining_back_entries=remaining,
+        deleted=[str(OLD/'input'),str(OLD/'work'),str(old_export)]))
     print('已迁移模型、检查点、结果；已清理旧input、work和旧718导出。其他备份目录仍须按预览精确核定。',flush=True)
 
 

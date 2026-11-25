@@ -25,16 +25,8 @@ models)
 short)
   S=$B/result/chd1282/.short-one
   test ! -e "$S"
-  cleanup() {
-    if [ -d "$S" ] && [ ! -L "$S" ] && [ "$(realpath -m "$S")" = "$B/result/chd1282/.short-one" ]; then
-      rm -rf -- "$S"
-    fi
-  }
-  trap cleanup EXIT
-  N=$("$PY" -B -c 'import json,sys; d=json.load(open(sys.argv[1])); print(next(n for n,r in d["heldout"].items() if r["role"]=="source_test"))' "$M/models.json")
-  "$PY" -B -u scripts/xu_data4.py predict --preprocessed "$D/prepared.json" --cht-code "$H" \
-    --models "$M" --groups source_test --case "$N" --output "$S" --threads 4
-  "$PY" -B -u scripts/xu_data4.py accept --output "$S" --receipt "$L/acceptance.json"
+  exec "$PY" -B -u scripts/xu_data4.py short --preprocessed "$D/prepared.json" --cht-code "$H" \
+    --models "$M" --output "$S" --threads 4 --receipt "$L/acceptance.json"
   ;;
 predict)
   O=$B/result/chd1282/prediction-sixway
