@@ -2,6 +2,7 @@ import argparse
 from collections import deque
 from pathlib import Path
 import os
+import re
 import shutil
 
 from ..contracts import atomic_json, digest, read_json, sha256_file
@@ -12,6 +13,33 @@ from . import PROTOCOL
 from .preprocessed import FORMAT, PreprocessedInputs
 from .reuse import SIX
 from .source import implementation, verify_frozen
+
+
+def label_semantics(labels):
+    aliases={re.sub('[^a-z0-9]','',name.lower()):name for name in ('background',*SEMANTICS.values())}
+    aliases.update({name.lower():meaning for name,meaning in SEMANTICS.items()})
+    if (len(labels)!=11 or any(type(value) is not int for value in labels.values())
+            or set(labels.values())!=set(range(11))):
+        raise ValueError('标签必须保留完整且唯一的0..10整数编号')
+    result={}
+    for name,value in labels.items():
+        token=re.sub('[^a-z0-9]','',name.lower())
+        if token not in aliases or aliases[token] in result:
+            raise ValueError('标签名称未知或存在重复语义：'+name)
+        result[aliases[token]]=value
+    if result.get('background')!=0:
+        raise ValueError('背景标签编号必须为0')
+    return result
+
+
+def validate_model_input(input_plan,input_labels,model_plan,model_labels):
+    if digest(input_plan)!=digest(model_plan):
+        keys=sorted(k for k in input_plan.keys()|model_plan.keys() if input_plan.get(k)!=model_plan.get(k))
+        raise ValueError('新数据的预处理计划与原训练不同，差异字段：'+', '.join(keys))
+    actual,expected=label_semantics(input_labels),label_semantics(model_labels)
+    if actual!=expected:
+        keys=sorted(k for k in actual if actual[k]!=expected[k])
+        raise ValueError('新数据的标签结构编号与原训练不同：'+', '.join(keys))
 
 
 def check_data(prepared,cht_code,technical=False):
@@ -58,8 +86,7 @@ def build_models(args):
     source=check_data(args.preprocessed,args.cht_code)
     old=Path(args.legacy_prepared).resolve(strict=True)/'preprocessed/Dataset282_CHDSource'
     plan,dataset=read_json(old/'nnUNetPlans.json'),read_json(old/'dataset.json')
-    if digest(plan)!=digest(source.plan) or dataset['labels']!=source.prepared['dataset_json']['labels']:
-        raise ValueError('新数据的真实计划或标签语义与原训练不同')
+    validate_model_input(source.plan,source.prepared['dataset_json']['labels'],plan,dataset['labels'])
     identities=[]
     selected={}
     for path in args.prediction:
@@ -134,8 +161,7 @@ def open_job(args,out):
     if not names or len(set(names))!=len(names) or set(names)-eligible.keys():
         raise ValueError('请选择冻结留出组中的病例')
     source=PreprocessedInputs(args.preprocessed,args.cht_code,names)
-    if digest(source.plan)!=digest(model['plan']) or description['dataset_json']['labels']!=model['dataset']['labels']:
-        raise ValueError('当前输入计划或类别语义与模型不兼容')
+    validate_model_input(source.plan,description['dataset_json']['labels'],model['plan'],model['dataset']['labels'])
     cases={}
     for name in names:
         row,original=rows[name],model['heldout'][name]
