@@ -125,7 +125,7 @@ def pooled_block(entry, section, use_label):
     shape = entry['image'].shape[1:]
     axes = [np.arange(t.start*4,t.stop*4) for t in section]
     indices = np.ix_(*(a.clip(0,n-1) for a,n in zip(axes,shape)))
-    raw = np.array(entry['image'][0][indices],dtype=np.float32,copy=True)
+    raw = np.array(entry['image'][(0, *indices)],dtype=np.float32,copy=True)
     valid = label_region(entry['label'],axes)>=0 if use_label else np.ones(raw.shape,dtype=bool)
     if not use_label:
         for axis,(positions,n) in enumerate(zip(axes,shape)):

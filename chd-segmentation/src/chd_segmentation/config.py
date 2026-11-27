@@ -9,7 +9,9 @@ import yaml
 DEFAULTS = {
     "model": "stunet", "scope": "formal", "fold": 0, "result_root": None, "plan": None,
     "input_source": {"path": None}, "checkpoint_dir": None,
-    "preprocessing": {"root": None, "statistics_source": "main-train", "execution": "auto", "block_bytes": 64 * 1024 ** 2,
+    "preprocessing": {"root": None, "statistics_source": "main-train", "storage_format": "b2nd",
+                      "compression_chunk_bytes": 4 * 1024 ** 2, "compression_level": 3,
+                      "execution": "auto", "block_bytes": 64 * 1024 ** 2,
                       "read_block_bytes": 64 * 1024 ** 2,
                       "auto_blocks": True, "max_block_bytes": 512 * 1024 ** 2,
                       "max_case_threads": 0, "growth_seconds": 5.,
@@ -92,6 +94,12 @@ def load_config(path, overrides=None):
         if type(config["preprocessing"][key]) is not int or config["preprocessing"][key] < 1024:
             raise ValueError("预处理块预算及分块阈值必须为至少 1024 字节的整数")
     prep = config["preprocessing"]
+    if prep['storage_format'] not in ('npy', 'b2nd'):
+        raise ValueError('preprocessing.storage_format必须为npy或b2nd')
+    if type(prep['compression_chunk_bytes']) is not int or not 1024 <= prep['compression_chunk_bytes'] <= 64*1024**2:
+        raise ValueError('compression_chunk_bytes必须为1024至64MiB的整数')
+    if type(prep['compression_level']) is not int or not 0 <= prep['compression_level'] <= 9:
+        raise ValueError('compression_level必须为0至9的整数')
     if prep['execution'] not in ('auto', 'whole', 'blocks'):
         raise ValueError('preprocessing.execution必须为auto、whole或blocks')
     explicit = source.get('preprocessing', {})

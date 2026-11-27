@@ -161,7 +161,7 @@ class QAdapter:
     def crop(self,entry,candidate,probability,parallel=True):
         size = self.config['local_size']
         start = tuple(int(np.floor(c-(size-1)/2+.5)) for c in candidate.center)
-        image = torch.from_numpy(entry['image'])[None]
+        image = entry['image']
         inputs,editable = crop_local_input(image,probability,start,size)
         grids = np.meshgrid(*(np.arange(s,s+size) for s in start),indexing='ij')
         inside = np.ones((size,)*3,dtype=bool)
@@ -281,7 +281,7 @@ class QAdapter:
             raise MemoryError('Q整例概率与融合工作区超出主机内存预算')
         model = self.model if self.stage=='base' else self.base
         with torch.no_grad():
-            logits = sliding_window_inference(torch.from_numpy(entry['image'])[None],
+            logits = sliding_window_inference(torch.from_numpy(np.asarray(entry['image']))[None],
                 roi_size=tuple(self.spec['patch']),sw_batch_size=1,
                 predictor=lambda x:model(x)[0],sw_device=self.device,device='cpu',overlap=.5,mode='gaussian')
         return logits.float().softmax(1)
@@ -356,10 +356,10 @@ class QAdapter:
     def predict(self,entry,prompts=None,internal=False):
         if self.stage!='local':
             raise ValueError('Q完整预测需要local阶段检查点')
-        image = torch.from_numpy(entry['image'])[None]
+        image = entry['image']
         probability = self.base_probability(entry)
         located = self.locate(entry)
-        candidates = select_candidates(located['heatmap'][0].float().cpu().numpy(),image.shape[2:],[4,4,8],.2,.8)
+        candidates = select_candidates(located['heatmap'][0].float().cpu().numpy(),image.shape[1:],[4,4,8],.2,.8)
         candidates = candidates[:self.config['max_candidates']]
         fusion = ProbabilityFusion(probability)
         diagnostics = []

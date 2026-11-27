@@ -39,7 +39,7 @@ def local_probability(bundle, entry, probability, workspace):
     workspace.drop(heat)
     total = workspace.create('layer', probability.shape, np.float32)
     weights = workspace.create('layer', probability.shape[1:], np.float32)
-    image = torch.from_numpy(entry['image'])[None]
+    image = entry['image']
     base = torch.from_numpy(probability)[None]
     context_map = torch.from_numpy(features)[None]
     size = bundle.config['local_size']

@@ -99,6 +99,16 @@ def case_estimates(config,prepared,stage):
                 workspace_bytes=2*GIB+4*block, output_array_bytes=output,
                 legacy_whole_case_bytes=case if config['model'] == 'q_route1' else native*32,
                 retained_case_bytes=0, rank_prediction_bytes=0)
+    for record in records:
+        stored = prepared.get('storage', {}).get('cases', {}).get(record['case_id'], {})
+        decode = stored.get('decode_workspace_bytes', 0)
+        if stage == 'preprocess' and config.get('preprocessing', {}).get('storage_format', 'b2nd') == 'b2nd':
+            decode = 4*config['preprocessing'].get('compression_chunk_bytes', 4*1024**2)
+        record['decode_workspace_bytes'] = decode
+        record['workspace_bytes'] += decode
+        if 'validation_workspace_bytes' in record:
+            record['validation_workspace_bytes'] += decode
+        record['rank_prediction_bytes'] += decode
     return records
 
 

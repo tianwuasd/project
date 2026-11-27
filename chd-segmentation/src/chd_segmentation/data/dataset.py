@@ -7,9 +7,12 @@ import numpy as np
 
 from ..preprocessing.offline_store import OfflineTransform, validate_storage
 from ..preprocessing.inputs import resolve_preprocessed
+from ..preprocessing.arrays import CompressedArray
 
 
 def array_bytes(value):
+    if isinstance(value, CompressedArray):
+        return 64 * 1024
     if isinstance(value, np.memmap):
         # 映射文件的逻辑尺寸独立于驻留页；实际物理占用由MemoryGuard持续监控。
         return min(value.nbytes, 64 * 1024)

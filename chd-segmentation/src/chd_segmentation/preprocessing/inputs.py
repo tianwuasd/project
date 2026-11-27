@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 
 from ..artifacts.store import read_json
+from .arrays import open_array
 
 
 class OfflineDataset:
@@ -18,10 +19,10 @@ class OfflineDataset:
                 or record['entry']['case_id']!=case_id or pointer.get('case_id',case_id)!=case_id):
             raise ValueError('选定病例指针与实际病例、版本或配方不一致：'+case_id)
         entry = deepcopy(record['entry'])
-        entry['image'] = np.load(directory / 'image.npy', mmap_mode='r', allow_pickle=False)
+        entry['image'] = open_array(directory, 'image', record['format'])
         if list(entry['image'].shape)!=pointer['shape_czyx']:
             raise ValueError('选定病例版本的数组尺寸不符：'+case_id)
-        entry['label'] = np.load(directory / 'label.npy', mmap_mode='r', allow_pickle=False) if with_label else None
+        entry['label'] = open_array(directory, 'label', record['format']) if with_label else None
         locations = {}
         if with_label:
             with np.load(directory / 'locations.npz', allow_pickle=False) as values:

@@ -42,7 +42,7 @@ def resolve_window(config, prepared):
 
 
 def native_recipe(prepared, config, *, window, derived_window):
-    source = recipe(prepared, config)
+    source = recipe(prepared, {**config, 'preprocessing': {**config['preprocessing'], 'storage_format': 'npy'}})
     statistics = dict(kind='explicit')
     if derived_window:
         statistics = dict(kind='training_percentiles', fold=prepared['fold'],

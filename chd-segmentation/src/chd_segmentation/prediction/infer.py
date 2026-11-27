@@ -178,7 +178,7 @@ def _predict(config, output, inputs=None, case_ids=None, manifest=None, prepared
                         spec['num_classes'],options,device,workspace)
                 else:
                     logits = sliding_window_inference(
-                        torch.from_numpy(entry["image"])[None], roi_size=tuple(spec["patch"]),
+                        torch.from_numpy(np.asarray(entry["image"]))[None], roi_size=tuple(spec["patch"]),
                         sw_batch_size=options["window_batch"], predictor=predictor, overlap=options["overlap"],
                         mode=options["blend"], sw_device=device, device=torch.device("cpu"), progress=False)
                     if not torch.isfinite(logits).all():

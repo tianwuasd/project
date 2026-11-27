@@ -11,9 +11,10 @@ import psutil
 
 from ..artifacts.store import digest, operation_lock, read_json, write_json
 from ..models.stunet.preprocess import CONTRACT
+from .arrays import NPY_FORMAT, B2ND_FORMAT, FORMATS, storage_format, array_name, open_array, save_compressed
 
 
-FORMAT = "chd-offline-npy-v1"
+FORMAT = NPY_FORMAT
 
 
 def case_directory(root, key):
@@ -29,7 +30,10 @@ def recipe(prepared, config):
                     not fit_ids and "train" in r["roles"] and r.get("cohort") != "auxiliary"]
     sources = [{k: row.get(k) for k in ("case_id", "sha256", "spacing_xyz", "geometry_policy", "unknown_classes", "ignore_label_ids")}
                for row in sorted(fit_rows, key=lambda r: r["case_id"])]
-    return {"format": FORMAT, "transform": CONTRACT, "dataset": prepared["dataset"],
+    format = storage_format(config['preprocessing'])
+    encoding = {'compression': {key: config['preprocessing'].get(key, default) for key, default in
+                (('compression_chunk_bytes', 4*1024**2), ('compression_level', 3))}} if format == B2ND_FORMAT else {}
+    return {"format": format, **encoding, "transform": CONTRACT, "dataset": prepared["dataset"],
             "statistics_source": config["preprocessing"]["statistics_source"], "fold": prepared["fold"],
             "statistics_inputs": sources,
             "scope": prepared["scope"], "technical": prepared["technical"],
@@ -70,7 +74,7 @@ def record_identity(record):
 
 def owned_remove(path):
     path = Path(path)
-    allowed = {"image.npy", "label.npy", "locations.npz", "case.json", "case.json.pending", "owner.json"}
+    allowed = {"image.npy", "label.npy", "image.b2nd", "label.b2nd", "locations.npz", "case.json", "case.json.pending", "owner.json"}
     work_allowed = {"source", "source-seg", "mask", "outside", "normalized", "labels", "result-image",
                     "result-label", "coeff", "coeff-z", "separate", "indicator", "indicator-coeff"}
     def known(p):
@@ -93,8 +97,12 @@ def inspect_case(directory, key, recipe_identity, full=False, *, evict=False, bo
     if directory.is_symlink() or not directory.is_dir() or not (directory / "case.json").is_file():
         return None
     record = read_json(directory / "case.json")
+    if record['format'] not in FORMATS or record['case_key'] != key or record['recipe_identity'] != recipe_identity:
+        raise ValueError('病例缓存身份或格式不同')
+    if array_name('image', record['format']) not in record['files']:
+        raise ValueError('病例缓存缺少影像文件记录')
     for name, expected in record["files"].items():
-        if name not in ("image.npy", "label.npy", "locations.npz"):
+        if name not in ("image.npy", "label.npy", "image.b2nd", "label.b2nd", "locations.npz"):
             raise ValueError("离线数据文件名称无效")
         path = directory / name
         if path.is_symlink() or not path.is_file():
@@ -115,18 +123,25 @@ def begin_case(directory, key, recipe_identity):
     return pending
 
 
-def save_case(directory, key, recipe_identity, entry, workspace=None):
+def save_case(directory, key, recipe_identity, entry, workspace=None, *, format=NPY_FORMAT, compression=None, boundary=None):
     directory = Path(directory)
     pending = begin_case(directory, key, recipe_identity) if workspace is None else directory.with_name(directory.name + ".pending")
     if read_json(pending / "owner.json") != {"case_key": key, "recipe_identity": recipe_identity}:
         raise ValueError("病例提交目录归属不符")
     metadata = {k: deepcopy(v) for k, v in entry.items() if k not in ("image", "label", "properties")}
     metadata["properties"] = {k: v for k, v in entry["properties"].items() if k != "class_locations"}
-    arrays = {"image.npy": entry["image"]}
+    arrays = {array_name('image', format): entry["image"]}
     if entry["label"] is not None:
-        arrays["label.npy"] = entry["label"]
+        arrays[array_name('label', format)] = entry["label"]
+    decode_workspace = 0
     for name, array in arrays.items():
-        if workspace is None:
+        if format == B2ND_FORMAT:
+            if workspace is not None:
+                array.flush()
+            decode_workspace += save_compressed(pending / name, array, compression or {}, boundary)
+            with (pending / name).open('r+b') as stream:
+                os.fsync(stream.fileno())
+        elif workspace is None:
             with (pending / name).open("wb") as stream:
                 np.save(stream, array, allow_pickle=False)
                 stream.flush()
@@ -150,11 +165,13 @@ def save_case(directory, key, recipe_identity, entry, workspace=None):
         stream.flush()
         os.fsync(stream.fileno())
     names = [*arrays, "locations.npz"]
-    record = {"format": FORMAT, "case_key": key, "recipe_identity": recipe_identity,
+    record = {"format": format, "case_key": key, "recipe_identity": recipe_identity,
               "entry": json_value(metadata), "location_keys": json_value(keys),
               "files": {n: {"stamp": stamp(pending / n)} for n in names}}
     for name, array in arrays.items():
         record["files"][name].update(shape=list(array.shape), dtype=str(array.dtype), array_bytes=array.nbytes)
+    if format == B2ND_FORMAT:
+        record['decode_workspace_bytes'] = decode_workspace
     record["identity"] = record_identity(record)
     write_json(pending / "case.json", record)
     if workspace is not None:
@@ -165,13 +182,13 @@ def save_case(directory, key, recipe_identity, entry, workspace=None):
 
 def validate_storage(prepared, full=False, config=None, expected_transform=CONTRACT):
     storage = prepared.get("storage")
-    if storage is None or storage.get("format") != FORMAT or not storage.get("complete"):
+    if storage is None or storage.get("format") not in FORMATS or not storage.get("complete"):
         raise ValueError("需要先运行 preprocess 完成离线预处理；在线旧任务使用冻结版本继续")
     root = Path(storage["root"]).resolve(strict=True)
     catalog = read_json(root / "catalog.json")
     if expected_transform is not None and catalog["recipe"]["transform"] != expected_transform:
         raise ValueError("离线处理方式与模型输入要求不同")
-    if catalog['format']!=FORMAT or catalog['recipe']['dataset']!=prepared['dataset'] or catalog['recipe']['labels']!=prepared['dataset_json']:
+    if catalog['format']!=storage['format'] or catalog['recipe']['dataset']!=prepared['dataset'] or catalog['recipe']['labels']!=prepared['dataset_json']:
         raise ValueError('离线描述的数据集、格式或类别不同')
     missing = {row['case_id'] for row in prepared['manifest']['cases']}-storage['cases'].keys()
     if missing:
@@ -223,8 +240,8 @@ class OfflineTransform:
         directory = case_directory(self.storage["root"], pointer["key"])
         record = read_json(directory / "case.json")
         entry = deepcopy(record["entry"])
-        entry["image"] = np.load(directory / "image.npy", mmap_mode="r", allow_pickle=False)
-        entry["label"] = np.load(directory / "label.npy", mmap_mode="r", allow_pickle=False) if self.with_label else None
+        entry["image"] = open_array(directory, 'image', record['format'])
+        entry["label"] = open_array(directory, 'label', record['format']) if self.with_label else None
         entry["properties"]["class_locations"] = {}
         if self.with_label:
             with np.load(directory / "locations.npz", allow_pickle=False) as arrays:

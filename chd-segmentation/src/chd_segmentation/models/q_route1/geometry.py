@@ -1,24 +1,31 @@
 import torch
 import torch.nn.functional as F
+import numpy as np
 
 
 def crop_local_input(image, base, start, size=128, valid_fov=None):
-    if image.shape[0] != 1 or image.shape[1] != 1 or base.shape != (1,11,*image.shape[2:]):
+    tensor = isinstance(image, torch.Tensor)
+    shape = image.shape if tensor else (1, *image.shape)
+    device = image.device if tensor else base.device
+    if shape[0] != 1 or shape[1] != 1 or base.shape != (1,11,*shape[2:]):
         raise ValueError('单例影像和11通道概率需要处于同一网格')
-    axes = [torch.arange(s,s+size,device=image.device) for s in start]
+    axes = [torch.arange(s,s+size,device=device) for s in start]
     raw = torch.meshgrid(*axes,indexing='ij')
-    valid = torch.ones((size,)*3,dtype=torch.bool,device=image.device)
+    valid = torch.ones((size,)*3,dtype=torch.bool,device=device)
     coords = []
     indices = []
-    for grid,n in zip(raw,image.shape[2:]):
+    for grid,n in zip(raw,shape[2:]):
         valid &= (grid >= 0) & (grid < n)
         coords.append(2*(grid+.5)/n-1)
         indices.append(grid.clamp(0,n-1))
     if valid_fov is not None:
-        if valid_fov.shape != image.shape or valid_fov.dtype != torch.bool:
+        if valid_fov.shape != shape or valid_fov.dtype != torch.bool:
             raise ValueError('有效视野需要与影像同形状的bool数组')
         valid &= valid_fov[(0,0,*indices)]
-    x = image[(slice(None),slice(None),*indices)]
+    if tensor:
+        x = image[(slice(None),slice(None),*indices)]
+    else:
+        x = torch.from_numpy(np.array(image[(slice(None), *(index.cpu().numpy() for index in indices))], copy=True))[None].to(device)
     probability = base[(slice(None),slice(None),*indices)].detach().clone()
     probability = probability*valid[None,None]
     probability[:,0] += ~valid

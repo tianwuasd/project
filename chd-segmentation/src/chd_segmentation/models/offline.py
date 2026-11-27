@@ -34,10 +34,11 @@ def require_q_statistics(config, prepared):
         raise ValueError('Q拟合来源包含A组以外的患者')
 
 
-def expected_recipe(config, prepared):
+def expected_recipe(config, prepared, storage_settings=None):
     if config['model'] == 'q_route1':
         require_q_statistics(config, prepared)
-        common = dict(preprocessing=dict(statistics_source='Q-A-technical' if config['technical'] else 'Q-A'))
+        common = dict(preprocessing={**(storage_settings or {}),
+            'statistics_source': 'Q-A-technical' if config['technical'] else 'Q-A'})
         return recipe(prepared, common)
     if not config['technical'] and prepared['dataset'] == 'chd1282' and (
             prepared['manifest'].get('split_source', {}).get('format') == 'q1282' or
@@ -72,7 +73,8 @@ def quick_check_model(model, prepared, stage, prepare_config=None):
     common = execution_config(model)
     if model['technical'] != (prepared['scope'] == 'technical'):
         raise ValueError('模型与准备描述的正式或技术范围不同')
-    expected = validate_model_storage(model, prepared) if prepared.get('storage') else expected_recipe(model, prepared)
+    expected = validate_model_storage(model, prepared) if prepared.get('storage') else expected_recipe(
+        model, prepared, prepare_config['preprocessing'] if prepare_config is not None else None)
     checks = dict(dataset=prepared['dataset'],cases=[row['case_id'] for row in prepared['manifest']['cases']])
     checks['recipe'] = dict(transform=expected['transform'], statistics=expected.get('statistics_source', expected.get('window_source')))
     checks['paths'] = {name: _path_check(common[name], writable=True) for name in ('run_dir', 'work_root')}
@@ -108,7 +110,7 @@ def preprocess_model(model_path, prepare_config_path, prepared_path, root, outpu
             reused=len(source['manifest']['cases']),new=0,output=str(target),
             data=source['storage']['root'],transform=actual['transform'])
         return source
-    expected = expected_recipe(model, source)
+    expected = expected_recipe(model, source, config['preprocessing'])
     event(config['run_dir'], 'quick_check', report=quick_check_model(model, source, 'preprocess', config))
     if model['model'] == 'q_route1':
         config['preprocessing']['statistics_source'] = expected['statistics_source']

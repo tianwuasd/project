@@ -26,6 +26,7 @@ from .prepare import load_prepared, validate_prepared_config
 from .scheduling import update_case_slots
 from ..acceleration.contracts import CaseEstimate, CasePolicy, ResourceSnapshot
 from ..acceleration.cpu import choose_execution
+from .arrays import array_name
 
 
 _WORKER_CANCEL = None
@@ -105,7 +106,9 @@ def produce_case(prepared, config, root, name, key, recipe_identity):
             entry, workspace = stream_case(prepared, row, config, pending, guard)
         try:
             with stage(config, "preprocess_case_save", case_id=name):
-                record = save_case(directory, key, recipe_identity, entry, workspace)
+                content = read_json(Path(root)/'catalog.json')['recipe']
+                record = save_case(directory, key, recipe_identity, entry, workspace,
+                    format=content['format'], compression=content.get('compression'), boundary=guard.checkpoint)
         finally:
             if workspace is not None:
                 workspace.release_handles()
@@ -116,8 +119,10 @@ def produce_case(prepared, config, root, name, key, recipe_identity):
 
 
 def case_pointer(record):
-    return {"case_id": record['entry']['case_id'], "key": record["case_key"], "identity": record["identity"], "shape_czyx": record["files"]["image.npy"]["shape"],
-            "array_bytes": sum(v["array_bytes"] for n, v in record["files"].items() if n.endswith(".npy")),
+    return {"case_id": record['entry']['case_id'], "key": record["case_key"], "identity": record["identity"], "shape_czyx": record["files"][array_name('image',record['format'])]["shape"],
+            "array_bytes": sum(v.get("array_bytes", 0) for v in record["files"].values()),
+            "decode_workspace_bytes": record.get('decode_workspace_bytes', 0),
+            "stored_bytes": sum(v['stamp'][0] for v in record['files'].values()),
             "locations_bytes": record["files"]["locations.npz"]["stamp"][0]}
 
 
@@ -238,9 +243,10 @@ def preprocess(config, prepared_path, output, *, producer=produce_case, recipe_b
     with operation_lock(root):
         catalog_path = root / "catalog.json"
         catalog = read_json(catalog_path) if catalog_path.exists() else {
-            "format": FORMAT, "recipe": content, "recipe_identity": identity, "cases": {}}
+            "format": content['format'], "recipe": content, "recipe_identity": identity, "cases": {}}
         if catalog["recipe"] != content or catalog["recipe_identity"] != identity:
             raise ValueError("已有数据版本的完整配方不一致")
+        write_json(catalog_path, catalog)
         pending, pointers, reused = [], {}, 0
         references, active = live_references(root)
         for row in prepared["manifest"]["cases"]:
@@ -281,7 +287,7 @@ def preprocess(config, prepared_path, output, *, producer=produce_case, recipe_b
         write_json(catalog_path, catalog)
         result = deepcopy(prepared)
         result.pop("identity")
-        result["storage"] = {"format": FORMAT, "root": str(root), "base_root": str(base),
+        result["storage"] = {"format": content['format'], "root": str(root), "base_root": str(base),
                              "recipe_identity": identity, "complete": True, "cases": pointers}
         result["identity"] = digest(result)
         validate_storage(result, expected_transform=content["transform"])
@@ -290,7 +296,7 @@ def preprocess(config, prepared_path, output, *, producer=produce_case, recipe_b
           new=len(pointers) - reused, output=str(output), data=str(root), seconds=perf_counter() - began)
     final = Progress(config, "preprocess", total=len(pointers), reused=reused, started=began)
     final.update(done=len(pointers), new=len(pointers) - reused, pending=0, active=0,
-                 storage_bytes=sum(p["array_bytes"] + p["locations_bytes"] for p in pointers.values()))
+                 storage_bytes=sum(p.get('stored_bytes', p["array_bytes"] + p["locations_bytes"]) for p in pointers.values()))
     final.close()
     return result
 

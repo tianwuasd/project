@@ -74,6 +74,16 @@ def case_estimates(config, prepared, stage):
         raise ValueError("资源规划没有可用病例")
     for row in reports:
         row.setdefault("workspace_bytes", row["raw_workspace_bytes"] + row["resample_workspace_bytes"])
+    for report in reports:
+        stored = prepared.get('storage', {}).get('cases', {}).get(report['case_id'], {})
+        decode = stored.get('decode_workspace_bytes', 0)
+        if stage == 'preprocess' and config.get('preprocessing', {}).get('storage_format', 'b2nd') == 'b2nd':
+            decode = 4*config['preprocessing'].get('compression_chunk_bytes', 4*1024**2)
+        report['decode_workspace_bytes'] = decode
+        report['workspace_bytes'] += decode
+        if 'whole_workspace_bytes' in report:
+            report['whole_workspace_bytes'] += decode
+            report['prediction_window_bytes'] += decode
     return reports
 
 
