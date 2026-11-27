@@ -50,11 +50,12 @@ class EvaluationLog:
             cpu = self.process.cpu_times()
             completed = self.current['completed']
             total = self.current['total']
+            measured_completed=max(0,completed-self.current.get('reused_cases',0))
             row = dict(self.current, event=event, timestamp=datetime.now(timezone.utc).isoformat(),
                        updated_at=now, elapsed_seconds=elapsed,
                        stage_seconds=time.monotonic()-getattr(self,'stage_started',self.started),
                        cpu_seconds=cpu.user+cpu.system, rss_bytes=self.process.memory_info().rss,
-                       eta_seconds=elapsed*(total-completed)/completed if completed else None)
+                       eta_seconds=elapsed*(total-completed)/measured_completed if measured_completed else None)
             text = json.dumps(row, ensure_ascii=False, allow_nan=False)
             print(text, flush=True)
             if self.stream is not None:

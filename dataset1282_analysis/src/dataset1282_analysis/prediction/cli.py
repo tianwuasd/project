@@ -201,6 +201,8 @@ def main(argv=None):
     for name in ('status','evaluate','worker'):
         p = commands.add_parser(name)
         p.add_argument('--output',type=Path,required=True)
+        if name=='evaluate':
+            p.add_argument('--workers',type=int,default=0)
         if name == 'worker':
             p.add_argument('--phase',choices=('prepare','predict'),required=True)
             p.add_argument('--device',required=True)
@@ -209,7 +211,7 @@ def main(argv=None):
         print(read_json(args.output/'status.json'))
     elif args.command == 'evaluate':
         from .evaluation import evaluate
-        evaluate(assert_output_location(args.output))
+        evaluate(assert_output_location(args.output),workers=args.workers)
     elif args.command == 'worker':
         from ..xu_resources import apply_env_limit
         from .workflow import prepare,predict

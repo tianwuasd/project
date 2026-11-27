@@ -12,9 +12,13 @@ CHT代码需要包含`preprocessing/arrays.py`的CompressedArray，以及offline
 
 每个病例分块写入B2ND，重新打开后逐字节核对CT与标签、几何/监督记录和前景坐标。全部病例通过后写出新的catalog.json、prepared.json与compression-complete.json。通过`--resume`接续：已经完成的病例不重写；未完成病例重新提交。输出目录与原NPY分离，峰值磁盘额外占用为压缩输出体积，实际比例与病例相关。
 
-加`--delete-npy-after-verify`时，在全部核验成功、目标文件身份未变且未发现活动引用后，只删除源清单内的image.npy和label.npy。原始CT/GT、模型、结果、JSON记录、locations.npz和B2ND均保留。中断的删除可用相同参数加`--resume`接续。删除NPY后，读取应使用新prepared.json；旧NPY任务不能直接续跑。若另有硬链接，移除一个文件名不一定立即释放对应磁盘空间。
+转换阶段保留NPY。删除还必须提供同一转换的CHT与XU两份真实读取验收JSON，协议为chd-b2nd-read-acceptance-v1，分别记录acceptance_party=CHT/XU、source_identity、prepared_identity、recipe_identity及实际读取病例；缺失、身份不同或未通过时拒绝删除。
 
-服务器可执行`bash scripts/data4_server.sh compress --delete-npy-after-verify`，日志重定向至course/chd1282/compress.log。默认输出为原数据目录名追加`-b2nd`。`CHD_COMPRESSED_OUTPUT`可指定另一个独立目标。
+服务器执行`bash scripts/data4_server.sh compress`，日志重定向至course/chd1282/compress.log。默认输出为原数据目录名追加`-b2nd`。`CHD_COMPRESSED_OUTPUT`可指定另一个独立目标。
+
+XU使用`bash scripts/data4_server.sh accept-b2nd`保存course/chd1282/xu-b2nd-read.json。CHT使用代码助手1提供的`scripts/accept_b2nd_cht.py`，明确指定已有的含压缩接口代码快照，执行真实sample_patch及固定区域比较，保存course/chd1282/cht-b2nd-read.json；验收脚本不创建代码快照、不运行模型。`CHD_CHT_CODE`可指定这一已有快照/code路径。
+
+两份记录均存在且通过后，执行`bash scripts/data4_server.sh delete-npy`。它在完整压缩核验、双接入验收、目标身份和活动引用检查后，只删除源清单内的image.npy和label.npy。原始CT/GT、模型、结果、JSON、locations.npz和B2ND保留。中断后重复相同命令接续。若另有硬链接，移除文件名不一定释放对应全部磁盘空间。
 
 ## 切换与单例检查
 

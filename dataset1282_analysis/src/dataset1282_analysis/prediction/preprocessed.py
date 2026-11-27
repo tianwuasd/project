@@ -17,7 +17,8 @@ _OPEN={}
 class PreprocessedInputs:
     def __init__(self, prepared, cht_code, names):
         code=Path(cht_code).resolve(strict=True)
-        if os.name=='posix' and not code.is_relative_to(Path('/data4/zhangruichen/code')):
+        existing_snapshot=code.is_relative_to(Path('/data4/zhangruichen/course/chd-segmentation/code-snapshots')) and (code/'.snapshot.json').is_file()
+        if os.name=='posix' and not code.is_relative_to(Path('/data4/zhangruichen/code')) and not existing_snapshot:
             raise ValueError('CHT读取代码必须位于data4/code')
         sys.path.insert(0,str(code/'src'))
         from chd_segmentation.preprocessing.inputs import resolve_preprocessed

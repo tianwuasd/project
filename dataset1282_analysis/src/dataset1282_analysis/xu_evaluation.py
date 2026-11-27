@@ -1,13 +1,23 @@
 """Native-grid volumetric and surface metrics for an individual Xu segmentation branch."""
 import numpy as np
 import time
-from scipy.ndimage import binary_erosion, generate_binary_structure
+from scipy.ndimage import binary_erosion, find_objects, generate_binary_structure
 from scipy.spatial import cKDTree
 
 
-def surface_points(mask, spacing):
-    interior = binary_erosion(mask, structure=generate_binary_structure(3, 1), border_value=0)
-    return np.argwhere(mask & ~interior) * spacing
+def surface_points(mask, spacing, offset=None):
+    if offset is None:
+        boxes=find_objects(mask,max_label=1)
+        if not boxes or boxes[0] is None:
+            return np.empty((0,3),dtype=float)
+        box=boxes[0]
+        region=np.ascontiguousarray(mask[box])
+        origin=np.asarray([s.start for s in box])
+    else:
+        region=np.ascontiguousarray(mask)
+        origin=offset
+    interior=binary_erosion(region,structure=generate_binary_structure(3,1),border_value=0)
+    return (np.argwhere(region & ~interior)+origin)*spacing
 
 
 def class_metrics(reference, prediction, spacing_xyz, supervision, progress=None):
@@ -24,8 +34,13 @@ def class_metrics(reference, prediction, spacing_xyz, supervision, progress=None
             raise ValueError('Expected integer labels in 0..10')
     present = set(supervision['present_classes'])
     counts = np.zeros(11, dtype=np.int64)
+    predicted_counts=np.zeros(11,dtype=np.int64)
+    intersections=np.zeros(11,dtype=np.int64)
     for z in range(0, reference.shape[2], 8):
-        counts += np.bincount(reference[:,:,z:z+8].ravel(), minlength=11)
+        left,right=reference[:,:,z:z+8],prediction[:,:,z:z+8]
+        counts += np.bincount(left.ravel(), minlength=11)
+        predicted_counts += np.bincount(right.ravel(), minlength=11)
+        intersections += np.bincount(left[left==right],minlength=11)
     if present != set(np.flatnonzero(counts[1:])+1):
         raise ValueError('Native reference and recorded present structures disagree')
     unknown = set(supervision['unknown_classes'])
@@ -33,6 +48,8 @@ def class_metrics(reference, prediction, spacing_xyz, supervision, progress=None
     if present | unknown | absent != set(range(1, 11)) or present & unknown or present & absent or unknown & absent:
         raise ValueError('Invalid structure supervision partition')
 
+    reference_boxes=find_objects(reference,max_label=10)
+    prediction_boxes=find_objects(prediction,max_label=10)
     results = {}
     for label in range(1, 11):
         started = time.monotonic()
@@ -56,20 +73,19 @@ def class_metrics(reference, prediction, spacing_xyz, supervision, progress=None
             results[label] = dict(status='unannotated')
             completed(results[label])
             continue
-        pred = prediction == label
-        predicted = int(pred.sum())
+        predicted = int(predicted_counts[label])
         if label in absent:
             results[label] = dict(status='verified_absent', predicted_voxels=predicted)
             completed(results[label])
             continue
-        truth = reference == label
-        size = int(truth.sum())
+        size = int(counts[label])
         row = dict(status='scored', reference_voxels=size, predicted_voxels=predicted,
-                   dice=2*int(np.count_nonzero(truth & pred))/(size+predicted),
+                   dice=2*int(intersections[label])/(size+predicted),
                    hd95_mm=None, asd_mm=None)
         if predicted:
-            left = measured('reference_surface',lambda: surface_points(truth, spacing))
-            right = measured('prediction_surface',lambda: surface_points(pred, spacing))
+            a,b=reference_boxes[label-1],prediction_boxes[label-1]
+            left = measured('reference_surface',lambda: surface_points(reference[a]==label,spacing,np.asarray([s.start for s in a])))
+            right = measured('prediction_surface',lambda: surface_points(prediction[b]==label,spacing,np.asarray([s.start for s in b])))
             forward = measured('nearest_forward',lambda: cKDTree(right).query(left)[0])
             backward = measured('nearest_backward',lambda: cKDTree(left).query(right)[0])
             distances = np.concatenate((forward, backward))

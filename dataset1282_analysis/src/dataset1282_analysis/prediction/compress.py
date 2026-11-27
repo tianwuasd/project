@@ -13,6 +13,7 @@ import psutil
 
 from ..contracts import atomic_json, digest, read_json
 from .preprocessed import FORMAT, B2ND_FORMAT
+from .read_acceptance import require_both
 
 
 def file_identity(path):
@@ -167,6 +168,7 @@ def run(args):
             if ready['conversion']!=expected or ready['prepared_identity']!=digest(read_json(target/'prepared.json')):
                 raise ValueError('已完成转换的来源或输出描述不同')
             if args.delete_npy_after_verify and not ready['source_deleted']:
+                require_both(target,ready,args.acceptance)
                 delete_verified_npys(source_root,target,ready)
             print(json.dumps({'stage':'compression_complete','cases':len(names),'reused':True,
                               'source_deleted':ready['source_deleted']}),flush=True)
@@ -231,6 +233,7 @@ def run(args):
         ready={'conversion':expected,'prepared_identity':digest(result),'verified':verified,'source_deleted':False}
         atomic_json(target/'compression-complete.json',ready)
         if args.delete_npy_after_verify:
+            require_both(target,ready,args.acceptance)
             delete_verified_npys(source_root,target,ready)
         print(json.dumps({'stage':'compression_complete','cases':len(names),'prepared':str(target/'prepared.json'),
                           'seconds':time.perf_counter()-began,'peak_rss_bytes':peak,'source_deleted':ready['source_deleted']}),flush=True)
@@ -242,6 +245,7 @@ def main(argv=None):
     parser.add_argument('--cht-code',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--resume',action='store_true')
+    parser.add_argument('--acceptance',type=Path,nargs='*',default=[])
     parser.add_argument('--delete-npy-after-verify',action='store_true',help='全部病例核验通过且无活动引用后，仅删除源image.npy和label.npy')
     parser.add_argument('--chunk-mib',type=int,default=4)
     parser.add_argument('--level',type=int,default=3)
