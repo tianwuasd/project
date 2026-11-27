@@ -9,6 +9,8 @@ from ..xu_geometry import CaseGeometry, _box_in, _resize
 
 
 FORMAT='chd-offline-npy-v1'
+B2ND_FORMAT='chd-offline-b2nd-v1'
+FORMATS=(FORMAT,B2ND_FORMAT)
 _OPEN={}
 
 
@@ -25,7 +27,7 @@ class PreprocessedInputs:
             raise ValueError('预处理描述必须位于正式data4/preprocessed目录')
         self.prepared=read_json(self.path)
         storage=self.prepared['storage']
-        if storage['format']!=FORMAT or not storage['complete']:
+        if storage['format'] not in FORMATS or not storage['complete']:
             raise ValueError('需要已完成的CHT预处理描述')
         self.source=resolve_preprocessed(self.path,dataset=self.prepared['dataset'],case_ids=names)
         if os.name=='posix' and not self.source.root.is_relative_to(

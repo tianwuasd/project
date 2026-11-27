@@ -11,6 +11,7 @@ from ..xu_geometry import PreparedCache, _resize
 from ..xu_roi import vote_box
 from .heldout import HeldoutCache, prepare_case, verify_case
 from .source import FINE, safe_path, verify_frozen
+from .preprocessed import FORMATS
 
 
 def verify_job(out):
@@ -136,7 +137,7 @@ def discard_transient(out,name):
 def predict(out,device):
     job = verify_job(out)
     source = verify_frozen(out)
-    external=job.get('input_format')=='chd-offline-npy-v1'
+    external=job.get('input_format') in FORMATS
     training = None if external else PreparedCache(job['prepared'],allow_technical_subset=job['technical_subset'],
                                                   metadata_only=job['mode']=='six-way')
     cache = HeldoutCache(out)

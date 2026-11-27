@@ -10,7 +10,7 @@ from ..observability.status import operation_lock, write_status
 from ..storage_paths import assert_output_location
 from ..xu_targets import SEMANTICS
 from . import PROTOCOL
-from .preprocessed import FORMAT, PreprocessedInputs
+from .preprocessed import B2ND_FORMAT, FORMATS, PreprocessedInputs
 from .reuse import SIX
 from .source import implementation, verify_frozen
 
@@ -70,7 +70,8 @@ def check_data(prepared,cht_code,technical=False):
                 raise ValueError('原件引用未指向当前RAW目录')
         source.geometry(name)
         directory=source.source.root/description['storage']['cases'][name]['key'][:16]
-        if not (directory/'label.npy').is_file() or not (directory/'locations.npz').is_file():
+        label='label.b2nd' if description['storage']['format']==B2ND_FORMAT else 'label.npy'
+        if not (directory/label).is_file() or not (directory/'locations.npz').is_file():
             raise ValueError('预处理病例缺少标签或采样坐标：'+name)
     if seen!=set(names):
         raise ValueError('预处理病例缺少原件记录')
@@ -176,7 +177,7 @@ def open_job(args,out):
                 raise ValueError('原图或GT未绑定实际数据集目录')
     job=dict(protocol=PROTOCOL,prepared=str(Path(args.preprocessed).resolve()),
         preprocessed=str(Path(args.preprocessed).resolve()),cht_code=str(Path(args.cht_code).resolve()),
-        preprocessed_identity=source.identity,input_format=FORMAT,mode='six-way',cases=cases,
+        preprocessed_identity=source.identity,input_format=description['storage']['format'],mode='six-way',cases=cases,
         technical_subset=False,implementation=implementation(),retention='final-only-v1')
     frozen=dict(protocol=PROTOCOL,run={k:model[k] for k in ('profile','supervision','request')},
         checkpoints=model['checkpoints'],boxes=model['boxes'],anatomy=model['anatomy'],
@@ -234,7 +235,7 @@ def acceptance(args):
     out=Path(args.output).resolve(strict=True)
     job=verify_job(out)
     complete=read_json(out/'complete.json')
-    if (job.get('input_format')!=FORMAT or job['mode']!='six-way' or len(complete['cases'])!=1
+    if (job.get('input_format') not in FORMATS or job['mode']!='six-way' or len(complete['cases'])!=1
             or complete['rejected']!=0):
         raise ValueError('验收要求1例新预处理输入成功完成无血池预测')
     for row in complete['cases'].values():

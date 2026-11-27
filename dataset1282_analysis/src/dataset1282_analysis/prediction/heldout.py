@@ -10,6 +10,7 @@ import numpy as np
 from ..contracts import atomic_json, digest, read_json, sha256_file
 from ..xu_geometry import CaseGeometry, _box_in, _resize
 from .source import safe_path
+from .preprocessed import FORMATS
 
 
 GROUPS = ('source_test','target_primary','target_secondary')
@@ -130,7 +131,7 @@ def prepare_case(out, name):
 
 def verify_case(out,name):
     job = read_json(out/'run.json')
-    if job.get('input_format')=='chd-offline-npy-v1':
+    if job.get('input_format') in FORMATS:
         from .preprocessed import from_job
         from_job(job).geometry(name)
         return dict(case=name,job=digest(job),external_preprocessed=True)
@@ -152,7 +153,7 @@ class HeldoutCache:
         self.job = read_json(self.out/'run.json')
         self._verified = {}
         self.preprocessed = None
-        if self.job.get('input_format')=='chd-offline-npy-v1':
+        if self.job.get('input_format') in FORMATS:
             from .preprocessed import from_job
             self.preprocessed=from_job(self.job)
 

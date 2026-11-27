@@ -10,6 +10,7 @@ from ..storage_paths import assert_output_location
 from . import PROTOCOL
 from .heldout import GROUPS, plan_inputs
 from .source import FINE, freeze_source, implementation, inspect_source, verify_frozen
+from .preprocessed import FORMATS
 
 
 def validate_output(args):
@@ -89,7 +90,7 @@ def execute(args,out,owner,job,phase):
         if not devices:
             raise ValueError('No authorized GPU remains after physical exclusions')
     if phase == 'prepare':
-        if job.get('input_format')=='chd-offline-npy-v1':
+        if job.get('input_format') in FORMATS:
             from .heldout import verify_case
             for name in job['cases']:
                 verify_case(out,name)
