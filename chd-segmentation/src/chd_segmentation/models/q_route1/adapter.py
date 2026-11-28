@@ -65,6 +65,7 @@ class QAdapter:
         self.sampler = None
         self.corruption_rng = np.random.default_rng(config['seed']+1)
         self.current_name,self.current_frozen = None,None
+        self.frozen_store = None
         self.picked = None
         self.parent_models = None
         patch = config['patch']
@@ -173,7 +174,18 @@ class QAdapter:
         guard = getattr(self,'training_guard',None) if parallel else None
         with preparation(self.config,guard,entry,stage=self.stage) as runtime:
             support = allowed(raw,entry['unknown_classes'],self.prepared['dataset'],runtime)
+        self.release_frozen()
         return inputs,editable,support
+
+    def release_frozen(self):
+        if self.frozen_store is not None:
+            self.frozen_store.release()
+
+    def clear_frozen(self):
+        self.current_name,self.current_frozen = None,None
+        if self.frozen_store is not None:
+            self.frozen_store.close()
+            self.frozen_store = None
 
     @torch.no_grad()
     def locate(self,entry):
@@ -203,25 +215,12 @@ class QAdapter:
     def frozen(self,entry):
         if entry['case_id']==self.current_name:
             return self.current_frozen
-        self.current_name,self.current_frozen = None,None
-        from .candidates import Candidate
-        def produce():
-            probability = self.base_probability(entry)
-            located = self.locate(entry)
-            candidates = select_candidates(located['heatmap'][0].float().cpu().numpy(),entry['label'].shape,[4,4,8],.2,.8)
-            return dict(probability=probability,features=located['features'].float().cpu(),
-                        candidates=[asdict(value) for value in candidates])
-        amount = int(entry['image'].size*48)+2**20
-        guard = getattr(self,'training_guard',None)
-        retained = guard.admit(amount,label='q_frozen_cache_retained') if guard is not None else nullcontext(True)
-        with retained as ticket:
-            if ticket is None:
-                raise InterruptedError('冻结上游缓存内存等待已取消')
-            value = self.training_cache.get(entry,produce,amount)
-        probability,features = value['probability'],value['features']
-        candidates = [Candidate(**value) for value in value['candidates']]
+        self.clear_frozen()
+        from .local_inputs import frozen_inputs
+        self.frozen_store = frozen_inputs(self,entry)
         self.current_name = entry['case_id']
-        self.current_frozen = probability,features,candidates
+        self.current_frozen = (self.frozen_store.probability,self.frozen_store.features,
+                               self.frozen_store.candidates)
         return self.current_frozen
 
     def prepare_training(self,dataset,names):
@@ -344,6 +343,7 @@ class QAdapter:
                 editable[0,0].numpy(),self.corruption_rng,chance=.2)
             inputs[:,1:12] = torch.from_numpy(corrupted)[None]
             context = sample_context(features,candidate.center,samples=size//8)
+            self.release_frozen()
             target = torch.from_numpy(support)[None].to(self.device)
         editable = editable.to(self.device)
         out = self.model(inputs.to(self.device),context.to(self.device),editable)

@@ -66,6 +66,13 @@ def case_estimates(config,prepared,stage):
                 if stored is not None:
                     case = 2*64*1024+stored['locations_bytes']*2
                 retained = localizer['retained_bytes']
+            if stage == 'local':
+                from .q_route1.local_cache import disk_plan
+                local_voxels = config['training'].get('local_size',config['training']['patch'][0])**3
+                local_work = 8*block+local_voxels*192+256*2**20
+                if stored is not None:
+                    retained = stored['locations_bytes']+2*block
+                    case = 2*64*1024+stored['locations_bytes']*2
             records.append(dict(case_id=row['case_id'],native_shape_xyz=input_shape.tolist(),working_shape=target.tolist(),
                 native_read_bytes=0 if stored is not None else native*32,working_bytes=working,workspace_bytes=case,
                 retained_case_bytes=retained, validation_workspace_bytes=bounded_validation if is_validation else 0,
@@ -74,6 +81,9 @@ def case_estimates(config,prepared,stage):
                 rank_prediction_bytes=voxels*(11*32+288)+native*classes*8+original_voxels*2))
             if localizer is not None:
                 records[-1].update(localizer=localizer)
+            if stage == 'local':
+                records[-1].update(local_workspace_bytes=local_work,
+                    local_disk_bytes=disk_plan(target,config['training']['patch'][0])['peak_bytes'])
         else:
             from ..data.input_binding import intensity_policy
             mode = intensity_policy(entry,config.get('input_source',{}))['mode'] if entry is not None else 'source_window'
@@ -142,7 +152,8 @@ def memory_profile(config,prepared,stage,shares,records=None):
         if stage == 'prediction':
             rank_case=[prediction for _ in shares]
         elif stage == 'local':
-            rank_case=[max(training_prediction,validation) for _ in shares]
+            local = max(row['local_workspace_bytes'] for row in records)
+            rank_case=[max(local,validation) for _ in shares]
         elif stage=='base':
             rank_case=[validation for _ in shares]
         elif stage == 'localizer':

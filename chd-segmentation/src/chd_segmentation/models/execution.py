@@ -48,7 +48,8 @@ def execution_config(config):
         scope='technical' if config['technical'] else 'formal',pretrained=config['pretrained'],
         logging=config.get('logging',DEFAULTS['logging']),
         work_root=config['work_root'] or str(Path(config['run_dir']).parent),
-        technical=dict(roi_xyz=None),training=dict(batch=batch,patch=patch,precision=config['precision']))
+        technical=dict(roi_xyz=None),training=dict(batch=batch,patch=patch,local_size=config['local_size'],
+                                                  precision=config['precision']))
 
 
 def resource_spec(config,prepared,stage):

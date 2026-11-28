@@ -83,7 +83,7 @@ def validate_records(bundle, dataset, names):
     records = []
     config = bundle.config
     settings = config['execution']
-    bundle.current_name, bundle.current_frozen = None, None
+    bundle.clear_frozen()
     for completed, name in enumerate(names, 1):
         started = perf_counter()
         entry = dataset.get(name)

@@ -553,6 +553,7 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
                 from .execution import record_model_peaks
                 record_model_peaks(common,allocation['spec'],allocation['gpus'],allocation['shares'],measurements)
     dataset.clear()
+    bundle.clear_frozen()
     if rank == 0:
         feedback.close()
     return summary

@@ -141,7 +141,7 @@ def validate_parallel(bundle, dataset, names, rank, common, allocation, gate, de
     demands = [max((demand_by_case[name] for name in group), key=lambda item:item['desired']) if group else None
                for group in groups]
     dataset.clear()
-    bundle.current_name, bundle.current_frozen = None, None
+    bundle.clear_frozen()
     gc.collect()
     phase = f'q-validation:{update}'
     gate.ready.wait(rank, phase + ':memory', device)
@@ -169,7 +169,7 @@ def validate_parallel(bundle, dataset, names, rank, common, allocation, gate, de
     gate.finish(rank, phase, device)
     records = [row for result in all_states(local) for row in result]
     dataset.clear()
-    bundle.current_name, bundle.current_frozen = None, None
+    bundle.clear_frozen()
     gc.collect()
     gate.ready.wait(rank, f'q-validation:{update}:release', device)
     if rank == 0:
