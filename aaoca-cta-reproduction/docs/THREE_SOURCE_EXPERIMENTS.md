@@ -16,6 +16,8 @@ CHD1282方向、作者间距、数组索引配对与强度依据通过spatial_bi
 
 `bind-cohort --config BASE --inputs INPUTS --output RUN --chd1282-root CHD_ROOT --data-root DATA [--check]`绑定原有影像及标签，不复制CT。BASE提供现有AAOCA和ImageCHD根，可用对应根参数覆盖。输入包含新CSV，无需另建英文表。
 
+迁移后原件布局不同，使用`--chd1282-source-inputs SOURCE_INPUTS_JSON`代替CHD根参数，读取既有导出保留的data_root及cases[case_id].image/label。严格按原病例编号映射，保留患者角色、标签、空间政策及原相对路径来源，核对实际文件大小；路径须位于登记数据根内，缺失、重复或冲突直接停止。原目录和输入包不改写，标准化缓存不能充当原件。
+
 ```bash
 python -B run.py prepare-dataset --config RUN/project.dataset.json --check
 python -u -B run.py prepare-dataset --config RUN/project.dataset.json

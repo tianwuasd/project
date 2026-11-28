@@ -17,12 +17,24 @@ def portable_manifest(manifest, config):
     return result
 
 
-def bound_manifest(portable, config):
+def bound_manifest(portable, config, chd1282_mapping=None):
     if portable["portable_schema"] != 1 or portable["author_release"] != RELEASE or portable["schema"] != 1:
         raise ValueError("输入迁移格式或作者版本不匹配")
     result = deepcopy(portable)
     del result["portable_schema"]
+    if chd1282_mapping is not None:
+        records = chd1282_mapping["cases"]
+        if not isinstance(records, dict):
+            raise ValueError("CHD原件映射cases须为按病例编号索引的对象")
+        root = config["chd1282_root"].resolve(strict=True)
+        if Path(chd1282_mapping["data_root"]).resolve(strict=True) != root:
+            raise ValueError("CHD原件映射根与指定数据根不一致")
+        required = {row["case_id"].removeprefix("chd1282_") for row in result["cases"] if row["dataset"] == "chd1282"}
+        missing = required - records.keys()
+        if missing:
+            raise ValueError("CHD原件映射缺少所选病例：" + ",".join(sorted(missing)))
     seen, aliases, roles = set(), {}, {}
+    mapped_files = set()
     for row in result["cases"]:
         if row["case_id"] in seen or row["dataset"] not in {"aaoca", "imagechd", "chd1282"}:
             raise ValueError("迁移病例重复或数据集未知")
@@ -38,14 +50,24 @@ def bound_manifest(portable, config):
                 raise ValueError("迁移患者存在未解决的别名冲突")
             aliases[alias] = row["patient_key"]
         root = config[row["dataset"] + "_root"].resolve(strict=True)
+        mapped = row["dataset"] == "chd1282" and chd1282_mapping is not None
+        if mapped:
+            original_id = row["case_id"].removeprefix("chd1282_")
+            entry = chd1282_mapping["cases"][original_id]
+            row["source_path_binding"] = {"mapping_case_id": original_id,
+                "portable_paths": {key: row[key] for key in ("image", "label")}}
         row["source_stat"] = {}
         for key in ("image", "label"):
             relative = PurePosixPath(row[key])
             if relative.is_absolute() or ".." in relative.parts or ":" in row[key] or "\\" in row[key]:
                 raise ValueError("迁移输入必须使用数据根内的相对路径")
-            target = (root / relative).resolve(strict=True)
-            if not target.is_relative_to(root):
+            target = (root / Path(entry[key]) if mapped else root / relative).resolve(strict=True)
+            if not target.is_relative_to(root) or not target.is_file():
                 raise ValueError("迁移输入超出数据根")
+            if mapped:
+                if target in mapped_files:
+                    raise ValueError("CHD原件映射将多个病例或影像/标签绑定到同一文件")
+                mapped_files.add(target)
             stamp = signature(target)
             if stamp["bytes"] != row["expected_bytes"][key]:
                 raise ValueError("迁移文件大小与冻结登记不一致")

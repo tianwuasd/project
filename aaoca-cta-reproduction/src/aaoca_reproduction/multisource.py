@@ -273,7 +273,19 @@ def bind_cohort(config, inputs, output, check=False):
     diagnoses = (inputs / name).resolve(strict=True)
     if diagnoses.stat().st_size != portable["source_csv_bytes"]:
         raise ValueError("集中CSV大小与清单登记不一致")
-    manifest = bound_manifest(portable, config)
+    config = deepcopy(config)
+    mapping = None
+    if config.get("chd1282_source_inputs"):
+        path = Path(config["chd1282_source_inputs"]).resolve(strict=True)
+        mapping = read_json(path)
+        root = Path(mapping["data_root"]).resolve(strict=True)
+        if config.get("chd1282_root") and Path(config["chd1282_root"]).resolve(strict=True) != root:
+            raise ValueError("显式CHD根与原件映射根冲突")
+        config["chd1282_root"] = root
+    manifest = bound_manifest(portable, config, chd1282_mapping=mapping)
+    if mapping is not None:
+        manifest["source_bindings"] = {"chd1282": {"mapping_file": signature(path),
+            "data_root": str(root), "mapped_cases": sum(row["dataset"] == "chd1282" for row in manifest["cases"])}}
     settings = deepcopy(config)
     settings.pop("demographic_excel", None)
     settings.update(project_root=output, state_root=str(output), course_root=output,

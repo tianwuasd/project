@@ -27,6 +27,7 @@ def main():
     parser.add_argument("--aaoca-root")
     parser.add_argument("--imagechd-root")
     parser.add_argument("--chd1282-root")
+    parser.add_argument("--chd1282-source-inputs")
     parser.add_argument("--author-archive")
     parser.add_argument("--split", choices=("validation", "test"), default="test")
     parser.add_argument("--check", action="store_true")
@@ -37,12 +38,16 @@ def main():
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--confirm-output-root")
     args = parser.parse_args()
+    if args.chd1282_source_inputs and args.action != "bind-cohort":
+        parser.error("--chd1282-source-inputs仅适用于三来源原件绑定")
     if args.action in {"audit-sources", "build-cohort"} and args.dependency_dir:
         sys.path.append(str(Path(args.dependency_dir).resolve(strict=True)))
     if args.check and args.action not in {"bind-dataset", "prepare-dataset", "generate-run-configs", "reset-preprocessing", "predict-best",
                                          "build-cohort", "bind-cohort", "prepare-author-weights", "generate-experiments", "predict-ensemble"}:
         parser.error("--check仅适用于绑定、预处理计划、配置生成、清理计划和最佳模型预测计划")
     config = load_config(args.config)
+    if args.chd1282_source_inputs:
+        config["chd1282_source_inputs"] = str(Path(args.chd1282_source_inputs).resolve(strict=True))
     if any((args.runtime_root, args.data_root, args.aaoca_root, args.imagechd_root, args.chd1282_root)):
         if args.action not in {"bind-dataset", "bind-cohort"}:
             parser.error("数据及运行根覆盖只适用于bind-dataset，不修改源配置")
@@ -65,8 +70,8 @@ def main():
         result = build_cohort(config, args.diagnoses, args.output, check=args.check)
     elif args.action == "bind-cohort":
         from .multisource import bind_cohort
-        if not args.inputs or not args.output or not config.get("chd1282_root"):
-            parser.error("bind-cohort需要--inputs、--output和实际--chd1282-root")
+        if not args.inputs or not args.output or not (config.get("chd1282_root") or config.get("chd1282_source_inputs")):
+            parser.error("bind-cohort需要--inputs、--output，以及--chd1282-root或--chd1282-source-inputs")
         result = bind_cohort(config, args.inputs, args.output, check=args.check)
     elif args.action == "prepare-author-weights":
         from .experiments import prepare_author_weights
