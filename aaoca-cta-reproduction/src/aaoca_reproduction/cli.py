@@ -12,7 +12,7 @@ from .records import load_config
 def main():
     parser = argparse.ArgumentParser(description="AAOCA论文复现：输入核查与明确病例定位裁剪")
     parser.add_argument("action", choices=("audit", "prepare", "prepare-classification", "prepare-dataset", "check-training", "check-label-registry", "organize-two-tasks", "bind-dataset", "export-inputs", "bind-inputs",
-                                          "export-confirmed-labels", "generate-run-configs", "reset-preprocessing", "train", "predict"))
+                                          "export-confirmed-labels", "generate-run-configs", "reset-preprocessing", "train", "predict", "predict-best"))
     parser.add_argument("--config", default="project.local.json")
     parser.add_argument("--case")
     parser.add_argument("--inputs")
@@ -32,8 +32,8 @@ def main():
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--confirm-output-root")
     args = parser.parse_args()
-    if args.check and args.action not in {"bind-dataset", "prepare-dataset", "generate-run-configs", "reset-preprocessing"}:
-        parser.error("--check仅适用于绑定、预处理计划、配置生成和清理计划")
+    if args.check and args.action not in {"bind-dataset", "prepare-dataset", "generate-run-configs", "reset-preprocessing", "predict-best"}:
+        parser.error("--check仅适用于绑定、预处理计划、配置生成、清理计划和最佳模型预测计划")
     config = load_config(args.config)
     if any((args.runtime_root, args.data_root, args.aaoca_root, args.imagechd_root)):
         if args.action != "bind-dataset":
@@ -64,7 +64,7 @@ def main():
     else:
         manifest = load_frozen(config)
         result = None
-    if args.action in ("prepare-classification", "prepare-dataset", "train", "predict") and args.dependency_dir:
+    if args.action in ("prepare-classification", "prepare-dataset", "train", "predict", "predict-best") and args.dependency_dir:
         sys.path.insert(0, str(Path(args.dependency_dir).resolve(strict=True)))
     if args.action in ("prepare", "prepare-classification"):
         matches = [row for row in manifest["cases"] if row["case_id"] == args.case]
@@ -107,4 +107,7 @@ def main():
     elif args.action == "predict":
         from .prediction import predict
         result = predict(config, manifest)
+    elif args.action == "predict-best":
+        from .best_prediction import predict_best
+        result = predict_best(config, manifest, output=args.output, device=args.device, check=args.check)
     print(json.dumps(result, ensure_ascii=False, indent=2))
