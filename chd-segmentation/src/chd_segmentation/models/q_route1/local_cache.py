@@ -4,6 +4,7 @@ from uuid import uuid4
 import math
 import os
 import shutil
+import threading
 
 from filelock import FileLock
 import numpy as np
@@ -15,6 +16,15 @@ from ...artifacts.cache import release_private_mapping
 from ...artifacts.store import digest, read_json, write_json
 from ...observability.events import event
 from .candidates import Candidate
+
+
+class BuildLock(FileLock):
+    guard = None
+
+    def _acquire(self):
+        if self.guard is not None:
+            self.guard.checkpoint()
+        super()._acquire()
 
 
 def disk_plan(shape, patch=32):
@@ -74,13 +84,19 @@ def _remove(path, key):
 
 
 class FrozenInputs:
-    def __init__(self, store, path, receipt, temporary):
+    def __init__(self, store, path, receipt, temporary, guard=None):
         self.store, self.path, self.receipt, self.temporary = store, path, receipt, temporary
         self.maps = {}
+        self.guard, self.buffer_ticket = guard, None
+        self.release_lock, self.touched_bytes = threading.Lock(), 0
+        self.buffer_bytes = 512*2**20
         self.probability, self.features = None, None
         record = read_json(path/'entry.json')
         self.key = record['key']
         try:
+            if guard is not None:
+                self.buffer_ticket = guard.admit(min(record['bytes'],self.buffer_bytes),label='q_local_input_read_buffer')
+                self.buffer_ticket.__enter__()
             for name in ('probability', 'features'):
                 array = np.load(path/(name+'.npy'), mmap_mode='c', allow_pickle=False)
                 self.maps[name] = array
@@ -96,14 +112,22 @@ class FrozenInputs:
                 self.close()
 
     def release(self):
-        for array in self.maps.values():
-            release_private_mapping(array)
+        with self.release_lock:
+            self.touched_bytes += self.store.identity.get('local_size',128)**3*48
+            pressure = self.guard is not None and self.guard.client.boundary().action == 'wait'
+            if pressure or self.touched_bytes >= self.buffer_bytes:
+                for array in self.maps.values():
+                    release_private_mapping(array)
+                self.touched_bytes = 0
 
     def close(self):
         self.probability, self.features = None, None
         for array in self.maps.values():
             array._mmap.close()
         self.maps.clear()
+        if self.buffer_ticket is not None:
+            self.buffer_ticket.__exit__(None,None,None)
+            self.buffer_ticket = None
         with self.store.lock():
             if self.receipt.exists():
                 self.receipt.unlink()
@@ -181,19 +205,26 @@ class LocalCache:
             pending=pending.name, cached=retain, **plan))
         return pending, receipt, retain
 
-    def acquire(self, entry, build):
+    def acquire(self, entry, build, guard=None):
         key = digest(dict(identity=self.identity, case=entry['case_id'], shape=list(entry['image'].shape),
             spacing=entry['processed_spacing'], unknown_classes=entry['unknown_classes']))
         self.path.mkdir(parents=True, exist_ok=True)
         plan = disk_plan(entry['image'].shape[1:], self.identity['patch'])
-        with FileLock(self.path/(key+'.lock'), timeout=self.timeout):
+        wait = guard.client.handle.resources.get('max_wait') if guard is not None else None
+        if guard is not None:
+            guard.checkpoint()
+        lock = BuildLock(self.path/(key+'.lock'), timeout=-1 if wait is None else wait)
+        lock.guard = guard
+        with lock.acquire(poll_interval=1):
+            if guard is not None:
+                guard.checkpoint()
             with self.lock():
                 existing = self._existing(key)
                 if existing is None:
                     pending, reservation, cached = self._reserve(key, plan)
             if existing is not None:
                 event(self.log_dir, 'q_local_cache_hit', case_id=entry['case_id'], storage='disk')
-                return FrozenInputs(self, *existing)
+                return FrozenInputs(self, *existing, guard=guard)
             committed = False
             try:
                 record = build(pending, key)
@@ -209,7 +240,7 @@ class LocalCache:
                     committed = True
                 event(self.log_dir, 'q_local_cache_saved', case_id=entry['case_id'], bytes=amount,
                       retained=cached, storage='disk')
-                return FrozenInputs(self, target, reader, not cached)
+                return FrozenInputs(self, target, reader, not cached, guard=guard)
             finally:
                 if not committed:
                     with self.lock():

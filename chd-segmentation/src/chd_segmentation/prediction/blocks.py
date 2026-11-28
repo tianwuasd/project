@@ -1,4 +1,7 @@
 import math
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
+from time import perf_counter
 
 from monai.data.utils import dense_patch_slices
 from monai.data.utils import compute_importance_map
@@ -10,7 +13,16 @@ import torch
 from ..models.stunet.streaming import tiles, tile_extent
 
 
-def window_probabilities(image, model, patch, classes, options, device, workspace):
+def window_inputs(image, sections, before, shape):
+    inputs = []
+    for section in sections:
+        native = tuple(slice(max(0, s.start-b), min(n, s.stop-b)) for s, b, n in zip(section, before, shape))
+        padding = tuple((max(0, b-s.start), max(0, s.stop-b-n)) for s, b, n in zip(section, before, shape))
+        inputs.append(np.pad(np.array(image[(slice(None), *native)], copy=True), ((0, 0), *padding)))
+    return np.stack(inputs)
+
+
+def window_probabilities(image, model, patch, classes, options, device, workspace, *, prefetch=False):
     shape = tuple(image.shape[1:])
     padded = tuple(max(a, b) for a, b in zip(shape, patch))
     before = tuple((b-a)//2 for a, b in zip(shape, padded))
@@ -24,29 +36,37 @@ def window_probabilities(image, model, patch, classes, options, device, workspac
     cpu_weight = weight.cpu().numpy()
     batch = options['window_batch']
     dirty_bytes = 0
-    for start in range(0, len(windows), batch):
-        with workspace.boundary(), torch.inference_mode():
-            sections = windows[start:start+batch]
-            inputs = []
-            for section in sections:
-                native = tuple(slice(max(0, s.start-b), min(n, s.stop-b)) for s, b, n in zip(section, before, shape))
-                padding = tuple((max(0, b-s.start), max(0, s.stop-b-n)) for s, b, n in zip(section, before, shape))
-                inputs.append(np.pad(np.array(image[(slice(None), *native)], copy=True), ((0, 0), *padding)))
-            inputs = torch.from_numpy(np.stack(inputs)).to(device)
-            values = model(inputs)
-            values = values[0] if isinstance(values, (tuple, list)) else values
-            if tuple(values.shape) != (len(sections), classes, *patch) or not torch.isfinite(values).all():
-                raise ValueError('分块预测的模型输出尺寸或数值无效')
-            weighted = (values*weight).float().cpu().numpy()
-            for section, output in zip(sections, weighted):
-                sums[(slice(None), *section)] += output
-                counts[section] += cpu_weight
-            del weighted, values, inputs
-        dirty_bytes += len(sections)*math.prod(patch)*(classes+2)*4
-        if dirty_bytes >= workspace.block_bytes or start+batch >= len(windows):
-            workspace.release(image)
-            dirty_bytes = 0
-        workspace.progress('sliding_window', min(start+batch, len(windows)), len(windows))
+    preparation_seconds, network_seconds, merge_seconds = 0., 0., 0.
+    with ThreadPoolExecutor(max_workers=1) if prefetch else nullcontext() as pool:
+        pending = pool.submit(window_inputs, image, windows[:batch], before, shape) if pool else None
+        for start in range(0, len(windows), batch):
+            with workspace.boundary(), torch.inference_mode():
+                sections = windows[start:start+batch]
+                began = perf_counter()
+                array = pending.result() if pool else window_inputs(image, sections, before, shape)
+                if pool and start+batch < len(windows):
+                    pending = pool.submit(window_inputs, image, windows[start+batch:start+2*batch], before, shape)
+                preparation_seconds += perf_counter()-began
+                began = perf_counter()
+                inputs = torch.from_numpy(array).to(device)
+                values = model(inputs)
+                values = values[0] if isinstance(values, (tuple, list)) else values
+                if tuple(values.shape) != (len(sections), classes, *patch) or not torch.isfinite(values).all():
+                    raise ValueError('分块预测的模型输出尺寸或数值无效')
+                weighted = (values*weight).float().cpu().numpy()
+                network_seconds += perf_counter()-began
+                began = perf_counter()
+                for section, output in zip(sections, weighted):
+                    sums[(slice(None), *section)] += output
+                    counts[section] += cpu_weight
+                merge_seconds += perf_counter()-began
+                del weighted, values, inputs, array
+            dirty_bytes += len(sections)*math.prod(patch)*(classes+2)*4
+            if dirty_bytes >= workspace.block_bytes or start+batch >= len(windows):
+                workspace.release(image)
+                dirty_bytes = 0
+            workspace.progress('sliding_window', min(start+batch, len(windows)), len(windows),
+                input_wait_seconds=preparation_seconds, network_seconds=network_seconds, merge_seconds=merge_seconds)
     voxels = max(1, workspace.block_bytes//(classes*16+32))
     extent = tile_extent(padded, voxels)
     total = math.prod(math.ceil(n/b) for n, b in zip(padded, extent))

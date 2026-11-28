@@ -207,3 +207,17 @@ def preparation(config,guard,entry,stage=None):
         yield runtime
     finally:
         runtime.executor.close()
+
+
+def prepare_candidates(bundle,dataset,names,rank,world,gate,device):
+    from ..execution import all_states
+    quotas = [len(names[index::world]) if bundle.stage=='local' else 0 for index in range(world)]
+    gate.start(rank,'q-candidates',quotas,device)
+    if bundle.stage=='local':
+        dataset.mode = 'candidate_shard'
+        records = bundle.prepare_training(dataset,names[rank::world],build_sampler=False)
+        bundle.clear_frozen()
+    gate.finish(rank,'q-candidates',device)
+    if bundle.stage=='local':
+        bundle.set_training_records([record for part in all_states(records) for record in part],names)
+    dataset.mode = 'candidates'

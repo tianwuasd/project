@@ -341,9 +341,8 @@ def _train_q_rank(payload,rank,common,allocation,gate,device,memory):
         feedback.snapshot(force=True)
         event(root,'model_candidates_started',stage=stage,cases=len(names))
     candidates_started = perf_counter()
-    gate.start(rank,'q-candidates',[len(names) if stage=='local' else 0]*allocation['world'],device)
-    bundle.prepare_training(dataset,names)
-    gate.finish(rank,'q-candidates',device)
+    from .q_route1.preparation import prepare_candidates
+    prepare_candidates(bundle,dataset,names,rank,allocation['world'],gate,device)
     if rank==0:
         event(root,'model_candidates_completed',stage=stage,seconds=perf_counter()-candidates_started)
     update,history,best = 0,[],None

@@ -56,6 +56,9 @@ def prepare(root, args):
             reserve_ram_bytes=256*2**20),logging=dict(heartbeat_seconds=15,case_details=False))
     write_json(root/'prepare-config.json',cfg)
     cfg = load_config(root/'prepare-config.json')
+    if getattr(args,'technical_cpu',False):
+        cfg['resources']['technical_cpu'] = True
+        cfg['resources']['ram_fraction'] = 1.
     build(cfg,root/'course/source.json')
     return preprocess(cfg,root/'course/source.json',root/'course/prepared.json')
 

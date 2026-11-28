@@ -8,6 +8,7 @@ from nnunetv2.preprocessing.cropping.cropping import crop_to_nonzero
 import psutil
 
 from ..artifacts.store import digest, operation_lock, read_json, require_output, write_json
+from ..acceleration.limits import host_fraction
 from ..datasets.manifest import LABELS
 from ..observability.events import event, stage
 from .validation import SourceReader
@@ -62,7 +63,7 @@ def fit_plan(config, manifest, request):
     from ..acceleration.memory import system_headroom
     facts = host_capacity()
     resources = config['resources']
-    headroom, _ = system_headroom(facts, min(.8, resources['ram_fraction']), resources['reserve_ram_bytes'])
+    headroom, _ = system_headroom(facts, host_fraction(resources), resources['reserve_ram_bytes'])
     current = psutil.Process().memory_info().rss
     capacity = max(1, min(100_000_000_000, resources['memory_limit_bytes'], headroom+current-256*1024**2))
     runtime = dict(config)

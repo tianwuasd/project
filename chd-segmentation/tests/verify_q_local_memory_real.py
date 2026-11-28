@@ -20,7 +20,7 @@ import psutil
 import torch
 
 PROJECT = Path(__file__).resolve().parents[1]
-TEST_ROOT = Path('D:/projects/back/t17/chd-q-local-memory-20261128')
+TEST_ROOT = Path(os.environ.get('CHD_Q_MEMORY_TEST_ROOT','D:/projects/back/t17/chd-q-local-memory-20261128'))
 TEST_ROOT.mkdir(parents=True, exist_ok=True)
 (TEST_ROOT/'system-temp').mkdir(exist_ok=True)
 os.environ.update(CHD_RUNTIME_DIR=str(TEST_ROOT/'runtime'), PYTHONDONTWRITEBYTECODE='1',

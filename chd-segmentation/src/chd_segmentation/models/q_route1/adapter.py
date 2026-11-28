@@ -223,7 +223,7 @@ class QAdapter:
                                self.frozen_store.candidates)
         return self.current_frozen
 
-    def prepare_training(self,dataset,names):
+    def prepare_training(self,dataset,names,build_sampler=True):
         if self.stage!='local':
             return
         import yaml
@@ -260,6 +260,13 @@ class QAdapter:
                 event(Path(self.config['run_dir'])/self.stage,'q_candidates_completed',case_id=name,
                     cases_completed=completed,cases_total=len(names),candidates=len(candidates),records=len(records))
             del probability,features
+        if build_sampler:
+            self.set_training_records(records,names)
+        return records
+
+    def set_training_records(self,records,names):
+        order = {name:index for index,name in enumerate(names)}
+        records = sorted(records,key=lambda value:(order[value.case],value.candidate))
         self.sampler = CandidateSampler(records,self.config['seed'])
 
     def sample(self,dataset,names,rng):
