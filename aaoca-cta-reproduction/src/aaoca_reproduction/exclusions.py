@@ -8,10 +8,13 @@ SKIP_REASONS = {"missing_label_file", "missing_localization_structures", "empty_
 
 
 def exclusion_source(case, config):
-    return {"source": {key: case.get(key) for key in (
+    value = {"source": {key: case.get(key) for key in (
         "case_id", "dataset", "image", "label", "source_stat", "spacing_xyz", "spacing_evidence", "localization")},
         "method": {key: config.get(key) for key in (
             "classification_recipe", "roi_mm", "offset_index_mm", "imagechd_orientation_policy")}}
+    if "spatial_binding" in case:
+        value["source"]["spatial_binding"] = case["spatial_binding"]
+    return value
 
 
 def exclusion_directory(case, config):

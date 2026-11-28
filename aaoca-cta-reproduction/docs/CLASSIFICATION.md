@@ -80,8 +80,9 @@ CUDA训练用`gpu_count`选择固定设备数量，默认1；必须不超过全�
 |`local_from_scratch`|仅aaoca_present；无pretrained_detection，按现有MONAI Kaiming初始化|
 |`author_detection_transfer`|仅origin_left/high_risk；pretrained_detection须为检测任务的author_state_dict|
 |`local_detection_transfer`|仅origin_left/high_risk；pretrained_detection须为检测任务的local_complete_checkpoint|
+|`author_detector_finetune`|仅aaoca_present；使用对应成员的作者检测state_dict，执行显式分类层暖机及最后阶段微调|
 
-其他模式直接拒绝，当前未增加子任务从头训练或检测微调。迁移仍需已知父检测训练患者来源且与当前验证组无交集；作者资料无法提供时保持缺项。父权重描述显式选择真实文件/成员，程序不按子成员索引推断父成员。策略、覆盖审核及原有语义设置进入运行身份；完整checkpoint的state保存实际strategy和coverage_reviews。恢复需要身份及策略一致，旧checkpoint缺字段时停止，不据文件目录补造其历史策略。
+其他模式直接拒绝。子任务迁移仍需已知父检测训练患者来源且与当前验证组无交集；作者资料无法提供时保持缺项。检测器自身微调、五成员预测和来源审查见THREE_SOURCE_EXPERIMENTS.md。父权重描述显式选择真实文件/成员，程序不按子成员索引推断父成员。策略、覆盖审核及原有语义设置进入运行身份；完整checkpoint的state保存实际strategy和coverage_reviews。恢复需要身份及策略一致，旧checkpoint缺字段时停止，不据文件目录补造其历史策略。
 
 `train`还需：`member_index`（0–4）、`seed`、`learning_rate_recipe`、`epochs`（2–300）、`batch_size`和course内`run_directory`。主配方`paper_lr_1e-3=0.001`，发布默认对照`release_default_lr_1e-4=0.0001`。float32为当前明确精度，其他精度直接拒绝。作者requested MONAI1.4.0，本机actual1.5.2；必要计算路径源码对照一致，复用现有依赖，不以版本字符串阻止。实际网络构造核对阶段数、通道、分类形状和分组，权重严格加载。依据见`MONAI_COMPATIBILITY.md`，不宣称forward数值已验。
 

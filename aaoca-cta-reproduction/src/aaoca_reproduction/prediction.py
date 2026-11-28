@@ -15,10 +15,10 @@ from .records import event, identity, signature, write_json
 from .resources import admit_model, classification_device, configure_cpu, memory_guard, smoke_shape
 
 
-def metrics(truth, probabilities):
+def metrics(truth, probabilities, threshold=0.5):
     labels = np.asarray(truth, dtype=int)
     scores = np.asarray(probabilities, dtype=float)
-    predicted = scores > 0.5
+    predicted = scores > threshold
     tp = int(np.count_nonzero((labels == 1) & predicted))
     tn = int(np.count_nonzero((labels == 0) & ~predicted))
     fp = int(np.count_nonzero((labels == 0) & predicted))
@@ -43,6 +43,12 @@ def predict(config, manifest):
     if settings.get("gpu_count", 1) != 1:
         raise ValueError("预测逐病例单卡执行，请明确gpu_count=1")
     small = smoke_shape(config)
+    threshold = settings.get("decision_threshold", 0.5)
+    if not isinstance(threshold, (int, float)) or not np.isfinite(threshold) or not 0 <= threshold <= 1:
+        raise ValueError("预测阈值须为0到1之间的有限值")
+    evaluation_role = settings.get("evaluation_role", "test")
+    if evaluation_role not in {"test", "validation"}:
+        raise ValueError("预测范围须为明确的验证或独立测试")
     if any(d.get("test_only") for d in settings["weights"]) and not small:
         raise ValueError("小测模型仅允许在明确的小测配置中预测")
     if task not in LABEL_MAPS:
@@ -54,8 +60,9 @@ def predict(config, manifest):
     requested = settings["prediction_case_ids"]
     if not requested or len(set(requested)) != len(requested):
         raise ValueError("预测需显式列出不重复病例，禁止自动处理全部队列")
+    role = "predict" if evaluation_role == "test" else "candidate_validation"
     candidates = {r["case_id"]: r for r in manifest["cases"]
-                  if r["role"] == "predict" or (small and r["role"] == "candidate_validation")}
+                  if r["role"] == role or (small and r["role"] == "candidate_validation")}
     rows = [candidates[key] for key in requested]
     rows, exclusions = usable_cases(rows, config)
     if not rows:
@@ -94,6 +101,8 @@ def predict(config, manifest):
     started = perf_counter()
     run_identity = identity({"task": task, "weights": [(d, signature(p)) for d, p in zip(descriptors, weight_paths)],
                              "inputs": [p["identity"] for p in receipts], "direction": review, "coverage": coverage})
+    if "decision_threshold" in settings or "evaluation_role" in settings:
+        run_identity = identity({"base": run_identity, "threshold": threshold, "evaluation_role": evaluation_role})
     directory.mkdir(parents=True, exist_ok=True)
     results = [{"case_id": row["case_id"], "patient_key": row["patient_key"], "task": task,
                 "preprocessing_id": receipt["identity"], "members": [], "ensemble_mode": settings["ensemble_mode"]}
@@ -104,6 +113,12 @@ def predict(config, manifest):
         for descriptor in descriptors:
             model = build_model(task)
             provenance = load_weights(model, descriptor, task)
+            if "training_patient_keys" in provenance:
+                forbidden = set(provenance["training_patient_keys"])
+                if evaluation_role == "test" and not small:
+                    forbidden.update(provenance["validation_patient_keys"])
+                if forbidden.intersection(row["patient_key"] for row in rows):
+                    raise ValueError("预测病例与该成员实际训练或模型选择患者重叠")
             if "cohort_identity" in provenance:
                 local_cohorts.add(provenance["cohort_identity"])
                 if provenance["seed"] in local_seeds or len(local_cohorts) > 1:
@@ -135,7 +150,7 @@ def predict(config, manifest):
         confirmed_truth, confirmed_probability = [], []
         for row, result in zip(rows, results):
             probability = sum(x["probability"] for x in result["members"]) / count
-            label = int(probability > 0.5)
+            label = int(probability > threshold)
             reference = truths.get(row["patient_key"], {})
             labels = reference.get("labels", {})
             truth = labels.get(task)
@@ -158,8 +173,9 @@ def predict(config, manifest):
             if confirmed_value is not None:
                 confirmed_truth.append(confirmed_value)
                 confirmed_probability.append(probability)
-        report = {"identity": run_identity, "task": task, "results": results, "metrics": metrics(valid_truth, valid_probability),
-                  "test_only": bool(small),
+        report = {"identity": run_identity, "task": task, "results": results, "metrics": metrics(valid_truth, valid_probability, threshold),
+                  "decision_threshold": threshold, "evaluation_role": evaluation_role,
+                  "test_only": bool(small) or config.get("run_purpose") == "smoke",
                   "localization_exclusions": exclusions,
                   "unknown_or_inapplicable": len(results) - len(valid_truth), "memory": memory,
                   "seconds": perf_counter() - started, "initialization_members": count,
@@ -167,7 +183,7 @@ def predict(config, manifest):
                   "direction_status": review["direction_status"],
                   "evaluation_scope": "exploratory_predictions_with_" + label_policy + "_reference_only",
                   "label_policy": label_policy,
-                  "confirmed_reference_metrics": metrics(confirmed_truth, confirmed_probability),
+                  "confirmed_reference_metrics": metrics(confirmed_truth, confirmed_probability, threshold),
                   "paper_performance_validated": False, "clinical_diagnostic_validity": "not_established"}
         if len(json.dumps(report, ensure_ascii=False).encode("utf-8")) * 2 > budget:
             raise OSError("预测结果超过获准保存预算")

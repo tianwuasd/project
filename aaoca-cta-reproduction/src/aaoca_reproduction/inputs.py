@@ -24,7 +24,7 @@ def bound_manifest(portable, config):
     del result["portable_schema"]
     seen, aliases, roles = set(), {}, {}
     for row in result["cases"]:
-        if row["case_id"] in seen or row["dataset"] not in {"aaoca", "imagechd"}:
+        if row["case_id"] in seen or row["dataset"] not in {"aaoca", "imagechd", "chd1282"}:
             raise ValueError("迁移病例重复或数据集未知")
         seen.add(row["case_id"])
         if row["role"] not in {"candidate_train", "candidate_validation", "predict"}:

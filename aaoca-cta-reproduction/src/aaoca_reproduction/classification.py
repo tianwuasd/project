@@ -13,7 +13,7 @@ LABEL_MAPS = {"aaoca_present": {"0": "normal_origin", "1": "AAOCA"},
               "origin_left": {"0": "anomalous_right_coronary", "1": "anomalous_left_coronary_system"},
               "high_risk": {"0": "paper_low_risk_course", "1": "interarterial_or_subpulmonic"}}
 LEARNING_RATES = {"paper_lr_1e-3": 0.001, "release_default_lr_1e-4": 0.0001}
-TRAINING_STRATEGIES = {"local_from_scratch", "author_detection_transfer", "local_detection_transfer"}
+TRAINING_STRATEGIES = {"local_from_scratch", "author_detection_transfer", "local_detection_transfer", "author_detector_finetune"}
 
 
 def training_strategy(settings, task):
@@ -24,6 +24,12 @@ def training_strategy(settings, task):
     if strategy == "local_from_scratch":
         if task != "aaoca_present" or parent is not None:
             raise ValueError("从头策略仅适用无父权重的检测训练")
+    elif strategy == "author_detector_finetune":
+        if task != "aaoca_present" or parent is None or parent["format"] != "author_state_dict":
+            raise ValueError("检测微调必须使用作者检测任务的真实state_dict")
+        validate_descriptor(parent, "aaoca_present")
+        if parent["member_index"] != settings["member_index"]:
+            raise ValueError("检测微调的初始化成员与实际父成员不一致")
     else:
         expected = "author_state_dict" if strategy == "author_detection_transfer" else "local_complete_checkpoint"
         if task == "aaoca_present" or parent is None or parent["format"] != expected:
@@ -113,7 +119,10 @@ def validate_descriptor(descriptor, task):
 
 def load_weights(model, descriptor, task):
     path, stamp = validate_descriptor(descriptor, task)
-    value = torch.load(path, map_location="cpu", weights_only=True)
+    memory_map = descriptor.get("memory_map", False)
+    if not isinstance(memory_map, bool):
+        raise ValueError("权重memory_map须为布尔值")
+    value = torch.load(path, map_location="cpu", weights_only=True, mmap=memory_map)
     provenance = {"descriptor": descriptor, "file_stat": stamp}
     if descriptor["format"] == "local_complete_checkpoint":
         validate_model_metadata(value["model_meta"], task)
@@ -127,7 +136,9 @@ def load_weights(model, descriptor, task):
             raise ValueError("检测初始化权重的实际患者来源与声明不一致")
         provenance.update(member_index=value["state"]["member_index"], seed=value["state"]["seed"],
                           cohort_identity=value["state"]["cohort_identity"], initialization=value["initialization"],
-                          strategy=value["state"]["strategy"])
+                          strategy=value["state"]["strategy"],
+                          training_patient_keys=value["state"]["training_patient_keys"],
+                          validation_patient_keys=value["state"]["validation_patient_keys"])
         weights = value["model"]
     elif descriptor["format"] == "author_state_dict":
         weights = value

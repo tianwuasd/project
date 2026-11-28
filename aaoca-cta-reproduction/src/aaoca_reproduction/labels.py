@@ -10,7 +10,7 @@ from .exclusions import usable_cases
 TASKS = ("aaoca_present", "origin_left", "high_risk")
 COLUMNS = ("patient_key", *TASKS, "reviewer", "reference", "review_status", "ct_matched")
 CERTAINTY_COLUMNS = dict(zip(TASKS, ("aaoca_certainty", "origin_certainty", "risk_certainty")))
-POLICIES = ("confirmed", "document_explicit", "research_sources")
+POLICIES = ("confirmed", "document_explicit", "research_sources", "patient_research")
 TASK_PREFIXES = dict(zip(TASKS, ("aaoca", "origin", "risk")))
 
 
@@ -42,7 +42,18 @@ def read_label_rows(path, sheet=None):
             raise ValueError("CSV不支持工作表参数")
         with path.open(encoding="utf-8-sig", newline="") as stream:
             reader = csv.reader(stream)
-            return _table(next(reader), reader)
+            headers = next(reader)
+            if {"patient_id", "Admission Num", "Inpatient Num", "aaoca_status", "aaoca_subtype",
+                    "comorbidity_exclusion", "CT_status"}.issubset(headers):
+                if len(headers) != len(set(headers)):
+                    raise ValueError("患者级研究CSV列名重复")
+                result = []
+                for values in reader:
+                    if len(values) != len(headers):
+                        raise ValueError("患者级研究CSV行宽不匹配")
+                    result.append(dict(zip(headers, values)))
+                return result
+            return _table(headers, reader)
     if path.suffix.lower() not in {".xlsx", ".xlsm"}:
         raise ValueError("诊断表仅支持CSV、XLSX或XLSM")
     from openpyxl import load_workbook
@@ -86,10 +97,12 @@ def validate_manifest(manifest):
         case_ids.add(case["case_id"])
         if case["role"] not in {"candidate_train", "candidate_validation", "predict"}:
             raise ValueError("冻结清单含未知角色")
-        if case["dataset"] not in {"aaoca", "imagechd"}:
+        if case["dataset"] not in {"aaoca", "imagechd", "chd1282"}:
             raise ValueError("冻结清单含未知数据集")
-        if case["dataset"] == "imagechd" and case["role"] != "predict" and imagechd_attestation(case) is None:
+        if case["dataset"] == "imagechd" and case["role"] != "predict" and not case.get("patient_research_reference") and imagechd_attestation(case) is None:
             raise ValueError("ImageCHD监督角色须有显式用户阴性确认")
+        if case["dataset"] == "chd1282" and not case.get("patient_research_reference"):
+            raise ValueError("CHD1282须有本次患者级研究参考来源")
         for alias in [patient, *case["aliases"]]:
             alias = _text(alias)
             if not alias or (alias in aliases and aliases[alias] != patient):
@@ -154,7 +167,9 @@ def ct_volume_binding(row, case, aaoca_root, task=None):
 
 def reviewed_labels(rows, manifest, policy="confirmed", registry=None, aaoca_root=None):
     if policy not in POLICIES:
-        raise ValueError("标签策略须为confirmed、document_explicit或research_sources")
+        raise ValueError("未知分类标签策略")
+    if policy == "patient_research":
+        return patient_research_labels(rows, manifest)
     aliases = {}
     cases = validate_manifest(manifest) if registry is None else registry
     seen = set()
@@ -254,6 +269,51 @@ def reviewed_labels(rows, manifest, policy="confirmed", registry=None, aaoca_roo
     return result
 
 
+def patient_research_labels(rows, manifest):
+    indexed = {}
+    for row in rows:
+        key = _text(row["patient_id"])
+        if not key or key in indexed:
+            raise ValueError("新CSV的patient_id为空或重复")
+        indexed[key] = row
+    result = {}
+    for case in validate_manifest(manifest):
+        reference = case["patient_research_reference"]
+        source_type = reference["source_type"]
+        if not _text(reference["reference"]) or reference["patient_key"] != case["patient_key"]:
+            raise ValueError("患者级研究来源缺少参考或病例对应")
+        labels = dict.fromkeys(TASKS)
+        if case["dataset"] == "aaoca":
+            if source_type != "curated_patient_csv":
+                raise ValueError("AAOCA阳性须来自新患者级研究CSV")
+            row = indexed[reference["source_row_id"]]
+            if (row["aaoca_status"] != "confirmed" or row["comorbidity_exclusion"] != "not_flagged"
+                    or row["CT_status"] != "Performed"
+                    or not set((_text(row["Admission Num"]), _text(row["Inpatient Num"]))).intersection(case["aliases"])):
+                raise ValueError("新CSV状态或实际患者映射不满足已批准的研究纳入条件")
+            labels.update(aaoca_present=1, origin_left={"R-AAOCA": 0, "L-AAOCA": 1}.get(row["aaoca_subtype"]))
+        else:
+            if (source_type != "user_attestation" or reference["confirmed_by"] != "user"
+                    or reference["aaoca_present"] != 0 or not reference["confirmed_on"]):
+                raise ValueError("阴性来源须保留用户对相应数据集的明确确认")
+            labels["aaoca_present"] = 0
+        bindings = {task: {"ct_matched": False, "available_ct_matched": False,
+                    "selected_ct_image": case["image"], "matched_ct_images": [],
+                    "ct_match_reference": None,
+                    "ct_binding_state": "patient_level_research_selected_scan_same_study_unverified"}
+                    for task in TASKS}
+        result[case["patient_key"]] = {"labels": labels, "research_labels": labels,
+            "confirmed_labels": dict.fromkeys(TASKS), "confirmed_raw_labels": dict.fromkeys(TASKS),
+            "label_policy": "patient_research", "source_type": source_type,
+            "reference": reference["reference"], "review_status": "patient_level_research", "reviewer": "",
+            "certainty": {task: "explicit" if value is not None else "unknown" for task, value in labels.items()},
+            "source_fields": deepcopy(reference), "ct_bindings": bindings,
+            "supervision_scope": "patient_level_label_on_selected_scan_not_study_confirmed",
+            "reference_positive_aaoca": labels["aaoca_present"] == 1, "confirmed_positive_aaoca": False,
+            "ct_match_status": "same_study_unverified", **bindings["aaoca_present"]}
+    return result
+
+
 def summarize_registry_labels(rows, registry, manifest, aaoca_root=None):
     selected = {case["patient_key"]: case["image"] for case in validate_manifest(manifest) if case["dataset"] == "aaoca"}
     candidates = [{**patient, **({"image": selected[patient["patient_key"]]} if patient["patient_key"] in selected else {})}
@@ -303,10 +363,10 @@ def task_partitions(config, manifest, task):
         if case["role"] not in partitions or review is None:
             continue
         target = review["labels"][task]
-        if review["ct_bindings"][task]["ct_matched"] and target in (0, 1):
+        if (policy == "patient_research" or review["ct_bindings"][task]["ct_matched"]) and target in (0, 1):
             item = deepcopy(case)
             item["target"] = target
-            if policy in {"document_explicit", "research_sources"} or review["ct_binding_state"] == "legacy_confirmed_attestation":
+            if policy in {"document_explicit", "research_sources", "patient_research"} or review["ct_binding_state"] == "legacy_confirmed_attestation":
                 item["label_provenance"] = {key: review[key] for key in
                     ("label_policy", "source_type", "reference", "certainty", "review_status", "reviewer", "ct_matched", "ct_match_status",
                      "selected_ct_image", "matched_ct_images", "ct_match_reference", "ct_binding_state")}
@@ -314,8 +374,9 @@ def task_partitions(config, manifest, task):
             partitions[case["role"]].append(item)
     for partition in partitions.values():
         if config.get("run_purpose") == "smoke":
-            if not partition or len(cases) > 2 or not 1 <= config["classification"].get("max_update_attempts", 0) <= 2:
-                raise ValueError("小测仅允许两例及最多两次更新，训练和验证均需真实病例")
+            case_limit = config.get("smoke_case_limit", 2)
+            if case_limit not in (2, 3) or not partition or len(cases) > case_limit or not 1 <= config["classification"].get("max_update_attempts", 0) <= 2:
+                raise ValueError("小测须在明确的两例或三例范围及最多两次更新内，训练和验证均需真实病例")
             continue
         if {item["target"] for item in partition} != {0, 1}:
             raise ValueError("任务" + task + "按" + policy + "策略的训练集与验证集须各有CT匹配的0/1两类")

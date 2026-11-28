@@ -94,3 +94,19 @@ class AuthorAugmentation:
         if not torch.isfinite(span) or span.item() == 0:
             raise ValueError("TorchIO作者分支归一化遇到常量或非有限输入")
         return (image - image.min()) / span
+
+
+class SourceRobustAugmentation:
+    def __init__(self):
+        self.author = AuthorAugmentation(probability=0.15)
+        self.style = tio.Compose([
+            tio.RandomGamma(log_gamma=(-0.15, 0.15), p=0.3),
+            tio.RandomNoise(mean=0, std=(0, 0.015), p=0.3),
+            tio.RandomBlur(std=(0, 0.6), p=0.2),
+            tio.RandomAnisotropy(axes=(0, 1, 2), downsampling=(1, 1.5), p=0.2)])
+
+    def __call__(self, array):
+        image = self.author(array)
+        image = self.style(image[None]).squeeze(0)
+        # 同一范围用于所有来源；不改变几何、左右含义或引入来源特定参数。
+        return image.clamp(0, 1).to(dtype=torch.float32)

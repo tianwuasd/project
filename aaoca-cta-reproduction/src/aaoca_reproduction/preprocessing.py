@@ -53,7 +53,15 @@ def network_tensor(array):
 def preprocessing_identity(case, recipe):
     source = {name: case.get(name) for name in ("case_id", "dataset", "image", "label", "source_stat",
                                                 "spacing_xyz", "spacing_evidence", "localization")}
+    if "spatial_binding" in case:
+        source["spatial_binding"] = case["spatial_binding"]
     return identity({"source": source, "method": recipe})
+
+
+def array_statistics(array):
+    return {"mean": float(array.mean()), "std": float(array.std()),
+            "q05_q50_q95": np.quantile(array, [0.05, 0.5, 0.95]).tolist(),
+            "zero_fraction": float(np.count_nonzero(array == 0) / array.size)}
 
 
 def resample_crop(crop, crop_affine, verify_author=False, reference_affine=None):
@@ -205,6 +213,7 @@ def prepare_classification(case, config, directory, verify_author=False):
         tic = perf_counter()
         normalized, geometry = resample_crop(crop, np.asarray(crop_record["crop_affine"]), verify_author,
                                              reference_affine=crop_record.get("target_affine"))
+        statistics = array_statistics(normalized)
         timings["resample_normalize_seconds"] = perf_counter() - tic
         output_bytes = normalized.nbytes * 3
         if output_bytes > config["max_work_bytes"] or psutil.disk_usage(str(directory)).free < output_bytes:
@@ -222,6 +231,7 @@ def prepare_classification(case, config, directory, verify_author=False):
         pending_training.replace(training)
         timings["save_seconds"] = perf_counter() - tic
     record = {"identity": key, "case_id": case["case_id"], "method": recipe, "stage": "normalized_xyz",
+              "input_statistics": statistics,
               "reused": False, "crop": crop_record, "geometry": geometry, "timing": timings,
               "measurement": measured, "resources": applied_resources, "memory_guard": guarded,
               "resample_memory_estimate": memory_estimate,

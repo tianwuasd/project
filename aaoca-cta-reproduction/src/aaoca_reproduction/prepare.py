@@ -19,6 +19,20 @@ LABEL_PATH_LOCK = threading.RLock()
 
 def effective_affine(image, case):
     affine = image.affine.copy()
+    if case["dataset"] == "chd1282":
+        binding = case.get("spatial_binding")
+        if not binding or binding["array_alignment"] != "shared_index_research_policy" or not binding["reference"]:
+            raise ValueError("CHD1282缺少已有方向/数组配对依据，须先绑定整理成果")
+        direction = np.asarray(binding["direction_matrix_RAS"], dtype=float)
+        spacing = np.asarray(case["spacing_xyz"], dtype=float)
+        if (direction.shape != (3, 3) or not np.isfinite(direction).all()
+                or not np.allclose(direction.T @ direction, np.eye(3), atol=1e-5)
+                or spacing.shape != (3,) or not np.isfinite(spacing).all() or np.any(spacing <= 0)):
+            raise ValueError("CHD1282方向矩阵和作者间距无效")
+        if binding["origin_policy"] != "local_zero" or binding["intensity_policy"] not in {"source_values_assumed_HU", "verified_HU"}:
+            raise ValueError("CHD1282须明确局部原点与真实强度依据范围")
+        affine = np.eye(4)
+        affine[:3, :3] = direction * spacing
     if case["dataset"] == "imagechd":
         direction = affine[:3, :3] / np.linalg.norm(affine[:3, :3], axis=0)
         affine[:3, :3] = direction * np.asarray(case["spacing_xyz"])
@@ -44,13 +58,18 @@ def ascii_label(path, directory):
 
 
 def load_localization(case, image, directory, allow_missing=False):
-    if case["dataset"] == "imagechd":
+    if case["dataset"] in {"imagechd", "chd1282"}:
         label = nib.load(case["label"])
-        if label.shape != image.shape or not np.allclose(label.affine, image.affine, atol=1e-5, rtol=0):
+        if label.shape != image.shape:
+            raise ValueError("影像与解剖标签数组尺寸不匹配")
+        if case["dataset"] == "imagechd" and not np.allclose(label.affine, image.affine, atol=1e-5, rtol=0):
             raise ValueError("ImageCHD影像与标签网格不匹配")
+        if case["dataset"] == "chd1282":
+            effective_affine(image, case)
         data = np.asanyarray(label.dataobj)
-        return data == 1, data == 6, {"LV": {"name": "LV", "value": 1, "layer": 0},
-                                     "AO": {"name": "AO", "value": 6, "layer": 0}}
+        ao_value = 5 if case["dataset"] == "chd1282" else 6
+        return data == 1, data == ao_value, {"LV": {"name": "LV", "value": 1, "layer": 0},
+                                             "AO": {"name": "AO", "value": ao_value, "layer": 0}}
     with ascii_label(case["label"], directory) as link:
         label = sitk.ReadImage(str(link))
     if label.GetDimension() != 3:
@@ -130,7 +149,7 @@ def center_of_interest(lv, aorta, config=None, memory_plan=None):
 
 def localization_memory_plan(case, image, directory):
     voxels = int(np.prod(image.shape))
-    if case["dataset"] == "imagechd":
+    if case["dataset"] in {"imagechd", "chd1282"}:
         label = nib.load(case["label"])
         itemsize = label.get_data_dtype().itemsize
         if label.dataobj.slope != 1 or label.dataobj.inter != 0:
@@ -180,6 +199,8 @@ def crop_in_memory(case, config, directory, verify_center=False, allow_missing=F
         if signature(case[key]) != case["source_stat"][key]:
             raise ValueError("冻结后输入影像或标签的文件状态已变化")
     image = nib.load(case["image"])
+    # 在读取标签和CT像素前核对新增来源的方向依据。
+    effective_affine(image, case)
     directory.mkdir(parents=True, exist_ok=True)
     check_work(config)
     allocations, components = localization_memory_plan(case, image, directory)
@@ -260,6 +281,8 @@ def crop_in_memory(case, config, directory, verify_center=False, allow_missing=F
                   "spacing_evidence": case.get("spacing_evidence", "native_CT_geometry"),
                   "orientation_policy": config["imagechd_orientation_policy"] if case["dataset"] == "imagechd" else "native_CT_header",
                   "source_header_affine": image.affine.tolist(), "effective_source_affine": affine.tolist(),
+                  "spatial_binding": case.get("spatial_binding"),
+                  "coordinate_origin_scope": "arbitrary_local_origin" if case["dataset"] == "chd1282" else "source_header_origin",
                   "center_index": center.tolist(), "center_mode": center_mode,
                   "offset_index_voxels": offset.tolist(), "offset_RAS_mm": (affine[:3, :3] @ offset).tolist(),
                   "target_affine": target_affine.tolist() if physical else None,

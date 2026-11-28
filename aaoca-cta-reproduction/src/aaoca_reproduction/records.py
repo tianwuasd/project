@@ -46,6 +46,11 @@ def load_config(path):
         value["input_manifest"] = (path.parent / value["input_manifest"]).resolve()
     for key in ("aaoca_root", "aaoca_pairs", "imagechd_root", "imagechd_manifest"):
         value[key] = (path.parent / value[key]).resolve()
+    for key in ("chd1282_root", "chd1282_manifest", "geometry_bindings", "author_archive"):
+        if value.get(key) is not None:
+            value[key] = (path.parent / value[key]).resolve()
+    if value.get("diagnoses") is not None:
+        value["diagnoses"] = str((path.parent / value["diagnoses"]).resolve())
     if not 0 < value["host_memory_fraction"] <= 0.8:
         raise ValueError("本任务整机内存预算必须在0到80%之间")
     if not 0 < value["max_memory_bytes"] <= 100_000_000_000:
@@ -68,13 +73,13 @@ def classification_for_task(existing, task, prediction_case_ids):
         for key in ("strategy", "pretrained_detection", "weights"):
             value.pop(key, None)
     else:
-        strategies = {"local_from_scratch"} if task == "aaoca_present" else {"author_detection_transfer", "local_detection_transfer"}
+        strategies = {"local_from_scratch", "author_detector_finetune"} if task == "aaoca_present" else {"author_detection_transfer", "local_detection_transfer"}
         if "strategy" in value and value["strategy"] not in strategies:
             raise ValueError("已有初始化策略不适用于当前分类任务")
         if any(weight["task"] != task for weight in value.get("weights", [])):
             raise ValueError("已有预测权重的任务声明与当前任务不符")
         if value.get("pretrained_detection") is not None and (
-                task == "aaoca_present" or value["pretrained_detection"]["task"] != "aaoca_present"):
+                (task == "aaoca_present" and value.get("strategy") != "author_detector_finetune") or value["pretrained_detection"]["task"] != "aaoca_present"):
             raise ValueError("检测父权重只适用于子任务且必须声明检测任务")
     value.update(task=task, prediction_case_ids=list(prediction_case_ids))
     return value

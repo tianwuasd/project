@@ -119,6 +119,8 @@ def model_resource_plan(config, training):
     with torch.device("meta"):
         model = build_model(settings["task"])
     parameters = sum(p.numel() for p in model.parameters())
+    fine = training and settings.get("strategy") == "author_detector_finetune"
+    trainable_parameters = sum(p.numel() for module in (model.layer4, model.last_linear) for p in module.parameters()) if fine else parameters
     state_bytes = sum(t.numel() * t.element_size() for t in model.state_dict().values())
     small = smoke_shape(config)
     shape = (small[2], small[0], small[1]) if small else (85, 215, 215)
@@ -144,7 +146,10 @@ def model_resource_plan(config, training):
                 size = math.ceil(raw) if layer.ceil_mode else math.floor(raw)
                 output.append(size - 1 if layer.ceil_mode and (size - 1) * s >= n + p else size)
             shape = tuple(output)
+    last_stage_start = 0
     for stage in (model.layer1, model.layer2, model.layer3, model.layer4):
+        if stage is model.layer4:
+            last_stage_start = len(activation_sizes)
         for block in stage:
             incoming = shape
             for component in (block.conv1, block.conv2, block.conv3):
@@ -153,10 +158,12 @@ def model_resource_plan(config, training):
                 convolution(block.project.conv, incoming)
     input_bytes = batch * (math.prod(small) if small else 85 * 215 * 215) * 4
     activation_estimate = sum(activation_sizes) * 6 + input_bytes * 4 if training else max(activation_sizes) * 3 + input_bytes * 2
-    device_working = state_bytes * (4 if training else 1) + activation_estimate
+    if fine:
+        activation_estimate = max(activation_sizes) * 3 + sum(activation_sizes[last_stage_start:]) * 6 + input_bytes * 4
+    device_working = state_bytes + (trainable_parameters * 12 if training else 0) + activation_estimate
     cpu = torch.device(settings["device"]).type == "cpu"
     host_working = device_working if cpu else state_bytes * 3 + input_bytes * 4
-    plan = {"parameter_count": parameters, "state_tensor_bytes": state_bytes,
+    plan = {"parameter_count": parameters, "trainable_parameter_count": trainable_parameters, "state_tensor_bytes": state_bytes,
             "input_bytes": input_bytes, "activation_working_estimate_bytes": activation_estimate,
             "estimated_host_working_bytes": host_working, "estimated_gpu_working_bytes": device_working,
             "checkpoint_capacity_estimate_bytes": (parameters * 16 + 8 * 2**20) * 4,

@@ -9,6 +9,7 @@ import numpy as np
 import torch
 
 from .augmentations import AuthorAugmentation
+from .finetuning import make_optimizer, set_training_phase, settings_for_finetuning
 from .classification import LEARNING_RATES, build_model, coverage_reviews, load_weights, model_contract, model_metadata, require_direction_review, training_strategy, validate_model_metadata
 from .data import guard_inputs, load_batch, prepared_receipt
 from .labels import task_partitions
@@ -83,6 +84,7 @@ def train(config, manifest, resume=False):
     code = code_provenance()
     task = settings["task"]
     strategy = training_strategy(settings, task)
+    fine = settings_for_finetuning(settings)
     meta = model_metadata(task)
     if settings["learning_rate_recipe"] not in LEARNING_RATES:
         raise ValueError("必须具名选择论文或发布版学习率")
@@ -113,7 +115,7 @@ def train(config, manifest, resume=False):
         known_training = set(pretrained["training_patient_keys"])
         if not known_training or known_training.intersection(row["patient_key"] for row in validation_rows):
             raise ValueError("检测初始化患者来源缺失或与当前验证患者重叠")
-    elif pretrained is not None:
+    elif pretrained is not None and fine is None:
         raise ValueError("作者检测配方需要从头初始化")
     directory = Path(settings["run_directory"]).resolve()
     course = Path(config["course_root"]).resolve()
@@ -129,13 +131,31 @@ def train(config, manifest, resume=False):
     run_identity = identity({"settings": semantic_settings, "model": model_contract(task), "direction": direction, "coverage": coverage,
                              "train": [(r["patient_key"], r["target"], p["identity"]) for r, p in zip(train_rows, train_inputs)],
                              "validation": [(r["patient_key"], r["target"], p["identity"]) for r, p in zip(validation_rows, validation_inputs)]})
-    if config.get("label_policy", "confirmed") in {"document_explicit", "research_sources"}:
+    if config.get("label_policy", "confirmed") in {"document_explicit", "research_sources", "patient_research"}:
         run_identity = identity({"base": run_identity, "label_policy": config["label_policy"],
                                  "labels": [(row["patient_key"], row["label_provenance"])
                                             for row in train_rows + validation_rows]})
     if config.get("training_policy") == "local_adaptation" or small:
         run_identity = identity({"base": run_identity, "training_policy": config.get("training_policy"),
                                  "run_purpose": config.get("run_purpose", "training")})
+    if resume:
+        inspected_at = perf_counter()
+        # 完成成员只读取真实检查点元数据，不再为模型与优化器预留整套工作内存。
+        completed = torch.load(latest, map_location="cpu", weights_only=True, mmap=True)
+        if completed["schema"] != 1 or completed["identity"] != run_identity:
+            raise ValueError("恢复检查点的输入、方法、模型或配置身份不匹配")
+        validate_model_metadata(completed["model_meta"], task)
+        if completed["state"]["strategy"] != strategy:
+            raise ValueError("恢复检查点的实际训练策略不符")
+        if completed["state"]["complete"]:
+            attempts = json.loads(attempts_path.read_text(encoding="utf-8"))
+            if (attempts["schema"] != 1 or attempts["identity"] != run_identity
+                    or type(attempts["attempted_updates"]) is not int
+                    or attempts["attempted_updates"] < completed["state"]["attempted_updates"]):
+                raise ValueError("完成成员的更新次数记录与检查点不一致")
+            return {"directory": str(directory), "identity": run_identity, "state": completed["state"],
+                    "reused_complete_member": True, "seconds_this_invocation": perf_counter() - inspected_at}
+        del completed
     resources = configure_cpu(config)
     admission = admit_model(config)
     budget = budget if budget is not None else admission["plan"]["checkpoint_capacity_estimate_bytes"]
@@ -153,9 +173,13 @@ def train(config, manifest, resume=False):
         initialization = {"source": "MONAI_Kaiming_from_scratch", "seed": seed, "code": code}
         if not resume and pretrained is not None:
             initialization = load_weights(model, pretrained, "aaoca_present")
-        optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATES[settings["learning_rate_recipe"]], weight_decay=0.01)
+        optimizer = make_optimizer(model, fine, LEARNING_RATES[settings["learning_rate_recipe"]])
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=int(0.75 * epochs), eta_min=1e-6)
-        augmentation = AuthorAugmentation(probability=0.15)
+        if settings.get("augmentation", "author") == "source_robust_v1":
+            from .augmentations import SourceRobustAugmentation
+            augmentation = SourceRobustAugmentation()
+        else:
+            augmentation = AuthorAugmentation(probability=0.15)
         state = {"epoch": 0, "phase": "train", "order": [], "cursor": 0,
                  "train_loss_sum": 0.0, "train_batches": 0, "val_loss_sum": 0.0, "val_batches": 0,
                  "attempted_updates": 0, "successful_updates": 0, "best_loss": float("inf"),
@@ -167,7 +191,9 @@ def train(config, manifest, resume=False):
                  "cohort_identity": identity({"task": task,
                      "train": [(r["patient_key"], r["target"], p["identity"]) for r, p in zip(train_rows, train_inputs)],
                      "validation": [(r["patient_key"], r["target"], p["identity"]) for r, p in zip(validation_rows, validation_inputs)]})}
-        if config.get("label_policy", "confirmed") in {"document_explicit", "research_sources"}:
+        if fine is not None:
+            state.update(best_average_precision=-1.0, val_targets=[], val_probabilities=[])
+        if config.get("label_policy", "confirmed") in {"document_explicit", "research_sources", "patient_research"}:
             state["label_policy"] = config["label_policy"]
         if any("label_provenance" in row for row in train_rows + validation_rows):
             state["label_sources"] = {row["patient_key"]: row["label_provenance"]
@@ -214,8 +240,8 @@ def train(config, manifest, resume=False):
             save_checkpoint(latest, model, optimizer, scheduler, state, run_identity, meta, initialization)
         with (directory / "events.jsonl").open("a", encoding="utf-8") as log:
             while state["epoch"] < epochs and not state["complete"]:
+                phase = set_training_phase(model, fine, state["epoch"])
                 if state["phase"] == "train":
-                    model.train()
                     if not state["order"]:
                         state["order"] = np.random.permutation(len(train_rows)).tolist()
                     while state["cursor"] < len(state["order"]):
@@ -258,10 +284,14 @@ def train(config, manifest, resume=False):
                         while state["cursor"] < len(validation_rows):
                             indices = list(range(state["cursor"], min(state["cursor"] + batch_size, len(validation_rows))))
                             images, targets = load_batch(validation_rows, validation_inputs, indices, smoke_shape=small)
-                            loss = loss_function(model(images.to(device)), targets.to(device))
+                            logits = model(images.to(device))
+                            loss = loss_function(logits, targets.to(device))
                             if not torch.isfinite(loss):
                                 raise ValueError("验证损失不是有限值")
                             state["val_loss_sum"] += float(loss.item())
+                            if fine is not None:
+                                state["val_targets"].extend(targets.reshape(-1).tolist())
+                                state["val_probabilities"].extend(torch.sigmoid(logits).reshape(-1).cpu().tolist())
                             state["val_batches"] += 1
                             state["cursor"] += len(indices)
                             if state["val_batches"] % checkpoint_interval == 0:
@@ -270,18 +300,33 @@ def train(config, manifest, resume=False):
                     train_loss = state["train_loss_sum"] / state["train_batches"]
                     validation_loss = state["val_loss_sum"] / state["val_batches"]
                     scheduler.step()
-                    improved = validation_loss <= state["best_loss"]
+                    score = None
+                    if fine is not None and len(set(state["val_targets"])) == 2:
+                        from sklearn.metrics import average_precision_score
+                        score = float(average_precision_score(state["val_targets"], state["val_probabilities"]))
+                        improved = (score > state["best_average_precision"] or
+                                    (score == state["best_average_precision"] and validation_loss <= state["best_loss"]))
+                    else:
+                        improved = validation_loss <= state["best_loss"]
                     state["bad_epochs"] = 0 if improved else state["bad_epochs"] + 1
                     if improved:
                         state["best_loss"] = validation_loss
+                        if fine is not None and score is not None:
+                            state["best_average_precision"] = score
                     state["epoch"] += 1
                     state.update(phase="train", cursor=0, order=[], train_loss_sum=0.0, train_batches=0,
                                  val_loss_sum=0.0, val_batches=0,
-                                 complete=state["bad_epochs"] >= 100 or state["epoch"] >= epochs)
+                                 complete=state["bad_epochs"] >= (fine["patience"] if fine is not None else 100) or state["epoch"] >= epochs)
+                    if fine is not None:
+                        state.update(val_targets=[], val_probabilities=[])
                     record = {"epoch": state["epoch"], "train_loss_mean_of_batches": train_loss,
                               "validation_loss_mean_of_batches": validation_loss, "improved_or_equal": improved,
                               "successful_updates": state["successful_updates"], "lr": optimizer.param_groups[0]["lr"],
                               "elapsed_seconds": perf_counter() - started}
+                    if fine is not None:
+                        record.update(validation_average_precision=score, training_phase=phase,
+                                      selection_metric="average_precision_then_validation_loss" if score is not None else
+                                      "smoke_single_class_validation_loss_no_performance_claim")
                     log.write(json.dumps(record, ensure_ascii=False) + "\n")
                     log.flush()
                     event("classification_epoch_completed", **record)
